@@ -4,15 +4,21 @@
 
 As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0) Netdata comes with some ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box with minimal configuration required.
 
-🚧 **Note**: This functionality is still under active development and may face breaking changes. It is considered experimental while we dogfood it internally and among early adopters within the Netdata community. We would like to develop and build on these foundational ML capabilities in the open with the community so if you would like to get involved and help us with some feedback please feel free to email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
+🚧 **Note**: This functionality is still under active development and considered experimental. Changes might cause the feature to break. We dogfood it internally and among early adopters within the Netdata community to build the feature. If you would like to get involved and help us with some feedback please feel free to email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 
 Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of potentially anomalous patterns in recent observations as opposed to just point anomalies like big spikes or drops ([this infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies). 
 
-The sections below will introduce some of the main concepts - **anomaly score**, **anomaly bit**, **anomaly rate** and **anomaly detector**. Additional explanations and details can be found in the [Glossary](#glossary) and [Notes](#notes) at the bottom of the page.
+The sections below will introduce some of the main concepts: 
+- anomaly bit
+- anomaly score
+- anomaly rate
+- anomaly detector
+
+Additional explanations and details can be found in the [Glossary](#glossary) and [Notes](#notes) at the bottom of the page.
 
 ### Anomaly Bit - (100 = Anomalous, 0 = Normal)
 
-Once each model is trained, Netdata will begin producing an ["anomaly score"](#anomaly-score) at each timestep for each dimension. This ["anomaly score"](#anomaly-score) is essentially a distance measure to the trained cluster centers of the model (by default each model has k=2, so two cluster centers are learned). More anomalous looking data should be more distant to those cluster centers. If this ["anomaly score"](#anomaly-score) is sufficiently large this is a sign that the recent raw values of the dimension could potentially be anomalous. By default, "sufficiently large" means that the distance is in the 99th percentile or above of all distances observed during training or, put another way, it has to be further away than the furthest 1% of the data used during training. Once this threshold is passed the ["anomaly bit"](#anomaly-bit) corresponding to that dimension is set to 100 to flag it as anomalous, otherwise it would be left at 0 to signal normal data.
+Once each model is trained, Netdata will begin producing an ["anomaly score"](#anomaly-score) at each time step for each dimension. This ["anomaly score"](#anomaly-score) is essentially a distance measure to the trained cluster centers of the model (by default each model has k=2, so two cluster centers are learned). More anomalous looking data should be more distant to those cluster centers. If this ["anomaly score"](#anomaly-score) is sufficiently large, this is a sign that the recent raw values of the dimension could potentially be anomalous. By default, "sufficiently large" means that the distance is in the 99th percentile or above of all distances observed during training or, put another way, it has to be further away than the furthest 1% of the data used during training. Once this threshold is passed, the ["anomaly bit"](#anomaly-bit) corresponding to that dimension is set to 100 to flag it as anomalous, otherwise it would be left at 0 to signal normal data.
 
 What this means is that in addition to the raw value of each metric, Netdata now also would have available an ["anomaly bit"](#anomaly-bit) that is either 100 (anomalous) or 0 (normal). Importantly, this is achieved without additional storage overhead due to how the anomaly bit has been implemented within the existing internal Netdata storage representation.
 
@@ -56,7 +62,7 @@ Typically, the anomaly bit will mostly be 0 under normal circumstances with some
 
 ### Anomaly Rate - avg(anomaly bit)
 
-Once all models have been trained, we can think of the Netdata dashboard as essentially a big matrix or table of 0's and 100's. If we consider this "anomaly bit" based representation of the state of the node we can now think about how we might detect overall node level anomalies. Below is a picture to help illustrate the main ideas here.
+Once all models have been trained, we can think of the Netdata dashboard as essentially a big matrix or table of 0's and 100's. If we consider this "anomaly bit"-based representation of the state of the node, we can now think about how we might detect overall node level anomalies. The figure below illustrates the main ideas.
 
 ```
         dimensions
@@ -79,19 +85,19 @@ NAR        = Node Anomaly Rate
 NAR_t1-t10 = Node Anomaly Rate over t1 to t10
 ```
 
-Here we can just average a row or a column and work out an ["anomaly rate"](#anomaly-rate) in any direction. For example, if we were to just average along a row then this would be the ["node anomaly rate"](#node-anomaly-rate) (all dimensions) at time t. Likewise if we averaged a column then we would have the ["dimension anomaly rate"](#dimension-anomaly-rate) for each dimension over the time window t=1-10. Extending this idea we can work out an overall ["anomaly rate"](#anomaly-rate) for the whole matrix or any subset of it we might be interested in.
+ To work out an ["anomaly rate"](#anomaly-rate), we can just average a row or a column in any direction. For example, if we were to just average along a row then this would be the ["node anomaly rate"](#node-anomaly-rate) (all dimensions) at time t. Likewise if we averaged a column then we would have the ["dimension anomaly rate"](#dimension-anomaly-rate) for each dimension over the time window t=1-10. Extending this idea, we can work out an overall ["anomaly rate"](#anomaly-rate) for the whole matrix or any subset of it we might be interested in.
 
 ### Anomaly Detector - Node level anomaly events
 
-Netdata uses the concept of an ["anomaly detector"](#anomaly-detector) that looks at all the anomaly bits of the node and if a sufficient percentage of them are high enough for a persistent amount of time then an ["anomaly event"](#anomaly-event) will be produced. This anomaly event signals that there was sufficient evidence among all the anomaly bits that some strange behavior might have been detected in a more global sense across the node.
+ An ["anomaly detector"](#anomaly-detector) looks at all anomaly bits of a node. Netdata's anomaly detector produces an ["anomaly event"](#anomaly-event) when a the percentage of anomaly bits is high enough for a persistent amount of time. This anomaly event signals that there was sufficient evidence among all the anomaly bits that some strange behavior might have been detected in a more global sense across the node.
 
-Essentially if the ["Node Anomaly Rate"](#node-anomaly-rate) (NAR) passes a defined threshold and stays above that threshold for a persistent amount of time a "Node [Anomaly Event](#anomaly-event)" will be triggered.
+Essentially if the ["Node Anomaly Rate"](#node-anomaly-rate) (NAR) passes a defined threshold and stays above that threshold for a persistent amount of time, a "Node [Anomaly Event](#anomaly-event)" will be triggered.
 
 These anomaly events are currently exposed via `/api/v1/anomaly_events`
 
 https://london.my-netdata.io/api/v1/anomaly_events?after=1638365182000&before=1638365602000
 
-If an event exists within the window the result would be a list of start and end time's
+If an event exists within the window, the result would be a list of start and end times.
 
 ```
 [
@@ -102,7 +108,7 @@ If an event exists within the window the result would be a list of start and end
 ]
 ```
 
-Where information about each anomaly event can then be found at the `/api/v1/anomaly_event_info` endpoint (making sure to pass the `after` and `before` params): 
+Information about each anomaly event can then be found at the `/api/v1/anomaly_event_info` endpoint (making sure to pass the `after` and `before` params): 
 
 https://london.my-netdata.io/api/v1/anomaly_event_info?after=1638367788&before=1638367851
 
@@ -123,13 +129,16 @@ https://london.my-netdata.io/api/v1/anomaly_event_info?after=1638367788&before=1
     ...
 ```
 
-This returns a list of dimension anomaly rates for all dimensions that were considered part of the detected anomaly event.
+The query returns a list of dimension anomaly rates for all dimensions that were considered part of the detected anomaly event.
 
-**Note**: We plan to build additional anomaly detection and exploration features into both Netdata Agent and Netdata Cloud and so these endpoints are primarily to power these features and so still under active development.
+**Note**: We plan to build additional anomaly detection and exploration features into both Netdata Agent and Netdata Cloud. The current endpoints are still under active development to power the upcoming features.
 
 ## Configuration
 
-To enable anomaly detection all you need to do is set `enabled = yes` in the `[ml]` section of `netdata.conf` and restart netdata (typically `sudo systemctl restart netdata`).
+To enable anomaly detection:
+1. Find and open the Netdata configuration file `netdata.conf`.
+2. In the `[ml]` section, set `enabled = yes`.
+3. Restart netdata (typically `sudo systemctl restart netdata`).
 
 Below is a list of all the available configuration params and their default values.
 
@@ -246,4 +255,4 @@ The anomaly rate across all dimensions of a node.
 - Netdata uses [dlib](https://github.com/davisking/dlib) under the hood for its core ML features.
 - You should benchmark Netdata resource usage before and after enabling ML. Typical overhead ranges from 1-2% additional CPU at most.
 - The "anomaly bit" has been implemented to be a building block to underpin many more ML based use cases that we plan to deliver soon.
-- At its core Netdata uses an approach and problem formulation very similar to the Netdata python [anomalies collector](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies), just implemented in a much much more efficient and scalable way in the agent in c++. So if you would like to learn more about the approach and are familiar with Python that is a useful resource to explore, as is the corresponding [deepdive tutorial](https://nbviewer.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where the default model used is PCA instead of K-Means but the overall approach and formulation is similar.
+- At its core Netdata uses an approach and problem formulation very similar to the Netdata python [anomalies collector](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies), just implemented in a much much more efficient and scalable way in the agent in c++. So if you would like to learn more about the approach and are familiar with Python that is a useful resource to explore, as is the corresponding [deep dive tutorial](https://nbviewer.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where the default model used is PCA instead of K-Means but the overall approach and formulation is similar.
