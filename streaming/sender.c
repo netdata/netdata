@@ -360,26 +360,12 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     char *version_start = strchr(http, '=');
     int32_t version = -1;
     if(version_start) {
-        uint32_t capabilities = 0;
-        char *caps_start = NULL;
         version_start++;
-        version = (int32_t)strtol(version_start, &caps_start, 10);
+        version = (int32_t)strtol(version_start, NULL, 10);
         answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
         if(!answer) {
             rrdpush_set_flags_to_newest_stream(host);
         }
-        if (caps_start && *caps_start == '.') {
-            capabilities = (uint32_t)strtol(caps_start + 1, NULL, 10);
-        }
-#ifdef ENABLE_COMPRESSION
-        if (!(capabilities & STREAM_CAPABILITY_COMPRESSION)) {
-            // if parent doesn't support compression and this child does
-            // then disable compression for this child
-            default_compression_enabled = 0;
-            if (s->compressor) 
-                s->compressor->destroy(&s->compressor);
-        }
-#endif
     } else {
         answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
         if(!answer) {
@@ -402,15 +388,28 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         return 0;
     }
     s->version = version;
+
 #ifdef ENABLE_COMPRESSION
-    if (s->compressor)
-        s->compressor->reset(s->compressor);
-#endif
+    if(s->version >= STREAM_VERSION_COMPRESSION)
+    {
+        // parent supports compression
+        if(s->compressor)
+            s->compressor->reset(s->compressor);
+    }
+    else {
+        //parent does not support compression or has compression disabled
+        if (default_compression_enabled)
+            default_compression_enabled = 0;
+        if (s->compressor)
+            s->compressor->destroy(&s->compressor);
+    }        
+#endif  //ENABLE_COMPRESSION
+
 
     info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
          , host->hostname
          , s->connected_to
-         , version);
+         , s->version);
 
     if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
         error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, s->connected_to);

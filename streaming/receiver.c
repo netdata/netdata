@@ -520,12 +520,18 @@ static int rrdpush_receive(struct receiver_state *rpt)
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", rpt->host->hostname, rpt->client_ip, rpt->client_port);
     char initial_response[HTTP_HEADER_SIZE];
     if (rpt->stream_version > 1) {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
-        uint32_t capabilities = 0;
+        if(rpt->stream_version >= STREAM_VERSION_COMPRESSION){
 #ifdef ENABLE_COMPRESSION
-        capabilities |= default_compression_enabled ? STREAM_CAPABILITY_COMPRESSION : 0;
+            if(!default_compression_enabled)
+                rpt->stream_version = (STREAM_VERSION_COMPRESSION - 1);
+#else
+            if(STREAMING_PROTOCOL_CURRENT_VERSION < rpt->stream_version) {
+                rpt->stream_version =  STREAMING_PROTOCOL_CURRENT_VERSION;               
+            }
 #endif
-        sprintf(initial_response, "%s%u.%x", START_STREAMING_PROMPT_VN, rpt->stream_version, capabilities);
+        }
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
+        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, rpt->stream_version);
     } else if (rpt->stream_version == 1) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
