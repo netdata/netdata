@@ -56,22 +56,23 @@ Typically, the anomaly bit will mostly be 0 under normal circumstances with some
 
 ### Anomaly Rate - avg(anomaly bit)
 
-Once all models have been trained, we can think of the Netdata dashboard as essentially a big matrix or table of 0's and 100's. If consider this "anomaly bit" based representation of the state of the node we can now think about how we might detect overall node level anomalies. Below is a picture to help illustrate the main ideas here. 
+Once all models have been trained, we can think of the Netdata dashboard as essentially a big matrix or table of 0's and 100's. If we consider this "anomaly bit" based representation of the state of the node we can now think about how we might detect overall node level anomalies. Below is a picture to help illustrate the main ideas here.
 
 ```
-t	d1	d2	d3	d4	d5		NAR
-1	0	0	0	0	0		 0%
-2	0	0	0	0	100		20%
-3	0	0	0	0	0		 0%
-4	0	100	0	0	0		20%
-5	100	0	0	0	0		20%
-6	0	100	100	0	100		60%
-7	0	100	0	100	0		40%
-8	0	0	0	0	100		20%
-9	0	0	100	100	0		40%
-10	0	0	0	0	0		 0%
+            dimensions
+time    d1	d2	d3	d4	d5		NAR
+   1	0	0	0	0	0		 0%
+   2	0	0	0	0	100		20%
+   3	0	0	0	0	0		 0%
+   4	0	100	0	0	0		20%
+   5	100	0	0	0	0		20%
+   6	0	100	100	0	100		60%
+   7	0	100	0	100	0		40%
+   8	0	0	0	0	100		20%
+   9	0	0	100	100	0		40%
+   10	0	0	0	0	0		 0%
  
-DAR	10%	30%	20%	20%	30%		22% NAR_t1-t10
+DAR	    10%	30%	20%	20%	30%		22% NAR_t1-t10
 
 DAR        = Dim Anomaly Rate
 NAR        = Node Anomaly Rate
