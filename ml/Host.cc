@@ -391,7 +391,7 @@ void DetectableHost::detectOnce() {
             }
 
             /*regardless the dimension value was anomalous or not, update the value of the percentage of anomalous dimension*/            
-            D->setAnomalyPercentage((D->getAnomalousBitCount() / ((Cfg.SaveAnomalyPercentageEvery - AnomalyBitCounterWindow) * static_cast<double>(updateEvery()))) * 100.0);
+            D->setAnomalyPercentage((D->getAnomalousBitCount() / (abs(Cfg.SaveAnomalyPercentageEvery - AnomalyBitCounterWindow) * static_cast<double>(updateEvery()))) * 100.0);
             
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
@@ -433,7 +433,7 @@ void DetectableHost::detectOnce() {
         nlohmann::json JsonResult = DimsAnomalyRate;
 
         time_t Before = now_realtime_sec();
-        time_t After = Before - (Cfg.SaveAnomalyPercentageEvery * updateEvery());
+        time_t After = Before - ((Cfg.SaveAnomalyPercentageEvery-1) * updateEvery());
         
         DB.insertBulkAnomalyRateInfo(getUUID(), After, Before, JsonResult.dump(4));
         /*and reset the window size to restart down-counting*/
@@ -494,7 +494,7 @@ void DetectableHost::detect() {
 void DetectableHost::getAnomalyRateInfoCurrentRange(std::vector<std::pair<std::string, double>> &V, time_t After, time_t Before) {
     for (auto &DP : DimensionsMap) {
         Dimension *D = DP.second;
-        V.push_back({D->getID(), (D->getAnomalyPercentage() * (Before - After) / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery())))});
+        V.push_back({D->getID(), (D->getAnomalyPercentage() * abs(Before - After) / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery())))});
     }
 }
 
@@ -514,7 +514,7 @@ void DetectableHost::getAnomalyRateInfoMixedRange(std::vector<std::pair<std::str
             if( it != DimAndAnomalyRateInRange.end())
             {
                 double CurrentPercentage = (D->getAnomalyPercentage() * (Before - getLastSavedBefore()) / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery())));
-                V.push_back({D->getID(), ((CurrentPercentage * (Before - getLastSavedBefore())) + (it->second * (getLastSavedBefore() - After)))/(Before - After)});
+                V.push_back({D->getID(), abs(((CurrentPercentage * (Before - getLastSavedBefore())) + (it->second * (getLastSavedBefore() - After)))/(Before - After))});
             }
         }    
     }

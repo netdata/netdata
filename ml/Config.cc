@@ -49,8 +49,8 @@ void Config::readMLConfig(void) {
 
     double SaveAnomalyPercentageEvery = config_get_number(ConfigSectionML, "window size of anomaly bit counting for anomaly percentage", 1 * 60);
 
-    double MaxAnomalyRateInfoTableSize = config_get_number(ConfigSectionML, "the maximum size, in rows, of the data table that holds anomaly rate information", 100.0);
-    double MaxAnomalyRateInfoAge = config_get_number(ConfigSectionML, "the oldest age, in hours, of the anomaly rate information allowed to stay in the table", 2.0);
+    double MaxAnomalyRateInfoTableSize = config_get_number(ConfigSectionML, "the maximum size, in rows, of the data table that holds anomaly rate information", 1000.0);
+    double MaxAnomalyRateInfoAge = config_get_number(ConfigSectionML, "the oldest age, in hours, of the anomaly rate information allowed to stay in the table", 48.0);
 
     std::string HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     std::string ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training",
