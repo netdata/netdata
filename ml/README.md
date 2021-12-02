@@ -74,18 +74,18 @@ time    d1	d2	d3	d4	d5		NAR
  
 DAR	    10%	30%	20%	20%	30%		22% NAR_t1-t10
 
-DAR        = Dim Anomaly Rate
+DAR        = Dimension Anomaly Rate
 NAR        = Node Anomaly Rate
 NAR_t1-t10 = Node Anomaly Rate over t1 to t10
 ```
 
-Here we can just average a row or a column and work out an ["anomaly rate"](#anomaly-rate). For example, if we were to just average along a row then this would be the ["anomaly rate"](#anomaly-rate) across all dimensions at time t. Likewise if we averaged a column then we would have the ["anomaly rate"](#anomaly-rate) for dimension d over the time window t=1-10. Extending this idea we can work out an ["anomaly rate"](#anomaly-rate) for the whole matrix or any subset of it we might be interested in. 
+Here we can just average a row or a column and work out an ["anomaly rate"](#anomaly-rate) in any direction. For example, if we were to just average along a row then this would be the ["node anomaly rate"](#node-anomaly-rate) (all dimensions) at time t. Likewise if we averaged a column then we would have the ["dimension anomaly rate"](#dimension-anomaly-rate) for each dimension over the time window t=1-10. Extending this idea we can work out an overall ["anomaly rate"](#anomaly-rate) for the whole matrix or any subset of it we might be interested in.
 
 ### Anomaly Detector - Node level anomaly events
 
-Netdata uses the concept of an ["anomaly detector"](#anomaly-detector) that looks at all the anomaly bits of the node and if a sufficient percentage of them are high enough for a persistant amount of time then an ["anomaly event"](#anomaly-event) will be produced. This anomaly event signals that there was sufficient evidence among all the anomaly bits that some strange behaviour might have been detected. 
+Netdata uses the concept of an ["anomaly detector"](#anomaly-detector) that looks at all the anomaly bits of the node and if a sufficient percentage of them are high enough for a persistent amount of time then an ["anomaly event"](#anomaly-event) will be produced. This anomaly event signals that there was sufficient evidence among all the anomaly bits that some strange behavior might have been detected in a more global sense across the node.
 
-Essentially if the ["Node Anomaly Rate"](#node-anomaly-rate) (NAR) passes a defined threshold and stays above that threshold for a persistant amout of time a "Node Anomaly Event" will be triggered.
+Essentially if the ["Node Anomaly Rate"](#node-anomaly-rate) (NAR) passes a defined threshold and stays above that threshold for a persistent amount of time a "Node [Anomaly Event](#anomaly-event)" will be triggered.
 
 These anomaly events are currently exposed via `/api/v1/anomaly_events`
 
@@ -102,7 +102,7 @@ If an event exists within the window the result would be a list of start and end
 ]
 ```
 
-Where information about each anomaly event can then be found at the `/api/v1/anomaly_event_info` endpoint: 
+Where information about each anomaly event can then be found at the `/api/v1/anomaly_event_info` endpoint (making sure to pass the `after` and `before` params): 
 
 https://london.my-netdata.io/api/v1/anomaly_event_info?after=1638367788&before=1638367851
 
@@ -123,15 +123,15 @@ https://london.my-netdata.io/api/v1/anomaly_event_info?after=1638367788&before=1
     ...
 ```
 
-This returns a list of dimension anomaly rates for all dimensions that were considered part of the anomaly event.
+This returns a list of dimension anomaly rates for all dimensions that were considered part of the detected anomaly event.
 
-**Note**: We plan to build additional anomaly detection and exploration features into both Netdata Agent and Netdata Cloud and so these endpoints are primarially to power these features and still under active development.
+**Note**: We plan to build additional anomaly detection and exploration features into both Netdata Agent and Netdata Cloud and so these endpoints are primarily to power these features and so still under active development.
 
 ## Configuration
 
-To enable anomaly detection all you need to do is set `enabled = yes` in the `[ml]` section of `netdata.conf` and restart netdata `sudo systemctl restart netdata`.
+To enable anomaly detection all you need to do is set `enabled = yes` in the `[ml]` section of `netdata.conf` and restart netdata (typically `sudo systemctl restart netdata`).
 
-Below is a list of all the available configuration params and thier default values.
+Below is a list of all the available configuration params and their default values.
 
 ```
 [ml]
@@ -156,21 +156,21 @@ Below is a list of all the available configuration params and thier default valu
 
 ### Descriptions (min/max)
 
-- `enabled`: `yes` to enable, `no` to diable.
+- `enabled`: `yes` to enable, `no` to disable.
 - `maximum num samples to train`: (`3600`/`21600`) This is the maximum amount of time you would like to train each model on. For example, the default of `14400` would train on the preceding 4 hours of data assuming an `update every` of 1 second.
 - `minimum num samples to train`: (`900`/`21600`) This is the minimum amount of data required to be able to train a model. For example, the default of `3600` implies that once at least 1 hour of data is available for training a model will be trained, otherwise it will be skipped and checked again at the next training run.
 - `train every`: (`1800`/`21600`) This is how often each model will be retrained. For example, the default of `3600` means that each model will be retrained every hour. Note: the training of all models is spread out across the `train every` period for efficiency so in reality it means that each model will be trained in a staggered manner within each `train every` period.
-- `num samples to diff`: (`0`/`1`) This is a `0` or `1` to determine if you want the model to operate on differences of the raw data or just the raw data. For example, the default of `1` means that we take differences of the raw values. Using differences is more general and works on dimensions that might naturally tend to have some trends or cycles in them that is normal behaviour we don't want to be too sensitive to.
-- `num samples to smooth`: (`0`/`5`) This is a small integer that controls the amount of smoothing applied as part of the feature processing used by the model. For example, the default of `3` means that the rolling average of the last 3 values is used. Smoothing like this helps the model be a little more robust to spikey types of dimensions that naturally "jump" up or down as part of their normal behaviour.
+- `num samples to diff`: (`0`/`1`) This is a `0` or `1` to determine if you want the model to operate on differences of the raw data or just the raw data. For example, the default of `1` means that we take differences of the raw values. Using differences is more general and works on dimensions that might naturally tend to have some trends or cycles in them that is normal behavior we don't want to be too sensitive to.
+- `num samples to smooth`: (`0`/`5`) This is a small integer that controls the amount of smoothing applied as part of the feature processing used by the model. For example, the default of `3` means that the rolling average of the last 3 values is used. Smoothing like this helps the model be a little more robust to spiky types of dimensions that naturally "jump" up or down as part of their normal behavior.
 - `num samples to lag`: (`0`/`5`) This is a small integer that determines how many lagged values of the dimension to include in the feature vector. For example, the default of `5` means that in addition to the most recent (by default, differenced and smoothed) value of the dimension, the feature vector will also include the 5 previous values too. Using lagged values in our feature representation allows the model to work over strange patterns over recent values of a dimension as opposed to just focusing on if the most recent value itself is big or small enough to be anomalous.
 - `maximum number of k-means iterations`: A parameter that can be passed to the model to limit the number of iterations in training the k-means model. Vast majority of cases can ignore and leave as default.
 - `dimension anomaly score threshold`: (`0.01`/`5.00`) This is the threshold at which an individual dimension at a specific timestep is considered anomalous or not. For example, the default of `0.99` means that a dimension with an anomaly score of 99% or higher will be flagged as anomalous. This is a normalized probability based on the training data, so the default of 99% means that anything that is as strange (based on distance measure) or more as the most strange 1% of data observed during training will be flagged as anomalous. If you wanted to make the anomaly detection on individual dimensions more sensitive you could try a value like `0.90` (90%) or to make it less sensitive you could try `1.5` (150%).
 - `host anomaly rate threshold`: (`0.0`/`1.0`) The is the percentage of dimensions (based on all those enabled for anomaly detection) that need to be considered anomalous at specific timestep for the host itself to be considered anomalous. For example, the default value of `0.01` means that if more than 1% of dimensions are anomalous at the same time then the host itself is considered in an anomalous state.
-- `minimum window size`: The netdata "Anomaly Detector" logic works over a rolling window of data. This parameter defines the minimum length of window to consider. If over this window the host is in an anomalous state then an anomaly detection event will be triggered. For example, the default of `30` means that the detector will initially work over a rolling window of 30 seconds. Note: The length of this window will be dynamic once an anomaly event has been triggered such that it will expand as needed until either the max length of an anomaly event is hit or the host settles back into a normal state with sufficiently decreased host level anomaly states in the rolling window. Note: If you wanted to adjust the higher level anomaly detector behaviour then this is one parameter you might adjust to see the impact of on anomaly detection events.
+- `minimum window size`: The netdata "Anomaly Detector" logic works over a rolling window of data. This parameter defines the minimum length of window to consider. If over this window the host is in an anomalous state then an anomaly detection event will be triggered. For example, the default of `30` means that the detector will initially work over a rolling window of 30 seconds. Note: The length of this window will be dynamic once an anomaly event has been triggered such that it will expand as needed until either the max length of an anomaly event is hit or the host settles back into a normal state with sufficiently decreased host level anomaly states in the rolling window. Note: If you wanted to adjust the higher level anomaly detector behavior then this is one parameter you might adjust to see the impact of on anomaly detection events.
 - `maximum window size`: This parameter defines the maximum length of window to consider. If an anomaly event reaches this size it will be closed. This is to provide a upper bound on the length of an anomaly event and cost of the anomaly detector logic for that event.
 - `window minimum anomaly rate`: (`0.0`/`1.0`) The parameter corresponds to a threshold on the percentage of time in the rolling window that the host was considered in an anomalous state. For example, the default of `0.25` means that if the host is in an anomalous state for 25% of more of the rolling window then and anomaly event will be triggered or extended if one is already active. Note: If you wanted to make the anomaly detector itself less sensitive the you could adjust this value to something like `0.75` which would mean the host needs to be much more consistently in an anomalous state to trigger an anomaly detection event. Likewise a lower value like `0.1` would make the anomaly detector more sensitive.
 - `anomaly event min dimension rate threshold`: (`0.0`/`1.0`) This is a parameter that helps filter out irrelevant dimensions from anomaly events. For example, the default of `0.05` means that only dimensions that were considered anomalous for at least 5% of the anomaly event itself will be included in that anomaly event. The idea here is to just include dimensions that were consistently anomalous as opposed to those that may have just randomly happened to be anomalous at the same time.
-- `hosts to skip from training`: If you would like to turn off anomaly detection for any child hosts on a parent host you can define those you would like to skip from training here. For example a value like `dev-*` would skip all hosts on a parent that begin with the "dev-" prefix. The default value of `!*` means "dont skip any".
+- `hosts to skip from training`: If you would like to turn off anomaly detection for any child hosts on a parent host you can define those you would like to skip from training here. For example a value like `dev-*` would skip all hosts on a parent that begin with the "dev-" prefix. The default value of `!*` means "don't skip any".
 - `charts to skip from training`: If you would like to exclude certain charts from anomaly detection then you can define them here. By default all charts apart from a specific allow list of the typical basic netdata charts are excluded. If you have additional charts you would like to include for anomaly detection then you can add them here. **Note**: It is recommended to add charts in small groups and then measure any impact on performance before adding additional ones.
 
 ## Charts
@@ -227,6 +227,10 @@ The is essentially business logic that just tries to process a collection of ano
 #### _anomaly event_
 
 Anomaly events are triggered by the anomaly detector as represent a window of time on the node with sufficiently elevated anomaly rates across all dimensions.
+
+#### _dimension anomaly rate_
+
+The anomaly rate of a specific dimension over some window of time.
 
 #### _node anomaly rate_
 
