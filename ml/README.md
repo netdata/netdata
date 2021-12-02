@@ -4,9 +4,9 @@
 
 As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0) Netdata comes with some ML powered anomaly detection capabilites built into it and available to use out of the box with minimal configuration required.
 
-**Note**: This functionality is still under active development and may face breaking changes. It is considered experimental while we dogfood it internally and among early adopters within the Netdata community. We would like to develop and build on these foundational ml capabilities in the open and with the community so if you would like to get involved and help us with some feedback please feel free to email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
+🚧 **Note**: This functionality is still under active development and may face breaking changes. It is considered experimental while we dogfood it internally and among early adopters within the Netdata community. We would like to develop and build on these foundational ml capabilities in the open and with the community so if you would like to get involved and help us with some feedback please feel free to email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 
-Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of "strange patterns" in recent observations for each metric as opposed to just point anomalies like big spikes or drops. 
+Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of "strange patterns" in recent observations for each metric as opposed to just point anomalies like big spikes or drops ([this infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies). 
 
 The below sections will introduce some of the main concepts. Additional explainations and details can be found in the Glossary and Notes sections below.
 
@@ -59,19 +59,19 @@ Typically, the anomaly bit will mostly be 0 under normal circumstances with some
 Once all models have been trained, we can think of the Netdata dashboard as essentially a big matrix or table of 0's and 100's. If consider this "anomaly bit" based representation of the state of the node we can now think about how we might detect overall node level anomalies. Below is a picture to help illustrate the main ideas here. 
 
 ```
-t	d1	d2	d3	d4	d5      NAR
-1	0	0	0	0	0        0%
-2	0	0	0	0	100     20%
-3	0	0	0	0	0        0%
-4	0	100	0	0	0       20%
-5	100	0	0	0	0       20%
-6	0	100	100	0	100     60%
-7	0	100	0	100	0       40%   
-8	0	0	0	0	100     20%
-9	0	0	100	100	0       40%
-10	0	0	0	0	0        0%
-       
-DAR 10% 30% 20% 20% 30%     22% NAR_t1-t10
+t	d1	d2	d3	d4	d5		NAR
+1	0	0	0	0	0		 0%
+2	0	0	0	0	100		20%
+3	0	0	0	0	0		 0%
+4	0	100	0	0	0		20%
+5	100	0	0	0	0		20%
+6	0	100	100	0	100		60%
+7	0	100	0	100	0		40%
+8	0	0	0	0	100		20%
+9	0	0	100	100	0		40%
+10	0	0	0	0	0		 0%
+ 
+DAR	10%	30%	20%	20%	30%		22% NAR_t1-t10
 
 DAR        = Dim Anomaly Rate
 NAR        = Node Anomaly Rate
