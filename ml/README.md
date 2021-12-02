@@ -2,19 +2,19 @@
 
 ## Overview
 
-As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0) Netdata comes with some ML powered anomaly detection capabilites built into it and available to use out of the box with minimal configuration required.
+As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0) Netdata comes with some ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box with minimal configuration required.
 
-🚧 **Note**: This functionality is still under active development and may face breaking changes. It is considered experimental while we dogfood it internally and among early adopters within the Netdata community. We would like to develop and build on these foundational ml capabilities in the open and with the community so if you would like to get involved and help us with some feedback please feel free to email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
+🚧 **Note**: This functionality is still under active development and may face breaking changes. It is considered experimental while we dogfood it internally and among early adopters within the Netdata community. We would like to develop and build on these foundational ML capabilities in the open with the community so if you would like to get involved and help us with some feedback please feel free to email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 
-Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of "strange patterns" in recent observations for each metric as opposed to just point anomalies like big spikes or drops ([this infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies). 
+Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of potentially anomalous patterns in recent observations as opposed to just point anomalies like big spikes or drops ([this infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies). 
 
-The below sections will introduce some of the main concepts. Additional explainations and details can be found in the Glossary and Notes sections below.
+The sections below will introduce some of the main concepts - **anomaly score**, **anomaly bit**, **anomaly rate** and **anomaly detector**. Additional explanations and details can be found in the [Glossary](#glossary) and [Notes](#notes) at the bottom of the page.
 
 ### Anomaly Bit - (100 = Anomalous, 0 = Normal)
 
-Once each model is trained, Netdata will begin producing an ["anomaly score"](#anomaly-score) at each timestep for each dimension. This ["anomaly score"](#anomaly-score) is essentially a distance measure to the trained cluster centers of the model, so more anomlous looking data should be more distant to those cluster centers. If this ["anomaly score"](#anomaly-score) is sufficiently large this is a sign that the recent raw values of the dimension could potentialy be anomalous. Once this threshold is passed the ["anomaly bit"](#anomaly-bit) corresponding to that dimension is set to 100 to flag it as anomalous, otherwise it would be left at 0 to signal normal data.
+Once each model is trained, Netdata will begin producing an ["anomaly score"](#anomaly-score) at each timestep for each dimension. This ["anomaly score"](#anomaly-score) is essentially a distance measure to the trained cluster centers of the model (by default each model has k=2, so two cluster centers are learned). More anomalous looking data should be more distant to those cluster centers. If this ["anomaly score"](#anomaly-score) is sufficiently large this is a sign that the recent raw values of the dimension could potentially be anomalous. By default, "sufficiently large" means that the distance is in the 99th percentile or above of all distances observed during training or, put another way, it has to be further away than the furthest 1% of the data used during training. Once this threshold is passed the ["anomaly bit"](#anomaly-bit) corresponding to that dimension is set to 100 to flag it as anomalous, otherwise it would be left at 0 to signal normal data.
 
-What this means is that in addition to the raw value of each metric, Netdata now also would have available an ["anomaly bit"](#anomaly-bit) that is either 100 for anomalous or 0 for normal. Importanlty, this is achieved without additional storage overhead due to how the anomaly bit has been implemented within the internal Netdata storage representation.
+What this means is that in addition to the raw value of each metric, Netdata now also would have available an ["anomaly bit"](#anomaly-bit) that is either 100 (anomalous) or 0 (normal). Importantly, this is achieved without additional storage overhead due to how the anomaly bit has been implemented within the existing internal Netdata storage representation.
 
 This ["anomaly bit"](#anomaly-bit) is exposed via the `anomaly-bit` key that can be passed to the `options` param of the `/api/v1/data` REST API. 
 
@@ -231,7 +231,7 @@ Anomaly events are triggered by the anomaly detector as represent a window of ti
 
 The anomaly rate across all dimensions of a node.
 
-### Notes
+## Notes
 
 - We would love to hear any feedback relating to this functionality, please email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 - [This presentation](https://docs.google.com/presentation/d/18zkCvU3nKP-Bw_nQZuXTEa4PIVM6wppH3VUnAauq-RU/edit?usp=sharing) walks through some of the main concepts covered above in a more informal way.
