@@ -164,6 +164,35 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
         freez(se->kernel_version);
 }
 
+static inline long int parse_stream_version(RRDHOST *host, char *http)
+{
+    long int stream_version = -1;
+    int answer = -1;
+    char *stream_version_start = strchr(http, '=');
+    if (stream_version_start) {
+        stream_version_start++;
+        stream_version = strtol(stream_version_start, NULL, 10);
+        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(stream_version_start - http));
+        if (!answer) {
+            rrdpush_set_flags_to_newest_stream(host);
+        }
+    } else {
+        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
+        if (!answer) {
+            stream_version = 1;
+            rrdpush_set_flags_to_newest_stream(host);
+        } else {
+            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+            if (!answer) {
+                stream_version = 0;
+                host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
+                host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+            }
+        }
+    }
+    return stream_version;
+}
+
 static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
     struct sender_state *s) {
 
@@ -739,33 +768,4 @@ void *rrdpush_sender_thread(void *ptr) {
 
     netdata_thread_cleanup_pop(1);
     return NULL;
-}
-
-static inline long int parse_stream_version(RRDHOST *host, char *http)
-{
-    long int stream_version = -1;
-    int answer = -1;
-    char *stream_version_start = strchr(http, '=');
-    if (stream_version_start) {
-        stream_version_start++;
-        stream_version = strtol(stream_version_start, NULL, 10);
-        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(stream_version_start - http));
-        if (!answer) {
-            rrdpush_set_flags_to_newest_stream(host);
-        }
-    } else {
-        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
-        if (!answer) {
-            stream_version = 1;
-            rrdpush_set_flags_to_newest_stream(host);
-        } else {
-            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
-            if (!answer) {
-                stream_version = 0;
-                host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
-                host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
-            }
-        }
-    }
-    return stream_version;
 }
