@@ -179,7 +179,7 @@ One enabled, the "Anomaly Detection" menu and charts will be available on the da
 
 ![anomaly_detection_menu](https://user-images.githubusercontent.com/2178292/144255721-4568aabf-39c7-4855-bf1c-31b1d60e28e6.png)
 
-In terms of anomaly detection the most interesting charts would be the `anomaly_detection.dimensions` and `anomaly_detection.anomaly_rate` ones which hold the `anomalous` and `anomaly_rate` dimensions that show the overall number of dimensions considered anomalous at any time and the corresponding anomaly rate.
+In terms of anomaly detection, the most interesting charts would be the `anomaly_detection.dimensions` and `anomaly_detection.anomaly_rate` ones which hold the `anomalous` and `anomaly_rate` dimensions that show the overall number of dimensions considered anomalous at any time and the corresponding anomaly rate.
 
 - `anomaly_detection.dimensions`: Total count of dimensions considered anomalous or normal.
 - `anomaly_detection.dimensions`: Percentage of anomalous dimensions.
@@ -206,15 +206,15 @@ After a short while the rolling node anomaly rate goes `above_threshold`, and on
 
 #### _feature vector_
 
-A [feature vector](https://en.wikipedia.org/wiki/Feature_(machine_learning)) is what the ML model is trained on and uses for prediction. The most simple feature vector would be just the latest raw dimension value itself [x]. By default Netdata will use a feature vector consisting of the 6 latest differences and smoothed values of the dimension so conceptually something like `[avg3(diff1(x-5)), avg3(diff1(x-4)), avg3(diff1(x-3)), avg3(diff1(x-2)), avg3(diff1(x-1)), avg3(diff1(x))]` which ends up being 6 floating point numbers that try and represent the "shape" of recent data.
+A [feature vector](https://en.wikipedia.org/wiki/Feature_(machine_learning)) is what the ML model is trained on and uses for prediction. The most simple feature vector would be just the latest raw dimension value itself [x]. By default Netdata will use a feature vector consisting of the 6 latest differences and smoothed values of the dimension so conceptually something like `[avg3(diff1(x-5)), avg3(diff1(x-4)), avg3(diff1(x-3)), avg3(diff1(x-2)), avg3(diff1(x-1)), avg3(diff1(x))]` which ends up being just 6 floating point numbers that try and represent the "shape" of recent data.
 
 #### _anomaly score_
 
-At prediction time the anomaly score is just the distance of the most recent feature vector to the trained cluster centers of the model, which are themselves just feature vectors, albeit supposeldy the best most representitive feature vectors that could be "learned" from the training data. So if the most recent feature vector is very far away in terms of [eucliedian distance](https://en.wikipedia.org/wiki/Euclidean_distance#:~:text=In%20mathematics%2C%20the%20Euclidean%20distance,being%20called%20the%20Pythagorean%20distance.) it's more likley that the recent data it represents consists of some strange pattern not commonly found in the training data.
+At prediction time the anomaly score is just the distance of the most recent feature vector to the trained cluster centers of the model, which are themselves just feature vectors, albeit supposedly the best most representative feature vectors that could be "learned" from the training data. So if the most recent feature vector is very far away in terms of [euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance#:~:text=In%20mathematics%2C%20the%20Euclidean%20distance,being%20called%20the%20Pythagorean%20distance.) it's more likely that the recent data it represents consists of some strange pattern not commonly found in the training data.
 
 #### _anomaly bit_
 
-If the anomaly score is greater than a specified threshold then the most recent feature vector, and hence most recent raw data, is considered anomalous. Since storing the raw anomaly score would essentially double amout of storage space Netdata would need, we instead efficiently store just the anomaly bit in the existing internal Netdata data representation without any additional storage overhead.
+If the anomaly score is greater than a specified threshold then the most recent feature vector, and hence most recent raw data, is considered anomalous. Since storing the raw anomaly score would essentially double amount of storage space Netdata would need, we instead efficiently store just the anomaly bit in the existing internal Netdata data representation without any additional storage overhead.
 
 #### _anomaly rate_
 
@@ -226,7 +226,7 @@ The is essentially business logic that just tries to process a collection of ano
 
 #### _anomaly event_
 
-Anomaly events are triggered by the anomaly detector as represent a window of time on the node with sufficiently elevated anomaly rates across all dimensions.
+Anomaly events are triggered by the anomaly detector and represent a window of time on the node with sufficiently elevated anomaly rates across all dimensions.
 
 #### _dimension anomaly rate_
 
@@ -239,10 +239,11 @@ The anomaly rate across all dimensions of a node.
 ## Notes
 
 - We would love to hear any feedback relating to this functionality, please email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
+- We are working on additional UI/UX based features that build on these core components to make them as useful as possible out of the box.
+- Although not yet a core focus of this work, users could leverage the `anomaly_detection` chart dimensions and/or `anomaly-bit` options in defining alarms based on ML driven anomaly detection models.
 - [This presentation](https://docs.google.com/presentation/d/18zkCvU3nKP-Bw_nQZuXTEa4PIVM6wppH3VUnAauq-RU/edit?usp=sharing) walks through some of the main concepts covered above in a more informal way.
 - After restart Netdata will wait until `minimum num samples to train` observations of data are available before starting training and prediction.
-- Although not yet a core focus of this work, users could leverage the `anomaly_detection` chart dimensions and/or `anomaly-bit` options in defining alarms based on ML driven anomaly detection models.
 - Netdata uses [dlib](https://github.com/davisking/dlib) under the hood for its core ML features.
-- You should benchmark Netdata resource usage before and after enabling ML. Typical overhead ranges from 1-2% additional CPU.
+- You should benchmark Netdata resource usage before and after enabling ML. Typical overhead ranges from 1-2% additional CPU at most.
 - The "anomaly bit" has been implemented to be a building block to underpin many more ML based use cases that we plan to deliver soon.
-- At its core Netdata uses an approach and problem formulation very similar to the Netdata python [anomalies collector](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies), just implemented in a much much more effcient and scalable way in the agent in c++. So if you would like to learn more about the approach and are familar with Python that is a useful resource, as is the corresponding [deepdive tutorial](https://nbviewer.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where the default model used is PCA instead of K-Means but the overall approach and formulation is similar.
+- At its core Netdata uses an approach and problem formulation very similar to the Netdata python [anomalies collector](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies), just implemented in a much much more efficient and scalable way in the agent in c++. So if you would like to learn more about the approach and are familiar with Python that is a useful resource to explore, as is the corresponding [deepdive tutorial](https://nbviewer.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where the default model used is PCA instead of K-Means but the overall approach and formulation is similar.
