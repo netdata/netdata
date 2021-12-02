@@ -63,9 +63,8 @@ external databases, and more.
 
 ## Have a different operating system, or want to try another method?
 
-Netdata works on many different operating systems, each with a few possible installation methods. To see the full list
-of approved methods for each operating system/version we support, see our [distribution
-matrix](/packaging/DISTRIBUTIONS.md).
+Netdata works on many different platforms, to see the full list go check out our [platform support
+policy](/packaging/PLATFORM_SUPPORT.md).
 
 Below, you can find a few additional installation methods, followed by separate instructions for a variety of unique
 operating systems.
@@ -112,7 +111,7 @@ option when you install or update Netdata using the [automatic one-line installa
 script](#automatic-one-line-installation-script).
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
+rm -f ./kickstart.sh ; wget https://my-netdata.io/kickstart.sh && sh ./kickstart.sh --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update
