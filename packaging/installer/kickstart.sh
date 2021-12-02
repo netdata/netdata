@@ -39,7 +39,7 @@
 # shellcheck disable=SC2039,SC2059,SC2086
 
 # External files
-PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/packaging-split/packaging/installer/install-required-packages.sh"
+#PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/packaging-split/packaging/installer/install-required-packages.sh"
 
 # Netdata Tarball Base URL (defaults to our Google Storage Bucket)
 [ -z "$NETDATA_TARBALL_BASEURL" ] && NETDATA_TARBALL_BASEURL=https://storage.googleapis.com/netdata-nightlies
@@ -359,11 +359,12 @@ dependencies() {
       echo download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
     fi
 
-    if [ ! -s "${ndtmpdir}/install-required-packages.sh" ]; then
+    if [ -s "/install-required-packages.sh" ]; then
       warning "Downloaded dependency installation script is empty."
     else
       progress "Running downloaded script to detect required packages..."
-      echo run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+      pwd
+      run ${sudo} "${bash}" "install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
       # shellcheck disable=SC2181
       if [ $? -ne 0 ]; then
         warning "It failed to install all the required packages, but installation might still be possible."
@@ -594,12 +595,13 @@ fi
 # install required system packages
 
 ndtmpdir=$(create_tmp_directory)
-cd "${ndtmpdir}" || exit 1
+#cd "${ndtmpdir}" || exit 1
 
 dependencies
 
 # ---------------------------------------------------------------------------------------------------------------------
 # download netdata package
+cd "${ndtmpdir}" || exit 1
 
 if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ]; then
   set_tarball_urls "${RELEASE_CHANNEL}"
