@@ -228,6 +228,7 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
     if (buffer != r->read_buffer + r->read_len) {
         // read to external buffer
         *ret = fread(buffer, 1, size, fp);
+        info("STREAM_COMPRESSION: Decompressor is active in receiver side.");
         if (!*ret)
             return 1;
     } else {
@@ -539,6 +540,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
         info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT);
     }
+    info("Initial response to %s: %s", rpt->client_ip, initial_response);
+
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
     #ifdef ENABLE_HTTPS
     rpt->host->stream_ssl.conn = rpt->ssl.conn;
