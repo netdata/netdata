@@ -59,7 +59,7 @@ Typically, the anomaly bit will mostly be 0 under normal circumstances with some
 Once all models have been trained, we can think of the Netdata dashboard as essentially a big matrix or table of 0's and 100's. If we consider this "anomaly bit" based representation of the state of the node we can now think about how we might detect overall node level anomalies. Below is a picture to help illustrate the main ideas here.
 
 ```
-            dimensions
+        dimensions
 time    d1	d2	d3	d4	d5		NAR
    1	0	0	0	0	0		 0%
    2	0	0	0	0	100		20%
