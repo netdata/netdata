@@ -101,6 +101,7 @@ struct sender_state {
     int32_t version;
     unsigned int rrdpush_compression;
 #ifdef ENABLE_COMPRESSION
+    unsigned int rrdpush_compression;
     struct compressor_state *compressor;
 #endif
 };
@@ -135,6 +136,7 @@ struct receiver_state {
     struct netdata_ssl ssl;
 #endif
 #ifdef ENABLE_COMPRESSION
+    unsigned int rrdpush_compression;
     struct decompressor_state *decompressor;
 #endif
 };

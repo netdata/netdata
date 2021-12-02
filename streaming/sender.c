@@ -414,7 +414,9 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
     s->version = version;
 #ifdef ENABLE_COMPRESSION
-    if(s->version >= STREAM_VERSION_COMPRESSION)
+    s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_VERSION_COMPRESSION));
+    info("Compression sender status: %s compression=%u (%u && %u)", s->host->hostname, s->rrdpush_compression, default_compression_enabled, (unsigned int)(s->version >= STREAM_VERSION_COMPRESSION));
+    if(s->rrdpush_compression)
     {
         // parent supports compression
         if(s->compressor)
@@ -422,11 +424,9 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
     else {
         //parent does not support compression or has compression disabled
-        if (default_compression_enabled) {
-            info("Parent %s does not support compression.", s->connected_to);
-            if (s->compressor)
-                s->compressor->destroy(&s->compressor);
-        }
+        info("Stream is uncompressed! One of the agents (%s <-> %s) does not support OR has compression disabled.", s->connected_to, s->host->hostname);
+        if (s->compressor)
+            s->compressor->destroy(&s->compressor);
     }        
 #endif  //ENABLE_COMPRESSION
 
@@ -625,6 +625,7 @@ void sender_init(struct sender_state *s, RRDHOST *parent) {
     s->buffer = cbuffer_new(1024, 1024*1024);
     s->build = buffer_create(1);
 #ifdef ENABLE_COMPRESSION
+    s->rrdpush_compression = default_compression_enabled;
     if (default_compression_enabled)
         s->compressor = create_compressor();
 #endif

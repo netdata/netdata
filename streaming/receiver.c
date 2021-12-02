@@ -429,6 +429,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
 
+#ifdef  ENABLE_COMPRESSION
+    unsigned int rrdpush_compression = default_compression_enabled;
+    rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable_compression", rrdpush_compression);
+    rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable_compression", rrdpush_compression);
+    rpt->rrdpush_compression = (rrdpush_compression && default_compression_enabled); 
+    info("stream.conf compression=%u key(%u && %u)", rpt->rrdpush_compression, rrdpush_compression, default_compression_enabled);
+#endif  //ENABLE_COMPRESSION
+
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
@@ -527,7 +535,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if (rpt->stream_version > 1) {
         if(rpt->stream_version >= STREAM_VERSION_COMPRESSION){
 #ifdef ENABLE_COMPRESSION
-            if(!default_compression_enabled)
+            if(!rpt->rrdpush_compression)
                 rpt->stream_version = (STREAM_VERSION_COMPRESSION - 1);
 #else
             if(STREAMING_PROTOCOL_CURRENT_VERSION < rpt->stream_version) {
