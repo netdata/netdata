@@ -346,6 +346,15 @@ IF(LINUX AND EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
     ENDIF(ELF_LIBRARIES)
 ENDIF()
 
+# -----------------------------------------------------------------------------
+# Detect ml dependencies
+IF(EXISTS "${CMAKE_SOURCE_DIR}/ml/kmeans/dlib/dlib/all/source.cpp" AND EXISTS "${CMAKE_SOURCE_DIR}/ml/json/single_include/nlohmann/json.hpp")
+    set(ENABLE_ML True)
+    list(APPEND NETDATA_COMMON_CFLAGS "-DDLIB_NO_GUI_SUPPORT")
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS "ml/kmeans/dlib")
+ELSE()
+    set(ENABLE_ML False)
+ENDIF()
 
 # -----------------------------------------------------------------------------
 # netdata files
@@ -922,9 +931,35 @@ set(DAEMON_FILES
         )
 
 set(ML_FILES
-        ml/ml.h
-        ml/ml-dummy.c
+    ml/ml.h
+    ml/ml-dummy.c
 )
+
+IF(ENABLE_ML)
+    list(APPEND ML_FILES
+            ml/BitBufferCounter.h
+            ml/BitBufferCounter.cc
+            ml/BitRateWindow.h
+            ml/BitRateWindow.cc
+            ml/Config.h
+            ml/Config.cc
+            ml/Database.h
+            ml/Database.cc
+            ml/Dimension.cc
+            ml/Dimension.h
+            ml/Host.h
+            ml/Host.cc
+            ml/Query.h
+            ml/kmeans/KMeans.h
+            ml/kmeans/KMeans.cc
+            ml/kmeans/SamplesBuffer.h
+            ml/kmeans/SamplesBuffer.cc
+            ml/kmeans/dlib/dlib/all/source.cpp
+            ml/json/single_include/nlohmann/json.hpp
+            ml/ml.cc
+            ml/ml-private.h
+    )
+ENDIF()
 
 set(NETDATA_FILES
         collectors/all.h
@@ -1330,7 +1365,6 @@ IF(ENABLE_PLUGIN_CGROUP_NETWORK)
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
 ENDIF()
-
 
 # -----------------------------------------------------------------------------
 # Unit tests
