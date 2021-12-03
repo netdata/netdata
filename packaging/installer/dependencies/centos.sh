@@ -62,7 +62,7 @@ function check_plugins_core {
   if rpm -q dnf-plugins-core; then
     echo "Package dnf-plugins-core is INSTALLED"
   else
-    dnf install 'dnf-command(config-manager)'
+    dnf install -y 'dnf-command(config-manager)'
   fi
 }
 
