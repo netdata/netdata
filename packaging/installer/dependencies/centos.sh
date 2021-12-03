@@ -58,6 +58,7 @@ EOF
   fi
 }
 
+dnf makecache --refresh
 
 if [[ $(os_version) -eq 8 ]]; then
   package_manager=dnf
