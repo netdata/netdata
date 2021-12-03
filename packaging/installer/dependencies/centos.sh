@@ -58,10 +58,21 @@ EOF
   fi
 }
 
+function check_plugins_core {
+  if rpm -q dnf-plugins-core; then
+    echo "Package dnf-plugins-core is INSTALLED"
+  else
+    dnf install 'dnf-command(config-manager)'
+  fi
+}
+
 dnf makecache --refresh
 
 if [[ $(os_version) -eq 8 ]]; then
   package_manager=dnf
+
+  check_plugins_core
+
   dnf config-manager --set-enabled powertools || enable_repo
 else
   package_manager=yum
