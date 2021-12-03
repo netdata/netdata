@@ -41,8 +41,27 @@ declare -a package_tree=(
   gzip
 )
 
+function enable_repo {
+  if ! dnf repolist | grep -q powertools; then
+    cat > /etc/yum.repos.d/powertools.repo <<-EOF
+    [powertools]
+    name=CentOS Linux $releasever - PowerTools
+    mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=PowerTools&infra=$infra
+    #baseurl=http://mirror.centos.org/$contentdir/$releasever/PowerTools/$basearch/os/
+    gpgcheck=1
+    enabled=1
+    gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+EOF
+  else
+    echo "Something went wrong!"
+    exit 1
+  fi
+}
+
+
 if [[ $(os_version) -eq 8 ]]; then
   package_manager=dnf
+  dnf config-manager --set-enabled powertools || enable_repo
 else
   package_manager=yum
 fi
