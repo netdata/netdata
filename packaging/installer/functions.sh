@@ -158,7 +158,7 @@ fetch_and_verify() {
 # -----------------------------------------------------------------------------
 
 netdata_banner() {
-    local l1="  ^" \
+    l1="  ^" \
     l2="  |.-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-" \
     l3="  |   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'  " \
     l4="  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->" \
@@ -566,7 +566,9 @@ pidisnetdata() {
 }
 
 stop_netdata_on_pid() {
-  local pid="${1}" ret=0 count=0
+  pid="${1}"
+  ret=0
+  count=0
 
   pidisnetdata "${pid}" || return 0
 
@@ -663,10 +665,10 @@ stop_all_netdata() {
 # restart netdata
 
 restart_netdata() {
-  local netdata="${1}"
+  netdata="${1}"
   shift
 
-  local started=0
+  started=0
 
   progress "Restarting netdata instance"
 

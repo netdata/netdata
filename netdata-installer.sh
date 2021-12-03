@@ -5,7 +5,7 @@
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
-  local path=""
+  path=""
   tmp="$(mktemp)"
   (echo  "${PATH}" | tr ":" "\n") > "$tmp"
   while read -r REPLY;
@@ -200,7 +200,8 @@ NONROOT
 }
 
 usage() {
-  netdata_banner "installer command line options"
+  netdata_banner
+  progress "installer command line options"
   cat << HEREDOC
 
 USAGE: ${PROGRAM} [options]
@@ -450,7 +451,8 @@ fi
 
 if [ "${UID}" -ne 0 ]; then
   if [ -z "${NETDATA_PREFIX}" ]; then
-    netdata_banner "wrong command line options!"
+    netdata_banner
+	progress "wrong command line options!"
     banner_nonroot_install "${@}"
     exit 1
   else
@@ -458,7 +460,8 @@ if [ "${UID}" -ne 0 ]; then
   fi
 fi
 
-netdata_banner "real-time performance monitoring, done right!"
+netdata_banner
+progress "real-time performance monitoring, done right!"
 cat << BANNER1
 
   You are about to build and install netdata to your system.
@@ -505,13 +508,14 @@ fi
 have_autotools=
 if [ "$(type autoreconf 2> /dev/null)" ]; then
   autoconf_maj_min() {
-    local maj min IFS=.-
-
+    OLDIFS=$IFS
+    IFS=.-
     maj=$1
     min=$2
 
     set -- $(autoreconf -V | sed -ne '1s/.* \([^ ]*\)$/\1/p')
     eval $maj=\$1 $min=\$2
+    IFS=$OLDIFS
   }
   autoconf_maj_min AMAJ AMIN
 
@@ -530,7 +534,8 @@ if [ ! "$have_autotools" ]; then
   if [ -f configure ]; then
     echo "Will skip autoreconf step"
   else
-    netdata_banner "autotools v2.60 required"
+    netdata_banner
+	progress "autotools v2.60 required"
     cat << "EOF"
 
 -------------------------------------------------------------------------------
@@ -558,7 +563,8 @@ if [ ${DONOTWAIT} -eq 0 ]; then
 fi
 
 build_error() {
-  netdata_banner "sorry, it failed to build..."
+  netdata_banner
+  progress "sorry, it failed to build..."
   cat << EOF
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -612,7 +618,7 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 build_libmosquitto() {
-  local env_cmd=''
+  env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
@@ -688,7 +694,7 @@ bundle_libmosquitto
 # -----------------------------------------------------------------------------
 
 build_libwebsockets() {
-  local env_cmd=''
+  env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
@@ -793,7 +799,7 @@ bundle_libwebsockets
 # -----------------------------------------------------------------------------
 
 build_protobuf() {
-  local env_cmd=''
+  env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
@@ -867,8 +873,8 @@ bundle_protobuf
 # -----------------------------------------------------------------------------
 
 build_judy() {
-  local env_cmd=''
-  local libtoolize="libtoolize"
+  env_cmd=''
+  libtoolize="libtoolize"
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
@@ -963,7 +969,7 @@ bundle_judy
 # -----------------------------------------------------------------------------
 
 build_jsonc() {
-  local env_cmd=''
+  env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
@@ -1036,9 +1042,7 @@ get_kernel_version() {
 
   tmpfile="$(mktemp)"
   echo "${r}" | tr '.' ' ' > "${tmpfile}"
-  read -r v _ < "${tmpfile}"
 
-  echo "${v}" | tr '.' ' ' > "${tmpfile}"
   read -r maj min patch _ < "${tmpfile}"
 
   rm -f "${tmpfile}"
@@ -1234,20 +1238,9 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 
   progress "Backup existing netdata configuration before installing it"
 
-#  if [ "${BASH_VERSINFO[0]}" -ge "4" ]; then
- #   declare -A configs_signatures=()
-  #  if [ -f "configs.signatures" ]; then
-   #   source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
-    #fi
-#fi
-
   config_signature_matches() {
-    local md5="${1}" file="${2}"
-
-    if [ "${BASH_VERSINFO[0]}" -ge "4" ]; then
-      [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
-      return 1
-    fi
+    md5="${1}"
+    file="${2}"
 
     if [ -f "configs.signatures" ]; then
       grep "\['${md5}'\]='${file}'" "configs.signatures" > /dev/null
@@ -1258,14 +1251,14 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
   }
 
   # clean up stock config files from the user configuration directory
-  (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r '' x; do
+  (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r  x; do
     if [ -f "${x}" ]; then
       # find it relative filename
-	  f=$("$x" | sed "${NETDATA_PREFIX}%etc/netdata/")
+      f=$("$x" | sed "${NETDATA_PREFIX}%etc/netdata/")
 
       # find the stock filename
-	  t=$("${f}" | sed ".conf.installer_backup.*/.conf")
-	  t=$("${t}" | sed ".conf.old/.conf")
+      t=$("${f}" | sed ".conf.installer_backup.*/.conf")
+      t=$("${t}" | sed ".conf.old/.conf")
       t=$("${t}" | sed ".conf.orig/.conf")
       t=$("${t}" | sed "orig\//")
 
@@ -1336,7 +1329,9 @@ progress "Read installation options from netdata.conf"
 
 # function to extract values from the config file
 config_option() {
-  local section="${1}" key="${2}" value="${3}"
+  section="${1}"
+  key="${2}"
+  value="${3}"
 
   if [ -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
     "${NETDATA_PREFIX}/usr/sbin/netdata" \
@@ -1570,23 +1565,27 @@ govercomp() {
   # - go.d.plugin, version: v0.14.1-1-g4c5f98c-dirty
 
   # we need to compare only MAJOR.MINOR.PATCH part
-  local ver1 ver2
+
   ver1=$(echo "$1" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
   ver2=$(echo "$2" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
-
-  local IFS=.
-  read -r ver1
-  read -r ver2
 
   if [ ${#ver1} -eq 0 ] || [ ${#ver2} -eq 0 ]; then
     return 3
   fi
 
-  local i
-  for i in $(seq 0 ${#ver1}); do
-    if [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
+  num1=$(echo $ver1 | grep -o -E '\.' | wc -l)
+  num2=$(echo $ver2 | grep -o -E '\.' | wc -l)
+
+  if [ ${num1} -ne ${num2} ]; then
+          return 3
+  fi
+
+  for i in $(seq 1 $((num1+1))); do
+          x=$(echo $ver1 | cut -d'.' -f$i)
+          y=$(echo $ver2 | cut -d'.' -f$i)
+    if [ "${x}" -gt "${y}" ]; then
       return 1
-    elif [ "${ver2[i]}" -gt "${ver1[i]}" ]; then
+    elif [ "${y}" -gt "${x}" ]; then
       return 2
     fi
   done
@@ -1598,9 +1597,6 @@ should_install_go() {
   if [ -n "${NETDATA_DISABLE_GO+x}" ]; then
     return 1
   fi
-
-  local version_in_file
-  local binary_version
 
   version_in_file="$(cat packaging/go.d.version 2> /dev/null)"
   binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2> /dev/null)
@@ -1693,7 +1689,7 @@ install_go() {
   run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
   run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
-  run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
+  run tar -xf "${tmp}/${GO_PACKAGE_BASENAME}"
   run mv "${GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   if [ "${UID}" -eq 0 ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
