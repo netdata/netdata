@@ -385,7 +385,6 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     http[received] = '\0';
     debug(D_STREAM, "Response to sender from far end: %s", http);
-    info("Response to sender from far end: %s", http);
     int32_t version = (int32_t)parse_stream_version(host, http);
     if(version == -1) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
@@ -396,7 +395,6 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
 #ifdef ENABLE_COMPRESSION
     s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_VERSION_COMPRESSION));
-    info("Compression sender status: %s compression=%u (%u && %u)", s->host->hostname, s->rrdpush_compression, default_compression_enabled, (unsigned int)(s->version >= STREAM_VERSION_COMPRESSION));
     if(s->rrdpush_compression)
     {
         // parent supports compression
@@ -405,10 +403,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
     else {
         //parent does not support compression or has compression disabled
-        info("Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR it is disabled.", s->connected_to, s->host->hostname);
+        debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
         s->version = (STREAM_VERSION_COMPRESSION - 1);
-        // if (s->compressor)
-        //     s->compressor->destroy(&s->compressor);
     }        
 #endif  //ENABLE_COMPRESSION
 
