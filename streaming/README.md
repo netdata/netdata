@@ -139,13 +139,25 @@ a proxy).
 ```
 [stream]
     enabled = yes | no
-    compresion_enabled = yes | no
+# This is the default compression flag for an agent. Select if you want to use stream compression to send data to a parent. 
+    enable_compression = yes | no
     destination = IP:PORT[:SSL] ...
     api key = XXXXXXXXXXX
+
+[API_KEY]
+    enabled = yes | no
+# Manage stream compression per child. (En/dis)able stream compression per child. This configuration uses AND logic with the default compression in [stream] section. This means the stream compression from child to parent will be enbaled only if the outcome of the AND operation is true (default compression enabled && api key compression enabled). So both should be enabled to get compression otherwise compression is disabled.
+    enable_compression = yes | no
+[MACHINE_GUID]
+    enabled = yes | no
+# Manage stream compression per child. (En/dis)able stream compression per child. This configuration uses AND logic with the default compression in [stream] section. This means the stream compression from child to parent will be enbaled only if the outcome of the AND operation is true (default compression enabled && mguid compression enabled). So both should be enabled to get compression otherwise compression is disabled.
+    enable_compression = yes | no
 ```
 Stream data compression is enabled by default on systems where the appropriate versions (1.9.0 and later) of LZ4 library are installed.
 The current implementation of streaming data compression has the limitation: the size of single data block transmitted
 must not exceed 16384 bytes. If single data block size exceeds this limit, stream data compression should be disabled.
+
+Stream compression is supported by Netdata streaming version protocol 5+. Any lower version will disable compression for streaming compatibility between the Netdata agents.
 
 This is an overview of how these options can be combined:
 
