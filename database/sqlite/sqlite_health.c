@@ -1093,20 +1093,23 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
             switch (status)
                 {
                 case RRDCALC_STATUS_CLEAR:
+                    if (last_status == RRDCALC_STATUS_CLEAR) {
+                        if (when == start) { t_in_clear = 0; }
+                    }
                     if (last_status == RRDCALC_STATUS_WARNING) {
                         in_warn -= range;
                         in_clear += range;
-                        if (when == start) t_in_warn = 0;
+                        if (when == start) { t_in_warn = 0; if (!chart_change) no_of_alerts--; }
                     }
                     else if (last_status == RRDCALC_STATUS_CRITICAL) {
                         in_crit -= range;
                         in_clear += range;
-                        if (when == start) t_in_crit = 0;
+                        if (when == start) { t_in_crit = 0; if (!chart_change) no_of_alerts--; }
                     }
                     else if (last_status == RRDCALC_STATUS_UNDEFINED) {
                         in_other -= range;
                         in_clear += range;
-                        if (when == start) t_in_other = 0;
+                        if (when == start) { t_in_other = 0; if (!chart_change) no_of_alerts--; }
                     }
                     last_status = RRDCALC_STATUS_CLEAR;
                     t_in_clear++;
@@ -1117,17 +1120,20 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     if (last_status == RRDCALC_STATUS_CLEAR) {
                         in_clear -= range;
                         in_warn += range;
-                        if (when == start) t_in_clear = 0;
+                        if (when == start) { t_in_clear = 0; if (!chart_change) no_of_alerts--; }
+                    }
+                    if (last_status == RRDCALC_STATUS_WARNING) {
+                        if (when == start) { t_in_warn = 0; }
                     }
                     else if (last_status == RRDCALC_STATUS_CRITICAL) {
                         in_crit -= range;
                         in_warn += range;
-                        if (when == start) t_in_crit = 0;
+                        if (when == start) { t_in_crit = 0; if (!chart_change) no_of_alerts--; }
                     }
                     else if (last_status == RRDCALC_STATUS_UNDEFINED) {
                         in_other -= range;
                         in_warn += range;
-                        if (when == start) t_in_other = 0;
+                        if (when == start) { t_in_other = 0; if (!chart_change) no_of_alerts--; }
                     }
                     last_status = RRDCALC_STATUS_WARNING;
                     t_in_warn++;
@@ -1138,17 +1144,20 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     if (last_status == RRDCALC_STATUS_CLEAR) {
                         in_clear -= range;
                         in_crit += range;
-                        if (when == start) t_in_clear = 0;
+                        if (when == start) { t_in_clear = 0; if (!chart_change) no_of_alerts--; }
                     }
                     else if (last_status == RRDCALC_STATUS_WARNING) {
                         in_warn -= range;
                         in_crit += range;
-                        if (when == start) t_in_warn = 0;
+                        if (when == start) { t_in_warn = 0; if (!chart_change) no_of_alerts--; }
+                    }
+                    if (last_status == RRDCALC_STATUS_CRITICAL) {
+                        if (when == start) { t_in_crit = 0; }
                     }
                     else if (last_status == RRDCALC_STATUS_UNDEFINED) {
                         in_other -= range;
                         in_crit += range;
-                        if (when == start) t_in_other = 0;
+                        if (when == start) { t_in_other = 0; if (!chart_change) no_of_alerts--; }
                     }
                     last_status = RRDCALC_STATUS_CRITICAL;
                     t_in_crit++;
@@ -1160,17 +1169,17 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     if (last_status == RRDCALC_STATUS_CLEAR) {
                         in_clear -= range;
                         in_other += range;
-                        if (when == start) t_in_clear = 0;
+                        if (when == start) { t_in_clear = 0; if (!chart_change) no_of_alerts--; }
                     }
                     else if (last_status == RRDCALC_STATUS_WARNING) {
                         in_warn -= range;
                         in_other += range;
-                        if (when == start) t_in_warn = 0;
+                        if (when == start) { t_in_warn = 0; if (!chart_change) no_of_alerts--; }
                     }
                     else if (last_status == RRDCALC_STATUS_CRITICAL) {
                         in_crit -= range;
                         in_other += range;
-                        if (when == start) t_in_crit = 0;
+                        if (when == start) { t_in_crit = 0; if (!chart_change) no_of_alerts--; }
                     }
                     last_status = RRDCALC_STATUS_UNDEFINED;
                     t_in_other++;
