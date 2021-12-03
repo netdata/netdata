@@ -41,7 +41,14 @@ public:
     SIMPLE_PATTERN *SP_ChartsToSkip;
 
     std::string AnomalyDBPath;
-
+    #if defined(ENABLE_ML_TESTS)
+    std::string AnomalyTestDBPath;
+    std::string AnomalyTestDataPath;
+    std::string AnomalyTestQuery1Path;
+    std::string AnomalyTestCheck1Path;
+    std::string AnomalyTestQuery2Path;
+    std::string AnomalyTestCheck2Path;
+    #endif // ENABLE_ML_TESTS
     void readMLConfig();
 };
 

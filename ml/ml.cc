@@ -190,7 +190,9 @@ int test_ml(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
 
-    test_ml_anomaly_info_api_sql();
+    if(test_ml_anomaly_info_api_sql() == 0) {
+        fprintf(stderr, "PASSED testing ML API SQL query; SQL_SELECT_ANOMALY_RATE_INFO\n");
+    }
 
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
@@ -198,7 +200,7 @@ int test_ml(int argc, char *argv[]) {
 
 // --------------------------------------------------------------------------------------------------------------------
 // test ML API SQL query: SQL_SELECT_ANOMALY_RATE_INFO
-char *read_file_content_path(char const *filepath) {
+char *read_file_content_path(const char *filepath) {
     FILE *file = fopen(filepath, "r");
     if (file != NULL) {
         fseek(file, 0L, SEEK_END);
@@ -224,7 +226,7 @@ int test_ml_callback(void *IgnoreMe, int argc, char **argv, char **TableField) {
     return 0;
 }
 
-int run_ml_test_query(sqlite3 *db, char const *filepath) {
+int run_ml_test_query(sqlite3 *db, const char *filepath) {
     char *err_msg = 0;
     char *sql = read_file_content_path(filepath);
     if(sql != "NULL!") {
@@ -247,16 +249,15 @@ int run_ml_test_query(sqlite3 *db, char const *filepath) {
 ...The SQL query is obviously only for the part of the service when the given time range belongs to the past
 ... and its corresponding anomaly data is already saved in the database.
 ...For the other part of the service of the API service when the unsaved data is required, i.e. nearer the current time,
-...a manual test is sought.
-In order to run the following test, please first, change the file path of the db file and the sql script files
-...to your home/???/opt/... directory where all your test .sql files should reside. 
-...Otherwise, a common variable from some config file should be used to replace the directory*/
+...a manual test is sought.*/
 int test_ml_anomaly_info_api_sql(void) {
     int retValue = 0;
-    fprintf(stderr, "Testing ML API SQL query; SQL_SELECT_ANOMALY_RATE_INFO\n");
+    fprintf(stderr, "Testing ML API SQL query; SQL_SELECT_ANOMALY_RATE_INFO on %s\n", Cfg.AnomalyTestDBPath.c_str());
     sqlite3 *db_ml_anomaly_info;
-        
-    int rc = sqlite3_open("/home/siamak/opt/netdata/var/cache/netdata/ml_test_anomaly_info.db", &db_ml_anomaly_info);
+
+    
+    int rc = sqlite3_open(Cfg.AnomalyTestDBPath.c_str(), &db_ml_anomaly_info);
+    //int rc = sqlite3_open_v2(Cfg.AnomalyTestDBPath.c_str(), &db_ml_anomaly_info, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Testing ML API SQL query; Cannot open database: %s\n", sqlite3_errmsg(db_ml_anomaly_info));
         sqlite3_close(db_ml_anomaly_info);        
@@ -264,47 +265,47 @@ int test_ml_anomaly_info_api_sql(void) {
     }
     else {
         //Create and populate the test database from sql script
-        if(run_ml_test_query(db_ml_anomaly_info, "/home/siamak/opt/netdata/var/cache/netdata/ml_test_data.sql") == 0) {
+        if(run_ml_test_query(db_ml_anomaly_info, Cfg.AnomalyTestDataPath.c_str()) == 0) {
             //Test 1: query a range where all source info have equal values of anomaly, so the average should be equal to each value
             //... this is compared against a set result
             fprintf(stderr, "Testing ML API SQL query; SQL_SELECT_ANOMALY_RATE_INFO; Test 1:\n");
             //execute the query under subject to this unit test
-            if(run_ml_test_query(db_ml_anomaly_info, "/home/siamak/opt/netdata/var/cache/netdata/ml_test_query_1.sql") == 0) {
+            if(run_ml_test_query(db_ml_anomaly_info, Cfg.AnomalyTestQuery1Path.c_str()) == 0) {
                 //execute the query to check the results
-                if(run_ml_test_query(db_ml_anomaly_info, "/home/siamak/opt/netdata/var/cache/netdata/ml_test_check_1.sql") == 0) {
-            
+                if(run_ml_test_query(db_ml_anomaly_info, Cfg.AnomalyTestCheck1Path.c_str()) == 0) {
+                    fprintf(stderr, "Testing ML API SQL query; SQL_SELECT_ANOMALY_RATE_INFO: Passed Test1.\n");
                 }
                 else {
-                    fprintf(stderr, "Testing ML API SQL query; error reading sql file ml_test_check_1.sql\n");
+                    fprintf(stderr, "Testing ML API SQL query; error reading q1 %s\n", Cfg.AnomalyTestQuery1Path.c_str());
                     retValue = 1;
                 }        
             }
             else {
-                fprintf(stderr, "Testing ML API SQL query; error reading sql file ml_test_query_1.sql\n");
+                fprintf(stderr, "Testing ML API SQL query; error reading c1 %s\n", Cfg.AnomalyTestCheck1Path.c_str());
                 retValue = 1;
             }
             //Test 2: query a range where all info do not have equal values, so the average values should be different
             //... and within the margin of the set results
             fprintf(stderr, "Testing ML API SQL query; SQL_SELECT_ANOMALY_RATE_INFO; Test 2:\n");
             //execute the query under subject to this unit test
-            if(run_ml_test_query(db_ml_anomaly_info, "/home/siamak/opt/netdata/var/cache/netdata/ml_test_query_2.sql") == 0) {
+            if(run_ml_test_query(db_ml_anomaly_info, Cfg.AnomalyTestQuery2Path.c_str()) == 0) {
                 //execute the query to check the results
-                if(run_ml_test_query(db_ml_anomaly_info, "/home/siamak/opt/netdata/var/cache/netdata/ml_test_check_2.sql") == 0) {
-            
+                if(run_ml_test_query(db_ml_anomaly_info, Cfg.AnomalyTestCheck2Path.c_str()) == 0) {
+                    fprintf(stderr, "Testing ML API SQL query; SQL_SELECT_ANOMALY_RATE_INFO: Passed Test2.\n");
                 }
                 else {
-                    fprintf(stderr, "Testing ML API SQL query; error reading sql file ml_test_check_2.sql\n");
+                    fprintf(stderr, "Testing ML API SQL query; error reading q2 %s\n", Cfg.AnomalyTestQuery2Path.c_str());
                     retValue = 1;
                 }        
             }
             else {
-                fprintf(stderr, "Testing ML API SQL query; error reading sql file ml_test_query_2.sql\n");
+                fprintf(stderr, "Testing ML API SQL query; error reading c2 %s\n", Cfg.AnomalyTestCheck2Path.c_str());
                 retValue = 1;
             }
 
         }
         else {
-            fprintf(stderr, "Testing ML API SQL query; error reading sql file ml_test_data.sql\n");
+            fprintf(stderr, "Testing ML API SQL query; error reading data %s\n", Cfg.AnomalyTestDataPath.c_str());
             retValue = 1;
         }  
     }
