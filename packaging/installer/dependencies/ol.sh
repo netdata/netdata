@@ -41,11 +41,31 @@ declare -a package_tree=(
   gzip
 )
 
-if [[ $(os_version) -eq 8 ]]; then
+function enable_repo {
+  if ! dnf repolist | grep -q codeready; then
+    cat > /etc/yum.repos.d/ol8_codeready.repo <<-EOF
+    [ol8_codeready_builder]
+    name=Oracle Linux \$releasever CodeReady Builder (\$basearch)
+    baseurl=http://yum.oracle.com/repo/OracleLinux/OL8/codeready/builder/\$basearch
+    gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+    gpgcheck=1
+    enabled=1
+EOF
+  else 
+    echo "Something went wrong!"
+    exit 1 
+  fi
+}
+
+if [[ $(os_version) =~ 8* ]]; then
   package_manager=dnf
+  echo " > Checking for CodeReady Builder ..."
+  dnf config-manager --set-enabled ol8_codeready_builder || enable_repo
 else
   package_manager=yum
 fi
+
+dnf makecache --refresh
 
 packages_to_install=
 
@@ -64,3 +84,4 @@ else
   echo "packages_to_install: ${packages_to_install[@]}"
   ${package_manager} install -y ${packages_to_install[@]}
 fi
+
