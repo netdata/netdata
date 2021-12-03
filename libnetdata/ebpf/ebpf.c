@@ -488,7 +488,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     return ebpf_attach_programs(*obj, count_programs, em->names);
 }
 
-static char *ebpf_update_name(char *search)
+char *ebpf_find_symbol(char *search)
 {
     char filename[FILENAME_MAX + 1];
     char *ret = NULL;
@@ -526,7 +526,7 @@ void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em)
     size_t i = 0;
     while (opt[i].program_name) {
         opt[i].retprobe = (mode == MODE_RETURN);
-        opt[i].optional = ebpf_update_name(opt[i].function_to_attach);
+        opt[i].optional = ebpf_find_symbol(opt[i].function_to_attach);
 
         i++;
     }

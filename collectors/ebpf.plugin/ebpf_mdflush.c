@@ -294,6 +294,13 @@ void *ebpf_mdflush_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = mdflush_maps;
 
+    char *md_flush_request = ebpf_find_symbol("md_flush_request");
+    if (!md_flush_request) {
+        em->enabled = CONFIG_BOOLEAN_NO;
+        error("Cannot monitor MD devices, because md is not loaded.");
+    }
+    freez(md_flush_request);
+
     if (!em->enabled) {
         goto endmdflush;
     }
