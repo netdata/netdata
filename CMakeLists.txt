@@ -1021,7 +1021,38 @@ IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     message(STATUS "prometheus remote write backend: enabled")
 
     find_package(Protobuf REQUIRED)
-    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
+    
+    function(PROTOBUF_REMOTE_WRITE_GENERATE_CPP SRCS HDRS)
+        if(NOT ARGN)
+            message(SEND_ERROR "Error: PROTOBUF_REMOTE_WRITE_GENERATE_CPP() called without any proto files")
+            return()
+        endif()
+
+        set(${SRCS})
+        set(${HDRS})
+        foreach(FIL ${ARGN})
+            get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+            get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+            get_filename_component(FIL_WE ${FIL} NAME_WE)
+            set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+            set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+            list(APPEND ${SRCS} ${GENERATED_PB_CC})
+            list(APPEND ${HDRS} ${GENERATED_PB_H})
+            add_custom_command(
+            OUTPUT ${GENERATED_PB_CC}
+                    ${GENERATED_PB_H}
+            COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+            ARGS -I=${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write --cpp_out=${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write ${ABS_FIL}
+            DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+            COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+            VERBATIM )
+        endforeach()
+        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+        set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+        set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+    endfunction()
+
+    protobuf_remote_write_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
 
     list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
