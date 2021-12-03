@@ -21,11 +21,11 @@ guarantees for platforms in that tier, as follows:
 
 Additionally, we define two categories for special cases that we do not support:
 
-- **Externally Supported**: Some platform maintainers actively support Netdata on their platforms even though we
-  do not provide official support. Externally supported platforms may work, but the experience of using Netdata on
-  such platforms is not something we can guarantee. Users reporting bugs when using externally supported platforms
-  will be asked to either reproduce the issue on a supported platform or direct their support request to the
-  platform maintainers.
+- **Third-party Supported Platforms**: Some platform maintainers actively support Netdata on their platforms even
+  though we do not provide official support. Third-party supported platforms may work, but the experience of using
+  Netdata on such platforms is not something we can guarantee. Users reporting bugs when using externally supported
+  platforms will be asked to either reproduce the issue on a supported platform or direct their support request
+  to the platform maintainers.
 - **Previously Supported**: As platforms become End Of Life upstream, Netdata will stop officially supporting
   them. We will generally not go out of our way to break things on these platforms, but we will also not make any
   effort to ensure that things keep working on them either. Additionally, Netdata may occasionally move an
@@ -57,8 +57,14 @@ A general outline of the various support tiers and categories is shown in the fo
 | Core | High priority | Everything but rare edge cases | Full | Yes, if we can provide them | Full |
 | Intermediate | Normal priority | Common cases | Partial (CI mostly equivalent to **Core**, but possibly with some gaps, and not required to pass) | Possibly | Full |
 | Community | Best Effort | Default only | None | No | Best Effort |
-| Externally Supported | Users directed to platform maintainers | None | None | No | Best Effort |
+| Third-party Supported | Users directed to platform maintainers | None | None | No | Best Effort |
 | Previously Supported | Users asked to upgrade | None | None | Yes, but only already published versions | Best Effort |
+
+- ‘Bug Support’: How we handle of platform-specific bugs.
+- ‘Guaranteed Configurations’: Which runtime configurations for the agent we try to guarantee will work with minimal effort from users.
+- ‘CI Coverage’: What level of coverage we provide for the platform in CI.
+- ‘Native Packages’: Whether we provide native packages for the system package manager for the platform.
+- ‘Static Build Support’: How well our static builds are expected to work on the platform.
 
 # Currently supported platforms
 
@@ -110,12 +116,14 @@ A general outline of the various support tiers and categories is shown in the fo
 | openSUSE | Tumbleweed | No | |
 | Sabayon | Latest | No | |
 
-# Externally supported platforms
+# Third-party supported platforms
 
 Currently, the following platforms have some degree of external support for Netdata:
 
 - NixOS: Netdata’s official installation methods do not support NixOS, but the NixOS maintainers provide their
   own Netdata packages for their platform.
+- Rockstor: Rockstor provides support for a Netdata add-on for their NAS platform. The Rockstor community and
+  developers are the primary source for support on their platform.
 
 # Previously supported platforms
 
@@ -142,4 +150,4 @@ This is a list of platforms that we have supported in the recent past but no lon
 ## IPMI
 
 Our IPMI collector is based on FreeIPMI. Due to upstream limitations in FreeIPMI, we are unable to support our
-IPMI collector on POWER-based hardware. 
+IPMI collector on POWER-based hardware.
