@@ -4,10 +4,6 @@ RUN yum install -y git
 
 RUN git clone https://github.com/netdata/netdata.git -b packaging-split
 
-RUN yum install -y epel-release
+WORKDIR /netdata/packaging/installer
 
-RUN yum makecache
-
-RUN ./netdata/packaging/installer/dependencies/centos.sh
-
-RUN ./netdata/packaging/installer/kickstart.sh
+RUN ./kickstart.sh --dont-wait
