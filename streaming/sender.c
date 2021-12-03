@@ -359,8 +359,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     int answer = -1;
     char *version_start = strchr(http, '=');
     int32_t version = -1;
+    uint32_t capabilities = 0;
     if(version_start) {
-        uint32_t capabilities = 0;
         char *caps_start = NULL;
         version_start++;
         version = (int32_t)strtol(version_start, &caps_start, 10);
@@ -371,15 +371,6 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         if (caps_start && *caps_start == '.') {
             capabilities = (uint32_t)strtol(caps_start + 1, NULL, 10);
         }
-#ifdef ENABLE_COMPRESSION
-        if (!(capabilities & STREAM_CAPABILITY_COMPRESSION)) {
-            // if parent doesn't support compression and this child does
-            // then disable compression for this child
-            default_compression_enabled = 0;
-            if (s->compressor) 
-                s->compressor->destroy(&s->compressor);
-        }
-#endif
     } else {
         answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
         if(!answer) {
@@ -395,6 +386,15 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
             }
         }
     }
+#ifdef ENABLE_COMPRESSION
+    if (!(capabilities & STREAM_CAPABILITY_COMPRESSION)) {
+        // if parent doesn't support compression and this child does,
+        // then disable compression for the child
+        default_compression_enabled = 0;
+        if (s->compressor) 
+            s->compressor->destroy(&s->compressor);
+    }
+#endif
 
     if(version == -1) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
