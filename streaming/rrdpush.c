@@ -78,7 +78,7 @@ int rrdpush_init() {
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
 #ifdef ENABLE_COMPRESSION
     default_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
-        "enable_compression", 1);
+        "enable_compression", default_compression_enabled);
 #endif
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {

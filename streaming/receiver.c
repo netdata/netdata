@@ -228,7 +228,6 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
     if (buffer != r->read_buffer + r->read_len) {
         // read to external buffer
         *ret = fread(buffer, 1, size, fp);
-        info("STREAM_COMPRESSION: Decompressor is active in receiver side.");
         if (!*ret)
             return 1;
     } else {
@@ -433,8 +432,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     unsigned int rrdpush_compression = default_compression_enabled;
     rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable_compression", rrdpush_compression);
     rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable_compression", rrdpush_compression);
-    rpt->rrdpush_compression = (rrdpush_compression && default_compression_enabled); 
-    info("stream.conf compression=%u key(%u && %u)", rpt->rrdpush_compression, rrdpush_compression, default_compression_enabled);
+    rpt->rrdpush_compression = (rrdpush_compression && default_compression_enabled);
 #endif  //ENABLE_COMPRESSION
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");

@@ -139,14 +139,15 @@ a proxy).
 ```
 [stream]
     enabled = yes | no
-    compresion_enabled = yes | no
     destination = IP:PORT[:SSL] ...
     api key = XXXXXXXXXXX
-```
-Stream data compression is enabled by default on systems where the appropriate versions (1.9.0 and later) of LZ4 library are installed.
-The current implementation of streaming data compression has the limitation: the size of single data block transmitted
-must not exceed 16384 bytes. If single data block size exceeds this limit, stream data compression should be disabled.
 
+[API_KEY]
+    enabled = yes | no
+
+[MACHINE_GUID]
+    enabled = yes | no
+```
 This is an overview of how these options can be combined:
 
 | target|memory<br/>mode|web<br/>mode|stream<br/>enabled|backend|alarms|dashboard|
@@ -324,6 +325,45 @@ With the introduction of TLS/SSL, the parent-child communication behaves as show
 | Yes|-/force/optional|Yes|no|The parent-child stream is encrypted, provided that the parent has a valid TLS/SSL certificate. Otherwise, the child refuses to connect.|
 | Yes|-/force/optional|Yes|yes|The parent-child stream is encrypted.|
 
+### Streaming compression
+Streaming compression is supported in streaming version protocol 5+. Streaming compression is based on [lz4](https://github.com/lz4/lz4). Your OS should support lz4 v1.9.0+ in order to enable streaming compression. Any lower version will disable compression for streaming compatibility between the Netdata agents.
+
+Stream data compression is enabled by default on systems where the appropriate versions (1.9.0 and later) of LZ4 library are installed. A compressed data packet is determined and decompressed on the fly. The current implementation of streaming data compression has the limitation: the size of single data block transmitted must not exceed 16384 bytes. If single data block size exceeds this limit, stream data compression should be disabled.
+
+#### How to enable streaming compression.
+Netdata agents are shipped with data compression enabled by default but of course you can simply configure which streams will use compression.
+You can quickly enable compression in the `stream.conf` under the section `[stream]`.
+```
+# This is the default compression flag for an agent. Select if you want to use stream compression to send data to a parent.
+[stream]
+enable_compression = yes | no
+```
+This configuration will allow to the Netdata agent to negotiate streaming compression with other Netdata agents. During the negotiation of streaming compression BOTH Netdata agents should support and enable compression in order to communicate over a compressed stream. If one of the Netdata agents doesn't support OR has compression disabled then the negotiation will result in an uncompressed stream.
+
+| Parent               | Stream compression | Child                |
+|----------------------|--------------------|----------------------|
+| Supported & Enabled  | compressed         | Supported & Enabled  |
+| (Supported & Disabled)/Not supported | uncompressed         | Supported & Enabled |
+| Supported & Enabled | uncompressed         | (Supported & Disabled)/Not supported |
+| (Supported & Disabled)/Not supported | uncompressed         | (Supported & Disabled)/Not supported |
+
+In case of parents with multiple children you can select which streams will be compressed by using the same configuration under the `[API_KEY]`, `[MACHINE_GUID]` section. 
+
+Manage stream compression per child. (En/dis)able stream compression per child. This configuration uses AND logic with the default compression in [stream] section. This means the stream compression from child to parent will be enbaled only if the outcome of the AND operation is true (default compression enabled && api key compression enabled). So both should be enabled to get compression otherwise compression is disabled.
+
+```
+# This is the default compression flag for an agent. Select if you want to use stream compression to send data to a parent. 
+[stream]
+    enable_compression = yes | no
+
+# Manage stream compression per child. (En/dis)able stream compression per child. This configuration uses AND logic with the default compression in [stream] section. This means the stream compression from child to parent will be enbaled only if the outcome of the AND operation is true (default compression enabled && api key compression enabled). So both should be enabled to get compression otherwise compression is disabled.    
+[API_KEY]
+    enable_compression = yes | no
+
+# Manage stream compression per child. (En/dis)able stream compression per child. This configuration uses AND logic with the default compression in [stream] section. This means the stream compression from child to parent will be enbaled only if the outcome of the AND operation is true (default compression enabled && mguid compression enabled). So both should be enabled to get compression otherwise compression is disabled.    
+[MACHINE_GUID]
+    enable_compression = yes | no
+```
 ## Viewing remote host dashboards, using mirrored databases
 
 On any receiving Netdata, that maintains remote databases and has its web server enabled,

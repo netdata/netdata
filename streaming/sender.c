@@ -20,7 +20,7 @@ void sender_commit(struct sender_state *s) {
 #ifdef ENABLE_COMPRESSION
     do {
         if (src && src_len) {
-            if (s->compressor) {
+            if (s->compressor && s->rrdpush_compression) {
                 src_len = s->compressor->compress(s->compressor, src, src_len, &src);
                 if (!src_len) {
                     error("Compression error - data discarded");
@@ -381,8 +381,6 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     http[received] = '\0';
     debug(D_STREAM, "Response to sender from far end: %s", http);
-    info("Response to sender from far end: %s", http);
-    // negotiations
     int32_t version = (int32_t)parse_stream_version(host, http);
     // if(version_start) {
     //     version_start++;
@@ -415,7 +413,6 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     s->version = version;
 #ifdef ENABLE_COMPRESSION
     s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_VERSION_COMPRESSION));
-    info("Compression sender status: %s compression=%u (%u && %u)", s->host->hostname, s->rrdpush_compression, default_compression_enabled, (unsigned int)(s->version >= STREAM_VERSION_COMPRESSION));
     if(s->rrdpush_compression)
     {
         // parent supports compression
@@ -424,9 +421,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
     else {
         //parent does not support compression or has compression disabled
-        info("Stream is uncompressed! One of the agents (%s <-> %s) does not support OR has compression disabled.", s->connected_to, s->host->hostname);
-        if (s->compressor)
-            s->compressor->destroy(&s->compressor);
+        debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
+        s->version = (STREAM_VERSION_COMPRESSION - 1);
     }        
 #endif  //ENABLE_COMPRESSION
 
