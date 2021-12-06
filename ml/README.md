@@ -57,7 +57,7 @@ And if we add the `&options=anomaly-bit` params, we can see the "anomaly bit" va
  ]
 }
 ```
-
+In this example, the dimensions "received" and "sent" didn't show any abnormal behavior, so the anomaly bit is zero.
 Under normal circumstances, the anomaly bit will mostly be 0. However, there can be random fluctuations setting the anomaly to 100, although this very much depends on the nature of the dimension in question.
 
 ### Anomaly Rate - average(anomaly bit)
