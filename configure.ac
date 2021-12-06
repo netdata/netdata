@@ -1387,12 +1387,7 @@ PKG_CHECK_MODULES(
 PKG_CHECK_MODULES(
     [AWS_CPP_SDK_CORE],
     [aws-cpp-sdk-core],
-    [AC_CHECK_LIB(
-        [aws-cpp-sdk-core],
-        [cJSON_free],
-        [have_libaws_cpp_sdk_core=yes],
-        [have_libaws_cpp_sdk_core=no]
-    )],
+    [have_libaws_cpp_sdk_core=yes],
     [have_libaws_cpp_sdk_core=no]
 )
 
