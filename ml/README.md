@@ -190,7 +190,7 @@ Below is a list of all the available configuration params and their default valu
 
 ## Charts
 
-One enabled, the "Anomaly Detection" menu and charts will be available on the dashboard.
+Once enabled, the "Anomaly Detection" menu and charts will be available on the dashboard.
 
 ![anomaly_detection_menu](https://user-images.githubusercontent.com/2178292/144255721-4568aabf-39c7-4855-bf1c-31b1d60e28e6.png)
 
