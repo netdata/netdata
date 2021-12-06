@@ -1035,6 +1035,14 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     analytics_get_data(analytics_data.netdata_config_stream_enabled, wb);
     buffer_strcat(wb, ",\n");
 
+#ifdef  ENABLE_COMPRESSION
+    buffer_strcat(wb, "\t\"stream-compression\": ");
+    buffer_strcat(wb, (default_compression_enabled ? "\"enabled\"" : "\"disabled\""));
+    buffer_strcat(wb, ",\n");
+#else
+    buffer_strcat(wb, "\t\"stream-compression\": \"N/A\",\n");
+#endif  //ENABLE_COMPRESSION   
+
     buffer_strcat(wb, "\t\"hosts-available\": ");
     analytics_get_data(analytics_data.netdata_config_hosts_available, wb);
     buffer_strcat(wb, ",\n");

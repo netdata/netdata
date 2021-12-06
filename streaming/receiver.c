@@ -430,8 +430,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
 #ifdef  ENABLE_COMPRESSION
     unsigned int rrdpush_compression = default_compression_enabled;
-    rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable_compression", rrdpush_compression);
-    rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable_compression", rrdpush_compression);
+    rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rrdpush_compression);
+    rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rrdpush_compression);
     rpt->rrdpush_compression = (rrdpush_compression && default_compression_enabled);
 #endif  //ENABLE_COMPRESSION
 
