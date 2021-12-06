@@ -860,9 +860,9 @@ lookup: average -3s percentage foreach *
 The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds. In this case
 Netdata will create alarms for all dimensions of the chart.
 
-### Example 7
+### Example 7 - Z Score based alarm
 
-Derive a z score based alarm on `user` dimension of the `system.cpu` chart:
+Derive a "[Z Score](https://en.wikipedia.org/wiki/Standard_score)" based alarm on `user` dimension of the `system.cpu` chart:
 
 ```yaml
  alarm: cpu_user_mean
@@ -884,7 +884,7 @@ lookup: mean -10s of user
   crit: $this < -3 or $this > 3
 ```
 
-Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alrams, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
+Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alarms, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
 
 ## Troubleshooting
 
