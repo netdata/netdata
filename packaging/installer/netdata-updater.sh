@@ -269,7 +269,7 @@ update_available() {
   searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
   ndbinary="$(env PATH="${searchpath}" command -v netdata 2>/dev/null)"
 
-  if [ -z "${ndinary}" ]; then
+  if [ -z "${ndbinary}" ]; then
     current_version=0
   else
     current_version="$(parse_version "$(${ndbinary} -v | cut -f 2 -d ' ')")"
