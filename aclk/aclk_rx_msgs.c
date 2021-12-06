@@ -119,7 +119,7 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     }\
     ACLK_SHARED_STATE_UNLOCK;
 
-static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, char *raw_payload)
+static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent, char *raw_payload)
 {
     if (!aclk_use_new_cloud_arch) {
         HTTP_CHECK_AGENT_INITIALIZED();
@@ -172,67 +172,43 @@ error:
     return 1;
 }
 
-typedef struct aclk_incoming_msg_type{
-    char *name;
-    int(*fnc)(struct aclk_request *, char *);
-}aclk_incoming_msg_type;
-
-aclk_incoming_msg_type aclk_incoming_msg_types_compression[] = {
-    { .name = "http",    .fnc = aclk_handle_cloud_request_v2 },
-    { .name = NULL,      .fnc = NULL                         }
-};
-
-struct aclk_incoming_msg_type *aclk_incoming_msg_types = aclk_incoming_msg_types_compression;
-
-int aclk_handle_cloud_message(char *payload)
+int aclk_handle_cloud_cmd_message(char *payload)
 {
     struct aclk_request cloud_to_agent;
     memset(&cloud_to_agent, 0, sizeof(struct aclk_request));
 
     if (unlikely(!payload)) {
-        errno = 0;
-        error("ACLK incoming message is empty");
+        error_report("ACLK incoming 'cmd' message is empty");
         return 1;
     }
 
-    debug(D_ACLK, "ACLK incoming message (%s)", payload);
+    debug(D_ACLK, "ACLK incoming 'cmd' message (%s)", payload);
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
     if (unlikely(rc != JSON_OK)) {
-        errno = 0;
-        error("Malformed json request (%s)", payload);
+        error_report("Malformed json request (%s)", payload);
         goto err_cleanup;
     }
 
     if (!cloud_to_agent.type_id) {
-        errno = 0;
-        error("Cloud message is missing compulsory key \"type\"");
+        error_report("Cloud message is missing compulsory key \"type\"");
         goto err_cleanup;
     }
 
-
-    for (int i = 0; aclk_incoming_msg_types[i].name; i++) {
-        if (strcmp(cloud_to_agent.type_id, aclk_incoming_msg_types[i].name) == 0) {
-            if (likely(!aclk_incoming_msg_types[i].fnc(&cloud_to_agent, payload))) {
-                // in case of success handler is supposed to clean up after itself
-                // or as in the case of aclk_handle_cloud_request take
-                // ownership of the pointers (done to avoid copying)
-                // see what `aclk_queue_query` parameter `internal` does
-
-                // NEVER CONTINUE THIS LOOP AFTER CALLING FUNCTION!!!
-                // msg handlers (namely aclk_handle_version_response)
-                // can freely change what aclk_incoming_msg_types points to
-                // so either exit or restart this for loop
-                freez(cloud_to_agent.type_id);
-                return 0;
-            }
-            goto err_cleanup;
-        }
+    // Originally we were expecting to have multiple types of 'cmd' message,
+    // but after the new protocol was designed we will ever only have 'http'
+    if (strcmp(cloud_to_agent.type_id, "http")) {
+        error_report("Only 'http' cmd message is supported");
+        goto err_cleanup;
     }
 
-    errno = 0;
-    error("Unknown message type from Cloud \"%s\"", cloud_to_agent.type_id);
+    if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload))) {
+        // aclk_handle_cloud_request takes ownership of the pointers
+        // (to avoid copying) in case of success
+        freez(cloud_to_agent.type_id);
+        return 0;
+    }
 
 err_cleanup:
     if (cloud_to_agent.payload)
