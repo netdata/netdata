@@ -259,7 +259,10 @@ int handle_old_proto_cmd(const char *msg, size_t msg_len)
     char *str = mallocz(msg_len+1);
     memcpy(str, msg, msg_len);
     str[msg_len] = 0;
-    aclk_handle_cloud_message(str);
+    if (aclk_handle_cloud_cmd_message(str)) {
+        freez(str);
+        return 1;
+    }
     freez(str);
     return 0;
 }
