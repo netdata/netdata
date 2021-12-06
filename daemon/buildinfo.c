@@ -61,6 +61,13 @@
 #define FEAT_ML 0
 #endif
 
+#ifdef  ENABLE_COMPRESSION
+#define  FEAT_STREAM_COMPRESSION 1
+#else
+#define  FEAT_STREAM_COMPRESSION 0
+#endif  //ENABLE_COMPRESSION
+
+
 // Optional libraries
 
 #ifdef HAVE_PROTOBUF
@@ -366,6 +373,7 @@ void analytics_build_info(BUFFER *b) {
     if(FEAT_ACLK_LEGACY)     buffer_strcat (b, "|ACLK Legacy");
     if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
     if(FEAT_ML)              buffer_strcat (b, "|Machine Learning");
+    if(FEAT_STREAM_COMPRESSION) buffer_strcat (b, "|Streaming Compression");
 
     if(FEAT_PROTOBUF)        buffer_strcat (b, "|protobuf");
     if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");
