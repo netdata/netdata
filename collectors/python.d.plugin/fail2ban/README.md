@@ -10,8 +10,44 @@ Monitors the fail2ban log file to show all bans for all active jails.
 
 ## Requirements
 
-- fail2ban.log file must be readable by Netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at
-  logrotate.d)
+The `fail2ban.log` file must be readable by the user `netdata`:
+
+- change the file ownership and access permissions.
+- update `/etc/logrotate.d/fail2ban` to persists the changes after rotating the log file.
+
+<details>
+  <summary>Click to expand the instruction.</summary>
+
+To change the file ownership and access permissions, execute the following:
+
+```shell
+sudo chown root:netdata /var/log/fail2ban.log
+sudo chmod 640 /var/log/fail2ban.log
+```
+
+To persists the changes after rotating the log file, add `create 640 root netdata` to the `/etc/logrotate.d/fail2ban`:
+
+```shell
+/var/log/fail2ban.log {
+
+    weekly
+    rotate 4
+    compress
+
+    delaycompress
+    missingok
+    postrotate
+        fail2ban-client flushlogs 1>/dev/null
+    endscript
+
+    # If fail2ban runs as non-root it still needs to have write access
+    # to logfiles.
+    # create 640 fail2ban adm
+    create 640 root netdata
+}
+```
+
+</details>
 
 ## Charts
 
