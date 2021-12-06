@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Explicitly conflict with distro netdata DEB packages. [\#11855](https://github.com/netdata/netdata/pull/11855) ([Ferroin](https://github.com/Ferroin))
+- fixed username for not-local users [\#11854](https://github.com/netdata/netdata/pull/11854) ([scatenag](https://github.com/scatenag))
+- Create ML README.md [\#11848](https://github.com/netdata/netdata/pull/11848) ([andrewm4894](https://github.com/andrewm4894))
 - Fix token name in release draft workflow. [\#11847](https://github.com/netdata/netdata/pull/11847) ([Ferroin](https://github.com/Ferroin))
 - Bump static builds to use Alpine 3.15 as a base. [\#11836](https://github.com/netdata/netdata/pull/11836) ([Ferroin](https://github.com/Ferroin))
 - Remove Fedora 33 from CI. [\#11640](https://github.com/netdata/netdata/pull/11640) ([Ferroin](https://github.com/Ferroin))
