@@ -25,7 +25,7 @@ sudo chown root:netdata /var/log/fail2ban.log
 sudo chmod 640 /var/log/fail2ban.log
 ```
 
-To persists the changes after rotating the log file, add `create 640 root netdata` to the `/etc/logrotate.d/fail2ban`:
+To persist the changes after rotating the log file, add `create 640 root netdata` to the `/etc/logrotate.d/fail2ban`:
 
 ```shell
 /var/log/fail2ban.log {
