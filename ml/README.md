@@ -58,7 +58,7 @@ And if we add the `&options=anomaly-bit` params, we can see the "anomaly bit" va
 }
 ```
 
-Typically, the anomaly bit will mostly be 0 under normal circumstances with some random fluctuations every now and then to 100. Although this very much depends on the nature of the dimension in question.
+Typically, the anomaly bit will mostly be 0 under normal circumstances, with some random fluctuations every now and then to 100, although this very much depends on the nature of the dimension in question.
 
 ### Anomaly Rate - average(anomaly bit)
 
