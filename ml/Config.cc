@@ -111,7 +111,7 @@ void Config::readMLConfig(void) {
     ADWindowRateThreshold = clamp(ADWindowRateThreshold, 0.01, 0.99);
     ADDimensionRateThreshold = clamp(ADDimensionRateThreshold, 0.01, 0.99);
 
-    SaveAnomalyPercentageEvery = clamp(SaveAnomalyPercentageEvery, 60.0, 240.0);
+    SaveAnomalyPercentageEvery = clamp(SaveAnomalyPercentageEvery, 60.0, 3600.0);
 
     MaxAnomalyRateInfoTableSize = clamp(MaxAnomalyRateInfoTableSize, 10.0, 100000.0);
     MaxAnomalyRateInfoAge = clamp(MaxAnomalyRateInfoAge, 0.1, 2400.0);
