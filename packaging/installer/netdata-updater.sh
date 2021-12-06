@@ -38,6 +38,8 @@ else
   script_source="${script_dir}/netdata-updater.sh"
 fi
 
+PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
+
 info() {
   echo >&3 "$(date) : INFO: " "${@}"
 }
@@ -262,7 +264,17 @@ get_latest_version() {
 }
 
 update_available() {
-  current_version="$(command -v netdata > /dev/null && parse_version "$(netdata -v | cut -f 2 -d ' ')")"
+  basepath="$(basename "$(basename "$(basename "${NETDATA_LIB_DIR}")")")"
+  searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
+  searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
+  ndbinary="$(env PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
+  if [ -z "${ndinary}" ]; then
+    current_version=0
+  else
+    current_version="$(parse_version "$(${ndbinary} -v | cut -f 2 -d ' ')")"
+  fi
+
   latest_tag="$(get_latest_version)"
   latest_version="$(parse_version "${latest_tag}")"
   path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
