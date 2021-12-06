@@ -95,6 +95,8 @@ Essentially if the ["Node Anomaly Rate"](#node-anomaly-rate) (NAR) passes a defi
 
 These anomaly events are currently exposed via `/api/v1/anomaly_events`
 
+**Note**: Clicking the link below will likely return an empty list of `[]`. This is the response when no anomaly events exist in the specified range. The example response below is illustrative of what the response would be when one or more anomaly events exist within the range of `after` to `before`.
+
 https://london.my-netdata.io/api/v1/anomaly_events?after=1638365182000&before=1638365602000
 
 If an event exists within the window, the result would be a list of start and end times.
@@ -108,9 +110,9 @@ If an event exists within the window, the result would be a list of start and en
 ]
 ```
 
-**Note**: Clicking the link above will likely return an empty list of `[]`. This is the response when no anomaly events exist in the specified range. The example response above is illustrative of what the response would be when one or more anomaly events exist within the range of `after` to `before`.
-
 Information about each anomaly event can then be found at the `/api/v1/anomaly_event_info` endpoint (making sure to pass the `after` and `before` params): 
+
+**Note**: If you click the below url you will get a `null` since no such anomaly event exists as the response is just an illustrative example taken from a node that did have such an anomaly event.
 
 https://london.my-netdata.io/api/v1/anomaly_event_info?after=1638367788&before=1638367851
 
@@ -130,8 +132,6 @@ https://london.my-netdata.io/api/v1/anomaly_event_info?after=1638367788&before=1
     ],
     ...
 ```
-
-**Note**: If you click the above url you will get a `null` since no such anomaly event exists as the response is just an illustrative example taken from a node that did have such an anomaly event.
 
 The query returns a list of dimension anomaly rates for all dimensions that were considered part of the detected anomaly event.
 
