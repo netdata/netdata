@@ -189,16 +189,10 @@ int aclk_handle_cloud_message(char *payload)
     struct aclk_request cloud_to_agent;
     memset(&cloud_to_agent, 0, sizeof(struct aclk_request));
 
-    if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        aclk_metrics_per_sample.cloud_req_recvd++;
-        ACLK_STATS_UNLOCK;
-    }
-
     if (unlikely(!payload)) {
         errno = 0;
         error("ACLK incoming message is empty");
-        goto err_cleanup_nojson;
+        return 1;
     }
 
     debug(D_ACLK, "ACLK incoming message (%s)", payload);
@@ -249,13 +243,6 @@ err_cleanup:
         freez(cloud_to_agent.msg_id);
     if (cloud_to_agent.callback_topic)
         freez(cloud_to_agent.callback_topic);
-
-err_cleanup_nojson:
-    if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        aclk_metrics_per_sample.cloud_req_err++;
-        ACLK_STATS_UNLOCK;
-    }
 
     return 1;
 }
@@ -507,14 +494,29 @@ void aclk_init_rx_msg_handlers(void)
 
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len)
 {
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.cloud_req_recvd++;
+        ACLK_STATS_UNLOCK;
+    }
     new_cloud_rx_msg_t *msg_descriptor = find_rx_handler_by_hash(simple_hash(message_type));
     debug(D_ACLK, "Got message named '%s' from cloud", message_type);
     if (unlikely(!msg_descriptor)) {
         error("Do not know how to handle message of type '%s'. Ignoring", message_type);
+        if (aclk_stats_enabled) {
+            ACLK_STATS_LOCK;
+            aclk_metrics_per_sample.cloud_req_err++;
+            ACLK_STATS_UNLOCK;
+        }
         return;
     }
     if (msg_descriptor->fnc(msg, msg_len)) {
         error("Error processing message of type '%s'", message_type);
+        if (aclk_stats_enabled) {
+            ACLK_STATS_LOCK;
+            aclk_metrics_per_sample.cloud_req_err++;
+            ACLK_STATS_UNLOCK;
+        }
         return;
     }
 }
