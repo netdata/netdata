@@ -233,6 +233,9 @@ USAGE: ${PROGRAM} [options]
   --disable-backend-prometheus-remote-write
   --enable-backend-mongodb   Enable MongoDB backend. Default: enable it when libmongoc is available.
   --disable-backend-mongodb
+  --enable-exporting-pubsub  Enable Google Cloud PupSub exporting connector. Default: enable it when
+                             libgoogle_cloud_cpp_pubsub_protos and libraries it depends on are available.
+  --disable-exporting-pubsub
   --enable-lto               Enable Link-Time-Optimization. Default: disabled
   --disable-lto
   --enable-ml                Enable anomaly detection with machine learning. (Default: autodetect)
@@ -326,6 +329,8 @@ while [ -n "${1}" ]; do
       ;;
     "--enable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-mongodb/} --enable-backend-mongodb" ;;
     "--disable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-mongodb/} --disable-backend-mongodb" ;;
+    "--enable-exporting-pubsub") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-exporting-pubsub/} --enable-exporting-pubsub" ;;
+    "--disable-exporting-pubsub") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-exporting-pubsub/} --disable-exporting-pubsub" ;;
     "--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto" ;;
     "--enable-ml")
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-ml/} --enable-ml"
