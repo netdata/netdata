@@ -40,7 +40,7 @@ run ./configure \
   --with-openssl
 
 # Curl autoconf does not honour the curl_LDFLAGS environment variable
-run sed -i -e "s/curl_LDFLAGS =/curl_LDFLAGS = -all-static/" src/Makefile
+run sed -i -e "s/LDFLAGS =/LDFLAGS = -all-static/" src/Makefile
 
 run make clean
 run make -j "$(nproc)"
