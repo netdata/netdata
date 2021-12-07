@@ -264,10 +264,10 @@ get_latest_version() {
 }
 
 update_available() {
-  basepath="$(basename "$(basename "$(basename "${NETDATA_LIB_DIR}")")")"
+  basepath="$(dirname "$(dirname "$(dirname "${NETDATA_LIB_DIR}")")")"
   searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
   searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
-  ndbinary="$(env PATH="${searchpath}" command -v netdata 2>/dev/null)"
+  ndbinary="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
 
   if [ -z "${ndbinary}" ]; then
     current_version=0
@@ -290,9 +290,6 @@ update_available() {
 
   if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; then
     info "Newest version (current=${current_version} >= latest=${latest_version}) is already installed"
-    return 1
-  elif [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
-    info "Newest version is already installed"
     return 1
   else
     info "Update available"
@@ -327,15 +324,18 @@ update() {
   if update_available; then
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
     download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.tar.gz"
-    if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
-      fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour."
+    if [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
+      info "Newest version is already installed"
+    else
+      if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
+        fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour."
+      fi
+      NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
+      tar -xf netdata-latest.tar.gz >&3 2>&3
+      rm netdata-latest.tar.gz >&3 2>&3
+      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || exit 1
+      RUN_INSTALLER=1
     fi
-    NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
-    tar -xf netdata-latest.tar.gz >&3 2>&3
-    rm netdata-latest.tar.gz >&3 2>&3
-    cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || exit 1
-    RUN_INSTALLER=1
-    cd "${NETDATA_LOCAL_TARBALL_OVERRIDE}" || exit 1
   fi
 
   # We got the sources, run the update now
