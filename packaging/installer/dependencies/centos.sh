@@ -41,10 +41,51 @@ declare -a package_tree=(
   gzip
 )
 
+function enable_powertools_repo {
+  if ! dnf repolist | grep -q powertools; then
+    cat > /etc/yum.repos.d/powertools.repo <<-EOF
+    [powertools]
+    name=CentOS Linux $releasever - PowerTools
+    mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=PowerTools&infra=$infra
+    #baseurl=http://mirror.centos.org/$contentdir/$releasever/PowerTools/$basearch/os/
+    gpgcheck=1
+    enabled=1
+    gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+EOF
+  else
+    echo "Something went wrong!"
+    exit 1
+  fi
+}
+
+function enable_epel_release {
+  if ! rpm -qa | grep epel-release > /dev/null; then
+    echo "EPEL not found, installing it.."
+    yum install -y epel-release
+  else
+    echo "EPEL is installed"
+  fi
+}
+
+function check_plugins_core {
+  if rpm -q dnf-plugins-core; then
+    echo "Package dnf-plugins-core is INSTALLED"
+  else
+    echo "Installing 'dnf-command(config-manager)' ..."
+    dnf install -y 'dnf-command(config-manager)'
+  fi
+}
+
 if [[ $(os_version) -eq 8 ]]; then
   package_manager=dnf
+  check_plugins_core
+  dnf config-manager --set-enabled powertools || enable_repo
+  dnf makecache --refresh
 else
-  package_manager=yum
+ package_manager=yum
+ enable_epel_release
+ yum makecache
+
 fi
 
 packages_to_install=
