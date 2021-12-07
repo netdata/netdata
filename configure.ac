@@ -1479,7 +1479,7 @@ PKG_CHECK_MODULES(
 
 PKG_CHECK_MODULES(
     [PUBSUB],
-    [googleapis_cpp_pubsub_protos],
+    [google_cloud_cpp_pubsub_protos],
     [have_pubsub_protos=yes],
     [have_pubsub_protos=no]
 )

@@ -288,7 +288,7 @@ pkg_check_modules(GRPC grpc)
 # -----------------------------------------------------------------------------
 # Detect libgoogleapis_cpp_pubsub_protos
 
-pkg_check_modules(PUBSUB googleapis_cpp_pubsub_protos)
+pkg_check_modules(PUBSUB google_cloud_cpp_pubsub_protos)
 # later we use:
 # ${PUBSUB_LIBRARIES}
 # ${PUBSUB_CFLAGS_OTHER}
