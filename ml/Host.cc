@@ -370,6 +370,9 @@ void DetectableHost::detectOnce() {
 
         DimsOverThreshold.reserve(DimensionsMap.size());
         DimsAnomalyRate.reserve(DimensionsMap.size());
+        /*Time variable to hold the oldest time that dbengine holds data, so that 
+        ...the records older than this may be deleted from anomaly rate info*/
+        time_t OldestTimeOfAllDims = now_realtime_sec();
 
         for (auto &DP : DimensionsMap) {
             Dimension *D = DP.second;
@@ -392,12 +395,18 @@ void DetectableHost::detectOnce() {
 
             /*regardless the dimension value was anomalous or not, update the value of the percentage of anomalous dimension*/            
             D->setAnomalyPercentage((D->getAnomalousBitCount() / (abs(Cfg.SaveAnomalyPercentageEvery - AnomalyBitCounterWindow) * static_cast<double>(updateEvery()))) * 100.0);
+            /*Register the oldest time of this dimension*/
+            OldestTimeOfAllDims = MIN(D->oldestTime(), OldestTimeOfAllDims);
             
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
                 double AnomalyPercentage = (D->getAnomalousBitCount() / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery()))) * 100.0;
-                DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
+                DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });                
                 D->setAnomalousBitCount(0.0);
+
+                //Delete the old records based on the oldest time of dim data in dbengine, i.e. OldestTimeOfAllDims
+                DB.removeOldAnomalyRateInfo(OldestTimeOfAllDims);
+                info("ML Anomaly Rate Info: Deleted records older than %ld", OldestTimeOfAllDims);
             }
 
             if (NewAnomalyEvent && (AnomalyRate >= Cfg.ADDimensionRateThreshold))
@@ -412,7 +421,6 @@ void DetectableHost::detectOnce() {
             AnomalyRate = 0.0;
 
         NumNormalDimensions = DimensionsMap.size() - NumAnomalousDimensions;
-
     }
 
     this->NumAnomalousDimensions = NumAnomalousDimensions;
@@ -484,10 +492,10 @@ void DetectableHost::detect() {
         std::this_thread::sleep_for(Seconds{updateEvery()});
 
         /*control the size of the database table and shrink them if required*/
-        DB.shrinkAnomalyRateInfoTable(static_cast<int>(Cfg.MaxAnomalyRateInfoTableSize));
+        //DB.shrinkAnomalyRateInfoTable(static_cast<int>(Cfg.MaxAnomalyRateInfoTableSize));
         /*control the age of the data and remove them if required*/
-        time_t OldestTime = now_realtime_sec() - (Cfg.MaxAnomalyRateInfoAge * 3600);
-        DB.removeOldAnomalyRateInfo(OldestTime);
+        //time_t OldestTime = now_realtime_sec() - (Cfg.MaxAnomalyRateInfoAge * 3600);
+        //DB.removeOldAnomalyRateInfo(OldestTime);
     }
 }
 
