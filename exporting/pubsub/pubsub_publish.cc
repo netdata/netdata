@@ -194,7 +194,7 @@ int pubsub_get_result(
 {
     struct pubsub_specific_data *connector_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
     std::list<struct response> *responses = (std::list<struct response> *)connector_specific_data->responses;
-    grpc_impl::CompletionQueue::NextStatus next_status;
+    grpc::CompletionQueue::NextStatus next_status;
 
     *sent_metrics = 0;
     *sent_bytes = 0;
