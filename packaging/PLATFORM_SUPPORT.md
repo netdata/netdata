@@ -14,7 +14,7 @@ guarantees for platforms in that tier, as follows:
 - **Intermediate**: Platforms in the intermediate support tier are those which Netdata wants to support, but cannot
   justify core level support for. They are also covered in CI, but not as rigorously as the core tier, may or may
   not include official binary packages, and any platform specific bugs recieve a normal priority. This is generally
-  where we ill add new platforms we have decided to officially support ourselves.
+  where we will add new platforms we have decided to officially support ourselves.
 - **Community**: Platforms in the community support tier are those which are primarily supported by community
   contributors. They may recieve some support from Netdata, but are only a best-effort affair. When a community
   member makes a contribution to add support for a new platform, that platform generally will start in this tier.
@@ -110,9 +110,9 @@ A general outline of the various support tiers and categories is shown in the fo
 | FreeBSD | 13-STABLE | No | |
 | FreeBSD | 12-STABLE | No | |
 | Gentoo | Latest | No | |
-| macOS | 12 | No | Planned for **Core** tier support, currently only works for Intel-based hardware |
-| macOS | 11 | No | Planned for **Core** tier support, currently only works for Intel-based hardware |
-| macOS | 10.15 | No | Planned for **Core** tier support |
+| macOS | 12 | No | Planned for **Core** tier support, currently only works for Intel-based hardware, currently requires Homebrew for dependencies |
+| macOS | 11 | No | Planned for **Core** tier support, currently only works for Intel-based hardwar, currently requires Homebrew for dependencies  |
+| macOS | 10.15 | No | Planned for **Core** tier suppor, currently requires Homebrew for dependencies  |
 | openSUSE | Tumbleweed | No | |
 | Sabayon | Latest | No | |
 
