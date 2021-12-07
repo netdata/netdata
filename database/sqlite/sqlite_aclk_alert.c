@@ -370,6 +370,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     alarm_log.node_id =  wc->node_id;
     alarm_log.log_entries = log_entries;
     alarm_log.status = wc->alert_updates == 0 ? 2 : 1;
+    alarm_log.enabled = 1;
 
     wc->alert_sequence_id = last_sequence;
 
