@@ -27,7 +27,6 @@ declare -a package_tree=(
   devpkg-elfutils
   git
   findutils
-  os-core-update
   curl
   gzip
   python3-basic
