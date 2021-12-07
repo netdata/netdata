@@ -27,7 +27,6 @@ declare -a package_tree=(
   judy-devel
   libelf-devel
   git
-  pkgconfig
   tar
   curl
   gzip
