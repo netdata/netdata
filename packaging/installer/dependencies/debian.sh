@@ -5,6 +5,12 @@
 
 set -e
 
+#export PATH="${PATH}:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+#export LC_ALL=C
+
+# Be nice on production environments
+#renice 19 $$ > /dev/null 2> /dev/null
+
 package_tree="
   git
   gcc

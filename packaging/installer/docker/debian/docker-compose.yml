@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  debian-8:
+    build: ./8
+  debian-9:
+    build: ./9
+  debian-10:
+    build: ./10
+  debian-11:
+    build: ./11
