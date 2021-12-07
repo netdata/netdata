@@ -799,27 +799,6 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
             AC_MSG_RESULT([yes])
         fi
 
-        if test "${with_bundled_protobuf}" = "yes"; then
-            AC_LANG_PUSH([C++]) 
-            CXXFLAGS="${CXXFLAGS} -std=c++11"
-
-            # On some platforms, std::atomic needs a helper library
-            AC_MSG_CHECKING(whether -latomic is needed for static protobuf)
-            AC_LINK_IFELSE([AC_LANG_SOURCE([[
-              #include <atomic>
-              #include <cstdint>
-              std::atomic<std::int64_t> v;
-              int main() {
-                return v;
-              }
-            ]])], STD_ATOMIC_NEED_LIBATOMIC=no, STD_ATOMIC_NEED_LIBATOMIC=yes)
-            AC_MSG_RESULT($STD_ATOMIC_NEED_LIBATOMIC)
-            if test "x$STD_ATOMIC_NEED_LIBATOMIC" = xyes; then
-                OPTIONAL_ATOMIC_LIBS="-latomic"
-            fi
-            AC_SUBST([OPTIONAL_ATOMIC_LIBS])
-            AC_LANG_POP([C++])
-        fi
         AC_MSG_CHECKING([ACLK Next Generation can support New Cloud protocol])
         AC_MSG_RESULT([${can_build_new_cloud_protocol}])
         if test "$new_cloud_protocol" = "yes" -a "$can_build_new_cloud_protocol" != "yes"; then
@@ -1655,11 +1634,44 @@ AC_MSG_RESULT([${enable_lto}])
 
 # -----------------------------------------------------------------------------
 
-AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" \
-                                     -o "${enable_exporting_pubsub}" = "yes" \
-                                     -o "${enable_backend_prometheus_remote_write}" = "yes" \
-                                     -o "${new_cloud_protocol}" = "yes" \
-                                     -o "${build_ml}" = "yes"])
+if test "${enable_backend_kinesis}" = "yes" -o \
+        "${enable_exporting_pubsub}" = "yes" -o \
+        "${enable_backend_prometheus_remote_write}" = "yes" -o \
+        "${new_cloud_protocol}" = "yes" -o \
+        "${build_ml}" = "yes"; then
+    enable_cxx_linker="yes"
+
+    # Try to unconditionally link with -latomic. If the compiler can satisfy
+    # all the atomic ops with builtins then, the library will be left unused.
+    # Otherwise, some ops will be covered by the compiler's intrinsics and some
+    # will be picked up by the linker from -latomic. In the later case, if
+    # -latomic is not available there will be a build failure, which would
+    # have happened either way before this change.
+    AC_LANG_PUSH([C++])
+
+    AC_MSG_CHECKING(whether we can use -latomic)
+    OLD_LIBS="${LIBS}"
+    LIBS="-latomic"
+    AC_LINK_IFELSE([AC_LANG_SOURCE([[
+      #include <atomic>
+      #include <cstdint>
+      std::atomic<std::int64_t> v;
+      int main() {
+        return v;
+      }
+    ]])], CAN_USE_LIBATOMIC=yes, CAN_USE_LIBATOMIC=no)
+    LIBS="${OLD_LIBS}"
+    AC_MSG_RESULT($CAN_USE_LIBATOMIC)
+
+    if test "x$CAN_USE_LIBATOMIC" = xyes; then
+        OPTIONAL_ATOMIC_LIBS="-latomic"
+    fi
+    AC_SUBST([OPTIONAL_ATOMIC_LIBS])
+
+    AC_LANG_POP([C++])
+fi
+
+AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_cxx_linker}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 

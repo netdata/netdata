@@ -969,6 +969,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_ATOMIC_LIBS) \
     $(NULL)
 
 if LINK_STATIC_JSONC
@@ -995,7 +996,6 @@ netdata_LDADD = \
 
 if ACLK_NG
     netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
-        $(OPTIONAL_ATOMIC_LIBS) \
         $(NULL)
 endif
 
