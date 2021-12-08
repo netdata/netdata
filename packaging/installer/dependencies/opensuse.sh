@@ -37,7 +37,7 @@ declare -a package_tree=(
 packages_to_install=
 
 for package in ${package_tree[@]}; do
-  if rpm -q $package &> /dev/null; then
+  if zypper search -i $package &> /dev/null; then
     echo "Package '${package}' is installed"
   else
     echo "Package '$package' is NOT installed"

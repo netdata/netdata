@@ -1,6 +1,6 @@
 FROM archlinux:base
 
-RUN pacman -Sy git
+RUN pacman -Sy --noconfirm git
 
 RUN git clone https://github.com/netdata/netdata.git -b packaging-split
 
