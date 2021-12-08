@@ -464,6 +464,8 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
     info "Switching back to ${PREVDIR}"
     cd "${PREVDIR}"
   fi
+  [ -n "${logfile}" ] && rm "${logfile}" && logfile=
+  exit 0
 else
   # the installer updates this script - so we run and exit in a single line
   update && exit 0
