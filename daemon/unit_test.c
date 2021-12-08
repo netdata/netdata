@@ -2079,6 +2079,32 @@ int test_sql_alert_stats(void) {
         return 1;
     }
 
+    /*
+      Some other cases
+    */
+    test_sql_alert_stats_insert("delete from health_log_00000000_0000_0000_0000_000000000000");
+    buffer_reset(b);
+
+    fprintf(stderr, "Running scenario 11...\n");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 1, 100, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", -1, 110, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 1, 120, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    buffer_strcat(b, "{\n");
+    sql_get_alert_analytics(host, 110, 130, b);
+    buffer_strcat(b, "}");
+
+    fprintf(stderr, "[%s]", buffer_tostring(b));
+
+    if (test_sql_alert_stats_check_json(b, "a-name", 1, 10, 1, 0, 0, 0, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 11/a failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
     buffer_free(b);
     return 0;
 }
