@@ -311,7 +311,7 @@ while [ -n "${1}" ]; do
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
 	"--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-freeipmi)}" | sed 's/$/ --enable-plugin-freeipmi/g')" ;;
-    "--disable-plugin-freeipmi") NNETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-freeipmi)}" | sed 's/$/ --disable-plugin-freeipmi/g')" ;;
+    "--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-freeipmi)}" | sed 's/$/ --disable-plugin-freeipmi/g')" ;;
     "--disable-https") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-https)}" | sed 's/$/ --disable-plugin-https/g')" ;;
     "--disable-dbengine")
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-dbengine)}" | sed 's/$/ --disable-dbengine/g')"
@@ -418,7 +418,7 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   total_ram="$((total_ram * 1024))"
 
   if [ "${total_ram}" -le "$((base * mega))" ] && [ -z "${NETDATA_ENABLE_ML}" ]; then
-    NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ml/} --disable-ml"
+    NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
     NETDATA_ENABLE_ML=0
   fi
 
@@ -550,11 +550,11 @@ fi
 
 if [ ${DONOTWAIT} -eq 0 ]; then
   if [ -n "${NETDATA_PREFIX}" ]; then
-    printf "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
+    printf '%s' "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
   else
-    printf "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to your system${TPUT_RESET} > "
+    printf '%s' "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to your system${TPUT_RESET} > "
   fi
-  read REPLY
+  read -r REPLY
   if [ "$REPLY" != '' ]; then
     exit 1
   fi
