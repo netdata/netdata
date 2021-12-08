@@ -214,7 +214,7 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 progress "fix plugin permissions"
 
-for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin; do
+for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin perf.plugin slabinfo.plugin freeipmi.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
