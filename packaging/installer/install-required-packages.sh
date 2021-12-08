@@ -1231,6 +1231,7 @@ EOF
 
 pwd
 ls -la
+echo "distribution: ${distribution}"
 dependencies/${distribution}.sh
 
 remote_log "OK"
