@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << openSUSE >>
+# << opeSUSE >>
 # supported versions: leap/15.3 and tumbleweed
+# it may work with SLES as well, although we have not tested with it
 
 set -e
 
