@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
 # << Oracle Linux >>
-# supported versions: 7,8
+# supported versions: 8
 
 set -e
 

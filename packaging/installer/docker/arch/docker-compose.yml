@@ -1,12 +1,8 @@
 version: "3.9"
 services:
-  fedora-24:
-    build: ./24
-  fedora-33:
-    build: ./33
-  fedora-34:
-    build: ./34
-  fedora-35:
-    build: ./35
+  base:
+    build: ./base
+  base-devel:
+    build: ./base-devel
 
 

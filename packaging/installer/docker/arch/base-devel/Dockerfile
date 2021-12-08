@@ -1,6 +1,6 @@
-FROM alpine:3.13
+FROM archlinux:base-devel
 
-RUN apk add git
+RUN pacman -Sy --noconfirm git
 
 RUN git clone https://github.com/netdata/netdata.git -b packaging-split
 
