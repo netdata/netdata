@@ -48,5 +48,5 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  pacman -Sy ${packages_to_install[@]}
+  pacman -Sy --noconfirm ${packages_to_install[@]}
 fi
