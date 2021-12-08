@@ -320,6 +320,16 @@ static int handle_connection(mqtt_wss_client client)
             return 1;
         }
 
+        if (aclk_kill_link) {                       // User has reloaded the claiming state
+            aclk_kill_link = 0;
+            aclk_graceful_disconnect(client);
+            log_access("Aclk_kill_link detected.");
+            aclk_queue_unlock();
+            aclk_shared_state.mqtt_shutdown_msg_id = -1;
+            aclk_shared_state.mqtt_shutdown_msg_rcvd = 0;
+            return 1;
+        }
+
         if (disconnect_req) {
             disconnect_req = 0;
             aclk_graceful_disconnect(client);
