@@ -30,6 +30,7 @@ declare -a package_tree=(
   curl
   gzip
   python3
+  binutils
 )
 
 packages_to_install=
