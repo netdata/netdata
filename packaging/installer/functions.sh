@@ -160,7 +160,6 @@ fetch_and_verify() {
 netdata_banner() {
     l1="  ^" \
     l2="  |.-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-" \
-    l3="  |   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'  " \
     l4="  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->" \
     sp="                                                                              " \
     space="  "
@@ -168,15 +167,7 @@ netdata_banner() {
     l3e="               '-'   '-'   '-'   '-'   '-'   "
 
     netdata="netdata"
-    msg="${*}"
     chartcolor="${TPUT_DIM}"
-
-  [ ${#msg} -lt ${#netdata} ] && msg="${msg}$(printf '%s' ${sp} | cut -c $((${#netdata} - ${#msg})))"
-  [ ${#msg} -gt $((${#l2} - 20)) ] && msg="$(printf '%s' ${msg} | cut -c $((${#l2} - 23)))..."
-
-  start="$((${#l2} / 2 - 4))"
-  [ $((start + ${#msg} + 4)) -gt ${#l2} ] && start=$((${#l2} - ${#msg} - 4))
-  end=$((start + ${#msg} + 4))
 
   echo >&2
   echo >&2 "${chartcolor}${l1}${TPUT_RESET}"
@@ -368,7 +359,11 @@ get_os_key() {
 }
 
 issystemd() {
-  local pids p myns ns systemctl
+  pids=''
+  p=''
+  myns=''
+  ns=''
+  systemctl=''
 
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
@@ -609,7 +604,8 @@ stop_netdata_on_pid() {
 }
 
 netdata_pids() {
-  local p myns ns
+  p=''
+  ns=''
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
 
   for p in \
@@ -625,7 +621,8 @@ netdata_pids() {
 }
 
 stop_all_netdata() {
-  local p uname
+  p=''
+  uname=''
 
   if [ "${UID}" -eq 0 ]; then
     uname="$(uname 2> /dev/null)"
@@ -650,7 +647,7 @@ stop_all_netdata() {
     fi
   fi
 
-  if [ -n "$(netdata_pids)" ] && [ -n "$(type -P netdatacli)" ]; then
+  if [ -n "$(netdata_pids)" ] && [ -n "$(type netdatacli)" ]; then
     netdatacli shutdown-agent
     sleep 20
   fi
