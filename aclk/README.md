@@ -84,7 +84,7 @@ Features:
 
 To verify which ACLK implementation Netdata uses, visit the `/api/v1/info` endpoint on your local dashboard and check the `aclk-implementation` key.
 
-New Netdata Cloud features will be implemented on top of ACLK-NG from this point on. ACLK Legacy is therefore kept as a fallback in case some users have issues.
+New Netdata Cloud features will be implemented on top of ACLK-NG only. ACLK Legacy is therefore kept as a fallback in case some users have issues.
 
 ACLK Legacy is planned to be removed in following releases!
 
