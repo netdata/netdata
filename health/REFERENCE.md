@@ -679,7 +679,7 @@ Check the `health/health.d/` directory for all alarms shipped with Netdata.
 
 Here are a few examples:
 
-### Example 1
+### Example 1 - check server alive
 
 A simple check if an apache server is alive:
 
@@ -739,7 +739,7 @@ If these result in non-zero or true, they trigger the alarm.
 So, the warning condition checks if we have not collected data from apache for 5
 iterations and the critical condition checks for 10 iterations.
 
-### Example 2
+### Example 2 - disk space
 
 Check if any of the disks is critically low on disk space:
 
@@ -760,7 +760,7 @@ So, the `calc` line finds the percentage of used space. `$this` resolves to this
 This is a repeating alarm and if the alarm becomes CRITICAL it repeats the notifications every 10 seconds. It also
 repeats notifications every 2 minutes if the alarm goes into WARNING mode.
 
-### Example 3
+### Example 3 - disk fill rate
 
 Predict if any disk will run out of space in the near future.
 
@@ -803,7 +803,7 @@ Once this alarm triggers we will receive an email like this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/17839993/87872b32-6802-11e6-8e08-b2e4afef93bb.png)
 
-### Example 4
+### Example 4 - dropped packets
 
 Check if any network interface is dropping packets:
 
@@ -823,7 +823,7 @@ Note that the drops chart does not exist if a network interface has never droppe
 When Netdata detects a dropped packet, it will add the chart and it will automatically attach this
 alarm to it.
 
-### Example 5
+### Example 5 - CPU usage
 
 Check if user or system dimension is using more than 50% of cpu:
 
@@ -842,7 +842,7 @@ The `lookup` line will calculate the average CPU usage from system and user in t
 the foreach in the `lookup` line, Netdata will create two independent alarms called `dim_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
-### Example 6
+### Example 6 - CPU usage
 
 Check if all dimensions are using more than 50% of cpu:
 
@@ -859,6 +859,32 @@ lookup: average -3s percentage foreach *
 
 The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds. In this case
 Netdata will create alarms for all dimensions of the chart.
+
+### Example 7 - Z-Score based alarm
+
+Derive a "[Z Score](https://en.wikipedia.org/wiki/Standard_score)" based alarm on `user` dimension of the `system.cpu` chart:
+
+```yaml
+ alarm: cpu_user_mean
+    on: system.cpu
+lookup: mean -60s of user
+ every: 10s
+
+ alarm: cpu_user_stddev
+    on: system.cpu
+lookup: stddev -60s of user
+ every: 10s
+
+ alarm: cpu_user_zscore
+    on: system.cpu
+lookup: mean -10s of user
+  calc: ($this - $cpu_user_mean) / $cpu_user_stddev
+ every: 10s
+  warn: $this < -2 or $this > 2
+  crit: $this < -3 or $this > 3
+```
+
+Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alarms, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
 
 ## Troubleshooting
 
