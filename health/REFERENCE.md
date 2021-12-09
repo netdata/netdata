@@ -823,7 +823,7 @@ Note that the drops chart does not exist if a network interface has never droppe
 When Netdata detects a dropped packet, it will add the chart and it will automatically attach this
 alarm to it.
 
-### Example 5 - cpu usage
+### Example 5 - CPU usage
 
 Check if user or system dimension is using more than 50% of cpu:
 
