@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- fix\(updater\): don't produce output when static update succeeded [\#11879](https://github.com/netdata/netdata/pull/11879) ([ilyam8](https://github.com/ilyam8))
 - fix\(updater\): fix exit code when updating static install && updater script [\#11873](https://github.com/netdata/netdata/pull/11873) ([ilyam8](https://github.com/ilyam8))
+- add z score alarm example [\#11871](https://github.com/netdata/netdata/pull/11871) ([andrewm4894](https://github.com/andrewm4894))
 - fix\(health\): used\_swap alarm calc [\#11868](https://github.com/netdata/netdata/pull/11868) ([ilyam8](https://github.com/ilyam8))
 - Initialize enabled parameter to 1 in AlarmLogHealth message [\#11856](https://github.com/netdata/netdata/pull/11856) ([MrZammler](https://github.com/MrZammler))
 - Explicitly conflict with distro netdata DEB packages. [\#11855](https://github.com/netdata/netdata/pull/11855) ([Ferroin](https://github.com/Ferroin))
@@ -16,6 +18,7 @@
 - Fix token name in release draft workflow. [\#11847](https://github.com/netdata/netdata/pull/11847) ([Ferroin](https://github.com/Ferroin))
 - Bump static builds to use Alpine 3.15 as a base. [\#11836](https://github.com/netdata/netdata/pull/11836) ([Ferroin](https://github.com/Ferroin))
 - Detect whether libatomic should be linked in when using CXX linker. [\#11818](https://github.com/netdata/netdata/pull/11818) ([vkalintiris](https://github.com/vkalintiris))
+- Make netdata-updater.sh POSIX compliant. [\#11755](https://github.com/netdata/netdata/pull/11755) ([Ferroin](https://github.com/Ferroin))
 - Remove Fedora 33 from CI. [\#11640](https://github.com/netdata/netdata/pull/11640) ([Ferroin](https://github.com/Ferroin))
 - Remove OpenSUSE Leap 15.2 from CI. [\#11600](https://github.com/netdata/netdata/pull/11600) ([Ferroin](https://github.com/Ferroin))
 
