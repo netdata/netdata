@@ -842,7 +842,7 @@ The `lookup` line will calculate the average CPU usage from system and user in t
 the foreach in the `lookup` line, Netdata will create two independent alarms called `dim_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
-### Example 6 - cpu usage
+### Example 6 - CPU usage
 
 Check if all dimensions are using more than 50% of cpu:
 
