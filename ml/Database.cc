@@ -108,13 +108,6 @@ const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
 const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO_RANGE =
     "SELECT after, before FROM anomaly_rate_info WHERE host_id == ?1 ORDER BY before DESC LIMIT 1;";
 
-const char *ml::Database::SQL_SHRINK_ANOMALY_RATE_INFO =
-    "DELETE FROM anomaly_rate_info "
-    " WHERE after NOT IN ( "
-    " SELECT after FROM ( "
-    " SELECT after FROM anomaly_rate_info "
-    " ORDER BY after DESC LIMIT ?1 ) foo);";
-
 const char *ml::Database::SQL_REMOVE_OLD_ANOMALY_RATE_INFO =
     "DELETE FROM anomaly_rate_info "
     " WHERE before <= ?1;";

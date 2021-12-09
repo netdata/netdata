@@ -299,3 +299,138 @@ TEST(BitRateWindowTest, MaxWindow) {
     R = BRW.insert(false);
     EXPECT_EQ(R.first, std::make_pair(State::AboveThreshold, State::Idle));
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// test ML API SQL query: SQL_SELECT_ANOMALY_RATE_INFO
+
+/*The following test verifies the operation of the sal query that is included in the service of the ML_API_3
+... the API is in charge of providing the peercentage of the time that each dimension has been anomalous
+... within the given time range.
+...The SQL query is obviously only for the part of the service when the given time range belongs to the past
+... and its corresponding anomaly data is already saved in the database.
+...For the other part of the service of the API service when the unsaved data is required, i.e. nearer the current time,
+...a manual test is sought.*/
+char *read_file_content_path(const char *filepath) {
+    FILE *file = fopen(filepath, "r");
+    if (file != NULL) {
+        fseek(file, 0L, SEEK_END);
+        long file_size = ftell(file);
+        rewind(file);
+        char *text = (char*)malloc(file_size + 1);
+        fread(text, 1, file_size, file);
+        text[file_size] = '\0';
+        fclose(file);
+        return text;
+    }
+    else {
+        return "NULL!";
+    }
+}
+
+int test_ml_callback(void *IgnoreMe, int argc, char **argv, char **TableField) {    
+    IgnoreMe = 0;
+    printf("Testing ML API SQL query; RESULTS:\n");  
+    for (int i = 0; i < argc; i++) {
+        printf("Testing ML API SQL query; %s = %s\n", TableField[i], argv[i] ? argv[i] : "NULL");
+    }    
+    return 0;
+}
+
+int run_ml_test_query(sqlite3 *db, const char *filepath) {
+    char *err_msg = 0;
+    char *sql = read_file_content_path(filepath);
+    if(sql != "NULL!") {
+        int rc = sqlite3_exec(db, sql, test_ml_callback, 0, &err_msg);    
+        if (rc != SQLITE_OK ) {        
+            fprintf(stderr, "Testing ML API SQL query; SQL error: %s\n", err_msg);        
+            sqlite3_free(err_msg);      
+            return 1;
+        }
+    }
+    else {
+        return 1;
+    }
+    return 0;
+}
+
+int test_ml_anomaly_info_api_sql(const std::string &AnomalyTestDBPath, const std::string &AnomalyTestDataPath, 
+                                    const std::string &AnomalyTestQueryPath, const std::string &AnomalyTestCheckPath) {
+    int retValue = 0;
+    sqlite3 *db_ml_anomaly_info;
+
+    
+    int rc = sqlite3_open_v2(AnomalyTestDBPath.c_str(), &db_ml_anomaly_info, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Testing ML API SQL query; Cannot open database: %s\n", sqlite3_errmsg(db_ml_anomaly_info));
+        sqlite3_close(db_ml_anomaly_info);        
+        retValue = 1;
+    }
+    else {
+        //Create and populate the test database from sql script
+        if(run_ml_test_query(db_ml_anomaly_info, AnomalyTestDataPath.c_str()) == 0) {
+            //execute the query under subject to this unit test
+            if(run_ml_test_query(db_ml_anomaly_info, AnomalyTestQueryPath.c_str()) == 0) {
+                //execute the query to check the results
+                if(run_ml_test_query(db_ml_anomaly_info, AnomalyTestCheckPath.c_str()) != 0) {
+                    fprintf(stderr, "Testing ML API SQL query; error reading query script at %s\n", AnomalyTestQueryPath.c_str());
+                    retValue = 1;
+                }        
+            }
+            else {
+                fprintf(stderr, "Testing ML API SQL query; error reading check script at %s\n", AnomalyTestCheckPath.c_str());
+                retValue = 1;
+            }
+        }
+        else {
+            fprintf(stderr, "Testing ML API SQL query; error reading data %s\n", AnomalyTestDataPath.c_str());
+            retValue = 1;
+        }  
+    }
+    sqlite3_close(db_ml_anomaly_info);    
+    return retValue;
+}
+
+//Test 1: query a range where all source info have equal values of anomaly, so the average should be equal to each value
+//... this is compared against a set result
+TEST(AnomalyRateInfoSqlTest, AllDimEqualValues) {
+    std::stringstream TestDBDirectory, TestDataDirectory, TestQueryDirectory, TestCheckDirectory;
+    
+    TestDBDirectory << netdata_configured_cache_dir << "/ml_test_anomaly_info.db";
+    std::string AnomalyTestDBPath = TestDBDirectory.str();
+    
+    TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
+    std::string AnomalyTestDataPath = TestDataDirectory.str();
+    
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_1.sql";
+    std::string AnomalyTestQueryPath = TestQueryDirectory.str();
+    
+    TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_1.sql";
+    std::string AnomalyTestCheckPath = TestCheckDirectory.str();
+    
+    EXPECT_EQ(test_ml_anomaly_info_api_sql(AnomalyTestDBPath, AnomalyTestDataPath, 
+                                            AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
+}
+
+//Test 2: query a range where all info do not have equal values, so the average values should be different
+//... and within the margin of the set results
+TEST(AnomalyRateInfoSqlTest, DifferentDimValues) {
+    std::stringstream TestDBDirectory, TestDataDirectory, TestQueryDirectory, TestCheckDirectory;
+    
+    TestDBDirectory << netdata_configured_cache_dir << "/ml_test_anomaly_info.db";
+    std::string AnomalyTestDBPath = TestDBDirectory.str();
+    
+    TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
+    std::string AnomalyTestDataPath = TestDataDirectory.str();
+    
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_2.sql";
+    std::string AnomalyTestQueryPath = TestQueryDirectory.str();
+    
+    TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_2.sql";
+    std::string AnomalyTestCheckPath = TestCheckDirectory.str();
+    
+    EXPECT_EQ(test_ml_anomaly_info_api_sql(AnomalyTestDBPath, AnomalyTestDataPath, 
+                                            AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
+}
+
+
+

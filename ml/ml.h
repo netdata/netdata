@@ -34,10 +34,8 @@ char *ml_get_anomaly_rate_info(RRDHOST *RH, time_t After, time_t Before);
 
 #if defined(ENABLE_ML_TESTS)
 int test_ml(int argc, char *argv[]);
-int test_ml_anomaly_info_api_sql(void);
-char *read_file_content_path(const char *filepath);
-int test_ml_callback(void *IgnoreMe, int argc, char **argv, char **TableField);
 #endif
+
 #ifdef __cplusplus
 };
 #endif
