@@ -642,8 +642,6 @@ RRDHOST *rrdhost_find_or_create(
         rrdhost_unlock(host);
     }
 
-    rrdhost_cleanup_orphan_hosts_nolock(host);
-
     rrd_unlock();
 
     return host;
@@ -652,7 +650,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
     if(host != protected_host
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && host->receiver
+       && !host->receiver
        && host->senders_disconnected_time
        && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
         return 1;
