@@ -974,7 +974,7 @@ build_jsonc() {
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
-  cd"${1}" > /dev/null || exit 1
+  cd "${1}" > /dev/null || exit 1
   run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
   run ${env_cmd} ${make} ${MAKEOPTS}
   cd - > /dev/null || exit 1
