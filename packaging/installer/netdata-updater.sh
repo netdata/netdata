@@ -40,6 +40,12 @@ fi
 
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
+if [ ! -t 1 ]; then
+  INTERACTIVE=0
+else
+  INTERACTIVE=1
+fi
+
 info() {
   echo >&3 "$(date) : INFO: " "${@}"
 }
@@ -67,6 +73,11 @@ if [ "${ENVIRONMENT_FILE}" = "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; th
     fi
   fi
 fi
+
+str_in_list() {
+  printf "%s\n" "${2}" | tr ' ' "\n" | grep -qE "^${1}\$"
+  return $?
+}
 
 safe_sha256sum() {
   # Within the context of the installer, we only use -c option that is common between the two commands
@@ -394,7 +405,7 @@ update_static() {
   if update_available; then
     sysarch="$(uname -m)"
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
-    download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
+    download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-${sysarch}-latest.gz.run"
     if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
       fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour."
     fi
@@ -412,6 +423,7 @@ update_static() {
     else
       info "NOTE: did not remove: ${ndtmpdir}"
     fi
+
     echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
   fi
 
@@ -529,19 +541,14 @@ update_binpkg() {
     env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
   fi
 
-  if ${pkg_installed_check} netdata-repo > /dev/null 2>&1; then
-    # shellcheck disable=SC2086
-    env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata-repo || fatal "Failed to update Netdata repository config."
-    # shellcheck disable=SC2086
-    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
-  fi
-
-  if ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
-    # shellcheck disable=SC2086
-    env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata-repo-edge || fatal "Failed to update Netdata repository config."
-    # shellcheck disable=SC2086
-    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
-  fi
+  for repopkg in netdata-repo netdata-repo-edge; do
+    if ${pkg_installed_check} ${repopkg} > /dev/null 2>&1; then
+      # shellcheck disable=SC2086
+      env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} ${repopkg} || fatal "Failed to update Netdata repository config."
+      # shellcheck disable=SC2086
+      env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
+    fi
+  done
 
   # shellcheck disable=SC2086
   env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata || fatal "Failed to update Netdata package."
@@ -627,7 +634,7 @@ case "${INSTALL_TYPE}" in
     *binpkg*)
       update_binpkg && exit 0
       ;;
-    "") # Fallback case for no `.isntall-type` file. This just works like the old install type detecton.
+    "") # Fallback case for no `.install-type` file. This just works like the old install type detection.
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
         update_static && exit 0
