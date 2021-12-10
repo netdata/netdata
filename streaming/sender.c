@@ -408,7 +408,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 #endif  //ENABLE_COMPRESSION
 
 
-    info("STREAM %s [send to %s]: established communication with a parent using protocol version %d. Negotiated compression is %s - ready to send metrics..."
+    info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
          , host->hostname
          , s->connected_to
          , s->version);
