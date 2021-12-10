@@ -71,6 +71,8 @@ ProtectHome=read-only
 ProtectControlGroups=true
 # We whitelist this because it's the standard location to listen on a UNIX socket.
 ReadWriteDirectories=/run/netdata
+# This is needed to make email-based alert deliver work if Postfix is the email provider on the system.
+ReadWriteDirectories=-/var/spool/postfix/maildrop
 
 [Install]
 WantedBy=multi-user.target
