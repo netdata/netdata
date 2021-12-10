@@ -63,7 +63,7 @@ You can configure following keys in the `netdata.conf` section `[cloud]`:
 [cloud]
   statistics = yes
   query thread count = 2
-  aclk implementation = legacy
+  aclk implementation = ng
 ```
 
 - `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the database and slightly reduce memory usage of Netdata Agent.
@@ -84,7 +84,12 @@ Features:
 
 To verify which ACLK implementation Netdata uses, visit the `/api/v1/info` endpoint on your local dashboard and check the `aclk-implementation` key.
 
-New Netdata Cloud features will be implemented on top of ACLK-NG from this point on. ACLK Legacy is therefore kept as a fallback in case some users have issues with ACLK-NG or need to use features which are not yet available in ACLK-NG *(like IPv6 support and SOCKS proxy)*.
+New Netdata Cloud features will be implemented on top of ACLK-NG only. ACLK Legacy is therefore kept as a fallback in case some users have issues.
+
+
+> Note: ACLK Legacy will be removed in following releases! 
+> Update your ACLK configuration to ACLK-NG to prevent any disruptions.
+
 
 ### Improvements of ACLK-NG over Legacy are:
 - No dependency on custom patched `libmosquitto` (no bundling of libraries). Which should remove obstacles many GNU/Linux distribution package maintainers had trying to provide Netdata with Cloud support

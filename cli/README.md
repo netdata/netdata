@@ -17,8 +17,10 @@ help
     Show this help menu.
 reload-health
     Reload health configuration.
+reload-labels
+    Reload all labels.
 save-database
-    Save internal DB to disk for for memory mode save.
+    Save internal DB to disk for memory mode save.
 reopen-logs
     Close and reopen log files.
 shutdown-agent
@@ -26,7 +28,11 @@ shutdown-agent
 fatal-agent
     Log the state and halt the netdata agent.
 reload-claiming-state
-    Reload agent connection state from disk.
+    Reload agent claiming state from disk.
+ping
+    Return with 'pong' if agent is alive.
+aclk-state [json]
+    Returns current state of ACLK and Cloud connection. (optionally in json)
 ```
 
 Those commands are the same that can be sent to netdata via [signals](/daemon/README.md#command-line-options).
