@@ -1190,6 +1190,27 @@ int web_client_api_request_v1_anomaly_event_info(RRDHOST *host, struct web_clien
     freez(s);
     return HTTP_RESP_OK;
 }
+
+int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char *url) {
+    (void) url;
+
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    char *s = ml_get_host_runtime_info(host);
+    if (!s)
+        s = strdup("{\"error\": \"json string is empty\" }\n");
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_strcat(wb, s);
+    buffer_no_cacheable(wb);
+
+    freez(s);
+    return HTTP_RESP_OK;
+}
+
 #endif // defined(ENABLE_ML)
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
@@ -1250,6 +1271,7 @@ static struct api_command {
 #if defined(ENABLE_ML)
         { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_events     },
         { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_event_info },
+        { "ml_info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_info            },
 #endif
 
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },

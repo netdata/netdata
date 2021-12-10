@@ -18,6 +18,7 @@ void ml_new_host(RRDHOST *RH);
 void ml_delete_host(RRDHOST *RH);
 
 char *ml_get_host_info(RRDHOST *RH);
+char *ml_get_host_runtime_info(RRDHOST *RH);
 
 void ml_new_dimension(RRDDIM *RD);
 void ml_delete_dimension(RRDDIM *RD);

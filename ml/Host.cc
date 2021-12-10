@@ -441,6 +441,7 @@ void DetectableHost::detect() {
 }
 
 void DetectableHost::getDetectionInfoAsJson(nlohmann::json &Json) const {
+    Json["version"] = 1;
     Json["anomalous-dimensions"] = NumAnomalousDimensions;
     Json["normal-dimensions"] = NumNormalDimensions;
     Json["total-dimensions"] = NumAnomalousDimensions + NumNormalDimensions;
