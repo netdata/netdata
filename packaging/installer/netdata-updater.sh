@@ -325,7 +325,8 @@ update() {
     possible_pids=$(pidof netdata)
     do_not_start=
     if [ -n "${possible_pids}" ]; then
-      kill -USR1 "${possible_pids}"
+      # shellcheck disable=SC2086
+      kill -USR1 ${possible_pids}
     else
       # netdata is currently not running, so do not start it after updating
       do_not_start="--dont-start-it"
