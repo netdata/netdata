@@ -25,7 +25,6 @@
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
 #define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
 #define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
-#define START_COMPRESSION "stream_compression="
 
 #define HTTP_HEADER_SIZE 8192
 
@@ -99,7 +98,6 @@ struct sender_state {
     char read_buffer[512];
     int read_len;
     int32_t version;
-    unsigned int rrdpush_compression;
 #ifdef ENABLE_COMPRESSION
     unsigned int rrdpush_compression;
     struct compressor_state *compressor;
@@ -131,7 +129,6 @@ struct receiver_state {
     int read_len;
     unsigned int shutdown:1;    // Tell the thread to exit
     unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
-    unsigned int rrdpush_compression;
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
@@ -143,12 +140,9 @@ struct receiver_state {
 
 
 extern unsigned int default_rrdpush_enabled;
-// #ifdef ENABLE_COMPRESSION
-// extern unsigned int default_compression_enabled;
-// #endif
-// Need to create a different streaming version in order to support and select compression.
-// Then is compression is supported the agents can negotiate the compression.
+#ifdef ENABLE_COMPRESSION
 extern unsigned int default_compression_enabled;
+#endif
 
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
@@ -172,8 +166,6 @@ extern void rrdpush_sender_thread_stop(RRDHOST *host);
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 
-extern long int parse_stream_version(RRDHOST *host, char *http);
-extern unsigned int parse_stream_compression(RRDHOST *host, char *http);
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();

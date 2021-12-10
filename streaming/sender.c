@@ -132,6 +132,11 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     rrdpush_sender_thread_send_custom_host_variables(host);
 }
 
+static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
+    host->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+    host->labels.labels_flag &= ~LABEL_FLAG_STOP_STREAM;
+}
+
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
 {
     se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
@@ -255,7 +260,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%u&compression=%u"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%u"
                  "&NETDATA_SYSTEM_OS_NAME=%s"
                  "&NETDATA_SYSTEM_OS_ID=%s"
                  "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -296,7 +301,6 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  , host->system_info->hops + 1
                  , (host->tags) ? host->tags : ""
                  , STREAMING_PROTOCOL_CURRENT_VERSION
-                 , default_compression_enabled
                  , se.os_name
                  , se.os_id
                  , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
@@ -382,29 +386,6 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     http[received] = '\0';
     debug(D_STREAM, "Response to sender from far end: %s", http);
     int32_t version = (int32_t)parse_stream_version(host, http);
-    // if(version_start) {
-    //     version_start++;
-    //     version = (int32_t)strtol(version_start, NULL, 10);
-    //     answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
-    //     if(!answer) {
-    //         rrdpush_set_flags_to_newest_stream(host);
-    //     }
-    // } else {
-    //     answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
-    //     if(!answer) {
-    //         version = 1;
-    //         rrdpush_set_flags_to_newest_stream(host);
-    //     }
-    //     else {
-    //         answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
-    //         if(!answer) {
-    //             version = 0;
-    //             host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
-    //             host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
-    //         }
-    //     }
-    // }
-
     if(version == -1) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);

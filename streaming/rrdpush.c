@@ -496,7 +496,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     int32_t utc_offset = 0;
     int update_every = default_rrd_update_every;
     uint32_t stream_version = UINT_MAX;
-    unsigned int rrdpush_compression = default_compression_enabled;
     char buf[GUID_LEN + 1];
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
@@ -533,8 +532,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             tags = value;
         else if(!strcmp(name, "ver"))
             stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
-        else if(!strcmp(name, "compression"))
-            rrdpush_compression = (unsigned int)strtoul(value, NULL, 0);           
         else {
             // An old Netdata child does not have a compatible streaming protocol, map to something sane.
             if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
@@ -769,64 +766,4 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
 
     buffer_flush(w->response.data);
     return 200;
-}
-
-// // Streaming Initial negotiations between two agents
-// static void negotiations(RRDHOST *host, char *http) {
-//     parse_stream_version(host, http);
-//     // Add here any other negotiation logic
-//     parse_stream_compression(host, http);
-// }
-
-static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
-    host->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
-    host->labels.labels_flag &= ~LABEL_FLAG_STOP_STREAM;
-}
-
-long int parse_stream_version(RRDHOST *host, char *http)
-{
-    long int stream_version = -1;
-    int answer = -1;
-    char *stream_version_start = strchr(http, '=');
-    if (stream_version_start) {
-        stream_version_start++;
-        stream_version = strtol(stream_version_start, NULL, 10);
-        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(stream_version_start - http));
-        if (!answer) {
-            rrdpush_set_flags_to_newest_stream(host);
-        }
-    } else {
-        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
-        if (!answer) {
-            stream_version = 1;
-            rrdpush_set_flags_to_newest_stream(host);
-        } else {
-            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
-            if (!answer) {
-                stream_version = 0;
-                host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
-                host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
-            }
-        }
-    }
-    return stream_version;
-}
-
-unsigned int parse_stream_compression(RRDHOST *host, char *http)
-{
-    UNUSED(host);
-    unsigned int compression = UINT_MAX;
-    // Add here the decision logic for compression compatibility in the stream
-    char *compression_str_start = strstr(http, START_COMPRESSION);
-    if (compression_str_start) {
-        compression_str_start += strlen(START_COMPRESSION);
-        compression = (unsigned int) strtoul(compression_str_start, NULL, 10);
-        info("Incoming compression = %u", compression);
-        compression = (compression && default_compression_enabled);
-        info("Stream  negotiated compression = %u", compression);
-    } else {
-        compression = 0;
-    }
-
-    return compression;
 }

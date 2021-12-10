@@ -383,7 +383,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
     int health_enabled = default_health_enabled;
     int rrdpush_enabled = default_rrdpush_enabled;
-    int rrdpush_compression = default_compression_enabled;
     char *rrdpush_destination = default_rrdpush_destination;
     char *rrdpush_api_key = default_rrdpush_api_key;
     char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
@@ -415,9 +414,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "default proxy enabled", rrdpush_enabled);
     rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->machine_guid, "proxy enabled", rrdpush_enabled);
-
-    rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable_compression", rrdpush_compression);
-    rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable_compression", rrdpush_compression);
 
     rrdpush_destination = appconfig_get(&stream_config, rpt->key, "default proxy destination", rrdpush_destination);
     rrdpush_destination = appconfig_get(&stream_config, rpt->machine_guid, "proxy destination", rrdpush_destination);
@@ -550,19 +546,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
         info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT);
     }
-    //Negotiating compression...
-    rpt->rrdpush_compression = (rpt->rrdpush_compression && rrdpush_compression);
-    if(rpt->rrdpush_compression)
-    {
-        info("STREAM %s [receive from [%s]:%s]: Compression enabled over stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
-    }
-    else
-    {
-        info("STREAM %s [receive from [%s]:%s]: Compression disabled over stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
-    }
-    sprintf((initial_response + strlen(initial_response)), " %s%u", START_COMPRESSION, rpt->rrdpush_compression);        
-    info("Initial response to %s: %s", rpt->client_ip, initial_response);
-
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
     #ifdef ENABLE_HTTPS
     rpt->host->stream_ssl.conn = rpt->ssl.conn;
