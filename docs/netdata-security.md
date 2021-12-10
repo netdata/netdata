@@ -13,11 +13,11 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
 2.  [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
 3.  [Netdata is read-only](#netdata-is-read-only)
 4.  [Netdata viewers authentication](#netdata-viewers-authentication)
-    -   [Why Netdata should be protected](#why-netdata-should-be-protected)
-    -   [Protect Netdata from the internet](#protect-netdata-from-the-internet)
-        		\- [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
-        		\- [Use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
-        		\- [Other methods](#other-methods)
+    *   [Why Netdata should be protected](#why-netdata-should-be-protected)
+    *   [Protect Netdata from the internet](#protect-netdata-from-the-internet)
+        * [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
+        * [Use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
+        * [Other methods](#other-methods)
 5.  [Registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
 
 ## Your data is safe with Netdata
@@ -34,7 +34,7 @@ This means that Netdata can safely be used in environments that require the high
 
 We are very proud that **the Netdata daemon runs as a normal system user, without any special privileges**. This is quite an achievement for a monitoring system that collects all kinds of system and application metrics.
 
-There are a few cases however that raw source data are only exposed to processes with escalated privileges. To support these cases, Netdata attempts to minimize and completely isolate the code that runs with escalated privileges.
+There are a few cases, however, that raw source data are only exposed to processes with escalated privileges. To support these cases, Netdata attempts to minimize and completely isolate the code that runs with escalated privileges.
 
 So, Netdata **plugins**, even those running with escalated capabilities or privileges, perform a **hard coded data collection job**. They do not accept commands from Netdata. The communication is strictly **unidirectional**: from the plugin towards the Netdata daemon. The original application data collected by each plugin do not leave the process they are collected, are not saved and are not transferred to the Netdata daemon. The communication from the plugins to the Netdata daemon includes only chart metadata and processed metric values.
 
