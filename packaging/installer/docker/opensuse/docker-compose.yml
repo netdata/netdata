@@ -1,12 +1,8 @@
 version: "3.9"
 services:
-  fedora-24:
-    build: ./24
-  fedora-33:
-    build: ./33
-  fedora-34:
-    build: ./34
-  fedora-35:
-    build: ./35
+  leap-15.3:
+    build: ./leap-15.3
+  tubleweed:
+    build: ./tumbleweed
 
 

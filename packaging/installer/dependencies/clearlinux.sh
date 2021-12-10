@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
 # << ClearLinux >>
+#Support versions: base
 
 set -e
 

@@ -4,6 +4,6 @@ RUN dnf install -y git
 
 RUN git clone https://github.com/netdata/netdata.git -b packaging-split
 
-RUN ./netdata/packaging/installer/dependencies/fedora.sh
+WORKDIR /netdata/packaging/installer
 
-RUN ./netdata/packaging/installer/kickstart.sh
+RUN ./kickstart.sh --dont-wait
