@@ -723,7 +723,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
     rpt->stream_version    = stream_version;
-    rpt->rrdpush_compression = default_compression_enabled;
 #ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
     rpt->ssl.flags         = w->ssl.flags;

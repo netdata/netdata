@@ -143,7 +143,6 @@ extern unsigned int default_rrdpush_enabled;
 #ifdef ENABLE_COMPRESSION
 extern unsigned int default_compression_enabled;
 #endif
-
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
