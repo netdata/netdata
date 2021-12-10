@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix postdrop handling for systemd systems. [\#11885](https://github.com/netdata/netdata/pull/11885) ([Ferroin](https://github.com/Ferroin))
+- Minor ACLK docu updates [\#11882](https://github.com/netdata/netdata/pull/11882) ([underhood](https://github.com/underhood))
 - fix\(updater\): don't produce output when static update succeeded [\#11879](https://github.com/netdata/netdata/pull/11879) ([ilyam8](https://github.com/ilyam8))
 - fix\(updater\): fix exit code when updating static install && updater script [\#11873](https://github.com/netdata/netdata/pull/11873) ([ilyam8](https://github.com/ilyam8))
 - add z score alarm example [\#11871](https://github.com/netdata/netdata/pull/11871) ([andrewm4894](https://github.com/andrewm4894))
