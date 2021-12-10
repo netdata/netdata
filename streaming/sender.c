@@ -392,6 +392,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         return 0;
     }
     s->version = version;
+
 #ifdef ENABLE_COMPRESSION
     s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_VERSION_COMPRESSION));
     if(s->rrdpush_compression)
