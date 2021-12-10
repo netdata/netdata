@@ -19,29 +19,16 @@ started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide or
 documentation](/claim/README.md).
 
 ## Data privacy
-
 [Data privacy](https://netdata.cloud/data-privacy/) is very important to us. We firmly believe that your data belongs to
-you. This is why **we don't store any metric data in Netdata Cloud**. 
+you. This is why **we don't store any metric data in Netdata Cloud**.
 
-All the data that the user sees in the web browser when using Netdata Cloud, are actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. They pass through our systems, but they are not stored.
+All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. 
+The data passes through our systems, but it isn't stored.
 
-We do however store a limited number of *metadata* to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud.
+However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
 
-### Metadata
+Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/data-privacy) in the documentation.
 
-The information we store in Netdata Cloud is the following (using the publicly available demo server `frankfurt.my-netdata.io` as an example):
-- The email address you used to sign up/or sign in
-- For each node connected to your Spaces in Netdata Cloud:
- - Hostname (as it appears in Netdata Cloud)
- - Information shown in `/api/v1/info`. For example: [https://frankfurt.my-netdata.io/api/v1/info](https://frankfurt.my-netdata.io/api/v1/info).
- - The chart metadata shown in `/api/v1/charts`. For example: [https://frankfurt.my-netdata.io/api/v1/info](https://frankfurt.my-netdata.io/api/v1/info).
- - Alarm configurations shown in `/api/v1/alarms?all`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms?all](https://frankfurt.my-netdata.io/api/v1/alarms?all).
- - Active alarms shown in `/api/v1/alarms`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms](https://frankfurt.my-netdata.io/api/v1/alarms).
-
-How we use them:
-- The data are stored in our production database on Google Cloud and some of it is also used in BigQuery, our data lake, for analytics purposes. These analytics are crucial for our product development process.
-- Email is used to identify users in regards to product use and to enrich our tools with product use, such as our CRM.
-- This data is only available to Netdata and never to a 3rd party.
 
 ## Enable and configure the ACLK
 
