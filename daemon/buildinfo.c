@@ -255,6 +255,7 @@ void print_build_info(void) {
     printf("    ACLK Legacy:                %s\n", FEAT_YES_NO(FEAT_ACLK_LEGACY));
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
+    printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
 
     printf("Libraries:\n");
     printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
@@ -316,6 +317,7 @@ void print_build_info_json(void) {
 
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
+    printf("    \"stream-compression\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
     printf("  },\n");
 
     printf("  \"libs\": {\n");
@@ -373,7 +375,7 @@ void analytics_build_info(BUFFER *b) {
     if(FEAT_ACLK_LEGACY)     buffer_strcat (b, "|ACLK Legacy");
     if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
     if(FEAT_ML)              buffer_strcat (b, "|Machine Learning");
-    if(FEAT_STREAM_COMPRESSION) buffer_strcat (b, "|Streaming Compression");
+    if(FEAT_STREAM_COMPRESSION) buffer_strcat (b, "|Stream Compression");
 
     if(FEAT_PROTOBUF)        buffer_strcat (b, "|protobuf");
     if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");

@@ -326,42 +326,42 @@ With the introduction of TLS/SSL, the parent-child communication behaves as show
 | Yes|-/force/optional|Yes|yes|The parent-child stream is encrypted.|
 
 ### Streaming compression
-Streaming compression is supported in Netdata streaming version protocol 5+.
+Streaming compression is supported in Netdata streaming protocol version 5+.
 #### OS dependencies
-* Streaming compression is based on [lz4 v1.9.0+](https://github.com/lz4/lz4). The [lz4 v1.9.0+](https://github.com/lz4/lz4) must be installed in your OS in order to enable streaming compression. Any lower version will disable Netdata streaming compression for compatibility purposes between the older version of Netdata agents.
+* Streaming compression is based on [lz4 v1.9.0+](https://github.com/lz4/lz4). The [lz4 v1.9.0+](https://github.com/lz4/lz4) library must be installed in your OS in order to enable streaming compression. Any lower version will disable Netdata streaming compression for compatibility purposes between the older versions of Netdata agents.
 
-* Check if your netdata agent supports and was build with stream compression through the Netdata agent web api (browser/terminal).
+You can check if your netdata agent supports and was build with stream compression through the Netdata agent web api (browser/terminal).
 ```
-curl -X GET http://localhost:19999/api/v1/info | grep 'Streaming Compression'
+curl -X GET http://localhost:19999/api/v1/info | grep 'Stream Compression'
 ```
 
 OUTPUT:
 <pre>
-"buildinfo": "dbengine|Native HTTPS|Netdata Cloud|ACLK Next Generation|New Cloud Protocol Support|ACLK Legacy|TLS Host Verification|Machine Learning|<b>Streaming Compression</b>|protobuf|JSON-C|libcrypto|libm|LWS v3.2.2|mosquitto|zlib|apps|cgroup Network Tracking|EBPF|perf|slabinfo",
+"buildinfo": "dbengine|Native HTTPS|Netdata Cloud|ACLK Next Generation|New Cloud Protocol Support|ACLK Legacy|TLS Host Verification|Machine Learning|<b>Stream Compression</b>|protobuf|JSON-C|libcrypto|libm|LWS v3.2.2|mosquitto|zlib|apps|cgroup Network Tracking|EBPF|perf|slabinfo",
 </pre>
-Note: If your OS doesn't support Netdata compression the `buildinfo` will not contain the `Streaming Compression` statement.
+Note: If your OS doesn't support Netdata compression the `buildinfo` will not contain the `Stream Compression` statement.
 
-Check if your netdata agent has stream compression enabled or disabled.
+You can check if your netdata agent has stream compression enabled or disabled.
 ```
  curl -X GET http://localhost:19999/api/v1/info | grep 'stream-compression'
 ```
 OUTPUT:
 ```
-"stream-compression": enabled
+"stream-compression": "enabled"
 ```
-Note: The `stream-compression` status can be `enabled | disabled | N/A`.
+Note: The `stream-compression` status can be `"enabled" | "disabled" | "N/A"`.
 
 Stream data compression is enabled by default on systems where LZ4 library v1.9.0+ is installed. A compressed data packet is determined and decompressed on the fly.
 #### Limitations
 The current implementation of streaming data compression has the limitation that the size of single data block transmitted must not exceed 16384 bytes. If single data block size exceeds this limit, stream data compression should be disabled.
-#### How to enable streaming compression.
+#### How to enable stream compression.
 Netdata agents are shipped with data compression enabled by default but of course you can simply configure which streams will use compression.
 You can quickly enable compression in the `stream.conf` under the section `[stream]`.
 ```
-# This is the default streaming compression flag for an agent.
+# This is the default stream compression flag for an agent.
 
 [stream]
-enable_compression = yes | no
+enable compression = yes | no
 ```
 Enabling compression will allow to the Netdata agent to negotiate streaming compression with other Netdata agents. During the negotiation of streaming compression BOTH Netdata agents should support and enable compression in order to communicate over a compressed stream. If one of the Netdata agents doesn't support OR has compression disabled then the negotiation will result in an uncompressed stream.
 
@@ -374,15 +374,15 @@ Enabling compression will allow to the Netdata agent to negotiate streaming comp
 
 In case of parents with multiple children you can select which streams will be compressed by using the same configuration under the `[API_KEY]`, `[MACHINE_GUID]` section. 
 
-This configuration uses AND logic with the default stream compression configuration under the `[stream]` section. This means the stream compression from child to parent will be enbaled only if the outcome of the AND logic operation is true (default compression enabled && api key compression enabled). So both should be enabled to get stream compression otherwise  stream compression is disabled.
+This configuration uses AND logic with the default stream compression configuration under the `[stream]` section. This means the stream compression from child to parent will be enabled only if the outcome of the AND logic operation is true (`default compression enabled` && `api key compression enabled`). So both should be enabled to get stream compression otherwise  stream compression is disabled.
 ```  
 [API_KEY]
-    enable_compression = yes | no
+    enable compression = yes | no
 ```
 Same thing applies with the `[MACHINE_GUID]` configuration.
 ```
 [MACHINE_GUID]
-    enable_compression = yes | no
+    enable compression = yes | no
 ```
 ## Viewing remote host dashboards, using mirrored databases
 
