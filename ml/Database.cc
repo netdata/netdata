@@ -103,7 +103,7 @@ const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
     "  AND json_valid(ari.anomaly_rates)) "
     "  GROUP BY dimension_id) AS post "
     " ON main.dimension_id = post.dimension_id "
-    "GROUP BY main.dimension_id;";
+    "GROUP BY main.dimension_id HAVING percentage > 0.0;";
  
 const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO_RANGE =
     "SELECT after, before FROM anomaly_rate_info WHERE host_id == ?1 ORDER BY before DESC LIMIT 1;";
