@@ -86,7 +86,10 @@ To verify which ACLK implementation Netdata uses, visit the `/api/v1/info` endpo
 
 New Netdata Cloud features will be implemented on top of ACLK-NG only. ACLK Legacy is therefore kept as a fallback in case some users have issues.
 
-ACLK Legacy is planned to be removed in following releases!
+
+> Note: ACLK Legacy will be removed in following releases! 
+> Update your ACLK configuration to ACLK-NG to prevent any disruptions.
+
 
 ### Improvements of ACLK-NG over Legacy are:
 - No dependency on custom patched `libmosquitto` (no bundling of libraries). Which should remove obstacles many GNU/Linux distribution package maintainers had trying to provide Netdata with Cloud support
