@@ -1017,11 +1017,9 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #endif
             buffer_strcat(wb, "\t\"aclk-available-protocol\": \"Legacy\",\n");
     }
-    else {
+    else
 #endif
-        buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
-        buffer_strcat(wb, "\t\"aclk-available-protocol\": null,\n");
-    }
+        buffer_strcat(wb, "\t\"aclk-available\": false,\n\t\"aclk-available-protocol\": null,\n");     // Intentionally valid with/without #ifdef above
 
     buffer_strcat(wb, "\t\"memory-mode\": ");
     analytics_get_data(analytics_data.netdata_config_memory_mode, wb);
