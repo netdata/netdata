@@ -1,4 +1,4 @@
-name: "Bug report: Netdata Agent"
+name: "Bug Report"
 description: "Submit a report and help us improve our free and open-source Netdata Agent"
 title: "[Bug]: "
 labels: ["bug", "needs triage"]
