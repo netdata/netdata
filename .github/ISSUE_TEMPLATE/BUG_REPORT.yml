@@ -1,5 +1,5 @@
-name: Bug Report
-description: File a bug report
+name: "Bug report: Netdata Agent"
+description: "Submit a report and help us improve our free and open-source Netdata Agent"
 title: "[Bug]: "
 labels: ["bug", "needs triage"]
 body:
@@ -9,8 +9,6 @@ body:
   - type: markdown
     attributes:
       value: |
-        Submit a report and help us improve our free and open-source Netdata Agent.
-
         Before submitting, we'd appreciate it if you:
           - Verify that your issue is not already reported on GitHub.
           - Check if your Netdata is up to date. If not, we recommend that you updgrade first.
