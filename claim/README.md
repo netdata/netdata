@@ -399,7 +399,7 @@ grep -i ACLK /var/log/netdata/error.log
 ```
 
 If the installer's output does not help you enable Cloud features, contact us by [creating an issue on
-GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality)
+GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality)
 with details about your system and relevant output from `error.log`.
 
 #### agent-claimed is false / Claimed: No
@@ -416,7 +416,7 @@ connecting](#connect-through-a-proxy).
 
 If you are certain firewall and proxy settings are not the issue, you should consult the Agent's `error.log` at
 `/var/log/netdata/error.log` and contact us by [creating an issue on
-GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=ACLK-available-is-false)
+GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=ACLK-available-is-false)
 with details about your system and relevant output from `error.log`.
 
 ### Remove and reconnect a node
