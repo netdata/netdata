@@ -287,7 +287,7 @@ static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
     RRDHOST *host = st->rrdhost;
     buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
     if (s->version >= VERSION_GAP_FILLING)
-        buffer_sprintf(host->sender->build, " %ld\n", st->last_collected_time.tv_sec);
+        buffer_sprintf(host->sender->build, " %"PRId64"\n", (int64_t)st->last_collected_time.tv_sec);
     else
         buffer_strcat(host->sender->build, "\n");
 
@@ -677,7 +677,13 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 host->receiver->shutdown = 1;
                 shutdown(host->receiver->fd, SHUT_RDWR);
                 host->receiver = NULL;      // Thread holds reference to structure
-                info("STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is dead (%ld sec), accepting new connection.", host->hostname, w->client_ip, w->client_port, age);
+                info(
+                    "STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - "
+                    "existing connection is dead (%"PRId64" sec), accepting new connection.",
+                    host->hostname,
+                    w->client_ip,
+                    w->client_port,
+                    (int64_t)age);
             }
             else {
                 netdata_mutex_unlock(&host->receiver_lock);
@@ -685,7 +691,13 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 rrd_unlock();
                 log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname,
                                       "REJECTED - ALREADY CONNECTED");
-                info("STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is active (within last %ld sec), rejecting new connection.", host->hostname, w->client_ip, w->client_port, age);
+                info(
+                    "STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - "
+                    "existing connection is active (within last %"PRId64" sec), rejecting new connection.",
+                    host->hostname,
+                    w->client_ip,
+                    w->client_port,
+                    (int64_t)age);
                 // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "This GUID is already streaming to this server");

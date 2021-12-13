@@ -607,13 +607,15 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION reset for process '%s' (prevented %lu logs in the last %ld seconds).\n"
-                    , date
-                    , program_name
-                    , program_name
-                    , prevented
-                    , now - start
-            );
+            fprintf(
+                stderr,
+                "%s: %s LOG FLOOD PROTECTION reset for process '%s' "
+				"(prevented %lu logs in the last %"PRId64" seconds).\n",
+                date,
+                program_name,
+                program_name,
+                prevented,
+                (int64_t)(now - start));
         }
 
         start = now;
@@ -628,13 +630,15 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' (prevented %lu logs in the last %ld seconds).\n"
-                    , date
-                    , program_name
-                    , program_name
-                    , prevented
-                    , error_log_throttle_period
-            );
+            fprintf(
+                stderr,
+                "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' "
+				"(prevented %lu logs in the last %"PRId64" seconds).\n",
+                date,
+                program_name,
+                program_name,
+                prevented,
+                (int64_t)error_log_throttle_period);
         }
 
         // restart the period accounting
@@ -650,15 +654,18 @@ int error_log_limit(int reset) {
         if(!prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %ld seconds). Preventing more logs from process '%s' for %ld seconds.\n"
-                    , date
-                    , program_name
-                    , counter
-                    , now - start
-                    , error_log_errors_per_period
-                    , error_log_throttle_period
-                    , program_name
-                    , start + error_log_throttle_period - now);
+            fprintf(
+                stderr,
+                "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
+				"in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.\n",
+                date,
+                program_name,
+                counter,
+                (int64_t)(now - start),
+                error_log_errors_per_period,
+                (int64_t)error_log_throttle_period,
+                program_name,
+                (int64_t)(start + error_log_throttle_period - now));
         }
 
         prevented++;

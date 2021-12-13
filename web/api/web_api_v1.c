@@ -589,9 +589,13 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                 w->id, google_version, google_reqId, google_sig, google_out, responseHandler, outFileName
         );
 
-        buffer_sprintf(w->response.data,
-                "%s({version:'%s',reqId:'%s',status:'ok',sig:'%ld',table:",
-                responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
+        buffer_sprintf(
+            w->response.data,
+            "%s({version:'%s',reqId:'%s',status:'ok',sig:'%"PRId64"',table:",
+            responseHandler,
+            google_version,
+            google_reqId,
+            (int64_t)st->last_updated.tv_sec);
     }
     else if(format == DATASOURCE_JSONP) {
         if(responseHandler == NULL)

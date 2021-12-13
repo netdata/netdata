@@ -684,9 +684,10 @@ void *health_main(void *ptr) {
         if (unlikely(check_if_resumed_from_suspension())) {
             apply_hibernation_delay = 1;
 
-            info("Postponing alarm checks for %ld seconds, because it seems that the system was just resumed from suspension.",
-                 hibernation_delay
-            );
+            info(
+                "Postponing alarm checks for %"PRId64" seconds, "
+                "because it seems that the system was just resumed from suspension.",
+                (int64_t)hibernation_delay);
         }
 
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
@@ -706,9 +707,10 @@ void *health_main(void *ptr) {
                 continue;
 
             if (unlikely(apply_hibernation_delay)) {
-
-                info("Postponing health checks for %ld seconds, on host '%s'.", hibernation_delay, host->hostname
-                );
+                info(
+                    "Postponing health checks for %"PRId64" seconds, on host '%s'.",
+                    (int64_t)hibernation_delay,
+                    host->hostname);
 
                 host->health_delay_up_to = now + hibernation_delay;
             }
