@@ -1130,11 +1130,11 @@ int web_client_api_request_v1_anomaly_events(RRDHOST *host, struct web_client *w
 
     char *s;
     if (!before || !after)
-        s = strdup("{\"error\": \"missing after/before parameters\" }\n");
+        s = strdupz("{\"error\": \"missing after/before parameters\" }\n");
     else {
         s = ml_get_anomaly_events(host, "AD1", 1, after, before);
         if (!s)
-            s = strdup("{\"error\": \"json string is empty\" }\n");
+            s = strdupz("{\"error\": \"json string is empty\" }\n");
     }
 
     BUFFER *wb = w->response.data;
@@ -1174,11 +1174,11 @@ int web_client_api_request_v1_anomaly_event_info(RRDHOST *host, struct web_clien
 
     char *s;
     if (!before || !after)
-        s = strdup("{\"error\": \"missing after/before parameters\" }\n");
+        s = strdupz("{\"error\": \"missing after/before parameters\" }\n");
     else {
         s = ml_get_anomaly_event_info(host, "AD1", 1, after, before);
         if (!s)
-            s = strdup("{\"error\": \"json string is empty\" }\n");
+            s = strdupz("{\"error\": \"json string is empty\" }\n");
     }
 
     BUFFER *wb = w->response.data;
@@ -1199,7 +1199,7 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
 
     char *s = ml_get_host_runtime_info(host);
     if (!s)
-        s = strdup("{\"error\": \"json string is empty\" }\n");
+        s = strdupz("{\"error\": \"json string is empty\" }\n");
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
