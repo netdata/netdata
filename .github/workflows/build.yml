@@ -465,7 +465,7 @@ jobs:
           name: final-artifacts
           path: final-artifacts
       - name: Setup Gcloud
-        uses: google-github-actions/setup-gcloud@v0.2.1
+        uses: google-github-actions/setup-gcloud@v0.3
         with:
           project_id: ${{ secrets.GCP_NIGHTLY_STORAGE_PROJECT }}
           service_account_key: ${{ secrets.GCP_STORAGE_SERVICE_ACCOUNT_KEY }}
