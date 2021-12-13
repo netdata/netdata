@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Clean up anomaly-detection guide docs [\#11901](https://github.com/netdata/netdata/pull/11901) ([andrewm4894](https://github.com/andrewm4894))
+- Use the chart id instead of chart name in response to incoming cloud context queries [\#11898](https://github.com/netdata/netdata/pull/11898) ([stelfrag](https://github.com/stelfrag))
+- Moved data privacy section into a separate topic [\#11889](https://github.com/netdata/netdata/pull/11889) ([kickoke](https://github.com/kickoke))
+- Fixed formatting issues. [\#11888](https://github.com/netdata/netdata/pull/11888) ([kickoke](https://github.com/kickoke))
 - Fix postdrop handling for systemd systems. [\#11885](https://github.com/netdata/netdata/pull/11885) ([Ferroin](https://github.com/Ferroin))
 - Minor ACLK docu updates [\#11882](https://github.com/netdata/netdata/pull/11882) ([underhood](https://github.com/underhood))
 - fix\(updater\): don't produce output when static update succeeded [\#11879](https://github.com/netdata/netdata/pull/11879) ([ilyam8](https://github.com/ilyam8))
