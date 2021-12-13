@@ -31,7 +31,7 @@ If Netdata is installed on a system running a web server, it will detect it and 
 ![image](https://cloud.githubusercontent.com/assets/2662304/22900686/e283f636-f237-11e6-93d2-cbdf63de150c.png)
 *[**netdata**](https://my-netdata.io/) charts based on metrics collected by querying the `nginx` API (i.e. `/stub_status`).*
 
-> [**netdata**](https://my-netdata.io/) supports `apache`, `nginx`, `lighttpd` and `tomcat`. To obtain real-time information from a web server API, the web server needs to expose it. For directions on configuring your web server, check the config files for each web server. There is a directory with a config file for each web server under [`/etc/netdata/python.d/`](../). 
+> [**netdata**](https://my-netdata.io/) supports `apache`, `nginx`, `lighttpd` and `tomcat`. To obtain real-time information from a web server API, the web server needs to expose it. For directions on configuring your web server, check the config files for each web server. There is a directory with a config file for each web server under `/etc/netdata/python.d/`]. 
 
 ## Configuration
 
