@@ -1,4 +1,4 @@
-<!--
+---
 title: "Unsupervised anomaly detection for Raspberry Pi monitoring"
 description: "Use a low-overhead machine learning algorithm and an open-source monitoring tool to detect anomalous metrics on a Raspberry Pi."
 image: /img/seo/guides/monitor/raspberry-pi-anomaly-detection.png
@@ -6,9 +6,7 @@ author: "Andy Maguire"
 author_title: "Senior Machine Learning Engineer"
 author_img: "/img/authors/andy-maguire.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/raspberry-pi-anomaly-detection.md
--->
-
-# Unsupervised anomaly detection for Raspberry Pi monitoring
+---
 
 We love IoT and edge at Netdata, we also love machine learning. Even better if we can combine the two to ease the pain
 of monitoring increasingly complex systems.
@@ -110,7 +108,7 @@ looks like a potentially useful addition to enable unsupervised anomaly detectio
 See our two-part guide series for a more complete picture of configuring the anomalies collector, plus some best
 practices on using the charts it automatically generates:
 
-- [_Detect anomalies in systems and applications_](/docs/guides/monitor/anomaly-detection.md)
+- [_Detect anomalies in systems and applications_](/docs/guides/monitor/anomaly-detection-python.md)
 - [_Monitor and visualize anomalies with Netdata_](/docs/guides/monitor/visualize-monitor-anomalies.md)
 
 If you're using your Raspberry Pi for other purposes, like blocking ads/trackers with Pi-hole, check out our companions
