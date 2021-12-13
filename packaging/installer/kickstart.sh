@@ -614,7 +614,7 @@ else
   run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE}" "${ndtmpdir}/netdata-latest.tar.gz"
 fi
 
-if ! grep netdata-latest.tar.gz "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+if ! grep netdata-latest.tar.gz "${ndtmpdir}/sha256sum.txt" | safe_sha256sum ${ndtmpdir}/sha256sum.txt ${ndtmpdir}/netdata-latest.tar.gz > /dev/null 2>&1; then
   fatal "Tarball checksum validation failed. Stopping Netdata Agent installation and leaving tarball in ${ndtmpdir}.\nUsually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0005
 fi
 run tar -xf netdata-latest.tar.gz
