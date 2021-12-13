@@ -229,7 +229,7 @@ find_processors() {
     gnproc && return
   fi
 
-  cpus
+  cpus=''
   if [ -f "/proc/cpuinfo" ]; then
     # linux
     cpus=$(grep -c ^processor /proc/cpuinfo)
@@ -983,7 +983,7 @@ cleanup_old_netdata_updater() {
 }
 
 enable_netdata_updater() {
-  updater_type
+  updater_type=''
 
   if [ -n "${1}" ] ; then
     updater_type="${1}"
