@@ -94,7 +94,7 @@ want to see alarm notifications from Netdata. Click the green **Add to Slack** b
 
 On the following page, you'll receive a **Webhook URL**. That's what you'll need to configure Netdata, so keep it handy.
 
-Navigate to your [Netdata config directory](/docs/configure/nodes.md#netdata-config-directory) and use `edit-config` to
+Navigate to your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) and use `edit-config` to
 open the `health_alarm_notify.conf` file:
 
 ```bash
