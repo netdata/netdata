@@ -216,7 +216,7 @@ the `chart` dimension. If you'd like you can combine the `chart` and `instance` 
 Let's give this a try: `netdata_system_cpu_percentage_average{chart="system.cpu", instance="netdata:19999"}`
 
 This is the basics of using Prometheus to query Netdata. I'd advise everyone at this point to read [this
-page](/exporting/prometheus/#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
+page](/exporting/prometheus/README.md#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
 its internal DB or can send metrics _as-collected_ by specifying the `source=as-collected` URL parameter like so.
 <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected> If you choose to use
 this method you will need to use Prometheus's set of functions here: <https://prometheus.io/docs/querying/functions/> to
