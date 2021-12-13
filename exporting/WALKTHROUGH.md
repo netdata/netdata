@@ -99,7 +99,7 @@ reading to migrate this tutorial to a VM or Server of any sort.
 Let's start another container in the same fashion as we did the Netdata container. 
 
 ```sh
-docker run -it --name prometheus --hostname prometheus
+docker run -it --name prometheus --hostname prometheus \
 --network=netdata-tutorial -p 9090:9090  centos:latest '/bin/bash'
 ``` 
 
@@ -108,6 +108,12 @@ files later in this tutorial.
 
 ```sh
 yum install vim -y
+```
+
+You will also need `wget` and `curl` to download files and `sudo` if you are not root.
+
+```sh
+yum install curl sudo wget -y
 ```
 
 Prometheus provides a tarball of their latest stable versions [here](https://prometheus.io/download/).
@@ -129,7 +135,7 @@ This should get Prometheus installed into the container. Let's test that we can 
 interface.
 
 ```sh
-/opt/prometheus/prometheus
+/opt/prometheus/prometheus --config.file=/opt/prometheus/prometheus.yml
 ```
 
 Now attempt to go to <http://localhost:9090/>. You should be presented with the Prometheus homepage. This is a good
