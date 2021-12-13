@@ -194,8 +194,8 @@ man-in-the-middle attacks.
 ### CentOS 6 and CentOS 8
 
 To install the Agent on certain CentOS and RHEL systems, you must enable non-default repositories, such as EPEL or
-PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer/methods/manual.md#centos-rehel-6-x) and
-[CentOS 8](/packaging/installer/methods/manual.md#centos-rehel-8-x) sections for more information.
+PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer/methods/manual.md#centos--rhel-6x) and
+[CentOS 8](/packaging/installer/methods/manual.md#centos--rhel-8x) sections for more information.
 
 ### Access to file is not permitted
 
