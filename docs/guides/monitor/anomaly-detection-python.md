@@ -5,7 +5,7 @@ image: /img/seo/guides/monitor/anomaly-detection.png
 author: "Joel Hans"
 author_title: "Editorial Director, Technical & Educational Resources"
 author_img: "/img/authors/joel-hans.jpg"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomaly-detection.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomaly-detection-python.md
 -->
 
 # Detect anomalies in systems and applications
