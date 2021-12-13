@@ -282,6 +282,9 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
     Json["idle-window-size"] = Cfg.ADIdleWindowSize;
     Json["window-rate-threshold"] = Cfg.ADWindowRateThreshold;
     Json["dimension-rate-threshold"] = Cfg.ADDimensionRateThreshold;
+
+    Json["hosts-to-skip"] = Cfg.HostsToSkip;
+    Json["charts-to-skip"] = Cfg.ChartsToSkip;
 }
 
 std::pair<Dimension *, Duration<double>>
