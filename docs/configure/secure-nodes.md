@@ -11,7 +11,7 @@ internet at large, anyone can access the dashboard and your node's metrics at `h
 so that the local dashboard was immediately accessible to users, and so that we don't dictate how professionals set up
 and secure their infrastructures. 
 
-Despite this design decision, your [data](/docs/netdata-security.md#your-data-are-safe-with-netdata) and your
+Despite this design decision, your [data](/docs/netdata-security.md#your-data-is-safe-with-netdata) and your
 [systems](/docs/netdata-security.md#your-systems-are-safe-with-netdata) are safe with Netdata. Netdata is read-only,
 cannot do anything other than present metrics, and runs without special/`sudo` privileges. Also, the local dashboard
 only exposes chart metadata and metric values, not raw data.
