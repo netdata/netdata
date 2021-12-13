@@ -233,9 +233,6 @@ The receiving end (proxy or parent) logs entries like these:
 
 For Netdata v1.9+, streaming can also be monitored via `access.log`.
 
-There are no any configuration options for enabling or disabling stream data compression.
-A compressed data packet is determined and decompressed on the fly.
-
 ### Securing streaming communications
 
 Netdata does not activate TLS encryption by default. To encrypt streaming connections, you first need to [enable TLS support](/web/server/README.md#enabling-tls-support) on the parent. With encryption enabled on the receiving side, you need to instruct the child to use TLS/SSL as well. On the child's `stream.conf`, configure the destination as follows:
@@ -326,7 +323,10 @@ With the introduction of TLS/SSL, the parent-child communication behaves as show
 | Yes|-/force/optional|Yes|yes|The parent-child stream is encrypted.|
 
 ### Streaming compression
-Streaming compression is supported in Netdata streaming protocol version 5+.
+<a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/badge/Supported%20Netdata%20Agent-v1.33%2B-brightgreen" alt="Supported version Netdata agent release"></a>
+
+<a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/badge/Supported%20Netdata%20stream%20version-v5%2B-blue" alt="Supported version Netdata agent release"></a>
+
 #### OS dependencies
 * Streaming compression is based on [lz4 v1.9.0+](https://github.com/lz4/lz4). The [lz4 v1.9.0+](https://github.com/lz4/lz4) library must be installed in your OS in order to enable streaming compression. Any lower version will disable Netdata streaming compression for compatibility purposes between the older versions of Netdata agents.
 
@@ -361,9 +361,9 @@ You can quickly enable compression in the `stream.conf` under the section `[stre
 # This is the default stream compression flag for an agent.
 
 [stream]
-enable compression = yes | no
+    enable compression = yes | no
 ```
-Enabling compression will allow to the Netdata agent to negotiate streaming compression with other Netdata agents. During the negotiation of streaming compression BOTH Netdata agents should support and enable compression in order to communicate over a compressed stream. If one of the Netdata agents doesn't support OR has compression disabled then the negotiation will result in an uncompressed stream.
+Enabling compression will allow to the Netdata agent to negotiate streaming compression with other Netdata agents. During the negotiation of streaming compression both Netdata agents should support and enable compression in order to communicate over a compressed stream. If one of the Netdata agents doesn't support OR has compression disabled then the negotiation will result in an uncompressed stream.
 
 | Parent               | Stream compression | Child                |
 |----------------------|--------------------|----------------------|

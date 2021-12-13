@@ -530,7 +530,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         if(rpt->stream_version >= STREAM_VERSION_COMPRESSION){
 #ifdef ENABLE_COMPRESSION
             if(!rpt->rrdpush_compression)
-                rpt->stream_version = (STREAM_VERSION_COMPRESSION - 1);
+                rpt->stream_version = STREAM_VERSION_CLABELS;
 #else
             if(STREAMING_PROTOCOL_CURRENT_VERSION < rpt->stream_version) {
                 rpt->stream_version =  STREAMING_PROTOCOL_CURRENT_VERSION;               

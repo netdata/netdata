@@ -404,7 +404,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     else {
         //parent does not support compression or has compression disabled
         debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
-        s->version = (STREAM_VERSION_COMPRESSION - 1);
+        s->version = STREAM_VERSION_CLABELS;
     }        
 #endif  //ENABLE_COMPRESSION
 
