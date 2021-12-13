@@ -48,7 +48,7 @@ analysis (RCA).
 
 The anomalies collector creates two "classes" of alarms for each chart captured by the `charts_regex` setting. All these
 alarms are preconfigured based on your [configuration in
-`anomalies.conf`](/docs/guides/monitor-python.md#configure-the-anomalies-collector). With the `charts_regex`
+`anomalies.conf`](/docs/guides/monitor/anomaly-detection-python.md#configure-the-anomalies-collector). With the `charts_regex`
 and `charts_to_exclude` settings from [part 1](/docs/guides/monitor/anomaly-detection-python.md) of this guide series, the
 Netdata Agent creates 32 alarms driven by unsupervised anomaly detection.
 
