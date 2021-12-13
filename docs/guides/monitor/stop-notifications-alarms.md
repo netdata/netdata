@@ -80,7 +80,7 @@ You can add `to: silent` to any alarm you'd rather not bother you with notificat
 You should now know the fundamentals behind silencing any individual alarm in Netdata.
 
 To learn about _all_ of Netdata's health configuration possibilities, visit the [health reference
-guide](/health/REFERENCE.md), or check out other [tutorials on health monitoring](/health/README.md#tutorials).
+guide](/health/REFERENCE.md), or check out other [tutorials on health monitoring](/health/README.md#guides).
 
 Or, take better control over how you get notified about alarms via the [notification
 system](/health/notifications/README.md).
