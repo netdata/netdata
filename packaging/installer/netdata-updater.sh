@@ -473,8 +473,8 @@ if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
 
     # Do not pass any options other than the accept, for now
     # shellcheck disable=SC2086
-    if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
-      rm -r "${ndtmpdir}"
+    if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
+      rm -rf "${ndtmpdir}" >&3 2>&3
     else
       info "NOTE: did not remove: ${ndtmpdir}"
     fi
