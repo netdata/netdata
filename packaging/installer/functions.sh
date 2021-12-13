@@ -128,11 +128,11 @@ download_file() {
 # external component handling
 
 fetch_and_verify() {
-  component="${1}"
-  url="${2}"
-  base_name="${3}"
-  tmp="${4}"
-  override="${5}"
+  component=${1}
+  url=${2}
+  base_name=${3}
+  tmp=${4}
+  override=${5}
 
   if [ -z "${override}" ]; then
     download_file "${url}" "${tmp}/${base_name}" "${component}"
@@ -229,7 +229,6 @@ find_processors() {
     gnproc && return
   fi
 
-  cpus=''
   if [ -f "/proc/cpuinfo" ]; then
     # linux
     cpus=$(grep -c ^processor /proc/cpuinfo)
@@ -621,7 +620,6 @@ netdata_pids() {
 
 stop_all_netdata() {
   p=''
-  uname=''
 
   if [ "${UID}" -eq 0 ]; then
     uname="$(uname 2> /dev/null)"
@@ -983,7 +981,6 @@ cleanup_old_netdata_updater() {
 }
 
 enable_netdata_updater() {
-  updater_type=''
 
   if [ -n "${1}" ] ; then
     updater_type="${1}"
