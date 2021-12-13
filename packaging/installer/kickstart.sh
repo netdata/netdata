@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Run me with:
@@ -196,41 +196,40 @@ progress() {
   echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
+run_logfile="/dev/null"
 run() {
-  run_logfile="/dev/null"
-  run_user="${USER--}"
-  run_dir="${PWD}"
+  local user="${USER--}" dir="${PWD}" info info_console
 
   if [ "${UID}" = "0" ]; then
-    run_info="[root ${run_dir}]# "
-    run_info_console="[${TPUT_DIM}${run_dir}${TPUT_RESET}]# "
+    info="[root ${dir}]# "
+    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
   else
-    run_info="[${run_user} ${run_dir}]$ "
-    run_info_console="[${TPUT_DIM}${run_dir}${TPUT_RESET}]$ "
+    info="[${user} ${dir}]$ "
+    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
   fi
 
   {
-    printf "${run_info}"
+    printf "${info}"
     escaped_print "${@}"
     printf " ... "
   } >> "${run_logfile}"
 
-  printf >&2 "${run_info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+  printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
   escaped_print >&2 "${@}"
   printf >&2 "${TPUT_RESET}"
 
   "${@}"
 
-  run_ret=$?
-  if [ ${run_ret} -ne 0 ]; then
+  local ret=$?
+  if [ ${ret} -ne 0 ]; then
     run_failed
-    printf >> "${run_logfile}" "FAILED with exit code ${run_ret}\n"
+    printf >> "${run_logfile}" "FAILED with exit code ${ret}\n"
   else
     run_ok
     printf >> "${run_logfile}" "OK\n"
   fi
 
-  return ${run_ret}
+  return ${ret}
 }
 
 warning() {
@@ -244,23 +243,24 @@ warning() {
 }
 
 _cannot_use_tmpdir() {
-  _testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
-  _ret=0
+  local testfile ret
+  testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
+  ret=0
 
-  if [ -z "${_testfile}" ] ; then
-    return "${_ret}"
+  if [ -z "${testfile}" ] ; then
+    return "${ret}"
   fi
 
-  if printf '#!/bin/sh\necho SUCCESS\n' > "${_testfile}" ; then
-    if chmod +x "${_testfile}" ; then
-      if [ "$("${_testfile}")" = "SUCCESS" ] ; then
-        _ret=1
+  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
+    if chmod +x "${testfile}" ; then
+      if [ "$("${testfile}")" = "SUCCESS" ] ; then
+        ret=1
       fi
     fi
   fi
 
-  rm -f "${_testfile}"
-  return "${_ret}"
+  rm -f "${testfile}"
+  return "${ret}"
 }
 
 create_tmp_directory() {
@@ -282,12 +282,12 @@ create_tmp_directory() {
 }
 
 download() {
-  download_url="${1}"
-  download_dest="${2}"
+  url="${1}"
+  dest="${2}"
   if command -v curl > /dev/null 2>&1; then
-    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${download_dest}" "${download_url}" || fatal "Cannot download ${download_url}" F0002
+    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || fatal "Cannot download ${url}" F0002
   elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O "${download_dest}" "${download_url}" || fatal "Cannot download ${download_url}" F0002
+    run wget -T 15 -O "${dest}" "${url}" || fatal "Cannot download ${url}" F0002
   else
     fatal "I need curl or wget to proceed, but neither is available on this system." F0003
   fi
@@ -300,6 +300,7 @@ set_tarball_urls() {
   fi
 
   if [ "$1" = "stable" ]; then
+    local latest
     # Simple version
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.tar.gz"
@@ -623,8 +624,7 @@ cd netdata-* || fatal "Cannot cd to netdata source tree" F0006
 
 install() {
   progress "Installing netdata..."
-  pwd
-  run ${sudo} /netdata/netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS}
+  run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS}
   case $? in
     1)
       fatal "netdata-installer.sh exited with error" F0007

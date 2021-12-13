@@ -1,9 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
+
 # -----------------------------------------------------------------------------
 
 setup_terminal() {
@@ -128,11 +129,11 @@ download_file() {
 # external component handling
 
 fetch_and_verify() {
-  component="${1}"
-  url="${2}"
-  base_name="${3}"
-  tmp="${4}"
-  override="${5}"
+  local component=${1}
+  local url=${2}
+  local base_name=${3}
+  local tmp=${4}
+  local override=${5}
 
   if [ -z "${override}" ]; then
     download_file "${url}" "${tmp}/${base_name}" "${component}"
@@ -158,20 +159,24 @@ fetch_and_verify() {
 # -----------------------------------------------------------------------------
 
 netdata_banner() {
-    l1="  ^" \
+  local l1="  ^" \
     l2="  |.-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-" \
+    l3="  |   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'  " \
     l4="  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->" \
-    space="  "
-    l3f="  |   '-'   '-'   '-'   '-'   '-'"
-    l3e="               '-'   '-'   '-'   '-'   '-'   "
+    sp="                                                                              " \
+    netdata="netdata" start end msg="${*}" chartcolor="${TPUT_DIM}"
 
-    netdata="netdata"
-    chartcolor="${TPUT_DIM}"
+  [ ${#msg} -lt ${#netdata} ] && msg="${msg}${sp:0:$((${#netdata} - ${#msg}))}"
+  [ ${#msg} -gt $((${#l2} - 20)) ] && msg="${msg:0:$((${#l2} - 23))}..."
+
+  start="$((${#l2} / 2 - 4))"
+  [ $((start + ${#msg} + 4)) -gt ${#l2} ] && start=$((${#l2} - ${#msg} - 4))
+  end=$((start + ${#msg} + 4))
 
   echo >&2
   echo >&2 "${chartcolor}${l1}${TPUT_RESET}"
-  echo >&2 "${chartcolor}${l2%-.   .-.   .-.   .-.   .-.   .-.   .-.   .-}${space}${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}${l2#  |.-.   .-.   .-.   .-.   .-.   .-.   .-. }${TPUT_RESET}"
-  echo >&2 "${chartcolor}${l3f}${l3e}${TPUT_RESET}"
+  echo >&2 "${chartcolor}${l2:0:start}${sp:0:2}${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}${sp:0:$((end - start - 2 - ${#netdata}))}${l2:end:$((${#l2} - end))}${TPUT_RESET}"
+  echo >&2 "${chartcolor}${l3:0:start}${sp:0:2}${TPUT_RESET}${TPUT_BOLD}${TPUT_CYAN}${msg}${TPUT_RESET}${chartcolor}${sp:0:2}${l3:end:$((${#l2} - end))}${TPUT_RESET}"
   echo >&2 "${chartcolor}${l4}${TPUT_RESET}"
   echo >&2
 }
@@ -184,8 +189,7 @@ rcservice_cmd="$(command -v rc-service 2> /dev/null)"
 systemctl_cmd="$(command -v systemctl 2> /dev/null)"
 service() {
 
-  cmd="${1}"
-  action="${2}"
+  local cmd="${1}" action="${2}"
 
   if [ -n "${systemctl_cmd}" ]; then
     run "${systemctl_cmd}" "${action}" "${cmd}"
@@ -204,6 +208,7 @@ service() {
 # portable pidof
 
 safe_pidof() {
+  local pidof_cmd
   pidof_cmd="$(command -v pidof 2> /dev/null)"
   if [ -n "${pidof_cmd}" ]; then
     ${pidof_cmd} "${@}"
@@ -229,7 +234,7 @@ find_processors() {
     gnproc && return
   fi
 
-  cpus
+  local cpus
   if [ -f "/proc/cpuinfo" ]; then
     # linux
     cpus=$(grep -c ^processor /proc/cpuinfo)
@@ -259,12 +264,12 @@ run_failed() {
 }
 
 ESCAPED_PRINT_METHOD=
-if printf "%s " test > /dev/null 2>&1; then
+if printf "%q " test > /dev/null 2>&1; then
   ESCAPED_PRINT_METHOD="printfq"
 fi
 escaped_print() {
   if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
-    printf "%s " "${@}"
+    printf "%q " "${@}"
   else
     printf "%s" "${*}"
   fi
@@ -273,8 +278,7 @@ escaped_print() {
 
 run_logfile="/dev/null"
 run() {
-  user="${USER--}"
-  dir="${PWD}"
+  local user="${USER--}" dir="${PWD}" info info_console
 
   if [ "${UID}" = "0" ]; then
     info="[root ${dir}]# "
@@ -296,7 +300,7 @@ run() {
 
   "${@}"
 
-  ret=$?
+  local ret=$?
   if [ ${ret} -ne 0 ]; then
     run_failed
     printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
@@ -310,6 +314,7 @@ run() {
 
 iscontainer() {
   # man systemd-detect-virt
+  local cmd
   cmd=$(command -v systemd-detect-virt 2> /dev/null)
   if [ -n "${cmd}" ] && [ -x "${cmd}" ]; then
     "${cmd}" --container > /dev/null 2>&1 && return 0
@@ -317,6 +322,7 @@ iscontainer() {
 
   # /proc/1/sched exposes the host's pid of our init !
   # http://stackoverflow.com/a/37016302
+  local pid
   pid=$(head -n 1 /proc/1/sched 2> /dev/null | {
     # shellcheck disable=SC2034
     IFS='(),#:' read -r name pid th threads
@@ -347,22 +353,18 @@ iscontainer() {
 get_os_key() {
   if [ -f /etc/os-release ]; then
     # shellcheck disable=SC1091
-    . /etc/os-release || return 1
+    source /etc/os-release || return 1
     echo "${ID}-${VERSION_ID}"
 
   elif [ -f /etc/redhat-release ]; then
-    cat /etc/redhat-release
+    echo "$(< /etc/redhat-release)"
   else
     echo "unknown"
   fi
 }
 
 issystemd() {
-  pids=''
-  p=''
-  myns=''
-  ns=''
-  systemctl=''
+  local pids p myns ns systemctl
 
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
@@ -396,7 +398,8 @@ issystemd() {
 }
 
 get_systemd_service_dir() {
-  SYSTEMD_DIRECTORY=""
+  local SYSTEMD_DIRECTORY=""
+  local key
   key="$(get_os_key)"
 
   if [ -w "/lib/systemd/system" ]; then
@@ -407,7 +410,7 @@ get_systemd_service_dir() {
     SYSTEMD_DIRECTORY="/etc/systemd/system"
   fi
 
-  if expr "${key}" : "^devuan*" || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+  if [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
     SYSTEMD_DIRECTORY="/etc/systemd/system"
   fi
 
@@ -416,24 +419,26 @@ get_systemd_service_dir() {
 
 install_non_systemd_init() {
   [ "${UID}" != 0 ] && return 1
+
+  local key
   key="$(get_os_key)"
 
   if [ -d /etc/init.d ] && [ ! -f /etc/init.d/netdata ]; then
-    if expr "${key}" : "^(gentoo|alpine).*"; then
+    if [[ ${key} =~ ^(gentoo|alpine).* ]]; then
       echo >&2 "Installing OpenRC init file..."
       run cp system/netdata-openrc /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run rc-update add netdata default &&
         return 0
 
-    elif expr "${key}" : "^devuan*" || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+    elif [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
       echo >&2 "Installing LSB init file..."
       run cp system/netdata-lsb /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run update-rc.d netdata defaults &&
         run update-rc.d netdata enable &&
         return 0
-    elif expr "${key}" : "^(amzn-201[5678]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).*"; then
+    elif [[ ${key} =~ ^(amzn-201[5678]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).* ]]; then
       echo >&2 "Installing init.d file..."
       run cp system/netdata-init-d /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
@@ -461,6 +466,7 @@ NETDATA_START_CMD="netdata"
 NETDATA_INSTALLER_START_CMD=""
 
 install_netdata_service() {
+  local uname
   uname="$(uname 2> /dev/null)"
 
   if [ "${UID}" -eq 0 ]; then
@@ -506,7 +512,7 @@ install_netdata_service() {
       if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
         ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
         IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
-        if [ "${IS_NETDATA_ENABLED}" = "disabled" ]; then
+        if [ "${IS_NETDATA_ENABLED}" == "disabled" ]; then
           echo >&2 "Netdata was there and disabled, make sure we don't re-enable it ourselves"
           ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="true"
         fi
@@ -521,7 +527,7 @@ install_netdata_service() {
       fi
     else
       install_non_systemd_init
-      ret=$?
+      local ret=$?
 
       if [ ${ret} -eq 0 ]; then
         if [ -n "${service_cmd}" ]; then
@@ -560,14 +566,12 @@ pidisnetdata() {
 }
 
 stop_netdata_on_pid() {
-  pid="${1}"
-  ret=0
-  count=0
+  local pid="${1}" ret=0 count=0
 
   pidisnetdata "${pid}" || return 0
 
   printf >&2 "Stopping netdata on pid %s ..." "${pid}"
-  while [ -n "${pid}" ] && [ ${ret} -eq 0 ]; do
+  while [ -n "$pid" ] && [ ${ret} -eq 0 ]; do
     if [ ${count} -gt 24 ]; then
       echo >&2 "Cannot stop the running netdata on pid ${pid}."
       return 1
@@ -603,8 +607,8 @@ stop_netdata_on_pid() {
 }
 
 netdata_pids() {
-  p=''
-  ns=''
+  local p myns ns
+
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
 
   for p in \
@@ -620,8 +624,7 @@ netdata_pids() {
 }
 
 stop_all_netdata() {
-  p=''
-  uname=''
+  local p uname
 
   if [ "${UID}" -eq 0 ]; then
     uname="$(uname 2> /dev/null)"
@@ -646,7 +649,7 @@ stop_all_netdata() {
     fi
   fi
 
-  if [ -n "$(netdata_pids)" ] && [ -n "$(type netdatacli)" ]; then
+  if [ -n "$(netdata_pids)" ] && [ -n "$(builtin type -P netdatacli)" ]; then
     netdatacli shutdown-agent
     sleep 20
   fi
@@ -661,10 +664,10 @@ stop_all_netdata() {
 # restart netdata
 
 restart_netdata() {
-  netdata="${1}"
+  local netdata="${1}"
   shift
 
-  started=0
+  local started=0
 
   progress "Restarting netdata instance"
 
@@ -734,8 +737,7 @@ install_netdata_logrotate() {
 # create netdata.conf
 
 create_netdata_conf() {
-  path="${1}"
-  url="${2}"
+  local path="${1}" url="${2}"
 
   if [ -s "${path}" ]; then
     return 0
@@ -776,8 +778,7 @@ create_netdata_conf() {
 }
 
 portable_add_user() {
-  username="${1}"
-  homedir="${2}"
+  local username="${1}" homedir="${2}"
 
   [ -z "${homedir}" ] && homedir="/tmp"
 
@@ -789,6 +790,7 @@ portable_add_user() {
 
   echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
+  local nologin
   nologin="$(command -v nologin || echo '/bin/false')"
 
   # Linux
@@ -817,7 +819,7 @@ portable_add_user() {
 }
 
 portable_add_group() {
-  groupname="${1}"
+  local groupname="${1}"
 
   # Check if group exist
   if cut -d ':' -f 1 < /etc/group | grep "^${groupname}$" 1> /dev/null 2>&1; then
@@ -852,8 +854,7 @@ portable_add_group() {
 }
 
 portable_add_user_to_group() {
-  groupname="${1}"
-  username="${2}"
+  local groupname="${1}" username="${2}"
 
   # Check if group exist
   if ! cut -d ':' -f 1 < /etc/group | grep "^${groupname}$" > /dev/null 2>&1; then
@@ -862,7 +863,7 @@ portable_add_user_to_group() {
   fi
 
   # Check if user is in group
-  if expr ",$(grep "^${groupname}:" < /etc/group | cut -d ':' -f 4)," : ",""${username}"","; then
+  if [[ ",$(grep "^${groupname}:" < /etc/group | cut -d ':' -f 4)," =~ ,${username}, ]]; then
     # username is already there
     echo >&2 "User '${username}' is already in group '${groupname}'."
     return 0
@@ -983,7 +984,7 @@ cleanup_old_netdata_updater() {
 }
 
 enable_netdata_updater() {
-  updater_type
+  local updater_type
 
   if [ -n "${1}" ] ; then
     updater_type="${1}"
@@ -1056,4 +1057,3 @@ disable_netdata_updater() {
 set_netdata_updater_channel() {
   sed -i -e "s/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL=\"${RELEASE_CHANNEL}\"/" "${NETDATA_USER_CONFIG_DIR}/.environment"
 }
-
