@@ -610,7 +610,7 @@ int error_log_limit(int reset) {
             fprintf(
                 stderr,
                 "%s: %s LOG FLOOD PROTECTION reset for process '%s' "
-				"(prevented %lu logs in the last %"PRId64" seconds).\n",
+                "(prevented %lu logs in the last %"PRId64" seconds).\n",
                 date,
                 program_name,
                 program_name,
@@ -633,7 +633,7 @@ int error_log_limit(int reset) {
             fprintf(
                 stderr,
                 "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' "
-				"(prevented %lu logs in the last %"PRId64" seconds).\n",
+                "(prevented %lu logs in the last %"PRId64" seconds).\n",
                 date,
                 program_name,
                 program_name,
@@ -657,7 +657,7 @@ int error_log_limit(int reset) {
             fprintf(
                 stderr,
                 "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
-				"in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.\n",
+                "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.\n",
                 date,
                 program_name,
                 counter,
