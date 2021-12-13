@@ -91,7 +91,7 @@ single-node dashboards in Netdata Cloud to drill down on specific issues, scrub 
 historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 
 Read about the process in the [infrastructure
-overview](/docs/visualize/overview-infrastructure.md#single-node-dashboards) doc, then learn about [interacting with
+overview](/docs/visualize/overview-infrastructure.md#drill-down-with-single-node-dashboards) doc, then learn about [interacting with
 dashboards and charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time
 metrics.
 
