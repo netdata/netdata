@@ -17,7 +17,7 @@ on:
         default: nightly
         required: true
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
-  group: release-${{ github.ref }}-${{ github.event_name }}
+  group: build-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
   build-dist: # Build the distribution tarball and store it as an artifact.
