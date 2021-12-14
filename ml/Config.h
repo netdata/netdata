@@ -30,10 +30,6 @@ public:
     double ADWindowRateThreshold;
     double ADDimensionRateThreshold;
 
-    /*The maximum size, and the associated threshold, of the data table that holds anomaly rate information*/
-    double MaxAnomalyRateInfoTableRows;
-    double MaxAnomalyRateInfoAge;
-
     SIMPLE_PATTERN *SP_HostsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;
 

@@ -282,9 +282,6 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
     Json["idle-window-size"] = Cfg.ADIdleWindowSize;
     Json["window-rate-threshold"] = Cfg.ADWindowRateThreshold;
     Json["dimension-rate-threshold"] = Cfg.ADDimensionRateThreshold;
-
-    Json["max-anomaly-rate-info-table-rows"] = Cfg.MaxAnomalyRateInfoTableRows;
-    Json["max-anomaly-rate-info-age"] = Cfg.MaxAnomalyRateInfoAge;
 }
 
 std::pair<Dimension *, Duration<double>>

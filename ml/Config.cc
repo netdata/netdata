@@ -22,7 +22,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void Config::readMLConfig(void) {
     const char *ConfigSectionML = CONFIG_SECTION_ML;
 
-    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", true);
+    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
 
     /*
      * Read values
@@ -46,9 +46,6 @@ void Config::readMLConfig(void) {
     double ADIdleWindowSize = config_get_float(ConfigSectionML, "idle window size", 30);
     double ADWindowRateThreshold = config_get_float(ConfigSectionML, "window minimum anomaly rate", 0.25);
     double ADDimensionRateThreshold = config_get_float(ConfigSectionML, "anomaly event min dimension rate threshold", 0.05);
-
-    double MaxAnomalyRateInfoTableRows = config_get_number(ConfigSectionML, "the maximum size, in rows, of the data table that holds anomaly rate information", 10000.0);
-    double MaxAnomalyRateInfoAge = config_get_number(ConfigSectionML, "the oldest age, in hours, of the anomaly rate information allowed to stay in the table", 240.0);
 
     std::string HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     std::string ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training",
@@ -83,8 +80,6 @@ void Config::readMLConfig(void) {
     ADWindowRateThreshold = clamp(ADWindowRateThreshold, 0.01, 0.99);
     ADDimensionRateThreshold = clamp(ADDimensionRateThreshold, 0.01, 0.99);
 
-    MaxAnomalyRateInfoTableRows = clamp(MaxAnomalyRateInfoTableRows, 10.0, 100000.0);
-    MaxAnomalyRateInfoAge = clamp(MaxAnomalyRateInfoAge, 0.1, 2400.0);
     /*
      * Validate
      */
@@ -128,18 +123,7 @@ void Config::readMLConfig(void) {
     Cfg.ADWindowRateThreshold = ADWindowRateThreshold;
     Cfg.ADDimensionRateThreshold = ADDimensionRateThreshold;
 
-    Cfg.MaxAnomalyRateInfoTableRows = MaxAnomalyRateInfoTableRows;
-    Cfg.MaxAnomalyRateInfoAge = MaxAnomalyRateInfoAge;
-
     Cfg.SP_HostsToSkip = simple_pattern_create(HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
-
-    #if 0
-        Cfg.MinTrainSamples = 1 * 60;
-        Cfg.MaxTrainSamples = 4 * 60;
-        Cfg.TrainEvery = 1 * 60;
-
-        Cfg.SP_ChartsToSkip = simple_pattern_create("!system.cpu *", NULL, SIMPLE_PATTERN_EXACT);
-    #endif
  
 }
