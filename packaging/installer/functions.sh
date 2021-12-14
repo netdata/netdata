@@ -1074,3 +1074,42 @@ prompt() {
     esac
   done
 }
+
+usage() {
+  cat << EOF
+OPTIONS:
+[--dont-wait] [--non-interactive] [ ]
+EOF
+}
+
+check_flags() {
+  while [ -n "${1}" ]; do
+    case "${1}" in
+      dont-wait | --dont-wait | -n)
+        DONT_WAIT=1
+        ;;
+
+      non-interactive | --non-interactive | -y)
+        NON_INTERACTIVE=1
+        ;;
+
+      help | -h | --help)
+        usage
+        exit 1
+        ;;
+
+      *)
+        echo >&2 "ERROR: Cannot understand option '${1}'"
+        echo >&2
+        usage
+        exit 1
+        ;;
+    esac
+    shift
+  done
+
+  if [ "${DONT_WAIT}" -eq 0 ] && [ "${NON_INTERACTIVE}" -eq 0 ]; then
+    read -r -p "Press ENTER to run it > " || exit 1
+  fi
+}
+
