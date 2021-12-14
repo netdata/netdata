@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Package tree used for installing netdata on distribution:
+# << Sabayon >>
+
+set -e
+
+package_tree="
+  dev-vcs/git
+  sys-apps/findutils
+  sys-devel/gcc
+  sys-devel/make
+  sys-devel/autoconf
+  sys-devel/autoconf-archive
+  sys-devel/autogen
+  sys-devel/automake
+  virtual/pkgconfig
+  dev-util/cmake
+  app-arch/tar
+  net-misc/curl
+  app-arch/gzip
+  net-analyzer/gnu-netcat
+  sys-apps/util-linux
+  net-libs/libmnl
+  dev-libs/json-c
+  dev-libs/libuv
+  app-arch/lz4
+  dev-libs/openssl
+  dev-libs/judy
+  virtual/libelf
+  dev-lang/python:3.4
+  dev-lang/python:2.7
+  libuv
+  "
+  #libtoolize
+  #libz-dev
+
+packages_to_install=
+
+for package in $package_tree; do
+  if equo search $package &> /dev/null; then
+    echo "Package '${package}' is installed"
+  else
+    echo "Package '${package}' is NOT installed"
+    packages_to_install="$packages_to_install $package"
+  fi
+done
+
+if [[ -z "$packages_to_install" ]]; then
+  echo "All required packages are already installed. Skipping .."
+else
+  echo "packages_to_install: $packages_to_install"
+  equo install $packages_to_install
+fi

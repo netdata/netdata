@@ -1057,3 +1057,20 @@ disable_netdata_updater() {
 set_netdata_updater_channel() {
   sed -i -e "s/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL=\"${RELEASE_CHANNEL}\"/" "${NETDATA_USER_CONFIG_DIR}/.environment"
 }
+
+prompt() {
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode, assuming yes (y)"
+    echo >&2 " > Would have prompted for ${1} ..."
+    return 0
+  fi
+
+  while true; do
+    read -r -p "${1} [y/n] " yn
+    case $yn in
+      [Yy]*) return 0 ;;
+      [Nn]*) return 1 ;;
+      *) echo >&2 "Please answer with yes (y) or no (n)." ;;
+    esac
+  done
+}
