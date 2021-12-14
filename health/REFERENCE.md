@@ -538,7 +538,7 @@ See our [simple patterns docs](../libnetdata/simple_pattern/) for more examples.
 Netdata has an internal [infix expression parser](../libnetdata/eval). This parses expressions and creates an internal
 structure that allows fast execution of them.
 
-These operators are supported `+`, `-`, `*`, `/`, `<`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`, `NOT`.
+These operators are supported `+`, `-`, `*`, `/`, `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`, `NOT`.
 Boolean operators result in either `1` (true) or `0` (false).
 
 The conditional evaluation operator `?` is supported too. Using this operator IF-THEN-ELSE conditional statements can be
