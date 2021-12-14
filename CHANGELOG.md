@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.32.1...1.32.1)
+
 ## [v1.32.1](https://github.com/netdata/netdata/tree/v1.32.1) (2021-12-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.32.0...v1.32.1)
