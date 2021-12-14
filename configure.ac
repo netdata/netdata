@@ -562,6 +562,7 @@ if test "${enable_compression}" != "no"; then
         )
         LIBS="${LIBS_BKP}"
         if test "${enable_compression}" == "yes"; then
+            OPTIONAL_LZ4_LIBS="${LZ4_LIBS_FAST}"
             AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
         fi
     else
