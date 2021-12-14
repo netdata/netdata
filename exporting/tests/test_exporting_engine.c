@@ -1309,9 +1309,9 @@ static void test_format_batch_prometheus_remote_write(void **state)
     assert_int_equal(format_batch_prometheus_remote_write(instance), 0);
 
     BUFFER *buffer = instance->buffer;
-    char *write_request_string = calloc(1, 400);
-    convert_write_request_to_string(buffer_tostring(buffer), write_request_string, 399);
-    assert_int_equal(strlen(write_request_string), 271);
+    char *write_request_string = calloc(1, 1000);
+    convert_write_request_to_string(buffer_tostring(buffer), buffer_strlen(buffer), write_request_string, 999);
+    assert_int_equal(strlen(write_request_string), 753);
     assert_string_equal(
         write_request_string,
         "timeseries {\n"
@@ -1329,7 +1329,41 @@ static void test_format_batch_prometheus_remote_write(void **state)
         "  }\n"
         "  labels {\n"
         "    name: \"version\"\n"
-        "    value: \"test_application\"\n"
+        "    value: \"test_version\"\n"
+        "  }\n"
+        "  labels {\n"
+        "    name: \"test_key\"\n"
+        "    value: \"test_value\"\n"
+        "  }\n"
+        "  samples {\n"
+        "    value: 1\n"
+        "    timestamp: 15051\n"
+        "  }\n"
+        "}\n"
+        "timeseries {\n"
+        "  labels {\n"
+        "    name: \"__name__\"\n"
+        "    value: \"test_name\"\n"
+        "  }\n"
+        "  labels {\n"
+        "    name: \"chart\"\n"
+        "    value: \"test chart\"\n"
+        "  }\n"
+        "  labels {\n"
+        "    name: \"family\"\n"
+        "    value: \"test_family\"\n"
+        "  }\n"
+        "  labels {\n"
+        "    name: \"dimension\"\n"
+        "    value: \"test_dimension\"\n"
+        "  }\n"
+        "  labels {\n"
+        "    name: \"instance\"\n"
+        "    value: \"test_instance\"\n"
+        "  }\n"
+        "  samples {\n"
+        "    value: 123000321\n"
+        "    timestamp: 15052\n"
         "  }\n"
         "}\n");
     free(write_request_string);
