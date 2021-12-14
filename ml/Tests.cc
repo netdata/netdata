@@ -390,6 +390,27 @@ int test_ml_anomaly_info_api_sql(const std::string &AnomalyTestDBPath, const std
     return retValue;
 }
 
+//Test 0: query a range where all source info have zero values of anomaly, so the average should be equal to zero
+//... this is compared against a set result
+TEST(AnomalyRateInfoSqlTest, AllDimZeroValues) {
+    std::stringstream TestDBDirectory, TestDataDirectory, TestQueryDirectory, TestCheckDirectory;
+    
+    TestDBDirectory << netdata_configured_cache_dir << "/ml_test_anomaly_info.db";
+    std::string AnomalyTestDBPath = TestDBDirectory.str();
+    
+    TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data_0.sql";
+    std::string AnomalyTestDataPath = TestDataDirectory.str();
+    
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_0.sql";
+    std::string AnomalyTestQueryPath = TestQueryDirectory.str();
+    
+    TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_0.sql";
+    std::string AnomalyTestCheckPath = TestCheckDirectory.str();
+    
+    EXPECT_EQ(test_ml_anomaly_info_api_sql(AnomalyTestDBPath, AnomalyTestDataPath, 
+                                            AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
+}
+
 //Test 1: query a range where all source info have equal values of anomaly, so the average should be equal to each value
 //... this is compared against a set result
 TEST(AnomalyRateInfoSqlTest, AllDimEqualValues) {
@@ -432,5 +453,24 @@ TEST(AnomalyRateInfoSqlTest, DifferentDimValues) {
                                             AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
 }
 
-
+//Test SimpleDB: query on a very simplified database of five records and two dimensions with only one none zero value
+//... on one of the dimensions in one record, the result is compared against a set result
+TEST(AnomalyRateInfoSqlTest, SimpleDimOneNoneZeroValue) {
+    std::stringstream TestDBDirectory, TestDataDirectory, TestQueryDirectory, TestCheckDirectory;
+    
+    TestDBDirectory << netdata_configured_cache_dir << "/ml_test_anomaly_info.db";
+    std::string AnomalyTestDBPath = TestDBDirectory.str();
+    
+    TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data_simple.sql";
+    std::string AnomalyTestDataPath = TestDataDirectory.str();
+    
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_simple.sql";
+    std::string AnomalyTestQueryPath = TestQueryDirectory.str();
+    
+    TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_simple.sql";
+    std::string AnomalyTestCheckPath = TestCheckDirectory.str();
+    
+    EXPECT_EQ(test_ml_anomaly_info_api_sql(AnomalyTestDBPath, AnomalyTestDataPath, 
+                                            AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
+}
 

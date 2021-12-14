@@ -2,30 +2,27 @@ DROP TABLE IF EXISTS anomaly_rate_info_test_queried_2;
 CREATE TABLE anomaly_rate_info_test_queried_2 (dim_id text NOT NULL, anomaly_percentage real);
 INSERT INTO anomaly_rate_info_test_queried_2 (dim_id, anomaly_percentage)
 SELECT  main.dimension_id, COALESCE(
-     ((COALESCE(pre.avg,0) * (SELECT before-after FROM anomaly_rate_info_test_source WHERE after <= 1638208643 ORDER BY after DESC LIMIT 1)) + 
+     ((COALESCE(pre.avg,0) * (SELECT before-1638208643 FROM anomaly_rate_info_test_source WHERE after < 1638208643 ORDER BY after DESC LIMIT 1)) + 
      (COALESCE(main.avg,0) * ((SELECT before FROM anomaly_rate_info_test_source WHERE before <= 1638209003 ORDER BY before DESC LIMIT 1) - 
                   (SELECT after FROM anomaly_rate_info_test_source WHERE after >= 1638208643 ORDER BY after ASC LIMIT 1))) + 
-     (COALESCE(post.avg,0) * (SELECT before-after FROM anomaly_rate_info_test_source WHERE before >= 1638209003 OR ((SELECT before FROM anomaly_rate_info_test_source 
+     (COALESCE(post.avg,0) * (SELECT 1638209003-after FROM anomaly_rate_info_test_source WHERE before > 1638209003 OR ((SELECT before FROM anomaly_rate_info_test_source 
                                                                                                 WHERE before <= 1638209003 
                                                                                                 ORDER BY before DESC LIMIT 1) 
                                                                                             AND NOT EXISTS (SELECT before FROM anomaly_rate_info_test_source 
-                                                                                                                WHERE before >= 1638209003 
+                                                                                                                WHERE before > 1638209003 
                                                                                                                 ORDER BY before ASC LIMIT 1)) 
                                                                 ORDER BY before ASC LIMIT 1))) / 
      ( 
-     ((COALESCE(pre.avg,0)/(CASE WHEN COALESCE(pre.avg,1) = 0 THEN 0.0000001 ELSE COALESCE(pre.avg,1) END)
-      * (SELECT before-after FROM anomaly_rate_info_test_source WHERE after <= 1638208643 ORDER BY after DESC LIMIT 1)) + 
-     (COALESCE(main.avg,0)/(CASE WHEN COALESCE(main.avg,1) = 0 THEN 0.0000001 ELSE COALESCE(main.avg,1) END)
-      * ((SELECT before FROM anomaly_rate_info_test_source WHERE before <= 1638209003 ORDER BY before DESC LIMIT 1) - 
-                  (SELECT after FROM anomaly_rate_info_test_source WHERE after >= 1638208643 ORDER BY after ASC LIMIT 1))) + 
-     (COALESCE(post.avg,0)/(CASE WHEN COALESCE(post.avg,1) = 0 THEN 0.0000001 ELSE COALESCE(post.avg,1) END)
-      * (SELECT before-after FROM anomaly_rate_info_test_source WHERE before >= 1638209003 OR ((SELECT before FROM anomaly_rate_info_test_source 
+     (SELECT before-1638208643 FROM anomaly_rate_info_test_source WHERE after < 1638208643 ORDER BY after DESC LIMIT 1) + 
+     (SELECT before FROM anomaly_rate_info_test_source WHERE before <= 1638209003 ORDER BY before DESC LIMIT 1) - 
+     (SELECT after FROM anomaly_rate_info_test_source WHERE after >= 1638208643 ORDER BY after ASC LIMIT 1) + 
+     (SELECT 1638209003-after FROM anomaly_rate_info_test_source WHERE before > 1638209003 OR ((SELECT before FROM anomaly_rate_info_test_source 
                                                                                                 WHERE before <= 1638209003 
                                                                                                 ORDER BY before DESC LIMIT 1) 
                                                                                             AND NOT EXISTS (SELECT before FROM anomaly_rate_info_test_source 
-                                                                                                                WHERE before >= 1638209003 
+                                                                                                                WHERE before > 1638209003 
                                                                                                                 ORDER BY before ASC LIMIT 1)) 
-                                                                ORDER BY before ASC LIMIT 1)))
+                                                                ORDER BY before ASC LIMIT 1)
 		),0.0) avg FROM 
     (SELECT dimension_id, AVG(anomaly_percentage) avg FROM 
       (SELECT json_extract(j.value, '$[1]') AS dimension_id, 
@@ -58,7 +55,7 @@ SELECT  main.dimension_id, COALESCE(
                                                                                             AND NOT EXISTS (SELECT before FROM anomaly_rate_info_test_source 
                                                                                                             WHERE before >= 1638209003 
                                                                                                             ORDER BY before ASC LIMIT 1)) 
-                                                                ORDER BY before DESC LIMIT 1) 
+                                                                ORDER BY before ASC LIMIT 1) 
       AND json_valid(ari.anomaly_rates)) 
       GROUP BY dimension_id) AS post 
      ON main.dimension_id = post.dimension_id 
