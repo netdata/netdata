@@ -3,7 +3,15 @@
 # << Alpine >>
 # supported versions: 3.12, 3.13, 3.14, 3.15, edge
 
+
+source "../functions.sh"
+
 set -e
+
+NON_INTERACTIVE=0
+DONT_WAIT=0
+
+check_flags ${@}
 
 package_tree="
   alpine-sdk
@@ -46,5 +54,11 @@ if [[ -z "$packages_to_install" ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: $packages_to_install"
-  apk add $packages_to_install
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+
+  apk add ${opts} $packages_to_install
 fi
