@@ -2,10 +2,7 @@
 # Package tree used for installing netdata on distribution:
 # << FreeBSD  >>
 
-
-echo "before"
 source "../functions.sh" 
-echo "after"
 
 set -e
 
@@ -80,23 +77,6 @@ function os_version {
     echo "Erorr: Cannot determine OS version!"
     exit 1
   fi
-}
-
-prompt() {
-  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
-    echo >&2 "Running in non-interactive mode, assuming yes (y)"
-    echo >&2 " > Would have prompted for ${1} ..."
-    return 0
-  fi
-
-  while true; do
-    read -r -p "${1} [y/n] " yn
-    case $yn in
-      [Yy]*) return 0 ;;
-      [Nn]*) return 1 ;;
-      *) echo >&2 "Please answer with yes (y) or no (n)." ;;
-    esac
-  done
 }
 
 version=$(os_version)
