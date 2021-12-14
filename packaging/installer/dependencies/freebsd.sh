@@ -2,6 +2,11 @@
 # Package tree used for installing netdata on distribution:
 # << FreeBSD  >>
 
+
+echo "before"
+source "../functions.sh" 
+echo "after"
+
 set -e
 
 NON_INTERACTIVE=0
@@ -14,7 +19,7 @@ OPTIONS:
 EOF
 }
 
-if [ ! -z "${1}" ]; then 	
+while [ -n "${1}" ]; do
   case "${1}" in
       dont-wait | --dont-wait | -n)
         DONT_WAIT=1
@@ -36,9 +41,13 @@ if [ ! -z "${1}" ]; then
         exit 1
         ;;
   esac
-else
-  echo "Run script without flags"
+  shift
+done
+
+if [ "${DONT_WAIT}" -eq 0 ] && [ "${NON_INTERACTIVE}" -eq 0 ]; then
+  read -r -p "Press ENTER to run it > " || exit 1
 fi
+
 
 packages_to_install=
 package_tree="
