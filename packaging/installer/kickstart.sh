@@ -363,9 +363,6 @@ dependencies() {
       warning "Downloaded dependency installation script is empty."
     else
       progress "Running downloaded script to detect required packages..."
-      pwd
-      echo "SHOW PARAMS"
-      echo "${PACKAGES_INSTALLER_OPTIONS}"
       run ${sudo} "${bash}" "install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
       # shellcheck disable=SC2181
       if [ $? -ne 0 ]; then
