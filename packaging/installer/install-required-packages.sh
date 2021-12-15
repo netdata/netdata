@@ -16,7 +16,7 @@ if [ "${BASH_VERSINFO[0]}" -lt "4" ]; then
 fi
 
 TMP_PARAMETERS=${1}
-echo "SUS IN INTALL '${TMP_PARAMETERS}'"
+echo "SUS IN INTALL `${TMP_PARAMETERS}`"
 
 # These options control which packages we are going to install
 # They can be pre-set, but also can be controlled with command line options
