@@ -3,13 +3,14 @@
 # << Debian >>
 # supported versions: 9, 10, 11
 
+source "../functions.sh"
+
 set -e
 
-#export PATH="${PATH}:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
-#export LC_ALL=C
+NON_INTERACTIVE=0
+DONT_WAIT=0
 
-# Be nice on production environments
-#renice 19 $$ > /dev/null 2> /dev/null
+check_flags ${@}
 
 package_tree="
   git
@@ -55,5 +56,14 @@ if [[ -z "$packages_to_install" ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: $packages_to_install"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y $packages_to_install
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    export DEBIAN_FRONTEND="noninteractive"
+    opts="${opts} -yq"
+  fi
+  echo "Running apt-get update and updating your APT caches ..."
+  apt-get update
+  apt-get install ${opts} $packages_to_install 
 fi
+
