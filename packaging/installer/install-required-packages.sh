@@ -1223,15 +1223,8 @@ EOF
 
 #mapfile -t PACKAGES_TO_INSTALL < <(packages | sort -u)
 
-
-  if [ "${DONT_WAIT}" -eq 0 ] && [ "${NON_INTERACTIVE}" -eq 0 ]; then
-    read -r -p "Press ENTER to run it > " || exit 1
-  fi
-
-
-pwd
-ls -la
 echo "distribution: ${distribution}"
+
 dependencies/${distribution}.sh
 
 remote_log "OK"
