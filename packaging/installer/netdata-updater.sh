@@ -181,10 +181,6 @@ get_netdata_latest_tag() {
     fatal "I need curl or wget to proceed, but neither of them are available on this system."
   fi
 
-  if echo "${tag}" | grep -vEq "^v[0-9]+\..+"; then
-    fatal "Cannot download latest stable tag from ${url}"
-  fi
-
   echo "${tag}" >"${dest}"
 }
 
@@ -270,7 +266,7 @@ set_tarball_urls() {
 
   if [ "$1" = "stable" ]; then
     latest="$(get_netdata_latest_tag /dev/stdout)"
-    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.${extension}"
+    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-latest.${extension}"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
     export NETDATA_TARBALL_URL="$NETDATA_NIGHTLIES_BASEURL/netdata-latest.${extension}"

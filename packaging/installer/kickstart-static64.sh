@@ -186,7 +186,7 @@ set_tarball_urls() {
     local latest
     # Simple version
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
-    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.gz.run"
+    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-latest.gz.run"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
     export NETDATA_TARBALL_URL="$NETDATA_TARBALL_BASEURL/netdata-latest.gz.run"
