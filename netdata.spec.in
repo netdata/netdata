@@ -138,9 +138,6 @@ BuildRequires: zlib-devel
 BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
-%if 0%{?fedora}
-BuildRequires: libwebsockets-devel >= 3.2
-%endif
 %if 0%{?suse_version}
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
@@ -251,9 +248,6 @@ autoreconf -ivf
 	%endif
 	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
 	--with-bundled-libJudy \
-	%endif
-	%if 0%{?centos_ver} < 8 || 0%{!?fedora:1}
-	--with-bundled-lws \
 	%endif
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
@@ -550,6 +544,8 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
+- Remove support code for legacy ACLK implementation.
 * Wed Sep 16 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-14
 - Convert to using 'AutoReq: yes' for library dependencies.
 * Thu Feb 13 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-13
