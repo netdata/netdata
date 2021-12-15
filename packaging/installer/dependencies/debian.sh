@@ -10,6 +10,8 @@ set -e
 NON_INTERACTIVE=0
 DONT_WAIT=0
 
+echo "${1}
+
 check_flags ${@}
 
 package_tree="
