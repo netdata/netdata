@@ -15,6 +15,8 @@ if [ "${BASH_VERSINFO[0]}" -lt "4" ]; then
   exit 1
 fi
 
+TMP_PARAMETERS=${1}
+
 # These options control which packages we are going to install
 # They can be pre-set, but also can be controlled with command line options
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
@@ -1225,9 +1227,7 @@ EOF
 
 echo "distribution: ${distribution}"
 
-echo "before our script"
-echo "FIRST PARAMETER ${@}"
-dependencies/${distribution}.sh ${@} aa bb 
+dependencies/${distribution}.sh ${TMP_PARAMETERS}
 
 remote_log "OK"
 
