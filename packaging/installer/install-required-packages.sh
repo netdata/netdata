@@ -1227,7 +1227,7 @@ echo "distribution: ${distribution}"
 
 echo "before our script"
 
-dependencies/${distribution}.sh ${@}
+dependencies/${distribution}.sh ${1}
 
 remote_log "OK"
 
