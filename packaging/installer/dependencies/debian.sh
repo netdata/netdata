@@ -10,6 +10,7 @@ set -e
 NON_INTERACTIVE=0
 DONT_WAIT=0
 
+echo "Dispay input for scrit"
 echo "${1}"
 
 check_flags ${@}
