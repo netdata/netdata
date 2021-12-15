@@ -15,4 +15,4 @@ RUN echo "${PRE}" > /prep-cmd.sh && \
 
 COPY . /netdata
 
-RUN /netdata/packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+RUN /netdata/packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
