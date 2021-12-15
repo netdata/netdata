@@ -366,7 +366,7 @@ dependencies() {
       pwd
       echo "SHOW PARAMS"
       echo "${PACKAGES_INSTALLER_OPTIONS}"
-      run ${sudo} "${bash}" "install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+      run ${sudo} "${bash}" "install-required-packages.sh ${PACKAGES_INSTALLER_OPTIONS}"
       # shellcheck disable=SC2181
       if [ $? -ne 0 ]; then
         warning "It failed to install all the required packages, but installation might still be possible."
