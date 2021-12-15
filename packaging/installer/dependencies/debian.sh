@@ -11,10 +11,11 @@ NON_INTERACTIVE=0
 DONT_WAIT=0
 
 
-  while [ -n "${1}" ]; do
-    echo ${1}
-    shift
-  done
+while [ -n "${1}" ]; do
+  echo "${1}"
+  echo "ABCD"
+  shift
+done
 
 
 echo "Dispay input for scrit"
