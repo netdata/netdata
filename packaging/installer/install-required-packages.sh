@@ -1225,7 +1225,9 @@ EOF
 
 echo "distribution: ${distribution}"
 
-dependencies/${distribution}.sh
+echo "before our script"
+
+dependencies/${distribution}.sh --dont-wait --non-interactive
 
 remote_log "OK"
 
