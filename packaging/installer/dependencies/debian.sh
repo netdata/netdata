@@ -10,10 +10,17 @@ set -e
 NON_INTERACTIVE=0
 DONT_WAIT=0
 
+
+  while [ -n "${1}" ]; do
+    echo ${1}
+    shift
+  done
+
+
 echo "Dispay input for scrit"
 echo "${@}"
 
-check_flags ${@}
+check_flags ${1}
 
 package_tree="
   git
