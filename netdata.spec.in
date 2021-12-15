@@ -226,10 +226,6 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-%{version}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%if 0%{!?fedora:1}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-lws.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%endif
 # Only bundle libJudy if this isn't Fedora or SUSE
 %if 0%{!?fedora:1} && 0%{!?suse_version:1}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-judy.sh ${RPM_BUILD_DIR}/%{name}-%{version}

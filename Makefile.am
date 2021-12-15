@@ -64,8 +64,6 @@ dist_noinst_DATA = \
     packaging/bundle-ebpf.sh \
     packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
-    packaging/bundle-lws.sh \
-    packaging/bundle-mosquitto.sh \
     packaging/check-kernel-config.sh \
     packaging/ebpf.checksums \
     packaging/ebpf.version \
@@ -80,10 +78,6 @@ dist_noinst_DATA = \
     packaging/judy.version \
     packaging/libbpf.checksums \
     packaging/libbpf.version \
-    packaging/libwebsockets.checksums \
-    packaging/libwebsockets.version \
-    packaging/mosquitto.checksums \
-    packaging/mosquitto.version \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
