@@ -1226,7 +1226,7 @@ EOF
 echo "distribution: ${distribution}"
 
 echo "before our script"
-
+echo "FIRST PARAMETER ${1}"
 dependencies/${distribution}.sh ${1} aa bb 
 
 remote_log "OK"
