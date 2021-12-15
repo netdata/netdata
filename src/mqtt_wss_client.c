@@ -98,6 +98,8 @@ struct mqtt_wss_client_struct {
     size_t mqtt_buf_max_size;
     int last_ec;
 
+    pthread_mutex_t pub_lock;
+
 // signifies that we didn't write all MQTT wanted
 // us to write during last cycle (e.g. due to buffer
 // size) and thus we should arm POLLOUT
@@ -196,6 +198,9 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
         mws_error(log, "OOM alocating mqtt_wss_client");
         goto fail;
     }
+
+    pthread_mutex_init(&client->pub_lock, NULL);
+
     client->msg_callback = msg_callback;
     client->puback_callback = puback_callback;
 
@@ -307,6 +312,8 @@ void mqtt_wss_destroy(mqtt_wss_client client)
 
     if (client->sockfd > 0)
         close(client->sockfd);
+
+    pthread_mutex_destroy(&client->pub_lock);
 
     mqtt_wss_log_ctx_destroy(client->log);
     free(client);
@@ -998,11 +1005,16 @@ ssize_t mqtt_pal_recvall(mqtt_pal_socket_handle mqtt_wss_client, void* buf, size
 #endif
 }
 
-int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id)
+static int _mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id)
 {
     int ret;
     int rc = 0;
     uint8_t mqtt_flags = 0;
+
+    if (client->mqtt_disconnecting) {
+        mws_error(client->log, "mqtt_wss is disconnecting can't publish");
+        return 1;
+    }
 
     if (!client->mqtt_connected) {
         mws_error(client->log, "MQTT is offline. Can't send message.");
@@ -1042,14 +1054,100 @@ int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *
     return rc;
 }
 
+static int mqtt_wss_handle_buffer_growth(mqtt_wss_client client, size_t msg_len)
+{
+    if (client->mqtt_buf_max_size && mqtt_wss_able_to_send(client, msg_len) == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
+        MQTT_PAL_MUTEX_LOCK(&client->mqtt_client->mutex);
+        size_t grow_by = msg_len * 1.5 - client->mqtt_client->mq.curr_sz;
+        size_t new_size = MIN(client->mqtt_send_buf_size + grow_by, client->mqtt_buf_max_size);
+        if (new_size == client->mqtt_send_buf_size) {
+            MQTT_PAL_MUTEX_UNLOCK(&client->mqtt_client->mutex);
+            mws_error(client->log, "Message bigger than maximum allowed MQTT buffer size.");
+            return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
+        }
+        mws_info(client->log, "Growing TX buffer to %zu (on the fly).", new_size);
+
+        void *new_buf = mqtt_mq_realloc(&client->mqtt_client->mq, new_size, realloc);
+        if (!new_buf) {
+            mws_error(client->log, "Realocation failed.");
+            return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
+        }
+        client->mqtt_send_buf = new_buf;
+        client->mqtt_send_buf_size = new_size;
+        MQTT_PAL_MUTEX_UNLOCK(&client->mqtt_client->mutex);
+    }
+    return mqtt_wss_able_to_send(client, msg_len);
+}
+
+int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id)
+{
+    pthread_mutex_lock(&client->pub_lock);
+    int rc = mqtt_wss_handle_buffer_growth(client, msg_len);
+    if (rc != MQTT_WSS_OK) {
+        pthread_mutex_unlock(&client->pub_lock);
+        return rc;
+    }
+    rc = _mqtt_wss_publish_pid(client, topic, msg, msg_len, publish_flags, packet_id);
+    pthread_mutex_unlock(&client->pub_lock);
+    return rc;
+}
+
+/* timeout_ms negative - block forever */
+/* timeout_ms == 0 instant fail */
+#define BLOCK_POLL_SLEEP_MS 100
+int mqtt_wss_publish_pid_block(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id, int timeout_ms)
+{
+    pthread_mutex_lock(&client->pub_lock);
+    int rc = mqtt_wss_handle_buffer_growth(client, msg_len);
+    if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
+        pthread_mutex_unlock(&client->pub_lock);
+        return rc;
+    }
+
+    while (rc == MQTT_WSS_ERR_CANT_SEND_NOW) {
+        if (timeout_ms > 0) {
+            if (timeout_ms >= BLOCK_POLL_SLEEP_MS) {
+                timeout_ms -= BLOCK_POLL_SLEEP_MS;
+                usleep(BLOCK_POLL_SLEEP_MS * 1000);
+            } else {
+                usleep(timeout_ms * 1000);
+                timeout_ms = 0;
+            }
+        }
+        if (timeout_ms == 0) {
+            pthread_mutex_unlock(&client->pub_lock);
+            return MQTT_WSS_ERR_BLOCK_TIMEOUT;
+        }
+
+        rc = mqtt_wss_able_to_send(client, msg_len);
+    }
+
+    rc = _mqtt_wss_publish_pid(client, topic, msg, msg_len, publish_flags, packet_id);
+    pthread_mutex_unlock(&client->pub_lock);
+    return rc;
+}
+
+#define MQTT_MSG_RESERVE 100 // this is a hack
+int mqtt_wss_able_to_send(mqtt_wss_client client, size_t bytes)
+{
+    if ((size_t)(client->mqtt_client->mq.mem_end - client->mqtt_client->mq.mem_start) <= bytes + MQTT_MSG_RESERVE)
+        return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
+    if (client->mqtt_client->mq.curr_sz < bytes + MQTT_MSG_RESERVE) {
+        MQTT_PAL_MUTEX_LOCK(&client->mqtt_client->mutex);
+        mqtt_mq_clean(&client->mqtt_client->mq);
+        if (client->mqtt_client->mq.curr_sz < (bytes + MQTT_MSG_RESERVE)) {
+            MQTT_PAL_MUTEX_UNLOCK(&client->mqtt_client->mutex);
+            return MQTT_WSS_ERR_CANT_SEND_NOW;
+        }
+        MQTT_PAL_MUTEX_UNLOCK(&client->mqtt_client->mutex);
+        return MQTT_WSS_OK;
+    }
+    return MQTT_WSS_OK;
+}
+
 int mqtt_wss_publish(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags)
 {
     uint16_t pid;
-
-    if (client->mqtt_disconnecting) {
-        mws_error(client->log, "mqtt_wss is disconnecting can't publish");
-        return 1;
-    }
 
     return mqtt_wss_publish_pid(client, topic, msg, msg_len, publish_flags, &pid);
 }

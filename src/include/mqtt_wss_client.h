@@ -34,6 +34,9 @@
 #define MQTT_WSS_ERR_TX_BUF_TOO_SMALL  -4
 #define MQTT_WSS_ERR_RX_BUF_TOO_SMALL  -5
 
+#define MQTT_WSS_ERR_CANT_SEND_NOW -6
+#define MQTT_WSS_ERR_BLOCK_TIMEOUT -7
+
 typedef struct mqtt_wss_client_struct *mqtt_wss_client;
 
 /* Creates new instance of MQTT over WSS. Doesn't start connection.
@@ -54,6 +57,8 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
                              void (*puback_callback)(uint16_t packet_id));
 
 void mqtt_wss_set_max_buf_size(mqtt_wss_client client, size_t size);
+
+int mqtt_wss_able_to_send(mqtt_wss_client client, size_t bytes);
 
 void mqtt_wss_destroy(mqtt_wss_client client);
 
@@ -129,6 +134,8 @@ int mqtt_wss_publish(mqtt_wss_client client, const char *topic, const void *msg,
  * @return Returns 0 on success
  */
 int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id);
+
+int mqtt_wss_publish_pid_block(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id, int timeout_ms);
 
 /* Subscribes to MQTT topic
  * @param client mqtt_wss_client which should do the subscription
