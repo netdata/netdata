@@ -35,6 +35,7 @@
 #define PLUGINSD_KEYWORD_CONTEXT "CONTEXT"
 #define PLUGINSD_KEYWORD_TOMBSTONE "TOMBSTONE"
 #define PLUGINSD_KEYWORD_HOST "HOST"
+// Add here the replication keywords
 
 
 #define PLUGINSD_LINE_MAX 1024
