@@ -57,7 +57,8 @@ else
   opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
-    opts="-y"
+  else
+    opts="-i"
   fi
 
   apk add ${opts} $packages_to_install
