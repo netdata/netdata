@@ -1098,6 +1098,10 @@ check_flags() {
         exit 1
         ;;
 
+     netdata)
+       echo "Test"
+       ;;
+
       *)
         echo >&2 "ERROR: Cannot understand option '${1}'"
         echo >&2

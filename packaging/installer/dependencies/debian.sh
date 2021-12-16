@@ -3,14 +3,25 @@
 # << Debian >>
 # supported versions: 9, 10, 11
 
-source "../functions.sh"
+source "./functions.sh"
 
 set -e
 
 NON_INTERACTIVE=0
 DONT_WAIT=0
 
-check_flags ${@}
+
+while [ -n "${1}" ]; do
+  echo "${1}"
+  echo "ABCD"
+  shift
+done
+
+
+echo "Dispay input for scrit"
+echo "${1}"
+
+check_flags ${1}
 
 package_tree="
   git
