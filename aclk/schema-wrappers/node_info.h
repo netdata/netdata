@@ -49,6 +49,10 @@ struct aclk_node_info {
     char *machine_guid;
 
     struct label *host_labels_head;
+
+    bool ml_capable;
+
+    bool ml_enabled;
 };
 
 struct update_node_info {
@@ -58,6 +62,7 @@ struct update_node_info {
     struct timeval updated_at;
     char *machine_guid;
     int child;
+    bool ml_on_parent;
 };
 
 char *generate_update_node_info_message(size_t *len, struct update_node_info *info);
