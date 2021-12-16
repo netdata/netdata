@@ -15,9 +15,6 @@ if [ "${BASH_VERSINFO[0]}" -lt "4" ]; then
   exit 1
 fi
 
-TMP_PARAMETERS=${1}
-echo "SUS IN INTALL ${TMP_PARAMETERS}"
-
 # These options control which packages we are going to install
 # They can be pre-set, but also can be controlled with command line options
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
@@ -1228,7 +1225,7 @@ EOF
 
 echo "distribution: ${distribution}"
 
-dependencies/${distribution}.sh ${TMP_PARAMETERS}
+dependencies/${distribution}.sh 
 
 remote_log "OK"
 
