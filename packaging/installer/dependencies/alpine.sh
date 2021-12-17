@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
 # << Alpine >>
 # supported versions: 3.12, 3.13, 3.14, 3.15, edge
@@ -54,11 +54,11 @@ if [[ -z "$packages_to_install" ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: $packages_to_install"
-  opts=
+  opts="--force-broken-world"
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
   else
-    opts="-i"
+    opts="${opts} -i"
   fi
   apk add ${opts} $packages_to_install
 fi
