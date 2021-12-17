@@ -72,8 +72,7 @@ validate_tree_ol() {
   opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
-  else
-    opts="-i"
+    opts="-y"
   fi
 
 
@@ -113,8 +112,7 @@ else
   opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
-  else
-    opts="-i"
+    opts="-y"
   fi
   echo "packages_to_install: ${packages_to_install[@]}"
   dnf install ${opts} ${packages_to_install[@]}
