@@ -5,14 +5,10 @@
 
 set -e
 
-function os_version {
-  if [[ -f /etc/os-release ]]; then
-    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2 | cut -d'"' -f2
-  else
-    echo "Erorr: Cannot determine OS version!"
-    exit 1
-  fi
-}
+NON_INTERACTIVE=0
+DONT_WAIT=0
+
+check_flags ${@}
 
 declare -a package_tree=(
   gcc
@@ -41,31 +37,62 @@ declare -a package_tree=(
   gzip
 )
 
+function os_version {
+  if [[ -f /etc/os-release ]]; then
+    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2 | cut -d'"' -f2
+  else
+    echo "Erorr: Cannot determine OS version!"
+    exit 1
+  fi
+}
+
 function enable_repo {
   if ! dnf repolist | grep -q codeready; then
-    cat > /etc/yum.repos.d/ol8_codeready.repo <<-EOF
-    [ol8_codeready_builder]
-    name=Oracle Linux \$releasever CodeReady Builder (\$basearch)
-    baseurl=http://yum.oracle.com/repo/OracleLinux/OL8/codeready/builder/\$basearch
-    gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
-    gpgcheck=1
-    enabled=1
+    if prompt "CodeReady Builder not found, shall I install it?"; then	  
+      cat > /etc/yum.repos.d/ol8_codeready.repo <<-EOF
+      [ol8_codeready_builder]
+      name=Oracle Linux \$releasever CodeReady Builder (\$basearch)
+      baseurl=http://yum.oracle.com/repo/OracleLinux/OL8/codeready/builder/\$basearch
+      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+      gpgcheck=1
+      enabled=1
 EOF
+    fi
   else 
     echo "Something went wrong!"
     exit 1 
   fi
 }
 
-if [[ $(os_version) =~ 8* ]]; then
-  package_manager=dnf
-  echo " > Checking for CodeReady Builder ..."
-  dnf config-manager --set-enabled ol8_codeready_builder || enable_repo
-else
-  package_manager=yum
-fi
 
-dnf makecache --refresh
+validate_tree_ol() {
+
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+  else
+    opts="-i"
+  fi
+
+
+  echo >&2 " > Checking for config-manager ..."
+  if ! dnf config-manager; then
+    if prompt "config-manager not found, shall I install it?"; then
+      dnf ${opts} install 'dnf-command(config-manager)'
+    fi
+  fi
+
+  echo " > Checking for CodeReady Builder ..."
+  if ! dnf repolist | grep ol8_codeready_builder; then
+    if prompt "CodeReadyBuilder not found, shall I install it?"; then
+      dnf ${opts} config-manager --set-enabled ol8_codeready_builder || enable_repo
+    fi
+  fi
+
+  dnf makecache --refresh
+}
+
+validate_tree_ol
 
 packages_to_install=
 
@@ -81,7 +108,13 @@ done
 if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+  else
+    opts="-i"
+  fi
   echo "packages_to_install: ${packages_to_install[@]}"
-  ${package_manager} install -y ${packages_to_install[@]}
+  dnf install ${opts} ${packages_to_install[@]}
 fi
 
