@@ -3,6 +3,8 @@
 # << Oracle Linux >>
 # supported versions: 8
 
+source "../functions.sh"
+
 set -e
 
 NON_INTERACTIVE=0
