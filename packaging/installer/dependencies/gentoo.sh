@@ -2,7 +2,14 @@
 # Package tree used for installing netdata on distribution:
 # << Gentoo >>
 
+source "../functions.sh"
+
 set -e
+
+NON_INTERACTIVE=0
+DONT_WAIT=0
+
+check_flags ${@}
 
 package_tree="
   dev-vcs/git
@@ -48,6 +55,11 @@ if [[ -z "$packages_to_install" ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: $packages_to_install"
-  emerge $packages_to_install
+  opts="--ask"
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts=""
+  fi
+  emerge ${opts} $packages_to_install
 fi
 

@@ -3,7 +3,14 @@
 # << ArchLinux >>
 # supported versions: base / base-devel
 
+source "../functions.sh"
+
 set -e
+
+NON_INTERACTIVE=0
+DONT_WAIT=0
+
+check_flags ${@}
 
 declare -a package_tree=(
   gcc
@@ -48,5 +55,10 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  pacman -Sy --noconfirm ${packages_to_install[@]}
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="--noconfirm"
+  fi
+  pacman -Sy ${opts} ${packages_to_install[@]}
 fi

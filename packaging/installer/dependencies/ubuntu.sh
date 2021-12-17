@@ -3,7 +3,14 @@
 # << Ubuntu >>
 # supported versions: 18.04 20.04 20.10 21.04 21.10 
 
+source "../functions.sh"
+
 set -e
+
+NON_INTERACTIVE=0
+DONT_WAIT=0
+
+check_flags ${@}
 
 package_tree="
   git
@@ -48,5 +55,13 @@ if [[ -z "$packages_to_install" ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: $packages_to_install"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y $packages_to_install
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    export DEBIAN_FRONTEND="noninteractive"
+    opts="${opts} -yq"
+  fi
+  echo "Running apt-get update and updating your APT caches ..."
+  apt-get update
+  apt-get install ${opts} $packages_to_install
 fi

@@ -4,7 +4,14 @@
 # supported versions: leap/15.3 and tumbleweed
 # it may work with SLES as well, although we have not tested with it
 
+source "../functions.sh"
+
 set -e
+
+NON_INTERACTIVE=0
+DONT_WAIT=0
+
+check_flags ${@}
 
 declare -a package_tree=(
   gcc
@@ -49,5 +56,10 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  zypper -n install ${packages_to_install[@]}
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-n"
+  fi
+  zypper install ${opts} ${packages_to_install[@]}
 fi

@@ -3,16 +3,14 @@
 # << ClearLinux >>
 #Support versions: base
 
+source "../functions.sh"
+
 set -e
 
-function os_version {
-  if [[ -f /etc/os-release ]]; then
-    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2 | cut -d'"' -f2
-  else
-    echo "Erorr: Cannot determine OS version!"
-    exit 1
-  fi
-}
+NON_INTERACTIVE=0
+DONT_WAIT=0
+
+check_flags ${@}
 
 declare -a package_tree=(
   c-basic
@@ -48,6 +46,11 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  swupd bundle-add -y ${packages_to_install[@]}
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+  swupd bundle-add ${opts} ${packages_to_install[@]}
 fi
 

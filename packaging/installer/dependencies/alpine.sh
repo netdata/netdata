@@ -4,7 +4,7 @@
 # supported versions: 3.12, 3.13, 3.14, 3.15, edge
 
 
-source "../functions.sh"
+. "../functions.sh"
 
 set -e
 
@@ -60,6 +60,5 @@ else
   else
     opts="-i"
   fi
-
   apk add ${opts} $packages_to_install
 fi

@@ -3,7 +3,14 @@
 # << Fedora >>
 # supported versions: 24->35
 
+source "../functions.sh"
+
 set -e
+
+NON_INTERACTIVE=0
+DONT_WAIT=0
+
+check_flags ${@}
 
 function os_version {
   if [[ -f /etc/os-release ]]; then
@@ -65,5 +72,10 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  dnf -y install ${packages_to_install[@]}
+  opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+  dnf install ${opts} ${packages_to_install[@]}
 fi
