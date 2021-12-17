@@ -48,24 +48,22 @@ function os_version {
   fi
 }
 
-function enable_repo {
+enable_repo () {
   if ! dnf repolist | grep -q codeready; then
-    if prompt "CodeReady Builder not found, shall I install it?"; then	  
-      cat > /etc/yum.repos.d/ol8_codeready.repo <<-EOF
-      [ol8_codeready_builder]
-      name=Oracle Linux \$releasever CodeReady Builder (\$basearch)
-      baseurl=http://yum.oracle.com/repo/OracleLinux/OL8/codeready/builder/\$basearch
-      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
-      gpgcheck=1
-      enabled=1
+cat >> /etc/yum.repos.d/oracle-linux-ol8.repo <<-EOF
+
+[ol8_codeready_builder]
+name=Oracle Linux \$releasever CodeReady Builder (\$basearch)
+baseurl=http://yum.oracle.com/repo/OracleLinux/OL8/codeready/builder/\$basearch
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+gpgcheck=1
+enabled=1
 EOF
-    fi
   else 
     echo "Something went wrong!"
     exit 1 
   fi
 }
-
 
 validate_tree_ol() {
 
