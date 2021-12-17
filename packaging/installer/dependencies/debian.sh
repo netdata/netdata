@@ -3,7 +3,7 @@
 # << Debian >>
 # supported versions: 9, 10, 11
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 

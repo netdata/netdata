@@ -2,7 +2,7 @@
 # Package tree used for installing netdata on distribution:
 # << Gentoo >>
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 

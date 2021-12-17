@@ -3,7 +3,7 @@
 # << ClearLinux >>
 #Support versions: base
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 
@@ -46,11 +46,6 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  opts=
-  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
-    echo >&2 "Running in non-interactive mode"
-    opts="-y"
-  fi
-  swupd bundle-add ${opts} ${packages_to_install[@]}
+  swupd bundle-add ${packages_to_install[@]}
 fi
 

@@ -3,7 +3,7 @@
 # << CentOS >>
 # supported versions: 7,8
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 

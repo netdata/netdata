@@ -3,7 +3,7 @@
 # << Oracle Linux >>
 # supported versions: 8
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 

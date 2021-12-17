@@ -3,7 +3,7 @@
 # << Fedora >>
 # supported versions: 24->35
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 

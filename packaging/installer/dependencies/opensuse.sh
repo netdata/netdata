@@ -4,7 +4,7 @@
 # supported versions: leap/15.3 and tumbleweed
 # it may work with SLES as well, although we have not tested with it
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 
@@ -56,10 +56,10 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  opts=
+  opts="--ignore-unknown"
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
-    opts="-n"
+    opts="--non-interactive"
   fi
-  zypper install ${opts} ${packages_to_install[@]}
+  zypper ${opts} install ${packages_to_install[@]}
 fi

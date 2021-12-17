@@ -3,7 +3,7 @@
 # << Ubuntu >>
 # supported versions: 18.04 20.04 20.10 21.04 21.10 
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 

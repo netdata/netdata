@@ -3,7 +3,7 @@
 # << ArchLinux >>
 # supported versions: base / base-devel
 
-source "../functions.sh"
+source ./functions.sh
 
 set -e
 
