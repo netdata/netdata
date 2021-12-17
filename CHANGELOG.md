@@ -8,6 +8,8 @@
 
 - Don’t verify optional dependencies in build test environments in CI. [\#11910](https://github.com/netdata/netdata/pull/11910) ([Ferroin](https://github.com/Ferroin))
 - fix getting latest release tag [\#11908](https://github.com/netdata/netdata/pull/11908) ([maneamarius](https://github.com/maneamarius))
+- Fix handling of agent restart on update. [\#11887](https://github.com/netdata/netdata/pull/11887) ([Ferroin](https://github.com/Ferroin))
+- Fix the code that checks for available updates. [\#11870](https://github.com/netdata/netdata/pull/11870) ([Ferroin](https://github.com/Ferroin))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
