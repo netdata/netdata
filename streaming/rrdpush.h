@@ -10,10 +10,11 @@
 
 #define CONNECTED_TO_SIZE 100
 
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)4
 #define STREAM_VERSION_CLAIM 3
 #define STREAM_VERSION_CLABELS 4
-#define VERSION_GAP_FILLING 5
+#define STREAM_VERSION_COMPRESSION 5
+#define VERSION_GAP_FILLING 6
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(VERSION_GAP_FILLING)
 
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
@@ -94,6 +95,7 @@ struct receiver_state {
 
 
 extern unsigned int default_rrdpush_enabled;
+extern unsigned int default_rrdpush_replication_enabled;
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;

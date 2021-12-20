@@ -40,6 +40,7 @@ struct config stream_config = {
 };
 
 unsigned int default_rrdpush_enabled = 0;
+unsigned int default_rrdpush_replication_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
