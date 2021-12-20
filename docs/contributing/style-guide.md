@@ -421,7 +421,7 @@ In Markdown, use the standard image syntax, `![]()`, and place the alt text betw
 using our logo:
 
 ```markdown
-![The Netdata logo](../../web/gui/images/netdata-logomark.svg)
+![The Netdata logo](/web/gui/static/img/netdata-logomark.svg)
 ```
 
 Reference in-product text, code samples, and terminal output with actual text content, not screen captures or other

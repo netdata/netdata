@@ -29,7 +29,7 @@ Our most popular application collectors:
     rows in less than half a second.
 -   [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): Collect database global,
     replication, and per-user statistics.
--   [Redis](/collectors/python.d.plugin/redis/): Monitor database status by reading the server's response to the `INFO`
+-   [Redis](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis): Monitor database status by reading the server's response to the `INFO`
     command.
 -   [Apache](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache/): Collect Apache web
     server performance metrics via the `server-status?auto` endpoint.

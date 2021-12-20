@@ -38,6 +38,8 @@ else
   script_source="${script_dir}/netdata-updater.sh"
 fi
 
+PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
+
 info() {
   echo >&3 "$(date) : INFO: " "${@}"
 }
@@ -257,6 +259,40 @@ get_latest_version() {
   fi
 }
 
+update_available() {
+  basepath="$(dirname "$(dirname "$(dirname "${NETDATA_LIB_DIR}")")")"
+  searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
+  searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
+  ndbinary="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
+  if [ -z "${ndbinary}" ]; then
+    current_version=0
+  else
+    current_version="$(parse_version "$(${ndbinary} -v | cut -f 2 -d ' ')")"
+  fi
+
+  latest_tag="$(get_latest_version)"
+  latest_version="$(parse_version "${latest_tag}")"
+  path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
+
+  # If we can't get the current version for some reason assume `0`
+  current_version="${current_version:-0}"
+
+  # If we can't get the latest version for some reason assume `0`
+  latest_version="${latest_version:-0}"
+
+  info "Current Version: ${current_version}"
+  info "Latest Version: ${latest_version}"
+
+  if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; then
+    info "Newest version (current=${current_version} >= latest=${latest_version}) is already installed"
+    return 1
+  else
+    info "Update available"
+    return 0
+  fi
+}
+
 set_tarball_urls() {
   extension="tar.gz"
 
@@ -281,37 +317,21 @@ update() {
   ndtmpdir=$(create_tmp_directory)
   cd "$ndtmpdir" || exit 1
 
-  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
-
-  current_version="$(command -v netdata > /dev/null && parse_version "$(netdata -v | cut -f 2 -d ' ')")"
-  latest_tag="$(get_latest_version)"
-  latest_version="$(parse_version "${latest_tag}")"
-  path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
-
-  # If we can't get the current version for some reason assume `0`
-  current_version="${current_version:-0}"
-
-  # If we can't get the latest version for some reason assume `0`
-  latest_version="${latest_version:-0}"
-
-  info "Current Version: ${current_version}"
-  info "Latest Version: ${latest_version}"
-
-  if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; then
-    info "Newest version (current=${current_version} >= latest=${latest_version}) is already installed"
-  elif [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
-    info "Newest version is already installed"
-  else
+  if update_available; then
+    download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
     download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.tar.gz"
-    if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
-      fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour."
+    if [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
+      info "Newest version is already installed"
+    else
+      if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
+        fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour."
+      fi
+      NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
+      tar -xf netdata-latest.tar.gz >&3 2>&3
+      rm netdata-latest.tar.gz >&3 2>&3
+      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || exit 1
+      RUN_INSTALLER=1
     fi
-    NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
-    tar -xf netdata-latest.tar.gz >&3 2>&3
-    rm netdata-latest.tar.gz >&3 2>&3
-    cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || exit 1
-    RUN_INSTALLER=1
-    cd "${NETDATA_LOCAL_TARBALL_OVERRIDE}" || exit 1
   fi
 
   # We got the sources, run the update now
@@ -321,7 +341,8 @@ update() {
     possible_pids=$(pidof netdata)
     do_not_start=
     if [ -n "${possible_pids}" ]; then
-      kill -USR1 "${possible_pids}"
+      # shellcheck disable=SC2086
+      kill -USR1 ${possible_pids}
     else
       # netdata is currently not running, so do not start it after updating
       do_not_start="--dont-start-it"
@@ -434,27 +455,29 @@ if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
   info "Entering ${ndtmpdir}"
   cd "${ndtmpdir}" || exit 1
 
-  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
-  download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
-  if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour."
-  fi
+  if update_available; then
+    download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
+    download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
+    if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+      fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour."
+    fi
 
-  if [ -e /opt/netdata/etc/netdata/.install-type ] ; then
-    install_type="$(cat /opt/netdata/etc/netdata/.install-type)"
-  else
-    install_type="INSTALL_TYPE='legacy-static'"
-  fi
+    if [ -e /opt/netdata/etc/netdata/.install-type ] ; then
+      install_type="$(cat /opt/netdata/etc/netdata/.install-type)"
+    else
+      install_type="INSTALL_TYPE='legacy-static'"
+    fi
 
-  # Do not pass any options other than the accept, for now
-  # shellcheck disable=SC2086
-  if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
-    rm -rf "${ndtmpdir}" >&3 2>&3
-  else
-    info "NOTE: did not remove: ${ndtmpdir}"
-  fi
+    # Do not pass any options other than the accept, for now
+    # shellcheck disable=SC2086
+    if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
+      rm -rf "${ndtmpdir}" >&3 2>&3
+    else
+      info "NOTE: did not remove: ${ndtmpdir}"
+    fi
 
-  echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
+    echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
+  fi
 
   if [ -e "${PREVDIR}" ]; then
     info "Switching back to ${PREVDIR}"
