@@ -70,7 +70,7 @@ When coming from  [Nodes view page](https://learn.netdata.cloud/docs/cloud/visua
 
 ### Connect an agent running in Linux
 
-If you want to connect a node that is running on a Linux environment, the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
+If you want to connect a node that is running on a Linux environment, the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
@@ -80,7 +80,7 @@ the node in your Space after 60 seconds, see the [troubleshooting information](#
 
 Please note that to run it you will either need to have root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](#connect-an-agent-without-root-privileges) section.
 
-For more details on what are the extra parameters `claim-token`, `claim-rooms` and `claim-url` please refer to [Connect node to Netdata Cloud during installation](/packaging/installer/methods/kickstart#connect-node-to-netdata-cloud-during-installation).
+For more details on what are the extra parameters `claim-token`, `claim-rooms` and `claim-url` please refer to [Connect node to Netdata Cloud during installation](/packaging/installer/methods/kickstart.md#connect-node-to-netdata-cloud-during-installation).
 
 ### Connect an agent without root privileges
 
@@ -224,7 +224,7 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 
 ### Connect an agent running in macOS
 
-To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/methods/macos#install-netdata-with-kickstart) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
+To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/methods/macos.md#install-netdata-with-our-automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
@@ -234,7 +234,7 @@ the node in your Space after 60 seconds, see the [troubleshooting information](#
 
 ### Connect a Kubernetes cluster's parent Netdata pod
 
-Read our [Kubernetes installation](/packaging/installer/methods/kubernetes.md#connect-a-kubernetes-clusters-parent-pod)
+Read our [Kubernetes installation](/packaging/installer/methods/kubernetes.md#connect-your-kubernetes-cluster-to-netdata-cloud)
 for details on connecting a parent Netdata pod.
 
 ### Connect through a proxy
@@ -263,7 +263,7 @@ For example, a HTTP proxy setting may look like the following:
     proxy = http://proxy.example.com:1080 # With a URL
 ```
 
-You can now move on to connecting. When you connect with the [kickstart](/packaging/installer/#automatic-one-line-installation-script) script, add the `--claim-proxy=` parameter and
+You can now move on to connecting. When you connect with the [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script) script, add the `--claim-proxy=` parameter and
 append the same proxy setting you added to `netdata.conf`.
 
 ```bash
@@ -458,7 +458,7 @@ using the [ACLK](/aclk/README.md).
 
 ### kickstart script
 
-The best way to install Netdata and connect your nodes to Netdata Cloud is with our automatic one-line installation script, [kickstart](/packaging/installer/#automatic-one-line-installation-script). This script will install the Netdata Agent, in case it isn't already installed, and connect your node to Netdata Cloud. 
+The best way to install Netdata and connect your nodes to Netdata Cloud is with our automatic one-line installation script, [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script). This script will install the Netdata Agent, in case it isn't already installed, and connect your node to Netdata Cloud. 
 
 This  works with:
 * all Linux distributions, see [Netdata distribution support matrix](https://learn.netdata.cloud/docs/agent/packaging/distributions)
@@ -516,7 +516,7 @@ netdatacli reload-claiming-state
 
 This reloads the Agent connection state from disk.
 
-Our recommendation is to trigger the connection process using the [kickstart](/packaging/installer/#automatic-one-line-installation-script) whenever possible.
+Our recommendation is to trigger the connection process using the [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script) whenever possible.
 
 ### Netdata Agent command line
 

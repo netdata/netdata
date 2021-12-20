@@ -91,7 +91,7 @@ update. You can also export the environment variable `DO_NOT_TRACK` with a non-z
 
 When using Docker, **set your `DO_NOT_TRACK` environment variable to `1`.** You can set this variable with the following
 command: `export DO_NOT_TRACK=1`. When creating a container using Netdata's [Docker
-image](/packaging/docker/README.md#run-the-agent-with-the-docker-command) for the first time, this variable will disable
+image](/packaging/docker/README.md#create-a-new-netdata-agent-container) for the first time, this variable will disable
 the anonymous statistics script inside of the container.
 
 Each of these opt-out processes does the following:

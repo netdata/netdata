@@ -52,7 +52,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 -   The `every` line is **required** if not using `lookup`.
 -   Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`.
 -   A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
-    `!` for a negative match. Order is important, too! See our [simple patterns docs](../libnetdata/simple_pattern/) for
+    `!` for a negative match. Order is important, too! See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for
     more examples.
 -   Lines terminated by a `\` are spliced together with the next line. The backslash is removed and the following line is
     joined with the current one. No space is inserted, so you may split a line anywhere, even in the middle of a word.
@@ -275,7 +275,7 @@ template: disk_svctm_alarm
 The `families` line, used only alongside templates, filters which families within the context this alarm should apply
 to. The value is a space-separated list.
 
-The value is a space-separate list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for
+The value is a space-separate list of simple patterns. See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for
 some examples.
 
 For example, you can create a template on the `disk.io` context, but filter it to only the `sda` and `sdb` families:
@@ -294,7 +294,7 @@ The format is:
 lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS] [foreach DIMENSIONS]
 ```
 
-Everything is the same with [badges](../web/api/badges/). In short:
+Everything is the same with [badges](/web/api/badges/README.md). In short:
 
 -   `METHOD` is one of `average`, `min`, `max`, `sum`, `incremental-sum`.
      This is required.
@@ -531,11 +531,11 @@ that will be applied to all hosts installed in the last decade with the followin
 host labels: installed = 201*
 ```
 
-See our [simple patterns docs](../libnetdata/simple_pattern/) for more examples.
+See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for more examples.
 
 ## Expressions
 
-Netdata has an internal [infix expression parser](../libnetdata/eval). This parses expressions and creates an internal
+Netdata has an internal [infix expression parser](/libnetdata/eval). This parses expressions and creates an internal
 structure that allows fast execution of them.
 
 These operators are supported `+`, `-`, `*`, `/`, `<`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`, `NOT`.
@@ -602,15 +602,15 @@ You can find all the variables that can be used for a given chart, using
 Agent dashboard. For example, [variables for the `system.cpu` chart of the
 registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
 
-> If you don't know how to find the CHART_NAME, you can read about it [here](../web/README.md#charts).
+> If you don't know how to find the CHART_NAME, you can read about it [here](/web/README.md#charts).
 
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
 <details markdown="1"><summary>The variables below can be used in both chart alarms and context templates.</summary>
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
-templates for charts belonging to a given [context](../web/README.md#contexts). The reason is that all charts of a given
-context are essentially identical, with the only difference being the [family](../web/README.md#families) that
+templates for charts belonging to a given [context](/web/README.md#contexts). The reason is that all charts of a given
+context are essentially identical, with the only difference being the [family](/web/README.md#families) that
 identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway,
 unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
 
