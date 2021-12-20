@@ -81,8 +81,8 @@ void *grouping_create_des(RRDR *r) {
 
 // resets when switches dimensions
 // so, clear everything to restart
-void grouping_reset_des(RRDR *r) {
-    struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
+void grouping_reset_des(RRDR *r, unsigned int index) {
+    struct grouping_des *g = (struct grouping_des *)r->internal.gf[index].grouping_data;
     g->level = 0.0;
     g->trend = 0.0;
     g->count = 0;
@@ -91,13 +91,13 @@ void grouping_reset_des(RRDR *r) {
 
 }
 
-void grouping_free_des(RRDR *r) {
-    freez(r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+void grouping_free_des(RRDR *r, unsigned int index) {
+    freez(r->internal.gf[index].grouping_data);
+    r->internal.gf[index].grouping_data = NULL;
 }
 
-void grouping_add_des(RRDR *r, calculated_number value) {
-    struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
+void grouping_add_des(RRDR *r, calculated_number value, unsigned int index) {
+    struct grouping_des *g = (struct grouping_des *)r->internal.gf[index].grouping_data;
 
     if(calculated_number_isnumber(value)) {
         if(likely(g->count > 0)) {
@@ -125,8 +125,8 @@ void grouping_add_des(RRDR *r, calculated_number value) {
     //fprintf(stderr, "value: " CALCULATED_NUMBER_FORMAT ", level: " CALCULATED_NUMBER_FORMAT ", trend: " CALCULATED_NUMBER_FORMAT "\n", value, g->level, g->trend);
 }
 
-calculated_number grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
+calculated_number grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index) {
+    struct grouping_des *g = (struct grouping_des *)r->internal.gf[index].grouping_data;
 
     if(unlikely(!g->count || !calculated_number_isnumber(g->level))) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;

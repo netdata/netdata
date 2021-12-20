@@ -9,9 +9,9 @@
 extern void grouping_init_des(void);
 
 extern void *grouping_create_des(RRDR *r);
-extern void grouping_reset_des(RRDR *r);
-extern void grouping_free_des(RRDR *r);
-extern void grouping_add_des(RRDR *r, calculated_number value);
-extern calculated_number grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+extern void grouping_reset_des(RRDR *r, unsigned int index);
+extern void grouping_free_des(RRDR *r, unsigned int index);
+extern void grouping_add_des(RRDR *r, calculated_number value, unsigned int index);
+extern calculated_number grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index);
 
 #endif //NETDATA_API_QUERIES_DES_H

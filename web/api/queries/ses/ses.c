@@ -57,19 +57,19 @@ void *grouping_create_ses(RRDR *r) {
 
 // resets when switches dimensions
 // so, clear everything to restart
-void grouping_reset_ses(RRDR *r) {
-    struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
+void grouping_reset_ses(RRDR *r, unsigned int index) {
+    struct grouping_ses *g = (struct grouping_ses *)r->internal.gf[index].grouping_data;
     g->level = 0.0;
     g->count = 0;
 }
 
-void grouping_free_ses(RRDR *r) {
-    freez(r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+void grouping_free_ses(RRDR *r, unsigned int index) {
+    freez(r->internal.gf[index].grouping_data);
+    r->internal.gf[index].grouping_data = NULL;
 }
 
-void grouping_add_ses(RRDR *r, calculated_number value) {
-    struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
+void grouping_add_ses(RRDR *r, calculated_number value, unsigned int index) {
+    struct grouping_ses *g = (struct grouping_ses *)r->internal.gf[index].grouping_data;
 
     if(calculated_number_isnumber(value)) {
         if(unlikely(!g->count))
@@ -80,8 +80,8 @@ void grouping_add_ses(RRDR *r, calculated_number value) {
     }
 }
 
-calculated_number grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
+calculated_number grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index) {
+    struct grouping_ses *g = (struct grouping_ses *)r->internal.gf[index].grouping_data;
 
     if(unlikely(!g->count || !calculated_number_isnumber(g->level))) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;

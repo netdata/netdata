@@ -17,20 +17,20 @@ void *grouping_create_min(RRDR *r) {
 
 // resets when switches dimensions
 // so, clear everything to restart
-void grouping_reset_min(RRDR *r) {
-    struct grouping_min *g = (struct grouping_min *)r->internal.grouping_data;
+void grouping_reset_min(RRDR *r, unsigned int index) {
+    struct grouping_min *g = (struct grouping_min *)r->internal.gf[index].grouping_data;
     g->min = 0;
     g->count = 0;
 }
 
-void grouping_free_min(RRDR *r) {
-    freez(r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+void grouping_free_min(RRDR *r, unsigned int index) {
+    freez(r->internal.gf[index].grouping_data);
+    r->internal.gf[index].grouping_data = NULL;
 }
 
-void grouping_add_min(RRDR *r, calculated_number value) {
+void grouping_add_min(RRDR *r, calculated_number value, unsigned int index) {
     if(!isnan(value)) {
-        struct grouping_min *g = (struct grouping_min *)r->internal.grouping_data;
+        struct grouping_min *g = (struct grouping_min *)r->internal.gf[index].grouping_data;
 
         if(!g->count || calculated_number_fabs(value) < calculated_number_fabs(g->min)) {
             g->min = value;
@@ -39,8 +39,8 @@ void grouping_add_min(RRDR *r, calculated_number value) {
     }
 }
 
-calculated_number grouping_flush_min(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_min *g = (struct grouping_min *)r->internal.grouping_data;
+calculated_number grouping_flush_min(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index) {
+    struct grouping_min *g = (struct grouping_min *)r->internal.gf[index].grouping_data;
 
     calculated_number value;
 

@@ -268,6 +268,39 @@ const char *group_method2string(RRDR_GROUPING group) {
     return "unknown-group-method";
 }
 
+void grouping_do_all(ALL_GROUPING_TASK task, RRDR *r, calculated_number value, RRDR_VALUE_FLAGS *rrdr_value_options_ptr)
+{
+    unsigned int gf_count = r->internal.grouping_function_count;
+    switch (task) {
+        case GROUPING_CREATE_ALL:
+            for (size_t i = 0; i < gf_count; i++) {
+                r->internal.gf[i].grouping_data = r->internal.gf[i].grouping_create(r);
+            }
+            break;
+
+        case GROUPING_ADD_ALL:
+            for (size_t i = 0; i < gf_count; i++) {
+                r->internal.gf[i].grouping_add(r, value, i);
+            }
+            break;
+
+        case GROUPING_FREE_ALL:
+            for (size_t i = 0; i < gf_count; i++) {
+                r->internal.gf[i].grouping_free(r, i);
+            }
+            break;
+
+        case GROUPING_RESET_ALL:
+            for (size_t i = 0; i < gf_count; i++) {
+                r->internal.gf[i].grouping_reset(r, i);
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
 RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def) {
     int i;
 
@@ -464,34 +497,35 @@ static inline void do_dimension_variablestep(
                 }
             }
             // add this value to grouping
-            r->internal.grouping_add(r, value);
+            grouping_do_all(GROUPING_ADD_ALL, r, value, NULL);
             values_in_group++;
             db_points_read++;
         }
 
         if (0 == values_in_group) {
             // add NAN to grouping
-            r->internal.grouping_add(r, NAN);
+            grouping_do_all(GROUPING_ADD_ALL, r, value, NULL);
         }
-
-        rrdr_line = rrdr_line_init(r, now, rrdr_line);
 
         if(unlikely(!min_date)) min_date = now;
         max_date = now;
 
         // find the place to store our values
-        RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_line * r->d + dim_id_in_rrdr];
+        RRDR_VALUE_FLAGS *rrdr_value_options_ptr;
 
         // update the dimension options
         if(likely(values_in_group_non_zero))
             r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
-        // store the specific point options
-        *rrdr_value_options_ptr = group_value_flags;
-
-        // store the value
-        value = r->internal.grouping_flush(r, rrdr_value_options_ptr);
-        r->v[rrdr_line * r->d + dim_id_in_rrdr] = value;
+        for (int i = 0; i < r->internal.grouping_function_count; i++) {
+            rrdr_line = rrdr_line_init(r, now, rrdr_line);
+            // store the specific point options
+            rrdr_value_options_ptr = &r->o[rrdr_line * r->d + dim_id_in_rrdr];
+            *rrdr_value_options_ptr = group_value_flags;
+            // store the value
+            value = r->internal.gf[i].grouping_flush(r, rrdr_value_options_ptr, i);
+            r->v[rrdr_line * r->d + dim_id_in_rrdr] = value;
+        }
 
         if(likely(points_added || dim_id_in_rrdr)) {
             // find the min/max across all dimensions
@@ -615,29 +649,31 @@ static inline void do_dimension_fixedstep(
             }
 
             // add this value for grouping
-            r->internal.grouping_add(r, value);
+            grouping_do_all(GROUPING_ADD_ALL, r, value, NULL);
             values_in_group++;
             db_points_read++;
 
             if(unlikely(values_in_group == group_size)) {
-                rrdr_line = rrdr_line_init(r, now, rrdr_line);
-
                 if(unlikely(!min_date)) min_date = now;
                 max_date = now;
 
-                // find the place to store our values
-                RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_line * r->d + dim_id_in_rrdr];
+                RRDR_VALUE_FLAGS *rrdr_value_options_ptr;
 
                 // update the dimension options
-                if(likely(values_in_group_non_zero))
+                if (likely(values_in_group_non_zero))
                     r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
-                // store the specific point options
-                *rrdr_value_options_ptr = group_value_flags;
+                calculated_number value;
 
-                // store the value
-                calculated_number value = r->internal.grouping_flush(r, rrdr_value_options_ptr);
-                r->v[rrdr_line * r->d + dim_id_in_rrdr] = value;
+                for (int i = 0; i < r->internal.grouping_function_count; i++) {
+                    rrdr_line = rrdr_line_init(r, now, rrdr_line);
+                    // store the specific point options
+                    rrdr_value_options_ptr = &r->o[rrdr_line * r->d + dim_id_in_rrdr];
+                    *rrdr_value_options_ptr = group_value_flags;
+                    // store the value
+                    value = r->internal.gf[i].grouping_flush(r, rrdr_value_options_ptr, i);
+                    r->v[rrdr_line * r->d + dim_id_in_rrdr] = value;
+                }
 
                 if(likely(points_added || dim_id_in_rrdr)) {
                     // find the min/max across all dimensions
@@ -682,7 +718,7 @@ static inline void do_dimension_fixedstep(
 
 #ifdef NETDATA_INTERNAL_CHECKS
 static void rrd2rrdr_log_request_response_metadata(RRDR *r
-        , RRDR_GROUPING group_method
+        , RRDR_GROUPING group_method[]
         , int aligned
         , long group
         , long resampling_time
@@ -710,7 +746,8 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 
          // grouping
          , (aligned) ? "aligned" : "unaligned"
-         , group_method2string(group_method)
+         //TODO group_method index is hardcoded as [0]
+         , group_method2string(group_method[0])
          , group
          , resampling_time
          , resampling_group
@@ -831,7 +868,7 @@ static RRDR *rrd2rrdr_fixedstep(
         , long points_requested
         , long long after_requested
         , long long before_requested
-        , RRDR_GROUPING group_method
+        , RRDR_GROUPING group_method[]
         , long resampling_time_requested
         , RRDR_OPTIONS options
         , const char *dimensions
@@ -1048,14 +1085,16 @@ static RRDR *rrd2rrdr_fixedstep(
 
     {
         int i, found = 0;
-        for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
-            if(api_v1_data_groups[i].value == group_method) {
-                r->internal.grouping_create= api_v1_data_groups[i].create;
-                r->internal.grouping_reset = api_v1_data_groups[i].reset;
-                r->internal.grouping_free  = api_v1_data_groups[i].free;
-                r->internal.grouping_add   = api_v1_data_groups[i].add;
-                r->internal.grouping_flush = api_v1_data_groups[i].flush;
-                found = 1;
+        for (int gc = 0; r->internal.grouping_function_count > gc; gc++) {
+            for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
+                if(api_v1_data_groups[i].value == group_method[gc]) {
+                    r->internal.gf[gc].grouping_create = api_v1_data_groups[i].create;
+                    r->internal.gf[gc].grouping_reset = api_v1_data_groups[i].reset;
+                    r->internal.gf[gc].grouping_free = api_v1_data_groups[i].free;
+                    r->internal.gf[gc].grouping_add = api_v1_data_groups[i].add;
+                    r->internal.gf[gc].grouping_flush = api_v1_data_groups[i].flush;
+                    found = 1;
+                }
             }
         }
         if(!found) {
@@ -1063,16 +1102,17 @@ static RRDR *rrd2rrdr_fixedstep(
             #ifdef NETDATA_INTERNAL_CHECKS
             error("INTERNAL ERROR: grouping method %u not found for chart '%s'. Using 'average'", (unsigned int)group_method, r->st->name);
             #endif
-            r->internal.grouping_create= grouping_create_average;
-            r->internal.grouping_reset = grouping_reset_average;
-            r->internal.grouping_free  = grouping_free_average;
-            r->internal.grouping_add   = grouping_add_average;
-            r->internal.grouping_flush = grouping_flush_average;
+            r->internal.gf[0].grouping_create = grouping_create_average;
+            r->internal.gf[0].grouping_reset = grouping_reset_average;
+            r->internal.gf[0].grouping_free = grouping_free_average;
+            r->internal.gf[0].grouping_add = grouping_add_average;
+            r->internal.gf[0].grouping_flush = grouping_flush_average;
+            r->internal.grouping_function_count = 1;
         }
     }
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_data = r->internal.grouping_create(r);
+    grouping_do_all(GROUPING_CREATE_ALL, r, NAN, NULL);
 
 
     // -------------------------------------------------------------------------
@@ -1103,7 +1143,7 @@ static RRDR *rrd2rrdr_fixedstep(
         r->od[c] |= RRDR_DIMENSION_SELECTED;
 
         // reset the grouping for the new dimension
-        r->internal.grouping_reset(r);
+        grouping_do_all(GROUPING_CREATE_RESET, r, NAN, NULL);
 
         do_dimension_fixedstep(
                 r
@@ -1181,7 +1221,7 @@ static RRDR *rrd2rrdr_fixedstep(
     #endif
 
     // free all resources used by the grouping method
-    r->internal.grouping_free(r);
+    grouping_do_all(GROUPING_CREATE_FREE, r, NAN, NULL);
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
@@ -1203,7 +1243,7 @@ static RRDR *rrd2rrdr_variablestep(
         , long points_requested
         , long long after_requested
         , long long before_requested
-        , RRDR_GROUPING group_method
+        , RRDR_GROUPING group_method[]
         , long resampling_time_requested
         , RRDR_OPTIONS options
         , const char *dimensions
@@ -1426,31 +1466,33 @@ static RRDR *rrd2rrdr_variablestep(
 
     {
         int i, found = 0;
-        for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
-            if(api_v1_data_groups[i].value == group_method) {
-                r->internal.grouping_create= api_v1_data_groups[i].create;
-                r->internal.grouping_reset = api_v1_data_groups[i].reset;
-                r->internal.grouping_free  = api_v1_data_groups[i].free;
-                r->internal.grouping_add   = api_v1_data_groups[i].add;
-                r->internal.grouping_flush = api_v1_data_groups[i].flush;
-                found = 1;
+        for (int gc = 0; r->internal.grouping_function_count > gc; gc++) {
+            for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
+                if(api_v1_data_groups[i].value == group_method[gc]) {
+                    r->internal.gf[gc].grouping_create = api_v1_data_groups[i].create;
+                    r->internal.gf[gc].grouping_reset = api_v1_data_groups[i].reset;
+                    r->internal.gf[gc].grouping_free = api_v1_data_groups[i].free;
+                    r->internal.gf[gc].grouping_add = api_v1_data_groups[i].add;
+                    r->internal.gf[gc].grouping_flush = api_v1_data_groups[i].flush;;
+                    found = 1;
+                }
             }
-        }
         if(!found) {
             errno = 0;
             #ifdef NETDATA_INTERNAL_CHECKS
             error("INTERNAL ERROR: grouping method %u not found for chart '%s'. Using 'average'", (unsigned int)group_method, r->st->name);
             #endif
-            r->internal.grouping_create= grouping_create_average;
-            r->internal.grouping_reset = grouping_reset_average;
-            r->internal.grouping_free  = grouping_free_average;
-            r->internal.grouping_add   = grouping_add_average;
-            r->internal.grouping_flush = grouping_flush_average;
+            r->internal.gf[0].grouping_create = grouping_create_average;
+            r->internal.gf[0].grouping_reset = grouping_reset_average;
+            r->internal.gf[0].grouping_free = grouping_free_average;
+            r->internal.gf[0].grouping_add = grouping_add_average;
+            r->internal.gf[0].grouping_flush = grouping_flush_average;
+            r->internal.grouping_function_count = 1;
         }
     }
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_data = r->internal.grouping_create(r);
+    grouping_do_all(GROUPING_CREATE_ALL, r, NAN, NULL);
 
 
     // -------------------------------------------------------------------------
@@ -1480,7 +1522,7 @@ static RRDR *rrd2rrdr_variablestep(
         r->od[c] |= RRDR_DIMENSION_SELECTED;
 
         // reset the grouping for the new dimension
-        r->internal.grouping_reset(r);
+        grouping_do_all(GROUPING_RESET_ALL, r, NAN, NULL);
 
         do_dimension_variablestep(
                 r
@@ -1559,7 +1601,7 @@ static RRDR *rrd2rrdr_variablestep(
     #endif
 
     // free all resources used by the grouping method
-    r->internal.grouping_free(r);
+    grouping_do_all(GROUPING_CREATE_FREE, r, NAN, NULL);
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
@@ -1589,6 +1631,14 @@ RRDR *rrd2rrdr(
         , struct context_param *context_param_list
 )
 {
+    //Testing Purpose
+    enum rrdr_grouping group_methodT[4];
+    group_methodT[0] = group_method;
+    group_methodT[1] = RRDR_GROUPING_MAX;
+    group_methodT[2] = RRDR_GROUPING_END;
+    group_methodT[3] = RRDR_GROUPING_END;
+    //End of Testing Purpose
+
     int rrd_update_every;
     int absolute_period_requested;
 
@@ -1638,7 +1688,7 @@ RRDR *rrd2rrdr(
                 }
                 freez(region_info_array);
             }
-            return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
+            return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_methodT,
                                       resampling_time_requested, options, dimensions, rrd_update_every,
                                       first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
         } else {
@@ -1649,13 +1699,13 @@ RRDR *rrd2rrdr(
                                                                                   rrd_update_every, first_entry_t,
                                                                                   last_entry_t, options);
             }
-            return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
+            return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_methodT,
                                          resampling_time_requested, options, dimensions, rrd_update_every,
                                          first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list);
         }
     }
 #endif
-    return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
+    return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_methodT,
                               resampling_time_requested, options, dimensions,
                               rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
 }

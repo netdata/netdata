@@ -7,9 +7,9 @@
 #include "../rrdr.h"
 
 extern void *grouping_create_max(RRDR *r);
-extern void grouping_reset_max(RRDR *r);
-extern void grouping_free_max(RRDR *r);
-extern void grouping_add_max(RRDR *r, calculated_number value);
-extern calculated_number grouping_flush_max(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+extern void grouping_reset_max(RRDR *r, unsigned int index);
+extern void grouping_free_max(RRDR *r, unsigned int index);
+extern void grouping_add_max(RRDR *r, calculated_number value, unsigned int index);
+extern calculated_number grouping_flush_max(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index);
 
 #endif //NETDATA_API_QUERY_MAX_H

@@ -21,18 +21,18 @@ void *grouping_create_stddev(RRDR *r) {
 
 // resets when switches dimensions
 // so, clear everything to restart
-void grouping_reset_stddev(RRDR *r) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+void grouping_reset_stddev(RRDR *r, unsigned int index) {
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.gf[index].grouping_data;
     g->count = 0;
 }
 
-void grouping_free_stddev(RRDR *r) {
-    freez(r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+void grouping_free_stddev(RRDR *r, unsigned int index) {
+    freez(r->internal.gf[index].grouping_data);
+    r->internal.gf[index].grouping_data = NULL;
 }
 
-void grouping_add_stddev(RRDR *r, calculated_number value) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+void grouping_add_stddev(RRDR *r, calculated_number value, unsigned int index) {
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.gf[index].grouping_data;
 
     if(calculated_number_isnumber(value)) {
         g->count++;
@@ -64,8 +64,8 @@ static inline calculated_number stddev(struct grouping_stddev *g) {
     return sqrtl(variance(g));
 }
 
-calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index) {
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.gf[index].grouping_data;
 
     calculated_number value;
 
@@ -85,14 +85,14 @@ calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_op
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
 
-    grouping_reset_stddev(r);
+    grouping_reset_stddev(r, index);
 
     return  value;
 }
 
 // https://en.wikipedia.org/wiki/Coefficient_of_variation
-calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index) {
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.gf[index].grouping_data;
 
     calculated_number value;
 
@@ -115,7 +115,7 @@ calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FL
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
 
-    grouping_reset_stddev(r);
+    grouping_reset_stddev(r, index);
 
     return  value;
 }

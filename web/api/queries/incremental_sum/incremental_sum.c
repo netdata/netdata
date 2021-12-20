@@ -18,21 +18,21 @@ void *grouping_create_incremental_sum(RRDR *r) {
 
 // resets when switches dimensions
 // so, clear everything to restart
-void grouping_reset_incremental_sum(RRDR *r) {
-    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
+void grouping_reset_incremental_sum(RRDR *r, unsigned int index) {
+    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.gf[index].grouping_data;
     g->first = 0;
     g->last = 0;
     g->count = 0;
 }
 
-void grouping_free_incremental_sum(RRDR *r) {
-    freez(r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+void grouping_free_incremental_sum(RRDR *r, unsigned int index) {
+    freez(r->internal.gf[index].grouping_data);
+    r->internal.gf[index].grouping_data = NULL;
 }
 
-void grouping_add_incremental_sum(RRDR *r, calculated_number value) {
+void grouping_add_incremental_sum(RRDR *r, calculated_number value, unsigned int index) {
     if(!isnan(value)) {
-        struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
+        struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.gf[index].grouping_data;
 
         if(unlikely(!g->count)) {
             g->first = value;
@@ -45,8 +45,8 @@ void grouping_add_incremental_sum(RRDR *r, calculated_number value) {
     }
 }
 
-calculated_number grouping_flush_incremental_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
+calculated_number grouping_flush_incremental_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index) {
+    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.gf[index].grouping_data;
 
     calculated_number value;
 

@@ -4,6 +4,7 @@
 #define NETDATA_API_DATA_QUERY_H
 
 typedef enum rrdr_grouping {
+    RRDR_GROUPING_END = -128,
     RRDR_GROUPING_UNDEFINED = 0,
     RRDR_GROUPING_AVERAGE,
     RRDR_GROUPING_MIN,

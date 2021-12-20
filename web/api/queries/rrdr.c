@@ -95,6 +95,7 @@ inline void rrdr_free(RRDR *r)
     freez(r->v);
     freez(r->o);
     freez(r->od);
+    freez(r->internal.gf);
     freez(r);
 }
 
@@ -124,12 +125,15 @@ RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param
     } else
         rrddim_foreach_read(rd, st) r->d++;
 
-    r->n = n;
+    r->internal.grouping_function_count = find_enum_count(groups);
 
-    r->t = callocz((size_t)n, sizeof(time_t));
-    r->v = mallocz(n * r->d * sizeof(calculated_number));
-    r->o = mallocz(n * r->d * sizeof(RRDR_VALUE_FLAGS));
+    r->n = n;
+    r->t = callocz((size_t)n * r->internal.grouping_function_count, sizeof(time_t));
+    r->v = mallocz(n * r->d * r->internal.grouping_function_count * sizeof(calculated_number));
+    r->o = mallocz(n * r->d * r->internal.grouping_function_count * sizeof(RRDR_VALUE_FLAGS));
     r->od = mallocz(r->d * sizeof(RRDR_DIMENSION_FLAGS));
+    r->internal.gf =
+        (struct grouping_functions *)mallocz(r->internal.grouping_function_count * sizeof(struct grouping_functions));
 
     // set the hidden flag on hidden dimensions
     int c;

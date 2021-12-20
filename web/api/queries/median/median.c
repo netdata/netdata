@@ -25,18 +25,18 @@ void *grouping_create_median(RRDR *r) {
 
 // resets when switches dimensions
 // so, clear everything to restart
-void grouping_reset_median(RRDR *r) {
-    struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
+void grouping_reset_median(RRDR *r, unsigned int index) {
+    struct grouping_median *g = (struct grouping_median *)r->internal.gf[index].grouping_data;
     g->next_pos = 0;
 }
 
-void grouping_free_median(RRDR *r) {
-    freez(r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+void grouping_free_median(RRDR *r, unsigned int index) {
+    freez(r->internal.gf[index].grouping_data);
+    r->internal.gf[index].grouping_data = NULL;
 }
 
-void grouping_add_median(RRDR *r, calculated_number value) {
-    struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
+void grouping_add_median(RRDR *r, calculated_number value, unsigned int index) {
+    struct grouping_median *g = (struct grouping_median *)r->internal.gf[index].grouping_data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
         error("INTERNAL ERROR: median buffer overflow on chart '%s' - next_pos = %zu, series_size = %zu, r->group = %ld.", r->st->name, g->next_pos, g->series_size, r->group);
@@ -47,8 +47,8 @@ void grouping_add_median(RRDR *r, calculated_number value) {
     }
 }
 
-calculated_number grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
+calculated_number grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, unsigned int index) {
+    struct grouping_median *g = (struct grouping_median *)r->internal.gf[index].grouping_data;
 
     calculated_number value;
 

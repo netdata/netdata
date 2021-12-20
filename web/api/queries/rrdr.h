@@ -49,6 +49,9 @@ typedef enum rrdr_result_flags {
     RRDR_RESULT_OPTION_VARIABLE_STEP = 0x00000004, // the query uses variable-step time-frames
 } RRDR_RESULT_FLAGS;
 
+struct rrdresult;
+#include "grouping_list.h"
+
 typedef struct rrdresult {
     struct rrdset *st;         // the chart this result refers to
 
@@ -82,12 +85,8 @@ typedef struct rrdresult {
         long resampling_group;
         calculated_number resampling_divisor;
 
-        void *(*grouping_create)(struct rrdresult *r);
-        void (*grouping_reset)(struct rrdresult *r);
-        void (*grouping_free)(struct rrdresult *r);
-        void (*grouping_add)(struct rrdresult *r, calculated_number value);
-        calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
-        void *grouping_data;
+        struct grouping_functions *gf;
+        unsigned int grouping_function_count;
 
         #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
