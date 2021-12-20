@@ -229,6 +229,7 @@ If you would like to go deeper on what exactly the anomalies collector is doing 
 - If you activate this collector on a fresh node, it might take a little while to build up enough data to calculate a realistic and useful model.
 - Some models like `iforest` can be comparatively expensive (on same n1-standard-2 system above ~2s runtime during predict, ~40s training time, ~50% cpu on both train and predict) so if you would like to use it you might be advised to set a relatively high `update_every` maybe 10, 15 or 30 in `anomalies.conf`.
 - Setting a higher `train_every_n` and `update_every` is an easy way to devote less resources on the node to anomaly detection. Specifying less charts and a lower `train_n_secs` will also help reduce resources at the expense of covering less charts and maybe a more noisy model if you set `train_n_secs` to be too small for how your node tends to behave.
+- If you would like to enable this on a Rasberry Pi, then check out [this guide](https://learn.netdata.cloud/guides/monitor/raspberry-pi-anomaly-detection) which will guide you through first installing LLVM.
 
 ## Useful links and further reading
 
