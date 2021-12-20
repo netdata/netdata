@@ -4,12 +4,11 @@
 # supported versions: 3.12, 3.13, 3.14, 3.15, edge
 
 
-. ./functions.sh
+source ./functions.sh
 
 set -e
 
 NON_INTERACTIVE=0
-DONT_WAIT=0
 
 check_flags ${@}
 
