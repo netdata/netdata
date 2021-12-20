@@ -268,7 +268,7 @@ const char *group_method2string(RRDR_GROUPING group) {
     return "unknown-group-method";
 }
 
-void grouping_do_all(ALL_GROUPING_TASK task, RRDR *r, calculated_number value, RRDR_VALUE_FLAGS *rrdr_value_options_ptr)
+void grouping_do_all(ALL_GROUPING_TASK task, RRDR *r, calculated_number value)
 {
     unsigned int gf_count = r->internal.grouping_function_count;
     switch (task) {
@@ -497,14 +497,14 @@ static inline void do_dimension_variablestep(
                 }
             }
             // add this value to grouping
-            grouping_do_all(GROUPING_ADD_ALL, r, value, NULL);
+            grouping_do_all(GROUPING_ADD_ALL, r, value);
             values_in_group++;
             db_points_read++;
         }
 
         if (0 == values_in_group) {
             // add NAN to grouping
-            grouping_do_all(GROUPING_ADD_ALL, r, value, NULL);
+            grouping_do_all(GROUPING_ADD_ALL, r, value);
         }
 
         if(unlikely(!min_date)) min_date = now;
@@ -649,7 +649,7 @@ static inline void do_dimension_fixedstep(
             }
 
             // add this value for grouping
-            grouping_do_all(GROUPING_ADD_ALL, r, value, NULL);
+            grouping_do_all(GROUPING_ADD_ALL, r, value);
             values_in_group++;
             db_points_read++;
 
@@ -1086,7 +1086,7 @@ static RRDR *rrd2rrdr_fixedstep(
     {
         int i, found = 0;
         for (int gc = 0; r->internal.grouping_function_count > gc; gc++) {
-            for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
+            for(i = 0; api_v1_data_groups[i].name ;i++) {
                 if(api_v1_data_groups[i].value == group_method[gc]) {
                     r->internal.gf[gc].grouping_create = api_v1_data_groups[i].create;
                     r->internal.gf[gc].grouping_reset = api_v1_data_groups[i].reset;
@@ -1110,10 +1110,8 @@ static RRDR *rrd2rrdr_fixedstep(
             r->internal.grouping_function_count = 1;
         }
     }
-
     // allocate any memory required by the grouping method
-    grouping_do_all(GROUPING_CREATE_ALL, r, NAN, NULL);
-
+    grouping_do_all(GROUPING_CREATE_ALL, r, NAN);
 
     // -------------------------------------------------------------------------
     // disable the not-wanted dimensions
@@ -1134,17 +1132,14 @@ static RRDR *rrd2rrdr_fixedstep(
     RRDDIM *rd;
     long c, dimensions_used = 0, dimensions_nonzero = 0;
     for(rd = temp_rd?temp_rd:st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
-
         // if we need a percentage, we need to calculate all dimensions
         if(unlikely(!(options & RRDR_OPTION_PERCENTAGE) && (r->od[c] & RRDR_DIMENSION_HIDDEN))) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_SELECTED)) r->od[c] &= ~RRDR_DIMENSION_SELECTED;
             continue;
         }
         r->od[c] |= RRDR_DIMENSION_SELECTED;
-
         // reset the grouping for the new dimension
-        grouping_do_all(GROUPING_RESET_ALL, r, NAN, NULL);
-
+        grouping_do_all(GROUPING_RESET_ALL, r, NAN);
         do_dimension_fixedstep(
                 r
                 , points_wanted
@@ -1154,7 +1149,6 @@ static RRDR *rrd2rrdr_fixedstep(
                 , before_wanted
                 , options
                 );
-
         if(r->od[c] & RRDR_DIMENSION_NONZERO)
             dimensions_nonzero++;
 
@@ -1221,7 +1215,7 @@ static RRDR *rrd2rrdr_fixedstep(
     #endif
 
     // free all resources used by the grouping method
-    grouping_do_all(GROUPING_FREE_ALL, r, NAN, NULL);
+    grouping_do_all(GROUPING_FREE_ALL, r, NAN;
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
@@ -1467,7 +1461,7 @@ static RRDR *rrd2rrdr_variablestep(
     {
         int i, found = 0;
         for (int gc = 0; r->internal.grouping_function_count > gc; gc++) {
-            for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
+            for(i = 0; api_v1_data_groups[i].name ;i++) {
                 if(api_v1_data_groups[i].value == group_method[gc]) {
                     r->internal.gf[gc].grouping_create = api_v1_data_groups[i].create;
                     r->internal.gf[gc].grouping_reset = api_v1_data_groups[i].reset;
@@ -1493,7 +1487,7 @@ static RRDR *rrd2rrdr_variablestep(
     }
 
     // allocate any memory required by the grouping method
-    grouping_do_all(GROUPING_CREATE_ALL, r, NAN, NULL);
+    grouping_do_all(GROUPING_CREATE_ALL, r, NAN);
 
 
     // -------------------------------------------------------------------------
@@ -1523,7 +1517,7 @@ static RRDR *rrd2rrdr_variablestep(
         r->od[c] |= RRDR_DIMENSION_SELECTED;
 
         // reset the grouping for the new dimension
-        grouping_do_all(GROUPING_RESET_ALL, r, NAN, NULL);
+        grouping_do_all(GROUPING_RESET_ALL, r, NAN);
 
         do_dimension_variablestep(
                 r
@@ -1602,7 +1596,7 @@ static RRDR *rrd2rrdr_variablestep(
     #endif
 
     // free all resources used by the grouping method
-    grouping_do_all(GROUPING_FREE_ALL, r, NAN, NULL);
+    grouping_do_all(GROUPING_FREE_ALL, r, NAN);
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
@@ -1635,7 +1629,7 @@ RRDR *rrd2rrdr(
     //Testing Purpose
     enum rrdr_grouping group_methodT[4];
     group_methodT[0] = group_method;
-    group_methodT[1] = RRDR_GROUPING_MAX;
+    group_methodT[1] = RRDR_GROUPING_AVERAGE;
     group_methodT[2] = RRDR_GROUPING_END;
     group_methodT[3] = RRDR_GROUPING_END;
     //End of Testing Purpose

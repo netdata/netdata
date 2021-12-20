@@ -21,7 +21,6 @@ typedef enum rrdr_grouping {
 typedef enum grouping_task{
     GROUPING_CREATE_ALL,
     GROUPING_ADD_ALL,
-    GROUPING_FLUSH_ALL,
     GROUPING_FREE_ALL,
     GROUPING_RESET_ALL,
 

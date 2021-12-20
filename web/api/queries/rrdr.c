@@ -109,7 +109,7 @@ inline void rrdr_free(RRDR *r)
     freez(r);
 }
 
-RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param_list,RRDR_GROUPING groups[])
+RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param_list, RRDR_GROUPING groups[])
 {
     if (unlikely(!st)) {
         error("NULL value given!");
