@@ -887,7 +887,7 @@ static RRDR *rrd2rrdr_fixedstep(
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
     if(duration <= 0 || available_points <= 0)
-        return rrdr_create(st, 1, context_param_list);
+        return rrdr_create(st, 1, context_param_list, group_method);
 
     // check the number of wanted points in the result
     if(unlikely(points_requested < 0)) points_requested = -points_requested;
@@ -1045,7 +1045,7 @@ static RRDR *rrd2rrdr_fixedstep(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(st, points_wanted, context_param_list);
+    RRDR *r = rrdr_create(st, points_wanted, context_param_list, group_method);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
@@ -1143,7 +1143,7 @@ static RRDR *rrd2rrdr_fixedstep(
         r->od[c] |= RRDR_DIMENSION_SELECTED;
 
         // reset the grouping for the new dimension
-        grouping_do_all(GROUPING_CREATE_RESET, r, NAN, NULL);
+        grouping_do_all(GROUPING_RESET_ALL, r, NAN, NULL);
 
         do_dimension_fixedstep(
                 r
@@ -1221,7 +1221,7 @@ static RRDR *rrd2rrdr_fixedstep(
     #endif
 
     // free all resources used by the grouping method
-    grouping_do_all(GROUPING_CREATE_FREE, r, NAN, NULL);
+    grouping_do_all(GROUPING_FREE_ALL, r, NAN, NULL);
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
@@ -1264,7 +1264,7 @@ static RRDR *rrd2rrdr_variablestep(
 
     if(duration <= 0 || available_points <= 0) {
         freez(region_info_array);
-        return rrdr_create(st, 1, context_param_list);
+        return rrdr_create(st, 1, context_param_list, group_method);
     }
 
     // check the number of wanted points in the result
@@ -1423,7 +1423,7 @@ static RRDR *rrd2rrdr_variablestep(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(st, points_wanted, context_param_list);
+    RRDR *r = rrdr_create(st, points_wanted, context_param_list, group_method);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
@@ -1477,6 +1477,7 @@ static RRDR *rrd2rrdr_variablestep(
                     found = 1;
                 }
             }
+        }
         if(!found) {
             errno = 0;
             #ifdef NETDATA_INTERNAL_CHECKS
@@ -1601,7 +1602,7 @@ static RRDR *rrd2rrdr_variablestep(
     #endif
 
     // free all resources used by the grouping method
-    grouping_do_all(GROUPING_CREATE_FREE, r, NAN, NULL);
+    grouping_do_all(GROUPING_FREE_ALL, r, NAN, NULL);
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {

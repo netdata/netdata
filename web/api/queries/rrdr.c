@@ -58,8 +58,18 @@ static void rrdr_dump(RRDR *r)
 }
 */
 
-
-
+inline unsigned int find_enum_count(RRDR_GROUPING y[])
+{
+    int count = 0, i = 0, max = 100;
+    while (y[i] != RRDR_GROUPING_END && count < max) {
+        count++;
+        i++;
+    };
+    if (count >= max) {
+        count = 0;
+    }
+    return count;
+}
 
 inline static void rrdr_lock_rrdset(RRDR *r) {
     if(unlikely(!r)) {
@@ -99,7 +109,7 @@ inline void rrdr_free(RRDR *r)
     freez(r);
 }
 
-RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param_list)
+RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param_list,RRDR_GROUPING groups[])
 {
     if (unlikely(!st)) {
         error("NULL value given!");

@@ -18,6 +18,15 @@ typedef enum rrdr_grouping {
     RRDR_GROUPING_DES,
 } RRDR_GROUPING;
 
+typedef enum grouping_task{
+    GROUPING_CREATE_ALL,
+    GROUPING_ADD_ALL,
+    GROUPING_FLUSH_ALL,
+    GROUPING_FREE_ALL,
+    GROUPING_RESET_ALL,
+
+} ALL_GROUPING_TASK;
+
 extern const char *group_method2string(RRDR_GROUPING group);
 extern void web_client_api_v1_init_grouping(void);
 extern RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def);
