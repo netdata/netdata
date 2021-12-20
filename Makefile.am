@@ -996,7 +996,8 @@ netdata_LDADD = \
 
 if ACLK_NG
     netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
-        $(NULL)
+    $(OPTIONAL_ATOMIC_LIBS) \
+    $(NULL)
 endif
 
 if ENABLE_ML_TESTS
