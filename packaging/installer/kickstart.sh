@@ -176,7 +176,7 @@ run_ok() {
 }
 
 run_failed() {
-  printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} \n\n"
+  printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${1} \n\n"
 }
 
 ESCAPED_PRINT_METHOD=
