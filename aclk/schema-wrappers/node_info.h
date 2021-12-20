@@ -11,6 +11,11 @@
 extern "C" {
 #endif
 
+struct machine_learning_info {
+    bool ml_capable;
+    bool ml_enabled;
+};
+
 struct aclk_node_info {
     char *name;
 
@@ -50,9 +55,7 @@ struct aclk_node_info {
 
     struct label *host_labels_head;
 
-    bool ml_capable;
-
-    bool ml_enabled;
+    struct machine_learning_info ml_info;
 };
 
 struct update_node_info {
@@ -62,7 +65,8 @@ struct update_node_info {
     struct timeval updated_at;
     char *machine_guid;
     int child;
-    bool ml_on_parent;
+
+    struct machine_learning_info ml_info;
 };
 
 char *generate_update_node_info_message(size_t *len, struct update_node_info *info);
