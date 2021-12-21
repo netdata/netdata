@@ -53,6 +53,7 @@ have complete visibility over the range of support.
 | SLES 15 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | Alpine | Alpine | &#10004; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | Arch Linux (latest) | Arch | &#10004; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
+| Gentoo Linux (latest) | Gentoo | &#63; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; | &#10004; | &#10004;
 | All other linux | Other | &#10007; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10004; | &#63;
 
 ## x86 Architecture
@@ -81,6 +82,7 @@ have complete visibility over the range of support.
 | SLES 15 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10007; | &#63;
 | Alpine | Alpine | &#10007; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; | &#10007; | &#63;
 | Arch Linux (latest) | Arch | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
+| Gentoo Linux (latest) | Gentoo | &#63; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; | &#10004; | &#10004;
 | All other linux | Other | &#10007; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10007; | &#63;
 
 ## Supported functionalities across different distribution channels
