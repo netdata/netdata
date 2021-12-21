@@ -124,10 +124,10 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 
 Netdata Cloud support may require the following packages to be installed:
 
-| package  | description
-|:--------:| -----------------------
-| `cmake` | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux
-| `openssl` | Needed to secure communications with the Netdata Cloud
+|  package  | description                                                                                                                          |
+|:---------:|--------------------------------------------------------------------------------------------------------------------------------------|
+|  `cmake`  | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux |
+| `openssl` | Needed to secure communications with the Netdata Cloud                                                                               |
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
