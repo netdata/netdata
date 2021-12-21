@@ -99,7 +99,7 @@ reading to migrate this tutorial to a VM or Server of any sort.
 Let's start another container in the same fashion as we did the Netdata container. 
 
 ```sh
-docker run -it --name prometheus --hostname prometheus
+docker run -it --name prometheus --hostname prometheus \
 --network=netdata-tutorial -p 9090:9090  centos:latest '/bin/bash'
 ``` 
 
@@ -108,6 +108,12 @@ files later in this tutorial.
 
 ```sh
 yum install vim -y
+```
+
+You will also need `wget` and `curl` to download files and `sudo` if you are not root.
+
+```sh
+yum install curl sudo wget -y
 ```
 
 Prometheus provides a tarball of their latest stable versions [here](https://prometheus.io/download/).
@@ -129,7 +135,7 @@ This should get Prometheus installed into the container. Let's test that we can 
 interface.
 
 ```sh
-/opt/prometheus/prometheus
+/opt/prometheus/prometheus --config.file=/opt/prometheus/prometheus.yml
 ```
 
 Now attempt to go to <http://localhost:9090/>. You should be presented with the Prometheus homepage. This is a good
@@ -216,7 +222,7 @@ the `chart` dimension. If you'd like you can combine the `chart` and `instance` 
 Let's give this a try: `netdata_system_cpu_percentage_average{chart="system.cpu", instance="netdata:19999"}`
 
 This is the basics of using Prometheus to query Netdata. I'd advise everyone at this point to read [this
-page](/exporting/prometheus/#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
+page](/exporting/prometheus/README.md#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
 its internal DB or can send metrics _as-collected_ by specifying the `source=as-collected` URL parameter like so.
 <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected> If you choose to use
 this method you will need to use Prometheus's set of functions here: <https://prometheus.io/docs/querying/functions/> to

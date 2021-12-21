@@ -30,7 +30,7 @@ eBPF collector to analyze how and when a process accesses files, when it makes s
 creating zombie processes, and more.
 
 While the above plugins and associated collectors are the most important for system metrics, there are many others. You
-can find all system collectors in our [supported collectors list](/collectors/COLLECTORS.md#system-metrics).
+can find all system collectors in our [supported collectors list](/collectors/COLLECTORS.md#system-collectors).
 
 ## Collect Windows system metrics
 

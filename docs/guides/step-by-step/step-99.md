@@ -44,7 +44,7 @@ If that feels like too much possibility to you, why not one of these options:
 -   Share your experience with Netdata and this guide. Be sure to [@mention](https://twitter.com/linuxnetdata) us on 
     Twitter!
 -   Contribute to what we do. Browse our [open issues](https://github.com/netdata/netdata/issues) and check out out
-    [contributions doc](/CONTRIBUTING.md) for ideas of how you can pitch in.
+    [contributions doc](/README.md#contribute) for ideas of how you can pitch in.
 
 We can't wait to see what you monitor next! Bon voyage! ⛵
 
