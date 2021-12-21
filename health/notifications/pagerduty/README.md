@@ -19,7 +19,7 @@ notifications](https://user-images.githubusercontent.com/1153921/118317133-872a4
 
 ## What you need to get started
 
-- An installation of the open-source [Netdata](/docs/get-netdata.mdx) monitoring agent
+- An installation of the open-source [Netdata](/docs/get-started.mdx) monitoring agent
 - An installation of the [PagerDuty agent](https://www.pagerduty.com/docs/guides/agent-install-guide/) on the node
   running Netdata
 - A PagerDuty `Generic API` service using either the `Events API v2` or `Events API v1`
