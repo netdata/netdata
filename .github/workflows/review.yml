@@ -98,6 +98,8 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Install eslint
+        run: npm install eslint -D
       - name: Run eslint
         uses: reviewdog/action-eslint@v1
         with:
