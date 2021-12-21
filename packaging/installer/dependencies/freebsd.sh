@@ -7,9 +7,9 @@ source ./functions.sh
 set -e
 
 NON_INTERACTIVE=0
-DONT_WAIT=0
+export DONT_WAIT=0
 
-check_flags ${@}
+check_flags "${@}"
 
 packages_to_install=
 package_tree="
@@ -66,7 +66,7 @@ validate_tree_freebsd() {
 validate_tree_freebsd
 
 for package in $package_tree; do
-  if pkg info -Ix $package &> /dev/null; then
+  if pkg info -Ix "$package" &> /dev/null; then
     echo "Package '${package}' is installed"
   else
     echo "Package '${package}' is NOT installed"
@@ -83,6 +83,5 @@ else
     echo >&2 "Running in non-interactive mode"
     opts="-y"
   fi
-  pkg install ${opts} $packages_to_install
+  pkg install ${opts} "$packages_to_install"
 fi
-

@@ -9,8 +9,9 @@ source ./functions.sh
 set -e
 
 NON_INTERACTIVE=0
+export DONT_WAIT=0
 
-check_flags ${@}
+check_flags "${@}"
 
 package_tree="
   alpine-sdk
@@ -41,7 +42,7 @@ package_tree="
 packages_to_install=
 
 for package in $package_tree; do
-  if apk -e info $package &> /dev/null; then
+  if apk -e info "$package" &> /dev/null; then
     echo "Package '${package}' is installed"
   else
     echo "Package '${package}' is NOT installed"
@@ -59,5 +60,5 @@ else
   else
     opts="${opts} -i"
   fi
-  apk add ${opts} $packages_to_install
+  apk add "${opts}" "$packages_to_install"
 fi

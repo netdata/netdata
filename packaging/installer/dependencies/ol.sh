@@ -8,9 +8,9 @@ source ./functions.sh
 set -e
 
 NON_INTERACTIVE=0
-DONT_WAIT=0
+export DONT_WAIT=0
 
-check_flags ${@}
+check_flags "${@}"
 
 declare -a package_tree=(
   gcc
@@ -95,8 +95,8 @@ validate_tree_ol
 
 packages_to_install=
 
-for package in ${package_tree[@]}; do
-  if rpm -q $package &> /dev/null; then
+for package in "${package_tree[@]}"; do
+  if rpm -q "$package" &> /dev/null; then
     echo "Package '${package}' is installed"
   else
     echo "Package '$package' is NOT installed"
@@ -112,7 +112,6 @@ else
     echo >&2 "Running in non-interactive mode"
     opts="-y"
   fi
-  echo "packages_to_install: ${packages_to_install[@]}"
-  dnf install ${opts} ${packages_to_install[@]}
+  echo "packages_to_install:" "${packages_to_install[@]}"
+  dnf install ${opts} "${packages_to_install[@]}"
 fi
-

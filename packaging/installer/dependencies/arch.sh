@@ -62,4 +62,3 @@ else
   fi
   pacman -Sy ${opts} "${packages_to_install[@]}"
 fi
-

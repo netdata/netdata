@@ -7,10 +7,10 @@ source ./functions.sh
 
 set -e
 
-NON_INTERACTIVE=0
-DONT_WAIT=0
+export NON_INTERACTIVE=0
+export DONT_WAIT=0
 
-check_flags ${@}
+check_flags "${@}"
 
 declare -a package_tree=(
   c-basic
@@ -33,8 +33,8 @@ declare -a package_tree=(
 
 packages_to_install=
 
-for package in ${package_tree[@]}; do
-  if [[ "$(swupd bundle-info $package | grep Status | cut -d':' -f2)" == " Not installed" ]]; then
+for package in "${package_tree[@]}"; do
+  if [[ "$(swupd bundle-info "$package" | grep Status | cut -d':' -f2)" == " Not installed" ]]; then
     echo "Package '$package' is NOT installed"
     packages_to_install="$packages_to_install $package"
   else
@@ -45,7 +45,6 @@ done
 if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
-  echo "packages_to_install: ${packages_to_install[@]}"
-  swupd bundle-add ${packages_to_install[@]}
+  echo "packages_to_install:" "${packages_to_install[@]}"
+  swupd bundle-add "${packages_to_install[@]}"
 fi
-

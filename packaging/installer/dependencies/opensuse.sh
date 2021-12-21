@@ -9,9 +9,9 @@ source ./functions.sh
 set -e
 
 NON_INTERACTIVE=0
-DONT_WAIT=0
+export DONT_WAIT=0
 
-check_flags ${@}
+check_flags "${@}"
 
 declare -a package_tree=(
   gcc
@@ -43,8 +43,8 @@ declare -a package_tree=(
 
 packages_to_install=
 
-for package in ${package_tree[@]}; do
-  if zypper search -i $package &> /dev/null; then
+for package in "${package_tree[@]}"; do
+  if zypper search -i "$package" &> /dev/null; then
     echo "Package '${package}' is installed"
   else
     echo "Package '$package' is NOT installed"
@@ -55,11 +55,11 @@ done
 if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
-  echo "packages_to_install: ${packages_to_install[@]}"
+  echo "packages_to_install:" "${packages_to_install[@]}"
   opts="--ignore-unknown"
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     opts="--non-interactive"
   fi
-  zypper ${opts} install ${packages_to_install[@]}
+  zypper ${opts} install "${packages_to_install[@]}"
 fi
