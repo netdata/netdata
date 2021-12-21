@@ -14,8 +14,7 @@ resolution times.
 
 Here's an example of a PagerDuty dashboard with Netdata alert notifications:
 
-![PagerDuty dashboard with Netdata alert
-notifications](https://user-images.githubusercontent.com/1153921/118317133-872a4100-b4ac-11eb-9cf1-70414aba010f.png)
+![PagerDuty dashboard with Netdata alert notifications](https://user-images.githubusercontent.com/1153921/118317133-872a4100-b4ac-11eb-9cf1-70414aba010f.png)
 
 ## What you need to get started
 
@@ -26,10 +25,9 @@ notifications](https://user-images.githubusercontent.com/1153921/118317133-872a4
 
 ## Setup
 
-[Add a new
-service](https://support.pagerduty.com/docs/services-and-integrations#section-configuring-services-and-integrations) to
-PagerDuty. Click **Use our API directly** and select either `Events API v2` or `Events API v1`. Once you finish creating
-the service, click on the **Integrations** tab to find your **Integration Key**.
+[Add a new service](https://support.pagerduty.com/docs/services-and-integrations#section-configuring-services-and-integrations)
+to PagerDuty. Click **Use our API directly** and select either `Events API v2` or `Events API v1`. Once you finish
+creating the service, click on the **Integrations** tab to find your **Integration Key**.
 
 Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) and use
 [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) to open
@@ -62,8 +60,8 @@ sudo su -s /bin/bash netdata
 
 ## Configuration
 
-Aside from the three values set in `health_alarm_notify.conf`, there is no further configuration required to send alert 
+Aside from the three values set in `health_alarm_notify.conf`, there is no further configuration required to send alert
 notifications to PagerDuty.
 
-To configure individual alarms, read our [alert configuration](/docs/monitor/configure-alarms.md) doc or the [health 
-entity reference](/health/REFERENCE.md) doc.
+To configure individual alarms, read our [alert configuration](/docs/monitor/configure-alarms.md) doc or
+the [health entity reference](/health/REFERENCE.md) doc.
