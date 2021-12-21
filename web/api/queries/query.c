@@ -1215,7 +1215,7 @@ static RRDR *rrd2rrdr_fixedstep(
     #endif
 
     // free all resources used by the grouping method
-    grouping_do_all(GROUPING_FREE_ALL, r, NAN;
+    grouping_do_all(GROUPING_FREE_ALL, r, NAN);
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
