@@ -164,12 +164,12 @@ top-left corner of a chart.
 Given the four example contexts, and two families of `sdb` and `sdd`, Netdata
 will create the following charts and their names:
 
-Context | `sdb` family | `sdd` family
---- | --- | ---
-`disk.io` | `disk_io.sdb` | `disk_io.sdd`
-`disk.ops` | `disk_ops.sdb` | `disk_ops.sdd`
-`disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd`
-`disk.util` | `disk_util.sdb` | `disk_util.sdd`
+| Context        | `sdb` family       | `sdd` family       |
+|----------------|--------------------|--------------------|
+| `disk.io`      | `disk_io.sdb`      | `disk_io.sdd`      |
+| `disk.ops`     | `disk_ops.sdb`     | `disk_ops.sdd`     |
+| `disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd` |
+| `disk.util`    | `disk_util.sdb`    | `disk_util.sdd`    |
 
 And here's what two of those charts in the `disk.io` context look like under
 `sdb` and `sdd` families:
