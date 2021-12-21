@@ -14,13 +14,15 @@ And like this on your Android device:
 
 You will need:
 
-1.  Signup and Login to pushbullet.com
-2.  Get your Access Token, go to <https://www.pushbullet.com/#settings/account> and create a new one
-3.  Fill in the PUSHBULLET_ACCESS_TOKEN with that value
-4.  Add the recipient emails or channel tags (each channel tag must be prefixed with #, e.g. #channeltag) to DEFAULT_RECIPIENT_PUSHBULLET
-    !!PLEASE NOTE THAT IF AN EMAIL RECIPIENT DOES NOT HAVE A PUSHBULLET ACCOUNT, PUSHBULLET SERVICE WILL SEND AN EMAIL!!
+1.  Sign up and log in to [pushbullet.com](pushbullet.com)
+2.  Create a new access token in your [account settings](https://www.pushbullet.com/#settings/account).
+3.  Fill in the `PUSHBULLET_ACCESS_TOKEN` with the newly generated access token.
+4.  Add the recipient emails or channel tags (each channel tag must be prefixed with #, e.g. #channeltag) to `DEFAULT_RECIPIENT_PUSHBULLET`.
+    > 🚨 The pushbullet notification service will send emails to the email recipient, regardless of if they have a pushbullet account.
 
-Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
+To add notification channels, run `/etc/netdata/edit-config health_alarm_notify.conf` 
+
+You can change the configuration like this:
 
 ```
 ###############################################################################
