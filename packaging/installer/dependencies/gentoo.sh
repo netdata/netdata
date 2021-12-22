@@ -58,5 +58,5 @@ else
     echo >&2 "Running in non-interactive mode"
     opts=""
   fi
-  emerge ${opts} "$packages_to_install"
+  emerge "${opts}" "$packages_to_install"
 fi
