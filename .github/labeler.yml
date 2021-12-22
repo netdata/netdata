@@ -19,6 +19,9 @@ area/backends:
   - backends/*
   - backends/**/*
 
+area/claim:
+  - claim/*
+
 area/exporting:
   - exporting/*
   - exporting/**/*
