@@ -124,9 +124,9 @@ Supported packages (you can append many of them):
 
     - sensors        install lm_sensors for monitoring h/w sensors
 
-    - firehol-all    packages required for FireHOL, FireQoS, update-ipsets
+    - firehol-all    packages required for FireHOL, FireQOS, update-ipsets
     - firehol        packages required for FireHOL
-    - fireqos        packages required for FireQoS
+    - fireqos        packages required for FireQOS
     - update-ipsets  packages required for update-ipsets
 
     - demo           packages required for running a netdata demo site

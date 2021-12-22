@@ -338,7 +338,7 @@ configure any of these collectors according to your setup and infrastructure.
     statistics using information provided by `ngx_http_reqstat_module`.
 -   [Tomcat](/collectors/python.d.plugin/tomcat/README.md): Collect web server performance metrics from the Manager App
     (`/manager/status?XML=true`).
--   [Traefik](/collectors/python.d.plugin/traefik/README.md): Uses Trafik's Health API to provide statistics.
+-   [Traefik](/collectors/python.d.plugin/traefik/README.md): Uses Traefik's Health API to provide statistics.
 -   [Varnish](/collectors/python.d.plugin/varnish/README.md): Provides HTTP accelerator global, backends (VBE), and
     disks (SMF) statistics using the `varnishstat` tool.
 -   [x509 check](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/x509check/): Monitor certificate

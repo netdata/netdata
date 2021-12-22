@@ -266,9 +266,9 @@ The `info` field supports `html`, embedding useful links and instructions in the
 
 ## Vendoring a new collector
 
-After all this hussle, not only did we illustrate how to visualize any data source in Netdata using the StatsD protocol, but we have also created a new collector in the process.
+While we learned how to visualize any data source in Netdata using the StatsD protocol, we have also created a new collector.
 
-While using the same underlying collector-StatsD-every new `myapp.conf` file will in essence create a new data source and dashboard section for Netdata. While Netdata will load all the configuration files by default, it will **not** create dashboard sections or charts, unless it start receiving data for that particular data source. This means that we can now share our collector with the rest of the Netdata community. 
+As long as you use the same underlying collector, every new `myapp.conf` file will create a new data source and dashboard section for Netdata. Netdata loads all the configuration files by default, but it will **not** create dashboard sections or charts, unless it starts receiving data for that particular data source. This means that we can now share our collector with the rest of the Netdata community. 
 
 If you want to contribute or you need any help in developing your collector, we have a whole [Forum Category](https://community.netdata.cloud/c/agent-development/9) dedicated to contributing to the Netdata Agent.
 

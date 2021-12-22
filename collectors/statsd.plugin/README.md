@@ -532,7 +532,7 @@ Using the client library by [sivy/node-statsd](https://github.com/sivy/node-stat
 You can also use StatsD with:
 - Golang, thanks to [alexcesaro/statsd](https://github.com/alexcesaro/statsd)
 - Ruby, thanks to [reinh/statsd](https://github.com/reinh/statsd)
-- Java, thanks to [DataDog/java-docstatsd-client](https://github.com/DataDog/java-dogstatsd-client)
+- Java, thanks to [DataDog/java-dogstatsd-client](https://github.com/DataDog/java-dogstatsd-client)
 
 
 ### Shell

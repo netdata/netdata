@@ -121,7 +121,7 @@ static int wait_till_agent_claimed(void)
  * agent claimed, cloud url set and private key available
  * 
  * @param aclk_hostname points to location where string pointer to hostname will be set
- * @param ackl_port port to int where port will be saved
+ * @param aclk_port port to int where port will be saved
  * 
  * @return If non 0 returned irrecoverable error happened and ACLK should be terminated
  */
@@ -212,7 +212,7 @@ static void msg_callback_old_protocol(const char *topic, const void *msg, size_t
     close(logfd);
 #endif
 
-    debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d MSG: \"%s\"", topic, qos, cmsg);
+    debug(D_ACLK, "Got Message From Broker Topic \"%s\" QoS %d MSG: \"%s\"", topic, qos, cmsg);
 
     if (strcmp(cmd_topic, topic))
         error("Received message on unexpected topic %s", topic);
@@ -303,7 +303,7 @@ static int read_query_thread_count()
 
 void aclk_graceful_disconnect(mqtt_wss_client client);
 
-/* Keeps connection alive and handles all network comms.
+/* Keeps connection alive and handles all network communications.
  * Returns on error or when netdata is shutting down.
  * @param client instance of mqtt_wss_client
  * @returns  0 - Netdata Exits

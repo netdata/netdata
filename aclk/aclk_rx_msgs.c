@@ -227,7 +227,7 @@ int aclk_handle_cloud_message(char *payload)
                 // see what `aclk_queue_query` parameter `internal` does
 
                 // NEVER CONTINUE THIS LOOP AFTER CALLING FUNCTION!!!
-                // msg handlers (namely aclk_handle_version_responce)
+                // msg handlers (namely aclk_handle_version_response)
                 // can freely change what aclk_incoming_msg_types points to
                 // so either exit or restart this for loop
                 freez(cloud_to_agent.type_id);

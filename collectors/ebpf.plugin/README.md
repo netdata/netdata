@@ -605,7 +605,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
 - `fd` :  This eBPF program creates charts that show information about calls to open files.
 - `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
 - `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
-- `sync`: Montitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
+- `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
 - `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
   bandwidth consumed by each.
 - `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.

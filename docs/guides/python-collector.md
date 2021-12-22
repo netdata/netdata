@@ -433,7 +433,7 @@ weather_station_1:
     name: 'Greece'
     endpoint: 'https://endpoint_1.com'
     port: 67
-    type: 'celcius'
+    type: 'celsius'
 weather_station_2:
     name: 'Florida USA'
     endpoint: 'https://endpoint_2.com'
