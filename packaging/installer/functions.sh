@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck disable=SC2034
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
