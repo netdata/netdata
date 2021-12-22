@@ -522,6 +522,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             utc_offset = (int32_t)strtol(value, NULL, 0);
         else if(!strcmp(name, "hops"))
             system_info->hops = (uint16_t) strtoul(value, NULL, 0);
+        else if(!strcmp(name, "ml_capable"))
+            system_info->ml_capable = strtoul(value, NULL, 0);
+        else if(!strcmp(name, "ml_enabled"))
+            system_info->ml_enabled = strtoul(value, NULL, 0);
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver"))

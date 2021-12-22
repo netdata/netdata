@@ -22,6 +22,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.claim_id = is_agent_claimed();
     node_info.machine_guid = wc->host_guid;
     node_info.child = (wc->host != localhost);
+    node_info.ml_info.ml_capable = localhost->system_info->ml_capable;
+    node_info.ml_info.ml_enabled = wc->host->ml_host != NULL;
     now_realtime_timeval(&node_info.updated_at);
 
     RRDHOST *host = wc->host;
@@ -46,6 +48,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.services = NULL;   // char **
     node_info.data.service_count = 0;
     node_info.data.machine_guid = wc->host_guid;
+    node_info.data.ml_info.ml_capable = host->system_info->ml_capable;
+    node_info.data.ml_info.ml_enabled = host->system_info->ml_enabled;
 
     struct label_index *labels = &host->labels;
     netdata_rwlock_wrlock(&labels->labels_rwlock);

@@ -62,6 +62,10 @@ static int generate_node_info(nodeinstance::info::v1::NodeInfo *info, struct acl
     if (data->machine_guid)
         info->set_machine_guid(data->machine_guid);
 
+    nodeinstance::info::v1::MachineLearningInfo *ml_info = info->mutable_ml_info();
+    ml_info->set_ml_capable(data->ml_info.ml_capable);
+    ml_info->set_ml_enabled(data->ml_info.ml_enabled);
+
     map = info->mutable_host_labels();
     label = data->host_labels_head;
     while (label) {
@@ -85,6 +89,10 @@ char *generate_update_node_info_message(size_t *len, struct update_node_info *in
     set_google_timestamp_from_timeval(info->updated_at, msg.mutable_updated_at());
     msg.set_machine_guid(info->machine_guid);
     msg.set_child(info->child);
+
+    nodeinstance::info::v1::MachineLearningInfo *ml_info = msg.mutable_ml_info();
+    ml_info->set_ml_capable(info->ml_info.ml_capable);
+    ml_info->set_ml_enabled(info->ml_info.ml_enabled);
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)malloc(*len);

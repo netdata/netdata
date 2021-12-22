@@ -382,7 +382,19 @@ RRDHOST *rrdhost_create(const char *hostname,
         else localhost = host;
     }
 
+    // ------------------------------------------------------------------------
+    // init new ML host and update system_info to let upstreams know
+    // about ML functionality
+
     ml_new_host(host);
+    if (is_localhost && host->system_info) {
+#ifndef ENABLE_ML
+        host->system_info->ml_capable = 0;
+#else
+        host->system_info->ml_capable = 1;
+#endif
+        host->system_info->ml_enabled = host->ml_host != NULL;
+    }
 
     info("Host '%s' (at registry as '%s') with guid '%s' initialized"
                  ", os '%s'"
