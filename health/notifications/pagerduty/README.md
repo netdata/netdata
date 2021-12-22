@@ -29,7 +29,7 @@ Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-
 [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) to open
 `health_alarm_notify.conf`.
 
-```
+```bash
 cd /etc/netdata
 sudo ./edit-config health_alarm_notify.conf
 ```
