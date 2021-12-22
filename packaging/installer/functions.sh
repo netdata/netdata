@@ -273,15 +273,14 @@ escaped_print() {
 
 run_logfile="/dev/null"
 run() {
-  user="${USER--}"
-  dir="${PWD}"
-
+  local_user="${USER--}"
+  local_dir="${PWD}"
   if [ "${UID}" = "0" ]; then
-    info="[root ${dir}]# "
-    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
+    info="[root ${local_dir}]# "
+    info_console="[${TPUT_DIM}${local_dir}${TPUT_RESET}]# "
   else
-    info="[${user} ${dir}]$ "
-    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
+    info="[${local_user} ${local_dir}]$ "
+    info_console="[${TPUT_DIM}${local_dir}${TPUT_RESET}]$ "
   fi
 
   {
