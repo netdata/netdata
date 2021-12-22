@@ -12,10 +12,6 @@ and DevOps monitoring stacks to improve operational reliability and agility. Fro
 correlating them into incidents, PagerDuty streamlines the incident management process by reducing alert noise and
 resolution times.
 
-Here's an example of a PagerDuty dashboard with Netdata alert notifications:
-
-![PagerDuty dashboard with Netdata alert notifications](https://user-images.githubusercontent.com/1153921/118317133-872a4100-b4ac-11eb-9cf1-70414aba010f.png)
-
 ## What you need to get started
 
 - An installation of the open-source [Netdata](/docs/get-started.mdx) monitoring agent.
