@@ -15,7 +15,7 @@ body:
       value: |
         Before submitting, we'd appreciate it if you:
           - Verify that your issue is not already reported on GitHub.
-          - Check if your Netdata Agent is up to date. If not, we recommend that you upgrade first.
+          - Check if your Netdata Agent is up to date. If not, we recommend that you [updade](https://learn.netdata.cloud/docs/agent/packaging/installer/update) first.
   - type: input
     id: netdata-component
     attributes:
