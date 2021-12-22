@@ -294,6 +294,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
+    //Handle replication configurtion per child in stream.conf
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
@@ -424,6 +425,10 @@ static int rrdpush_receive(struct receiver_state *rpt)
         close(rpt->fd);
         return 0;
     }
+    
+    // Start replication receiver thread (Rx).
+    // if(rpt->version >= VERSION_GAP_FILLING)
+    //     replication_receiver_thread_spawn(rpt->host);
 
     rrdhost_wrlock(rpt->host);
 /* if(rpt->host->connected_senders > 0) {

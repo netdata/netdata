@@ -177,6 +177,9 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->sender = mallocz(sizeof(*host->sender));
     sender_init(host->sender, host);
+    //Initialize the replication sender and receiver thread and any strcutures.
+    // variables, structs and mutexes/locks initialization, mem allocations, etc.
+    // replication_init();
     netdata_mutex_init(&host->receiver_lock);
 
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;

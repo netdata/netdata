@@ -409,6 +409,10 @@ static void attempt_to_connect(struct sender_state *state)
 
         // let the data collection threads know we are ready
         state->host->rrdpush_sender_connected = 1;
+
+        // Start replication sender thread (Tx).
+        // if(state->version >= VERSION_GAP_FILLING)
+        //     replication_sender_thread_spawn(state->host);
     }
     else {
         // increase the failed connections counter
