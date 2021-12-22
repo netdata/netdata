@@ -47,12 +47,6 @@ void Config::readMLConfig(void) {
     double ADWindowRateThreshold = config_get_float(ConfigSectionML, "window minimum anomaly rate", 0.25);
     double ADDimensionRateThreshold = config_get_float(ConfigSectionML, "anomaly event min dimension rate threshold", 0.05);
 
-    std::string HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
-    std::string ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training",
-            "!system.* !cpu.* !mem.* !disk.* !disk_* "
-            "!ip.* !ipv4.* !ipv6.* !net.* !net_* !netfilter.* "
-            "!services.* !apps.* !groups.* !user.* !ebpf.* !netdata.* *");
-
     std::stringstream SS;
     SS << netdata_configured_cache_dir << "/anomaly-detection.db";
     Cfg.AnomalyDBPath = SS.str();
@@ -123,6 +117,12 @@ void Config::readMLConfig(void) {
     Cfg.ADWindowRateThreshold = ADWindowRateThreshold;
     Cfg.ADDimensionRateThreshold = ADDimensionRateThreshold;
 
-    Cfg.SP_HostsToSkip = simple_pattern_create(HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
+    Cfg.HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
+    Cfg.SP_HostsToSkip = simple_pattern_create(Cfg.HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
+
+    Cfg.ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training",
+            "!system.* !cpu.* !mem.* !disk.* !disk_* "
+            "!ip.* !ipv4.* !ipv6.* !net.* !net_* !netfilter.* "
+            "!services.* !apps.* !groups.* !user.* !ebpf.* !netdata.* *");
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 }

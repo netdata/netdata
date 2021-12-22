@@ -75,12 +75,24 @@ char *ml_get_host_info(RRDHOST *RH) {
     if (RH && RH->ml_host) {
         Host *H = static_cast<Host *>(RH->ml_host);
         H->getConfigAsJson(ConfigJson);
-        H->getDetectionInfoAsJson(ConfigJson);
     } else {
         ConfigJson["enabled"] = false;
     }
 
     return strdup(ConfigJson.dump(2, '\t').c_str());
+}
+
+char *ml_get_host_runtime_info(RRDHOST *RH) {
+    nlohmann::json ConfigJson;
+
+    if (RH && RH->ml_host) {
+        Host *H = static_cast<Host *>(RH->ml_host);
+        H->getDetectionInfoAsJson(ConfigJson);
+    } else {
+        return nullptr;
+    }
+
+    return strdup(ConfigJson.dump(1, '\t').c_str());
 }
 
 bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
