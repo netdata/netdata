@@ -17,10 +17,47 @@ body:
           - Verify that your issue is not already reported on GitHub.
           - Check if your Netdata Agent is up to date. If not, we recommend that you [update](https://learn.netdata.cloud/docs/agent/packaging/installer/update) first.
   - type: textarea
-    id: report-summary
+    id: bug-description
     attributes:
-      label: Bug report summary
-      description: Provide a clear and concise description of the bug you're experiencing.
+      label: Bug description
+      description: Provide a description of the bug you're experiencing.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: Describe what you expected to happen when.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Describe the steps to reproduce the bug.
+      value: |
+        1.
+        2.
+        3.
+        ...
+    validations:
+      required: true
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Installation method
+      description: |
+        Select [installation method](https://learn.netdata.cloud/docs/agent/packaging/installer#alternative-methods) you used.
+        Describe the method in the "Additional info" section if you chose "other".
+      options:
+        - "kickstart.sh"
+        - "kickstart-static64.sh"
+        - "native binary packages (.deb/.rpm)"
+        - "from git"
+        - "from source"
+        - "docker"
+        - "helmchart (kubernetes)"
+        - "other"
     validations:
       required: true
   - type: textarea
@@ -54,43 +91,6 @@ body:
         ```
         > NOTE: This will be automatically formatted into code, so no need for backticks.
       render: shell
-    validations:
-      required: true
-  - type: dropdown
-    id: install-method
-    attributes:
-      label: Installation method
-      description: |
-        Select [installation method](https://learn.netdata.cloud/docs/agent/packaging/installer#alternative-methods) you used.
-        Describe the method in the "Additional info" section if you chose "other".
-      options:
-        - "kickstart.sh"
-        - "kickstart-static64.sh"
-        - "native binary packages (.deb/.rpm)"
-        - "from git"
-        - "from source"
-        - "docker"
-        - "helmchart (kubernetes)"
-        - "other"
-    validations:
-      required: true
-  - type: textarea
-    id: reproduce
-    attributes:
-      label: Steps to reproduce
-      description: Describe the steps to reproduce the bug.
-      value: |
-        1.
-        2.
-        3.
-        ...
-    validations:
-      required: true
-  - type: textarea
-    id: expected-behavior
-    attributes:
-      label: Expected behavior
-      description: Describe what you expected to happen when you performed the above steps.
     validations:
       required: true
   - type: textarea
