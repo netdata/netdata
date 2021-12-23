@@ -3258,7 +3258,7 @@ Content-Transfer-Encoding: 8bit
                     </tr>
                     <tr>
                       <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
-                        <div style="font-family:Open Sans, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#35414A;">Discuss and troubleshoot with others on the Netdata <a href="https://community.netdata.cloud/" class="link" style="color: #00AB44; text-decoration: none;">community forums</a></div>
+                        <div style="font-family:Open Sans, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#35414A;">Join the troubleshooting discussion for this alert on our <a href="https://community.netdata.cloud/t/${name//[._]/-}" class="link" style="color: #00AB44; text-decoration: none;">community forums</a>.</div>
                       </td>
                     </tr>
                     </tbody>
