@@ -27,7 +27,7 @@ body:
     id: expected-behavior
     attributes:
       label: Expected behavior
-      description: Describe what you expected to happen when.
+      description: Describe what you expected to happen.
     validations:
       required: true
   - type: textarea
