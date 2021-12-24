@@ -229,4 +229,5 @@ void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct a
 void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int claimed();
 void aclk_sync_exit_all();
+struct aclk_database_worker_config *find_inactive_wc_by_node_id(char *node_id);
 #endif //NETDATA_SQLITE_ACLK_H
