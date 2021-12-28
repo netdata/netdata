@@ -388,7 +388,9 @@ RRDHOST *rrdhost_create(const char *hostname,
     // init new ML host and update system_info to let upstreams know
     // about ML functionality
 
+#ifdef ENABLE_ML
     ml_new_host(host);
+#endif
     if (is_localhost && host->system_info) {
 #ifndef ENABLE_ML
         host->system_info->ml_capable = 0;
@@ -922,7 +924,9 @@ void rrdhost_free(RRDHOST *host) {
         rrdeng_exit(host->rrdeng_ctx);
 #endif
 
+#ifdef ENABLE_ML
     ml_delete_host(host);
+#endif
 
     // ------------------------------------------------------------------------
     // remove it from the indexes

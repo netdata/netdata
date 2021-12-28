@@ -821,7 +821,6 @@ int main(int argc, char **argv) {
                             sql_init_database(DB_CHECK_RECLAIM_SPACE);
                             return 0;
                         }
-
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
                             if(unit_test_str2ld()) return 1;
@@ -1171,7 +1170,9 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
         // Initialize ML configuration
+#ifdef ENABLE_ML
         ml_init();
+#endif
 
         // --------------------------------------------------------------------
         // setup process signals
