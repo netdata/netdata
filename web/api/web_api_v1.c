@@ -872,12 +872,14 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
             (host->receiver || host == localhost) ? "true" : "false", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
         netdata_mutex_unlock(&host->receiver_lock);
 
+#ifdef ENABLE_ACLK
         rrdhost_aclk_state_lock(host);
         if (host->aclk_state.claimed_id)
             buffer_sprintf(wb, "\"%s\" }", host->aclk_state.claimed_id);
         else
             buffer_strcat(wb, "null }");
         rrdhost_aclk_state_unlock(host);
+#endif
 
         count++;
     }
@@ -1234,9 +1236,11 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
 
+#ifdef ENABLE_ACLK
     char *str = aclk_state_json();
     buffer_strcat(wb, str);
     freez(str);
+#endif
 
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
