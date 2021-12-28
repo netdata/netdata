@@ -48,7 +48,7 @@ ELSE()
 ENDIF()
 
 # Consistency check
-IF( (${CONF_ENABLE_ACLK) AND NOT(${CONF_ENABLE_HTTPS}))
+IF( ${CONF_ENABLE_ACLK} AND NOT(${CONF_ENABLE_HTTPS}))
     message(FATAL_ERROR "HTTPS is required for ACLK")
 ENDIF()
 
