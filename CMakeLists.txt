@@ -9,6 +9,49 @@ project(netdata C CXX)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 
+
+# Parse config.h file for user-supplied parameters
+IF(EXISTS "config.h")
+    message("-- Config extraction from config.h")
+
+    FILE(READ config.h CONF_DATA)
+    STRING(FIND ${CONF_DATA} "#define ENABLE_ACLK 1"          CONF_ENABLE_ACLK)
+    STRING(FIND ${CONF_DATA} "#define ENABLE_ML 1"            CONF_ENABLE_ML)
+    STRING(FIND ${CONF_DATA} "#define ENABLE_HTTPS 1"         CONF_ENABLE_HTTPS)
+
+    IF(${CONF_ENABLE_ACLK} GREATER -1)
+        message("--   ACLK Enabled")
+        SET(CONF_ENABLE_ACLK True)
+    ELSE()
+        message("--   ACLK Disabled")
+        SET(CONF_ENABLE_ACLK False)
+    ENDIF()
+
+    IF(${CONF_ENABLE_ML} GREATER -1)
+        message("--   Machine Learning Enabled")
+        SET(CONF_ENABLE_ML True)
+    ELSE()
+        message("--   Machine Learning Disabled")
+        SET(CONF_ENABLE_ML False)
+    ENDIF()
+
+    IF(${CONF_ENABLE_HTTPS} GREATER -1)
+        message("--   HTTPS Enabled")
+        SET(CONF_ENABLE_HTTPS True)
+    ELSE()
+        message("--   HTTPS Disabled")
+        SET(CONF_ENABLE_HTTPS False)
+    ENDIF()
+ELSE()
+    # TODO: We can also do the job of configure with configure_file("config.h.in"
+    message(FATAL_ERROR "Cannot find 'config.h'. Please run './configure'")
+ENDIF()
+
+# Consistency check
+IF( (${CONF_ENABLE_ACLK) AND NOT(${CONF_ENABLE_HTTPS}))
+    message(FATAL_ERROR "HTTPS is required for ACLK")
+ENDIF()
+
 # default is "Debug"
 #set(CMAKE_BUILD_TYPE "Release")
 
@@ -127,10 +170,12 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
 
-pkg_check_modules(OPENSSL REQUIRED openssl)
-set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${OPENSSL_CFLAGS_OTHER})
-set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${OPENSSL_LIBRARIES})
-set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
+IF(CONF_ENABLE_HTTPS)
+    pkg_check_modules(OPENSSL REQUIRED openssl)
+    set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${OPENSSL_CFLAGS_OTHER})
+    set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${OPENSSL_LIBRARIES})
+    set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
+ENDIF()
 
 # -----------------------------------------------------------------------------
 # JSON-C used to health
@@ -635,16 +680,8 @@ set(RRD_PLUGIN_FILES
         database/rrdvar.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
-        database/sqlite/sqlite_aclk.c
-        database/sqlite/sqlite_aclk.h
         database/sqlite/sqlite_health.c
         database/sqlite/sqlite_health.h
-        database/sqlite/sqlite_aclk_node.c
-        database/sqlite/sqlite_aclk_node.h
-        database/sqlite/sqlite_aclk_chart.c
-        database/sqlite/sqlite_aclk_chart.h
-        database/sqlite/sqlite_aclk_alert.c
-        database/sqlite/sqlite_aclk_alert.h
         database/sqlite/sqlite3.c
         database/sqlite/sqlite3.h
         database/engine/rrdengine.c
@@ -761,6 +798,14 @@ set(CLAIM_PLUGIN_FILES
         )
 
 set(ACLK_ALWAYS_BUILD
+        database/sqlite/sqlite_aclk.c
+        database/sqlite/sqlite_aclk.h
+        database/sqlite/sqlite_aclk_node.c
+        database/sqlite/sqlite_aclk_node.h
+        database/sqlite/sqlite_aclk_chart.c
+        database/sqlite/sqlite_aclk_chart.h
+        database/sqlite/sqlite_aclk_alert.c
+        database/sqlite/sqlite_aclk_alert.h
         aclk/aclk_rrdhost_state.h
         aclk/aclk_api.c
         aclk/aclk_api.h
@@ -959,7 +1004,6 @@ set(NETDATA_FILES
         ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
-        ${ML_FILES}
         ${PLUGINSD_PLUGIN_FILES}
         ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
@@ -1070,96 +1114,112 @@ ENDIF()
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
-set(ACLK_LEGACY_CAN_BUILD 1)
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a")
-    message(WARNING "Static build of mosquitto not found. Disabling ACLK")
-    set(ACLK_LEGACY_CAN_BUILD 0)
+# Added for shm_*
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} rt)
+
+
+# -----------------------------------------------------------------------------
+# Machine Learning
+
+IF(CONF_ENABLE_ML)
+    list(APPEND NETDATA_FILES ${ML_FILES})
 ENDIF()
 
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a")
-    message(WARNING "Static build of libwebsockets not found. Disabling ACLK")
-    set(ACLK_LEGACY_CAN_BUILD 0)
-ENDIF()
+# -----------------------------------------------------------------------------
+# ACLK
 
-IF(ACLK_LEGACY_CAN_BUILD)
-    message(STATUS "agent-cloud-link Legacy: enabled")
-    list(APPEND NETDATA_FILES ${ACLK_LEGACY_FILES})
-    list(APPEND NETDATA_COMMON_LIBRARIES ${ACLK_LEGACY_STATIC_LIBS})
-    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/include)
-    IF(LINUX AND CAP_FOUND)
-        list(APPEND NETDATA_COMMON_LIBRARIES ${CAP_LIBRARIES})
-        list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CAP_INCLUDE_DIRS})
-        list(APPEND NETDATA_COMMON_CFLAGS ${CAP_CFLAGS_OTHER})
+IF(CONF_ENABLE_ACLK)
+    set(ACLK_LEGACY_CAN_BUILD 1)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a")
+        message(WARNING "Static build of mosquitto not found. Disabling ACLK")
+        set(ACLK_LEGACY_CAN_BUILD 0)
     ENDIF()
-ELSE()
-    message(STATUS "agent-cloud-link Legacy: disabled")
+
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a")
+        message(WARNING "Static build of libwebsockets not found. Disabling ACLK")
+        set(ACLK_LEGACY_CAN_BUILD 0)
+    ENDIF()
+
+    IF(ACLK_LEGACY_CAN_BUILD)
+        message(STATUS "agent-cloud-link Legacy: enabled")
+        list(APPEND NETDATA_FILES ${ACLK_LEGACY_FILES})
+        list(APPEND NETDATA_COMMON_LIBRARIES ${ACLK_LEGACY_STATIC_LIBS})
+        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/include)
+        IF(LINUX AND CAP_FOUND)
+            list(APPEND NETDATA_COMMON_LIBRARIES ${CAP_LIBRARIES})
+            list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CAP_INCLUDE_DIRS})
+            list(APPEND NETDATA_COMMON_CFLAGS ${CAP_CFLAGS_OTHER})
+        ENDIF()
+    ELSE()
+        message(STATUS "agent-cloud-link Legacy: disabled")
+    ENDIF()
+
+    find_package(Protobuf REQUIRED)
+
+    function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
+      if(NOT ARGN)
+        message(SEND_ERROR "Error: PROTOBUF_ACLK_GENERATE_CPP() called without any proto files")
+        return()
+      endif()
+
+      set(${SRCS})
+      set(${HDRS})
+      foreach(FIL ${ARGN})
+        get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+        get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+        get_filename_component(FIL_WE ${FIL} NAME_WE)
+        set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+        set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+    # cmake > 3.20 required :(
+    #    cmake_path(SET GENERATED_PB_CC "${DIR}")
+    #    cmake_path(SET GENERATED_PB_H "${DIR}")
+    #    cmake_path(APPEND GENERATED_PB_CC "${FIL_WE}.pb.cc")
+    #    cmake_path(APPEND GENERATED_PB_H "${FIL_WE}.pb.h")
+
+        list(APPEND ${SRCS} ${GENERATED_PB_CC})
+        list(APPEND ${HDRS} ${GENERATED_PB_H})
+        add_custom_command(
+          OUTPUT ${GENERATED_PB_CC}
+                 ${GENERATED_PB_H}
+          COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+          ARGS -I=${CMAKE_SOURCE_DIR}/aclk/aclk-schemas --cpp_out=${CMAKE_SOURCE_DIR}/aclk/aclk-schemas ${ABS_FIL}
+          DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+          COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+          VERBATIM )
+      endforeach()
+      set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+      set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+      set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+    endfunction()
+
+    set(ACLK_NG_PROTO_DEFS
+            aclk/aclk-schemas/proto/aclk/v1/lib.proto
+            aclk/aclk-schemas/proto/agent/v1/disconnect.proto
+            aclk/aclk-schemas/proto/agent/v1/connection.proto
+            aclk/aclk-schemas/proto/alarm/v1/config.proto
+            aclk/aclk-schemas/proto/alarm/v1/stream.proto
+            aclk/aclk-schemas/proto/chart/v1/config.proto
+            aclk/aclk-schemas/proto/chart/v1/dimension.proto
+            aclk/aclk-schemas/proto/chart/v1/instance.proto
+            aclk/aclk-schemas/proto/chart/v1/stream.proto
+            aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
+            aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+            aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+            )
+    PROTOBUF_ACLK_GENERATE_CPP(ACLK_NG_PROTO_BUILT_SRCS ACLK_NG_PROTO_BUILT_HDRS ${ACLK_NG_PROTO_DEFS})
+
+    list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
+    list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
+    list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
+    list(APPEND NETDATA_FILES ${ACLK_NG_FILES} ${ACLK_NG_PROTO_BUILT_SRCS} ${ACLK_NG_PROTO_BUILT_HDRS})
+    list(APPEND NETDATA_FILES ${ACLK_COMMON_FILES})
+    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
+    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
+    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
+    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
+
 ENDIF()
-
-find_package(Protobuf REQUIRED)
-
-function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
-  if(NOT ARGN)
-    message(SEND_ERROR "Error: PROTOBUF_ACLK_GENERATE_CPP() called without any proto files")
-    return()
-  endif()
-
-  set(${SRCS})
-  set(${HDRS})
-  foreach(FIL ${ARGN})
-    get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
-    get_filename_component(DIR ${ABS_FIL} DIRECTORY)
-    get_filename_component(FIL_WE ${FIL} NAME_WE)
-    set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
-    set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
-# cmake > 3.20 required :(
-#    cmake_path(SET GENERATED_PB_CC "${DIR}")
-#    cmake_path(SET GENERATED_PB_H "${DIR}")
-#    cmake_path(APPEND GENERATED_PB_CC "${FIL_WE}.pb.cc")
-#    cmake_path(APPEND GENERATED_PB_H "${FIL_WE}.pb.h")
-
-    list(APPEND ${SRCS} ${GENERATED_PB_CC})
-    list(APPEND ${HDRS} ${GENERATED_PB_H})
-    add_custom_command(
-      OUTPUT ${GENERATED_PB_CC}
-             ${GENERATED_PB_H}
-      COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
-      ARGS -I=${CMAKE_SOURCE_DIR}/aclk/aclk-schemas --cpp_out=${CMAKE_SOURCE_DIR}/aclk/aclk-schemas ${ABS_FIL}
-      DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
-      COMMENT "Running C++ protocol buffer compiler on ${FIL}"
-      VERBATIM )
-  endforeach()
-  set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
-  set(${SRCS} ${${SRCS}} PARENT_SCOPE)
-  set(${HDRS} ${${HDRS}} PARENT_SCOPE)
-endfunction()
-
-set(ACLK_NG_PROTO_DEFS
-        aclk/aclk-schemas/proto/aclk/v1/lib.proto
-        aclk/aclk-schemas/proto/agent/v1/disconnect.proto
-        aclk/aclk-schemas/proto/agent/v1/connection.proto
-        aclk/aclk-schemas/proto/alarm/v1/config.proto
-        aclk/aclk-schemas/proto/alarm/v1/stream.proto
-        aclk/aclk-schemas/proto/chart/v1/config.proto
-        aclk/aclk-schemas/proto/chart/v1/dimension.proto
-        aclk/aclk-schemas/proto/chart/v1/instance.proto
-        aclk/aclk-schemas/proto/chart/v1/stream.proto
-        aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
-        aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
-        aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
-        )
-PROTOBUF_ACLK_GENERATE_CPP(ACLK_NG_PROTO_BUILT_SRCS ACLK_NG_PROTO_BUILT_HDRS ${ACLK_NG_PROTO_DEFS})
-
-list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
-list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
-list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
-list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
-list(APPEND NETDATA_FILES ${ACLK_NG_FILES} ${ACLK_NG_PROTO_BUILT_SRCS} ${ACLK_NG_PROTO_BUILT_HDRS})
-list(APPEND NETDATA_FILES ${ACLK_COMMON_FILES})
-include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
-include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
-include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
-include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
-
 # -----------------------------------------------------------------------------
 # netdata
 
