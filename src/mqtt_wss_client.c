@@ -172,9 +172,7 @@ static void mqtt_rx_msg_callback(void **state, struct mqtt_response_publish *pub
         client->msg_callback(topic, publish->application_message, publish->application_message_size, publish->qos_level);
 }
 
-// TODO modify the MQTT to grow the buffer as needed (with min/max)
-// of look for MQTT implementation that doesn't need to fit whole message into the buffer
-// at once or write custom MQTT... MQTT is not that complex anyway
+// TODO write custom MQTT (to avoid the need for buffering the data)
 // TODO pretify the callbacks -> move them into cb struct so that mqtt_wss_new parameter list
 // doesn't look like Windows nightmare API
 #define MQTT_BUFFER_SIZE 1024*1024*3
