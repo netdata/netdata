@@ -481,7 +481,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
                 if (!p->discovered)
                     info(
-                        "Infiniband card %s port %s at speed %lu width %lu", dev_dent->d_name, port_dent->d_name,
+                        "Infiniband card %s port %s at speed %"PRIu64" width %"PRIu64"", dev_dent->d_name, port_dent->d_name,
                         p->speed, p->width);
 
                 p->discovered = 1;

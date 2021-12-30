@@ -101,7 +101,7 @@ static void health_silencers_init(void) {
                 freez(str);
             }
         } else {
-            error("Health silencers file %s has the size %ld that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, length, HEALTH_SILENCERS_MAX_FILE_LEN);
+            error("Health silencers file %s has the size %"PRId64" that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, (int64_t)length, HEALTH_SILENCERS_MAX_FILE_LEN);
         }
         fclose(fd);
     } else {
@@ -326,7 +326,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                     buffer_strcat(warn_alarms, ",");
                 buffer_strcat(warn_alarms, rc->name);
                 buffer_strcat(warn_alarms, "=");
-                buffer_snprintf(warn_alarms, 11, "%ld", rc->last_status_change);
+                buffer_snprintf(warn_alarms, 11, "%"PRId64"", (int64_t)rc->last_status_change);
                 n_warn++;
             } else if (ae->alarm_id == rc->id)
                 expr = rc->warning;
@@ -336,7 +336,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                     buffer_strcat(crit_alarms, ",");
                 buffer_strcat(crit_alarms, rc->name);
                 buffer_strcat(crit_alarms, "=");
-                buffer_snprintf(crit_alarms, 11, "%ld", rc->last_status_change);
+                buffer_snprintf(crit_alarms, 11, "%"PRId64"", (int64_t)rc->last_status_change);
                 n_crit++;
             } else if (ae->alarm_id == rc->id)
                 expr = rc->critical;
