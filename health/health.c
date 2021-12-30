@@ -101,7 +101,11 @@ static void health_silencers_init(void) {
                 freez(str);
             }
         } else {
-            error("Health silencers file %s has the size %"PRId64" that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, (int64_t)length, HEALTH_SILENCERS_MAX_FILE_LEN);
+            error(
+                "Health silencers file %s has the size %" PRId64 " that is out of range[ 1 , %d ]. Aborting read.",
+                silencers_filename,
+                (int64_t)length,
+                HEALTH_SILENCERS_MAX_FILE_LEN);
         }
         fclose(fd);
     } else {
