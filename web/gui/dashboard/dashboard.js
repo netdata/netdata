@@ -6957,7 +6957,7 @@ let chartState = function (element) {
                 resizeChartToHeight(this.height_original.toString());
             }
 
-            // else if the current height is not the firstChild's clientheight
+            // else if the current height is not the firstchild's clientheight
             // resize to it
             else if (typeof this.element_legend_childs.perfect_scroller.firstChild !== 'undefined') {
                 let parent_rect = this.element.getBoundingClientRect();
