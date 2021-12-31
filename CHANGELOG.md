@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Update dashboard to version v2.20.15. [\#11934](https://github.com/netdata/netdata/pull/11934) ([netdatabot](https://github.com/netdatabot))
 - fix\(claim\): set URL\_BASE only if `-url` parameter value is not null [\#11919](https://github.com/netdata/netdata/pull/11919) ([ilyam8](https://github.com/ilyam8))
 - Include libatomic again to allow protobuf to resolve [\#11917](https://github.com/netdata/netdata/pull/11917) ([MrZammler](https://github.com/MrZammler))
 - Send ML feature information with UpdateNodeInfo. [\#11913](https://github.com/netdata/netdata/pull/11913) ([vkalintiris](https://github.com/vkalintiris))
