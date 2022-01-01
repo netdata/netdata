@@ -461,19 +461,26 @@ RRD_PLUGIN_FILES = \
     database/rrdvar.h \
     database/sqlite/sqlite_functions.c \
     database/sqlite/sqlite_functions.h \
-    database/sqlite/sqlite_aclk.c \
-    database/sqlite/sqlite_aclk.h \
     database/sqlite/sqlite_health.c \
     database/sqlite/sqlite_health.h \
-    database/sqlite/sqlite_aclk_node.c \
-    database/sqlite/sqlite_aclk_node.h \
-    database/sqlite/sqlite_aclk_chart.c \
-    database/sqlite/sqlite_aclk_chart.h \
-    database/sqlite/sqlite_aclk_alert.c \
-    database/sqlite/sqlite_aclk_alert.h \
     database/sqlite/sqlite3.c \
     database/sqlite/sqlite3.h \
     $(NULL)
+
+if ENABLE_ACLK
+    RRD_PLUGIN_FILES += \
+        database/sqlite/sqlite_aclk.c \
+        database/sqlite/sqlite_aclk.h \
+        database/sqlite/sqlite_aclk_node.c \
+        database/sqlite/sqlite_aclk_node.h \
+        database/sqlite/sqlite_aclk_chart.c \
+        database/sqlite/sqlite_aclk_chart.h \
+        database/sqlite/sqlite_aclk_alert.c \
+        database/sqlite/sqlite_aclk_alert.h \
+        $(NULL)
+endif
+
+
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
@@ -782,7 +789,6 @@ ACLK_COMMON_FILES = \
     aclk/aclk_collector_list.c \
     aclk/aclk_collector_list.h \
     $(NULL)
-endif
 
 ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_rrdhost_state.h \
@@ -791,6 +797,7 @@ ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_proxy.c \
     aclk/aclk_proxy.h \
     $(NULL)
+endif
 
 if ACLK_LEGACY
 ACLK_LEGACY_FILES = \

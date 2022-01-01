@@ -1754,16 +1754,20 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
         return;
     }
 
+#ifdef ENABLE_ACLK
     struct aclk_database_worker_config *wc = host->dbsync_worker;
-
+#endif
     if (unlikely(!host->node_id))
         host->node_id = mallocz(sizeof(*host->node_id));
     uuid_copy(*(host->node_id), *node_id);
 
+#ifdef ENABLE_ACLK
     if (unlikely(!wc))
         sql_create_aclk_table(host, &host->host_uuid, node_id);
     else
         uuid_unparse_lower(*node_id, wc->node_id);
+#endif
+
     return;
 }
 

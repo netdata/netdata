@@ -861,7 +861,9 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     wc->now_deleting_files = NULL;
 
     wc->cleanup_thread_deleting_files = 0;
+#ifdef ENABLE_ACLK
     aclk_data_rotated();
+#endif
 
     /* interrupt event loop */
     uv_stop(wc->loop);

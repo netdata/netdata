@@ -393,7 +393,9 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
 
     host->health_log_entries_written = rotate_every;
 
+#ifdef ENABLE_ACLK
     sql_aclk_alert_clean_dead_entries(host);
+#endif
 }
 
 /* Health related SQL queries

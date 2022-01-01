@@ -199,7 +199,9 @@ RRDHOST *rrdhost_create(const char *hostname,
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_rwlock_init(&host->labels.labels_rwlock);
 
+#ifdef ENABLE_ACLK
     netdata_mutex_init(&host->aclk_state_lock);
+#endif
 
     host->system_info = system_info;
 
@@ -386,7 +388,9 @@ RRDHOST *rrdhost_create(const char *hostname,
     // init new ML host and update system_info to let upstreams know
     // about ML functionality
 
+#ifdef ENABLE_ML
     ml_new_host(host);
+#endif
     if (is_localhost && host->system_info) {
 #ifndef ENABLE_ML
         host->system_info->ml_capable = 0;
@@ -760,7 +764,9 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         fatal("Failed to initialize dbengine");
     }
 #endif
+#ifdef ENABLE_ACLK
     sql_aclk_sync_init();
+#endif
     rrd_unlock();
 
     web_client_api_v1_management_init();
@@ -918,7 +924,9 @@ void rrdhost_free(RRDHOST *host) {
         rrdeng_exit(host->rrdeng_ctx);
 #endif
 
+#ifdef ENABLE_ML
     ml_delete_host(host);
+#endif
 
     // ------------------------------------------------------------------------
     // remove it from the indexes
@@ -948,8 +956,10 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
+#ifdef ENABLE_ACLK
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
+#endif
     freez((void *)host->tags);
     free_label_list(host->labels.head);
     freez((void *)host->os);
@@ -1066,7 +1076,9 @@ static struct label *rrdhost_load_auto_labels(void)
         label_list =
             add_label_to_list(label_list, "_is_k8s_node", localhost->system_info->is_k8s_node, LABEL_SOURCE_AUTO);
 
+#ifdef ENABLE_ACLK
     label_list = add_aclk_host_labels(label_list);
+#endif
 
     label_list = add_label_to_list(
         label_list, "_is_parent", (localhost->next || configured_as_parent()) ? "true" : "false", LABEL_SOURCE_AUTO);

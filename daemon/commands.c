@@ -46,7 +46,9 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message);
 static cmd_status_t cmd_read_config_execute(char *args, char **message);
 static cmd_status_t cmd_write_config_execute(char *args, char **message);
 static cmd_status_t cmd_ping_execute(char *args, char **message);
+#ifdef ENABLE_ACLK
 static cmd_status_t cmd_aclk_state(char *args, char **message);
+#endif
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -59,8 +61,10 @@ static command_info_t command_info_array[] = {
         {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
         {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
         {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
-        {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
-        {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL}
+        {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL}
+#ifdef ENABLE_ACLK
+        ,{"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL}
+#endif
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -124,9 +128,11 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Reload agent claiming state from disk.\n"
              "ping\n"
              "    Return with 'pong' if agent is alive.\n"
+#ifdef ENABLE_ACLK
              "aclk-state [json]\n"
-             "    Returns current state of ACLK and Cloud connection. (optionally in json)\n",
-             MAX_COMMAND_LENGTH - 1);
+             "    Returns current state of ACLK and Cloud connection. (optionally in json)\n"
+#endif
+             ,MAX_COMMAND_LENGTH - 1);
     return CMD_STATUS_SUCCESS;
 }
 
@@ -314,6 +320,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
+#ifdef ENABLE_ACLK
 static cmd_status_t cmd_aclk_state(char *args, char **message)
 {
     info("COMMAND: Reopening aclk/cloud state.");
@@ -324,6 +331,7 @@ static cmd_status_t cmd_aclk_state(char *args, char **message)
 
     return CMD_STATUS_SUCCESS;
 }
+#endif
 
 static void cmd_lock_exclusive(unsigned index)
 {

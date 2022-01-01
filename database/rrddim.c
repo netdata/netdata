@@ -454,7 +454,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     calc_link_to_rrddim(rd);
 
+#ifdef ENABLE_ML
     ml_new_dimension(rd);
+#endif
 
     rrdset_unlock(st);
 #ifdef ENABLE_ACLK
@@ -468,7 +470,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
 void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 {
+#ifdef ENABLE_ML
     ml_delete_dimension(rd);
+#endif
 
 #ifndef ENABLE_ACLK
     UNUSED(db_rotated);

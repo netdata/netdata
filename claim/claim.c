@@ -2,7 +2,9 @@
 
 #include "claim.h"
 #include "registry/registry_internals.h"
+#ifdef ENABLE_ACLK
 #include "aclk/aclk_api.h"
+#endif
 
 char *claiming_pending_arguments = NULL;
 

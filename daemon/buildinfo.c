@@ -126,6 +126,10 @@
             #define FEAT_LWS_MSG "shared-lib"
         #endif
     #endif
+#else
+    #define FEAT_LWS 0
+    #define FEAT_LWS_MSG ""
+    #define FEAT_MOSQUITTO 0
 #endif /* ACLK_LEGACY_DISABLED */
 
 #ifdef NETDATA_WITH_ZLIB

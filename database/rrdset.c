@@ -1237,7 +1237,9 @@ static inline size_t rrdset_done_interpolate(
             }
 
             if(unlikely(!store_this_entry)) {
+#ifdef ENABLE_ML
                 (void) ml_is_anomalous(rd, 0, false);
+#endif
 
                 rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT);
 //                rd->values[current_entry] = SN_EMPTY_SLOT;
@@ -1247,11 +1249,12 @@ static inline size_t rrdset_done_interpolate(
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
+#ifdef ENABLE_ML
                 if (ml_is_anomalous(rd, new_value, true)) {
                     // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
                     dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
                 }
-
+#endif
                 rd->state->collect_ops.store_metric(rd, next_store_ut, pack_storage_number(new_value, dim_storage_flags));
 //                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
                 rd->last_stored_value = new_value;
@@ -1266,7 +1269,9 @@ static inline size_t rrdset_done_interpolate(
                 #endif
             }
             else {
+#ifdef ENABLE_ML
                 (void) ml_is_anomalous(rd, 0, false);
+#endif
 
                 #ifdef NETDATA_INTERNAL_CHECKS
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING "
