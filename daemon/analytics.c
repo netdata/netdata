@@ -494,10 +494,7 @@ void analytics_misc(void)
 {
 #ifdef ENABLE_ACLK
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
-    if (aclk_ng)
-        analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
-    else
-        analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "legacy");
+    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
 #else
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "false");
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "");

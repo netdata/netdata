@@ -773,26 +773,7 @@ set(ACLK_COMMON_FILES
         aclk/aclk_collector_list.h
         )
 
-set(ACLK_LEGACY_FILES
-        aclk/legacy/agent_cloud_link.c
-        aclk/legacy/agent_cloud_link.h
-        aclk/legacy/aclk_query.c
-        aclk/legacy/aclk_query.h
-        aclk/legacy/aclk_lws_wss_client.c
-        aclk/legacy/aclk_lws_wss_client.h
-        aclk/legacy/aclk_lws_https_client.c
-        aclk/legacy/aclk_lws_https_client.h
-        aclk/legacy/mqtt.c
-        aclk/legacy/mqtt.h
-        aclk/legacy/aclk_stats.c
-        aclk/legacy/aclk_stats.h
-        aclk/legacy/aclk_rx_msgs.c
-        aclk/legacy/aclk_rx_msgs.h
-        aclk/legacy/aclk_common.c
-        aclk/legacy/aclk_common.h
-        )
-
-set(ACLK_NG_FILES
+set(ACLK_FILES
         aclk/aclk.c
         aclk/aclk.h
         aclk/aclk_util.c
@@ -852,11 +833,6 @@ set(SPAWN_PLUGIN_FILES
         spawn/spawn_server.c
         spawn/spawn_client.c
         spawn/spawn.h
-        )
-
-set(ACLK_LEGACY_STATIC_LIBS
-        ${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a
-        ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a
         )
 
 set(EXPORTING_ENGINE_FILES
@@ -1070,31 +1046,6 @@ ENDIF()
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
-set(ACLK_LEGACY_CAN_BUILD 1)
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a")
-    message(WARNING "Static build of mosquitto not found. Disabling ACLK")
-    set(ACLK_LEGACY_CAN_BUILD 0)
-ENDIF()
-
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a")
-    message(WARNING "Static build of libwebsockets not found. Disabling ACLK")
-    set(ACLK_LEGACY_CAN_BUILD 0)
-ENDIF()
-
-IF(ACLK_LEGACY_CAN_BUILD)
-    message(STATUS "agent-cloud-link Legacy: enabled")
-    list(APPEND NETDATA_FILES ${ACLK_LEGACY_FILES})
-    list(APPEND NETDATA_COMMON_LIBRARIES ${ACLK_LEGACY_STATIC_LIBS})
-    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/include)
-    IF(LINUX AND CAP_FOUND)
-        list(APPEND NETDATA_COMMON_LIBRARIES ${CAP_LIBRARIES})
-        list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CAP_INCLUDE_DIRS})
-        list(APPEND NETDATA_COMMON_CFLAGS ${CAP_CFLAGS_OTHER})
-    ENDIF()
-ELSE()
-    message(STATUS "agent-cloud-link Legacy: disabled")
-ENDIF()
-
 find_package(Protobuf REQUIRED)
 
 function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
@@ -1133,7 +1084,7 @@ function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
   set(${HDRS} ${${HDRS}} PARENT_SCOPE)
 endfunction()
 
-set(ACLK_NG_PROTO_DEFS
+set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/aclk/v1/lib.proto
         aclk/aclk-schemas/proto/agent/v1/disconnect.proto
         aclk/aclk-schemas/proto/agent/v1/connection.proto
@@ -1147,13 +1098,13 @@ set(ACLK_NG_PROTO_DEFS
         aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
         )
-PROTOBUF_ACLK_GENERATE_CPP(ACLK_NG_PROTO_BUILT_SRCS ACLK_NG_PROTO_BUILT_HDRS ${ACLK_NG_PROTO_DEFS})
+PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PROTO_DEFS})
 
 list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
 list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
 list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
 list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
-list(APPEND NETDATA_FILES ${ACLK_NG_FILES} ${ACLK_NG_PROTO_BUILT_SRCS} ${ACLK_NG_PROTO_BUILT_HDRS})
+list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
 list(APPEND NETDATA_FILES ${ACLK_COMMON_FILES})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)

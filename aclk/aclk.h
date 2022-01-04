@@ -32,18 +32,18 @@ extern struct aclk_shared_state {
     int mqtt_shutdown_msg_rcvd;
 } aclk_shared_state;
 
-void ng_aclk_alarm_reload(void);
-int ng_aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
+void aclk_alarm_reload(void);
+int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 
 /* Informs ACLK about created/deleted chart
  * @param create 0 - if chart was deleted, other if chart created
  */
-int ng_aclk_update_chart(RRDHOST *host, char *chart_name, int create);
+int aclk_update_chart(RRDHOST *host, char *chart_name, int create);
 
-void ng_aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
-void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
+void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
+void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
 
-void ng_aclk_host_state_update(RRDHOST *host, int cmd);
+void aclk_host_state_update(RRDHOST *host, int cmd);
 
 void aclk_send_node_instances(void);
 

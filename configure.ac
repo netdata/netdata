@@ -213,22 +213,6 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_WITH(
-    [aclk-legacy],
-    [AS_HELP_STRING([--with-aclk-legacy],
-                    [Requires Legacy ACLK to be used even in case ACLK-NG can run on this system])],
-    [aclk_legacy="$withval"],
-    [aclk_legacy="detect"]
-)
-
-AC_ARG_WITH(
-    [aclk-ng],
-    [AS_HELP_STRING([--with-aclk-ng],
-                    [Requires ACLK-NG to be used even in case ACLK Legacy can run on this system])],
-    [aclk_ng="$withval"],
-    [aclk_ng="detect"]
-)
-
-AC_ARG_WITH(
     [new-cloud-protocol],
     [AS_HELP_STRING([--with-new-cloud-protocol],
                     [Requires New Cloud Protocol support to be built])],
@@ -721,22 +705,8 @@ fi
 
 AC_MSG_CHECKING([if Cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
-if test "$aclk_ng" = "no"; then
-    AC_DEFINE([ACLK_NG_DISABLED], [1], [ACLK NG was disabled by user request])
-fi
-if test "$aclk_legacy" = "no"; then
-    AC_DEFINE([ACLK_LEGACY_DISABLED], [1], [ACLK Legacy was disabled by user request])
-fi
 
-if test "$enable_cloud" = "no" -a "$aclk_legacy" = "yes"; then
-    AC_MSG_ERROR([--disable-cloud && --with-aclk-legacy not allowed together (such configuration is self contradicting)])
-fi
-
-if test "$enable_cloud" = "no" -a "$aclk_ng" = "yes"; then
-    AC_MSG_ERROR([--disable-cloud && --with-aclk-ng not allowed together (such configuration is self contradicting)])
-fi
-
-if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
+if test "$enable_cloud" != "no"; then
     AC_MSG_NOTICE([Checking if ACLK Next Generation can be built])
     can_enable_ng="yes"
     AC_MSG_CHECKING([if git submodules present for ACLK Next Generation])
@@ -764,18 +734,16 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
 
     AC_MSG_CHECKING([ACLK Next Generation can be built])
     AC_MSG_RESULT([${can_enable_ng}])
-    if test "$can_enable_ng" = "no" -a "$aclk_ng" = "yes"; then
-        AC_MSG_ERROR([You have requested --with-aclk-ng but it can't be built. See reasons in lines above])
+    if test "$can_enable_ng" = "no" -a "$enable_cloud" = "yes"; then
+        AC_MSG_ERROR([You have requested --with-cloud but ACLK can't be built. See reasons in lines above])
     fi
     if test "$can_enable_ng" = "yes"; then
-        aclk_ng="yes"
         enable_aclk="yes"
-        AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        OPTIONAL_ACLK_NG_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
+        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
     fi
 
-    if test "$aclk_ng" = "yes" -a "$new_cloud_protocol" != "no"; then
+    if "$new_cloud_protocol" != "no"; then
         can_build_new_cloud_protocol="yes"
         AC_MSG_CHECKING([if protobuf available for New Cloud Protocol])
         if test "${have_libprotobuf}" != "yes"; then
@@ -807,7 +775,7 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
         if test "$can_build_new_cloud_protocol" = "yes"; then
             new_cloud_protocol="yes"
             AC_DEFINE([ENABLE_NEW_CLOUD_PROTOCOL], [1], [New protobuf based Netdata Cloud Protocol Support])
-            OPTIONAL_ACLK_NG_CFLAGS="${OPTIONAL_ACLK_NG_CFLAGS} -I \$(abs_top_srcdir)/aclk/aclk-schemas"
+            OPTIONAL_ACLK_CFLAGS="${OPTIONAL_ACLK_CFLAGS} -I \$(abs_top_srcdir)/aclk/aclk-schemas"
             OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
             CXX11FLAG="-std=c++11"
             OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
@@ -815,96 +783,12 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
     fi
 fi
 
-if test "$enable_cloud" != "no" -a "$aclk_legacy" != "no"; then
-    AC_MSG_NOTICE([Checking if ACLK Legacy can be built])
-    if test -n "${SSL_LIBS}"; then
-        OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
-    else
-        AC_MSG_WARN([OpenSSL required for agent-cloud-link but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
-    fi
-
-    AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
-    if test -f "externaldeps/mosquitto/libmosquitto.a"; then
-        LIBS_BKP="${LIBS}"
-        LIBS="externaldeps/mosquitto/libmosquitto.a ${OPTIONAL_SSL_LIBS} ${LIBS_BKP}"
-        AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/mosquitto/mosquitto.h"
-                                         int main (int argc, char **argv) {
-                                             int m,mm,r;
-                                             mosquitto_lib_version(&m, &mm, &r);
-                                         }]])],
-                                        [HAVE_libmosquitto_a="yes"],
-                                        [HAVE_libmosquitto_a="no"])
-        LIBS="${LIBS_BKP}"
-    else
-        HAVE_libmosquitto_a="no"
-        AC_DEFINE([ACLK_NO_LIBMOSQ], [1], [Libmosquitto.a was not found during build.])
-    fi
-    AC_MSG_RESULT([${HAVE_libmosquitto_a}])
-
-    if test "${with_bundled_lws}" = "yes"; then
-        AC_MSG_CHECKING([if libwebsockets static lib is present for ACLK Legacy])
-        if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
-            LWS_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/libwebsockets/include"
-            OPTIONAL_LWS_LIBS="\$(abs_top_srcdir)/externaldeps/libwebsockets/libwebsockets.a"
-            AC_MSG_RESULT([yes])
-            AC_DEFINE([BUNDLED_LWS], [1], [using statically linked libwebsockets])
-        else
-            AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
-            # this should be error if installer ever changes default to system
-            # as currently this is default we prefer building netdata without ACLK
-            # instead of error fail
-            AC_MSG_RESULT([no])
-            AC_MSG_WARN([You required static libwebsockets to be used but we can't use it. Disabling ACLK Legacy])
-        fi
-    else
-        AC_CHECK_LIB([websockets],
-            [lws_get_vhost_by_name],
-            [OPTIONAL_LWS_LIBS="-lwebsockets"],
-            [AC_DEFINE([ACLK_NO_LWS], [1], [usable system libwebsockets was not found during build.])])
-    fi
-
-    if test "${build_target}" = "linux"; then
-        if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
-            AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-cloud or enable libcap])
-        fi
-        if test "${with_libcap}" = "yes"; then
-            LWS_CFLAGS+=" ${LIBCAP_CFLAGS}"
-        fi
-    fi
-
-    # next 2 lines are just to have info for ACLK dependencies in common place
-    AC_MSG_CHECKING([if json-c available for ACLK Legacy])
-    AC_MSG_RESULT([${enable_jsonc}])
-
-    AC_MSG_CHECKING([if netdata ACLK Legacy can be built])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${OPTIONAL_LWS_LIBS}" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
-        can_build_legacy="yes"
-    else
-        can_build_legacy="no"
-    fi
-    AC_MSG_RESULT([${can_build_legacy}])
-
-    if test "$can_build_legacy" = "no" -a "$aclk_legacy" = "yes"; then
-        AC_MSG_ERROR([You have requested --with-aclk-legacy but it can't be built. See reasons in lines above])
-    fi
-
-    if test "$can_build_legacy" = "yes"; then
-        AC_DEFINE([ACLK_LEGACY], [1], [ACLK Legacy Should be used])
-        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        aclk_legacy="yes"
-        enable_aclk="yes"
-    fi
-fi
-
 if test "$enable_cloud" = "yes" -a "$enable_aclk" != "yes"; then
-    AC_MSG_ERROR([Neither ACLK-NG nor ACLK-Legacy can be built but --enable-cloud was requested])
+    AC_MSG_ERROR([ACLK can't be built but --enable-cloud was requested])
 fi
 
 AC_SUBST([enable_cloud])
 AC_SUBST([enable_aclk])
-AM_CONDITIONAL([ACLK_NG], [test "${aclk_ng}" = "yes"])
-AM_CONDITIONAL([ACLK_LEGACY], [test "${aclk_legacy}" = "yes"])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 AM_CONDITIONAL([ENABLE_NEW_CLOUD_PROTOCOL], [test "${can_build_new_cloud_protocol}" = "yes"])
 
@@ -1703,7 +1587,7 @@ CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_NG_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_ML_TESTS_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_ML_TESTS_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1753,7 +1637,7 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
 AC_SUBST([OPTIONAL_LWS_LIBS])
-AC_SUBST([OPTIONAL_ACLK_NG_CFLAGS])
+AC_SUBST([OPTIONAL_ACLK_CFLAGS])
 AC_SUBST([OPTIONAL_PROTOBUF_CFLAGS])
 AC_SUBST([OPTIONAL_PROTOBUF_LIBS])
 AC_SUBST([OPTIONAL_GTEST_CFLAGS])
@@ -1907,7 +1791,6 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile
-    aclk/legacy/Makefile
     spawn/Makefile
     parser/Makefile
 ])

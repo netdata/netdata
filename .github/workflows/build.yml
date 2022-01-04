@@ -223,10 +223,6 @@ jobs:
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
-      - name: netdata-installer on ${{ matrix.distro }}, require cloud, require ACLK-NG
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata -e NETDATA_CONFIGURE_OPTIONS='--with-aclk-ng' \
-              sha256:${{ steps.load.outputs.image }} /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
         if: matrix.rmjsonc != ''
         run: |

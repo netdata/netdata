@@ -859,7 +859,7 @@ exit:
 // fix this in both old and new ACLK
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 
-void ng_aclk_alarm_reload(void)
+void aclk_alarm_reload(void)
 {
     ACLK_SHARED_STATE_LOCK;
     if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
@@ -871,7 +871,7 @@ void ng_aclk_alarm_reload(void)
     aclk_queue_query(aclk_query_new(METADATA_ALARMS));
 }
 
-int ng_aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
+int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 {
     BUFFER *local_buffer;
     json_object *msg;
@@ -902,7 +902,7 @@ int ng_aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     return 0;
 }
 
-int ng_aclk_update_chart(RRDHOST *host, char *chart_name, int create)
+int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
 {
     struct aclk_query *query;
 
@@ -926,7 +926,7 @@ int ng_aclk_update_chart(RRDHOST *host, char *chart_name, int create)
  * Add a new collector to the list
  * If it exists, update the chart count
  */
-void ng_aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
+void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
 {
     struct aclk_query *query;
     struct _collector *tmp_collector;
@@ -969,7 +969,7 @@ void ng_aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *m
  * This function will release the memory used and schedule
  * a cloud update
  */
-void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
+void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
 {
     struct aclk_query *query;
     struct _collector *tmp_collector;
@@ -1010,7 +1010,7 @@ void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *m
     aclk_queue_query(query);
 }
 
-void ng_aclk_host_state_update(RRDHOST *host, int cmd)
+void aclk_host_state_update(RRDHOST *host, int cmd)
 {
     uuid_t node_id;
     int ret;
