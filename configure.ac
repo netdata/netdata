@@ -743,7 +743,7 @@ if test "$enable_cloud" != "no"; then
         OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
     fi
 
-    if "$new_cloud_protocol" != "no"; then
+    if test "$new_cloud_protocol" != "no"; then
         can_build_new_cloud_protocol="yes"
         AC_MSG_CHECKING([if protobuf available for New Cloud Protocol])
         if test "${have_libprotobuf}" != "yes"; then
