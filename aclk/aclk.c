@@ -763,6 +763,10 @@ void *aclk_main(void *ptr)
         return NULL;
     }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    aclk_init_rx_msg_handlers();
+#endif
+
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
     // as it must notify the far end that it shutdown gracefully and avoid the LWT.
     netdata_thread_disable_cancelability();
