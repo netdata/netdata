@@ -48,9 +48,6 @@ jobs:
           - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/arm/v7, arch: armhf}
           - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/arm64/v8, arch: arm64}
-          - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/arm/v7, arch: armhf}
-          - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/arm64/v8, arch: arm64}
           - {distro: ubuntu, version: "21.10", pkgclouddistro: ubuntu/impish, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "21.10", pkgclouddistro: ubuntu/impish, format: deb, base_image: ubuntu, platform: linux/arm/v7, arch: armhf}
           - {distro: ubuntu, version: "21.10", pkgclouddistro: ubuntu/impish, format: deb, base_image: ubuntu, platform: linux/arm64/v8, arch: arm64}
