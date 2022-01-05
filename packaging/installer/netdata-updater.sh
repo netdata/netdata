@@ -68,8 +68,7 @@ if [ "${ENVIRONMENT_FILE}" = "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; th
     if [ -r "${envpath}" ]; then
       ENVIRONMENT_FILE="${envpath}"
     else
-      error "Cannot find environment file, unable to update."
-      exit 1
+      fatal "Cannot find environment file, unable to update."
     fi
   fi
 fi
@@ -554,6 +553,16 @@ update_binpkg() {
   env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata || fatal "Failed to update Netdata package."
 }
 
+# Simple function to encapsulate original updater behavior.
+update_legacy() {
+  set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+  if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
+    update_static && exit 0
+  else
+    update_build && exit 0
+  fi
+}
+
 logfile=
 ndtmpdir=
 
@@ -635,15 +644,16 @@ case "${INSTALL_TYPE}" in
       update_binpkg && exit 0
       ;;
     "") # Fallback case for no `.install-type` file. This just works like the old install type detection.
-      set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
-      if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
-        update_static && exit 0
-      else
-        update_build && exit 0
-      fi
+      update_legacy
       ;;
     custom)
-      fatal "This script does not support updating custom installations."
+      # At this point, we _should_ have a valid `.environment` file, but it0s best to just check.
+      # If we do, then behave like the legacy updater.
+      if [ -n "${RELEASE_CHANNEL}" ] && [ -n "${NETDATA_PREFIX}" ] && [ -n "${REINSTALL_OPTIONS}" ]; then
+        update_legacy
+      else
+        fatal "This script does not support updating custom installations."
+      fi
       ;;
     oci)
       fatal "This script does not support updating Netdata inside our official Docker containers, please instead update the container itself."
