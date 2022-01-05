@@ -1398,27 +1398,6 @@ PKG_CHECK_MODULES(
     [have_libaws_cpp_sdk_kinesis=no]
 )
 
-AC_CHECK_LIB(
-    [aws-checksums],
-    [aws_checksums_crc32],
-    [have_libaws_checksums=yes],
-    [have_libaws_checksums=no]
-)
-
-AC_CHECK_LIB(
-    [aws-c-common],
-    [aws_default_allocator],
-    [have_libaws_c_common=yes],
-    [have_libaws_c_common=no]
-)
-
-AC_CHECK_LIB(
-    [aws-c-event-stream],
-    [aws_event_stream_library_init],
-    [have_libaws_c_event_stream=yes],
-    [have_libaws_c_event_stream=no]
-)
-
 test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_kinesis}" != "yes" && \
     AC_MSG_ERROR([libaws-cpp-sdk-kinesis required but not found. try installing AWS C++ SDK])
 
@@ -1434,17 +1413,9 @@ test "${enable_backend_kinesis}" = "yes" -a "${have_libssl}" != "yes" && \
 test "${enable_backend_kinesis}" = "yes" -a "${have_libcrypto}" != "yes" && \
     AC_MSG_ERROR([libcrypto required but not found])
 
-test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_checksums}" != "yes" \
-                                         -a "${have_libaws_c_common}" != "yes" \
-                                         -a "${have_libaws_c_event_stream}" != "yes" && \
-    AC_MSG_ERROR([AWS SKD third party dependencies required but not found])
-
 AC_MSG_CHECKING([if kinesis backend should be enabled])
 if test "${enable_backend_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" = "yes" \
                                             -a "${have_libaws_cpp_sdk_core}" = "yes" \
-                                            -a "${have_libaws_checksums}" = "yes" \
-                                            -a "${have_libaws_c_common}" = "yes" \
-                                            -a "${have_libaws_c_event_stream}" = "yes" \
                                             -a "${have_libcurl}" = "yes" \
                                             -a "${have_libssl}" = "yes" \
                                             -a "${have_libcrypto}" = "yes"; then
