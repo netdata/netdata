@@ -627,7 +627,7 @@ case "${INSTALL_TYPE}" in
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_build && exit 0
       ;;
-    *-static)
+    *-static*)
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_static && exit 0
       ;;
