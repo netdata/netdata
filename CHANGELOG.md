@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix error in configure.ac [\#11937](https://github.com/netdata/netdata/pull/11937) ([underhood](https://github.com/underhood))
 - Update dashboard to version v2.20.15. [\#11934](https://github.com/netdata/netdata/pull/11934) ([netdatabot](https://github.com/netdatabot))
 - fix\(claim\): set URL\_BASE only if `-url` parameter value is not null [\#11919](https://github.com/netdata/netdata/pull/11919) ([ilyam8](https://github.com/ilyam8))
 - Include libatomic again to allow protobuf to resolve [\#11917](https://github.com/netdata/netdata/pull/11917) ([MrZammler](https://github.com/MrZammler))
@@ -20,7 +21,10 @@
 - Fix the code that checks for available updates. [\#11870](https://github.com/netdata/netdata/pull/11870) ([Ferroin](https://github.com/Ferroin))
 - chore: update community link of alert notifications [\#11860](https://github.com/netdata/netdata/pull/11860) ([burbuli8ra](https://github.com/burbuli8ra))
 - nvidia\_smi\_chart.py : fixed username for not-local users [\#11858](https://github.com/netdata/netdata/pull/11858) ([scatenag](https://github.com/scatenag))
+- Remove Ubuntu 21.04 from CI and packaging. [\#11851](https://github.com/netdata/netdata/pull/11851) ([Ferroin](https://github.com/Ferroin))
+- Removes ACLK Legacy [\#11841](https://github.com/netdata/netdata/pull/11841) ([underhood](https://github.com/underhood))
 - feat\(python.d/fail2ban\): add "Failed attempts" chart, cleanup [\#11825](https://github.com/netdata/netdata/pull/11825) ([ilyam8](https://github.com/ilyam8))
+- Optimize rx msg name resolution [\#11811](https://github.com/netdata/netdata/pull/11811) ([underhood](https://github.com/underhood))
 - add note with link to guide for using on Pi [\#11605](https://github.com/netdata/netdata/pull/11605) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
