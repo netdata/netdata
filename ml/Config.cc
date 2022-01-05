@@ -22,7 +22,9 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void Config::readMLConfig(void) {
     const char *ConfigSectionML = CONFIG_SECTION_ML;
 
-    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
+    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", true);
+
+    double SaveAnomalyPercentageEvery = 5 * 60;
 
     /*
      * Read values

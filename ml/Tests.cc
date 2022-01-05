@@ -312,7 +312,7 @@ TEST(BitRateWindowTest, MaxWindow) {
 ...a manual test is sought.*/
 char *read_file_content_path(const char *filepath) {
     FILE *file = fopen(filepath, "r");
-    if (file != NULL) {
+    if (file != nullptr) {
         fseek(file, 0L, SEEK_END);
         long file_size = ftell(file);
         rewind(file);
@@ -323,12 +323,12 @@ char *read_file_content_path(const char *filepath) {
         return text;
     }
     else {
-        return "NULL!";
+        return nullptr;
     }
 }
 
 int test_ml_callback(void *IgnoreMe, int argc, char **argv, char **TableField) {    
-    IgnoreMe = 0;
+    (void) IgnoreMe;
     printf("Testing ML API SQL query; RESULTS:\n");  
     for (int i = 0; i < argc; i++) {
         printf("Testing ML API SQL query; %s = %s\n", TableField[i], argv[i] ? argv[i] : "NULL");
@@ -339,7 +339,7 @@ int test_ml_callback(void *IgnoreMe, int argc, char **argv, char **TableField) {
 int run_ml_test_query(sqlite3 *db, const char *filepath) {
     char *err_msg = 0;
     char *sql = read_file_content_path(filepath);
-    if(sql != "NULL!") {
+    if(sql != NULL) {
         int rc = sqlite3_exec(db, sql, test_ml_callback, 0, &err_msg);    
         if (rc != SQLITE_OK ) {        
             fprintf(stderr, "Testing ML API SQL query; SQL error: %s\n", err_msg);        
@@ -401,7 +401,7 @@ TEST(AnomalyRateInfoSqlTest, AllDimZeroValues) {
     TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data_0.sql";
     std::string AnomalyTestDataPath = TestDataDirectory.str();
     
-    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_0.sql";
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_0_new.sql";
     std::string AnomalyTestQueryPath = TestQueryDirectory.str();
     
     TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_0.sql";
@@ -422,7 +422,7 @@ TEST(AnomalyRateInfoSqlTest, AllDimEqualValues) {
     TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
     std::string AnomalyTestDataPath = TestDataDirectory.str();
     
-    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_1.sql";
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_1_new.sql";
     std::string AnomalyTestQueryPath = TestQueryDirectory.str();
     
     TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_1.sql";
@@ -443,7 +443,7 @@ TEST(AnomalyRateInfoSqlTest, DifferentDimValues) {
     TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
     std::string AnomalyTestDataPath = TestDataDirectory.str();
     
-    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_2.sql";
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_2_new.sql";
     std::string AnomalyTestQueryPath = TestQueryDirectory.str();
     
     TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_2.sql";
@@ -464,7 +464,7 @@ TEST(AnomalyRateInfoSqlTest, SimpleDimOneNoneZeroValue) {
     TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data_simple.sql";
     std::string AnomalyTestDataPath = TestDataDirectory.str();
     
-    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_simple.sql";
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_simple_new.sql";
     std::string AnomalyTestQueryPath = TestQueryDirectory.str();
     
     TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_simple.sql";

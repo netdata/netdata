@@ -29,6 +29,8 @@ public:
     double ADIdleWindowSize;
     double ADWindowRateThreshold;
     double ADDimensionRateThreshold;
+    //The window size of anomaly bit counting for anomaly percentage
+    double SaveAnomalyPercentageEvery;
 
     SIMPLE_PATTERN *SP_HostsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;

@@ -147,6 +147,7 @@ char *ml_get_anomaly_rate_info(RRDHOST *RH, time_t After, time_t Before) {
     Host *H = static_cast<Host *>(RH->ml_host);
     std::vector<std::pair<std::string, double>> DimAndAnomalyRate;
     if(Before > After) {
+        
         if(Before <= H->getLastSavedBefore()) {
             //Only information from saved data is inquired
             bool Res = H->getAnomalyRateInfoInRange(DimAndAnomalyRate, H->getUUID(),

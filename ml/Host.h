@@ -41,8 +41,6 @@ protected:
 
     std::map<RRDDIM *, Dimension *> DimensionsMap;
     std::map<Dimension *, std::mutex> LocksMap;
-    //The window size of anomaly bit counting for anomaly percentage
-    double SaveAnomalyPercentageEvery = 15 * 60;
 };
 
 class TrainableHost : public RrdHost {
@@ -114,7 +112,7 @@ private:
     Database DB{Cfg.AnomalyDBPath};
 
     /*the counter variable to downcount the time window for anomaly bit counting*/
-    size_t AnomalyBitCounterWindow{static_cast<size_t>(SaveAnomalyPercentageEvery)};
+    size_t AnomalyBitCounterWindow{static_cast<size_t>(Cfg.SaveAnomalyPercentageEvery)};
     time_t LastSavedBefore{0};
 
 };

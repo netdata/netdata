@@ -152,7 +152,7 @@ public:
 
     template<typename ...ArgTypes>
     void removeOldAnomalyRateInfo(ArgTypes&&... Args) {
-        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {};
+        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) { (void) Stmt; };
         RemoveOldAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
     }
 

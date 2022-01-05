@@ -1217,11 +1217,11 @@ int web_client_api_request_v1_anomaly_rate_info(RRDHOST *host, struct web_client
 
     char *s;
     if (!before || !after)
-        s = strdup("{\"error\": \"missing after/before parameters\" }\n");
+        s = strdupz("{\"error\": \"missing after/before parameters\" }\n");
     else {
         s = ml_get_anomaly_rate_info(host, after, before);
         if (!s)
-            s = strdup("{\"error\": \"json string is empty\" }\n");
+            s = strdupz("{\"error\": \"json string is empty\" }\n");
     }
 
     BUFFER *wb = w->response.data;

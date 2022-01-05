@@ -35,4 +35,9 @@ char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
     return NULL;
 }
 
+char *ml_get_anomaly_rate_info(RRDHOST *RH, time_t After, time_t Before) {
+    (void) RH; (void) After; (void) Before;
+    return NULL;
+}
+
 #endif
