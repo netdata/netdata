@@ -642,7 +642,13 @@ case "${INSTALL_TYPE}" in
         update_build && exit 0
       fi
       ;;
+    custom)
+      fatal "This script does not support updating custom installations."
+      ;;
+    oci)
+      fatal "This script does not support updating Netdata inside our official Docker containers, please instead update the container itself."
+      ;;
     *)
-      fatal "Unrecognized installation type, unable to update."
+      fatal "Unrecognized installation type (${INSTALL_TYPE}), unable to update."
       ;;
 esac
