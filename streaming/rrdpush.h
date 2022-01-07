@@ -7,6 +7,7 @@
 #include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
+#include "streaming/replication.h"
 
 #define CONNECTED_TO_SIZE 100
 
@@ -121,5 +122,14 @@ extern void rrdpush_sender_thread_stop(RRDHOST *host);
 
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
+
+// Replication functions definitions
+// Initialization
+extern void replication_sender_init(struct sender_state *sender);
+extern void replication_receiver_init(struct receiver_state *receiver, struct config *stream_config);
+// Threads
+extern void replication_sender_thread_spawn(RRDHOST *host);
+extern void replication_receiver_thread_spawn(RRDHOST *host);
+extern void replication_sender_thread_stop(RRDHOST *host);
 
 #endif //NETDATA_RRDPUSH_H

@@ -1,5 +1,4 @@
 //Includes
-#include "rrdpush.h"
 #define REPLICATION_MSG "STREAM_REPLICATION"
 
 // Replication structs
@@ -21,20 +20,9 @@ typedef struct gap {
     char *uid;
     char *uuid;
     char *status;
-    struct time_window;
+    TIME_WINDOW t_window;
 } GAP;
 
 typedef struct gaps {
     struct gap *gaps_timeline; 
 } GAPS;
-
-// Functions definitions
-// Initialization
-void replication_sender_init(struct sender_state *sender);
-void replication_receiver_init(struct receiver_state *receiver, struct config *stream_config);
-// Threads
-void rrdpush_replication_sender_thread_spawn(RRDHOST *host);
-void rrdpush_replication_receiver_thread_spawn(RRDHOST *host);
-static void replication_receiver_thread_cleanup(RRDHOST *host);
-static void replication_sender_thread_cleanup_callback(void *ptr);
-void replication_sender_thread_stop(RRDHOST *host);

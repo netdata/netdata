@@ -1,5 +1,8 @@
 //Includes
-#include "replication.h"
+#include "rrdpush.h"
+
+static void replication_receiver_thread_cleanup(RRDHOST *host);
+static void replication_sender_thread_cleanup_callback(void *ptr);
 
 // Thread Initialization
 static void replication_state_init(REPLICATION_STATE *state){
@@ -11,7 +14,7 @@ void replication_sender_init(struct sender_state *sender){
     if(!default_rrdpush_replication_enabled)
         return;
     if(!sender || !sender->host){
-        error("Host or host's sender state is not initialized! - Tx thread Initialization failed!", REPLICATION_MSG);
+        error("%s: Host or host's sender state is not initialized! - Tx thread Initialization failed!", REPLICATION_MSG);
         return;
     }
 
@@ -27,8 +30,8 @@ static unsigned int replication_rd_config(struct receiver_state *rpt, struct con
     if(!default_rrdpush_replication_enabled)
         return default_rrdpush_replication_enabled;
     unsigned int rrdpush_replication_enable = default_rrdpush_replication_enabled;
-    rrdpush_replication_enable = appconfig_get_boolean(&stream_config, rpt->key, "enable replication", rrdpush_replication_enable);
-    rrdpush_replication_enable = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable replication", rrdpush_replication_enable);
+    rrdpush_replication_enable = appconfig_get_boolean(stream_config, rpt->key, "enable replication", rrdpush_replication_enable);
+    rrdpush_replication_enable = appconfig_get_boolean(stream_config, rpt->machine_guid, "enable replication", rrdpush_replication_enable);
     // Runtime replication enable status
     rrdpush_replication_enable = (default_rrdpush_replication_enabled && rrdpush_replication_enable && (rpt->stream_version >= VERSION_GAP_FILLING));
 
@@ -51,19 +54,23 @@ void replication_receiver_init(struct receiver_state *receiver, struct config *s
 }
 
 // Thread creation
-static void rrdpush_replication_sender_thread(void *ptr){
+void rrdpush_replication_sender_thread(void *ptr) {
     struct sender_state *s = (struct sender_state *) ptr;
     // can read the config.
     // Add here the sender thread logic
     netdata_thread_cleanup_push(replication_sender_thread_cleanup_callback, s->host);
     // Add here the thread loop
-    // for(;;) {}
+    // for(;;) {
+    //     // wait to connect
+    //     // send hi
+    //     // retrieve response
+    // }
     // Closing thread
     netdata_thread_cleanup_pop(1);
-    return NULL;    
+    return NULL;
 }
 
-void rrdpush_replication_sender_thread_spawn(RRDHOST *host) {
+void replication_sender_thread_spawn(RRDHOST *host) {
     netdata_mutex_lock(&host->sender->replication->mutex);
 
     if(!host->sender->replication->spawned) {
@@ -71,25 +78,29 @@ void rrdpush_replication_sender_thread_spawn(RRDHOST *host) {
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLICATION_SENDER[%s]", host->hostname);
 
         if(netdata_thread_create(&host->sender->replication->thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_replication_sender_thread, (void *) host->sender))
-            error("REPLICATION_SENDER %s [send]: failed to create new thread for client.", host->hostname);
+            error("%s %s [send]: failed to create new thread for client.", REPLICATION_MSG, host->hostname);
         else
             host->sender->replication->spawned = 1;
     }
     netdata_mutex_unlock(&host->sender->replication->mutex);
 }
 
-static void rrdpush_replication_receiver_thread(void *ptr){
+void rrdpush_replication_receiver_thread(void *ptr){
     netdata_thread_cleanup_push(replication_receiver_thread_cleanup, ptr);
     struct receiver_state *rpt = (struct receiver_state *)ptr;
     // Add here the receiver thread logic
     // Add here the thread loop
-    // for(;;) {}
+    // for(;;) {
+    //     // wait to connect
+    //     // send hi
+    //     // retrieve response
+    // }
     // Closing thread
     netdata_thread_cleanup_pop(1);
     return NULL;    
 }
 
-void rrdpush_replication_receiver_thread_spawn(RRDHOST *host){
+void replication_receiver_thread_spawn(RRDHOST *host){
     netdata_mutex_lock(&host->receiver->replication->mutex);
 
     if(!host->receiver->replication->spawned) {
@@ -97,7 +108,7 @@ void rrdpush_replication_receiver_thread_spawn(RRDHOST *host){
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLICATION_RECEIVER[%s]", host->hostname);
 
         if(netdata_thread_create(&host->sender->replication->thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_replication_receiver_thread, (void *) host->sender))
-            error("REPLICATION_RECEIVER %s [send]: failed to create new thread for client.", host->hostname);
+            error("%s %s [send]: failed to create new thread for client.", REPLICATION_MSG, host->hostname);
         else
             host->receiver->replication->spawned = 1;
     }
