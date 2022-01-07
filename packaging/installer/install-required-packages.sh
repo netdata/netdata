@@ -1613,7 +1613,7 @@ validate_tree_centos() {
 
   if [[ "${version}" =~ ^8(\..*)?$ ]]; then
     echo >&2 " > Checking for config-manager ..."
-    if ! run yum ${sudo} config-manager; then
+    if ! run ${sudo} yum config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
         run ${sudo} yum ${opts} install 'dnf-command(config-manager)'
       fi
