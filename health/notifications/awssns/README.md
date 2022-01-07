@@ -6,7 +6,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Amazon SNS
 
-As part of it's AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' or SNS.  Amazon SNS works kind of similarly to Netdata's own notification system, allowing dispatch of a single notification to multiple subscribers of different types.  Among other things, SNS supports sending notifications to:
+As part of its AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' (SNS). Amazon SNS works similarly to Netdata's own notification system, allowing to dispatch a single notification to multiple subscribers of different types. While Amazon SNS supports sending differently formatted messages for different delivery methods, Netdata does not currently support this functionality.
+Among other things, SNS supports sending notifications to:
 
 -   Email addresses.
 -   Mobile Phones via SMS.
@@ -15,29 +16,30 @@ As part of it's AWS suite, Amazon provides a notification broker service called 
 -   AWS SQS queues.
 -   Mobile applications via push notifications.
 
-To get this working, you will need:
+For email notification support, we recomment using Netdata's email notifications, as it is far better in almost all respects than its support through Amazon SNS.
+Read on to learn how to set up Amazon SNS in Netdata.
 
--   The Amazon Web Services CLI tools.  Most distributions provide these with the package name `awscli`.
--   An actual home directory for the user you run Netdata as, instead of just using `/` as a home directory.  Setup of this is distribution specific.  `/var/lib/netdata` is the recommended directory (because the permissions will already be correct) if you are using a dedicated user (which is how most distributions work).
--   An Amazon SNS topic to send notifications to with one or more subscribers.  The [Getting
+## Prerequisites
+
+Before you can enable SNS, you need:
+
+-   The [Amazon Web Services CLI tools](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (`awscli`).
+-   An actual home directory for the user you run Netdata as, instead of just using `/` as a home directory. The setup depends on the distribution, but `/var/lib/netdata` is the recommended directory. If you are using Netdata as a dedicated user, the permissions will already be correct.
+-   An Amazon SNS topic to send notifications to with one or more subscribers. The [Getting
     Started](https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html) section of the Amazon SNS documentation
-    covers the basics of how to set this up.  Make note of the Topic ARN when you create the topic.
--   While not mandatory, it is highly recommended to create a dedicated IAM user on your account for Netdata to send notifications.  This user needs to have programmatic access, and should only allow access to SNS.  If you're really paranoid, you can create one for each system or group of systems.
+    covers the basics of how to set this up. Make note of the **Topic ARN** when you create the topic.
+-   While not mandatory, it is highly recommended to create a dedicated IAM user on your account for Netdata to send notifications. This user needs to have programmatic access, and should only allow access to SNS. If you're really paranoid, you can create one for each system or group of systems.
 
-Once you have all the above, run the following command as the user Netdata runs under:
+## Enabling Amazon SNS
 
+To enable SNS:
+1. Run the following command as the user Netdata runs under:
 ```
 aws configure
 ```
+2. Enter the access key and secret key for accessing Amazon SNS. The system also promts you to enter the default region and output format, but you can leave those blank because Netdata doesn't use them.
 
-THis will prompt you for the access key and secret key for accessing Amazon SNS (as well as the default region and output format, but you can leave those blank because we don't use them).
-
-Once that's done, you're ready to go and can specify the desired topic ARN as a recipient.
-
-Notes:
-
--   Netdata's native email notification support is far better in almost all respects than it's support through Amazon SNS.  If you want email notifications, use the native support, not SNS.
-    -   If you need to change the notification format for SNS notifications, you can do so by specifying the format in `AWSSNS_MESSAGE_FORMAT` in the configuration.  This variable supports all the same variables you can use in custom notifications.
-    -   While Amazon SNS supports sending differently formatted messages for different delivery methods, Netdata does not currently support this functionality.
+3. Specify the desired topic ARN as a recipient, see [SNS documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/US_SetupSNS.html#set-up-sns-topic-cli).
+4. Optional: You can change the notification format for SNS notifications in the Netdata `???` configuration file. Specify the format: `AWSSNS_MESSAGE_FORMAT="${status} on ${host} at ${date}: ${chart} ${value_string}"`. This variable supports all the same variables you can use in custom notifications.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fawssns%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
