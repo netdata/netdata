@@ -16,7 +16,7 @@ most optimal installation method for your system, and get _automatic nightly upd
 normal user:
 
 ```bash
-rm -f ./kickstart.sh ; wget https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
+wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
 ```
 
 > See our [installation guide](/packaging/installer/README.md) for details about [automatic updates](/packaging/installer/README.md#automatic-updates) or
@@ -92,7 +92,7 @@ area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
 For example:
 
 ```bash
-rm -f ./kickstart.sh ; wget https://my-netdata.io/kickstart.sh && sh ./kickstart.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
+wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
 ```
 
 Please note that to run it you will either need to have root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](/claim/README.md#connect-an-agent-without-root-privileges) section.
@@ -137,7 +137,7 @@ To use `md5sum` to verify the integrity of the `kickstart.sh` script you will do
 run the following:
 
 ```bash
-[ "a20bf920af9e54ea23ec52900232c470" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "ae8ba2e88a3239280b5e4a53ed792a71" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.
