@@ -938,6 +938,7 @@ void rrdhost_free(RRDHOST *host) {
 
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
+    freez(host->aclk_state.prev_claimed_id);
     freez((void *)host->tags);
     free_label_list(host->labels.head);
     freez((void *)host->os);
