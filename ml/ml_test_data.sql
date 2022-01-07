@@ -872,16 +872,8 @@ INSERT INTO anomaly_rate_info_test_source (host_id, after, before, anomaly_rates
         "system.cpu|guest"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|steal"
-    ],
-    [
-        10.0,
-        "system.cpu|softirq"
-    ],
-    [
-        10.0,
-        "system.cpu|irq"
     ],
     [
         10.0,
@@ -892,11 +884,11 @@ INSERT INTO anomaly_rate_info_test_source (host_id, after, before, anomaly_rates
         "system.cpu|system"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|nice"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|iowait"
     ],
     [
@@ -915,15 +907,15 @@ INSERT INTO anomaly_rate_info_test_source (host_id, after, before, anomaly_rates
         "system.cpu|guest"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|steal"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|softirq"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|irq"
     ],
     [
@@ -962,11 +954,11 @@ INSERT INTO anomaly_rate_info_test_source (host_id, after, before, anomaly_rates
         "system.cpu|steal"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|softirq"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|irq"
     ],
     [
@@ -976,14 +968,6 @@ INSERT INTO anomaly_rate_info_test_source (host_id, after, before, anomaly_rates
     [
         10.0,
         "system.cpu|system"
-    ],
-    [
-        10.0,
-        "system.cpu|nice"
-    ],
-    [
-        10.0,
-        "system.cpu|iowait"
     ],
     [
         10.0,
@@ -1021,11 +1005,11 @@ INSERT INTO anomaly_rate_info_test_source (host_id, after, before, anomaly_rates
         "system.cpu|system"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|nice"
     ],
     [
-        10.0,
+        5.0,
         "system.cpu|iowait"
     ],
     [
@@ -1780,3 +1764,18 @@ INSERT INTO anomaly_rate_info_test_results_4 (dim_id, anomaly_percentage) VALUES
 ("system.cpu|steal", 10.0),
 ("system.cpu|system", 10.0),
 ("system.cpu|user", 8.3);
+
+--matching the record 1638209423,	1638209663 and the record after
+DROP TABLE IF EXISTS anomaly_rate_info_test_results_5;
+CREATE TABLE anomaly_rate_info_test_results_5 (dim_id text NOT NULL, anomaly_percentage real);
+INSERT INTO anomaly_rate_info_test_results_5 (dim_id, anomaly_percentage) VALUES
+("system.cpu|guest", 10.0),
+("system.cpu|guest_nice", 10.0),
+("system.cpu|idle", 10.0),
+("system.cpu|iowait", 6.7),
+("system.cpu|irq", 6.7),
+("system.cpu|nice", 6.7),
+("system.cpu|softirq", 6.7),
+("system.cpu|steal", 7.5),
+("system.cpu|system", 10.0),
+("system.cpu|user", 10.0);

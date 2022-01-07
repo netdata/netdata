@@ -495,6 +495,27 @@ TEST(AnomalyRateInfoSqlTest, PortionsOfTwoRanges) {
                                             AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
 }
 
+//Test 5: query over four ranges with some missing dimensions in some range, so all dimensions should appear
+//... with the average values should be proportional, and within the margin of the set results
+TEST(AnomalyRateInfoSqlTest, RangesWithMissingDimensions) {
+    std::stringstream TestDBDirectory, TestDataDirectory, TestQueryDirectory, TestCheckDirectory;
+    
+    TestDBDirectory << netdata_configured_cache_dir << "/ml_test_anomaly_info.db";
+    std::string AnomalyTestDBPath = TestDBDirectory.str();
+    
+    TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
+    std::string AnomalyTestDataPath = TestDataDirectory.str();
+    
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_5.sql";
+    std::string AnomalyTestQueryPath = TestQueryDirectory.str();
+    
+    TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_5.sql";
+    std::string AnomalyTestCheckPath = TestCheckDirectory.str();
+    
+    EXPECT_EQ(test_ml_anomaly_info_api_sql(AnomalyTestDBPath, AnomalyTestDataPath, 
+                                            AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
+}
+
 //Test SimpleDB: query on a very simplified database of five records and two dimensions with only one none zero value
 //... on one of the dimensions in one record, the result is compared against a set result
 TEST(AnomalyRateInfoSqlTest, SimpleDimOneNoneZeroValue) {
