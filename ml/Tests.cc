@@ -401,7 +401,7 @@ TEST(AnomalyRateInfoSqlTest, AllDimZeroValues) {
     TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data_0.sql";
     std::string AnomalyTestDataPath = TestDataDirectory.str();
     
-    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_0_new.sql";
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_0.sql";
     std::string AnomalyTestQueryPath = TestQueryDirectory.str();
     
     TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_0.sql";
@@ -422,7 +422,7 @@ TEST(AnomalyRateInfoSqlTest, AllDimEqualValues) {
     TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
     std::string AnomalyTestDataPath = TestDataDirectory.str();
     
-    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_1_new.sql";
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_1.sql";
     std::string AnomalyTestQueryPath = TestQueryDirectory.str();
     
     TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_1.sql";
@@ -443,10 +443,52 @@ TEST(AnomalyRateInfoSqlTest, DifferentDimValues) {
     TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
     std::string AnomalyTestDataPath = TestDataDirectory.str();
     
-    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_2_new.sql";
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_2.sql";
     std::string AnomalyTestQueryPath = TestQueryDirectory.str();
     
     TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_2.sql";
+    std::string AnomalyTestCheckPath = TestCheckDirectory.str();
+    
+    EXPECT_EQ(test_ml_anomaly_info_api_sql(AnomalyTestDBPath, AnomalyTestDataPath, 
+                                            AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
+}
+
+//Test 3: query portion of one range, so the average values should be equal to the values of the range
+//... and within the margin of the set results
+TEST(AnomalyRateInfoSqlTest, PortionOfOneRange) {
+    std::stringstream TestDBDirectory, TestDataDirectory, TestQueryDirectory, TestCheckDirectory;
+    
+    TestDBDirectory << netdata_configured_cache_dir << "/ml_test_anomaly_info.db";
+    std::string AnomalyTestDBPath = TestDBDirectory.str();
+    
+    TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
+    std::string AnomalyTestDataPath = TestDataDirectory.str();
+    
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_3.sql";
+    std::string AnomalyTestQueryPath = TestQueryDirectory.str();
+    
+    TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_3.sql";
+    std::string AnomalyTestCheckPath = TestCheckDirectory.str();
+    
+    EXPECT_EQ(test_ml_anomaly_info_api_sql(AnomalyTestDBPath, AnomalyTestDataPath, 
+                                            AnomalyTestQueryPath, AnomalyTestCheckPath), 0);
+}
+
+//Test 4: query a combination of two portions of two adjacent ranges, so the average values should be proportional
+//... and within the margin of the set results
+TEST(AnomalyRateInfoSqlTest, PortionsOfTwoRanges) {
+    std::stringstream TestDBDirectory, TestDataDirectory, TestQueryDirectory, TestCheckDirectory;
+    
+    TestDBDirectory << netdata_configured_cache_dir << "/ml_test_anomaly_info.db";
+    std::string AnomalyTestDBPath = TestDBDirectory.str();
+    
+    TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data.sql";
+    std::string AnomalyTestDataPath = TestDataDirectory.str();
+    
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_4.sql";
+    std::string AnomalyTestQueryPath = TestQueryDirectory.str();
+    
+    TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_4.sql";
     std::string AnomalyTestCheckPath = TestCheckDirectory.str();
     
     EXPECT_EQ(test_ml_anomaly_info_api_sql(AnomalyTestDBPath, AnomalyTestDataPath, 
@@ -464,7 +506,7 @@ TEST(AnomalyRateInfoSqlTest, SimpleDimOneNoneZeroValue) {
     TestDataDirectory << netdata_configured_cache_dir << "/ml_test_data_simple.sql";
     std::string AnomalyTestDataPath = TestDataDirectory.str();
     
-    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_simple_new.sql";
+    TestQueryDirectory << netdata_configured_cache_dir << "/ml_test_query_simple.sql";
     std::string AnomalyTestQueryPath = TestQueryDirectory.str();
     
     TestCheckDirectory << netdata_configured_cache_dir << "/ml_test_check_simple.sql";

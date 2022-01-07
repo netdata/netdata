@@ -112,7 +112,7 @@ private:
     Database DB{Cfg.AnomalyDBPath};
 
     /*the counter variable to downcount the time window for anomaly bit counting*/
-    size_t AnomalyBitCounterWindow{static_cast<size_t>(Cfg.SaveAnomalyPercentageEvery)};
+    size_t AnomalyBitCounterWindow{Cfg.SaveAnomalyPercentageEvery};
     time_t LastSavedBefore{0};
 
 };

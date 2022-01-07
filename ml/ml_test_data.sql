@@ -1750,3 +1750,33 @@ INSERT INTO anomaly_rate_info_test_results_2 (dim_id, anomaly_percentage) VALUES
 ("system.cpu|steal", 10.0),
 ("system.cpu|system", 10.0),
 ("system.cpu|user", 7.5);
+
+--matching the record 1638208763,	1638208823
+DROP TABLE IF EXISTS anomaly_rate_info_test_results_3;
+CREATE TABLE anomaly_rate_info_test_results_3 (dim_id text NOT NULL, anomaly_percentage real);
+INSERT INTO anomaly_rate_info_test_results_3 (dim_id, anomaly_percentage) VALUES
+("system.cpu|guest", 10.0),
+("system.cpu|guest_nice", 10.0),
+("system.cpu|idle", 10.0),
+("system.cpu|iowait", 4.0),
+("system.cpu|irq", 5.0),
+("system.cpu|nice", 4.0),
+("system.cpu|softirq", 10.0),
+("system.cpu|steal", 10.0),
+("system.cpu|system", 10.0),
+("system.cpu|user", 5.0);
+
+--matching the record 1638208763,	1638208823 and the record after
+DROP TABLE IF EXISTS anomaly_rate_info_test_results_4;
+CREATE TABLE anomaly_rate_info_test_results_4 (dim_id text NOT NULL, anomaly_percentage real);
+INSERT INTO anomaly_rate_info_test_results_4 (dim_id, anomaly_percentage) VALUES
+("system.cpu|guest", 10.0),
+("system.cpu|guest_nice", 10.0),
+("system.cpu|idle", 10.0),
+("system.cpu|iowait", 8.0),
+("system.cpu|irq", 8.3),
+("system.cpu|nice", 8.0),
+("system.cpu|softirq", 10.0),
+("system.cpu|steal", 10.0),
+("system.cpu|system", 10.0),
+("system.cpu|user", 8.3);

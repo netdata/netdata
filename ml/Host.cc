@@ -391,14 +391,14 @@ void DetectableHost::detectOnce() {
 
             /*regardless the dimension value was anomalous or not, update the value of the percentage of anomalous dimension*/
             if(AnomalyBitCounterWindow < Cfg.SaveAnomalyPercentageEvery) {           
-                D->setAnomalyPercentage((D->getAnomalousBitCount() / ((Cfg.SaveAnomalyPercentageEvery - AnomalyBitCounterWindow) * static_cast<double>(updateEvery()))) * 100.0);
+                D->setAnomalyPercentage((D->getAnomalousBitCount() / (static_cast<double>(Cfg.SaveAnomalyPercentageEvery - AnomalyBitCounterWindow) * static_cast<double>(updateEvery()))) * 100.0);
             }
             /*Register the oldest time of this dimension*/
             OldestTimeOfAllDims = MIN(D->oldestTime(), OldestTimeOfAllDims);
             
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
-                double AnomalyPercentage = (D->getAnomalousBitCount() / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery()))) * 100.0;
+                double AnomalyPercentage = (D->getAnomalousBitCount() / (static_cast<double>(Cfg.SaveAnomalyPercentageEvery) * static_cast<double>(updateEvery()))) * 100.0;
                 DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });                
                 D->setAnomalousBitCount(0.0);
             }

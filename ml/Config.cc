@@ -24,7 +24,7 @@ void Config::readMLConfig(void) {
 
     bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", true);
 
-    double SaveAnomalyPercentageEvery = 5 * 60;
+    unsigned long SaveAnomalyPercentageEvery = 15 * 60;
 
     /*
      * Read values
@@ -128,4 +128,5 @@ void Config::readMLConfig(void) {
     Cfg.SP_HostsToSkip = simple_pattern_create(HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
  
+    Cfg.SaveAnomalyPercentageEvery = SaveAnomalyPercentageEvery;
 }
