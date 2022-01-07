@@ -294,8 +294,10 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
-    //Handle replication configurtion per child in stream.conf
-
+    
+    // Read configuration - Initialize any replication receiver thread - Child-wise stream replication control.
+    replication_receiver_init(rpt, &stream_config);
+   
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
         error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the parent/proxy machine GUID to a child?", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->machine_guid);
@@ -426,10 +428,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
         return 0;
     }
     
-    // Start replication receiver thread (Rx).
-    // if(rpt->version >= VERSION_GAP_FILLING)
-    //     replication_receiver_thread_spawn(rpt->host);
-
     rrdhost_wrlock(rpt->host);
 /* if(rpt->host->connected_senders > 0) {
         rrdhost_unlock(rpt->host);
@@ -466,6 +464,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if (netdata_cloud_setting)
         aclk_host_state_update(rpt->host, 1);
 #endif
+
+    // Start replication receiver thread (Rx).
+    if(rpt->replication->enabled 
+    && !rpt->replication->spawned)
+        replication_receiver_thread_spawn(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, fp);
 

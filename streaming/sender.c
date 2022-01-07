@@ -411,8 +411,8 @@ static void attempt_to_connect(struct sender_state *state)
         state->host->rrdpush_sender_connected = 1;
 
         // Start replication sender thread (Tx).
-        // if(state->version >= VERSION_GAP_FILLING)
-        //     replication_sender_thread_spawn(state->host);
+        if(state->replication->enabled)
+            replication_sender_thread_spawn(state->host);
     }
     else {
         // increase the failed connections counter
@@ -603,6 +603,7 @@ void *rrdpush_sender_thread(void *ptr) {
         &stream_config, CONFIG_SECTION_STREAM,
         "initial clock resync iterations",
         remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
+    // Read replication configuration for sender thread.
 
     // initialize rrdpush globals
     s->host->rrdpush_sender_connected = 0;

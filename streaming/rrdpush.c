@@ -74,6 +74,7 @@ int rrdpush_init() {
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
+    // replication
     default_rrdpush_replication_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable replication", default_rrdpush_replication_enabled);
 
 
@@ -82,8 +83,10 @@ int rrdpush_init() {
         default_rrdpush_enabled = 0;
     }
 
-    // Disable replication if streaming is disabled. Guarded with #ifdef ?
-    if(!default_rrdpush_enabled && STREAMING_PROTOCOL_CURRENT_VERSION >= VERSION_GAP_FILLING) {
+    // Replication
+    if (!default_rrdpush_replication_enabled
+    || (STREAMING_PROTOCOL_CURRENT_VERSION < VERSION_GAP_FILLING)
+    || !default_rrdpush_enabled) {
         error("STREAM [send]: Cannot enable replication mechanism - Streaming is disabled.");
         default_rrdpush_replication_enabled = 0;
     }

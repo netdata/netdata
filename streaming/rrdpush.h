@@ -61,6 +61,8 @@ struct sender_state {
     char read_buffer[512];
     int read_len;
     int32_t version;
+    // Replication status
+    REPLICATION_STATE *replication;
 };
 
 struct receiver_state {
@@ -91,6 +93,8 @@ struct receiver_state {
 #endif
     unsigned int shutdown:1;    // Tell the thread to exit
     unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
+    // Replication status
+    REPLICATION_STATE *replication;
 };
 
 

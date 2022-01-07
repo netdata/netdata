@@ -177,9 +177,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->sender = mallocz(sizeof(*host->sender));
     sender_init(host->sender, host);
-    //Initialize the replication sender and receiver thread and any strcutures.
-    // variables, structs and mutexes/locks initialization, mem allocations, etc.
-    // replication_init();
     netdata_mutex_init(&host->receiver_lock);
 
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
@@ -191,13 +188,15 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdpush_sender_pipe[1] = -1;
     host->rrdpush_sender_socket  = -1;
 
-    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 #ifdef ENABLE_HTTPS
     host->ssl.conn = NULL;
     host->ssl.flags = NETDATA_SSL_START;
     host->stream_ssl.conn = NULL;
     host->stream_ssl.flags = NETDATA_SSL_START;
 #endif
+
+    //Initialization of the Replication Tx thread.
+    replication_sender_init(host->sender);
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_rwlock_init(&host->labels.labels_rwlock);
