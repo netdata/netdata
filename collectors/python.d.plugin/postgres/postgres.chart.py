@@ -49,7 +49,7 @@ QUERY_NAME_BLOCKERS = 'BLOCKERS'
 QUERY_NAME_DATABASES = 'DATABASES'
 QUERY_NAME_STANDBY = 'STANDBY'
 QUERY_NAME_REPLICATION_SLOT = 'REPLICATION_SLOT'
-QUERY_NAME_STAT_REPLICATION = 'STAT_REPLICATION'
+QUERY_NAME_DB_REPLICATION = 'STAT_REPLICATION'
 QUERY_NAME_STANDBY_DELTA = 'STANDBY_DELTA'
 QUERY_NAME_STANDBY_LAG = 'STANDBY_LAG'
 QUERY_NAME_REPSLOT_FILES = 'REPSLOT_FILES'
@@ -160,7 +160,7 @@ METRICS = {
         'replslot_wal_keep',
         'replslot_files'
     ],
-    QUERY_NAME_STAT_REPLICATION: []
+    QUERY_NAME_DB_REPLICATION: []
 }
 
 NO_VERSION = 0
@@ -478,7 +478,7 @@ FROM pg_replication_slots;
 """
 }
 
-QUERY_STAT_REPLICATION = {
+QUERY_DB_REPLICATION = {
     DEFAULT: """
     """,
 }
@@ -786,8 +786,8 @@ def query_factory(name, version=NO_VERSION):
         return QUERY_STANDBY[DEFAULT]
     elif name == QUERY_NAME_REPLICATION_SLOT:
         return QUERY_REPLICATION_SLOT[DEFAULT]
-    elif name == QUERY_NAME_STAT_REPLICATION:
-        return QUERY_STAT_REPLICATION[DEFAULT]
+    elif name == QUERY_NAME_DB_REPLICATION:
+        return QUERY_DB_REPLICATION[DEFAULT]
     elif name == QUERY_NAME_IF_SUPERUSER:
         return QUERY_SUPERUSER[DEFAULT]
     elif name == QUERY_NAME_SERVER_VERSION:
@@ -851,7 +851,7 @@ ORDER = [
     'stat_bgwriter_bgwriter',
     'stat_bgwriter_maxwritten',
     'replication_slot',
-    'stat_replications',
+    'db_replications',
     'standby_delta',
     'standby_lag',
     'autovacuum',
@@ -1086,8 +1086,8 @@ CHARTS = {
             ['replslot_files', 'pg_replslot files', 'absolute']
         ]
     },
-    'stat_replications': {
-        'options': [None, 'Stat Replications', 'Replications db', 'stat replication', 'postgres.stat_replication', 'line'],
+    'db_replications': {
+        'options': [None, 'Replications DB', 'Replications db', 'replication db', 'postgres.db_replication', 'line'],
         'lines': [
             ['on', 'State ON', 'absolute'],
         ]
@@ -1300,8 +1300,8 @@ class Service(SimpleService):
         if self.server_version >= 100000:
             self.queries[query_factory(QUERY_NAME_STANDBY_LAG)] = METRICS[QUERY_NAME_STANDBY_LAG]
 
-        QUERY_STAT_REPLICATION[DEFAULT] = CREATE_STAT_QUERY(self.secondaries)
-        self.queries[query_factory(QUERY_NAME_STAT_REPLICATION, self.server_version)] = METRICS[QUERY_NAME_STAT_REPLICATION]
+        QUERY_DB_REPLICATION[DEFAULT] = CREATE_DB_QUERY(self.secondaries)
+        self.queries[query_factory(QUERY_NAME_DB_REPLICATION, self.server_version)] = METRICS[QUERY_NAME_DB_REPLICATION]
 
     def create_dynamic_charts(self):
         for database_name in self.databases[::-1]:
@@ -1351,11 +1351,11 @@ class Service(SimpleService):
             )
         
         if self.server_version >= 90100 and len(self.secondaries):
-            add_stat_replications_chart(
+            add_db_replications_chart(
                     self,
                     order=self.order,
                     definitions=self.definitions,
-                    name='stat_replications',
+                    name='db_replications',
                     secondaries=self.secondaries[::]
                 )
 
@@ -1461,14 +1461,14 @@ def add_replication_slot_chart(order, definitions, name, slot_name):
         'options': [name, title + ': ' + slot_name, units, 'replication slot files', context, chart_type],
         'lines': create_lines(slot_name, chart_template['lines'])}
 
-def add_stat_replications_chart(s,order, definitions, name, secondaries):
+def add_db_replications_chart(s,order, definitions, name, secondaries):
     def create_lines(lines, secondaries):
         result = list()
         for line in lines:
             for secondary in secondaries:
                 secondary=secondary.replace("-","")
                 metric='_'.join([secondary, line[0]])  
-                METRICS[QUERY_NAME_STAT_REPLICATION].append(metric)
+                METRICS[QUERY_NAME_DB_REPLICATION].append(metric)
                 new_line = [metric, secondary] + line[2:]
                 result.append(new_line)
             return result
@@ -1478,17 +1478,17 @@ def add_stat_replications_chart(s,order, definitions, name, secondaries):
     order.insert(position, name)
     _, title, units, _, context, chart_type = chart_template['options']
     definitions[name] = {
-        'options': [name, title, units, 'stat replications', context, chart_type],
+        'options': [name, title, units, 'replication db', context, chart_type],
         'lines': create_lines(chart_template['lines'], secondaries)}
 
-def CREATE_STAT_QUERY(secondaries):
-    STAT_QUERY = """
+def CREATE_DB_QUERY(secondaries):
+    DB_QUERY = """
     (SELECT count(1) AS on 
     FROM pg_stat_replication 
     WHERE application_name = '{appname}' ) as {alias}"""
     querys = []
     for secondary in secondaries:
         newsecond = secondary.replace("-", "") + "_on"
-        querys.append(STAT_QUERY.format(appname = secondary, alias = newsecond))
+        querys.append(DB_QUERY.format(appname = secondary, alias = newsecond))
     query = "SELECT {};".format(",".join(querys))
     return query
