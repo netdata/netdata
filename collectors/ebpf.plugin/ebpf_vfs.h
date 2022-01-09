@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_VFS_H
 #define NETDATA_EBPF_VFS_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_VFS "vfs"
+
 #define NETDATA_DIRECTORY_VFS_CONFIG_FILE "vfs.conf"
 
 #define NETDATA_LATENCY_VFS_SLEEP_MS 750000ULL
@@ -36,7 +39,25 @@
 #define NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR "vfs_create_error"
 
 // Group used on Dashboard
-#define NETDATA_VFS_GROUP "VFS (eBPF)"
+#define NETDATA_VFS_GROUP "vfs"
+#define NETDATA_VFS_CGROUP_GROUP "vfs (eBPF)"
+
+// Contexts
+#define NETDATA_CGROUP_VFS_UNLINK_CONTEXT "cgroup.vfs_unlink"
+#define NETDATA_CGROUP_VFS_WRITE_CONTEXT "cgroup.vfs_write"
+#define NETDATA_CGROUP_VFS_WRITE_ERROR_CONTEXT "cgroup.vfs_write_error"
+#define NETDATA_CGROUP_VFS_READ_CONTEXT "cgroup.vfs_read"
+#define NETDATA_CGROUP_VFS_READ_ERROR_CONTEXT "cgroup.vfs_read_error"
+#define NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT "cgroup.vfs_write_bytes"
+#define NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT "cgroup.vfs_read_bytes"
+
+#define NETDATA_SYSTEMD_VFS_UNLINK_CONTEXT "services.vfs_unlink"
+#define NETDATA_SYSTEMD_VFS_WRITE_CONTEXT "services.vfs_write"
+#define NETDATA_SYSTEMD_VFS_WRITE_ERROR_CONTEXT "services.vfs_write_error"
+#define NETDATA_SYSTEMD_VFS_READ_CONTEXT "services.vfs_read"
+#define NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT "services.vfs_read_error"
+#define NETDATA_SYSTEMD_VFS_WRITE_BYTES_CONTEXT "services.vfs_write_bytes"
+#define NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT "services.vfs_read_bytes"
 
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;

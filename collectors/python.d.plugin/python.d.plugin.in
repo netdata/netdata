@@ -500,27 +500,31 @@ class Plugin:
         self.saver = None
         self.runs = 0
 
-    def load_config(self):
-        paths = [
-            DIRS.plugin_user_config,
-            DIRS.plugin_stock_config,
-        ]
-        self.log.debug("looking for '{0}' in {1}".format(self.config_name, paths))
-        abs_path = multi_path_find(self.config_name, *paths)
-        if not abs_path:
-            self.log.warning("'{0}' was not found, using defaults".format(self.config_name))
-            return True
-
-        self.log.debug("loading '{0}'".format(abs_path))
+    def load_config_file(self, filepath, expected):
+        self.log.debug("looking for '{0}'".format(filepath))
+        if not os.path.isfile(filepath):
+            log = self.log.info if not expected else self.log.error
+            log("'{0}' was not found".format(filepath))
+            return dict()
         try:
-            config = load_config(abs_path)
+            config = load_config(filepath)
         except Exception as error:
-            self.log.error("error on loading '{0}' : {1}".format(abs_path, repr(error)))
-            return False
+            self.log.error("error on loading '{0}' : {1}".format(filepath, repr(error)))
+            return dict()
+        self.log.debug("'{0}' is loaded".format(filepath))
+        return config
 
-        self.log.debug("'{0}' is loaded".format(abs_path))
-        self.config.update(config)
-        return True
+    def load_config(self):
+        user_config = self.load_config_file(
+            filepath=os.path.join(DIRS.plugin_user_config, self.config_name),
+            expected=False,
+        )
+        stock_config = self.load_config_file(
+            filepath=os.path.join(DIRS.plugin_stock_config, self.config_name),
+            expected=True,
+        )
+        self.config.update(stock_config)
+        self.config.update(user_config)
 
     def load_job_statuses(self):
         self.log.debug("looking for '{0}' in {1}".format(self.jobs_status_dump_name, DIRS.var_lib))
@@ -593,8 +597,7 @@ class Plugin:
         return jobs
 
     def setup(self):
-        if not self.load_config():
-            return False
+        self.load_config()
 
         if not self.config['enabled']:
             self.log.info('disabled in the configuration file')

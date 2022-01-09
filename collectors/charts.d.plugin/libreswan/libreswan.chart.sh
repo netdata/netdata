@@ -124,10 +124,10 @@ libreswan_create_one() {
   libreswan_tunnel_charts[${name}]="$(fixid "${name}")"
 
   cat << EOF
-CHART libreswan.${libreswan_tunnel_charts[${name}]}_net '${name}_net' "LibreSWAN Tunnel ${name} Traffic" "kilobits/s" "${name}" libreswan.net area $((libreswan_priority)) $libreswan_update_every
+CHART libreswan.${libreswan_tunnel_charts[${name}]}_net '${name}_net' "LibreSWAN Tunnel ${name} Traffic" "kilobits/s" "${name}" libreswan.net area $((libreswan_priority)) $libreswan_update_every '' '' 'libreswan'
 DIMENSION in '' incremental 8 1000
 DIMENSION out '' incremental -8 1000
-CHART libreswan.${libreswan_tunnel_charts[${name}]}_uptime '${name}_uptime' "LibreSWAN Tunnel ${name} Uptime" "seconds" "${name}" libreswan.uptime line $((libreswan_priority + 1)) $libreswan_update_every
+CHART libreswan.${libreswan_tunnel_charts[${name}]}_uptime '${name}_uptime' "LibreSWAN Tunnel ${name} Uptime" "seconds" "${name}" libreswan.uptime line $((libreswan_priority + 1)) $libreswan_update_every '' '' 'libreswan'
 DIMENSION uptime '' absolute 1 1
 EOF
 
@@ -173,7 +173,7 @@ VALUESEOF
 # _update is called continuously, to collect the values
 libreswan_update() {
   # the first argument to this function is the microseconds since last update
-  # pass this parameter to the BEGIN statement (see bellow).
+  # pass this parameter to the BEGIN statement (see below).
 
   libreswan_get || return 1
   libreswan_now=$(date +%s)

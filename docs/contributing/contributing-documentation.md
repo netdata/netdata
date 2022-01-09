@@ -18,7 +18,7 @@ The Netdata team aggregates and publishes all documentation at [learn.netdata.cl
 ## Before you get started
 
 Anyone interested in contributing to documentation should first read the [Netdata style
-guide](/docs/contributing/style-guide.md) and the [Netdata Community Code of Conduct](/CODE_OF_CONDUCT.md).
+guide](/docs/contributing/style-guide.md) and the [Netdata Community Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
 
 Netdata's documentation uses Markdown syntax. If you're not familiar with Markdown, read the [Mastering
 Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on creating
@@ -92,7 +92,7 @@ request based on the changes you made in the new branch of your fork.
 
 ## Making a pull request
 
-Pull requests (PRs) should be concise and informative. See our [PR guidelines](/CONTRIBUTING.md#pr-guidelines) for
+Pull requests (PRs) should be concise and informative. See our [PR guidelines](https://learn.netdata.cloud/contribute/handbook#pr-guidelines) for
 specifics.
 
 - The title must follow the [imperative mood](https://en.wikipedia.org/wiki/Imperative_mood) and be no more than ~50

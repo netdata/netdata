@@ -3,6 +3,8 @@
 #ifndef NETDATA_RRDENGINELIB_H
 #define NETDATA_RRDENGINELIB_H
 
+#include "libnetdata/libnetdata.h"
+
 /* Forward declarations */
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -11,10 +13,6 @@ struct rrdengine_instance;
 #define STR(x) STR_HELPER(x)
 
 #define BITS_PER_ULONG (sizeof(unsigned long) * 8)
-
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN (37)
-#endif
 
 /* Taken from linux kernel */
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))

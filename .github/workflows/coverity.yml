@@ -8,6 +8,11 @@ on:
     paths:
       - .github/workflows/coverity.yml
       - coverity-scan.sh
+env:
+  DO_NOT_TRACK: 1
+concurrency:
+  group: coverity-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   coverity:
     if: github.repository == 'netdata/netdata'
@@ -38,7 +43,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
+          SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Coverity run failed:'
           SLACK_USERNAME: 'GitHub Actions'

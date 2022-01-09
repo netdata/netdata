@@ -70,7 +70,9 @@ calculated_number exporting_calculate_value_from_stored_data(
     time_t *last_timestamp)
 {
     RRDSET *st = rd->rrdset;
+#ifdef NETDATA_INTERNAL_CHECKS
     RRDHOST *host = st->rrdhost;
+#endif
     time_t after = instance->after;
     time_t before = instance->before;
 

@@ -295,9 +295,6 @@ RRDHOST *rrdhost_create(const char *hostname,
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
-
-        health_alarm_log_load(host);
-        health_alarm_log_open(host);
     }
 
     RRDHOST *t = rrdhost_index_add(host);
@@ -313,6 +310,23 @@ RRDHOST *rrdhost_create(const char *hostname,
         if (unlikely(rc))
             error_report("Failed to store machine GUID to the database");
         sql_load_node_id(host);
+        if (host->health_enabled) {
+            if (!file_is_migrated(host->health_log_filename)) {
+                int rc = sql_create_health_log_table(host);
+                if (unlikely(rc)) {
+                    error_report("Failed to create health log table in the database");
+                    health_alarm_log_load(host);
+                    health_alarm_log_open(host);
+                }
+                else {
+                    health_alarm_log_load(host);
+                    add_migrated_file(host->health_log_filename, 0);
+                }
+            } else {
+                sql_create_health_log_table(host);
+                sql_health_alarm_log_load(host);
+            }
+        }
     }
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
@@ -366,6 +380,20 @@ RRDHOST *rrdhost_create(const char *hostname,
             localhost->next = host;
         }
         else localhost = host;
+    }
+
+    // ------------------------------------------------------------------------
+    // init new ML host and update system_info to let upstreams know
+    // about ML functionality
+
+    ml_new_host(host);
+    if (is_localhost && host->system_info) {
+#ifndef ENABLE_ML
+        host->system_info->ml_capable = 0;
+#else
+        host->system_info->ml_capable = 1;
+#endif
+        host->system_info->ml_enabled = host->ml_host != NULL;
     }
 
     info("Host '%s' (at registry as '%s') with guid '%s' initialized"
@@ -506,8 +534,21 @@ void rrdhost_update(RRDHOST *host
             health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
             rrdhost_unlock(host);
 
-            health_alarm_log_load(host);
-            health_alarm_log_open(host);
+            if (!file_is_migrated(host->health_log_filename)) {
+                int rc = sql_create_health_log_table(host);
+                if (unlikely(rc)) {
+                    error_report("Failed to create health log table in the database");
+
+                    health_alarm_log_load(host);
+                    health_alarm_log_open(host);
+                } else {
+                    health_alarm_log_load(host);
+                    add_migrated_file(host->health_log_filename, 0);
+                }
+            } else {
+                sql_create_health_log_table(host);
+                sql_health_alarm_log_load(host);
+            }
         }
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);
@@ -650,11 +691,18 @@ restart_after_removal:
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
+    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
+    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
+    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
+    if (rrdset_free_obsolete_time < 10) {
+        rrdset_free_obsolete_time = 10;
+        info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds. A lower delay can potentially cause a segmentation fault.");
+    }
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
     if (gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
 
-    if (unlikely(sql_init_database())) {
+    if (unlikely(sql_init_database(DB_CHECK_NONE))) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             fatal("Failed to initialize SQLite");
         info("Skipping SQLITE metadata initialization since memory mode is not db engine");
@@ -712,6 +760,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         fatal("Failed to initialize dbengine");
     }
 #endif
+    sql_aclk_sync_init();
     rrd_unlock();
 
     web_client_api_v1_management_init();
@@ -868,6 +917,8 @@ void rrdhost_free(RRDHOST *host) {
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx != &multidb_ctx)
         rrdeng_exit(host->rrdeng_ctx);
 #endif
+
+    ml_delete_host(host);
 
     // ------------------------------------------------------------------------
     // remove it from the indexes
@@ -1392,6 +1443,7 @@ restart_after_removal:
                     && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
         )) {
+            st->rrdhost->obsolete_charts_count--;
 #ifdef ENABLE_DBENGINE
             if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 RRDDIM *rd, *last;
@@ -1407,6 +1459,11 @@ restart_after_removal:
                         continue;
                     }
 
+                    if (rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)) {
+                        last = rd;
+                        rd = rd->next;
+                        continue;
+                    }
                     rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
                     while (rd->variables)
                         rrddimvar_free(rd->variables);
@@ -1437,6 +1494,7 @@ restart_after_removal:
                 rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
                 rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+                
                 if (st->dimensions) {
                     /* If the chart still has dimensions don't delete it from the metadata log */
                     continue;
@@ -1456,6 +1514,30 @@ restart_after_removal:
             goto restart_after_removal;
         }
     }
+}
+
+void rrd_cleanup_obsolete_charts()
+{
+    rrd_rdlock();
+
+    RRDHOST *host;
+    rrdhost_foreach_read(host)
+    {
+        if (host->obsolete_charts_count) {
+            rrdhost_wrlock(host);
+#ifdef ENABLE_ACLK
+            host->deleted_charts_count = 0;
+#endif
+            rrdhost_cleanup_obsolete_charts(host);
+#ifdef ENABLE_ACLK
+            if (host->deleted_charts_count)
+                aclk_update_chart(host, "dummy-chart", 0);
+#endif
+            rrdhost_unlock(host);
+        }
+    }
+
+    rrd_unlock();
 }
 
 // ----------------------------------------------------------------------------
@@ -1487,8 +1569,8 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
         system_info->container_os_version_id = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_DETECTION")){
-        freez(system_info->host_os_detection);
-        system_info->host_os_detection = strdupz(value);
+        freez(system_info->container_os_detection);
+        system_info->container_os_detection = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
         freez(system_info->host_os_name);
@@ -1571,6 +1653,8 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
     else if (!strcmp(name, "NETDATA_SYSTEM_RAM_DETECTION"))
         return res;
     else if (!strcmp(name, "NETDATA_SYSTEM_DISK_DETECTION"))
+        return res;
+    else if (!strcmp(name, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE"))
         return res;
     else {
         res = 1;

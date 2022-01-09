@@ -57,7 +57,7 @@ compressed metrics. The default settings retain about two day's worth of metrics
 every second.
 
 [**See our database engine
-calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 to help you correctly set `dbengine multihost disk space` based on your needs. The calculator gives an accurate estimate
 based on how many child nodes you have, how many metrics your Agent collects, and more.
 

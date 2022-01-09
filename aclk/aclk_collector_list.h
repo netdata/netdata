@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// This is copied from Legacy ACLK, Original Autor: amoss
+// This is copied from Legacy ACLK, Original Author: amoss
 
 // TODO unmess this
 
@@ -30,6 +30,8 @@ struct _collector {
     char *module_name;
     struct _collector *next;
 };
+
+extern struct _collector *collector_list;
 
 struct _collector *_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
 struct _collector *_del_collector(const char *hostname, const char *plugin_name, const char *module_name);

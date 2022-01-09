@@ -312,12 +312,12 @@ static void test_exporting_calculate_value_from_stored_data(void **state)
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 0);
     expect_function_call(__mock_rrddim_query_next_metric);
-    will_return(__mock_rrddim_query_next_metric, pack_storage_number(27, SN_EXISTS));
+    will_return(__mock_rrddim_query_next_metric, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 0);
     expect_function_call(__mock_rrddim_query_next_metric);
-    will_return(__mock_rrddim_query_next_metric, pack_storage_number(45, SN_EXISTS));
+    will_return(__mock_rrddim_query_next_metric, pack_storage_number(45, SN_DEFAULT_FLAGS));
 
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 1);
@@ -431,7 +431,7 @@ static void test_format_dimension_stored_graphite_plaintext(void **state)
     struct engine *engine = *state;
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
-    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     assert_int_equal(format_dimension_stored_graphite_plaintext(engine->instance_root, rd), 0);
@@ -459,7 +459,7 @@ static void test_format_dimension_stored_json_plaintext(void **state)
     struct engine *engine = *state;
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
-    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     assert_int_equal(format_dimension_stored_json_plaintext(engine->instance_root, rd), 0);
@@ -487,7 +487,7 @@ static void test_format_dimension_stored_opentsdb_telnet(void **state)
     struct engine *engine = *state;
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
-    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     assert_int_equal(format_dimension_stored_opentsdb_telnet(engine->instance_root, rd), 0);
@@ -515,7 +515,7 @@ static void test_format_dimension_stored_opentsdb_http(void **state)
     struct engine *engine = *state;
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
-    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     assert_int_equal(format_dimension_stored_opentsdb_http(engine->instance_root, rd), 0);
@@ -1053,7 +1053,7 @@ static void test_format_host_labels_prometheus(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
     format_host_labels_prometheus(instance, localhost);
-    assert_string_equal(buffer_tostring(instance->labels), "key1=\"netdata\",key2=\"value2\"");
+    assert_string_equal(buffer_tostring(instance->labels), "key1=\"value1\",key2=\"value2\"");
 }
 
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
@@ -1070,7 +1070,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
     will_return(__wrap_now_realtime_sec, 2);
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
-    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(localhost, buffer, "test_server", "test_prefix", 0, 0);
 
@@ -1087,7 +1087,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
     will_return(__wrap_now_realtime_sec, 2);
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
-    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
         localhost, buffer, "test_server", "test_prefix", 0, PROMETHEUS_OUTPUT_NAMES | PROMETHEUS_OUTPUT_TYPES);
@@ -1106,7 +1106,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
     will_return(__wrap_now_realtime_sec, 2);
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
-    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(localhost, buffer, "test_server", "test_prefix", 0, 0);
 
@@ -1265,7 +1265,7 @@ static void test_format_dimension_prometheus_remote_write(void **state)
     RRDDIM *rd = localhost->rrdset_root->dimensions;
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
-    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     expect_function_call(__wrap_add_metric);
     expect_value(__wrap_add_metric, write_request_p, 0xff);
@@ -1877,7 +1877,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_prometheus_label_copy, setup_prometheus, teardown_prometheus),
         cmocka_unit_test_setup_teardown(test_prometheus_units_copy, setup_prometheus, teardown_prometheus),
         cmocka_unit_test_setup_teardown(
-            test_format_host_labels_prometheus, setup_configured_engine, teardown_configured_engine),
+            test_format_host_labels_prometheus, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             rrd_stats_api_v1_charts_allmetrics_prometheus, setup_prometheus, teardown_prometheus),
     };

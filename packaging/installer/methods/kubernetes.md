@@ -39,25 +39,34 @@ parent pod, and multiple child pods.
 You've now installed Netdata on your Kubernetes cluster. Next, it's time to opt-in and enable the powerful Kubernetes
 dashboards available in Netdata Cloud.
 
-## Claim your Kubernetes cluster to Netdata Cloud
+## Connect your Kubernetes cluster to Netdata Cloud
 
 To start [Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes/), you must first
-[claim](/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). Claiming securely
+[connect](/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
 connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
 like the health map and time-series composite charts.
 
-First, find your claiming script in Netdata Cloud by clicking on your Space's dropdown, then **Manage your Space**.
-Click the **Nodes** tab to reveal the `netdata-claim.sh` script for your Space in Netdata Cloud. You need the `TOKEN`
+### New installations
+
+First, find the script to run an `helm install` command. You can get it by clicking on your Space's dropdown, then **Manage your Space**.
+Click the **Nodes** tab and select the environment your node is running, in this case **kubernetes**, to reveal the script for your Space in Netdata Cloud. You need the `TOKEN`
 and `ROOM` values.
 
-Next, create a file called `override.yml`.
+The script should be similar to:
+
+```bash
+helm install netdata netdata/netdata --set parent.claiming.enabled="true" --set parent.claiming.token="TOKEN" --set parent.claiming.rooms="ROOM" --set child.claiming.enabled=true --set child.claiming.token="TOKEN" --set child.claiming.rooms="ROOM"
+```
+
+### Existing installations
+
+On an existing installation, you will need to override the configuration values by running the `helm upgrade` command and provide a file with the values to override. You can start with creating a file called `override.yml`.
 
 ```bash
 touch override.yml
 ```
 
-Paste the following into your `override.yml` file, replacing instances of `ROOM` and `TOKEN` with those from the
-claiming script from Netdata Cloud. These settings claim your `parent`/`child` nodes to Netdata Cloud and store more
+Paste the following into your `override.yml` file, replacing instances of `ROOM` and `TOKEN` with those from the script from Netdata Cloud. These settings connect your `parent`/`child` nodes to Netdata Cloud and store more
 metrics in the nodes' time-series databases.
 
 ```yaml
@@ -92,7 +101,7 @@ Apply these new settings:
 helm upgrade -f override.yml netdata netdata/netdata
 ```
 
-The cluster terminates the old pods and creates new ones with the proper persistence and claiming configuration. You'll
+The cluster terminates the old pods and creates new ones with the proper persistence and connection configuration. You'll
 see your nodes, containers, and pods appear in Netdata Cloud in a few seconds.
 
 ![Netdata's Kubernetes monitoring
@@ -107,7 +116,7 @@ Read up on the various configuration options in the [Helm chart
 documentation](https://github.com/netdata/helmchart#configuration) if you need to tweak your Kubernetes monitoring.
 
 Your first option is to create an `override.yml` file, if you haven't created one already for
-[claiming](#claim-your-kubernetes-cluster-to-netdata-cloud), then apply the new configuration to your cluster with `helm
+[connect](#connect-your-kubernetes-cluster-to-netdata-cloud), then apply the new configuration to your cluster with `helm
 upgrade`.
 
 ```bash

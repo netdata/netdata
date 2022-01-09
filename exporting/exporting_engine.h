@@ -66,6 +66,8 @@ struct instance_config {
 
     const char *name;
     const char *destination;
+    const char *username;
+    const char *password;
     const char *prefix;
     const char *hostname;
 
@@ -104,6 +106,8 @@ struct simple_connector_data {
     void *connector_specific_data;
 
     char connected_to[CONNECTED_TO_MAX];
+    
+    char *auth_string;
 
     size_t total_buffered_metrics;
 

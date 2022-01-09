@@ -224,9 +224,14 @@ safe_pidof() {
 
 # -----------------------------------------------------------------------------
 find_processors() {
-  # Most UNIX systems have `nproc` as part of their userland (including macOS, Linux and BSD)
+  # Most UNIX systems have `nproc` as part of their userland (including Linux and BSD)
   if command -v nproc > /dev/null; then
     nproc && return
+  fi
+
+  # macOS has no nproc but it may have gnproc installed from Homebrew or from Macports.
+  if command -v gnproc > /dev/null; then
+    gnproc && return
   fi
 
   local cpus
@@ -234,7 +239,7 @@ find_processors() {
     # linux
     cpus=$(grep -c ^processor /proc/cpuinfo)
   else
-    # freebsd
+  # freebsd
     cpus=$(sysctl hw.ncpu 2> /dev/null | grep ^hw.ncpu | cut -d ' ' -f 2)
   fi
   if [ -z "${cpus}" ] || [ $((cpus)) -lt 1 ]; then

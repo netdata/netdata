@@ -2,7 +2,9 @@
 #
 # Copyright: © 2021 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-'''Bundle the dashboard code into the agent repo.'''
+'''Bundle the dashboard code into the agent repo.
+
+   This is designed to be run as part of a GHA workflow, but will work fine outside of one.'''
 
 import os
 import shutil
@@ -69,12 +71,19 @@ dist_webstaticmedia_DATA = \\
 
 def copy_dashboard(tag):
     '''Fetch and bundle the dashboard code.'''
+    print('Preparing target directory')
     shutil.rmtree(BASEPATH)
     BASEPATH.mkdir()
+    print('::group::Fetching dashboard release tarball')
     subprocess.check_call('curl -L -o dashboard.tar.gz ' + URLTEMPLATE.format(tag), shell=True)
+    print('::endgroup::')
+    print('::group::Extracting dashboard release tarball')
     subprocess.check_call('tar -xvzf dashboard.tar.gz -C ' + str(BASEPATH) + ' --strip-components=1', shell=True)
+    print('::endgroup::')
+    print('Copying README.md')
     BASEPATH.joinpath('README.md').symlink_to('../.dashboard-notice.md')
-#    BASEPATH.joinpath('..', 'dashboard.tar.gz').unlink()
+    print('Removing dashboard release tarball')
+    BASEPATH.joinpath('..', 'dashboard.tar.gz').unlink()
 
 
 def genfilelist(path):
@@ -87,6 +96,7 @@ def genfilelist(path):
 
 def write_makefile():
     '''Write out the makefile for the dashboard code.'''
+    print('Generating Makefile')
     MAKEFILEDATA = MAKEFILETEMPLATE.format(
         genfilelist(BASEPATH),
         genfilelist(BASEPATH.joinpath('css')),
@@ -101,5 +111,15 @@ def write_makefile():
     BASEPATH.joinpath('Makefile.am').write_text(MAKEFILEDATA)
 
 
+def list_changed_files():
+    '''Create a list of changed files, and set it in an environment variable.'''
+    if 'GITHUB_ENV' in os.environ:
+        print('Generating file list for commit.')
+        subprocess.check_call('echo "COMMIT_FILES<<EOF" >> $GITHUB_ENV', shell=True)
+        subprocess.check_call('git status --porcelain=v1 --no-renames --untracked-files=all | rev | cut -d \' \' -f 1 | rev >> $GITHUB_ENV', shell=True)
+        subprocess.check_call('echo "EOF" >> $GITHUB_ENV', shell=True)
+
+
 copy_dashboard(sys.argv[1])
 write_makefile()
+list_changed_files()

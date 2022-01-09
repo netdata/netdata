@@ -29,7 +29,7 @@ we recommend either the [`kickstart.sh` automatic installation script](kickstart
 packages](packages.md).
 
 To see the full list of approved methods for each operating system/version we support, see our [distribution
-matrix](../../DISTRIBUTIONS.md). That table will guide you to the various supported methods for your cloud instance.
+matrix](/packaging/DISTRIBUTIONS.md). That table will guide you to the various supported methods for your cloud instance.
 
 If you have issues with Netdata after installation, look to the sections below to find the issue you're experiencing,
 followed by the solution for your provider.

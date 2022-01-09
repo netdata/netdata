@@ -456,6 +456,10 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", default_destination));
 
+        tmp_instance->config.username = strdupz(exporter_get(instance_name, "username", ""));
+
+        tmp_instance->config.password = strdupz(exporter_get(instance_name, "password", ""));
+
         tmp_instance->config.prefix = strdupz(exporter_get(instance_name, "prefix", "netdata"));
 
         tmp_instance->config.hostname = strdupz(exporter_get(instance_name, "hostname", engine->config.hostname));

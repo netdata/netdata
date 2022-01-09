@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: NetData API
+  title: Netdata API
   description: Real-time performance and health monitoring.
   version: 1.11.1_rolling
 paths:
@@ -456,7 +456,7 @@ paths:
           required: false
           allowEmptyValue: true
           schema:
-           oneOf:
+            oneOf:
               - type: string
                 enum:
                   - green
@@ -478,7 +478,7 @@ paths:
           required: false
           allowEmptyValue: true
           schema:
-           oneOf:
+            oneOf:
               - type: string
                 enum:
                   - green
@@ -865,6 +865,18 @@ paths:
           description: A plain text response based on the result of the command.
         "403":
           description: Bearer authentication error.
+  /aclk:
+    get:
+      summary: Get information about current ACLK state
+      description: aclk endpoint returns detailed information
+        about current state of ACLK (Agent to Cloud communication).
+      responses:
+        "200":
+          description: JSON object with ACLK information.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/aclk_state"
 servers:
   - url: https://registry.my-netdata.io/api/v1
   - url: http://registry.my-netdata.io/api/v1
@@ -1082,7 +1094,7 @@ components:
           description: The title of the chart.
         priority:
           type: number
-          description: The relative priority of the chart. NetData does not care about
+          description: The relative priority of the chart. Netdata does not care about
             priorities. This is just an indication of importance for the chart
             viewers to sort charts of higher priority (lower number) closer to
             the top. Priority sorting should only be used among charts of the
@@ -1609,3 +1621,37 @@ components:
                   - WARNING
                   - CRITICAL
                   - UNKNOWN
+    aclk_state:
+      type: object
+      properties:
+        aclk-available:
+          type: string
+          description: Describes whether this agent is capable of connection to the Cloud.
+            False means agent has been built without ACLK component either on purpose (user choice) or due to missing dependency.
+        aclk-implementation:
+          type: string
+          description: Describes which ACLK implementation is currently used.
+          enum:
+            - Next Generation
+            - Legacy
+        new-cloud-protocol-supported:
+          type: boolean
+          description: Informs about new protobuf based Cloud/Agent protocol support of this agent.
+            If false agent has to be compiled with protobuf and protoc available.
+        agent-claimed:
+          type: boolean
+          description: Informs whether this agent has been added to a space in the cloud (User has to perform claiming).
+            If false (user didnt perform claiming) agent will never attempt any cloud connection.
+        claimed_id:
+          type: string
+          format: uuid
+          description: Unique ID this agent uses to identify when connecting to cloud
+        online:
+          type: boolean
+          description: Informs if this agent was connected to the cloud at the time this request has been processed.
+        used-cloud-protocol:
+          type: string
+          description: Informs which protocol is used to communicate with cloud
+          enum:
+            - Old
+            - New

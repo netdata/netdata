@@ -10,16 +10,22 @@
 # PACKAGE IS BROKEN WITHOUT THEM.
 AutoReqProv: yes
 
-%if "@HAVE_LIBBPF@" == "1"
-%global have_bpf 1
-%else
-%global have_bpf 0
-%endif
-
 # This is temporary and should eventually be resolved. This bypasses
 # the default rhel __os_install_post which throws a python compile
 # error.
 %global __os_install_post %{nil}
+
+# We don’t want LTO as it has a minimal performance impact at runtime
+# but a huge impact on build times (we want our CI to not take multiple
+# hours to finish).
+%global _lto_cflags %nil
+
+# Disable eBPF for architectures other than x86
+%ifarch x86_64 i386
+%global _have_ebpf 1
+%else
+%global _have_ebpf 0
+%endif
 
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
 %define _prefix /usr
@@ -132,9 +138,6 @@ BuildRequires: zlib-devel
 BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
-%if 0%{?centos_ver} >= 8 || 0%{?fedora}
-BuildRequires: libwebsockets-devel >= 3.2
-%endif
 %if 0%{?suse_version}
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
@@ -220,27 +223,31 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-%{version}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%if 0%{?centos_ver} < 8 || 0%{!?fedora:1}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-lws.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%endif
 # Only bundle libJudy if this isn't Fedora or SUSE
 %if 0%{!?fedora:1} && 0%{!?suse_version:1}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-judy.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
-%if 0%{?have_bpf}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%if 0%{?_have_ebpf}
+%if 0%{?centos_ver:1}
+%if %{centos_ver} < 8
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos7
+%else
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos8
+%endif
+%else
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} other
+%endif
 %endif
 
 %build
 # Conf step
 autoreconf -ivf
 %configure \
+	%if 0%{!?_have_ebpf}
+	--disable-ebpf
+	%endif
 	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
 	--with-bundled-libJudy \
-	%endif
-	%if 0%{?centos_ver} < 8 || 0%{!?fedora:1}
-	--with-bundled-lws \
 	%endif
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
@@ -282,7 +289,7 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 
 # ###########################################################
 # Install ebpf.plugin
-%if 0%{?have_bpf}
+%if 0%{?_have_ebpf}
 install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
 %endif
 
@@ -411,7 +418,7 @@ install_go() {
 install_go
 install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
-%if 0%{?have_bpf}
+%if 0%{?_have_ebpf}
 ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
 %endif
 
@@ -537,6 +544,8 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
+- Remove support code for legacy ACLK implementation.
 * Wed Sep 16 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-14
 - Convert to using 'AutoReq: yes' for library dependencies.
 * Thu Feb 13 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-13
