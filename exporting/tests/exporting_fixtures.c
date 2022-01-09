@@ -18,6 +18,8 @@ int teardown_configured_engine(void **state)
 
     struct instance *instance = engine->instance_root;
     free((void *)instance->config.destination);
+    free((void *)instance->config.username);
+    free((void *)instance->config.password);
     free((void *)instance->config.name);
     free((void *)instance->config.prefix);
     free((void *)instance->config.hostname);

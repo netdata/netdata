@@ -144,9 +144,9 @@ AC_ARG_ENABLE(
 )
 AC_ARG_ENABLE(
     [lto],
-    [AS_HELP_STRING([--disable-lto], [Link Time Optimizations @<:@default autodetect@:>@])],
+    [AS_HELP_STRING([--enable-lto], [Link Time Optimizations @<:@default disabled@:>@])],
     ,
-    [enable_lto="detect"]
+    [enable_lto="no"]
 )
 AC_ARG_ENABLE(
     [https],
@@ -174,17 +174,32 @@ AC_ARG_ENABLE(
 )
 AC_ARG_WITH(
     [bundled-lws],
-    [AS_HELP_STRING([--with-bundled-lws=DIR], [Use a specific Libwebsockets static library @<:@default use system library@:>@])],
-    [
-        with_bundled_lws="yes"
-        bundled_lws_dir="${withval}"
-    ],
-    [with_bundled_lws="no"]
+    [AS_HELP_STRING([--with-bundled-lws], [Use the bundled version of libwebsockets library @<:@default use system library@:>@])],
+    [with_bundled_lws="yes"], [with_bundled_lws="no"]
+)
+AC_ARG_WITH(
+    [bundled-protobuf],
+    [AS_HELP_STRING([--with-bundled-protobuf],
+                    [Uses the bundled version of Google Protocol Buffers @<:@default bundled if present@:>@])],
+    [with_bundled_protobuf="$withval"],
+    [with_bundled_protobuf="detect"]
+)
+AC_ARG_ENABLE(
+    [ml],
+    [AS_HELP_STRING([--enable-ml], [Enable anomaly detection @<:@default autodetect@:>@])],
+    ,
+    [enable_ml="detect"]
+)
+AC_ARG_ENABLE(
+    [ml_tests],
+    [AS_HELP_STRING([--enable-ml-tests], [Enable anomaly detection tests @<:@no@:>@])],
+    [enable_ml_tests="yes"],
+    [enable_ml_tests="no"]
 )
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
-test "${ac_cv_prog_cc_c99}" = "no" && AC_MSG_ERROR([Netdata rquires a compiler that supports C99 to build])
+test "${ac_cv_prog_cc_c99}" = "no" && AC_MSG_ERROR([Netdata requires a compiler that supports C99 to build])
 
 # -----------------------------------------------------------------------------
 # Check if cloud is enabled and if the functionality is available
@@ -198,11 +213,11 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_WITH(
-    [aclk-ng],
-    [AS_HELP_STRING([--with-aclk-ng],
-                    [Requires ACLK-NG to be used even in case ACLK Legacy can run on this system])],
-    [aclk_ng="$withval"],
-    [aclk_ng="fallback"]
+    [new-cloud-protocol],
+    [AS_HELP_STRING([--with-new-cloud-protocol],
+                    [Requires New Cloud Protocol support to be built])],
+    [new_cloud_protocol="$withval"],
+    [new_cloud_protocol="detect"]
 )
 
 if test "${enable_cloud}" = "no"; then
@@ -432,15 +447,14 @@ test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
 
-AC_ARG_WITH([libJudy],
-            [AS_HELP_STRING([--with-libJudy=PREFIX],[Use a specific Judy library (default is system-library)])],
+AC_ARG_WITH([bundled-libJudy],
+            [AS_HELP_STRING([--with-bundled-libJudy],[Use the bundled version of Judy library (default is system-library)])],
             [
-                libJudy_dir="$withval"
                 AC_MSG_CHECKING(for libJudy in $withval)
-                if test -f "${libJudy_dir}/libJudy.a" -a -f "${libJudy_dir}/Judy.h"; then
+                if test -f "externaldeps/libJudy/libJudy.a" -a -f "externaldeps/libJudy/Judy.h"; then
                     LIBS_BACKUP="${LIBS}"
-                    LIBS="${libJudy_dir}/libJudy.a"
-                    AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "${libJudy_dir}/Judy.h"
+                    LIBS="externaldeps/libJudy/libJudy.a"
+                    AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/libJudy/Judy.h"
                                                      int main (int argc, char **argv) {
                                                         Pvoid_t PJLArray = (Pvoid_t) NULL;
                                                         Word_t * PValue;
@@ -450,8 +464,8 @@ AC_ARG_WITH([libJudy],
                                                      [HAVE_libJudy_a="yes"],
                                                      [HAVE_libJudy_a="no"])
                     LIBS="${LIBS_BACKUP}"
-                    JUDY_LIBS="${libJudy_dir}/libJudy.a"
-                    JUDY_CFLAGS="-I${libJudy_dir}"
+                    JUDY_LIBS="\$(abs_top_srcdir)/externaldeps/libJudy/libJudy.a"
+                    JUDY_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/libJudy"
                     AC_MSG_RESULT([$HAVE_libJudy_a])
                 else
                     libjudy_dir=""
@@ -531,7 +545,7 @@ if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
 	if test "${HAVE_libjson_c_a}" = "yes"; then
 		AC_DEFINE([LINK_STATIC_JSONC], [1], [static json-c should be used])
 		JSONC_LIBS="static"
-		OPTIONAL_JSONC_STATIC_CFLAGS="-I externaldeps/jsonc"
+		OPTIONAL_JSONC_STATIC_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/jsonc"
 	fi
 	AC_MSG_RESULT([${HAVE_libjson_c_a}])
 fi
@@ -639,105 +653,61 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # -----------------------------------------------------------------------------
 # ACLK
 
-AC_MSG_CHECKING([if cloud functionality should be enabled])
+bundled_proto_avail="no"
+if test "${with_bundled_protobuf}" != "no"; then
+    AC_MSG_CHECKING([is bundled protobuf available])
+    if test -f "externaldeps/protobuf/src/protoc"; then
+        bundled_proto_avail="yes"
+    fi
+    AC_MSG_RESULT([${bundled_proto_avail}])
+    if test "${with_bundled_protobuf}" == "yes" -a "${bundled_proto_avail}" != "yes"; then
+        AC_MSG_ERROR([Bundled protobuf requested using --with-bundled-protobuf but it cannot be used/found])
+    fi
+    if test "${with_bundled_protobuf}" == "detect" -a "${bundled_proto_avail}" == "yes"; then
+        with_bundled_protobuf="yes"
+    fi
+fi
+
+if test "${with_bundled_protobuf}" != "yes"; then
+PKG_CHECK_MODULES(
+    [PROTOBUF],
+    [protobuf >= 3],
+    [have_libprotobuf=yes],
+    [have_libprotobuf=no]
+)
+
+AC_PATH_PROG([PROTOC], [protoc], [no])
+AS_IF(
+    [test x"${PROTOC}" == x"no"],
+    [have_protoc=no],
+    [have_protoc=yes]
+)
+else
+    AC_MSG_NOTICE([using bundled protobuf])
+    AC_DEFINE([BUNDLED_PROTOBUF], [1], [Using a bundled copy of protobuf])
+    PROTOC="\$(abs_top_srcdir)/externaldeps/protobuf/src/protoc"
+    PROTOBUF_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/protobuf/src"
+    PROTOBUF_LIBS="\$(abs_top_srcdir)/externaldeps/protobuf/src/.libs/libprotobuf.a"
+    have_libprotobuf="yes"
+    have_protoc="yes"
+fi
+
+AC_PATH_PROG([CXX_BINARY], [${CXX}], [no])
+AS_IF(
+    [test x"${CXX_BINARY}" == x"no"],
+    [have_CXX_compiler=no],
+    [have_CXX_compiler=yes]
+)
+
+if test "${have_libprotobuf}" == "yes" && test "${have_CXX_compiler}" == "yes"; then
+    AC_DEFINE([HAVE_PROTOBUF], [1], [Protobuf is available])
+fi
+
+AC_MSG_CHECKING([if Cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
-if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
-    # just to have all messages that can fail ACLK build in one place
-    # so it is easier to see why it can't be built
-    if test -n "${SSL_LIBS}"; then
-        OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
-    else
-        AC_MSG_WARN([OpenSSL required for agent-cloud-link but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
-    fi
 
-    AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
-    if test -f "externaldeps/mosquitto/libmosquitto.a"; then
-        LIBS_BKP="${LIBS}"
-        LIBS="externaldeps/mosquitto/libmosquitto.a ${OPTIONAL_SSL_LIBS} ${LIBS_BKP}"
-        AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/mosquitto/mosquitto.h"
-                                         int main (int argc, char **argv) {
-                                             int m,mm,r;
-                                             mosquitto_lib_version(&m, &mm, &r);
-                                         }]])],
-                                        [HAVE_libmosquitto_a="yes"],
-                                        [HAVE_libmosquitto_a="no"])
-        LIBS="${LIBS_BKP}"
-    else
-        HAVE_libmosquitto_a="no"
-        AC_DEFINE([ACLK_NO_LIBMOSQ], [1], [Libmosquitto.a was not found during build.])
-    fi
-    AC_MSG_RESULT([${HAVE_libmosquitto_a}])
-
-    if test "${with_bundled_lws}" = "yes"; then
-        AC_MSG_CHECKING([if libwebsockets static lib is present])
-        if test -f "${bundled_lws_dir}/libwebsockets.a"; then
-            LWS_CFLAGS="-I ${bundled_lws_dir}/include"
-            OPTIONAL_LWS_LIBS="${bundled_lws_dir}/libwebsockets.a"
-            AC_MSG_RESULT([yes])
-            AC_DEFINE([BUNDLED_LWS], [1], [using statically linked libwebsockets])
-        else
-            AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
-            # this should be error if installer ever changes default to system
-            # as currently this is default we prefer building netdata without ACLK
-            # instead of error fail
-            AC_MSG_RESULT([no])
-            AC_MSG_WARN([You required static libwebsockets to be used but we can't use it. Disabling ACLK])
-        fi
-    else
-        AC_CHECK_LIB([websockets],
-            [lws_get_vhost_by_name],
-            [OPTIONAL_LWS_LIBS="-lwebsockets"],
-            [AC_DEFINE([ACLK_NO_LWS], [1], [usable system libwebsockets was not found during build.])])
-    fi
-
-    if test "${build_target}" = "linux" -a "${enable_cloud}" != "no"; then
-        if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
-            AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-cloud or enable libcap])
-        fi
-        if test "${with_libcap}" = "yes"; then
-            LWS_CFLAGS+=" ${LIBCAP_CFLAGS}"
-        fi
-    fi
-
-    # next 2 lines are just to have info for ACLK dependencies in common place
-    AC_MSG_CHECKING([if json-c available for ACLK])
-    AC_MSG_RESULT([${enable_jsonc}])
-
-    test "${enable_cloud}" = "yes" -a "${enable_jsonc}" = "no" && \
-        AC_MSG_ERROR([You have asked for ACLK to be built but no json-c available. ACLK requires json-c])
-
-    AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${OPTIONAL_LWS_LIBS}" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
-        can_enable_aclk="yes"
-    else
-        can_enable_aclk="no"
-    fi
-    AC_MSG_RESULT([${can_enable_aclk}])
-
-# TODO fix this (you need to try fallback)
-    test "${enable_cloud}" = "yes" -a "${can_enable_aclk}" = "no" && \
-        AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
-
-    AC_MSG_CHECKING([if netdata agent-cloud-link should/will be enabled])
-    if test "${enable_cloud}" = "detect"; then
-        enable_aclk=$can_enable_aclk
-    else
-        enable_aclk=$enable_cloud
-    fi
-
-    if test "${enable_aclk}" = "yes"; then
-        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-    fi
-
-    AC_MSG_RESULT([${enable_aclk}])
-fi
-
-if test "$enable_cloud" = "no" -a "$aclk_ng" = "yes"; then
-    AC_MSG_ERROR([--disable-cloud && --aclk-ng not allowed together (such configuration is self contradicting)])
-fi
-
-if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
+if test "$enable_cloud" != "no"; then
+    AC_MSG_NOTICE([Checking if ACLK Next Generation can be built])
     can_enable_ng="yes"
     AC_MSG_CHECKING([if git submodules present for ACLK Next Generation])
     if test -f "mqtt_websockets/src/mqtt_wss_client.c"; then
@@ -761,26 +731,66 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
     else
         AC_MSG_RESULT([yes])
     fi
+
     AC_MSG_CHECKING([ACLK Next Generation can be built])
     AC_MSG_RESULT([${can_enable_ng}])
-    if test "$aclk_ng" = "yes" -a "$can_enable_ng" != "yes"; then
-        AC_MSG_ERROR([ACLK-NG requested but can't be built])
+    if test "$can_enable_ng" = "no" -a "$enable_cloud" = "yes"; then
+        AC_MSG_ERROR([You have requested --with-cloud but ACLK can't be built. See reasons in lines above])
     fi
-    if test "$aclk_ng" != "yes" -a "$enable_aclk" == "no" -a "$can_enable_ng" = "yes"; then #default "fallback"
-        AC_MSG_NOTICE([ACLK Legacy could not be built. Trying ACLK-NG as fallback.])
-        aclk_ng="yes"
-    fi
-    if test "$aclk_ng" = "yes"; then
-        AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
-        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+    if test "$can_enable_ng" = "yes"; then
         enable_aclk="yes"
-        OPTIONAL_ACLK_NG_CFLAGS="-Imqtt_websockets/src/include -Imqtt_websockets/c-rbuf/include -Imqtt_websockets/MQTT-C/include"
+        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
+    fi
+
+    if test "$new_cloud_protocol" != "no"; then
+        can_build_new_cloud_protocol="yes"
+        AC_MSG_CHECKING([if protobuf available for New Cloud Protocol])
+        if test "${have_libprotobuf}" != "yes"; then
+            AC_MSG_RESULT([no])
+            can_build_new_cloud_protocol="no"
+        else
+            AC_MSG_RESULT([yes])
+        fi
+        AC_MSG_CHECKING([if protoc available for New Cloud Protocol])
+        if test "${have_protoc}" != "yes"; then
+            AC_MSG_RESULT([no])
+            can_build_new_cloud_protocol="no"
+        else
+            AC_MSG_RESULT([yes])
+        fi
+        AC_MSG_CHECKING([if C++ compiler available for New Cloud Protocol])
+        if test "${have_CXX_compiler}" != "yes"; then
+            AC_MSG_RESULT([no])
+            can_build_new_cloud_protocol="no"
+        else
+            AC_MSG_RESULT([yes])
+        fi
+
+        AC_MSG_CHECKING([ACLK Next Generation can support New Cloud protocol])
+        AC_MSG_RESULT([${can_build_new_cloud_protocol}])
+        if test "$new_cloud_protocol" = "yes" -a "$can_build_new_cloud_protocol" != "yes"; then
+            AC_MSG_ERROR([Requested new cloud protocol support but it can't be build])
+        fi
+        if test "$can_build_new_cloud_protocol" = "yes"; then
+            new_cloud_protocol="yes"
+            AC_DEFINE([ENABLE_NEW_CLOUD_PROTOCOL], [1], [New protobuf based Netdata Cloud Protocol Support])
+            OPTIONAL_ACLK_CFLAGS="${OPTIONAL_ACLK_CFLAGS} -I \$(abs_top_srcdir)/aclk/aclk-schemas"
+            OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
+            CXX11FLAG="-std=c++11"
+            OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
+        fi
     fi
 fi
+
+if test "$enable_cloud" = "yes" -a "$enable_aclk" != "yes"; then
+    AC_MSG_ERROR([ACLK can't be built but --enable-cloud was requested])
+fi
+
 AC_SUBST([enable_cloud])
 AC_SUBST([enable_aclk])
-AM_CONDITIONAL([ACLK_NG], [test "${aclk_ng}" = "yes"])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
+AM_CONDITIONAL([ENABLE_NEW_CLOUD_PROTOCOL], [test "${can_build_new_cloud_protocol}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # apps.plugin
@@ -1060,6 +1070,90 @@ AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 # -----------------------------------------------------------------------------
+# gtest/gmock
+
+AC_MSG_CHECKING([if gtest and gmock can be found])
+
+PKG_CHECK_MODULES([GTEST], [gtest], [have_gtest=yes], [have_gtest=no])
+PKG_CHECK_MODULES([GMOCK], [gmock], [have_gmock=yes], [have_gmock=no])
+
+if test "${have_gtest}" = "yes" -a "${have_gmock}" = "yes"; then
+    OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS} ${GMOCK_CFLAGS}"
+    OPTIONAL_GTEST_LIBS="${GTEST_LIBS} ${GMOCK_LIBS}"
+    have_gtest="yes"
+else
+    have_gtest="no"
+fi
+
+# -----------------------------------------------------------------------------
+# ml - anomaly detection
+
+# Check if uuid is available. Fail if ML was explicitly requested.
+if test "${enable_ml}" = "yes" -a "${have_uuid}" != "yes"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but libuuid can not be found."])
+fi
+
+# Check if submodules have not been fetched. Fail if ML was explicitly requested.
+AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
+if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
+    AC_MSG_RESULT([yes])
+    have_ml_submodules="yes"
+else
+    AC_MSG_RESULT([no])
+    have_ml_submodules="no"
+fi
+
+if test "${enable_ml}" = "yes" -a "${have_ml_submodules}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built because the required git submodules are missing.])
+fi
+
+# Check if C++ toolchain does not support C++11. Fail if ML was explicitly requested.
+AC_LANG_PUSH([C++])
+AX_CHECK_COMPILE_FLAG([-std=c++11], [have_cxx11=yes], [have_cxx11=no])
+AC_LANG_POP([C++])
+
+# PPC64LE needs -std=gnu++11 in order to build dlib. However, the rest of
+# the agent's components use and have been tested only with -std=c++11.
+# Skip ML compilation on that CPU until we reorganize and test the C++ flags.
+if test "${host_cpu}" = "powerpc64le"; then
+    have_cxx11="no"
+fi
+
+if test "${enable_ml}" = "yes" -a "${have_cxx11}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built without a C++11 toolchain.])
+else
+    CXX11FLAG="$CXX11FLAG -std=c++11"
+fi
+
+# Decide if we should build ML
+if test "${enable_ml}" != "no" -a "${have_ml_submodules}" = "yes" -a "${have_cxx11}" = "yes" -a "${have_uuid}" = "yes"; then
+    build_ml="yes"
+else
+    build_ml="no"
+fi
+
+AM_CONDITIONAL([ENABLE_ML], [test "${build_ml}" = "yes"])
+if test "${build_ml}" = "yes"; then
+    AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
+    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
+    OPTIONAL_ML_LIBS=""
+fi
+
+# Decide if we should build ML tests.
+if test "${build_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"; then
+    build_ml_tests="yes"
+else
+    build_ml_tests="no"
+fi
+
+AM_CONDITIONAL([ENABLE_ML_TESTS], [test "${build_ml_tests}" = "yes"])
+if test "${build_ml_tests}" = "yes"; then
+    AC_DEFINE([ENABLE_ML_TESTS], [1], [anomaly detection tests])
+    OPTIONAL_ML_TESTS_CFLAGS="${OPTIONAL_GTEST_CFLAGS}"
+    OPTIONAL_ML_TESTS_LIBS="${OPTIONAL_GTEST_LIBS}"
+fi
+
+# -----------------------------------------------------------------------------
 # ebpf.plugin
 
 if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
@@ -1087,8 +1181,8 @@ if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
     if test "${have_libelf}" = "yes" -a \
             "${have_bpf}" = "yes" -a \
             "${have_libbpf}" = "yes"; then
-        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I externaldeps/libbpf/include"
-        OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
+        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I \$(abs_top_srcdir)/externaldeps/libbpf/include"
+        OPTIONAL_BPF_LIBS="\$(abs_top_srcdir)/externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
         AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
         enable_ebpf="yes"
     else
@@ -1287,13 +1381,6 @@ AM_CONDITIONAL([ENABLE_EXPORTING_PUBSUB], [test "${enable_exporting_pubsub}" = "
 # -----------------------------------------------------------------------------
 # Prometheus remote write backend - libprotobuf, libsnappy, protoc
 
-PKG_CHECK_MODULES(
-    [PROTOBUF],
-    [protobuf >= 3],
-    [have_libprotobuf=yes],
-    [have_libprotobuf=no]
-)
-
 AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
 
     AC_LANG_SAVE
@@ -1329,20 +1416,6 @@ AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
 
 AC_MSG_RESULT([${have_libsnappy}])
 
-AC_PATH_PROG([PROTOC], [protoc], [no])
-AS_IF(
-    [test x"${PROTOC}" == x"no"],
-    [have_protoc=no],
-    [have_protoc=yes]
-)
-
-AC_PATH_PROG([CXX_BINARY], [${CXX}], [no])
-AS_IF(
-    [test x"${CXX_BINARY}" == x"no"],
-    [have_CXX_compiler=no],
-    [have_CXX_compiler=yes]
-)
-
 test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libprotobuf}" != "yes" && \
     AC_MSG_ERROR([libprotobuf required but not found. try installing protobuf])
 
@@ -1360,9 +1433,11 @@ if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotob
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS} -Iexporting/prometheus/remote_write"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${SNAPPY_CFLAGS} -I \$(abs_top_srcdir)/exporting/prometheus/remote_write"
     CXX11FLAG="-std=c++11"
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS}"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${SNAPPY_LIBS}"
+    OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
+    OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
 else
     enable_backend_prometheus_remote_write="no"
 fi
@@ -1443,9 +1518,44 @@ AC_MSG_RESULT([${enable_lto}])
 
 # -----------------------------------------------------------------------------
 
-AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" \
-                                     -o "${enable_exporting_pubsub}" = "yes" \
-                                     -o "${enable_backend_prometheus_remote_write}" = "yes"])
+if test "${enable_backend_kinesis}" = "yes" -o \
+        "${enable_exporting_pubsub}" = "yes" -o \
+        "${enable_backend_prometheus_remote_write}" = "yes" -o \
+        "${new_cloud_protocol}" = "yes" -o \
+        "${build_ml}" = "yes"; then
+    enable_cxx_linker="yes"
+
+    # Try to unconditionally link with -latomic. If the compiler can satisfy
+    # all the atomic ops with builtins then, the library will be left unused.
+    # Otherwise, some ops will be covered by the compiler's intrinsics and some
+    # will be picked up by the linker from -latomic. In the later case, if
+    # -latomic is not available there will be a build failure, which would
+    # have happened either way before this change.
+    AC_LANG_PUSH([C++])
+
+    AC_MSG_CHECKING(whether we can use -latomic)
+    OLD_LIBS="${LIBS}"
+    LIBS="-latomic"
+    AC_LINK_IFELSE([AC_LANG_SOURCE([[
+      #include <atomic>
+      #include <cstdint>
+      std::atomic<std::int64_t> v;
+      int main() {
+        return v;
+      }
+    ]])], CAN_USE_LIBATOMIC=yes, CAN_USE_LIBATOMIC=no)
+    LIBS="${OLD_LIBS}"
+    AC_MSG_RESULT($CAN_USE_LIBATOMIC)
+
+    if test "x$CAN_USE_LIBATOMIC" = xyes; then
+        OPTIONAL_ATOMIC_LIBS="-latomic"
+    fi
+    AC_SUBST([OPTIONAL_ATOMIC_LIBS])
+
+    AC_LANG_POP([C++])
+fi
+
+AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_cxx_linker}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
@@ -1473,11 +1583,11 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
-CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
+CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_NG_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_ML_TESTS_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1527,7 +1637,15 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
 AC_SUBST([OPTIONAL_LWS_LIBS])
-AC_SUBST([OPTIONAL_ACLK_NG_CFLAGS])
+AC_SUBST([OPTIONAL_ACLK_CFLAGS])
+AC_SUBST([OPTIONAL_PROTOBUF_CFLAGS])
+AC_SUBST([OPTIONAL_PROTOBUF_LIBS])
+AC_SUBST([OPTIONAL_GTEST_CFLAGS])
+AC_SUBST([OPTIONAL_GTEST_LIBS])
+AC_SUBST([OPTIONAL_ML_CFLAGS])
+AC_SUBST([OPTIONAL_ML_LIBS])
+AC_SUBST([OPTIONAL_ML_TESTS_CFLAGS])
+AC_SUBST([OPTIONAL_ML_TESTS_LIBS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
@@ -1617,6 +1735,8 @@ AC_CONFIG_FILES([
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
+    ml/Makefile
+    ml/kmeans/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
@@ -1671,7 +1791,6 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile
-    aclk/legacy/Makefile
     spawn/Makefile
     parser/Makefile
 ])

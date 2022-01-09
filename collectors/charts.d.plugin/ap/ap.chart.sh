@@ -61,25 +61,25 @@ ap_create() {
 
     # create the chart with 3 dimensions
     cat << EOF
-CHART ap_clients.${dev} '' "Connected clients to ${ssid} on ${dev}" "clients" ${dev} ap.clients line $((ap_priority + 1)) $ap_update_every
+CHART ap_clients.${dev} '' "Connected clients to ${ssid} on ${dev}" "clients" ${dev} ap.clients line $((ap_priority + 1)) $ap_update_every '' '' 'ap'
 DIMENSION clients '' absolute 1 1
 
-CHART ap_bandwidth.${dev} '' "Bandwidth for ${ssid} on ${dev}" "kilobits/s" ${dev} ap.net area $((ap_priority + 2)) $ap_update_every
+CHART ap_bandwidth.${dev} '' "Bandwidth for ${ssid} on ${dev}" "kilobits/s" ${dev} ap.net area $((ap_priority + 2)) $ap_update_every '' '' 'ap'
 DIMENSION received '' incremental 8 1024
 DIMENSION sent '' incremental -8 1024
 
-CHART ap_packets.${dev} '' "Packets for ${ssid} on ${dev}" "packets/s" ${dev} ap.packets line $((ap_priority + 3)) $ap_update_every
+CHART ap_packets.${dev} '' "Packets for ${ssid} on ${dev}" "packets/s" ${dev} ap.packets line $((ap_priority + 3)) $ap_update_every '' '' 'ap'
 DIMENSION received '' incremental 1 1
 DIMENSION sent '' incremental -1 1
 
-CHART ap_issues.${dev} '' "Transmit Issues for ${ssid} on ${dev}" "issues/s" ${dev} ap.issues line $((ap_priority + 4)) $ap_update_every
+CHART ap_issues.${dev} '' "Transmit Issues for ${ssid} on ${dev}" "issues/s" ${dev} ap.issues line $((ap_priority + 4)) $ap_update_every '' '' 'ap'
 DIMENSION retries 'tx retries' incremental 1 1
 DIMENSION failures 'tx failures' incremental -1 1
 
-CHART ap_signal.${dev} '' "Average Signal for ${ssid} on ${dev}" "dBm" ${dev} ap.signal line $((ap_priority + 5)) $ap_update_every
+CHART ap_signal.${dev} '' "Average Signal for ${ssid} on ${dev}" "dBm" ${dev} ap.signal line $((ap_priority + 5)) $ap_update_every '' '' 'ap'
 DIMENSION signal 'average signal' absolute 1 1000
 
-CHART ap_bitrate.${dev} '' "Bitrate for ${ssid} on ${dev}" "Mbps" ${dev} ap.bitrate line $((ap_priority + 6)) $ap_update_every
+CHART ap_bitrate.${dev} '' "Bitrate for ${ssid} on ${dev}" "Mbps" ${dev} ap.bitrate line $((ap_priority + 6)) $ap_update_every '' '' 'ap'
 DIMENSION receive '' absolute 1 1000
 DIMENSION transmit '' absolute -1 1000
 DIMENSION expected 'expected throughput' absolute 1 1000
@@ -92,7 +92,7 @@ EOF
 # _update is called continuously, to collect the values
 ap_update() {
   # the first argument to this function is the microseconds since last update
-  # pass this parameter to the BEGIN statement (see bellow).
+  # pass this parameter to the BEGIN statement (see below).
 
   # do all the work to collect / calculate the values
   # for each dimension

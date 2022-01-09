@@ -94,6 +94,11 @@ static struct cgroups_systemd_config_setting cgroups_systemd_options[] = {
     { .name = NULL,      .setting = SYSTEMD_CGROUP_ERR     },
 };
 
+// Shared memory with information from detected cgroups
+netdata_ebpf_cgroup_shm_t shm_cgroup_ebpf = {NULL, NULL};
+static int shm_fd_cgroup_ebpf = -1;
+sem_t *shm_mutex_cgroup_ebpf = SEM_FAILED;
+
 /* on Fed systemd is not in PATH for some reason */
 #define SYSTEMD_CMD_RHEL "/usr/lib/systemd/systemd --version"
 #define SYSTEMD_HIERARCHY_STRING "default-hierarchy="
@@ -168,8 +173,6 @@ static enum cgroups_type cgroups_try_detect_version()
     if (!statfs(filename, &fsinfo)) {
         if (fsinfo.f_type == CGROUP2_SUPER_MAGIC)
             return CGROUPS_V2;
-        if (fsinfo.f_type == CGROUP_SUPER_MAGIC)
-            return CGROUPS_V1;
     }
 #endif
 
@@ -463,6 +466,61 @@ void read_cgroup_plugin_configuration() {
     mountinfo_free_all(root);
 }
 
+void netdata_cgroup_ebpf_set_values(size_t length)
+{
+    sem_wait(shm_mutex_cgroup_ebpf);
+
+    shm_cgroup_ebpf.header->cgroup_max = cgroup_root_max;
+    shm_cgroup_ebpf.header->systemd_enabled = cgroup_enable_systemd_services |
+                                              cgroup_enable_systemd_services_detailed_memory |
+                                              cgroup_used_memory;
+    shm_cgroup_ebpf.header->body_length = length;
+
+    sem_post(shm_mutex_cgroup_ebpf);
+}
+
+void netdata_cgroup_ebpf_initialize_shm()
+{
+    shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0660);
+    if (shm_fd_cgroup_ebpf < 0) {
+        error("Cannot initialize shared memory used by cgroup and eBPF, integration won't happen.");
+        return;
+    }
+
+    size_t length = sizeof(netdata_ebpf_cgroup_shm_header_t) + cgroup_root_max * sizeof(netdata_ebpf_cgroup_shm_body_t);
+    if (ftruncate(shm_fd_cgroup_ebpf, length)) {
+        error("Cannot set size for shared memory.");
+        goto end_init_shm;
+    }
+
+    shm_cgroup_ebpf.header = (netdata_ebpf_cgroup_shm_header_t *) mmap(NULL, length,
+                                                                       PROT_READ | PROT_WRITE, MAP_SHARED,
+                                                                       shm_fd_cgroup_ebpf, 0);
+
+    if (!shm_cgroup_ebpf.header) {
+        error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
+        goto end_init_shm;
+    }
+    shm_cgroup_ebpf.body = (netdata_ebpf_cgroup_shm_body_t *) ((char *)shm_cgroup_ebpf.header +
+                                                              sizeof(netdata_ebpf_cgroup_shm_header_t));
+
+    shm_mutex_cgroup_ebpf = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT,
+                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, 1);
+
+    if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
+        netdata_cgroup_ebpf_set_values(length);
+        return;
+    }
+
+    error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
+    munmap(shm_cgroup_ebpf.header, length);
+
+end_init_shm:
+    close(shm_fd_cgroup_ebpf);
+    shm_fd_cgroup_ebpf = -1;
+    shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
+}
+
 // ----------------------------------------------------------------------------
 // cgroup objects
 
@@ -597,10 +655,6 @@ struct cgroup_network_interface {
     struct cgroup_network_interface *next;
 };
 
-#define CGROUP_OPTIONS_DISABLED_DUPLICATE   0x00000001
-#define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
-#define CGROUP_OPTIONS_IS_UNIFIED           0x00000004
-
 // *** WARNING *** The fields are not thread safe. Take care of safe usage.
 struct cgroup {
     uint32_t options;
@@ -609,6 +663,7 @@ struct cgroup {
     char enabled;        // enabled in the config
 
     char pending_renames;
+    char *intermediate_id; // TODO: remove it when the renaming script is fixed
 
     char *id;
     uint32_t hash;
@@ -1313,13 +1368,16 @@ static inline char *cgroup_chart_id_strdupz(const char *s) {
     char *r = strdupz(s);
     netdata_fix_chart_id(r);
 
+    return r;
+}
+
+// TODO: move the code to cgroup_chart_id_strdupz() when the renaming script is fixed
+static inline void substitute_dots_in_id(char *s) {
     // dots are used to distinguish chart type and id in streaming, so we should replace them
-    for (char *d = r; *d; d++) {
+    for (char *d = s; *d; d++) {
         if (*d == '.')
             *d = '-';
     }
-
-    return r;
 }
 
 char *parse_k8s_data(struct label **labels, char *data)
@@ -1357,7 +1415,8 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     pid_t cgroup_pid;
     char command[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
+    // TODO: use cg->id when the renaming script is fixed
+    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->intermediate_id);
 
     debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->chart_id);
     FILE *fp = mypopen(command, &cgroup_pid);
@@ -1394,6 +1453,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
 
                     freez(cg->chart_id);
                     cg->chart_id = cgroup_chart_id_strdupz(name);
+                    substitute_dots_in_id(cg->chart_id);
                     cg->hash_chart = simple_hash(cg->chart_id);
                 }
             }
@@ -1420,7 +1480,10 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
     cg->chart_title = cgroup_title_strdupz(id);
 
+    cg->intermediate_id = cgroup_chart_id_strdupz(id);
+
     cg->chart_id = cgroup_chart_id_strdupz(id);
+    substitute_dots_in_id(cg->chart_id);
     cg->hash_chart = simple_hash(cg->chart_id);
 
     if(cgroup_use_unified_cgroups) cg->options |= CGROUP_OPTIONS_IS_UNIFIED;
@@ -1460,10 +1523,6 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
             strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
             char *s = buffer;
-
-            //freez(cg->chart_id);
-            //cg->chart_id = cgroup_chart_id_strdupz(s);
-            //cg->hash_chart = simple_hash(cg->chart_id);
 
             // skip to the last slash
             size_t len = strlen(s);
@@ -1588,6 +1647,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     free_pressure(&cg->memory_pressure);
 
     freez(cg->id);
+    freez(cg->intermediate_id);
     freez(cg->chart_id);
     freez(cg->chart_title);
 
@@ -2056,6 +2116,69 @@ static inline void copy_discovered_cgroups()
     cgroup_root = discovered_cgroup_root;
 }
 
+static void is_there_cgroup_procs(netdata_ebpf_cgroup_shm_body_t *out, char *id)
+{
+    struct stat buf;
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_cpuset_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_blkio_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_memory_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_devices_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    out->path[0] = '\0';
+    out->enabled = 0;
+}
+
+static inline void share_cgroups()
+{
+    struct cgroup *cg;
+    int count;
+    struct stat buf;
+
+    if (shm_mutex_cgroup_ebpf == SEM_FAILED) {
+        return;
+    }
+    sem_wait(shm_mutex_cgroup_ebpf);
+
+    for (cg = cgroup_root, count = 0; cg ; cg = cg->next, count++) {
+        netdata_ebpf_cgroup_shm_body_t *ptr = &shm_cgroup_ebpf.body[count];
+        char *prefix = (cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE) ? "" : "cgroup_";
+        snprintfz(ptr->name, CGROUP_EBPF_NAME_SHARED_LENGTH - 1, "%s%s", prefix, cg->chart_title);
+        ptr->hash = simple_hash(ptr->name);
+        ptr->options = cg->options;
+        ptr->enabled = cg->enabled;
+        if (cgroup_use_unified_cgroups) {
+            snprintfz(ptr->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, cg->id);
+            if (likely(stat(ptr->path, &buf) == -1)) {
+                ptr->path[0] = '\0';
+                ptr->enabled = 0;
+            }
+        } else {
+            is_there_cgroup_procs(ptr, cg->id);
+        }
+
+        debug(D_CGROUP, "cgroup shared: NAME=%s, ENABLED=%d", ptr->name, ptr->enabled);
+    }
+
+    shm_cgroup_ebpf.header->cgroup_root_count = count;
+    sem_post(shm_mutex_cgroup_ebpf);
+}
+
 static inline void find_all_cgroups() {
     debug(D_CGROUP, "searching for cgroups");
 
@@ -2111,6 +2234,8 @@ static inline void find_all_cgroups() {
     cleanup_all_cgroups();
     copy_discovered_cgroups();
     uv_mutex_unlock(&cgroup_root_mutex);
+
+    share_cgroups();
 
     debug(D_CGROUP, "done searching for cgroups");
 }
@@ -2743,7 +2868,7 @@ void update_systemd_services_charts(
             if(unlikely(!cg->rd_mem_detailed_rss))
                 cg->rd_mem_detailed_rss = rrddim_add(st_mem_detailed_rss, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_mem_detailed_rss, cg->rd_mem_detailed_rss, cg->memory.total_rss + cg->memory.total_rss_huge);
+            rrddim_set_by_pointer(st_mem_detailed_rss, cg->rd_mem_detailed_rss, cg->memory.total_rss);
 
             if(unlikely(!cg->rd_mem_detailed_mapped))
                 cg->rd_mem_detailed_mapped = rrddim_add(st_mem_detailed_mapped, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -2792,7 +2917,15 @@ void update_systemd_services_charts(
             if(unlikely(!cg->rd_swap_usage))
                 cg->rd_swap_usage = rrddim_add(st_swap_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_swap_usage, cg->rd_swap_usage, cg->memory.msw_usage_in_bytes);
+            if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                rrddim_set_by_pointer(
+                    st_swap_usage,
+                    cg->rd_swap_usage,
+                    cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
+                        cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) : 0);
+            } else {
+                rrddim_set_by_pointer(st_swap_usage, cg->rd_swap_usage, cg->memory.msw_usage_in_bytes);
+            }
         }
 
         if(likely(do_io && cg->io_service_bytes.updated)) {
@@ -3482,8 +3615,8 @@ void update_cgroup_charts(int update_every) {
                 rrddim_set(
                     cg->st_mem_usage,
                     "swap",
-                    (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes) ?
-                        cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes : 0);
+                    cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
+                        cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) : 0);
             } else {
                 rrddim_set(cg->st_mem_usage, "swap", cg->memory.msw_usage_in_bytes);
             }
@@ -4022,6 +4155,18 @@ static void cgroup_main_cleanup(void *ptr) {
         sleep_usec(step);
     }
 
+    if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
+        sem_close(shm_mutex_cgroup_ebpf);
+    }
+
+    if (shm_cgroup_ebpf.header) {
+        munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
+    }
+
+    if (shm_fd_cgroup_ebpf > 0) {
+        close(shm_fd_cgroup_ebpf);
+    }
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -4034,6 +4179,7 @@ void *cgroups_main(void *ptr) {
     int vdo_cpu_netdata = config_get_boolean("plugin:cgroups", "cgroups plugin resource charts", 1);
 
     read_cgroup_plugin_configuration();
+    netdata_cgroup_ebpf_initialize_shm();
 
     RRDSET *stcpu_thread = NULL;
 
@@ -4057,7 +4203,7 @@ void *cgroups_main(void *ptr) {
 
     int error = uv_thread_create(&discovery_thread.thread, cgroup_discovery_worker, NULL);
     if (error) {
-        error("CGROUP: cannot create tread worker. uv_thread_create(): %s", uv_strerror(error));
+        error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
         goto exit;
     }
     uv_thread_set_name_np(discovery_thread.thread, "PLUGIN[cgroups]");

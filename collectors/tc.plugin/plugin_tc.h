@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGIN_TC_H
 #define NETDATA_PLUGIN_TC_H 1
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 
 #if (TARGET_OS == OS_LINUX)
 

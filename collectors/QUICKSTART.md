@@ -23,7 +23,7 @@ Netdata has _pre-installed_ collectors for hundreds of popular applications and 
 anything to collect metrics from many popular services, like Nginx web servers, MySQL/MariaDB databases, and much more.
 
 To find whether Netdata has a pre-installed collector for your favorite app/service, check out our [collector support
-list](COLLECTORS.md). The only exception is the [third-party collectors](COLLECTORS.md#third-party-plugins), which
+list](COLLECTORS.md). The only exception is the [third-party collectors](COLLECTORS.md#third-party-collectors), which
 you do need to install yourself. However, this quickstart guide will focus on pre-installed collectors.
 
 When you find a collector you're interested in, take note of its orchestrator. These are in the headings above each

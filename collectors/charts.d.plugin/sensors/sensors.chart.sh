@@ -143,7 +143,7 @@ sensors_create() {
 				files="$(sensors_check_files "$files")"
 				files="$(sensors_check_temp_type "$files")"
 				[ -z "$files" ] && continue
-				echo "CHART sensors.temp_$id '' '$name Temperature' 'Celsius' 'temperature' 'sensors.temp' line $((sensors_priority + 1)) $sensors_update_every"
+				echo "CHART sensors.temp_$id '' '$name Temperature' 'Celsius' 'temperature' 'sensors.temp' line $((sensors_priority + 1)) $sensors_update_every '' '' 'sensors'"
 				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.temp_$id \$1\""
 				divisor=1000
 				;;
@@ -152,7 +152,7 @@ sensors_create() {
 				files="$(ls "$path"/in*_input 2>/dev/null)"
 				files="$(sensors_check_files "$files")"
 				[ -z "$files" ] && continue
-				echo "CHART sensors.volt_$id '' '$name Voltage' 'Volts' 'voltage' 'sensors.volt' line $((sensors_priority + 2)) $sensors_update_every"
+				echo "CHART sensors.volt_$id '' '$name Voltage' 'Volts' 'voltage' 'sensors.volt' line $((sensors_priority + 2)) $sensors_update_every '' '' 'sensors'"
 				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.volt_$id \$1\""
 				divisor=1000
 				;;
@@ -161,7 +161,7 @@ sensors_create() {
 				files="$(ls "$path"/curr*_input 2>/dev/null)"
 				files="$(sensors_check_files "$files")"
 				[ -z "$files" ] && continue
-				echo "CHART sensors.curr_$id '' '$name Current' 'Ampere' 'current' 'sensors.curr' line $((sensors_priority + 3)) $sensors_update_every"
+				echo "CHART sensors.curr_$id '' '$name Current' 'Ampere' 'current' 'sensors.curr' line $((sensors_priority + 3)) $sensors_update_every '' '' 'sensors'"
 				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.curr_$id \$1\""
 				divisor=1000
 				;;
@@ -170,7 +170,7 @@ sensors_create() {
 				files="$(ls "$path"/power*_input 2>/dev/null)"
 				files="$(sensors_check_files "$files")"
 				[ -z "$files" ] && continue
-				echo "CHART sensors.power_$id '' '$name Power' 'Watt' 'power' 'sensors.power' line $((sensors_priority + 4)) $sensors_update_every"
+				echo "CHART sensors.power_$id '' '$name Power' 'Watt' 'power' 'sensors.power' line $((sensors_priority + 4)) $sensors_update_every '' '' 'sensors'"
 				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.power_$id \$1\""
 				divisor=1000000
 				;;
@@ -179,7 +179,7 @@ sensors_create() {
 				files="$(ls "$path"/fan*_input 2>/dev/null)"
 				files="$(sensors_check_files "$files")"
 				[ -z "$files" ] && continue
-				echo "CHART sensors.fan_$id '' '$name Fans Speed' 'Rotations / Minute' 'fans' 'sensors.fans' line $((sensors_priority + 5)) $sensors_update_every"
+				echo "CHART sensors.fan_$id '' '$name Fans Speed' 'Rotations / Minute' 'fans' 'sensors.fans' line $((sensors_priority + 5)) $sensors_update_every '' '' 'sensors'"
 				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.fan_$id \$1\""
 				;;
 
@@ -187,7 +187,7 @@ sensors_create() {
 				files="$(ls "$path"/energy*_input 2>/dev/null)"
 				files="$(sensors_check_files "$files")"
 				[ -z "$files" ] && continue
-				echo "CHART sensors.energy_$id '' '$name Energy' 'Joule' 'energy' 'sensors.energy' areastack $((sensors_priority + 6)) $sensors_update_every"
+				echo "CHART sensors.energy_$id '' '$name Energy' 'Joule' 'energy' 'sensors.energy' areastack $((sensors_priority + 6)) $sensors_update_every '' '' 'sensors'"
 				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.energy_$id \$1\""
 				algorithm="incremental"
 				divisor=1000000
@@ -197,7 +197,7 @@ sensors_create() {
 				files="$(ls "$path"/humidity*_input 2>/dev/null)"
 				files="$(sensors_check_files "$files")"
 				[ -z "$files" ] && continue
-				echo "CHART sensors.humidity_$id '' '$name Humidity' 'Percent' 'humidity' 'sensors.humidity' line $((sensors_priority + 7)) $sensors_update_every"
+				echo "CHART sensors.humidity_$id '' '$name Humidity' 'Percent' 'humidity' 'sensors.humidity' line $((sensors_priority + 7)) $sensors_update_every '' '' 'sensors'"
 				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.humidity_$id \$1\""
 				divisor=1000
 				;;
@@ -237,7 +237,7 @@ sensors_create() {
 # _update is called continuously, to collect the values
 sensors_update() {
 	# the first argument to this function is the microseconds since last update
-	# pass this parameter to the BEGIN statement (see bellow).
+	# pass this parameter to the BEGIN statement (see below).
 
 	# do all the work to collect / calculate the values
 	# for each dimension

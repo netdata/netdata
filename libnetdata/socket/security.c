@@ -213,6 +213,7 @@ void security_start_ssl(int selector) {
             }
 
             netdata_srv_ctx =  security_initialize_openssl_server();
+            SSL_CTX_set_mode(netdata_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
             break;
         }
         case NETDATA_SSL_CONTEXT_STREAMING: {

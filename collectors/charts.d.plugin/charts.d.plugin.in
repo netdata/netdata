@@ -634,7 +634,7 @@ global_update() {
 		charts_run_counter[$chart]=0
 		charts_serial_failures[$chart]=0
 
-		echo "CHART netdata.plugin_chartsd_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' charts.d netdata.plugin_charts area 145000 ${charts_update_every[$chart]}"
+		echo "CHART netdata.plugin_chartsd_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' charts.d netdata.plugin_charts area 145000 ${charts_update_every[$chart]} '' '' '$chart'"
 		echo "DIMENSION run_time 'run time' absolute 1 1"
 	done
 

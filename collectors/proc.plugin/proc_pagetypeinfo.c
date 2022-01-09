@@ -139,7 +139,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             return 1;
         }
 
-        // 4th line is the "Free pages count per migrate type at order". Just substract these 8 words.
+        // 4th line is the "Free pages count per migrate type at order". Just subtract these 8 words.
         pageorders_cnt = procfile_linewords(ff, 3);
         if (pageorders_cnt < 9) {
             error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse Line 4 of %s", ff_path);

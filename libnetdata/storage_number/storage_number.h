@@ -60,17 +60,24 @@ typedef long double collected_number;
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
 
-#define SN_EXISTS           (1 << 24) // the value exists
+#define SN_ANOMALY_BIT      (1 << 24) // the anomaly bit of the value
 #define SN_EXISTS_RESET     (1 << 25) // the value has been overflown
 #define SN_EXISTS_100       (1 << 26) // very large value (multiplier is 100 instead of 10)
 
-// extract the flags
-#define get_storage_number_flags(value) ((((storage_number)(value)) & (1 << 24)) | (((storage_number)(value)) & (1 << 25)) | (((storage_number)(value)) & (1 << 26)))
+#define SN_DEFAULT_FLAGS    SN_ANOMALY_BIT
+
 #define SN_EMPTY_SLOT 0x00000000
 
+// When the calculated number is zero and the value is anomalous (ie. it's bit
+// is zero) we want to return a storage_number representation that is
+// different from the empty slot. We achieve this by mapping zero to
+// SN_EXISTS_100. Unpacking the SN_EXISTS_100 value will return zero because
+// its fraction field (as well as its exponent factor field) will be zero.
+#define SN_ANOMALOUS_ZERO SN_EXISTS_100
+
 // checks
-#define does_storage_number_exist(value) ((get_storage_number_flags(value) != 0)?1:0)
-#define did_storage_number_reset(value)  ((get_storage_number_flags(value) == SN_EXISTS_RESET)?1:0)
+#define does_storage_number_exist(value) (((storage_number) (value)) != SN_EMPTY_SLOT)
+#define did_storage_number_reset(value)  ((((storage_number) (value)) & SN_EXISTS_RESET) != 0)
 
 storage_number pack_storage_number(calculated_number value, uint32_t flags);
 calculated_number unpack_storage_number(storage_number value);

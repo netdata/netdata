@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-
-TARGET="@pluginsdir_POST@"
-BASE="$(cd "$(dirname "$0")" && pwd)"
-
-cp "$BASE/fake-charts.d.plugin" "$TARGET/charts.d.plugin"

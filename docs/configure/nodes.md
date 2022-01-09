@@ -18,9 +18,10 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 
 ## The Netdata config directory
 
-On most Linux systems, using our [recommended one-line installation](/docs/get/README.md#install-the-netdata-agent), the
-**Netdata config directory** is `/etc/netdata/`. The config directory contains several configuration files with the
-`.conf` extension, a few directories, and a shell script named `edit-config`.
+On most Linux systems, using our [recommended one-line
+installation](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended), the **Netdata config
+directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
+few directories, and a shell script named `edit-config`.
 
 > Some operating systems will use `/opt/netdata/etc/netdata/` as the config directory. If you're not sure where yours
 > is, navigate to `http://NODE:19999/netdata.conf` in your browser, replacing `NODE` with the IP address or hostname of

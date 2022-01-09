@@ -4,7 +4,7 @@
 
 #include "https_client.h"
 
-#include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
+#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
 enum http_parse_state {
     HTTP_PARSE_INITIAL = 0,
@@ -47,7 +47,7 @@ static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
 #define RESP_PROTO "HTTP/1.1 "
 #define HTTP_KEYVAL_SEPARATOR ": "
 #define HTTP_HDR_BUFFER_SIZE 256
-#define PORT_STR_MAX_BYTES 7
+#define PORT_STR_MAX_BYTES 12
 
 static void process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const char *val)
 {
@@ -303,7 +303,8 @@ static int read_parse_response(https_req_ctx_t *ctx) {
                 error("Poll timed out");
                 return 2;
             }
-            continue;
+            if (!ctx->ssl_ctx)
+                continue;
         }
         ctx->poll_fd.events = 0;
 
@@ -421,6 +422,35 @@ err_exit:
     return rc;
 }
 
+static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
+{
+    X509 *err_cert;
+    int err, depth;
+    char *err_str;
+
+    if (!preverify_ok) {
+        err = X509_STORE_CTX_get_error(ctx);
+        depth = X509_STORE_CTX_get_error_depth(ctx);
+        err_cert = X509_STORE_CTX_get_current_cert(ctx);
+        err_str = X509_NAME_oneline(X509_get_subject_name(err_cert), NULL, 0);
+
+        error("Cert Chain verify error:num=%d:%s:depth=%d:%s", err,
+                 X509_verify_cert_error_string(err), depth, err_str);
+
+        free(err_str);
+    }
+
+#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
+    if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)
+    {
+        preverify_ok = 1;
+        error("Self Signed Certificate Accepted as the agent was built with ACLK_SSL_ALLOW_SELF_SIGNED");
+    }
+#endif
+
+    return preverify_ok;
+}
+
 int https_request(https_req_t *request, https_req_response_t *response) {
     int rc = 1, ret;
     char connect_port_str[PORT_STR_MAX_BYTES];
@@ -438,7 +468,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         goto exit_req_ctx;
     }
 
-    snprintf(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
+    snprintfz(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
 
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout);
     if (ctx->sock < 0) {
@@ -479,6 +509,12 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         error("Cannot allocate SSL context");
         goto exit_sock;
     }
+
+    if (!SSL_CTX_set_default_verify_paths(ctx->ssl_ctx)) {
+        error("Error setting default verify paths");
+        goto exit_CTX;
+    }
+    SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
 
     ctx->ssl = SSL_new(ctx->ssl_ctx);
     if (ctx->ssl==NULL) {
@@ -570,7 +606,7 @@ static int parse_host_port(url_t *url) {
             error(URL_PARSER_LOG_PREFIX ": specified but no port number");
             return 1;
         }
-        if (port_len > 5 /* MAX port lenght is 5digit long in decimal */) {
+        if (port_len > 5 /* MAX port length is 5digit long in decimal */) {
             error(URL_PARSER_LOG_PREFIX "port # is too long");
             return 1;
         }

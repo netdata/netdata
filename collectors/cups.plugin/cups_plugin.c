@@ -6,7 +6,7 @@
  * Released under GPL v3+
  */
 
-#include "../../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 #include <cups/cups.h>
 #include <limits.h>
 

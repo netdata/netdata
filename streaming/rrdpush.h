@@ -3,17 +3,17 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
-#include "../database/rrd.h"
-#include "../libnetdata/libnetdata.h"
+#include "database/rrd.h"
+#include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
 
 #define CONNECTED_TO_SIZE 100
 
-// #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)4       Gap-filling
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)3
-#define VERSION_GAP_FILLING 4
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)4
 #define STREAM_VERSION_CLAIM 3
+#define STREAM_VERSION_CLABELS 4
+#define VERSION_GAP_FILLING 5
 
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
@@ -72,6 +72,8 @@ struct receiver_state {
     char *machine_guid;
     char *os;
     char *timezone;         // Unused?
+    char *abbrev_timezone;
+    int32_t utc_offset;
     char *tags;
     char *client_ip;        // Duplicated in pluginsd 
     char *client_port;        // Duplicated in pluginsd 

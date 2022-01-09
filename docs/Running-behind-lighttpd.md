@@ -14,7 +14,7 @@ $HTTP["url"] =~ "^/netdata/" {
 }
 ```
 
-If you have older lighttpd you have to use a chain (such as bellow), as explained [at this stackoverflow answer](http://stackoverflow.com/questions/14536554/lighttpd-configuration-to-proxy-rewrite-from-one-domain-to-another).
+If you have older lighttpd you have to use a chain (such as below), as explained [at this stackoverflow answer](http://stackoverflow.com/questions/14536554/lighttpd-configuration-to-proxy-rewrite-from-one-domain-to-another).
 
 ```txt
 $HTTP["url"] =~ "^/netdata/" {

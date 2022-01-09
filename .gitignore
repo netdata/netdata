@@ -7,6 +7,9 @@ gcs-credentials.json
 .project
 .pydevproject
 
+# local dev outputs
+dist/
+
 *.o
 *.a
 config.h.in
@@ -81,6 +84,9 @@ packaging/installer/.environment.sh
 
 # netdata makeself downloads
 packaging/makeself/tmp/
+
+# Libbpf is always overwritten depending of kernel version
+packaging/libbpf.*
 
 # coverity
 cov-int/
@@ -165,6 +171,7 @@ diagrams/plantuml.jar
 # cppcheck
 cppcheck-build/
 
+# python virtual environment
 venv/
 
 # debugging / profiling
@@ -209,3 +216,10 @@ netdata.cbp
 
 # External dependencies
 externaldeps/
+
+# vim sessions
+Session.vim
+Session.*.vim
+
+# Special exceptions
+!packaging/repoconfig/Makefile

@@ -2,15 +2,78 @@
 # Runs various ReviewDog based checks against PR with suggested changes to improve quality
 name: Review
 on:
-  pull_request:
+  pull_request: null
 env:
-  run_eslint: 0
-  run_hadolint: 0
-  run_shellcheck: 0
-  run_yamllint: 0
+  DO_NOT_TRACK: 1
+concurrency:
+  group: review-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  eslint:
-    name: eslint
+  prep-review:
+    name: Prepare Review Jobs
+    runs-on: ubuntu-latest
+    outputs:
+      actionlint: ${{ steps.actionlint.outputs.run }}
+      eslint: ${{ steps.eslint.outputs.run }}
+      hadolint: ${{ steps.hadolint.outputs.run }}
+      shellcheck: ${{ steps.shellcheck.outputs.run }}
+      yamllint: ${{ steps.yamllint.outputs.run }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Check files for actionlint
+        id: actionlint
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '\.github/workflows/.*' ; then
+            echo '::set-output name=run::true'
+            echo 'GitHub Actions workflows have changed, need to run actionlint.'
+          else
+            echo '::set-output name=run::false'
+          fi
+      - name: Check files for eslint
+        id: eslint
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -v "web/gui/dashboard" | grep -Eq '.*\.js|node\.d\.plugin\.in' ; then
+            echo '::set-output name=run::true'
+            echo 'JS files have changed, need to run ESLint.'
+          else
+            echo '::set-output name=run::false'
+          fi
+      - name: Check files for hadolint
+        id: hadolint
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*Dockerfile.*' ; then
+            echo '::set-output name=run::true'
+            echo 'Dockerfiles have changed, need to run Hadolint.'
+          else
+            echo '::set-output name=run::false'
+          fi
+      - name: Check files for shellcheck
+        id: shellcheck
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.sh.*' ; then
+            echo '::set-output name=run::true'
+            echo 'Shell scripts have changed, need to run shellcheck.'
+          else
+            echo '::set-output name=run::false'
+          fi
+      - name: Check files for yamllint
+        id: yamllint
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.ya?ml|python\.d/.*\.conf' ; then
+            echo '::set-output name=run::true'
+            echo 'YAML files have changed, need to run yamllint.'
+          else
+            echo '::set-output name=run::false'
+          fi
+
+  actionlint:
+    name: actionlint
+    needs: prep-review
+    if: needs.prep-review.outputs.actionlint == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
@@ -18,13 +81,26 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - name: Check files
-        run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.js|node\.d\.plugin\.in' ; then
-            echo 'run_eslint=1' >> $GITHUB_ENV
-          fi
+      - name: Run actionlint
+        uses: reviewdog/action-actionlint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
+
+  eslint:
+    name: eslint
+    needs: prep-review
+    if: needs.prep-review.outputs.eslint == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Install eslint
+        run: npm install eslint -D
       - name: Run eslint
-        if: env.run_eslint == 1
         uses: reviewdog/action-eslint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -33,19 +109,15 @@ jobs:
 
   hadolint:
     name: hadolint
+    needs: prep-review
+    if: needs.prep-review.outputs.hadolint == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Check files
-        run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*Dockerfile*' ; then
-            echo 'run_hadolint=1' >> $GITHUB_ENV
-          fi
       - name: Run hadolint
-        if: env.run_hadolint == 1
         uses: reviewdog/action-hadolint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -53,6 +125,8 @@ jobs:
 
   shellcheck:
     name: shellcheck
+    needs: prep-review
+    if: needs.prep-review.outputs.shellcheck == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
@@ -60,13 +134,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - name: Check files
-        run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.sh.*' ; then
-            echo 'run_shellcheck=1' >> $GITHUB_ENV
-          fi
       - name: Run shellcheck
-        if: env.run_shellcheck == 1
         uses: reviewdog/action-shellcheck@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -77,6 +145,8 @@ jobs:
 
   yamllint:
     name: yamllint
+    needs: prep-review
+    if: needs.prep-review.outputs.yamllint == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
@@ -84,13 +154,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - name: Check files
-        run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.ya?ml|python\.d/.*\.conf' ; then
-            echo 'run_yamllint=1' >> $GITHUB_ENV
-          fi
       - name: Run yamllint
-        if: env.run_yamllint == 1
         uses: reviewdog/action-yamllint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

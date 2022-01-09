@@ -116,9 +116,9 @@ int am_i_running_as_root()
 /**
  * Reset the target values
  *
- * @param root the pointer to the chain that will be reseted.
+ * @param root the pointer to the chain that will be reset.
  *
- * @return it returns the number of structures that was reseted.
+ * @return it returns the number of structures that was reset.
  */
 size_t zero_all_targets(struct target *root)
 {
@@ -910,6 +910,33 @@ static inline void del_pid_entry(pid_t pid)
 }
 
 /**
+ * Get command string associated with a PID.
+ * This can only safely be used when holding the `collect_data_mutex` lock.
+ *
+ * @param pid the pid to search the data.
+ * @param n the maximum amount of bytes to copy into dest.
+ *          if this is greater than the size of the command, it is clipped.
+ * @param dest the target memory buffer to write the command into.
+ * @return -1 if the PID hasn't been scraped yet, 0 otherwise.
+ */
+int get_pid_comm(pid_t pid, size_t n, char *dest)
+{
+    struct pid_stat *stat;
+
+    stat = all_pids[pid];
+    if (unlikely(stat == NULL)) {
+        return -1;
+    }
+
+    if (unlikely(n > sizeof(stat->comm))) {
+        n = sizeof(stat->comm);
+    }
+
+    strncpyz(dest, stat->comm, n);
+    return 0;
+}
+
+/**
  * Cleanup variable from other threads
  *
  * @param pid current pid.
@@ -922,7 +949,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
         socket_bandwidth_curr[pid] = NULL;
     }
 
-    // Clean cachestat strcture
+    // Clean cachestat structure
     if (cachestat_pid) {
         freez(cachestat_pid[pid]);
         cachestat_pid[pid] = NULL;
@@ -932,6 +959,30 @@ void cleanup_variables_from_other_threads(uint32_t pid)
     if (dcstat_pid) {
         freez(dcstat_pid[pid]);
         dcstat_pid[pid] = NULL;
+    }
+
+    // Clean swap structure
+    if (swap_pid) {
+        freez(swap_pid[pid]);
+        swap_pid[pid] = NULL;
+    }
+
+    // Clean vfs structure
+    if (vfs_pid) {
+        freez(vfs_pid[pid]);
+        vfs_pid[pid] = NULL;
+    }
+
+    // Clean fd structure
+    if (fd_pid) {
+        freez(fd_pid[pid]);
+        fd_pid[pid] = NULL;
+    }
+
+    // Clean shm structure
+    if (shm_pid) {
+        freez(shm_pid[pid]);
+        shm_pid[pid] = NULL;
     }
 }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
-#include "../parser/parser.h"
+#include "parser/parser.h"
 
 /*
  * rrdpush
@@ -183,6 +183,24 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     return 0;
 }
 
+// chart labels
+void rrdpush_send_clabels(RRDHOST *host, RRDSET *st) {
+    struct label_index *labels_c = &st->state->labels;
+    if (labels_c) {
+        netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+        struct label *lbl = labels_c->head;
+        while(lbl) {
+            buffer_sprintf(host->sender->build,
+                           "CLABEL \"%s\" \"%s\" %d\n", lbl->key, lbl->value, (int)lbl->label_source);
+
+            lbl = lbl->next;
+        }
+        if (labels_c->head)
+            buffer_sprintf(host->sender->build,"CLABEL_COMMIT\n");
+        netdata_rwlock_unlock(&host->labels.labels_rwlock);
+    }
+}
+
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
@@ -223,6 +241,10 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , (st->plugin_name)?st->plugin_name:""
             , (st->module_name)?st->module_name:""
     );
+
+    // send the chart labels
+    if (host->sender->version >= STREAM_VERSION_CLABELS)
+        rrdpush_send_clabels(host, st);
 
     // send the dimensions
     RRDDIM *rd;
@@ -464,13 +486,14 @@ void *rrdpush_receiver_thread(void *ptr);
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     info("clients wants to STREAM metrics.");
 
-    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
+    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *abbrev_timezone = "UTC", *tags = NULL;
+    int32_t utc_offset = 0;
     int update_every = default_rrd_update_every;
     uint32_t stream_version = UINT_MAX;
     char buf[GUID_LEN + 1];
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
-
+    system_info->hops = 1;
     while(url) {
         char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
@@ -493,6 +516,16 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             os = value;
         else if(!strcmp(name, "timezone"))
             timezone = value;
+        else if(!strcmp(name, "abbrev_timezone"))
+            abbrev_timezone = value;
+        else if(!strcmp(name, "utc_offset"))
+            utc_offset = (int32_t)strtol(value, NULL, 0);
+        else if(!strcmp(name, "hops"))
+            system_info->hops = (uint16_t) strtoul(value, NULL, 0);
+        else if(!strcmp(name, "ml_capable"))
+            system_info->ml_capable = strtoul(value, NULL, 0);
+        else if(!strcmp(name, "ml_enabled"))
+            system_info->ml_enabled = strtoul(value, NULL, 0);
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver"))
@@ -680,6 +713,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     rpt->machine_guid      = strdupz(machine_guid);
     rpt->os                = strdupz(os);
     rpt->timezone          = strdupz(timezone);
+    rpt->abbrev_timezone   = strdupz(abbrev_timezone);
+    rpt->utc_offset        = utc_offset;
     rpt->tags              = (tags)?strdupz(tags):NULL;
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);

@@ -191,7 +191,7 @@ for arg in "$@"
 do
         case $arg in
                 -token=*) TOKEN=${arg:7} ;;
-                -url=*) URL_BASE=${arg:5} ;;
+                -url=*) [ -n "${arg:5}" ] && URL_BASE=${arg:5} ;;
                 -id=*) ID=${arg:4} ;;
                 -rooms=*) ROOMS=${arg:7} ;;
                 -hostname=*) HOSTNAME=${arg:10} ;;
@@ -418,7 +418,7 @@ HERE_DOC
                 exit $EXIT_CODE
         fi
         echo >&2 "${PROXYMSG}The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud."
-        exit 5
+        [ "$NETDATA_RUNNING" -eq 0 ] && exit 0 || exit 5
 fi
 
 echo >&2 "Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""

@@ -1,11 +1,11 @@
 <!--
-title: "Exporting engine reference"
+title: "Exporting reference"
 description: "With the exporting engine, you can archive your Netdata metrics to multiple external databases for long-term storage or further analysis."
-sidebar_label: Reference guide
+sidebar_label: Exporting reference
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/README.md
 -->
 
-# Exporting engine reference
+# Exporting reference
 
 Welcome to the exporting engine reference guide. This guide contains comprehensive information about enabling,
 configuring, and monitoring Netdata's exporting engine, which allows you to send metrics to external time-series
@@ -164,6 +164,8 @@ You can configure each connector individually using the available [options](#opt
 [opentsdb:http:my_opentsdb_http_instance]
     enabled = yes
     destination = localhost:4242
+    username = my_username
+    password = my_password
 
 [opentsdb:https:my_opentsdb_https_instance]
     enabled = yes

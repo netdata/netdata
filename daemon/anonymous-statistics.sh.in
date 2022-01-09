@@ -22,9 +22,6 @@ if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ] || [ ! "${DO_NOT
   exit 0
 fi
 
-# Shorten version for easier reporting
-NETDATA_VERSION=$(echo "${NETDATA_VERSION}" | sed 's/-.*//g' | tr -d 'v')
-
 # -------------------------------------------------------------------------------------------------
 # Get the extra variables
 
@@ -60,6 +57,13 @@ NETDATA_HOST_ACLK_AVAILABLE="${32}"
 NETDATA_HOST_ACLK_IMPLEMENTATION="${33}"
 NETDATA_HOST_AGENT_CLAIMED="${34}"
 NETDATA_HOST_CLOUD_ENABLED="${35}"
+NETDATA_CONFIG_HTTPS_AVAILABLE="${36}"
+NETDATA_INSTALL_TYPE="${37}"
+NETDATA_IS_PRIVATE_REGISTRY="${38}"
+NETDATA_USE_PRIVATE_REGISTRY="${39}"
+NETDATA_CONFIG_OOM_SCORE="${40}"
+NETDATA_PREBUILT_DISTRO="${41}"
+
 
 # define body of request to be sent
 REQ_BODY="$(cat << EOF
@@ -80,6 +84,8 @@ REQ_BODY="$(cat << EOF
         "netdata_version": "${NETDATA_VERSION}",
         "netdata_buildinfo": ${NETDATA_BUILDINFO},
         "netdata_release_channel": ${NETDATA_CONFIG_RELEASE_CHANNEL},
+        "netdata_install_type": ${NETDATA_INSTALL_TYPE},
+        "netdata_prebuilt_distro": ${NETDATA_PREBUILT_DISTRO},
         "host_os_name": "${NETDATA_HOST_OS_NAME}",
         "host_os_id": "${NETDATA_HOST_OS_ID}",
         "host_os_id_like": "${NETDATA_HOST_OS_ID_LIKE}",
@@ -100,6 +106,7 @@ REQ_BODY="$(cat << EOF
         "container_os_version": "${NETDATA_CONTAINER_OS_VERSION}",
         "container_os_version_id": "${NETDATA_CONTAINER_OS_VERSION_ID}",
         "container_os_detection": "${NETDATA_CONTAINER_OS_DETECTION}",
+        "container_is_official_image": ${NETDATA_CONTAINER_IS_OFFICIAL_IMAGE},
         "system_cpu_detection": "${NETDATA_SYSTEM_CPU_DETECTION}",
         "system_cpu_freq": "${NETDATA_SYSTEM_CPU_FREQ}",
         "system_cpu_logical_cpu_count": "${NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT}",
@@ -114,10 +121,14 @@ REQ_BODY="$(cat << EOF
         "config_page_cache_size": ${NETDATA_CONFIG_PAGE_CACHE_SIZE},
         "config_multidb_disk_quota": ${NETDATA_CONFIG_MULTIDB_DISK_QUOTA},
         "config_https_enabled": ${NETDATA_CONFIG_HTTPS_ENABLED},
+        "config_https_available": ${NETDATA_CONFIG_HTTPS_AVAILABLE},
         "config_web_enabled": ${NETDATA_CONFIG_WEB_ENABLED},
         "config_exporting_enabled": ${NETDATA_CONFIG_EXPORTING_ENABLED},
         "config_is_parent": ${NETDATA_CONFIG_IS_PARENT},
+        "config_is_private_registry": ${NETDATA_IS_PRIVATE_REGISTRY},
+        "config_private_registry_used": ${NETDATA_USE_PRIVATE_REGISTRY},
         "config_hosts_available": ${NETDATA_CONFIG_HOSTS_AVAILABLE},
+        "config_oom_score": ${NETDATA_CONFIG_OOM_SCORE},
         "alarms_normal": ${NETDATA_ALARMS_NORMAL},
         "alarms_warning": ${NETDATA_ALARMS_WARNING},
         "alarms_critical": ${NETDATA_ALARMS_CRITICAL},
@@ -148,12 +159,13 @@ EOF
 
 # send the anonymous statistics to the Netdata PostHog
 if [ -n "$(command -v curl 2> /dev/null)" ]; then
-  curl -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" https://posthog.netdata.cloud/capture/ > /dev/null 2>&1
+  curl --silent -o /dev/null --write-out '%{http_code}' -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" https://posthog.netdata.cloud/capture/
 else
   wget -q -O - --no-check-certificate \
+  --server-response \
   --method POST \
   --timeout=1 \
   --header 'Content-Type: application/json' \
   --body-data "${REQ_BODY}" \
-   'https://posthog.netdata.cloud/capture/' > /dev/null 2>&1
+   'https://posthog.netdata.cloud/capture/' 2>&1 | awk '/^  HTTP/{print $2}'
 fi

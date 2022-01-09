@@ -43,7 +43,7 @@ looking at first (for more background information on why 3 stddev
 see [here](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule#:~:text=In%20the%20empirical%20sciences%20the,99.7%25%20probability%20as%20near%20certainty.))
 .
 
-In the example below we basically took a sledge hammer to our system so its not suprising that lots of charts light up
+In the example below we basically took a sledge hammer to our system so its not surprising that lots of charts light up
 after we run the stress command. In a more realistic setting you might just see a handful of charts with strange zscores
 and that could be a good indication of where to look first.
 
@@ -101,9 +101,9 @@ information about each one and what it does.
 host: '127.0.0.1:19999'
 # What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
 charts_regex: 'system\..*'
-# length of time to base calulcations off for mean and stddev
+# length of time to base calculations off for mean and stddev
 train_secs: 14400 # use last 4 hours to work out the mean and stddev for the zscore
-# offset preceeding latest data to ignore when calculating mean and stddev
+# offset preceding latest data to ignore when calculating mean and stddev
 offset_secs: 300 # ignore last 5 minutes of data when calculating the mean and stddev
 # recalculate the mean and stddev every n steps of the collector
 train_every_n: 900 # recalculate mean and stddev every 15 minutes
@@ -114,11 +114,11 @@ z_clip: 10 # cap each zscore at 10 so as to avoid really large individual zscore
 # set z_abs: 'true' to make all zscores be absolute values only.
 z_abs: 'true'
 # burn in period in which to initially calculate mean and stddev on every step
-burn_in: 2 # on startup of the collector continually update the mean and stddev in case any gaps or inital calculations fail to return
+burn_in: 2 # on startup of the collector continually update the mean and stddev in case any gaps or initial calculations fail to return
 # mode can be to get a zscore 'per_dim' or 'per_chart'
 mode: 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be aggregated to one zscore per chart per time step
 # per_chart_agg is how you aggregate from dimension to chart when mode='per_chart'
-per_chart_agg: 'mean' # 'absmax' will take the max absolute value accross all dimensions but will maintain the sign. 'mean' will just average.
+per_chart_agg: 'mean' # 'absmax' will take the max absolute value across all dimensions but will maintain the sign. 'mean' will just average.
 ```
 
 ## Notes
@@ -128,7 +128,7 @@ per_chart_agg: 'mean' # 'absmax' will take the max absolute value accross all di
   calls to the netdata rest api to get the required data for each chart when calculating the mean and stddev.
 - It may take a few hours or so for the collector to 'settle' into it's typical behaviour in terms of the scores you
   will see in the normal running of your system.
-- The zscore you see for each chart when using `mode: 'per_chart'` as actually an aggregated zscore accross all the
+- The zscore you see for each chart when using `mode: 'per_chart'` as actually an aggregated zscore across all the
   dimensions on the underlying chart.
 - If you set `mode: 'per_dim'` then you will see a zscore for each dimension on each chart as opposed to one per chart.
 - As this collector does some calculations itself in python you may want to try it out first on a test or development

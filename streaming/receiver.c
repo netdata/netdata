@@ -11,6 +11,7 @@ void destroy_receiver_state(struct receiver_state *rpt) {
     freez(rpt->machine_guid);
     freez(rpt->os);
     freez(rpt->timezone);
+    freez(rpt->abbrev_timezone);
     freez(rpt->tags);
     freez(rpt->client_ip);
     freez(rpt->client_port);
@@ -49,7 +50,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     }
 }
 
-#include "../collectors/plugins.d/pluginsd_parser.h"
+#include "collectors/plugins.d/pluginsd_parser.h"
 
 PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {
@@ -220,6 +221,8 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
     parser->plugins_action->chart_action     = &pluginsd_chart_action;
     parser->plugins_action->set_action       = &pluginsd_set_action;
+    parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
+    parser->plugins_action->clabel_action    = &pluginsd_clabel_action;
 
     user->parser = parser;
 
@@ -307,6 +310,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 , rpt->machine_guid
                 , rpt->os
                 , rpt->timezone
+                , rpt->abbrev_timezone
+                , rpt->utc_offset
                 , rpt->tags
                 , rpt->program_name
                 , rpt->program_version
@@ -341,13 +346,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
         netdata_mutex_unlock(&rpt->host->receiver_lock);
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     int ssl = 0;
 #ifdef ENABLE_HTTPS
     if (rpt->ssl.conn != NULL)
         ssl = 1;
 #endif
-
-#ifdef NETDATA_INTERNAL_CHECKS
     info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
          , rpt->client_ip
@@ -451,11 +455,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     cd.version = rpt->stream_version;
 
-#if defined(ENABLE_ACLK) && !defined(ACLK_NG)
+#if defined(ENABLE_ACLK)
     // in case we have cloud connection we inform cloud
     // new slave connected
     if (netdata_cloud_setting)
-        aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_CONNECT);
+        aclk_host_state_update(rpt->host, 1);
 #endif
 
     size_t count = streaming_parser(rpt, &cd, fp);
@@ -465,11 +469,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
 
-#if defined(ENABLE_ACLK) && !defined(ACLK_NG)
+#if defined(ENABLE_ACLK)
     // in case we have cloud connection we inform cloud
     // new slave connected
     if (netdata_cloud_setting)
-        aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_DISCONNECT);
+        aclk_host_state_update(rpt->host, 0);
 #endif
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread

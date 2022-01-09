@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "spawn.h"
-#include "../database/engine/rrdenginelib.h"
+#include "database/engine/rrdenginelib.h"
 
 static uv_thread_t thread;
 int spawn_thread_error;

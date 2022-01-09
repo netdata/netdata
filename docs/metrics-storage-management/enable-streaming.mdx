@@ -76,7 +76,7 @@ method](/docs/configure/start-stop-restart.md) for your system.
 
 While encrypting the connection between your parent and child nodes is recommended for security, it's not required to
 get started. If you're not interested in encryption, skip ahead to [view streamed
-metrics](#view-streamed-metrics-in-netdata-s-dashboard).
+metrics](#view-streamed-metrics-in-netdatas-dashboard).
 
 In this example, we'll use self-signed certificates. 
 
@@ -85,7 +85,7 @@ by the `netdata` user.
 
 ```bash
 sudo openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout /etc/netdata/ssl/key.pem -out /etc/netdata/ssl/cert.pem
-sudo chown netdata:netdata /etc/netdata/ssl/cert.pem k/etc/netdata/ssl/ey.pem
+sudo chown netdata:netdata /etc/netdata/ssl/cert.pem /etc/netdata/ssl/key.pem
 ```
 
 Next, enforce TLS/SSL on the web server. Open `netdata.conf`, scroll down to the `[web]` section, and look for the `bind
@@ -135,7 +135,7 @@ Now that you have a basic streaming setup with replication, you may want to twea
 child database, disable the child dashboard, or enable SSL on the streaming connection between the parent and child.
 
 See the [streaming reference
-doc](/docs/metrics-storage-management/reference-streaming.mdx#supported-streaming-configurations) for details about
+doc](/docs/metrics-storage-management/reference-streaming.mdx#examples) for details about
 other possible configurations.
 
 When using Netdata's default TSDB (`dbengine`), the parent node maintains separate, parallel databases for itself and

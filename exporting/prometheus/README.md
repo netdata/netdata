@@ -128,46 +128,46 @@ scrape_configs:
 
 #### Install nodes.yml
 
-The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the
+The following is completely optional, it will enable Prometheus to generate alerts from some Netdata sources. Tweak the
 values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and
 add a _- "nodes.yml"_ entry under the _rule_files:_ section in the example prometheus.yml file above.
 
 ```yaml
 groups:
-- name: nodes
+  - name: nodes
 
-  rules:
-  - alert: node_high_cpu_usage_70
-    expr: avg(rate(netdata_cpu_cpu_percentage_average{dimension="idle"}[1m])) by (job) > 70
-    for: 1m
-    annotations:
-      description: '{{ $labels.job }} on ''{{ $labels.job }}'' CPU usage is at {{ humanize $value }}%.'
-      summary: CPU alert for container node '{{ $labels.job }}'
+    rules:
+      - alert: node_high_cpu_usage_70
+        expr: sum(sum_over_time(netdata_system_cpu_percentage_average{dimension=~"(user|system|softirq|irq|guest)"}[10m])) by (job) / sum(count_over_time(netdata_system_cpu_percentage_average{dimension="idle"}[10m])) by (job) > 70
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} on ''{{ $labels.job }}'' CPU usage is at {{ humanize $value }}%.'
+          summary: CPU alert for container node '{{ $labels.job }}'
 
-  - alert: node_high_memory_usage_70
-    expr: 100 / sum(netdata_system_ram_MB_average) by (job) 
-      * sum(netdata_system_ram_MB_average{dimension=~"free|cached"}) by (job) < 30
-    for: 1m
-    annotations:
-      description: '{{ $labels.job }} memory usage is {{ humanize $value}}%.'
-      summary: Memory alert for container node '{{ $labels.job }}'
+      - alert: node_high_memory_usage_70
+        expr: 100 / sum(netdata_system_ram_MB_average) by (job)
+          * sum(netdata_system_ram_MB_average{dimension=~"free|cached"}) by (job) < 30
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} memory usage is {{ humanize $value}}%.'
+          summary: Memory alert for container node '{{ $labels.job }}'
 
-  - alert: node_low_root_filesystem_space_20
-    expr: 100 / sum(netdata_disk_space_GB_average{family="/"}) by (job)
-      * sum(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}) by (job) < 20
-    for: 1m
-    annotations:
-      description: '{{ $labels.job }} root filesystem space is {{ humanize $value}}%.'
-      summary: Root filesystem alert for container node '{{ $labels.job }}'
+      - alert: node_low_root_filesystem_space_20
+        expr: 100 / sum(netdata_disk_space_GB_average{family="/"}) by (job)
+          * sum(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}) by (job) < 20
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} root filesystem space is {{ humanize $value}}%.'
+          summary: Root filesystem alert for container node '{{ $labels.job }}'
 
-  - alert: node_root_filesystem_fill_rate_6h
-    expr: predict_linear(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}[1h], 6 * 3600) < 0
-    for: 1h
-    labels:
-      severity: critical
-    annotations:
-      description: Container node {{ $labels.job }} root filesystem is going to fill up in 6h.
-      summary: Disk fill alert for Swarm node '{{ $labels.job }}'
+      - alert: node_root_filesystem_fill_rate_6h
+        expr: predict_linear(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}[1h], 6 * 3600) < 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          description: Container node {{ $labels.job }} root filesystem is going to fill up in 6h.
+          summary: Disk fill alert for Swarm node '{{ $labels.job }}'
 ```
 
 #### Install prometheus.service

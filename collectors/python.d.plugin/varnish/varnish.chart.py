@@ -197,7 +197,7 @@ class VarnishVersion:
 
 class Parser:
     _backend_new = re.compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)')
-    _backend_old = re.compile(r'VBE\.[\d\w-]+\.([\w\d_]+).(beresp[\w_]+)\s+(\d+)')
+    _backend_old = re.compile(r'VBE\.[\d\w-]+\.([\w\d_-]+).(beresp[\w_]+)\s+(\d+)')
     _default = re.compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
 
     def __init__(self):

@@ -6,7 +6,7 @@
  * Released under GPL v3+
  */
 
-#include "../../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
 // ----------------------------------------------------------------------------
 
@@ -128,6 +128,7 @@ static int
         enable_file_charts = 1,
         max_fds_cache_seconds = 60,
 #endif
+        enable_detailed_uptime_charts = 0,
         enable_users_charts = 1,
         enable_groups_charts = 1,
         include_exited_childs = 1;
@@ -3354,7 +3355,7 @@ static void normalize_utilization(struct target *root) {
             cgtime_fix_ratio = 1.0; //(double)(global_utime + global_stime) / (double)(utime + cutime + stime + cstime);
         }
         else if((global_utime + global_stime > utime + stime) && (cutime || cstime)) {
-            // childrens resources are too high
+            // children resources are too high
             // lower only the children resources
             utime_fix_ratio  =
             stime_fix_ratio  =
@@ -3519,26 +3520,28 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
-    send_BEGIN(type, "uptime_min", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->uptime_min);
-    }
-    send_END();
+    if (enable_detailed_uptime_charts) {
+        send_BEGIN(type, "uptime_min", dt);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                send_SET(w->name, w->uptime_min);
+        }
+        send_END();
 
-    send_BEGIN(type, "uptime_avg", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->uptime_sum / w->processes);
-    }
-    send_END();
+        send_BEGIN(type, "uptime_avg", dt);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                send_SET(w->name, w->uptime_sum / w->processes);
+        }
+        send_END();
 
-    send_BEGIN(type, "uptime_max", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->uptime_max);
+        send_BEGIN(type, "uptime_max", dt);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                send_SET(w->name, w->uptime_max);
+        }
+        send_END();
     }
-    send_END();
 #endif
 
     send_BEGIN(type, "mem", dt);
@@ -3710,22 +3713,24 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-    }
+    if (enable_detailed_uptime_charts) {
+        fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed))
+                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+        }
 
-    fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-    }
+        fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed))
+                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+        }
 
-    fprintf(stdout, "CHART %s.uptime_max '' '%s Maximum Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+        fprintf(stdout, "CHART %s.uptime_max '' '%s Maximum Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed))
+                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+        }
     }
 #endif
 
@@ -3939,6 +3944,11 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
+        if(strcmp("with-detailed-uptime", argv[i]) == 0) {
+            enable_detailed_uptime_charts = 1;
+            continue;
+        }
+
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "\n"
@@ -3951,34 +3961,36 @@ static void parse_args(int argc, char **argv)
                     "\n"
                     " Available command line options:\n"
                     "\n"
-                    " SECONDS           set the data collection frequency\n"
+                    " SECONDS                set the data collection frequency\n"
                     "\n"
-                    " debug             enable debugging (lot of output)\n"
+                    " debug                  enable debugging (lot of output)\n"
                     "\n"
                     " with-childs\n"
-                    " without-childs    enable / disable aggregating exited\n"
-                    "                   children resources into parents\n"
-                    "                   (default is enabled)\n"
+                    " without-childs         enable / disable aggregating exited\n"
+                    "                        children resources into parents\n"
+                    "                        (default is enabled)\n"
                     "\n"
                     " with-guest\n"
-                    " without-guest     enable / disable reporting guest charts\n"
-                    "                   (default is disabled)\n"
+                    " without-guest          enable / disable reporting guest charts\n"
+                    "                        (default is disabled)\n"
                     "\n"
                     " with-files\n"
-                    " without-files     enable / disable reporting files, sockets, pipes\n"
-                    "                   (default is enabled)\n"
+                    " without-files          enable / disable reporting files, sockets, pipes\n"
+                    "                        (default is enabled)\n"
                     "\n"
-                    " without-users     disable reporting per user charts\n"
+                    " without-users          disable reporting per user charts\n"
                     "\n"
-                    " without-groups    disable reporting per user group charts\n"
+                    " without-groups         disable reporting per user group charts\n"
+                    "\n"
+                    " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
                     "\n"
 #ifndef __FreeBSD__
-                    " fds-cache-secs N  cache the files of processed for N seconds\n"
-                    "                   caching is adaptive per file (when a file\n"
-                    "                   is found, it starts at 0 and while the file\n"
-                    "                   remains open, it is incremented up to the\n"
-                    "                   max given)\n"
-                    "                   (default is %d seconds)\n"
+                    " fds-cache-secs N       cache the files of processed for N seconds\n"
+                    "                        caching is adaptive per file (when a file\n"
+                    "                        is found, it starts at 0 and while the file\n"
+                    "                        remains open, it is incremented up to the\n"
+                    "                        max given)\n"
+                    "                        (default is %d seconds)\n"
                     "\n"
 #endif
                     " version or -v or -V print program version and exit\n"

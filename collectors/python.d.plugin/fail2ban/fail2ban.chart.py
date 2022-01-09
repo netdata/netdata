@@ -11,8 +11,9 @@ from glob import glob
 from bases.FrameworkServices.LogService import LogService
 
 ORDER = [
+    'jails_failed_attempts',
     'jails_bans',
-    'jails_in_jail',
+    'jails_banned_ips',
 ]
 
 
@@ -23,40 +24,49 @@ def charts(jails):
 
     ch = {
         ORDER[0]: {
-            'options': [None, 'Jails Ban Rate', 'bans/s', 'bans', 'jail.bans', 'line'],
+            'options': [None, 'Failed attempts', 'attempts/s', 'failed attempts', 'fail2ban.failed_attempts', 'line'],
             'lines': []
         },
         ORDER[1]: {
-            'options': [None, 'Banned IPs (since the last restart of netdata)', 'IPs', 'in jail',
-                        'jail.in_jail', 'line'],
+            'options': [None, 'Bans', 'bans/s', 'bans', 'fail2ban.bans', 'line'],
+            'lines': []
+        },
+        ORDER[2]: {
+            'options': [None, 'Banned IP addresses (since the last restart of netdata)', 'ips', 'banned ips',
+                        'fail2ban.banned_ips', 'line'],
             'lines': []
         },
     }
     for jail in jails:
-        dim = [
-            jail,
-            jail,
-            'incremental',
-        ]
+        dim = ['{0}_failed_attempts'.format(jail), jail, 'incremental']
         ch[ORDER[0]]['lines'].append(dim)
 
-        dim = [
-            '{0}_in_jail'.format(jail),
-            jail,
-            'absolute',
-        ]
+        dim = [jail, jail, 'incremental']
         ch[ORDER[1]]['lines'].append(dim)
+
+        dim = ['{0}_in_jail'.format(jail), jail, 'absolute']
+        ch[ORDER[2]]['lines'].append(dim)
 
     return ch
 
 
 RE_JAILS = re.compile(r'\[([a-zA-Z0-9_-]+)\][^\[\]]+?enabled\s+= +(true|yes|false|no)')
 
+ACTION_BAN = 'Ban'
+ACTION_UNBAN = 'Unban'
+ACTION_RESTORE_BAN = 'Restore Ban'
+ACTION_FOUND = 'Found'
+
 # Example:
-# 2018-09-12 11:45:53,715 fail2ban.actions[25029]: WARNING [ssh] Unban 195.201.88.33
-# 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Ban 217.59.246.27
-# 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Restore Ban 217.59.246.27
-RE_DATA = re.compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>Unban|Ban|Restore Ban) (?P<ip>[a-f0-9.:]+)')
+# 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Found 203.0.113.1
+# 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Ban 203.0.113.1
+# 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Restore Ban 203.0.113.1
+# 2018-09-12 11:45:53,715 fail2ban.actions[25029]: WARNING [ssh] Unban 203.0.113.1
+RE_DATA = re.compile(
+    r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>{0}|{1}|{2}|{3}) (?P<ip>[a-f0-9.:]+)'.format(
+        ACTION_BAN, ACTION_UNBAN, ACTION_RESTORE_BAN, ACTION_FOUND
+    )
+)
 
 DEFAULT_JAILS = [
     'ssh',
@@ -94,6 +104,7 @@ class Service(LogService):
 
         self.monitoring_jails = self.jails_auto_detection()
         for jail in self.monitoring_jails:
+            self.data['{0}_failed_attempts'.format(jail)] = 0
             self.data[jail] = 0
             self.data['{0}_in_jail'.format(jail)] = 0
 
@@ -124,12 +135,14 @@ class Service(LogService):
 
             jail, action, ip = match['jail'], match['action'], match['ip']
 
-            if action == 'Ban' or action == 'Restore Ban':
+            if action == ACTION_FOUND:
+                self.data['{0}_failed_attempts'.format(jail)] += 1
+            elif action in (ACTION_BAN, ACTION_RESTORE_BAN):
                 self.data[jail] += 1
                 if ip not in self.banned_ips[jail]:
                     self.banned_ips[jail].add(ip)
                     self.data['{0}_in_jail'.format(jail)] += 1
-            else:
+            elif action == ACTION_UNBAN:
                 if ip in self.banned_ips[jail]:
                     self.banned_ips[jail].remove(ip)
                     self.data['{0}_in_jail'.format(jail)] -= 1
@@ -196,9 +209,9 @@ class Service(LogService):
             if name in exclude:
                 continue
 
-            if status in ('true','yes') and name not in active_jails:
+            if status in ('true', 'yes') and name not in active_jails:
                 active_jails.append(name)
-            elif status in ('false','no') and name in active_jails:
+            elif status in ('false', 'no') and name in active_jails:
                 active_jails.remove(name)
 
         return active_jails or DEFAULT_JAILS

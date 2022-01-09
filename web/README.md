@@ -17,14 +17,14 @@ There are two primary ways to view Netdata's dashboards:
 1.  The [local Agent dashboard](/web/gui/README.md) that comes pre-configured with every Netdata installation. You can
     see it at `http://NODE:19999`, replacing `NODE` with `localhost`, the hostname of your node, or its IP address. You
     can customize the contents and colors of the standard dashboard [using
-    JavaScript](/web/gui/README.md#customizing-the-standard-dashboard).
+    JavaScript](/web/gui/README.md#customizing-the-local-dashboard).
 
 2.  The [`dashboard.js` JavaScript library](#dashboardjs), which helps you
-   [customize the standard dashboards](/web/gui/README.md#customizing-the-standard-dashboard)
+   [customize the standard dashboards](/web/gui/README.md#customizing-the-local-dashboard)
    using JavaScript, or create entirely new [custom dashboards](/web/gui/custom/README.md) or
    [Atlassian Confluence dashboards](/web/gui/confluence/README.md).
 
-You can also view all the data Netdata collects through the [REST API v1](/web/api/).
+You can also view all the data Netdata collects through the [REST API v1](/web/api/README.md#netdata-rest-api).
 
 No matter where you use Netdata's charts, you'll want to know how to [use](#using-charts) them. You'll also want to
 understand how Netdata defines [charts](#charts), [dimensions](#dimensions), [families](#families), and
@@ -164,12 +164,12 @@ top-left corner of a chart.
 Given the four example contexts, and two families of `sdb` and `sdd`, Netdata
 will create the following charts and their names:
 
-Context | `sdb` family | `sdd` family
---- | --- | ---
-`disk.io` | `disk_io.sdb` | `disk_io.sdd`
-`disk.ops` | `disk_ops.sdb` | `disk_ops.sdd`
-`disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd`
-`disk.util` | `disk_util.sdb` | `disk_util.sdd`
+| Context        | `sdb` family       | `sdd` family       |
+|----------------|--------------------|--------------------|
+| `disk.io`      | `disk_io.sdb`      | `disk_io.sdd`      |
+| `disk.ops`     | `disk_ops.sdb`     | `disk_ops.sdd`     |
+| `disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd` |
+| `disk.util`    | `disk_util.sdb`    | `disk_util.sdd`    |
 
 And here's what two of those charts in the `disk.io` context look like under
 `sdb` and `sdd` families:

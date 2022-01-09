@@ -979,7 +979,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , NULL
                         , d->chart_family
                         , "net.carrier"
-                        , "Inteface Physical Link State"
+                        , "Interface Physical Link State"
                         , "state"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_NETDEV_NAME

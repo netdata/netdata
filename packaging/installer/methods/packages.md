@@ -6,8 +6,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Install Netdata with .deb/.rpm packages
 
-![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
-
 Netdata provides our own flavour of binary packages for the most common operating systems that use with `.deb` and
 `.rpm` packaging formats.
 

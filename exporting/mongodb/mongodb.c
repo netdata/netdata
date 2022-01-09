@@ -276,7 +276,9 @@ void mongodb_cleanup(struct instance *instance)
 void mongodb_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
+#ifdef NETDATA_INTERNAL_CHECKS
     struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
+#endif
     struct mongodb_specific_data *connector_specific_data =
         (struct mongodb_specific_data *)instance->connector_specific_data;
 

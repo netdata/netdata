@@ -94,7 +94,7 @@ void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned s
 
 void generate_journalfilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintf(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+    (void) snprintfz(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
                     datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 
@@ -428,8 +428,9 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
         iov = uv_buf_init(buf, size_bytes);
         ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
         if (ret < 0) {
-            fatal("uv_fs_read: %s", uv_strerror(ret));
-            /*uv_fs_req_cleanup(&req);*/
+            error("uv_fs_read: pos=%lu, %s", pos, uv_strerror(ret));
+            uv_fs_req_cleanup(&req);
+            goto skip_file;
         }
         fatal_assert(req.result >= 0);
         uv_fs_req_cleanup(&req);
@@ -451,7 +452,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
             max_id = MAX(max_id, id);
         }
     }
-
+skip_file:
     free(buf);
     return max_id;
 }

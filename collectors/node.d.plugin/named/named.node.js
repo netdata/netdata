@@ -233,7 +233,7 @@ var named = {
                     x = keys[len];
 
                     // we maintain an index of the values found
-                    // mapping them to objects splitted
+                    // mapping them to objects split
 
                     look = named.lookups.nsstats[x];
                     if(typeof look === 'undefined') {
@@ -418,7 +418,7 @@ var named = {
                                 var y = ykeys[ylen];
 
                                 // we maintain an index of the values found
-                                // mapping them to objects splitted
+                                // mapping them to objects split
 
                                 look = named.lookups.resolver_stats[y];
                                 if(typeof look === 'undefined') {

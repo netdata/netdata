@@ -49,6 +49,7 @@ while [ "${1}" ]; do
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
     "--disable-telemetry")
+      NETDATA_DISABLE_TELEMETRY=1
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
 
@@ -58,6 +59,7 @@ while [ "${1}" ]; do
 done
 
 if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+  NETDATA_DISABLE_TELEMETRY=1
   REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemetry"
 fi
 
@@ -138,7 +140,7 @@ install_netdata_logrotate || run_failed "Cannot install logrotate file for netda
 progress "Telemetry configuration"
 
 # Opt-out from telemetry program
-if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+if [ -n "${NETDATA_DISABLE_TELEMETRY}" ]; then
   run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 else
   printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file %s \n\n" "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
@@ -212,7 +214,7 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 progress "fix plugin permissions"
 
-for x in apps.plugin freeipmi.plugin ioping cgroup-network; do
+for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then

@@ -11,7 +11,7 @@
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"

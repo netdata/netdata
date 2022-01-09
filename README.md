@@ -4,6 +4,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
+  <a href="https://storage.googleapis.com/netdata-nightlies/latest-version.txt"><img src="https://img.shields.io/badge/dynamic/xml?url=https://storage.googleapis.com/netdata-nightlies/latest-version.txt&label=nightly%20release&query=/text()" alt="Nightly release"></a>
   <a href="https://travis-ci.com/netdata/netdata"><img src="https://travis-ci.com/netdata/netdata.svg?branch=master" alt="Build status"></a>
   <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
@@ -34,11 +35,11 @@ People get addicted to Netdata. Once you use it on your systems, there's no goin
 ![Users who are addicted to
 Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
 
-> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.30.0, March 31, 2021**
+> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.31.0, May 19, 2021**
 >
-> The v1.30.0 release of Netdata brings major improvements to our packaging and completely replaces Google Analytics/GTM
-> for product telemetry. We're also releasing the first changes in an upcoming overhaul to both our dashboard UI/UX and
-> the suite of preconfigured alarms that comes with every installation.
+> The v1.31.0 release of Netdata comes with re-packaged and redesigned elements of the dashboard to help you focus on
+> your metrics, even more Linux kernel insights via eBPF, on-node machine learning to help you find anomalies, and much
+> more.
 
 ## Menu
 
@@ -47,6 +48,7 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
   - [Docker](#docker)
   - [Other operating systems](#other-operating-systems)
   - [Post-installation](#post-installation)
+  - [Netdata Cloud](#netdata-cloud)
 - [How it works](#how-it-works)
 - [Infographic](#infographic)
 - [Documentation](#documentation)
@@ -166,6 +168,14 @@ Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
+
+### Netdata Cloud
+
+Netdata Cloud works with Netdata's free, open-source monitoring agent to help you monitor and troubleshoot every 
+layer of your systems to find weaknesses before they turn into outages. [Using both tools](https://learn.netdata.cloud/docs/agent/claim) 
+can help you turn data into insights immediately.
+
+[Get Netdata Cloud now!](https://app.netdata.cloud/)
 
 ## How it works
 
