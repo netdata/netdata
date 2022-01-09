@@ -29,12 +29,24 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 fetch() {
-  local dir="${1}" url="${2}"
+  local dir="${1}" url="${2}" sha256="${3}"
   local tar="${dir}.tar.gz"
 
   if [ ! -f "${NETDATA_MAKESELF_PATH}/tmp/${tar}" ]; then
     run wget -O "${NETDATA_MAKESELF_PATH}/tmp/${tar}" "${url}"
   fi
+
+  # Check SHA256 of gzip'd tar file (apparently alpine's sha256sum requires
+  # two empty spaces between the checksum and the file's path)
+  set +e
+  echo "${sha256}  ${NETDATA_MAKESELF_PATH}/tmp/${tar}" | sha256sum -c -s
+  local rc=$?
+  if [ ${rc} -ne 0 ]; then
+      echo >&2 "SHA256 verification of tar file ${tar} failed (rc=${rc})"
+      echo >&2 "expected: ${sha256}, got $(sha256sum "${NETDATA_MAKESELF_PATH}/tmp/${tar}")"
+      exit 1
+  fi
+  set -e
 
   if [ ! -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]; then
     cd "${NETDATA_MAKESELF_PATH}/tmp"

@@ -65,7 +65,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                             , "system.cpu"
                             , "Total CPU utilization"
                             , "percentage"
-                            , "macos"
+                            , "macos.plugin"
                             , "mach_smi"
                             , 100
                             , update_every
@@ -119,7 +119,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                             , NULL
                             , "System RAM"
                             , "MiB"
-                            , "macos"
+                            , "macos.plugin"
                             , "mach_smi"
                             , 200
                             , update_every
@@ -166,7 +166,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                             , NULL
                             , "Swap I/O"
                             , "KiB/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "mach_smi"
                             , 250
                             , update_every
@@ -197,7 +197,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                             , NULL
                             , "Memory Page Faults"
                             , "faults/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "mach_smi"
                             , NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS
                             , update_every

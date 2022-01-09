@@ -14,6 +14,11 @@ on:
       - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
+env:
+  DO_NOT_TRACK: 1
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   unit-tests-legacy:
     name: Unit Tests (legacy)
@@ -52,7 +57,7 @@ jobs:
       - name: Configure
         run: |
           autoreconf -ivf
-          ./configure --without-aclk-ng
+          ./configure --disable-ml
       # XXX: Work-around for bug with libbson-1.0 in Ubuntu 18.04
       # See: https://bugs.launchpad.net/ubuntu/+source/libmongoc/+bug/1790771
       #      https://jira.mongodb.org/browse/CDRIVER-2818
@@ -85,7 +90,7 @@ jobs:
           find . -type f -name '*.log' -exec cp {} ../logs/ \;
           popd || exit 1
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v2.2.3
+        uses: actions/upload-artifact@v2.2.4
         if: always()
         with:
           name: logs

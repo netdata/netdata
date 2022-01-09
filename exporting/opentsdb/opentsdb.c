@@ -269,10 +269,12 @@ void opentsdb_http_prepare_header(struct instance *instance)
         simple_connector_data->last_buffer->header,
         "POST /api/put HTTP/1.1\r\n"
         "Host: %s\r\n"
+        "%s"
         "Content-Type: application/json\r\n"
         "Content-Length: %lu\r\n"
         "\r\n",
         instance->config.destination,
+        simple_connector_data->auth_string ? simple_connector_data->auth_string : "",
         buffer_strlen(simple_connector_data->last_buffer->buffer));
 
     return;

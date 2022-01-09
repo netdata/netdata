@@ -6,19 +6,19 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README
 
 # Streaming and replication
 
-Each Netdata is able to replicate/mirror its database to another Netdata, by streaming collected
-metrics, in real-time to it. This is quite different to [data archiving to third party time-series
+Each Netdata is able to replicate/mirror its database to another Netdata, by streaming the collected
+metrics in real-time to it. This is quite different to [data archiving to third party time-series
 databases](/exporting/README.md).
 
 When Netdata streams metrics to another Netdata, the receiving one is able to perform everything a Netdata instance is
-capable of:
+capable of. This includes the following:
 
 -   Visualize metrics with a dashboard
 -   Run health checks that trigger alarms and send alarm notifications
--   Export metrics to a external time-series database
+-   Export metrics to an external time-series database
 
 The nodes that send metrics are called **child** nodes, and the nodes that receive metrics are called **parent** nodes.
-There are also **proxies**, which collects metrics from a child and sends it to a parent.
+There are also **proxy** nodes, which collects metrics from a child and sends it to a parent.
 
 ## Supported configurations
 

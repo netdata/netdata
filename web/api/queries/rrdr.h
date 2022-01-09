@@ -24,6 +24,7 @@ typedef enum rrdr_options {
     RRDR_OPTION_MATCH_NAMES  = 0x00008000, // when filtering dimensions, match only names
     RRDR_OPTION_CUSTOM_VARS  = 0x00010000, // when wrapping response in a JSON, return custom variables in response
     RRDR_OPTION_ALLOW_PAST   = 0x00020000, // The after parameter can extend in the past before the first entry
+    RRDR_OPTION_ANOMALY_BIT  = 0x00040000, // Return the anomaly bit stored in each collected_number
 } RRDR_OPTIONS;
 
 typedef enum rrdr_value_flag {

@@ -99,7 +99,7 @@ library for the build system:
     `externaldeps/libwebsockets`.
 6.  Copy `lib/libwebsockets.a` from the libwebsockets source directory to
     `externaldeps/libwebsockets/libwebsockets.a` in the Netdata source tree.
-7.  Copy the entire contents of `lib/include` from the libwebsockets source
+7.  Copy the entire contents of `include/` from the libwebsockets source
     directory to `externaldeps/libwebsockets/include` in the Netdata source tree.
 
 #### JSON-C
@@ -120,7 +120,7 @@ you can do the following to prepare a copy for the build system:
 4.  Build JSON-C by running `make` in the JSON-C source directory.
 5.  In the Netdata source directory, create a directory called
     `externaldeps/jsonc`.
-6.  Copy `libjson-c.a` fro the JSON-C source directory to
+6.  Copy `libjson-c.a` from the JSON-C source directory to
     `externaldeps/jsonc/libjson-c.a` in the Netdata source tree.
 7.  Copy all of the header files (`*.h`) from the JSON-C source directory
     to `externaldeps/jsonc/json-c` in the Netdata source tree.

@@ -196,13 +196,13 @@ typedef struct statsd_app_chart_dimension {
 } STATSD_APP_CHART_DIM;
 
 typedef struct statsd_app_chart {
-    const char *source;
     const char *id;
     const char *name;
     const char *title;
     const char *family;
     const char *context;
     const char *units;
+    const char *module;
     long priority;
     RRDSET_TYPE chart_type;
     STATSD_APP_CHART_DIM *dimensions;
@@ -1214,10 +1214,15 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     chart->next = app->charts;
                     app->charts = chart;
 
-                    {
-                        char lineandfile[FILENAME_MAX + 1];
-                        snprintfz(lineandfile, FILENAME_MAX, "%zu@%s", line, filename);
-                        chart->source = strdupz(lineandfile);
+                    if (!strncmp(
+                            filename,
+                            netdata_configured_stock_config_dir,
+                            strlen(netdata_configured_stock_config_dir))) {
+                        char tmpfilename[FILENAME_MAX + 1];
+                        strncpyz(tmpfilename, filename, FILENAME_MAX);
+                        chart->module = strdupz(basename(tmpfilename));
+                    } else {
+                        chart->module = strdupz("synthetic_chart");
                     }
                 }
             }
@@ -1996,7 +2001,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , chart->title              // title
                 , chart->units              // units
                 , PLUGIN_STATSD_NAME        // plugin
-                , chart->source             // module
+                , chart->module             // module
                 , chart->priority           // priority
                 , statsd.update_every       // update every
                 , chart->chart_type         // chart type
@@ -2175,8 +2180,8 @@ void *statsd_main(void *ptr) {
         statsd.histogram_percentile = 95.0;
     }
     {
-        char buffer[100 + 1];
-        snprintf(buffer, 100, "%0.1f%%", statsd.histogram_percentile);
+        char buffer[314 + 1];
+        snprintfz(buffer, 314, "%0.1f%%", statsd.histogram_percentile);
         statsd.histogram_percentile_str = strdupz(buffer);
     }
 
@@ -2436,7 +2441,7 @@ void *statsd_main(void *ptr) {
         char title[100 + 1];
 
         snprintfz(id, 100, "plugin_statsd_collector%d_cpu", i + 1);
-        snprintfz(title, 100, "NetData statsd collector thread No %d CPU usage", i + 1);
+        snprintfz(title, 100, "Netdata statsd collector thread No %d CPU usage", i + 1);
 
         statsd.collection_threads_status[i].st_cpu = rrdset_create_localhost(
                 "netdata"

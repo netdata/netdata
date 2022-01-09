@@ -24,11 +24,11 @@ ORDER = [
 
 CHARTS = {
     'z': {
-        'options': ['z', 'Z Score', 'z', 'Z Score', 'z', 'line'],
+        'options': ['z', 'Z Score', 'z', 'Z Score', 'zscores.z', 'line'],
         'lines': []
     },
     '3stddev': {
-        'options': ['3stddev', 'Z Score >3', 'count', '3 Stddev', '3stddev', 'stacked'],
+        'options': ['3stddev', 'Z Score >3', 'count', '3 Stddev', 'zscores.3stddev', 'stacked'],
         'lines': []
     },
 }

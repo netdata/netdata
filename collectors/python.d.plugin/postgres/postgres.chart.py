@@ -55,6 +55,8 @@ QUERY_NAME_REPSLOT_FILES = 'REPSLOT_FILES'
 QUERY_NAME_IF_SUPERUSER = 'IF_SUPERUSER'
 QUERY_NAME_SERVER_VERSION = 'SERVER_VERSION'
 QUERY_NAME_AUTOVACUUM = 'AUTOVACUUM'
+QUERY_NAME_FORCED_AUTOVACUUM = 'FORCED_AUTOVACUUM'
+QUERY_NAME_TX_WRAPAROUND = 'TX_WRAPAROUND'
 QUERY_NAME_DIFF_LSN = 'DIFF_LSN'
 QUERY_NAME_WAL_WRITES = 'WAL_WRITES'
 
@@ -135,6 +137,13 @@ METRICS = {
         'vacuum_freeze',
         'brin_summarize'
     ],
+    QUERY_NAME_FORCED_AUTOVACUUM: [
+        'percent_towards_forced_vacuum'
+    ],
+    QUERY_NAME_TX_WRAPAROUND: [
+        'oldest_current_xid',
+        'percent_towards_wraparound'
+    ],
     QUERY_NAME_STANDBY_DELTA: [
         'sent_delta',
         'write_delta',
@@ -187,7 +196,7 @@ FROM
     FROM pg_catalog.pg_ls_dir('pg_wal') AS wal(name)
     WHERE name ~ '^[0-9A-F]{24}$'
     ORDER BY
-        (pg_stat_file('pg_wal/'||name)).modification,
+        (pg_stat_file('pg_wal/'||name, true)).modification,
         wal.name DESC) sub;
 """,
     V96: """
@@ -214,7 +223,7 @@ FROM
     FROM pg_catalog.pg_ls_dir('pg_xlog') AS wal(name)
     WHERE name ~ '^[0-9A-F]{24}$'
     ORDER BY
-        (pg_stat_file('pg_xlog/'||name)).modification,
+        (pg_stat_file('pg_xlog/'||name, true)).modification,
         wal.name DESC) sub;
 """,
 }
@@ -446,17 +455,18 @@ FROM pg_stat_database
 WHERE
     has_database_privilege(
       (SELECT current_user), datname, 'connect')
-    AND NOT datname ~* '^template\d';
+    AND NOT datname ~* '^template\d'
+ORDER BY datname;
 """,
 }
 
 QUERY_STANDBY = {
     DEFAULT: """
 SELECT
-    application_name
-FROM pg_stat_replication
-WHERE application_name IS NOT NULL
-GROUP BY application_name;
+    COALESCE(prs.slot_name, psr.application_name) application_name
+FROM pg_stat_replication psr
+LEFT OUTER JOIN pg_replication_slots prs on psr.pid = prs.active_pid
+WHERE application_name IS NOT NULL;
 """,
 }
 
@@ -470,7 +480,7 @@ FROM pg_replication_slots;
 QUERY_STANDBY_DELTA = {
     DEFAULT: """
 SELECT
-    application_name,
+    COALESCE(prs.slot_name, psr.application_name) application_name,
     pg_wal_lsn_diff(
       CASE pg_is_in_recovery()
         WHEN true THEN pg_last_wal_receive_lsn()
@@ -495,12 +505,13 @@ SELECT
         ELSE pg_current_wal_lsn()
       END,
     replay_lsn) AS replay_delta
-FROM pg_stat_replication
+FROM pg_stat_replication psr
+LEFT OUTER JOIN pg_replication_slots prs on psr.pid = prs.active_pid
 WHERE application_name IS NOT NULL;
 """,
     V96: """
 SELECT
-    application_name,
+    COALESCE(prs.slot_name, psr.application_name) application_name,
     pg_xlog_location_diff(
       CASE pg_is_in_recovery()
         WHEN true THEN pg_last_xlog_receive_location()
@@ -525,7 +536,8 @@ SELECT
         ELSE pg_current_xlog_location()
       END,
     replay_location) AS replay_delta
-FROM pg_stat_replication
+FROM pg_stat_replication psr
+LEFT OUTER JOIN pg_replication_slots prs on psr.pid = prs.active_pid
 WHERE application_name IS NOT NULL;
 """,
 }
@@ -533,11 +545,12 @@ WHERE application_name IS NOT NULL;
 QUERY_STANDBY_LAG = {
     DEFAULT: """
 SELECT
-    application_name,
+    COALESCE(prs.slot_name, psr.application_name) application_name,
     COALESCE(EXTRACT(EPOCH FROM write_lag)::bigint, 0) AS write_lag,
     COALESCE(EXTRACT(EPOCH FROM flush_lag)::bigint, 0) AS flush_lag,
     COALESCE(EXTRACT(EPOCH FROM replay_lag)::bigint, 0) AS replay_lag
-FROM pg_stat_replication
+FROM pg_stat_replication psr
+LEFT OUTER JOIN pg_replication_slots prs on psr.pid = prs.active_pid
 WHERE application_name IS NOT NULL;
 """
 }
@@ -564,8 +577,20 @@ FROM
         slot_type,
         COALESCE (
           floor(
-            (pg_wal_lsn_diff(pg_current_wal_lsn (),slot.restart_lsn)
-             - (pg_walfile_name_offset (restart_lsn)).file_offset) / (s.val)
+            CASE WHEN pg_is_in_recovery()
+            THEN (
+              pg_wal_lsn_diff(pg_last_wal_receive_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_wal_lsn_diff(restart_lsn, '0/0') %% s.val)
+            ) / s.val
+            ELSE (
+              pg_wal_lsn_diff(pg_current_wal_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_walfile_name_offset(restart_lsn)).file_offset
+            ) / s.val
+            END
           ),0) AS replslot_wal_keep
     FROM pg_replication_slots slot
     LEFT JOIN (
@@ -603,8 +628,20 @@ FROM
         slot_type,
         COALESCE (
           floor(
-            (pg_wal_lsn_diff(pg_current_wal_lsn (),slot.restart_lsn)
-             - (pg_walfile_name_offset (restart_lsn)).file_offset) / (s.val)
+            CASE WHEN pg_is_in_recovery()
+            THEN (
+              pg_wal_lsn_diff(pg_last_wal_receive_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_wal_lsn_diff(restart_lsn, '0/0') %% s.val)
+            ) / s.val
+            ELSE (
+              pg_wal_lsn_diff(pg_current_wal_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_walfile_name_offset(restart_lsn)).file_offset
+            ) / s.val
+            END
           ),0) AS replslot_wal_keep
     FROM pg_replication_slots slot
     LEFT JOIN (
@@ -647,6 +684,43 @@ SELECT
     count(*) FILTER (WHERE query LIKE 'autovacuum: BRIN summarize%%') AS brin_summarize
 FROM pg_stat_activity
 WHERE query NOT LIKE '%%pg_stat_activity%%';
+""",
+}
+
+QUERY_FORCED_AUTOVACUUM = {
+    DEFAULT: """
+WITH max_age AS (
+    SELECT setting AS autovacuum_freeze_max_age
+        FROM pg_catalog.pg_settings
+        WHERE name = 'autovacuum_freeze_max_age' )
+, per_database_stats AS (
+    SELECT datname
+        , m.autovacuum_freeze_max_age::int
+        , age(d.datfrozenxid) AS oldest_current_xid
+    FROM pg_catalog.pg_database d
+    JOIN max_age m ON (true)
+    WHERE d.datallowconn )
+SELECT max(ROUND(100*(oldest_current_xid/autovacuum_freeze_max_age::float))) AS percent_towards_forced_autovacuum
+FROM per_database_stats;
+""",
+}
+
+QUERY_TX_WRAPAROUND = {
+    DEFAULT: """
+WITH max_age AS (
+    SELECT 2000000000 as max_old_xid
+        FROM pg_catalog.pg_settings
+        WHERE name = 'autovacuum_freeze_max_age' )
+, per_database_stats AS (
+    SELECT datname
+        , m.max_old_xid::int
+        , age(d.datfrozenxid) AS oldest_current_xid
+    FROM pg_catalog.pg_database d
+    JOIN max_age m ON (true)
+    WHERE d.datallowconn )
+SELECT max(oldest_current_xid) AS oldest_current_xid
+    , max(ROUND(100*(oldest_current_xid/max_old_xid::float))) AS percent_towards_wraparound
+FROM per_database_stats;
 """,
 }
 
@@ -712,6 +786,10 @@ def query_factory(name, version=NO_VERSION):
         return QUERY_SHOW_VERSION[DEFAULT]
     elif name == QUERY_NAME_AUTOVACUUM:
         return QUERY_AUTOVACUUM[DEFAULT]
+    elif name == QUERY_NAME_FORCED_AUTOVACUUM:
+        return QUERY_FORCED_AUTOVACUUM[DEFAULT]
+    elif name == QUERY_NAME_TX_WRAPAROUND:
+        return QUERY_TX_WRAPAROUND[DEFAULT]
     elif name == QUERY_NAME_WAL:
         if version < 100000:
             return QUERY_WAL[V96]
@@ -767,7 +845,10 @@ ORDER = [
     'replication_slot',
     'standby_delta',
     'standby_lag',
-    'autovacuum'
+    'autovacuum',
+    'forced_autovacuum',
+    'tx_wraparound_oldest_current_xid',
+    'tx_wraparound_percent_towards_wraparound'
 ]
 
 CHARTS = {
@@ -952,6 +1033,24 @@ CHARTS = {
             ['vacuum_analyze', 'vacuum analyze', 'absolute'],
             ['vacuum_freeze', 'vacuum freeze', 'absolute'],
             ['brin_summarize', 'brin summarize', 'absolute']
+        ]
+    },
+    'forced_autovacuum': {
+        'options': [None, 'Percent towards forced autovacuum', 'percent', 'autovacuum', 'postgres.forced_autovacuum', 'line'],
+        'lines': [
+            ['percent_towards_forced_autovacuum', 'percent', 'absolute']
+        ]
+    },
+    'tx_wraparound_oldest_current_xid': {
+        'options': [None, 'Oldest current XID', 'xid', 'tx_wraparound', 'postgres.tx_wraparound_oldest_current_xid', 'line'],
+        'lines': [
+            ['oldest_current_xid', 'xid', 'absolute']
+        ]
+    },
+    'tx_wraparound_percent_towards_wraparound': {
+        'options': [None, 'Percent towards wraparound', 'percent', 'tx_wraparound', 'postgres.percent_towards_wraparound', 'line'],
+        'lines': [
+            ['percent_towards_wraparound', 'percent', 'absolute']
         ]
     },
     'standby_delta': {
@@ -1179,6 +1278,9 @@ class Service(SimpleService):
 
         if self.server_version >= 90400:
             self.queries[query_factory(QUERY_NAME_AUTOVACUUM)] = METRICS[QUERY_NAME_AUTOVACUUM]
+
+        self.queries[query_factory(QUERY_NAME_FORCED_AUTOVACUUM)] = METRICS[QUERY_NAME_FORCED_AUTOVACUUM]
+        self.queries[query_factory(QUERY_NAME_TX_WRAPAROUND)] = METRICS[QUERY_NAME_TX_WRAPAROUND]
 
         if self.server_version >= 100000:
             self.queries[query_factory(QUERY_NAME_STANDBY_LAG)] = METRICS[QUERY_NAME_STANDBY_LAG]

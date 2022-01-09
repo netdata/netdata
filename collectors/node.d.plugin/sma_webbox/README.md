@@ -6,7 +6,7 @@ sidebar_label: "SMA Sunny WebBox"
 
 # SMA Sunny WebBox monitoring with Netdata
 
-Montiroing for the [SMA Sunny
+Monitoring for the [SMA Sunny
 WebBox](https://www.sma-sunny.com/en/questions-and-answers-on-discontinuation-of-the-sunny-webbox/).
 
 The module supports any number of name servers:

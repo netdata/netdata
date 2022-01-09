@@ -3,13 +3,17 @@
 #ifndef NETDATA_EBPF_CACHESTAT_H
 #define NETDATA_EBPF_CACHESTAT_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_CACHESTAT "cachestat"
+
 // charts
 #define NETDATA_CACHESTAT_HIT_RATIO_CHART "cachestat_ratio"
 #define NETDATA_CACHESTAT_DIRTY_CHART "cachestat_dirties"
 #define NETDATA_CACHESTAT_HIT_CHART "cachestat_hits"
 #define NETDATA_CACHESTAT_MISSES_CHART "cachestat_misses"
 
-#define NETDATA_CACHESTAT_SUBMENU "page cache (eBPF)"
+#define NETDATA_CACHESTAT_SUBMENU "page_cache"
+#define NETDATA_CACHESTAT_CGROUP_SUBMENU "page cache (eBPF)"
 
 #define EBPF_CACHESTAT_DIMENSION_PAGE "pages/s"
 #define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
@@ -19,6 +23,17 @@
 
 // configuration file
 #define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
+
+// Contexts
+#define NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT "cgroup.cachestat_ratio"
+#define NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT "cgroup.cachestat_dirties"
+#define NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT "cgroup.cachestat_hits"
+#define NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT "cgroup.cachestat_misses"
+
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT "services.cachestat_ratio"
+#define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "services.cachestat_dirties"
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "services.cachestat_hits"
+#define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "services.cachestat_misses"
 
 // variables
 enum cachestat_counters {
@@ -37,7 +52,7 @@ enum cachestat_indexes {
     NETDATA_CACHESTAT_IDX_MISS
 };
 
-enum cachesta_tables {
+enum cachestat_tables {
     NETDATA_CACHESTAT_GLOBAL_STATS,
     NETDATA_CACHESTAT_PID_STATS
 };

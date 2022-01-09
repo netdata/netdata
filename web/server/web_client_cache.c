@@ -79,7 +79,7 @@ static struct web_client *web_client_alloc(void) {
 // Comments per server:
 // SINGLE-THREADED : 1 cache is maintained
 // MULTI-THREADED  : 1 cache is maintained
-// STATIC-THREADED : 1 cache for each thred of the web server
+// STATIC-THREADED : 1 cache for each thread of the web server
 
 __thread struct clients_cache web_clients_cache = {
         .pid = 0,

@@ -6,7 +6,7 @@
 
 void generate_metadata_logfile_path(struct metadata_logfile *metalogfile, char *str, size_t maxlen)
 {
-    (void) snprintf(str, maxlen, "%s/" METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL METALOG_EXTENSION,
+    (void) snprintfz(str, maxlen, "%s/" METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL METALOG_EXTENSION,
                     metalogfile->ctx->rrdeng_ctx->dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
 }
 

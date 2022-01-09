@@ -28,7 +28,7 @@ dashboard](https://user-images.githubusercontent.com/1153921/80825153-abaec600-8
 
 **What's next?**: 
 
--   Read more about the [standard Netdata dashboard](/web/gui/).
+-   Read more about the [standard Netdata dashboard](/web/gui/README.md).
 -   Learn all the specifics of [using charts](/web/README.md#using-charts) or the differences between [charts,
     context, and families](/web/README.md#charts-contexts-families).
 
@@ -51,9 +51,9 @@ Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata) t
 
 -   [Change how long Netdata stores metrics](#change-how-long-netdata-stores-metrics) by changing the `page cache size`
     and `dbengine disk space` settings in `netdata.conf`.
--   Move Netdata's dashboard to a [different port](/web/server/) or enable TLS/HTTPS
+-   Move Netdata's dashboard to a [different port](/web/server/README.md) or enable TLS/HTTPS
     encryption.
--   See all the `netdata.conf` options in our [daemon configuration documentation](/daemon/config/).
+-   See all the `netdata.conf` options in our [daemon configuration documentation](/daemon/config/README.md).
 -   Run your own [registry](/registry/README.md#run-your-own-registry).
 
 ## Change how long Netdata stores metrics
@@ -86,7 +86,7 @@ Netdata](#start-stop-and-restart-netdata).
 
 However, auto-detection only works if you installed the source using its standard installation procedure. If Netdata
 isn't collecting metrics after a restart, your source probably isn't configured correctly. Look at the [external plugin
-documentation](/collectors/plugins.d/) to find the appropriate module for your source. Those pages will contain
+documentation](/collectors/plugins.d/README.md) to find the appropriate module for your source. Those pages will contain
 more information about how to configure your source for auto-detection.
 
 Some modules, like `chrony`, are disabled by default and must be enabled manually for auto-detection to work.
@@ -186,7 +186,7 @@ Find the `SEND_EMAIL="YES"` line and change it to `SEND_EMAIL="NO"`.
 -   Follow the [health quickstart](/health/QUICKSTART.md) to locate and edit existing health entities, and then
     create your own.
 -   See all the alarm options via the [health configuration reference](/health/REFERENCE.md).
--   Add a new notification method, like [Slack](/health/notifications/slack/).
+-   Add a new notification method, like [Slack](/health/notifications/slack/README.md).
 
 ## Monitor multiple systems with Netdata Cloud
 
@@ -203,7 +203,7 @@ You can use these features together or separately&mdash;the decision is up to yo
 
 -   Sign up for [Netdata Cloud](https://app.netdata.cloud).
 -   Read the [infrastructure monitoring quickstart](/docs/quickstart/infrastructure.md).
--   Better understand how the Netdata Agent connects securely to Netdata Cloud with [claiming](/claim/README.md) and
+-   Better understand how the Netdata Agent connects securely to Netdata Cloud with [connection process](/claim/README.md) and
     [Agent-Cloud link](/aclk/README.md) documentation.
 
 ## Start, stop, and restart Netdata
@@ -221,7 +221,7 @@ details.
 ## What's next?
 
 Even after you've configured `netdata.conf`, tweaked alarms, learned the basics of performance troubleshooting, and
-claimed all your systems in Netdata Cloud or added them to the Visited nodes menu, you've just gotten started with
+connected all your systems in Netdata Cloud or added them to the Visited nodes menu, you've just gotten started with
 Netdata.
 
 Take a look at some more advanced features and configurations:
@@ -230,7 +230,7 @@ Take a look at some more advanced features and configurations:
 -   Enable long-term archiving of Netdata metrics via [exporting engine](/exporting/README.md) to time-series databases.
 -   Improve security by putting Netdata behind an [Nginx proxy with SSL](/docs/Running-behind-nginx.md).
 
-Or, learn more about how you can contribute to [Netdata core](/CONTRIBUTING.md) or our
+Or, learn more about how you can contribute to [Netdata core](/README.md#contribute) or our
 [documentation](/docs/contributing/contributing-documentation.md)!
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fgetting-started&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

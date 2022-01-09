@@ -21,7 +21,7 @@ will install the content into `/opt/netdata`, making future removal safe and sim
 When Netdata is first installed, it will run as _root_. This may or may not be acceptable for you, and since other
 installations run it as the `netdata` user, you might wish to do the same. This requires some extra work:
 
-1.  Creat a group `netdata` via the Synology group interface. Give it no access to anything.
+1.  Create a group `netdata` via the Synology group interface. Give it no access to anything.
 2.  Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign
     the user to the `netdata` group. Netdata will chuid to this user when running.
 3.  Change ownership of the following directories, as defined in [Netdata
@@ -31,6 +31,14 @@ installations run it as the `netdata` user, you might wish to do the same. This 
 chown -R root:netdata /opt/netdata/usr/share/netdata
 chown -R netdata:netdata /opt/netdata/var/lib/netdata /opt/netdata/var/cache/netdata
 chown -R netdata:root /opt/netdata/var/log/netdata
+```
+
+4. Uncomment and set `web files owner` to `root`, and `web files group` to `netdata` in
+   the `/opt/netdata/etc/netdata/netdata.conf`.
+5. Restart Netdata
+
+```sh
+/etc/rc.netdata restart
 ```
 
 ## Create startup script

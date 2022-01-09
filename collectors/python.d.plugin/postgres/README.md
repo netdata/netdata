@@ -12,6 +12,8 @@ Collects database health and performance metrics.
 
 -   `python-psycopg2` package. You have to install it manually and make sure that it is available to the `netdata` user, either using `pip`, the package manager of your Linux distribution, or any other method you prefer.
 
+-   PostgreSQL v9.4+
+
 Following charts are drawn:
 
 1.  **Database size** MB

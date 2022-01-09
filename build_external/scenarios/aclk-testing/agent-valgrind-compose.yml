@@ -5,8 +5,8 @@ services:
       context: ../../..
       dockerfile: build_external/make-install.Dockerfile
       args:
-      - DISTRO=arch
-      - VERSION=extras
+        - DISTRO=arch
+        - VERSION=extras
     image: arch_extras_dev:latest
     command: >
       sh -c "echo -n 00000000-0000-0000-0000-000000000000 >/var/lib/netdata/cloud.d/claimed_id &&
@@ -15,5 +15,4 @@ services:
              echo '  agent cloud link port = 9002' >>/etc/netdata/netdata.conf &&
              /usr/sbin/valgrind --leak-check=full /usr/sbin/netdata -D -W debug_flags=0x200000000"
     ports:
-    - 20000:19999
-
+      - 20000:19999

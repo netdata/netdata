@@ -137,7 +137,7 @@ more than 256.
 ```
 
 Use our [database sizing
-calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 and [guide on storing historical metrics](/docs/guides/longer-metrics-storage.md) to help you determine the right
 setting for your Raspberry Pi.
 

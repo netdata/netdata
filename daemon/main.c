@@ -28,7 +28,6 @@ void netdata_cleanup_and_exit(int ret) {
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
-    analytics_free_data();
 
     char agent_crash_file[FILENAME_MAX + 1];
     char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
@@ -45,6 +44,9 @@ void netdata_cleanup_and_exit(int ret) {
 
         // stop everything
         info("EXIT: stopping static threads...");
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        aclk_sync_exit_all();
+#endif
         cancel_main_threads();
 
         // free the database
@@ -104,6 +106,7 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_PLUGINSD
     NETDATA_PLUGIN_HOOK_HEALTH
     NETDATA_PLUGIN_HOOK_ANALYTICS
+    NETDATA_PLUGIN_HOOK_SERVICE
 
     {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
 };
@@ -360,13 +363,16 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W sqlite-check          Check metadata database integrity and exit.\n\n"
+            "  -W sqlite-fix            Check metadata database integrity, fix if needed and exit.\n\n"
+            "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F\n"
             "                           Run a DB engine stress test for A seconds,\n"
             "                           with B writers and C readers, with a ramp up\n"
             "                           time of D seconds for writers, a page cache\n"
-            "                           size of E MiB, an optional disk space limit"
+            "                           size of E MiB, an optional disk space limit\n"
             "                           of F MiB and exit.\n\n"
 #endif
             "  -W set section option value\n"
@@ -801,6 +807,20 @@ int main(int argc, char **argv) {
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 #endif
+                        if(strcmp(optarg, "sqlite-check") == 0) {
+                            sql_init_database(DB_CHECK_INTEGRITY);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "sqlite-fix") == 0) {
+                            sql_init_database(DB_CHECK_FIX_DB);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "sqlite-compact") == 0) {
+                            sql_init_database(DB_CHECK_RECLAIM_SPACE);
+                            return 0;
+                        }
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -822,9 +842,15 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                             if(test_dbengine()) return 1;
 #endif
+                            if(test_sqlite()) return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
+#ifdef ENABLE_ML_TESTS
+                        else if(strcmp(optarg, "mltest") == 0) {
+                            return test_ml(argc, argv);
+                        }
+#endif
 #ifdef ENABLE_DBENGINE
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -1128,7 +1154,10 @@ int main(int argc, char **argv) {
         // get log filenames and settings
         log_init();
         error_log_limit_unlimited();
+        // initialize the log files
+        open_all_log_files();
 
+        get_system_timezone();
         // --------------------------------------------------------------------
         // get the certificate and start security
 #ifdef ENABLE_HTTPS
@@ -1139,6 +1168,10 @@ int main(int argc, char **argv) {
         // This is the safest place to start the SILENCERS structure
         set_silencers_filename();
         health_initialize_global_silencers();
+
+        // --------------------------------------------------------------------
+        // Initialize ML configuration
+        ml_init();
 
         // --------------------------------------------------------------------
         // setup process signals
@@ -1177,9 +1210,6 @@ int main(int argc, char **argv) {
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
     }
-
-    // initialize the log files
-    open_all_log_files();
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1230,6 +1260,7 @@ int main(int argc, char **argv) {
     netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
+    system_info->hops = 0;
 
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
@@ -1267,6 +1298,8 @@ int main(int argc, char **argv) {
 
     netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_GLOBAL, "enable zero metrics", CONFIG_BOOLEAN_NO);
 
+    set_late_global_environment();
+
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -1285,8 +1318,6 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
-
-    set_late_global_environment();
 
     send_statistics("START", "-",  "-");
     if (crash_detected)
