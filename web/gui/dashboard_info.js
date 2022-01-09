@@ -4161,8 +4161,8 @@ netdataDashboard.context = {
     'services.throttle_io_ops_write': {
         info: 'The number of write operations performed on specific devices as seen by the throttling policy.'
     },
-    'postgres.stat_replication': {
-        info: 'Stat Replication.<ul>' +
+    'postgres.db_replication': {
+        info: 'Replication DB.<ul>' +
             '<li><strong>nodes:</strong> Nodes are replications of the master database.</li>' +
             '</ul>' +
             'Node equal to 1 is active.<br/>' +
