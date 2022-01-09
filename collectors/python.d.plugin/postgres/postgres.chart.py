@@ -1300,7 +1300,7 @@ class Service(SimpleService):
         if self.server_version >= 100000:
             self.queries[query_factory(QUERY_NAME_STANDBY_LAG)] = METRICS[QUERY_NAME_STANDBY_LAG]
 
-        QUERY_DB_REPLICATION[DEFAULT] = CREATE_DB_QUERY(self.secondaries)
+        QUERY_DB_REPLICATION[DEFAULT] = create_db_query(self.secondaries)
         self.queries[query_factory(QUERY_NAME_DB_REPLICATION, self.server_version)] = METRICS[QUERY_NAME_DB_REPLICATION]
 
     def create_dynamic_charts(self):
@@ -1481,7 +1481,7 @@ def add_db_replications_chart(s,order, definitions, name, secondaries):
         'options': [name, title, units, 'replication db', context, chart_type],
         'lines': create_lines(chart_template['lines'], secondaries)}
 
-def CREATE_DB_QUERY(secondaries):
+def create_db_query(secondaries):
     DB_QUERY = """
     (SELECT count(1) AS on 
     FROM pg_stat_replication 
