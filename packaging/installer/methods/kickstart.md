@@ -108,8 +108,8 @@ you can do so by adding `--native-only` to the options you pass to the installer
 
 ### Static builds
 
-We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86,
-ARMv7, and AArch64 hardware. These static builds are able to operate in a mostly self-contained manner and only
+We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
+AArch64, and POWER8+ hardware. These static builds are able to operate in a mostly self-contained manner and only
 require a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
 you are on a platform which we provide static builds for but do not provide native packages for, a static build
 will be used by default for installation.
