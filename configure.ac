@@ -1340,12 +1340,14 @@ PKG_CHECK_MODULES(
     [have_libgrpc=no]
 )
 
-PKG_CHECK_MODULES(
-    [PUBSUB],
-    [googleapis_cpp_pubsub_protos],
-    [have_pubsub_protos=yes],
-    [have_pubsub_protos=no]
-)
+if test "${enable_exporting_pubsub}" != "no"; then
+    PKG_CHECK_MODULES(
+        [PUBSUB],
+        [google_cloud_cpp_pubsub_protos],
+        [have_pubsub_protos=yes],
+        [have_pubsub_protos=no]
+    )
+fi
 
 AC_PATH_PROG([CXX_BINARY], [${CXX}], [no])
 AS_IF(
