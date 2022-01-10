@@ -1,9 +1,8 @@
-# shellcheck shell=bash
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
 #
-# Made by Alexandre Azedo <aazedo@gocontact.pt>
+# Made by Alexandre Azedo | SRE <aazedo@gocontact.pt>
 # 2021
 
 # _update_every is a special variable - it holds the number of seconds
@@ -32,7 +31,7 @@ nvme_get() {
   # 4. USE LOCAL VARIABLES (global variables may overlap with other modules)
   nvme_list=$(sudo -n nvme list | awk '/nvme/ { print $1 }')
   local i=
-  for i in $nvme_list;do
+  for i in ${nvme_list[*]};do
     
     h=${i/\/dev\//}
 	
