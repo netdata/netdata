@@ -318,7 +318,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 
     uint64_t first_sequence;
     uint64_t last_sequence;
-    time_t last_timestamp;
+    time_t last_timestamp = 0;
 
     BUFFER *sql = buffer_create(1024);
 
@@ -979,6 +979,8 @@ int queue_chart_to_aclk(RRDSET *st)
 #ifndef ENABLE_NEW_CLOUD_PROTOCOL
 #ifdef ENABLE_ACLK
     aclk_update_chart(st->rrdhost, st->id, 1);
+#else
+    UNUSED(st);
 #endif
     return 0;
 #else

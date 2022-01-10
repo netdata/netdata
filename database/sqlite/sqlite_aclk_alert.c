@@ -724,6 +724,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 }
 #endif
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
 {
     ALARM_ENTRY *ae = host->health_log.alarms;
@@ -737,6 +738,7 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
 
     return 0;
 }
+#endif
 
 #define ALARM_EVENTS_PER_CHUNK 10
 void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
