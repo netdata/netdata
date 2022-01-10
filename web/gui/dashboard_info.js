@@ -2178,7 +2178,7 @@ netdataDashboard.context = {
     },
 
     'netfilter.conntrack_new': {
-        info: '<p>Packet tracking statistics.</p>'+
+        info: '<p>Packet tracking statistics. <b>New</b> (since v4.9) and <b>Ignore</b> (since v5.10) are hardcoded to zeros in the latest kernel.</p>'+
         '<p><b>New</b> - conntrack entries added which were not expected before. '+
         '<b>Ignore</b> - packets seen which are already connected to a conntrack entry. '+
         '<b>Invalid</b> - packets seen which can not be tracked.</p>'
