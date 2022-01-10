@@ -24,6 +24,12 @@ size_t get_write_request_size(void *write_request_p);
 
 int pack_and_clear_write_request(void *write_request_p, char *buffer, size_t *size);
 
+int convert_write_request_to_string(
+    const char *compressed_write_request,
+    size_t compressed_size,
+    char *buffer,
+    size_t size);
+
 void protocol_buffers_shutdown();
 
 #ifdef __cplusplus
