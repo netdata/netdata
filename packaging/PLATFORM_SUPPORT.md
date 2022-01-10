@@ -9,7 +9,7 @@ Netdata defines three tiers of official support: Core, Intermediate, and Communi
 guarantees for platforms in that tier, as follows:
 
 - **Core**: Platforms in the core support tier are our top priority. They are covered rigorously in our CI, usually
-  include official binary packages, and any platform specific bugs recieve a high priority. From the perspective
+  include official binary packages, and any platform-specific bugs receive a high priority. From the perspective
   of our developers, platforms in the core support tier _must_ work, with almost no exceptions.
 - **Intermediate**: Platforms in the intermediate support tier are those which Netdata wants to support, but cannot
   justify core level support for. They are also covered in CI, but not as rigorously as the core tier, may or may
@@ -21,17 +21,17 @@ guarantees for platforms in that tier, as follows:
 
 Additionally, we define two categories for special cases that we do not support:
 
-- **Third-party Supported Platforms**: Some platform maintainers actively support Netdata on their platforms even
+- **Third-party supported platforms**: Some platform maintainers actively support Netdata on their platforms even
   though we do not provide official support. Third-party supported platforms may work, but the experience of using
   Netdata on such platforms is not something we can guarantee. Users reporting bugs when using externally supported
   platforms will be asked to either reproduce the issue on a supported platform or direct their support request
   to the platform maintainers.
 - **Previously Supported**: As platforms become End Of Life upstream, Netdata will stop officially supporting
-  them. We will generally not go out of our way to break things on these platforms, but we will also not make any
+  them. We will not actively break things on these platforms, but we will also not make any
   effort to ensure that things keep working on them either. Additionally, Netdata may occasionally move an
   older supported platform to this tier if we can no longer provide full support for it for technical reasons.
-  Users reporting bugs on previously supported platforms will be asked to reproduce the issue on a currently
-  supported platform, and if they cannot the issue will be closed.
+  If you report a bug on a previously supported platforms, we will ask you to reproduce the issue on a currently
+  supported platform. If the issue is not reproducible, it will be closed.
 
 Any platforms not listed in any of these categories may or may not work
 
@@ -66,9 +66,9 @@ A general outline of the various support tiers and categories is shown in the fo
 - ‘Native Packages’: Whether we provide native packages for the system package manager for the platform.
 - ‘Static Build Support’: How well our static builds are expected to work on the platform.
 
-# Currently supported platforms
+## Currently supported platforms
 
-## Core
+### Core
 
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
@@ -89,7 +89,7 @@ A general outline of the various support tiers and categories is shown in the fo
 | Ubuntu | 20.04 | x86\_64, i386, ARMv7, AArch64 | |
 | Ubuntu | 18.04 | x86\_64, i386, ARMv7, AArch64 | |
 
-## Intermediate
+### Intermediate
 
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
@@ -99,7 +99,7 @@ A general outline of the various support tiers and categories is shown in the fo
 | Arch Linux | Latest | No | We officially recommend the community provided packages in AUR |
 | Manjaro Linux | Latest | No | We officially recommend the community provided packages in AUR |
 
-## Community
+### Community
 
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
@@ -110,13 +110,13 @@ A general outline of the various support tiers and categories is shown in the fo
 | FreeBSD | 13-STABLE | No | |
 | FreeBSD | 12-STABLE | No | |
 | Gentoo | Latest | No | |
-| macOS | 12 | No | Planned for **Core** tier support, currently only works for Intel-based hardware, currently requires Homebrew for dependencies |
-| macOS | 11 | No | Planned for **Core** tier support, currently only works for Intel-based hardwar, currently requires Homebrew for dependencies  |
-| macOS | 10.15 | No | Planned for **Core** tier suppor, currently requires Homebrew for dependencies  |
+| macOS | 12 | No | Planned for **Core** tier support. Currently only works for Intel-based hardware. Requires Homebrew for dependencies |
+| macOS | 11 | No | Planned for **Core** tier support. Currently only works for Intel-based hardware. Requires Homebrew for dependencies.  |
+| macOS | 10.15 | No | Planned for **Core** tier support. Requires Homebrew for dependencies.  |
 | openSUSE | Tumbleweed | No | |
 | Sabayon | Latest | No | |
 
-# Third-party supported platforms
+## Third-party supported platforms
 
 Currently, the following platforms have some degree of external support for Netdata:
 
@@ -125,7 +125,7 @@ Currently, the following platforms have some degree of external support for Netd
 - Rockstor: Rockstor provides support for a Netdata add-on for their NAS platform. The Rockstor community and
   developers are the primary source for support on their platform.
 
-# Previously supported platforms
+## Previously supported platforms
 
 This is a list of platforms that we have supported in the recent past but no longer officially support:
 
@@ -145,9 +145,9 @@ This is a list of platforms that we have supported in the recent past but no lon
 - Ubuntu 16.04: Support dropped for technical reasons.
 - Ubuntu 14.04: Support dropped for technical reasons.
 
-# Platform-specific support considerations
+## Platform-specific support considerations
 
-## IPMI
+### IPMI
 
 Our IPMI collector is based on FreeIPMI. Due to upstream limitations in FreeIPMI, we are unable to support our
 IPMI collector on POWER-based hardware.

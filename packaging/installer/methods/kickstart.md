@@ -11,18 +11,17 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 This page covers detailed instructions on using and configuring the automatic one-line installation script named
 `kickstart.sh`.
 
-This method is fully automatic on all Linux distributions and macOS environments. To install Netdata using the
-most optimal installation method for your system, and get _automatic nightly updates_, run the following as your
-normal user:
+The kickstart script works on all Linux distributions and macOS environments. By default, automatic nightly updates are enabled. If you are installing on macOS, make sure to check the [install documentation for macOS](packaging/installer/methods/macos) before continuing. 
+
+> If you are unsure whether you want nightly or stable releases, read the [installation guide](/packaging/installer/README.md#nightly-vs-stable-releases). 
+> If you want to turn off [automatic updates](/packaging/installer/README.md#automatic-updates), use the `--no-updates` option. You can find more installation options below.
+
+To install Netdata, run the following as your normal user:
 
 ```bash
 wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
 ```
 
-> See our [installation guide](/packaging/installer/README.md) for details about [automatic updates](/packaging/installer/README.md#automatic-updates) or
-> [nightly vs. stable releases](/packaging/installer/README.md#nightly-vs-stable-releases).
-
-> If you are installing on macOS, make sure to check the [install documentation for macOS](packaging/installer/methods/macos) before continuing.
 
 ## What does `kickstart.sh` do?
 
@@ -100,7 +99,7 @@ Please note that to run it you will either need to have root privileges or run i
 ### Native packages
 
 We publish official DEB/RPM packages for a number of common Linux distributions as part of our releases and nightly
-builds. These packages are available for 64-bit x86 systems, and depending on the distribution and release may
+builds. These packages are available for 64-bit x86 systems. Depending on the distribution and release they may
 also be available for 32-bit x86, ARMv7, and AArch64 systems.  These packages are the recommended installation
 method if available and will be used by default if possible for your system, allowing you to then handle updates
 of Netdata as part of your usual system update procedure.
@@ -110,9 +109,9 @@ you can do so by adding `--native-only` to the options you pass to the installer
 
 ### Static builds
 
-We publish pre-built static builds of Netdata for Linux systems. Currently, theseare published for 64-bit x86,
-ARMv7, and AArch64 hardware. These static builds are able to operate in a mostly self-contained manner, only
-requiring a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
+We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86,
+ARMv7, and AArch64 hardware. These static builds are able to operate in a mostly self-contained manner and only
+require a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
 you are on a platform which we provide static builds for but do not provide native packages for, a static build
 will be used by default for installation.
 
@@ -129,7 +128,6 @@ If you want to enforce the usage of a local build (perhaps because you require a
 which is not supported with native packages or static builds), you can do so by adding `--build-only` to the
 options you pass to the installer.
 
-## Considerations for macOS
 
 ## Verify script integrity
 

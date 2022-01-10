@@ -63,7 +63,7 @@ external databases, and more.
 
 ## Have a different operating system, or want to try another method?
 
-Netdata works on many different platforms, to see the full list go check out our [platform support
+Netdata works on many different platforms. To see all supported platforms, check out our [platform support
 policy](/packaging/PLATFORM_SUPPORT.md).
 
 Below, you can find a few additional installation methods, followed by separate instructions for a variety of unique
