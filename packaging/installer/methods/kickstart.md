@@ -100,9 +100,8 @@ Please note that to run it you will either need to have root privileges or run i
 
 We publish official DEB/RPM packages for a number of common Linux distributions as part of our releases and nightly
 builds. These packages are available for 64-bit x86 systems. Depending on the distribution and release they may
-also be available for 32-bit x86, ARMv7, and AArch64 systems.  These packages are the recommended installation
-method if available and will be used by default if possible for your system, allowing you to then handle updates
-of Netdata as part of your usual system update procedure.
+also be available for 32-bit x86, ARMv7, and AArch64 systems. If a native package is available, it will be used as the
+default installation method. This allows you to handle Netdata updates as part of your usual system update procedure.
 
 If you want to enforce the usage of native packages and have the installer return a failure if they are not available,
 you can do so by adding `--native-only` to the options you pass to the installer.

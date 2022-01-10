@@ -12,20 +12,20 @@ guarantees for platforms in that tier, as follows:
   include official binary packages, and any platform-specific bugs receive a high priority. From the perspective
   of our developers, platforms in the core support tier _must_ work, with almost no exceptions.
 - **Intermediate**: Platforms in the intermediate support tier are those which Netdata wants to support, but cannot
-  justify core level support for. They are also covered in CI, but not as rigorously as the core tier, may or may
-  not include official binary packages, and any platform specific bugs recieve a normal priority. This is generally
-  where we will add new platforms we have decided to officially support ourselves.
+  justify core level support for. They are also covered in CI, but not as rigorously as the core tier. They may or
+  may not include official binary packages, and any platform-specific bugs receive a normal priority. Generally,
+  we will add new platforms that we officially support ourselves to the intermediate tier.
 - **Community**: Platforms in the community support tier are those which are primarily supported by community
-  contributors. They may recieve some support from Netdata, but are only a best-effort affair. When a community
+  contributors. They may receive some support from Netdata, but are only a best-effort affair. When a community
   member makes a contribution to add support for a new platform, that platform generally will start in this tier.
 
 Additionally, we define two categories for special cases that we do not support:
 
 - **Third-party supported platforms**: Some platform maintainers actively support Netdata on their platforms even
   though we do not provide official support. Third-party supported platforms may work, but the experience of using
-  Netdata on such platforms is not something we can guarantee. Users reporting bugs when using externally supported
-  platforms will be asked to either reproduce the issue on a supported platform or direct their support request
-  to the platform maintainers.
+  Netdata on such platforms is not something we can guarantee. When you use an externally supported platform and
+  report a bug, we will either ask you to reproduce the issue on a supported platform or submit a support request
+  directly to the platform maintainers.
 - **Previously Supported**: As platforms become End Of Life upstream, Netdata will stop officially supporting
   them. We will not actively break things on these platforms, but we will also not make any
   effort to ensure that things keep working on them either. Additionally, Netdata may occasionally move an
@@ -50,10 +50,10 @@ Any platforms not listed in any of these categories may or may not work
 > with no prior warning from Netdata and no deprecation notice, unlike those being dropped for technical reasons,
 > as our end of support should already coincide with the end of the normal support lifecycle for that platform..
 
-A general outline of the various support tiers and categories is shown in the following table
+A general outline of the various support tiers and categories is shown in the following table.
 
-|   | Bug Support| Guaranteed Configurations | CI Coverage | Native Packages | Static Build Support |
-| - | -------------------- | ------------------------- | ----------- | -------------- | -------------------- |
+|   | Bug Support | Guaranteed Configurations | CI Coverage | Native Packages | Static Build Support |
+| - | ----------- | ------------------------- | ----------- | --------------- | -------------------- |
 | Core | High priority | Everything but rare edge cases | Full | Yes, if we can provide them | Full |
 | Intermediate | Normal priority | Common cases | Partial (CI mostly equivalent to **Core**, but possibly with some gaps, and not required to pass) | Possibly | Full |
 | Community | Best Effort | Default only | None | No | Best Effort |
@@ -129,21 +129,18 @@ Currently, the following platforms have some degree of external support for Netd
 
 This is a list of platforms that we have supported in the recent past but no longer officially support:
 
-- Alpine Linux 3.11: EOL as of 2021-11-01.
-- Alpine Linux 3.10: EOL as of 2021-05-01.
-- Alpine Linux 3.9: EOL as of 2021-01-01.
-- CentOS 6.x: Support dropped for technical reasons.
-- Debian 8.x: EOL as of 2020-06-30.
-- Fedora 33: EOL as of 2021-11-30.
-- Fedora 32: EOL as of 2021-05-25.
-- Fedora 31: EOL as of 2020-11-30.
-- FreeBSD 11-STABLE: EOL as of 2021-10-30.
-- openSUSE Leap 15.2: EOL as of 2021-12-01.
-- openSUSE Leap 15.1: EOL as of 2021-01-31.
-- Ubuntu 20.10: EOL as of 2021-07-22.
-- Ubuntu 19.10: EOL as of 2020-07-17.
-- Ubuntu 16.04: Support dropped for technical reasons.
-- Ubuntu 14.04: Support dropped for technical reasons.
+| Platform | Version | Notes |
+| -------- | ------- | ----- |
+| Alpine Linux | 3.11 | EOL as of 2021-11-01 |
+| Alpine Linux | 3.10 | EOL as of 2021-05-01 |
+| Fedora | 33 | EOL as of 2021-11-30 |
+| Fedora | 32 | EOL as of 2021-05-25 |
+| FreeBSD | 11-STABLE | EOL as of 2021-10-30 |
+| openSUSE | Leap 15.2 | EOL as of 2021-12-01 |
+| openSUSE | Leap 15.1 | EOL as of 2021-01-31 |
+| Ubuntu | 21.04 | EOL as of 2022-01-01 |
+| Ubuntu | 20.10 | EOL as of 2021-07-22 |
+| Ubuntu | 16.04 | EOL as of 2021-04-02 |
 
 ## Platform-specific support considerations
 
