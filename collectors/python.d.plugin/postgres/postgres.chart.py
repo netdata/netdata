@@ -1352,7 +1352,6 @@ class Service(SimpleService):
         
         if self.server_version >= 90100 and len(self.secondaries):
             add_db_replications_chart(
-                    self,
                     order=self.order,
                     definitions=self.definitions,
                     name='db_replications',
@@ -1461,7 +1460,7 @@ def add_replication_slot_chart(order, definitions, name, slot_name):
         'options': [name, title + ': ' + slot_name, units, 'replication slot files', context, chart_type],
         'lines': create_lines(slot_name, chart_template['lines'])}
 
-def add_db_replications_chart(s,order, definitions, name, secondaries):
+def add_db_replications_chart(order, definitions, name, secondaries):
     def create_lines(lines, secondaries):
         result = list()
         for line in lines:
