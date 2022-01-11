@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix retrieving service commands without failure [\#11947](https://github.com/netdata/netdata/pull/11947) ([maneamarius](https://github.com/maneamarius))
 - Fix error in configure.ac [\#11937](https://github.com/netdata/netdata/pull/11937) ([underhood](https://github.com/underhood))
 - Update dashboard to version v2.20.15. [\#11934](https://github.com/netdata/netdata/pull/11934) ([netdatabot](https://github.com/netdatabot))
 - fix\(claim\): set URL\_BASE only if `-url` parameter value is not null [\#11919](https://github.com/netdata/netdata/pull/11919) ([ilyam8](https://github.com/ilyam8))
@@ -18,13 +19,22 @@
 - Fix slight errors [\#11902](https://github.com/netdata/netdata/pull/11902) ([ardabbour](https://github.com/ardabbour))
 - Fix handling of agent restart on update. [\#11887](https://github.com/netdata/netdata/pull/11887) ([Ferroin](https://github.com/Ferroin))
 - Provide runtime ml info from a new endpoint. [\#11886](https://github.com/netdata/netdata/pull/11886) ([vkalintiris](https://github.com/vkalintiris))
+- Update dependencies for the pubsub exporting connector [\#11872](https://github.com/netdata/netdata/pull/11872) ([vlvkobal](https://github.com/vlvkobal))
 - Fix the code that checks for available updates. [\#11870](https://github.com/netdata/netdata/pull/11870) ([Ferroin](https://github.com/Ferroin))
+- Don't check for symbols in libaws-cpp-sdk-core [\#11867](https://github.com/netdata/netdata/pull/11867) ([vlvkobal](https://github.com/vlvkobal))
+- Update libbpf [\#11865](https://github.com/netdata/netdata/pull/11865) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore: update community link of alert notifications [\#11860](https://github.com/netdata/netdata/pull/11860) ([burbuli8ra](https://github.com/burbuli8ra))
 - nvidia\_smi\_chart.py : fixed username for not-local users [\#11858](https://github.com/netdata/netdata/pull/11858) ([scatenag](https://github.com/scatenag))
 - Remove Ubuntu 21.04 from CI and packaging. [\#11851](https://github.com/netdata/netdata/pull/11851) ([Ferroin](https://github.com/Ferroin))
+- Fix compilation warnings [\#11846](https://github.com/netdata/netdata/pull/11846) ([vlvkobal](https://github.com/vlvkobal))
 - Removes ACLK Legacy [\#11841](https://github.com/netdata/netdata/pull/11841) ([underhood](https://github.com/underhood))
+- Fix cachestat on kernel 5.15.x \(eBPF\) [\#11833](https://github.com/netdata/netdata/pull/11833) ([thiagoftsm](https://github.com/thiagoftsm))
 - feat\(python.d/fail2ban\): add "Failed attempts" chart, cleanup [\#11825](https://github.com/netdata/netdata/pull/11825) ([ilyam8](https://github.com/ilyam8))
+- Postgres: mat. views considered as tables in table size/count chart [\#11816](https://github.com/netdata/netdata/pull/11816) ([NikolayS](https://github.com/NikolayS))
+- Postgres: use block\_size instead of 8\*1024 [\#11815](https://github.com/netdata/netdata/pull/11815) ([NikolayS](https://github.com/NikolayS))
 - Optimize rx msg name resolution [\#11811](https://github.com/netdata/netdata/pull/11811) ([underhood](https://github.com/underhood))
+- fix tps decode, add memory usage chart [\#11797](https://github.com/netdata/netdata/pull/11797) ([neotf](https://github.com/neotf))
+- Add support to updater for updating native DEB/RPM installs with our official packages. [\#11753](https://github.com/netdata/netdata/pull/11753) ([Ferroin](https://github.com/Ferroin))
 - add note with link to guide for using on Pi [\#11605](https://github.com/netdata/netdata/pull/11605) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
