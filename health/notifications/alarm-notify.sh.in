@@ -1012,10 +1012,21 @@ send_pushover() {
 # pushbullet sender
 
 send_pushbullet() {
-  local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 user
+  local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 userOrChannelTag
   if [ "${SEND_PUSHBULLET}" = "YES" ] && [ -n "${userapikey}" ] && [ -n "${recipients}" ] && [ -n "${message}" ] && [ -n "${title}" ]; then
-    #https://docs.pushbullet.com/#create-push
-    for user in ${recipients}; do
+
+    # https://docs.pushbullet.com/#create-push
+    # Accept specification of user(s) (PushBullet account email address) and/or channel tag(s), separated by spaces.
+    # If recipient begins with a "#" then send to channel tag, otherwise send to email recipient.
+
+    for userOrChannelTag in ${recipients}; do
+      if [ "${userOrChannelTag::1}" = "#" ]; then
+        userOrChannelTag_type="channel_tag"
+        userOrChannelTag="${userOrChannelTag:1}" # Remove hash from start of channel tag (required by pushbullet API)
+      else
+        userOrChannelTag_type="email"
+      fi
+
       httpcode=$(docurl \
         --header 'Access-Token: '${userapikey}'' \
         --header 'Content-Type: application/json' \
@@ -1023,7 +1034,7 @@ send_pushbullet() {
           cat <<EOF
                               {"title": "${title}",
                               "type": "link",
-                              "email": "${user}",
+                              "${userOrChannelTag_type}": "${userOrChannelTag}",
                               "body": "$(echo -n ${message})",
                               "url": "${url}",
                               "source_device_iden": "${source_device}"}
@@ -1031,10 +1042,10 @@ EOF
         ) "https://api.pushbullet.com/v2/pushes" -X POST)
 
       if [ "${httpcode}" = "200" ]; then
-        info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+        info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${userOrChannelTag}'"
         sent=$((sent + 1))
       else
-        error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
+        error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${userOrChannelTag}' with HTTP response status code ${httpcode}."
       fi
     done
 
