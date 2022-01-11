@@ -28,6 +28,7 @@ GPU_UTIL = 'gpu_utilization'
 MEM_UTIL = 'mem_utilization'
 ENCODER_UTIL = 'encoder_utilization'
 MEM_USAGE = 'mem_usage'
+BAR_USAGE = 'bar1_usage'
 TEMPERATURE = 'temperature'
 CLOCKS = 'clocks'
 POWER = 'power'
@@ -42,6 +43,7 @@ ORDER = [
     MEM_UTIL,
     ENCODER_UTIL,
     MEM_USAGE,
+    BAR_USAGE,
     TEMPERATURE,
     CLOCKS,
     POWER,
@@ -93,6 +95,13 @@ def gpu_charts(gpu):
             'lines': [
                 ['fb_memory_free', 'free'],
                 ['fb_memory_used', 'used'],
+            ]
+        },
+        BAR_USAGE: {
+            'options': [None, 'Bar1 Memory Usage', 'MiB', fam, 'nvidia_smi.bar1_allocated', 'stacked'],
+            'lines': [
+                ['bar1_memory_free', 'free'],
+                ['bar1_memory_used', 'used'],
             ]
         },
         TEMPERATURE: {
@@ -345,6 +354,14 @@ class GPU:
         return self.root.find('fb_memory_usage').find('free').text.split()[0]
 
     @handle_attr_error
+    def bar1_memory_used(self):
+        return self.root.find('bar1_memory_usage').find('used').text.split()[0]
+
+    @handle_attr_error
+    def bar1_memory_free(self):
+        return self.root.find('bar1_memory_usage').find('free').text.split()[0]
+
+    @handle_attr_error
     def temperature(self):
         return self.root.find('temperature').find('gpu_temp').text.split()[0]
 
@@ -399,6 +416,8 @@ class GPU:
             'decoder_util': self.decoder_util(),
             'fb_memory_used': self.fb_memory_used(),
             'fb_memory_free': self.fb_memory_free(),
+            'bar1_memory_used': self.bar1_memory_used(),
+            'bar1_memory_free': self.bar1_memory_free(),
             'gpu_temp': self.temperature(),
             'graphics_clock': self.graphics_clock(),
             'video_clock': self.video_clock(),
