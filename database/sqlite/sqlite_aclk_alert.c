@@ -546,7 +546,9 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     rrd_wrlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
-        wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+        wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
+                 (struct aclk_database_worker_config *)host->dbsync_worker :
+                 (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
     rrd_unlock();
 
     if (unlikely(!host->health_enabled)) {

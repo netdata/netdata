@@ -189,6 +189,24 @@ int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd)
     return (wc == NULL);
 }
 
+struct aclk_database_worker_config *find_inactive_wc_by_node_id(char *node_id)
+{
+    if (unlikely(!node_id))
+        return NULL;
+
+    uv_mutex_lock(&aclk_async_lock);
+    struct aclk_database_worker_config *wc = aclk_thread_head;
+
+    while (wc) {
+        if (!strcmp(wc->node_id, node_id))
+            break;
+        wc = wc->next;
+    }
+    uv_mutex_unlock(&aclk_async_lock);
+
+    return (wc);
+}
+
 void aclk_sync_exit_all()
 {
     rrd_wrlock();
