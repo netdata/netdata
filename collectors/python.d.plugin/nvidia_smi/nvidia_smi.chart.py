@@ -28,7 +28,7 @@ GPU_UTIL = 'gpu_utilization'
 MEM_UTIL = 'mem_utilization'
 ENCODER_UTIL = 'encoder_utilization'
 MEM_USAGE = 'mem_usage'
-BAR_USAGE = 'bar1_usage'
+BAR_USAGE = 'bar1_mem_usage'
 TEMPERATURE = 'temperature'
 CLOCKS = 'clocks'
 POWER = 'power'
@@ -98,7 +98,7 @@ def gpu_charts(gpu):
             ]
         },
         BAR_USAGE: {
-            'options': [None, 'Bar1 Memory Usage', 'MiB', fam, 'nvidia_smi.bar1_allocated', 'stacked'],
+            'options': [None, 'Bar1 Memory Usage', 'MiB', fam, 'nvidia_smi.bar1_memory_usage', 'stacked'],
             'lines': [
                 ['bar1_memory_free', 'free'],
                 ['bar1_memory_used', 'used'],
