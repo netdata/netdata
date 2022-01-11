@@ -981,24 +981,18 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
-#ifdef ACLK_NG
     buffer_strcat(wb, "\t\"aclk-ng-available\": true,\n");
-#else
-    buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
-#endif
-#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": true,\n");
 #else
     buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": false,\n");
 #endif
-#ifdef ACLK_LEGACY
-    buffer_strcat(wb, "\t\"aclk-legacy-available\": true,\n");
-#else
     buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
-#endif
     buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
 #else
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
+    buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
+    buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
 #endif
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
