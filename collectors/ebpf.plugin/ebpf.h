@@ -27,6 +27,7 @@
 #include "libnetdata/config/appconfig.h"
 #include "libnetdata/ebpf/ebpf.h"
 #include "libnetdata/procfile/procfile.h"
+#include "collectors/cgroups.plugin/sys_fs_cgroup.h"
 #include "daemon/main.h"
 
 #include "ebpf_apps.h"
