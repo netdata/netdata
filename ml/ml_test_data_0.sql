@@ -90,7 +90,7 @@ INSERT INTO anomaly_rate_info_test_source_0 (host_id, after, before, anomaly_rat
 ),(
 '5cb28cec-3d65-11ec-83fd-15e0d7613f4b',	1638208343,	1638208403,	'[
     [
-        0.0,
+        0.1,
         "system.cpu|guest_nice"
     ],
     [
@@ -118,7 +118,7 @@ INSERT INTO anomaly_rate_info_test_source_0 (host_id, after, before, anomaly_rat
         "system.cpu|system"
     ],
     [
-        0.0,
+        0.2,
         "system.cpu|nice"
     ],
     [
@@ -157,7 +157,7 @@ INSERT INTO anomaly_rate_info_test_source_0 (host_id, after, before, anomaly_rat
         "system.cpu|user"
     ],
     [
-        0.0,
+        0.1,
         "system.cpu|system"
     ],
     [
@@ -192,7 +192,7 @@ INSERT INTO anomaly_rate_info_test_source_0 (host_id, after, before, anomaly_rat
         "system.cpu|softirq"
     ],
     [
-        0.0,
+        0.1,
         "system.cpu|irq"
     ],
     [
@@ -223,11 +223,11 @@ INSERT INTO anomaly_rate_info_test_source_0 (host_id, after, before, anomaly_rat
         "system.cpu|guest_nice"
     ],
     [
-        0.0,
+        0.1,
         "system.cpu|guest"
     ],
     [
-        0.0,
+        0.2,
         "system.cpu|steal"
     ],
     [

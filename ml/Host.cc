@@ -498,7 +498,9 @@ void DetectableHost::getAnomalyRateInfoCurrentRange(std::vector<std::pair<std::s
         std::lock_guard<std::mutex> Lock(Mutex);
         for (auto &DP : DimensionsMap) {
             Dimension *D = DP.second;
-            V.push_back({D->getID(), (D->getAnomalyPercentage() * abs(Before - After) / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery())))});
+            if(D->getAnomalyPercentage() > 0) {
+                V.push_back({D->getID(), (D->getAnomalyPercentage() * abs(Before - After) / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery())))});
+            }
         }
     }
 }
@@ -521,7 +523,9 @@ void DetectableHost::getAnomalyRateInfoMixedRange(std::vector<std::pair<std::str
                 if( it != DimAndAnomalyRateInRange.end())
                 {
                     double CurrentPercentage = (D->getAnomalyPercentage() * (Before - getLastSavedBefore()) / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery())));
-                    V.push_back({D->getID(), abs(((CurrentPercentage * (Before - getLastSavedBefore())) + (it->second * (getLastSavedBefore() - After)))/(Before - After))});
+                    if((CurrentPercentage > 0) || (it->second > 0)){
+                        V.push_back({D->getID(), abs(((CurrentPercentage * (Before - getLastSavedBefore())) + (it->second * (getLastSavedBefore() - After)))/(Before - After))});
+                    }
                 }
             }
         }    

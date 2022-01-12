@@ -52,12 +52,12 @@ const char *ml::Database::SQL_INSERT_BULK_ANOMALY_RATE_INFO =
     " VALUES (?1, ?2, ?3, ?4);";
    
 const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
-    "SELECT dimension_id, SUM(delta*avg)/SUM(delta) avg FROM "
+    "SELECT dimension_id, SUM(delta*avg)/SUM(delta) percentage FROM "
     "( "
     "SELECT delta, dimension_id, AVG(anomaly_percentage) avg FROM "
     "      (SELECT before-after delta, json_extract(j.value, '$[1]') AS dimension_id, "
     "      json_extract(j.value, '$[0]') AS anomaly_percentage "
-    "      FROM anomaly_rate_info_test_source_simple AS ari, json_each(ari.anomaly_rates) AS j "
+    "      FROM anomaly_rate_info AS ari, json_each(ari.anomaly_rates) AS j "
     "      WHERE ari.host_id == ?1 AND ari.after >= ?2 AND ari.before <= ?3 "
     "      AND json_valid(ari.anomaly_rates)) "
     "      GROUP BY dimension_id "
@@ -65,30 +65,30 @@ const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
     "SELECT delta, dimension_id, AVG(anomaly_percentage) avg FROM "
     "      (SELECT before-?2 delta, json_extract(j.value, '$[1]') AS dimension_id, "
     "      json_extract(j.value, '$[0]') AS anomaly_percentage "
-    "      FROM anomaly_rate_info_test_source_simple AS ari, json_each(ari.anomaly_rates) AS j "
+    "      FROM anomaly_rate_info AS ari, json_each(ari.anomaly_rates) AS j "
     "      WHERE ari.host_id == ?1 "
-    "      AND ari.after >= (SELECT after FROM anomaly_rate_info_test_source_simple WHERE after <= ?2 ORDER BY after DESC LIMIT 1) "
-    "      AND ari.before <= (SELECT before FROM anomaly_rate_info_test_source_simple WHERE before >= ?2 ORDER BY before ASC LIMIT 1) "
+    "      AND ari.after >= (SELECT after FROM anomaly_rate_info WHERE after <= ?2 ORDER BY after DESC LIMIT 1) "
+    "      AND ari.before <= (SELECT before FROM anomaly_rate_info WHERE before >= ?2 ORDER BY before ASC LIMIT 1) "
     "      AND json_valid(ari.anomaly_rates)) "
     "      GROUP BY dimension_id "
     "UNION "
     "SELECT delta, dimension_id, AVG(anomaly_percentage) avg FROM "
     "      (SELECT ?3-after delta, json_extract(j.value, '$[1]') AS dimension_id, "
     "      json_extract(j.value, '$[0]') AS anomaly_percentage "
-    "      FROM anomaly_rate_info_test_source_simple AS ari, json_each(ari.anomaly_rates) AS j "
+    "      FROM anomaly_rate_info AS ari, json_each(ari.anomaly_rates) AS j "
     "      WHERE ari.host_id == ?1 "
-    "      AND ari.after >= (SELECT after FROM anomaly_rate_info_test_source_simple WHERE after <= ?3 ORDER BY after DESC LIMIT 1) "
-    "      AND ari.before <= (SELECT before FROM anomaly_rate_info_test_source_simple WHERE before >= ?3 OR ((SELECT before FROM anomaly_rate_info_test_source_simple "
+    "      AND ari.after >= (SELECT after FROM anomaly_rate_info WHERE after <= ?3 ORDER BY after DESC LIMIT 1) "
+    "      AND ari.before <= (SELECT before FROM anomaly_rate_info WHERE before >= ?3 OR ((SELECT before FROM anomaly_rate_info "
     "                                                                                                WHERE before <= ?3 "
     "                                                                                                ORDER BY before DESC LIMIT 1) "
-    "                                                                                            AND NOT EXISTS (SELECT before FROM anomaly_rate_info_test_source_simple "
+    "                                                                                            AND NOT EXISTS (SELECT before FROM anomaly_rate_info "
     "                                                                                                            WHERE before >= ?3 "
     "                                                                                                            ORDER BY before ASC LIMIT 1)) "
     "                                                                ORDER BY before ASC LIMIT 1) "
     "      AND json_valid(ari.anomaly_rates)) "
     "      GROUP BY dimension_id "
     ") "
-    "GROUP BY dimension_id;";
+    "GROUP BY dimension_id HAVING percentage > 0.0;";
  
 const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO_RANGE =
     "SELECT after, before FROM anomaly_rate_info WHERE host_id == ?1 ORDER BY before DESC LIMIT 1;";
