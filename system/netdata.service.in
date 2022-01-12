@@ -54,6 +54,7 @@ CapabilityBoundingSet=CAP_FOWNER
 CapabilityBoundingSet=CAP_SETPCAP
 # is required for perf plugin
 CapabilityBoundingSet=CAP_SYS_ADMIN
+CapabilityBoundingSet=CAP_PERFMON
 # is required for apps plugin
 CapabilityBoundingSet=CAP_SYS_PTRACE
 # is required for ebpf plugin
