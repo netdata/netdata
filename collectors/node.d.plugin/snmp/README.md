@@ -183,8 +183,9 @@ The `options` given for each server, are:
 
 To use SNMPv3:
 
--   set `version` to 3
 -   use `user` instead of `community`
+-   set `version` to 3
+
 
 User syntax:
 
@@ -192,6 +193,7 @@ User syntax:
 {
     "user": {
         "name": "userName",
+        "version": 3,
         "level": 3,
         "authProtocol": "3",
         "authKey": "authKey",
@@ -201,19 +203,19 @@ User syntax:
 }
 ```
 
-Security levels:
+Security levels (`level`):
 
 -   1 is `noAuthNoPriv`
 -   2 is `authNoPriv`
 -   3 is `authPriv`
 
-Authentication protocols:
+Authentication protocols (`authProtocol`):
 
 -   "1" is `none`
 -   "2" is `md5`
 -   "3" is `sha`
 
-Privacy protocols:
+Privacy protocols (`privProtocol`):
 
 -   "1" is `none`
 -   "2" is `des`
