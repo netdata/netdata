@@ -6,49 +6,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/PLATFO
 # Netdata platform support policy
 
 Netdata defines three tiers of official support: Core, Intermediate, and Community. Each tier defines different
-guarantees for platforms in that tier, as follows:
+guarantees for platforms in that tier, described below in the section about that tier.
 
-- **Core**: Platforms in the core support tier are our top priority. They are covered rigorously in our CI, usually
-  include official binary packages, and any platform-specific bugs receive a high priority. From the perspective
-  of our developers, platforms in the core support tier _must_ work, with almost no exceptions.
-- **Intermediate**: Platforms in the intermediate support tier are those which Netdata wants to support, but cannot
-  justify core level support for. They are also covered in CI, but not as rigorously as the core tier. They may or
-  may not include official binary packages, and any platform-specific bugs receive a normal priority. Generally,
-  we will add new platforms that we officially support ourselves to the intermediate tier.
-- **Community**: Platforms in the community support tier are those which are primarily supported by community
-  contributors. They may receive some support from Netdata, but are only a best-effort affair. When a community
-  member makes a contribution to add support for a new platform, that platform generally will start in this tier.
-
-Additionally, we define two categories for special cases that we do not support:
-
-- **Third-party supported platforms**: Some platform maintainers actively support Netdata on their platforms even
-  though we do not provide official support. Third-party supported platforms may work, but the experience of using
-  Netdata on such platforms is not something we can guarantee. When you use an externally supported platform and
-  report a bug, we will either ask you to reproduce the issue on a supported platform or submit a support request
-  directly to the platform maintainers.
-- **Previously Supported**: As platforms become End Of Life upstream, Netdata will stop officially supporting
-  them. We will not actively break things on these platforms, but we will also not make any
-  effort to ensure that things keep working on them either. Additionally, Netdata may occasionally move an
-  older supported platform to this tier if we can no longer provide full support for it for technical reasons.
-  If you report a bug on a previously supported platforms, we will ask you to reproduce the issue on a currently
-  supported platform. If the issue is not reproducible, it will be closed.
+Additionally, we define two categories for special cases that we do not support, third-party supported platforms,
+and previously supported platforms. These two categories are explained further below.
 
 Any platforms not listed in any of these categories may or may not work
-
-> ### What happens when a platform becomes ‘Previously Supported’ for technical reasons?
->
-> In general, if we determine that we need to drop support for a given platform due to technical limitations,
-> this will be announced in the release notes of the next stable release with a deprecation notice. The platform
-> will be supported for _that release_, and will be removed from nightlies some time before the next release.
-
-> ### What constitutes ‘End of Life’ for a platform?
->
-> We consider a platform to be end-of-life when the upstream maintainers of that platfrom stop providing official
-> support for it themselves, or when that platform transitions into an ‘extended security maintenance’ period.
->
-> Platforms that meet these criteria will be immediately transitioned to the **Previously Supported** category,
-> with no prior warning from Netdata and no deprecation notice, unlike those being dropped for technical reasons,
-> as our end of support should already coincide with the end of the normal support lifecycle for that platform..
 
 A general outline of the various support tiers and categories is shown in the following table.
 
@@ -70,12 +33,18 @@ A general outline of the various support tiers and categories is shown in the fo
 
 ### Core
 
+Platforms in the core support tier are our top priority. They are covered rigorously in our CI, usually
+include official binary packages, and any platform-specific bugs receive a high priority. From the perspective
+of our developers, platforms in the core support tier _must_ work, with almost no exceptions. Our [static
+builds](#static-builds) are expected to work on these platforms if available. Source-based installs are expected
+to work on these platforms with minimal user effort.
+
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
 | Alpine Linux | 3.15 | No | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
 | CentOS | 7.x | x86\_64 | |
 | CentOS | 8.x | x86\_64, AArch64 | Includes Rocky Linux 8.x support, which will be our primary platform long-term for RHEL compatiblitiy |
-| Docker | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | |
+| Docker | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker |
 | Debian | 11.x | x86\_64, i386, ARMv7, AArch64 | |
 | Debian | 10.x | x86\_64, i386, ARMv7, AArch64 | |
 | Debian | 9.x | x86\_64, i386, ARMv7, AArch64 | |
@@ -91,6 +60,13 @@ A general outline of the various support tiers and categories is shown in the fo
 
 ### Intermediate
 
+Platforms in the intermediate support tier are those which Netdata wants to support, but cannot justify core level
+support for. They are also covered in CI, but not as rigorously as the core tier. They may or may not include
+official binary packages, and any platform-specific bugs receive a normal priority. Generally, we will add new
+platforms that we officially support ourselves to the intermediate tier. Our [static builds](#static-builds) are
+expected to work on these platforms if available. Source-based installs are expected to work on these platforms
+with minimal user effort.
+
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
 | Alpine Linux | 3.14 | No | |
@@ -100,6 +76,12 @@ A general outline of the various support tiers and categories is shown in the fo
 | Manjaro Linux | Latest | No | We officially recommend the community provided packages in AUR |
 
 ### Community
+
+Platforms in the community support tier are those which are primarily supported by community contributors. They may
+receive some support from Netdata, but are only a best-effort affair. When a community member makes a contribution
+to add support for a new platform, that platform generally will start in this tier. Our [static builds](#static-builds)
+are expected to work on these platforms if available. Source-based installs are usually expected to work on these
+platforms, but may require some extra effort from users.
 
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
@@ -114,11 +96,15 @@ A general outline of the various support tiers and categories is shown in the fo
 | macOS | 11 | No | Planned for **Core** tier support. Currently only works for Intel-based hardware. Requires Homebrew for dependencies.  |
 | macOS | 10.15 | No | Planned for **Core** tier support. Requires Homebrew for dependencies.  |
 | openSUSE | Tumbleweed | No | |
-| Sabayon | Latest | No | |
 
 ## Third-party supported platforms
 
-Currently, the following platforms have some degree of external support for Netdata:
+Some platform maintainers actively support Netdata on their platforms even though we do not provide official
+support. Third-party supported platforms may work, but the experience of using Netdata on such platforms is not
+something we can guarantee. When you use an externally supported platform and report a bug, we will either ask
+you to reproduce the issue on a supported platform or submit a support request directly to the platform maintainers.
+
+Currently, we know of the following platforms having some degree of third-party support for Netdata:
 
 - NixOS: Netdata’s official installation methods do not support NixOS, but the NixOS maintainers provide their
   own Netdata packages for their platform.
@@ -126,6 +112,21 @@ Currently, the following platforms have some degree of external support for Netd
   developers are the primary source for support on their platform.
 
 ## Previously supported platforms
+
+As platforms become End Of Life upstream, Netdata will stop officially supporting them. We will not actively break
+things on these platforms, but we will also not make any effort to ensure that things keep working on them either.
+If you report a bug on a previously supported platforms, we will ask you to reproduce the issue on a currently
+supported platform. If the issue is not reproducible, it will be closed.
+
+We consider a platform to be end-of-life when the upstream maintainers of that platfrom stop providing official
+support for it themselves, or when that platform transitions into an ‘extended security maintenance’ period.
+Platforms that meet these criteria will be immediately transitioned to the **Previously Supported** category,
+with no prior warning from Netdata and no deprecation notice, unlike those being dropped for technical reasons,
+as our end of support should already coincide with the end of the normal support lifecycle for that platform..
+
+On occasion, we may also drop support for a platform due to technical limitations.  In such cases, this will be
+announced in the release notes of the next stable release with a deprecation notice. The platform will be supported
+for _that release_, and will be removed from nightlies some time before the next release after that one.
 
 This is a list of platforms that we have supported in the recent past but no longer officially support:
 
@@ -141,6 +142,21 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Ubuntu | 21.04 | EOL as of 2022-01-01 |
 | Ubuntu | 20.10 | EOL as of 2021-07-22 |
 | Ubuntu | 16.04 | EOL as of 2021-04-02 |
+
+## Static builds
+
+The Netdata team provides static builds of Netdata for Linux systems with a selection of common CPU
+architectures. These static builds are largely self-contained, only requiring a a POSIX-compliant shell on the target
+system to provide their basic functionality. Static builds are built in an Alpine Linux environment using musl. This
+means that they generally do not support non-local username mappings or exotic name resolution configurations.
+
+We currently provide static builds for the following CPU architectures:
+
+- 32-bit x86
+- 64-bit x86
+- ARMv7
+- AArch64
+- POWER8+
 
 ## Platform-specific support considerations
 
