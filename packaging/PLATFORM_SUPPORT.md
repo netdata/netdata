@@ -5,15 +5,20 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/PLATFO
 
 # Netdata platform support policy
 
-Netdata defines three tiers of official support: Core, Intermediate, and Community. Each tier defines different
-guarantees for platforms in that tier, described below in the section about that tier.
+Netdata defines three tiers of official support: 
+- [Core](#core)
+- [Intermediate](#intermediate)
+- [Community](#community)
+Each tier defines different guarantees for platforms in that tier, described below in the section about that tier.
 
-Additionally, we define two categories for special cases that we do not support, third-party supported platforms,
-and previously supported platforms. These two categories are explained further below.
+Additionally, we define two categories for special cases that we do not support:
+- third-party supported platforms
+- previously supported platforms. 
+These two categories are explained further below.
 
-Any platforms not listed in any of these categories may or may not work
+Any platforms not listed in any of these categories may or may not work.
 
-A general outline of the various support tiers and categories is shown in the following table.
+The following table shows a general outline of the various support tiers and categories.
 
 |   | Bug Support | Guaranteed Configurations | CI Coverage | Native Packages | Static Build Support |
 | - | ----------- | ------------------------- | ----------- | --------------- | -------------------- |
@@ -113,16 +118,16 @@ Currently, we know of the following platforms having some degree of third-party 
 
 ## Previously supported platforms
 
-As platforms become End Of Life upstream, Netdata will stop officially supporting them. We will not actively break
+As platforms become end of life upstream, Netdata will stop officially supporting them. We will not actively break
 things on these platforms, but we will also not make any effort to ensure that things keep working on them either.
 If you report a bug on a previously supported platforms, we will ask you to reproduce the issue on a currently
 supported platform. If the issue is not reproducible, it will be closed.
 
-We consider a platform to be end-of-life when the upstream maintainers of that platfrom stop providing official
+We consider a platform to be end of life when the upstream maintainers of that platform stop providing official
 support for it themselves, or when that platform transitions into an ‘extended security maintenance’ period.
 Platforms that meet these criteria will be immediately transitioned to the **Previously Supported** category,
 with no prior warning from Netdata and no deprecation notice, unlike those being dropped for technical reasons,
-as our end of support should already coincide with the end of the normal support lifecycle for that platform..
+as our end of support should already coincide with the end of the normal support lifecycle for that platform.
 
 On occasion, we may also drop support for a platform due to technical limitations.  In such cases, this will be
 announced in the release notes of the next stable release with a deprecation notice. The platform will be supported
