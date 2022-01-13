@@ -6,14 +6,18 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/PLATFO
 # Netdata platform support policy
 
 Netdata defines three tiers of official support: 
+
 - [Core](#core)
 - [Intermediate](#intermediate)
 - [Community](#community)
+
 Each tier defines different guarantees for platforms in that tier, described below in the section about that tier.
 
 Additionally, we define two categories for special cases that we do not support:
+
 - third-party supported platforms
 - previously supported platforms. 
+
 These two categories are explained further below.
 
 Any platforms not listed in any of these categories may or may not work.
