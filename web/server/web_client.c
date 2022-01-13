@@ -110,6 +110,10 @@ void web_client_request_done(struct web_client *w) {
             case WEB_CLIENT_MODE_STREAM:
                 mode = "STREAM";
                 break;
+            
+            case WEB_CLIENT_MODE_REPLICATE:
+                mode = "REPLICATE";
+                break;                
 
             case WEB_CLIENT_MODE_NORMAL:
                 mode = "DATA";
@@ -832,7 +836,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
 /**
  * Valid Method
  *
- * Netdata accepts only three methods, including one of these three(STREAM) is an internal method.
+ * Netdata accepts only four methods. Two of them (STREAM, REPLICATE) are internal methods.
  *
  * @param w is the structure with the client request
  * @param s is the start string to parse
@@ -884,6 +888,41 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
 
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
+    else if(!strncmp(s, "REPLICATE ", 10)) {
+        s = &s[10];
+
+#ifdef ENABLE_HTTPS
+        if (w->ssl.flags && web_client_is_using_ssl_force(w)){
+            w->header_parse_tries = 0;
+            w->header_parse_last_size = 0;
+            web_client_disable_wait_receive(w);
+
+            char hostname[256];
+            char *copyme = strstr(s,"hostname=");
+            if ( copyme ){
+                copyme += 9;
+                char *end = strchr(copyme,'&');
+                if(end){
+                    size_t length = MIN(255, end - copyme);
+                    memcpy(hostname,copyme,length);
+                    hostname[length] = 0X00;
+                }
+                else{
+                    memcpy(hostname,"not available",13);
+                    hostname[13] = 0x00;
+                }
+            }
+            else{
+                memcpy(hostname,"not available",13);
+                hostname[13] = 0x00;
+            }
+            error("The server is configured to always use encrypted connections, please enable the SSL on child with hostname '%s'.", hostname);
+            s = NULL;
+        }
+#endif
+
+        w->mode = WEB_CLIENT_MODE_REPLICATE;
+    }    
     else {
         s = NULL;
     }
@@ -1085,7 +1124,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
 #ifdef ENABLE_HTTPS
                 if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
-                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
+                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && ((w->mode != WEB_CLIENT_MODE_STREAM)||(w->mode != WEB_CLIENT_MODE_REPLICATE)))  ) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
                         // The client will be redirected for Netdata and we are preserving the original request.
@@ -1106,7 +1145,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
             // another header line
             s = http_header_parse(w, s,
-                    (w->mode == WEB_CLIENT_MODE_STREAM) // parse user agent
+                    ((w->mode == WEB_CLIENT_MODE_STREAM)||(w->mode == WEB_CLIENT_MODE_REPLICATE)) // parse user agent
             );
         }
     }
@@ -1536,6 +1575,16 @@ void web_client_process_request(struct web_client *w) {
     switch(http_request_validate(w)) {
         case HTTP_VALIDATION_OK:
             switch(w->mode) {
+                case WEB_CLIENT_MODE_REPLICATE:
+                    // Check initialization of the w->acl = 0x11f
+                    if(unlikely(!web_client_can_access_replication(w))) {
+                        web_client_permission_denied(w);
+                        return;
+                    }
+                    // add here the receiver thread spawn
+                    w->response.code = replication_receiver_thread_spawn(w, w->decoded_url);
+                    return;                
+
                 case WEB_CLIENT_MODE_STREAM:
                     if(unlikely(!web_client_can_access_stream(w))) {
                         web_client_permission_denied(w);
@@ -1645,6 +1694,10 @@ void web_client_process_request(struct web_client *w) {
     else web_client_disable_wait_send(w);
 
     switch(w->mode) {
+        case WEB_CLIENT_MODE_REPLICATE:
+            debug(D_WEB_CLIENT, "%llu: REPLICATE done.", w->id);
+            break;
+
         case WEB_CLIENT_MODE_STREAM:
             debug(D_WEB_CLIENT, "%llu: STREAM done.", w->id);
             break;
