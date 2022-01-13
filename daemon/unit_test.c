@@ -1917,7 +1917,7 @@ static void generate_dbengine_chart(void *arg)
 
         thread_info->rd[j] = rd[j] = rrddim_add(st, name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    complete(&thread_info->charts_initialized);
+    completion_mark_complete(&thread_info->charts_initialized);
 
     // feed it with the test data
     time_current = time_present - history_seconds;
