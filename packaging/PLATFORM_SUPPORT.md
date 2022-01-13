@@ -5,7 +5,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/PLATFO
 
 # Netdata platform support policy
 
-Netdata defines three tiers of official support: 
+Netdata defines three tiers of official support:
 
 - [Core](#core)
 - [Intermediate](#intermediate)
@@ -15,8 +15,8 @@ Each tier defines different guarantees for platforms in that tier, described bel
 
 Additionally, we define two categories for special cases that we do not support:
 
-- third-party supported platforms
-- previously supported platforms. 
+- [Third-party supported platforms](#third-party-supported-platforms)
+- [Previously supported platforms](#previously-supported-platforms)
 
 These two categories are explained further below.
 
@@ -81,8 +81,8 @@ with minimal user effort.
 | Alpine Linux | 3.14 | No | |
 | Alpine Linux | 3.13 | No | |
 | Alpine Linux | 3.12 | No | |
-| Arch Linux | Latest | No | We officially recommend the community provided packages in AUR |
-| Manjaro Linux | Latest | No | We officially recommend the community provided packages in AUR |
+| Arch Linux | Latest | No | We officially recommend the community packages available for Arch Linux |
+| Manjaro Linux | Latest | No | We officially recommend the community packages available for Arch Linux |
 
 ### Community
 
@@ -98,8 +98,8 @@ platforms, but may require some extra effort from users.
 | Clear Linux | Latest | No | |
 | Debian | Sid | No | |
 | Fedora | Rawhide | No | |
-| FreeBSD | 13-STABLE | No | |
-| FreeBSD | 12-STABLE | No | |
+| FreeBSD | 13-STABLE | No | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
+| FreeBSD | 12-STABLE | No | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
 | Gentoo | Latest | No | |
 | macOS | 12 | No | Planned for **Core** tier support. Currently only works for Intel-based hardware. Requires Homebrew for dependencies |
 | macOS | 11 | No | Planned for **Core** tier support. Currently only works for Intel-based hardware. Requires Homebrew for dependencies.  |
