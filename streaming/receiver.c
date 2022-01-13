@@ -50,8 +50,10 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     }
 }
 
+// Remove this ugly include from here
 #include "collectors/plugins.d/pluginsd_parser.h"
 
+// this function should be moved to replication
 PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {
     UNUSED(plugins_action);
@@ -201,8 +203,6 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     user->trust_durations = 0;
 
     PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
-    parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
-    parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
@@ -210,6 +210,9 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         freez(user);
         return 0;
     }
+    
+    parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
+    parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
     parser->plugins_action->begin_action     = &pluginsd_begin_action;
     parser->plugins_action->flush_action     = &pluginsd_flush_action;
@@ -295,8 +298,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
     
+    //To be removed. This can go into the spawn function in webclient
     // Read configuration - Initialize any replication receiver thread - Child-wise stream replication control.
-    replication_receiver_init(rpt, &stream_config);
+    // replication_receiver_init(rpt, &stream_config);
    
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
@@ -465,10 +469,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
+    // TBRemoved - Replaced by Web client spawn.
     // Start replication receiver thread (Rx).
-    if(rpt->replication->enabled 
-    && !rpt->replication->spawned)
-        replication_receiver_thread_spawn(rpt->host);
+    // if(rpt->replication->enabled 
+    // && !rpt->replication->spawned)
+    //     replication_receiver_thread_spawn(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, fp);
 

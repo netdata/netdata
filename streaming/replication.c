@@ -1,5 +1,6 @@
 //Includes
 #include "rrdpush.h"
+#include "collectors/plugins.d/pluginsd_parser.h"
 
 static void replication_receiver_thread_cleanup_callback(RRDHOST *host);
 static void replication_sender_thread_cleanup_callback(void *ptr);
@@ -115,7 +116,16 @@ void replication_sender_thread_spawn(RRDHOST *host) {
 void replication_receiver_thread(void *ptr){
     netdata_thread_cleanup_push(replication_receiver_thread_cleanup_callback, ptr);
     struct receiver_state *rpt = (struct receiver_state *)ptr;
+    //read configuration
+    //create pluginds cd object
+    //verify stream version
+    //send the initial response REP ack
+    //connected
     // Add here the receiver thread logic
+    // Need a host
+    // Need a PARSER_USER_OBJECT
+    // Need a socket
+    // need flags to deactivate the no necessary keywords
     // Add here the thread loop
     // for(;;) {
     //     // wait to connect
@@ -178,8 +188,7 @@ int replication_receiver_thread_spawn(struct web_client *w, char *url) {
             }
 
             if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
-                info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
-                     w->client_ip, w->client_port, name, value);
+                infoerr("%s [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", REPLICATION_MSG, w->client_ip, w->client_port, name, value);
             }
         }
     }
@@ -705,9 +714,69 @@ void update_memory_index(){
 
 // Replication parser & commands
 size_t replication_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
-    // create or reuse the parser without interference between streaming and replication
-    // support REP on/off/pause/ack
-    // GAP
+    size_t result;
+    PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
+    user->enabled = cd->enabled;
+    user->host = rpt->host;
+    user->opaque = rpt;
+    user->cd = cd;
+    user->trust_durations = 0;
+
+    PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
+
+    if (unlikely(!parser)) {
+        error("Failed to initialize parser");
+        cd->serial_failures++;
+        freez(user);
+        return 0;
+    }
+    
+    // Add keywords related with REPlication
+    // REP on/off/pause/ack
+    // GAP - Gap metdata. Information to describe the gap (window_start/end, uuid, chart/dim_id)
+    // RDATA - gap data transmission
+    // Do I need these two commands in replication?
+    // parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
+    // parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
+
+    // These are not necessary for the replication parser. Normally I would suggest to assign an inactive action so the replication won't be able to use other functions that can trigger function execution not related with its tasks.
+    parser->plugins_action->begin_action     = &pluginsd_suspend_this_action;
+    // discuss it with the team
+    parser->plugins_action->flush_action     = &pluginsd_flush_action;
+    parser->plugins_action->end_action       = &pluginsd_end_action;
+    parser->plugins_action->disable_action   = &pluginsd_disable_action;
+    parser->plugins_action->variable_action  = &pluginsd_variable_action;
+    parser->plugins_action->dimension_action = &pluginsd_dimension_action;
+    parser->plugins_action->label_action     = &pluginsd_label_action;
+    parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
+    parser->plugins_action->chart_action     = &pluginsd_chart_action;
+    parser->plugins_action->set_action       = &pluginsd_set_action;
+    parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
+    parser->plugins_action->clabel_action    = &pluginsd_clabel_action;
+    // Add the actions related with replication here.
+    // parser->plugins_action->gap_action    = &pluginsd_gap_action;
+    // parser->plugins_action->rep_action    = &pluginsd_rep_action;
+    // parser->plugins_action->rdata_action    = &pluginsd_rdata_action;
+
+    user->parser = parser;
+
+    do {
+        if (receiver_read(rpt, fp))
+            break;
+        int pos = 0;
+        char *line;
+        while ((line = receiver_next_line(rpt, &pos))) {
+            if (unlikely(netdata_exit || rpt->shutdown || parser_action(parser,  line)))
+                goto done;
+        }
+        rpt->last_msg_t = now_realtime_sec();
+    }
+    while(!netdata_exit);
+done:
+    result= user->count;
+    freez(user);
+    parser_destroy(parser);
+    return result;
 }
 
 // gap processing

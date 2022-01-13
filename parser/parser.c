@@ -65,11 +65,6 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
         rc += parser_add_keyword(parser, "CLABEL", pluginsd_clabel);
         rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
         rc += parser_add_keyword(parser, "SET", pluginsd_set);
-        // Add keywords related with REPlication
-        // REP on/off/pause/ack
-        // GAP - Gap metdata. Information to describe the gap (window_start/end, uuid, chart/dim_id)
-        // RDATA - gap data transmission
-
     }
 
     return parser;

@@ -724,8 +724,18 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
 // REP
 // GAP
 // RDATA
-
-// New plugins.d parser
+// Add an incative plugins_action for security reasons. All the parser instances should not be able to use all the available actions.
+PARSER_RC pluginsd_suspend_this_action(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{
+    UNUSED(words);
+    UNUSED(user);    
+    UNUSED(plugins_action);
+    error("This keyword is not supported from the parser!");
+    //Parser continues?
+    return PARSER_RC_OK;
+    //Parser stops?
+    // return PARSER_RC_ERROR;
+}
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
 {
