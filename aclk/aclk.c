@@ -808,6 +808,7 @@ void *aclk_main(void *ptr)
         stats_thread = callocz(1, sizeof(struct aclk_stats_thread));
         stats_thread->thread = mallocz(sizeof(netdata_thread_t));
         stats_thread->query_thread_count = query_threads.count;
+        aclk_stats_thread_prepare(query_threads.count);
         netdata_thread_create(
             stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
             stats_thread);

@@ -245,6 +245,15 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
+void aclk_stats_thread_prepare(int query_thread_count)
+{
+    aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
+    aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
+    aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
+
+    memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
+}
+
 void aclk_stats_thread_cleanup()
 {
     freez(aclk_qt_data);
@@ -257,15 +266,10 @@ void *aclk_stats_main_thread(void *ptr)
     struct aclk_stats_thread *args = ptr;
 
     query_thread_count = args->query_thread_count;
-    aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
-    aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
-    aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
-
-    memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
 
     struct aclk_metrics_per_sample per_sample;
     struct aclk_metrics permanent;
