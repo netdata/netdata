@@ -183,37 +183,50 @@ The `options` given for each server, are:
 
 To use SNMPv3:
 
--   set `version` to 3
 -   use `user` instead of `community`
+-   set `version` to 3
 
 User syntax:
 
 ```json
 {
-    "user": {
+  "enable_autodetect": false,
+  "update_every": 10,
+  "servers": [
+    {
+      "hostname": "10.11.12.8",
+      "user": {
         "name": "userName",
         "level": 3,
         "authProtocol": "3",
         "authKey": "authKey",
         "privProtocol": "2",
         "privKey": "privKey"
+      },
+      "update_every": 10,
+      "options": {
+        "version": 3
+      },
+      "charts": {
+      }
     }
+  ]
 }
 ```
 
-Security levels:
+Security levels (`level`):
 
 -   1 is `noAuthNoPriv`
 -   2 is `authNoPriv`
 -   3 is `authPriv`
 
-Authentication protocols:
+Authentication protocols (`authProtocol`):
 
 -   "1" is `none`
 -   "2" is `md5`
 -   "3" is `sha`
 
-Privacy protocols:
+Privacy protocols (`privProtocol`):
 
 -   "1" is `none`
 -   "2" is `des`
