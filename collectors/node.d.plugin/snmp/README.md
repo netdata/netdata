@@ -186,20 +186,31 @@ To use SNMPv3:
 -   use `user` instead of `community`
 -   set `version` to 3
 
-
 User syntax:
 
 ```json
 {
-    "user": {
+  "enable_autodetect": false,
+  "update_every": 10,
+  "servers": [
+    {
+      "hostname": "10.11.12.8",
+      "user": {
         "name": "userName",
-        "version": 3,
         "level": 3,
         "authProtocol": "3",
         "authKey": "authKey",
         "privProtocol": "2",
         "privKey": "privKey"
+      },
+      "update_every": 10,
+      "options": {
+        "version": 3
+      },
+      "charts": {
+      }
     }
+  ]
 }
 ```
 
