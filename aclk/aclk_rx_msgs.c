@@ -457,6 +457,11 @@ new_cloud_rx_msg_t *find_rx_handler_by_hash(simple_hash_t hash)
     return NULL;
 }
 
+const char *rx_handler_get_name(size_t i)
+{
+    return rx_msgs[i].name;
+}
+
 unsigned int aclk_init_rx_msg_handlers(void)
 {
     int i;
@@ -490,6 +495,11 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             ACLK_STATS_UNLOCK;
         }
         return;
+    }
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_proto_tx_msgs_sample[msg_descriptor-rx_msgs]++;
+        ACLK_STATS_UNLOCK;
     }
     if (msg_descriptor->fnc(msg, msg_len)) {
         error("Error processing message of type '%s'", message_type);
