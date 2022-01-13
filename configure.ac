@@ -1711,6 +1711,7 @@ AC_CONFIG_FILES([
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
     libnetdata/clocks/Makefile
+    libnetdata/completion/Makefile
     libnetdata/config/Makefile
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#include "database/engine/rrdenginelib.h"
 
 static uv_thread_t thread;
 static uv_loop_t* loop;
@@ -640,7 +639,7 @@ static void command_thread(void *arg)
     command_thread_error = 0;
     command_thread_shutdown = 0;
     /* wake up initialization thread */
-    complete(&completion);
+    completion_mark_complete(&completion);
 
     while (command_thread_shutdown == 0) {
         uv_run(loop, UV_RUN_DEFAULT);
@@ -669,7 +668,7 @@ error_after_loop_init:
     freez(loop);
 
     /* wake up initialization thread */
-    complete(&completion);
+    completion_mark_complete(&completion);
 }
 
 static void sanity_check(void)
@@ -693,15 +692,15 @@ void commands_init(void)
     }
     fatal_assert(0 == uv_rwlock_init(&exclusive_rwlock));
 
-    init_completion(&completion);
+    completion_init(&completion);
     error = uv_thread_create(&thread, command_thread, NULL);
     if (error) {
         error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
     }
     /* wait for worker thread to initialize */
-    wait_for_completion(&completion);
-    destroy_completion(&completion);
+    completion_wait_for(&completion);
+    completion_destroy(&completion);
     uv_thread_set_name_np(thread, "DAEMON_COMMAND");
 
     if (command_thread_error) {
