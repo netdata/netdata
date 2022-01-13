@@ -321,6 +321,21 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     if (unlikely(!claim_id))
         return;
 
+    RRDHOST *host = wc->host;
+    if (unlikely(!host)) {
+        rrd_wrlock();
+        host = find_host_by_node_id(wc->node_id);
+        rrd_unlock();
+
+        if (unlikely(!host)) {
+            log_access(
+                "AC [%s (N/A)]: ACLK synchronization thread for %s is not yet linked to HOST.",
+                wc->node_id,
+                wc->host_guid);
+            return;
+        }
+    }
+
     uint64_t first_sequence = 0;
     uint64_t last_sequence = 0;
     struct timeval first_timestamp;
@@ -370,7 +385,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     alarm_log.node_id =  wc->node_id;
     alarm_log.log_entries = log_entries;
     alarm_log.status = wc->alert_updates == 0 ? 2 : 1;
-    alarm_log.enabled = 1;
+    alarm_log.enabled = (int)host->health_enabled;
 
     wc->alert_sequence_id = last_sequence;
 
