@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Add a missing capability for the perf plugin [\#11958](https://github.com/netdata/netdata/pull/11958) ([vlvkobal](https://github.com/vlvkobal))
+- python.d/nvidia\_smi: add bar1 chart [\#11956](https://github.com/netdata/netdata/pull/11956) ([pbouchez](https://github.com/pbouchez))
+- fix\(nfacct.plugin\): Netfilter accounting charts priority [\#11952](https://github.com/netdata/netdata/pull/11952) ([ilyam8](https://github.com/ilyam8))
+- fix\(nfacct.plugin\): Netfilter accounting data collection [\#11951](https://github.com/netdata/netdata/pull/11951) ([ilyam8](https://github.com/ilyam8))
 - fix: add a note that netfilter's `new` and `ignore` counters are removed in the latest kernel [\#11950](https://github.com/netdata/netdata/pull/11950) ([ilyam8](https://github.com/ilyam8))
 - Fix a broken link in dashboard\_info.js [\#11948](https://github.com/netdata/netdata/pull/11948) ([Ancairon](https://github.com/Ancairon))
 - fix retrieving service commands without failure [\#11947](https://github.com/netdata/netdata/pull/11947) ([maneamarius](https://github.com/maneamarius))
