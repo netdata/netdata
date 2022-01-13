@@ -48,15 +48,15 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t cloud_req_recvd;
     volatile uint32_t cloud_req_err;
 
-    // request types.
-    volatile uint32_t cloud_req_type_http;
-    volatile uint32_t cloud_req_type_alarm_upd;
-    volatile uint32_t cloud_req_type_metadata_info;
-    volatile uint32_t cloud_req_type_metadata_alarms;
-    volatile uint32_t cloud_req_type_chart_new;
-    volatile uint32_t cloud_req_type_chart_del;
-    volatile uint32_t cloud_req_type_register_node;
-    volatile uint32_t cloud_req_type_node_upd;
+    // query types.
+    volatile uint32_t query_type_http;
+    volatile uint32_t query_type_alarm_upd;
+    volatile uint32_t query_type_metadata_info;
+    volatile uint32_t query_type_metadata_alarms;
+    volatile uint32_t query_type_chart_new;
+    volatile uint32_t query_type_chart_del;
+    volatile uint32_t query_type_register_node;
+    volatile uint32_t query_type_node_upd;
 
     // HTTP-specific request types.
     volatile uint32_t cloud_req_http_by_type[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT];

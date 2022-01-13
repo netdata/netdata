@@ -50,21 +50,21 @@ static inline int _aclk_queue_query(aclk_query_t query)
 static inline volatile uint32_t *aclk_stats_qmetric_for_qtype(aclk_query_type_t qtype) {
     switch (qtype) {
         case HTTP_API_V2:
-            return &aclk_metrics_per_sample.cloud_req_type_http;
+            return &aclk_metrics_per_sample.query_type_http;
         case ALARM_STATE_UPDATE:
-            return &aclk_metrics_per_sample.cloud_req_type_alarm_upd;
+            return &aclk_metrics_per_sample.query_type_alarm_upd;
         case METADATA_INFO:
-            return &aclk_metrics_per_sample.cloud_req_type_metadata_info;
+            return &aclk_metrics_per_sample.query_type_metadata_info;
         case METADATA_ALARMS:
-            return &aclk_metrics_per_sample.cloud_req_type_metadata_alarms;
+            return &aclk_metrics_per_sample.query_type_metadata_alarms;
         case CHART_NEW:
-            return &aclk_metrics_per_sample.cloud_req_type_chart_new;
+            return &aclk_metrics_per_sample.query_type_chart_new;
         case CHART_DEL:
-            return &aclk_metrics_per_sample.cloud_req_type_chart_del;
+            return &aclk_metrics_per_sample.query_type_chart_del;
         case REGISTER_NODE:
-            return &aclk_metrics_per_sample.cloud_req_type_register_node;
+            return &aclk_metrics_per_sample.query_type_register_node;
         case NODE_STATE_UPDATE:
-            return &aclk_metrics_per_sample.cloud_req_type_node_upd;
+            return &aclk_metrics_per_sample.query_type_node_upd;
         default:
             return NULL;
     }
