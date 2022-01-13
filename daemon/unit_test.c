@@ -97,7 +97,7 @@ static int check_rrdcalc_comparisons(void) {
 
 int check_storage_number(calculated_number n, int debug) {
     char buffer[100];
-    uint32_t flags = SN_EXISTS;
+    uint32_t flags = SN_DEFAULT_FLAGS;
 
     storage_number s = pack_storage_number(n, flags);
     calculated_number d = unpack_storage_number(s);
@@ -150,7 +150,7 @@ calculated_number storage_number_min(calculated_number n) {
     do {
         last = n;
         n /= 2.0;
-        storage_number t = pack_storage_number(n, SN_EXISTS);
+        storage_number t = pack_storage_number(n, SN_DEFAULT_FLAGS);
         r = unpack_storage_number(t);
     } while(r != 0.0 && r != last);
 
@@ -263,7 +263,7 @@ void benchmark_storage_number(int loop, int multiplier) {
             n *= multiplier;
             if(n > storage_number_positive_max) n = storage_number_positive_min;
 
-            s = pack_storage_number(n, SN_EXISTS);
+            s = pack_storage_number(n, SN_DEFAULT_FLAGS);
             d = unpack_storage_number(s);
             print_calculated_number(buffer, d);
         }
@@ -289,25 +289,12 @@ void benchmark_storage_number(int loop, int multiplier) {
 }
 
 static int check_storage_number_exists() {
-    uint32_t flags;
-
-
-    for(flags = 0; flags < 7 ; flags++) {
-        if(get_storage_number_flags(flags << 24) != flags << 24) {
-            fprintf(stderr, "Flag 0x%08x is not checked correctly. It became 0x%08x\n", flags << 24, get_storage_number_flags(flags << 24));
-            return 1;
-        }
-    }
-
-    flags = SN_EXISTS;
+    uint32_t flags = SN_DEFAULT_FLAGS;
     calculated_number n = 0.0;
 
     storage_number s = pack_storage_number(n, flags);
     calculated_number d = unpack_storage_number(s);
-    if(get_storage_number_flags(s) != flags) {
-        fprintf(stderr, "Wrong flags. Given %08x, Got %08x!\n", flags, get_storage_number_flags(s));
-        return 1;
-    }
+
     if(n != d) {
         fprintf(stderr, "Wrong number returned. Expected " CALCULATED_NUMBER_FORMAT ", returned " CALCULATED_NUMBER_FORMAT "!\n", n, d);
         return 1;
@@ -1192,11 +1179,11 @@ int run_test(struct test *test)
     unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
     for(c = 0 ; c < max ; c++) {
         calculated_number v = unpack_storage_number(rd->values[c]);
-        calculated_number n = unpack_storage_number(pack_storage_number(test->results[c], SN_EXISTS));
+        calculated_number n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
         int same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-        fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+        fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
             test->name, rd->name, c+1,
-            (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+            (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
@@ -1205,9 +1192,9 @@ int run_test(struct test *test)
             v = unpack_storage_number(rd2->values[c]);
             n = test->results2[c];
             same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-            fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+            fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
                 test->name, rd2->name, c+1,
-                (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+                (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
@@ -1475,6 +1462,38 @@ int unit_test(long delay, long shift)
     return ret;
 }
 
+int test_sqlite(void) {
+    sqlite3  *db_meta;
+    fprintf(stderr, "Testing SQLIte\n");
+
+    int rc = sqlite3_open(":memory:", &db_meta);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: DB init failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec(db_meta, "CREATE TABLE IF NOT EXISTS mine (id1, id2);", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Create table failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec(db_meta, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Delete with LIMIT failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec(db_meta, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
+        return 1;
+    }
+    fprintf(stderr,"SQLite is OK\n");
+    return 0;
+}
+
+
 #ifdef ENABLE_DBENGINE
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now)
 {
@@ -1585,7 +1604,7 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
     collected_number next;
 
     update_every = REGION_UPDATE_EVERY[current_region];
-    time_now = time_start + update_every;
+    time_now = time_start;
     // feed it with the test data
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0 ; j < DIMS ; ++j) {
@@ -1596,7 +1615,7 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
         }
     }
     for (c = 0; c < REGION_POINTS[current_region] ; ++c) {
-        time_now += update_every; // time_now = start + (c + 2) * update_every
+        time_now += update_every; // time_now = start + (c + 1) * update_every
         for (i = 0 ; i < CHARTS ; ++i) {
             st[i]->usec_since_last_update = USEC_PER_SEC * update_every;
 
@@ -1628,14 +1647,14 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 
     // check the result
     for (c = 0; c < REGION_POINTS[current_region] ; c += QUERY_BATCH) {
-        time_now = time_start + (c + 2) * update_every;
+        time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
                 rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH * update_every);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
-                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
+                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
 
                     n = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved);
                     value = unpack_storage_number(n);
@@ -1673,7 +1692,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
 
     errors = 0;
     update_every = REGION_UPDATE_EVERY[current_region];
-    long points = (time_end - time_start) / update_every - 1;
+    long points = (time_end - time_start) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         RRDR *r = rrd2rrdr(st[i], points, time_start + update_every, time_end, RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL);
         if (!r) {
@@ -1692,8 +1711,8 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                     value = cn[j];
                     assert(rd[i][j] == d);
 
-                    last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c;
-                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
+                    last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c + 1;
+                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
 
                     same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
                     if(!same) {
@@ -1791,7 +1810,7 @@ int test_dbengine(void)
     current_region = 1;
     update_every = REGION_UPDATE_EVERY[current_region]; // use the maximum update_every = 3
     errors = 0;
-    long points = (time_end[REGIONS - 1] - time_start[0]) / update_every - 1; // cover all time regions with RRDR
+    long points = (time_end[REGIONS - 1] - time_start[0]) / update_every; // cover all time regions with RRDR
     long point_offset = (time_start[current_region] - time_start[0]) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         RRDR *r = rrd2rrdr(st[i], points, time_start[0] + update_every, time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL);
@@ -1814,8 +1833,8 @@ int test_dbengine(void)
                     calculated_number value = cn[j];
                     assert(rd[i][j] == d);
 
-                    collected_number last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c - point_offset;
-                    calculated_number expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
+                    collected_number last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c - point_offset + 1;
+                    calculated_number expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
 
                     uint8_t same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
                     if(!same) {
@@ -2044,7 +2063,7 @@ static void query_dbengine_chart(void *arg)
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);
-            expected = unpack_storage_number(pack_storage_number((calculated_number) generatedv, SN_EXISTS));
+            expected = unpack_storage_number(pack_storage_number((calculated_number) generatedv, SN_DEFAULT_FLAGS));
 
             if (unlikely(rd->state->query_ops.is_finished(&handle))) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */

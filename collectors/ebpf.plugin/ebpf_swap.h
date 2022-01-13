@@ -3,16 +3,25 @@
 #ifndef NETDATA_EBPF_SWAP_H
 #define NETDATA_EBPF_SWAP_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_SWAP "swap"
+
 #define NETDATA_SWAP_SLEEP_MS 850000ULL
 
 // charts
 #define NETDATA_MEM_SWAP_CHART "swapcalls"
 #define NETDATA_MEM_SWAP_READ_CHART "swap_read_call"
 #define NETDATA_MEM_SWAP_WRITE_CHART "swap_write_call"
-#define NETDATA_SWAP_SUBMENU "swap (eBPF)"
+#define NETDATA_SWAP_SUBMENU "swap"
 
 // configuration file
 #define NETDATA_DIRECTORY_SWAP_CONFIG_FILE "swap.conf"
+
+// Contexts
+#define NETDATA_CGROUP_SWAP_READ_CONTEXT "cgroup.swap_read"
+#define NETDATA_CGROUP_SWAP_WRITE_CONTEXT "cgroup.swap_write"
+#define NETDATA_SYSTEMD_SWAP_READ_CONTEXT "services.swap_read"
+#define NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT "services.swap_write"
 
 typedef struct netdata_publish_swap {
     uint64_t read;

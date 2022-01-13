@@ -92,7 +92,7 @@ int init_connectors(struct engine *engine)
         // dispatch the instance worker thread
         int error = uv_thread_create(&instance->thread, instance->worker, instance);
         if (error) {
-            error("EXPORTING: cannot create tread worker. uv_thread_create(): %s", uv_strerror(error));
+            error("EXPORTING: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
             return 1;
         }
         char threadname[NETDATA_THREAD_NAME_MAX + 1];
@@ -105,8 +105,57 @@ int init_connectors(struct engine *engine)
     return 0;
 }
 
+// TODO: use a base64 encoder from a library
+static size_t base64_encode(unsigned char *input, size_t input_size, char *output, size_t output_size)
+{
+    uint32_t value;
+    static char lookup[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                           "abcdefghijklmnopqrstuvwxyz"
+                           "0123456789+/";
+    if ((input_size / 3 + 1) * 4 >= output_size) {
+        error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input", output_size, input_size);
+        return 0;
+    }
+    size_t count = 0;
+    while (input_size > 3) {
+        value = ((input[0] << 16) + (input[1] << 8) + input[2]) & 0xffffff;
+        output[0] = lookup[value >> 18];
+        output[1] = lookup[(value >> 12) & 0x3f];
+        output[2] = lookup[(value >> 6) & 0x3f];
+        output[3] = lookup[value & 0x3f];
+        //error("Base-64 encode (%04x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]);
+        output += 4;
+        input += 3;
+        input_size -= 3;
+        count += 4;
+    }
+    switch (input_size) {
+        case 2:
+            value = (input[0] << 10) + (input[1] << 2);
+            output[0] = lookup[(value >> 12) & 0x3f];
+            output[1] = lookup[(value >> 6) & 0x3f];
+            output[2] = lookup[value & 0x3f];
+            output[3] = '=';
+            //error("Base-64 encode (%06x) -> %c %c %c %c\n", (value>>2)&0xffff, output[0], output[1], output[2], output[3]);
+            count += 4;
+            break;
+        case 1:
+            value = input[0] << 4;
+            output[0] = lookup[(value >> 6) & 0x3f];
+            output[1] = lookup[value & 0x3f];
+            output[2] = '=';
+            output[3] = '=';
+            //error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]);
+            count += 4;
+            break;
+        case 0:
+            break;
+    }
+    return count;
+}
+
 /**
- * Initialize a ring buffer for a simple connector
+ * Initialize a ring buffer and credentials for a simple connector
  *
  * @param instance an instance data structure.
  */
@@ -140,6 +189,26 @@ void simple_connector_init(struct instance *instance)
 
     first_buffer->next = connector_specific_data->first_buffer;
     connector_specific_data->last_buffer = connector_specific_data->first_buffer;
+
+    if (*instance->config.username || *instance->config.password) {
+        BUFFER *auth_string = buffer_create(0);
+
+        buffer_sprintf(auth_string, "%s:%s", instance->config.username, instance->config.password);
+
+        size_t encoded_size = (buffer_strlen(auth_string) / 3 + 1) * 4 + 1;
+        char *encoded_credentials = callocz(1, encoded_size);
+
+        base64_encode((unsigned char*)buffer_tostring(auth_string), buffer_strlen(auth_string), encoded_credentials, encoded_size);
+       
+        buffer_flush(auth_string);
+        buffer_sprintf(auth_string, "Authorization: Basic %s\n", encoded_credentials);
+
+        freez(encoded_credentials);
+
+        connector_specific_data->auth_string = strdupz(buffer_tostring(auth_string));
+
+        buffer_free(auth_string);
+    }
 
     return;
 }

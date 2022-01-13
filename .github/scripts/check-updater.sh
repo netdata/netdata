@@ -4,20 +4,20 @@ set -e
 # shellcheck source=.github/scripts/functions.sh
 . "$(dirname "$0")/functions.sh"
 
-check_successfull_update() {
+check_successful_update() {
   progress "Check netdata version after update"
   (
     netdata_version=$(netdata -v | awk '{print $2}')
     updater_version=$(cat packaging/version)
     if [ "$netdata_version" = "$updater_version" ]; then
-      echo "Update successfull!"
+      echo "Update successful!"
     else
       exit 1
     fi
   ) >&2
 }
 
-steps="check_successfull_update"
+steps="check_successful_update"
 
 _main() {
   for step in $steps; do

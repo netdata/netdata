@@ -39,6 +39,7 @@ EXTRA_DIST = \
     build/m4/ax_c_mallopt.m4 \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
+    ml/kmeans/dlib \
     README.md \
     LICENSE \
     REDISTRIBUTED.md \
@@ -57,15 +58,12 @@ dist_noinst_DATA = \
     contrib \
     docs \
     mqtt_websockets \
-    aclk/aclk-schemas \
     netdata.cppcheck \
     netdata.spec \
     package.json \
     packaging/bundle-ebpf.sh \
     packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
-    packaging/bundle-lws.sh \
-    packaging/bundle-mosquitto.sh \
     packaging/check-kernel-config.sh \
     packaging/ebpf.checksums \
     packaging/ebpf.version \
@@ -80,10 +78,8 @@ dist_noinst_DATA = \
     packaging/judy.version \
     packaging/libbpf.checksums \
     packaging/libbpf.version \
-    packaging/libwebsockets.checksums \
-    packaging/libwebsockets.version \
-    packaging/mosquitto.checksums \
-    packaging/mosquitto.version \
+    packaging/protobuf.checksums \
+    packaging/protobuf.version \
     packaging/version \
     $(NULL)
 
@@ -116,13 +112,8 @@ SUBDIRS += \
     claim \
     parser \
     spawn \
+    ml \
     $(NULL)
-
-if ENABLE_ACLK
-SUBDIRS += \
-    aclk/legacy \
-    $(NULL)
-endif
 
 AM_CFLAGS = \
     $(OPTIONAL_MATH_CFLAGS) \
@@ -232,6 +223,50 @@ HEALTH_PLUGIN_FILES = \
     health/health_log.c \
     $(NULL)
 
+ML_FILES = \
+    ml/ml.h \
+    ml/ml-dummy.c \
+    $(NULL)
+
+if ENABLE_ML
+
+ML_FILES += \
+    ml/BitBufferCounter.h \
+    ml/BitBufferCounter.cc \
+    ml/BitRateWindow.h \
+    ml/BitRateWindow.cc \
+    ml/Config.h \
+    ml/Config.cc \
+    ml/Database.h \
+    ml/Database.cc \
+    ml/Dimension.cc \
+    ml/Dimension.h \
+    ml/Host.h \
+    ml/Host.cc \
+    ml/Query.h \
+    ml/kmeans/KMeans.h \
+    ml/kmeans/KMeans.cc \
+    ml/kmeans/SamplesBuffer.h \
+    ml/kmeans/SamplesBuffer.cc \
+    ml/kmeans/dlib/dlib/all/source.cpp \
+    ml/json/single_include/nlohmann/json.hpp \
+    ml/ml.cc \
+    ml/ml-private.h \
+    $(NULL)
+
+# Disable warnings from dlib library
+ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits
+
+endif
+
+
+if ENABLE_ML_TESTS
+ML_TESTS_FILES = \
+    ml/kmeans/Tests.cc \
+    ml/Tests.cc \
+    $(NULL)
+endif
+
 IDLEJITTER_PLUGIN_FILES = \
     collectors/idlejitter.plugin/plugin_idlejitter.c \
     collectors/idlejitter.plugin/plugin_idlejitter.h \
@@ -295,12 +330,26 @@ EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf_dcstat.h \
     collectors/ebpf.plugin/ebpf_disk.c \
     collectors/ebpf.plugin/ebpf_disk.h \
+    collectors/ebpf.plugin/ebpf_fd.c \
+    collectors/ebpf.plugin/ebpf_fd.h \
     collectors/ebpf.plugin/ebpf_filesystem.c \
     collectors/ebpf.plugin/ebpf_filesystem.h \
+    collectors/ebpf.plugin/ebpf_hardirq.c \
+    collectors/ebpf.plugin/ebpf_hardirq.h \
+    collectors/ebpf.plugin/ebpf_mdflush.c \
+    collectors/ebpf.plugin/ebpf_mdflush.h \
+    collectors/ebpf.plugin/ebpf_mount.c \
+    collectors/ebpf.plugin/ebpf_mount.h \
+    collectors/ebpf.plugin/ebpf_oomkill.c \
+    collectors/ebpf.plugin/ebpf_oomkill.h \
     collectors/ebpf.plugin/ebpf_process.c \
     collectors/ebpf.plugin/ebpf_process.h \
+    collectors/ebpf.plugin/ebpf_shm.c \
+    collectors/ebpf.plugin/ebpf_shm.h \
     collectors/ebpf.plugin/ebpf_socket.c \
     collectors/ebpf.plugin/ebpf_socket.h \
+    collectors/ebpf.plugin/ebpf_softirq.c \
+    collectors/ebpf.plugin/ebpf_softirq.h \
     collectors/ebpf.plugin/ebpf_sync.c \
     collectors/ebpf.plugin/ebpf_sync.h \
     collectors/ebpf.plugin/ebpf_swap.c \
@@ -310,6 +359,8 @@ EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf.h \
     collectors/ebpf.plugin/ebpf_apps.c \
     collectors/ebpf.plugin/ebpf_apps.h \
+    collectors/ebpf.plugin/ebpf_cgroup.c \
+    collectors/ebpf.plugin/ebpf_cgroup.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -398,6 +449,16 @@ RRD_PLUGIN_FILES = \
     database/rrdvar.h \
     database/sqlite/sqlite_functions.c \
     database/sqlite/sqlite_functions.h \
+    database/sqlite/sqlite_aclk.c \
+    database/sqlite/sqlite_aclk.h \
+    database/sqlite/sqlite_health.c \
+    database/sqlite/sqlite_health.h \
+    database/sqlite/sqlite_aclk_node.c \
+    database/sqlite/sqlite_aclk_node.h \
+    database/sqlite/sqlite_aclk_chart.c \
+    database/sqlite/sqlite_aclk_chart.h \
+    database/sqlite/sqlite_aclk_alert.c \
+    database/sqlite/sqlite_aclk_alert.h \
     database/sqlite/sqlite3.c \
     database/sqlite/sqlite3.h \
     $(NULL)
@@ -545,8 +606,8 @@ PARSER_FILES = \
     parser/parser.h \
     $(NULL)
 
-if ACLK_NG
-ACLK_NG_FILES = \
+if ENABLE_ACLK
+ACLK_FILES = \
     aclk/aclk.c \
     aclk/aclk.h \
     aclk/aclk_util.c \
@@ -575,27 +636,82 @@ ACLK_NG_FILES = \
     mqtt_websockets/c-rbuf/include/ringbuffer.h \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/MQTT-C/src/mqtt.c \
-    mqtt_websockets/MQTT-C/include/mqtt.h \
+    mqtt_websockets/MQTT-C/include/mqtt.h
+    $(NULL)
+
+if ENABLE_NEW_CLOUD_PROTOCOL
+ACLK_FILES += \
+    aclk/aclk_charts_api.c \
+    aclk/aclk_charts_api.h \
+    aclk/aclk_alarm_api.c \
+    aclk/aclk_alarm_api.h \
     aclk/schema-wrappers/connection.cc \
     aclk/schema-wrappers/connection.h \
     aclk/schema-wrappers/node_connection.cc \
     aclk/schema-wrappers/node_connection.h \
     aclk/schema-wrappers/node_creation.cc \
     aclk/schema-wrappers/node_creation.h \
+    aclk/schema-wrappers/chart_stream.cc \
+    aclk/schema-wrappers/chart_stream.h \
+    aclk/schema-wrappers/chart_config.cc \
+    aclk/schema-wrappers/chart_config.h \
+    aclk/schema-wrappers/alarm_stream.cc \
+    aclk/schema-wrappers/alarm_stream.h \
+    aclk/schema-wrappers/alarm_config.cc \
+    aclk/schema-wrappers/alarm_config.h \
+    aclk/schema-wrappers/node_info.cc \
+    aclk/schema-wrappers/node_info.h \
     aclk/schema-wrappers/schema_wrappers.h \
+    aclk/schema-wrappers/schema_wrapper_utils.cc \
     aclk/schema-wrappers/schema_wrapper_utils.h \
     $(NULL)
 
-ACLK_NG_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
+ACLK_PROTO_DEFINITIONS = \
+    aclk/aclk-schemas/proto/aclk/v1/lib.proto \
+    aclk/aclk-schemas/proto/agent/v1/disconnect.proto \
+    aclk/aclk-schemas/proto/agent/v1/connection.proto \
+    aclk/aclk-schemas/proto/alarm/v1/config.proto \
+    aclk/aclk-schemas/proto/alarm/v1/stream.proto \
+    aclk/aclk-schemas/proto/chart/v1/config.proto \
+    aclk/aclk-schemas/proto/chart/v1/dimension.proto \
+    aclk/aclk-schemas/proto/chart/v1/instance.proto \
+    aclk/aclk-schemas/proto/chart/v1/stream.proto \
+    aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto \
+    aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto \
+    aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto \
+    $(NULL)
+
+dist_noinst_DATA += $(ACLK_PROTO_DEFINITIONS)
+
+ACLK_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/agent/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/stream.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/instance.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/dimension.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/config.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/config.pb.h \
+    aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
+    aclk/aclk-schemas/proto/aclk/v1/lib.pb.h \
+    aclk/aclk-schemas/proto/agent/v1/disconnect.pb.cc \
+    aclk/aclk-schemas/proto/agent/v1/disconnect.pb.h \
+    aclk/aclk-schemas/proto/alarm/v1/config.pb.cc \
+    aclk/aclk-schemas/proto/alarm/v1/config.pb.h \
+    aclk/aclk-schemas/proto/alarm/v1/stream.pb.cc \
+    aclk/aclk-schemas/proto/alarm/v1/stream.pb.h \
+    aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.cc \
+    aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h \
     $(NULL)
 
-BUILT_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
-nodist_netdata_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
+BUILT_SOURCES += $(ACLK_PROTO_BUILT_FILES)
+nodist_netdata_SOURCES += $(ACLK_PROTO_BUILT_FILES)
+CLEANFILES += $(ACLK_PROTO_BUILT_FILES)
 
 aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
 aclk/aclk-schemas/proto/agent/v1/connection.pb.h: aclk/aclk-schemas/proto/agent/v1/connection.proto
@@ -609,7 +725,45 @@ aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h: aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
-endif #ACLK_NG
+aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/stream.pb.h: aclk/aclk-schemas/proto/chart/v1/stream.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/instance.pb.h: aclk/aclk-schemas/proto/chart/v1/instance.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/dimension.pb.h: aclk/aclk-schemas/proto/chart/v1/dimension.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/config.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/config.pb.h: aclk/aclk-schemas/proto/chart/v1/config.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
+aclk/aclk-schemas/proto/aclk/v1/lib.pb.h: aclk/aclk-schemas/proto/aclk/v1/lib.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/agent/v1/disconnect.pb.cc \
+aclk/aclk-schemas/proto/agent/v1/disconnect.pb.h: aclk/aclk-schemas/proto/agent/v1/disconnect.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/alarm/v1/config.pb.cc \
+aclk/aclk-schemas/proto/alarm/v1/config.pb.h: aclk/aclk-schemas/proto/alarm/v1/config.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/alarm/v1/stream.pb.cc \
+aclk/aclk-schemas/proto/alarm/v1/stream.pb.h: aclk/aclk-schemas/proto/alarm/v1/stream.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.cc \
+aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h: aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+endif #ENABLE_NEW_CLOUD_PROTOCOL
+
+endif #ENABLE_ACLK
 
 if ENABLE_ACLK
 ACLK_COMMON_FILES = \
@@ -625,27 +779,6 @@ ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_proxy.c \
     aclk/aclk_proxy.h \
     $(NULL)
-
-if ACLK_LEGACY
-ACLK_LEGACY_FILES = \
-    aclk/legacy/agent_cloud_link.c \
-    aclk/legacy/agent_cloud_link.h \
-    aclk/legacy/aclk_query.c \
-    aclk/legacy/aclk_query.h \
-    aclk/legacy/mqtt.c \
-    aclk/legacy/mqtt.h \
-    aclk/legacy/aclk_rx_msgs.c \
-    aclk/legacy/aclk_rx_msgs.h \
-    aclk/legacy/aclk_lws_wss_client.c \
-    aclk/legacy/aclk_lws_wss_client.h \
-    aclk/legacy/aclk_lws_https_client.c \
-    aclk/legacy/aclk_lws_https_client.h \
-    aclk/legacy/aclk_common.c \
-    aclk/legacy/aclk_common.h \
-    aclk/legacy/aclk_stats.c \
-    aclk/legacy/aclk_stats.h \
-    $(NULL)
-endif #ACLK_LEGACY
 
 SPAWN_PLUGIN_FILES = \
     spawn/spawn.c \
@@ -750,6 +883,8 @@ NETDATA_FILES = \
     $(EXPORTING_ENGINE_FILES) \
     $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
+    $(ML_FILES) \
+    $(ML_TESTS_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
     $(PLUGINSD_PLUGIN_FILES) \
     $(REGISTRY_PLUGIN_FILES) \
@@ -761,8 +896,7 @@ NETDATA_FILES = \
     $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
     $(ACLK_COMMON_FILES) \
-    $(ACLK_LEGACY_FILES) \
-    $(ACLK_NG_FILES) \
+    $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(NULL)
 
@@ -801,6 +935,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_ATOMIC_LIBS) \
     $(NULL)
 
 if LINK_STATIC_JSONC
@@ -817,22 +952,24 @@ NETDATACLI_FILES = \
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 
+if LINUX
+    NETDATA_COMMON_LIBS += -lrt
+endif
 
 netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 
-if ACLK_NG
-    netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS)
+if ENABLE_ACLK
+    netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
+    $(OPTIONAL_ATOMIC_LIBS) \
+    $(NULL)
 endif
 
-if ACLK_LEGACY
-netdata_LDADD += \
-    $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
-    $(OPTIONAL_LWS_LIBS) \
-    $(OPTIONAL_LIBCAP_LIBS) \
-    $(NULL)
-endif #ACLK_LEGACY
+if ENABLE_ML_TESTS
+    netdata_LDADD += $(OPTIONAL_ML_TESTS_LIBS) \
+        $(NULL)
+endif
 
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
@@ -972,6 +1109,11 @@ if ENABLE_UNITTESTS
         $(NULL)
 
     TESTS = $(check_PROGRAMS)
+
+    XFAIL_TESTS = \
+        web/api/tests/web_api_testdriver \
+        web/api/tests/valid_urls_testdriver \
+        $(NULL)
 
     web_api_tests_valid_urls_testdriver_LDFLAGS = \
         -Wl,--wrap=rrdhost_find_by_hostname \

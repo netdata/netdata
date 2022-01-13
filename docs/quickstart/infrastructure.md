@@ -25,10 +25,10 @@ In this quickstart guide, you'll learn the basics of using Netdata Cloud to moni
 composite charts, and alarm viewing. You'll then learn about the most critical ways to configure the Agent on each of
 your nodes to maximize the value you get from Netdata.
 
-This quickstart assumes you've installed the Netdata Agent on more than one node in your infrastructure, and claimed
+This quickstart assumes you've installed the Netdata Agent on more than one node in your infrastructure, and connected
 those nodes to your Space in Netdata Cloud. If you haven't yet, see the [Netdata
 Cloud](https://learn.netdata.cloud/docs/cloud) docs for details on signing up for Netdata Cloud, installation, and
-claiming.
+connection process.
 
 > If you want to monitor a Kubernetes cluster with Netdata, see our [k8s installation
 > doc](/packaging/installer/methods/kubernetes.md) for setup details, and then read our guide, [_Monitor a Kubernetes
@@ -91,7 +91,7 @@ single-node dashboards in Netdata Cloud to drill down on specific issues, scrub 
 historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 
 Read about the process in the [infrastructure
-overview](/docs/visualize/overview-infrastructure.md#single-node-dashboards) doc, then learn about [interacting with
+overview](/docs/visualize/overview-infrastructure.md#drill-down-with-single-node-dashboards) doc, then learn about [interacting with
 dashboards and charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time
 metrics.
 

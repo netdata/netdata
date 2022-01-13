@@ -7,7 +7,7 @@
 # Utility to create self-extracting tar.gz archives.
 # The resulting archive is a file holding the tar.gz archive with
 # a small Shell script stub that uncompresses the archive to a temporary
-# directory and then executes a given script from withing that directory.
+# directory and then executes a given script from within that directory.
 #
 # Makeself home page: http://makeself.io/
 #

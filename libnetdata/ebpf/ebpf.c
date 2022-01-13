@@ -64,13 +64,19 @@ int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr)
 
 //----------------------------------------------------------------------------------------------------------------------
 
-int get_kernel_version(char *out, int size)
+/**
+ * Get Kernel version
+ *
+ * Get the current kernel from /proc and returns an integer value representing it
+ *
+ * @return it returns a value representing the kernel version.
+ */
+int ebpf_get_kernel_version()
 {
     char major[16], minor[16], patch[16];
     char ver[VERSION_STRING_LEN];
     char *version = ver;
 
-    out[0] = '\0';
     int fd = open("/proc/sys/kernel/osrelease", O_RDONLY);
     if (fd < 0)
         return -1;
@@ -103,10 +109,6 @@ int get_kernel_version(char *out, int size)
     while (*version && *version != '\n' && *version != '-')
         *move++ = *version++;
     *move = '\0';
-
-    fd = snprintf(out, (size_t)size, "%s.%s.%s", major, minor, patch);
-    if (fd > size)
-        error("The buffer to store kernel version is not smaller than necessary.");
 
     return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + (int)str2l(patch));
 }
@@ -255,7 +257,9 @@ char *ebpf_kernel_suffix(int version, int isrh)
         else
             return "3.10";
     } else {
-        if (version >= NETDATA_EBPF_KERNEL_5_11)
+        if (version >= NETDATA_EBPF_KERNEL_5_15)
+            return "5.15";
+        else if (version >= NETDATA_EBPF_KERNEL_5_11)
             return "5.11";
         else if (version >= NETDATA_EBPF_KERNEL_5_10)
             return "5.10";
@@ -272,14 +276,24 @@ char *ebpf_kernel_suffix(int version, int isrh)
 
 //----------------------------------------------------------------------------------------------------------------------
 
-int ebpf_update_kernel(ebpf_data_t *ed)
+/**
+ *  Update Kernel
+ *
+ *  Update string used to load eBPF programs
+ *
+ * @param ks      vector to store the value
+ * @param length  available length to store kernel
+ * @param isrh    Is a Red Hat distribution?
+ * @param version the kernel version
+ */
+void ebpf_update_kernel(char *ks, size_t length, int isrh, int version)
 {
-    char *kernel = ebpf_kernel_suffix(ed->running_on_kernel, (ed->isrh < 0) ? 0 : 1);
-    size_t length = strlen(kernel);
-    strncpyz(ed->kernel_string, kernel, length);
-    ed->kernel_string[length] = '\0';
-
-    return 0;
+    char *kernel = ebpf_kernel_suffix(version, (isrh < 0) ? 0 : 1);
+    size_t len = strlen(kernel);
+    if (len > length)
+        len = length - 1;
+    strncpyz(ks, kernel, len);
+    ks[len] = '\0';
 }
 
 static int select_file(char *name, const char *program, size_t length, int mode, char *kernel_string)
@@ -321,7 +335,7 @@ void ebpf_update_map_sizes(struct bpf_object *program, ebpf_module_t *em)
                         info("Changing map %s from size %u to %u ", map_name, w->internal_input, w->user_input);
 #endif
                         bpf_map__resize(map, w->user_input);
-                    } else if (((w->type & apps_type) == apps_type) && (!em->apps_charts)) {
+                    } else if (((w->type & apps_type) == apps_type) && (!em->apps_charts) && (!em->cgroup_charts)) {
                         w->user_input = ND_EBPF_DEFAULT_MIN_PID;
                         bpf_map__resize(map, w->user_input);
                     }
@@ -363,18 +377,21 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
     struct bpf_link **links = callocz(length , sizeof(struct bpf_link *));
     size_t i = 0;
     struct bpf_program *prog;
+    ebpf_specify_name_t *w;
     bpf_object__for_each_program(prog, obj)
     {
-        links[i] = bpf_program__attach(prog);
-        if (libbpf_get_error(links[i]) && names) {
+        if (names) {
             const char *name = bpf_program__name(prog);
-            ebpf_specify_name_t *w = ebpf_find_names(names, name);
-            if (w) {
-                enum bpf_prog_type type = bpf_program__get_type(prog);
-                if (type == BPF_PROG_TYPE_KPROBE)
-                    links[i] = bpf_program__attach_kprobe(prog, w->retprobe, w->optional);
-            }
-        }
+            w = ebpf_find_names(names, name);
+        } else
+            w = NULL;
+
+        if (w) {
+            enum bpf_prog_type type = bpf_program__get_type(prog);
+            if (type == BPF_PROG_TYPE_KPROBE)
+                links[i] = bpf_program__attach_kprobe(prog, w->retprobe, w->optional);
+        } else
+            links[i] = bpf_program__attach(prog);
 
         if (libbpf_get_error(links[i])) {
             links[i] = NULL;
@@ -386,15 +403,14 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
     return links;
 }
 
-static void ebpf_update_maps(ebpf_module_t *em, int *map_fd, struct bpf_object *obj)
+static void ebpf_update_maps(ebpf_module_t *em, struct bpf_object *obj)
 {
-    if (!map_fd)
+    if (!em->maps)
         return;
 
     ebpf_local_maps_t *maps = em->maps;
     struct bpf_map *map;
-    size_t i = 0;
-        bpf_map__for_each(map, obj)
+    bpf_map__for_each(map, obj)
     {
         int fd = bpf_map__fd(map);
         if (maps) {
@@ -408,8 +424,6 @@ static void ebpf_update_maps(ebpf_module_t *em, int *map_fd, struct bpf_object *
                 j++;
             }
         }
-        map_fd[i] = fd;
-        i++;
     }
 }
 
@@ -420,7 +434,7 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
         return;
 
     struct bpf_map *map;
-        bpf_map__for_each(map, obj)
+    bpf_map__for_each(map, obj)
     {
         size_t i = 0;
         while (maps[i].name) {
@@ -430,7 +444,7 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
                 w->type |= NETDATA_EBPF_MAP_CONTROLLER_UPDATED;
 
                 uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED;
-                int value = em->apps_charts;
+                int value = em->apps_charts | em->cgroup_charts;
                 int ret = bpf_map_update_elem(w->map_fd, &key, &value, 0);
                 if (ret)
                     error("Add key(%u) for controller table failed.", key);
@@ -441,7 +455,7 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
 }
 
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string,
-                                    struct bpf_object **obj, int *map_fd)
+                                    struct bpf_object **obj)
 {
     char lpath[4096];
     char lname[128];
@@ -466,7 +480,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         return NULL;
     }
 
-    ebpf_update_maps(em, map_fd, *obj);
+    ebpf_update_maps(em, *obj);
     ebpf_update_controller(em, *obj);
 
     size_t count_programs =  ebpf_count_programs(*obj);
@@ -474,7 +488,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     return ebpf_attach_programs(*obj, count_programs, em->names);
 }
 
-static char *ebpf_update_name(char *search)
+char *ebpf_find_symbol(char *search)
 {
     char filename[FILENAME_MAX + 1];
     char *ret = NULL;
@@ -512,7 +526,7 @@ void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em)
     size_t i = 0;
     while (opt[i].program_name) {
         opt[i].retprobe = (mode == MODE_RETURN);
-        opt[i].optional = ebpf_update_name(opt[i].function_to_attach);
+        opt[i].optional = ebpf_find_symbol(opt[i].function_to_attach);
 
         i++;
     }
@@ -533,7 +547,7 @@ int ebpf_load_config(struct config *config, char *filename)
 
 static netdata_run_mode_t ebpf_select_mode(char *mode)
 {
-    if (!strcasecmp(mode, "return"))
+    if (!strcasecmp(mode,EBPF_CFG_LOAD_MODE_RETURN ))
         return MODE_RETURN;
     else if  (!strcasecmp(mode, "dev"))
         return MODE_DEVMODE;
@@ -541,13 +555,26 @@ static netdata_run_mode_t ebpf_select_mode(char *mode)
     return MODE_ENTRY;
 }
 
+static void ebpf_select_mode_string(char *output, size_t len, netdata_run_mode_t  sel)
+{
+    if (sel == MODE_RETURN)
+        strncpyz(output, EBPF_CFG_LOAD_MODE_RETURN, len);
+    else
+        strncpyz(output, EBPF_CFG_LOAD_MODE_DEFAULT, len);
+}
+
+/**
+ * @param modules   structure that will be updated
+ */
 void ebpf_update_module_using_config(ebpf_module_t *modules)
 {
-    char *mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, EBPF_CFG_LOAD_MODE_DEFAULT);
+    char default_value[EBPF_MAX_MODE_LENGTH + 1];
+    ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
+    char *mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
     modules->mode = ebpf_select_mode(mode);
 
-    modules->update_time = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
-                                                     EBPF_CFG_UPDATE_EVERY, modules->update_time);
+    modules->update_every = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
+                                                     EBPF_CFG_UPDATE_EVERY, modules->update_every);
 
     modules->apps_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
                                                  modules->apps_charts);
@@ -632,7 +659,7 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
  *
  * @param algorithms the output vector
  * @param length     number of elements of algorithms vector
- * @param algortihm  algorithm used on charts.
+ * @param algorithm  algorithm used on charts.
 */
 void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm)
 {

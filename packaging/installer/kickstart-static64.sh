@@ -186,7 +186,7 @@ set_tarball_urls() {
     local latest
     # Simple version
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
-    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.gz.run"
+    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-latest.gz.run"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
     export NETDATA_TARBALL_URL="$NETDATA_TARBALL_BASEURL/netdata-latest.gz.run"
@@ -211,10 +211,25 @@ mark_install_type() {
   if [ -f "${install_type_file}" ]; then
     # shellcheck disable=SC1090
     . "${install_type_file}"
-    cat > "${install_type_file}" <<- EOF
+    cat > "${TMPDIR}/install-type" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
 	EOF
+    ${sudo} chown netdata:netdata "${TMPDIR}/install-type"
+    ${sudo} cp "${TMPDIR}/install-type" "${install_type_file}"
+  fi
+}
+
+claim() {
+  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
+  NETDATA_CLAIM_PATH=/opt/netdata/bin/netdata-claim.sh
+
+  if ${sudo} "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
+    progress "Successfully claimed node"
+    return 0
+  else
+    run_failed "Unable to claim node, you must do so manually."
+    return 1
   fi
 }
 
@@ -338,7 +353,10 @@ if [ -n "$ndpath" ] ; then
   if [ -r "${ndprefix}/etc/netdata/.environment" ] ; then
     ndstatic="$(grep IS_NETDATA_STATIC_BINARY "${ndprefix}/etc/netdata/.environment" | cut -d "=" -f 2 | tr -d \")"
     if [ -z "${NETDATA_REINSTALL}" ] && [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ] ; then
-      if [ -x "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ] ; then
+      if [ -n "${NETDATA_CLAIM_TOKEN}" ] ; then
+        claim
+        exit $?
+      elif [ -x "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ] ; then
         progress "Attempting to update existing install instead of creating a new one"
         if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" --not-running-from-cron ; then
           progress "Updated existing install at ${ndpath}"
@@ -365,7 +383,10 @@ if [ -n "$ndpath" ] ; then
     fi
   else
     progress "Existing install appears to be handled manually or through the system package manager."
-    if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
+    if [ -n "${NETDATA_CLAIM_TOKEN}" ] ; then
+      claim
+      exit $?
+    elif [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
       fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue."
       exit 1
     else
@@ -414,12 +435,5 @@ fi
 # --------------------------------------------------------------------------------------------------------------------
 
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
-  NETDATA_CLAIM_PATH=/opt/netdata/bin/netdata-claim.sh
-
-  if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
-    progress "Successfully claimed node"
-  else
-    run_failed "Unable to claim node, you must do so manually."
-  fi
+  claim
 fi

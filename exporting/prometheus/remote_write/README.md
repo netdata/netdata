@@ -41,6 +41,13 @@ For example, if your endpoint is `http://example.domain:example_port/storage/rea
     remote write URL path = /storage/read
 ```
 
+You can set basic HTTP authentication credentials using
+
+```conf
+    username = my_username
+    password = my_password
+```
+
 `buffered` and `lost` dimensions in the Netdata Exporting Connector Data Size operation monitoring chart estimate uncompressed
 buffer size on failures.
 

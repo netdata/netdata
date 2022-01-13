@@ -7,6 +7,8 @@
 #include "daemon/common.h"
 #include "schema-wrappers/schema_wrappers.h"
 
+#include "aclk_util.h"
+
 typedef enum {
     UNKNOWN,
     METADATA_INFO,
@@ -16,7 +18,15 @@ typedef enum {
     CHART_DEL,
     ALARM_STATE_UPDATE,
     REGISTER_NODE,
-    NODE_STATE_UPDATE
+    NODE_STATE_UPDATE,
+    CHART_DIMS_UPDATE,
+    CHART_CONFIG_UPDATED,
+    CHART_RESET,
+    RETENTION_UPDATED,
+    UPDATE_NODE_INFO,
+    ALARM_LOG_HEALTH,
+    ALARM_PROVIDE_CFG,
+    ALARM_SNAPSHOT
 } aclk_query_type_t;
 
 struct aclk_query_metadata {
@@ -32,6 +42,13 @@ struct aclk_query_chart_add_del {
 struct aclk_query_http_api_v2 {
     char *payload;
     char *query;
+};
+
+struct aclk_bin_payload { 
+    char *payload;
+    size_t size;
+    enum aclk_topics topic;
+    const char *msg_name;
 };
 
 typedef struct aclk_query *aclk_query_t;
@@ -61,6 +78,7 @@ struct aclk_query {
         struct aclk_query_chart_add_del chart_add_del;
         node_instance_creation_t node_creation;
         node_instance_connection_t node_update;
+        struct aclk_bin_payload bin_payload;
         json_object *alarm_update;
     } data;
 };
@@ -73,5 +91,14 @@ aclk_query_t aclk_queue_pop(void);
 void aclk_queue_flush(void);
 
 void aclk_queue_lock(void);
+void aclk_queue_unlock(void);
+
+#define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
+    if (likely(query->data.bin_payload.payload)) {                                                                     \
+        aclk_queue_query(query);                                                                                       \
+    } else {                                                                                                           \
+        error("Failed to generate payload (%s)", __FUNCTION__);                                                        \
+        aclk_query_free(query);                                                                                        \
+    }
 
 #endif /* NETDATA_ACLK_QUERY_QUEUE_H */

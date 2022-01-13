@@ -1,6 +1,6 @@
 <!--
 title: "Kubernetes monitoring with Netdata: Overview and visualizations"
-description: "Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granulrity."
+description: "Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granularity."
 image: /img/seo/guides/monitor/kubernetes-k8s-netdata.png
 author: "Joel Hans"
 author_title: "Editorial Director, Technical & Educational Resources"
@@ -45,9 +45,9 @@ To follow this tutorial, you need:
 
 -   A free Netdata Cloud account. [Sign up](https://app.netdata.cloud/sign-up?cloudRoute=/spaces) if you don't have one
     already.
--   A working cluster running Kubernetes v1.9 or newer, with a Netdata deployment and claimed parent/child nodes. See
+-   A working cluster running Kubernetes v1.9 or newer, with a Netdata deployment and connected parent/child nodes. See
     our [Kubernetes deployment process](/packaging/installer/methods/kubernetes.md) for details on deployment and
-    claiming.
+    conneting to Cloud.
 -   The [`kubectl`](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version
     difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an
     administrative system.
@@ -98,10 +98,10 @@ robot-shop    web-8bb887476-lkcjx               1/1     Running   0          14m
 ## Explore Netdata's Kubernetes monitoring charts
 
 The Netdata Helm chart deploys and enables everything you need for monitoring Kubernetes on every layer. Once you deploy
-Netdata and claim your cluster's nodes, you're ready to check out the visualizations **with zero configuration**.
+Netdata and connect your cluster's nodes, you're ready to check out the visualizations **with zero configuration**.
 
 To get started, [sign in](https://app.netdata.cloud/sign-in?cloudRoute=/spaces) to your Netdata Cloud account. Head over
-to the War Room you claimed your cluster to, if not **General**.
+to the War Room you connected your cluster to, if not **General**.
 
 Netdata Cloud is already visualizing your Kubernetes metrics, streamed in real-time from each node, in the
 [Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview):

@@ -101,7 +101,11 @@ static void health_silencers_init(void) {
                 freez(str);
             }
         } else {
-            error("Health silencers file %s has the size %ld that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, length, HEALTH_SILENCERS_MAX_FILE_LEN);
+            error(
+                "Health silencers file %s has the size %" PRId64 " that is out of range[ 1 , %d ]. Aborting read.",
+                silencers_filename,
+                (int64_t)length,
+                HEALTH_SILENCERS_MAX_FILE_LEN);
         }
         fclose(fd);
     } else {
@@ -230,6 +234,9 @@ void health_reload(void) {
     if (netdata_cloud_setting) {
         aclk_single_update_enable();
         aclk_alarm_reload();
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        aclk_alert_reloaded = 1;
+#endif
     }
 #endif
 }
@@ -323,7 +330,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                     buffer_strcat(warn_alarms, ",");
                 buffer_strcat(warn_alarms, rc->name);
                 buffer_strcat(warn_alarms, "=");
-                buffer_snprintf(warn_alarms, 11, "%ld", rc->last_status_change);
+                buffer_snprintf(warn_alarms, 11, "%"PRId64"", (int64_t)rc->last_status_change);
                 n_warn++;
             } else if (ae->alarm_id == rc->id)
                 expr = rc->warning;
@@ -333,7 +340,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                     buffer_strcat(crit_alarms, ",");
                 buffer_strcat(crit_alarms, rc->name);
                 buffer_strcat(crit_alarms, "=");
-                buffer_snprintf(crit_alarms, 11, "%ld", rc->last_status_change);
+                buffer_snprintf(crit_alarms, 11, "%"PRId64"", (int64_t)rc->last_status_change);
                 n_crit++;
             } else if (ae->alarm_id == rc->id)
                 expr = rc->critical;
@@ -662,6 +669,8 @@ void *health_main(void *ptr) {
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
+    int cleanup_sql_every_loop = 7200 / min_run_every;
+
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
@@ -679,9 +688,10 @@ void *health_main(void *ptr) {
         if (unlikely(check_if_resumed_from_suspension())) {
             apply_hibernation_delay = 1;
 
-            info("Postponing alarm checks for %ld seconds, because it seems that the system was just resumed from suspension.",
-                 hibernation_delay
-            );
+            info(
+                "Postponing alarm checks for %"PRId64" seconds, "
+                "because it seems that the system was just resumed from suspension.",
+                (int64_t)hibernation_delay);
         }
 
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
@@ -701,9 +711,10 @@ void *health_main(void *ptr) {
                 continue;
 
             if (unlikely(apply_hibernation_delay)) {
-
-                info("Postponing health checks for %ld seconds, on host '%s'.", hibernation_delay, host->hostname
-                );
+                info(
+                    "Postponing health checks for %"PRId64" seconds, on host '%s'.",
+                    (int64_t)hibernation_delay,
+                    host->hostname);
 
                 host->health_delay_up_to = now + hibernation_delay;
             }
@@ -715,6 +726,9 @@ void *health_main(void *ptr) {
                 info("Resuming health checks on host '%s'.", host->hostname);
                 host->health_delay_up_to = 0;
             }
+
+            if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
+                sql_health_alarm_log_cleanup(host);
 
             rrdhost_rdlock(host);
 
@@ -956,7 +970,7 @@ void *health_main(void *ptr) {
 
                         if(likely(!rrdcalc_isrepeating(rc))) {
                             ALARM_ENTRY *ae = health_create_alarm_entry(
-                                    host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                                    host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
                                     rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                     rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
                                     rc->delay_last,
@@ -1006,7 +1020,7 @@ void *health_main(void *ptr) {
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
                         rc->last_repeat = now;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                                host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
                                 rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                 rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
                                 rc->delay_last,
@@ -1029,6 +1043,14 @@ void *health_main(void *ptr) {
 
                 rrdhost_unlock(host);
             }
+
+#ifdef ENABLE_ACLK
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+            if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > 2) {
+                sql_queue_removed_alerts_to_aclk(host);
+            }
+#endif
+#endif
 
             if (unlikely(netdata_exit))
                 break;
@@ -1054,8 +1076,12 @@ void *health_main(void *ptr) {
             health_alarm_wait_for_execution(ae);
         }
 
-        rrd_unlock();
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        if (netdata_cloud_setting && unlikely(aclk_alert_reloaded))
+            aclk_alert_reloaded = 0;
+#endif
 
+        rrd_unlock();
 
         if(unlikely(netdata_exit))
             break;

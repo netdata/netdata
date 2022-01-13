@@ -236,8 +236,8 @@ same application on multiple systems and want to correlate how it performs on ea
 findings with someone else on your team.
 
 If you don't already have a Netdata Cloud account, go [sign in](https://app.netdata.cloud) and get started for free.
-Read the [get started with Cloud guide](https://learn.netdata.cloud/docs/cloud/get-started) for a walkthrough of node
-claiming and other fundamentals.
+Read the [get started with Cloud guide](https://learn.netdata.cloud/docs/cloud/get-started) for a walkthrough of 
+connecting nodes to and other fundamentals.
 
 Once you've added one or more nodes to a Space in Netdata Cloud, you can see aggregated eBPF metrics in the [Overview
 dashboard](/docs/visualize/overview-infrastructure.md) under the same **Applications** or **eBPF** sections that you

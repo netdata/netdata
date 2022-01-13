@@ -11,6 +11,8 @@
 extern int aclk_use_new_cloud_arch;
 extern usec_t aclk_session_newarch;
 
+extern int chart_batch_id;
+
 typedef enum {
     ACLK_ENC_UNKNOWN = 0,
     ACLK_ENC_JSON,
@@ -47,22 +49,34 @@ typedef struct {
     aclk_backoff_t backoff;
 } aclk_env_t;
 
+extern aclk_env_t *aclk_env;
+
 aclk_encoding_type_t aclk_encoding_type_t_from_str(const char *str);
 aclk_transport_type_t aclk_transport_type_t_from_str(const char *str);
 
 void aclk_transport_desc_t_destroy(aclk_transport_desc_t *trp_desc);
 void aclk_env_t_destroy(aclk_env_t *env);
+int aclk_env_has_capa(const char *capa);
 
 enum aclk_topics {
-    ACLK_TOPICID_UNKNOWN     = 0,
-    ACLK_TOPICID_CHART       = 1,
-    ACLK_TOPICID_ALARMS      = 2,
-    ACLK_TOPICID_METADATA    = 3,
-    ACLK_TOPICID_COMMAND     = 4,
-    ACLK_TOPICID_AGENT_CONN  = 5,
-    ACLK_TOPICID_CMD_NG_V1   = 6,
-    ACLK_TOPICID_CREATE_NODE = 7,
-    ACLK_TOPICID_NODE_CONN   = 8
+    ACLK_TOPICID_UNKNOWN               = 0,
+    ACLK_TOPICID_CHART                 = 1,
+    ACLK_TOPICID_ALARMS                = 2,
+    ACLK_TOPICID_METADATA              = 3,
+    ACLK_TOPICID_COMMAND               = 4,
+    ACLK_TOPICID_AGENT_CONN            = 5,
+    ACLK_TOPICID_CMD_NG_V1             = 6,
+    ACLK_TOPICID_CREATE_NODE           = 7,
+    ACLK_TOPICID_NODE_CONN             = 8,
+    ACLK_TOPICID_CHART_DIMS            = 9,
+    ACLK_TOPICID_CHART_CONFIGS_UPDATED = 10,
+    ACLK_TOPICID_CHART_RESET           = 11,
+    ACLK_TOPICID_RETENTION_UPDATED     = 12,
+    ACLK_TOPICID_NODE_INFO             = 13,
+    ACLK_TOPICID_ALARM_LOG             = 14,
+    ACLK_TOPICID_ALARM_HEALTH          = 15,
+    ACLK_TOPICID_ALARM_CONFIG          = 16,
+    ACLK_TOPICID_ALARM_SNAPSHOT        = 17
 };
 
 const char *aclk_get_topic(enum aclk_topics topic);

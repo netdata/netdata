@@ -129,7 +129,7 @@ configure any of these collectors according to your setup and infrastructure.
     metrics.
 -   [Redis (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis/): Monitor status from any
     number of database instances by reading the server's response to the `INFO ALL` command.
--   [Redis (Python)](/collectors/python.d.plugin/redis/): Monitor database status by reading the server's response to
+-   [Redis (Python)](/collectors/python.d.plugin/redis/README.md): Monitor database status by reading the server's response to
     the `INFO` command.
 -   [RethinkDB](/collectors/python.d.plugin/rethinkdbs/README.md): Collect database server and cluster statistics.
 -   [Riak KV](/collectors/python.d.plugin/riakkv/README.md): Collect database stats from the `/stats` endpoint.
@@ -169,14 +169,14 @@ configure any of these collectors according to your setup and infrastructure.
     plugins metrics from an endpoint provided by `in_monitor plugin`.
 -   [Logstash](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/logstash/): Monitor JVM threads,
     memory usage, garbage collection statistics, and more.
--   [OpenVPN status logs](/collectors/python.d.plugin/ovpn_status_log/): Parse server log files and provide summary
+-   [OpenVPN status logs](/collectors/python.d.plugin/ovpn_status_log/README.md): Parse server log files and provide summary
     (client, traffic) metrics.
 -   [Squid web server logs](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/squidlog/): Tail Squid
     access logs to return the volume of requests, types of requests, bandwidth, and much more.
 -   [Web server logs (Go version for Apache,
     NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/): Tail access logs and provide
     very detailed web server performance statistics. This module is able to parse 200k+ rows in less than half a second.
--   [Web server logs (Python version for Apache, NGINX, Squid)](/collectors/python.d.plugin/web_log/): Tail access log
+-   [Web server logs (Python version for Apache, NGINX, Squid)](/collectors/python.d.plugin/web_log/README.md): Tail access log
     file and collect web server/caching proxy metrics.
 
 ### Messaging
@@ -217,7 +217,7 @@ configure any of these collectors according to your setup and infrastructure.
     server authentication and accounting statistics from the `status server`.
 -   [Freeradius (Python)](/collectors/python.d.plugin/freeradius/README.md): Collect server authentication and
     accounting statistics from the `status server` using the `radclient` tool.
--   [Libreswan](/collectors/charts.d.plugin/libreswan/): Collect bytes-in, bytes-out, and uptime metrics.
+-   [Libreswan](/collectors/charts.d.plugin/libreswan/README.md): Collect bytes-in, bytes-out, and uptime metrics.
 -   [Icecast](/collectors/python.d.plugin/icecast/README.md): Monitor the number of listeners for active sources.
 -   [ISC BIND](/collectors/node.d.plugin/named/README.md): Collect nameserver summary performance statistics via a web
     interface (`statistics-channels` feature).
@@ -267,7 +267,7 @@ configure any of these collectors according to your setup and infrastructure.
     blockchain indexes, memory usage, network usage, and transactions of wallet instances.
 -   [Energi Core (Python)](/collectors/python.d.plugin/energid/README.md): Monitor blockchain, memory, network, and
     unspent transactions statistics.
--   [Fronius Symo](/collectors/node.d.plugin/fronius/): Collect power, consumption, autonomy, energy, and inverter
+-   [Fronius Symo](/collectors/node.d.plugin/fronius/README.md): Collect power, consumption, autonomy, energy, and inverter
     statistics.
 -   [UPS/PDU](/collectors/charts.d.plugin/nut/README.md): Read the status of UPS/PDU devices using the `upsc` tool.
 -   [SMA Sunny WebBox](/collectors/node.d.plugin/sma_webbox/README.md): Collect power statistics.
@@ -338,7 +338,7 @@ configure any of these collectors according to your setup and infrastructure.
     statistics using information provided by `ngx_http_reqstat_module`.
 -   [Tomcat](/collectors/python.d.plugin/tomcat/README.md): Collect web server performance metrics from the Manager App
     (`/manager/status?XML=true`).
--   [Traefik](/collectors/python.d.plugin/traefik/README.md): Uses Trafik's Health API to provide statistics.
+-   [Traefik](/collectors/python.d.plugin/traefik/README.md): Uses Traefik's Health API to provide statistics.
 -   [Varnish](/collectors/python.d.plugin/varnish/README.md): Provides HTTP accelerator global, backends (VBE), and
     disks (SMF) statistics using the `varnishstat` tool.
 -   [x509 check](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/x509check/): Monitor certificate

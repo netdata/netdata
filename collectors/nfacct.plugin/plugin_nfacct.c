@@ -690,7 +690,11 @@ static void nfacct_send_metrics() {
         if(likely(d->updated)) {
             if(unlikely(!d->packets_dimension_added)) {
                 d->packets_dimension_added = 1;
-                printf("CHART netfilter.nfacct_packets '' 'Netfilter Accounting Packets' 'packets/s'\n");
+                printf(
+                    "CHART netfilter.nfacct_packets '' 'Netfilter Accounting Packets' 'packets/s' 'nfacct' '' stacked %d %d %s\n",
+                    NETDATA_CHART_PRIO_NETFILTER_PACKETS,
+                    nfacct_root.update_every,
+                    PLUGIN_NFACCT_NAME);
                 printf("DIMENSION %s '' incremental 1 %d\n", d->name, nfacct_root.update_every);
             }
         }
@@ -721,7 +725,11 @@ static void nfacct_send_metrics() {
         if(likely(d->updated)) {
             if(unlikely(!d->bytes_dimension_added)) {
                 d->bytes_dimension_added = 1;
-                printf("CHART netfilter.nfacct_bytes '' 'Netfilter Accounting Bandwidth' 'kilobytes/s'\n");
+                printf(
+                    "CHART netfilter.nfacct_bytes '' 'Netfilter Accounting Bandwidth' 'kilobytes/s' 'nfacct' '' stacked %d %d %s\n",
+                    NETDATA_CHART_PRIO_NETFILTER_BYTES,
+                    nfacct_root.update_every,
+                    PLUGIN_NFACCT_NAME);
                 printf("DIMENSION %s '' incremental 1 %d\n", d->name, 1000 * nfacct_root.update_every);
             }
         }

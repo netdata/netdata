@@ -15,10 +15,12 @@
 #define EBPF_CFG_LOAD_MODE "ebpf load mode"
 #define EBPF_CFG_LOAD_MODE_DEFAULT "entry"
 #define EBPF_CFG_LOAD_MODE_RETURN "return"
+#define EBPF_MAX_MODE_LENGTH 6
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
+#define EBPF_CFG_CGROUP "cgroups"
 
 /**
  * The next magic number is got doing the following math:
@@ -42,6 +44,13 @@
  * 2048 = 8*256 + 0
  */
 #define NETDATA_RH_8 2048
+
+/**
+ *  Kernel 5.15
+ *
+ *  331520 = 5*65536 + 15*256
+ */
+#define NETDATA_EBPF_KERNEL_5_15 331520
 
 /**
  *  Kernel 5.11
@@ -151,9 +160,10 @@ typedef struct ebpf_module {
     const char *config_name;
     int enabled;
     void *(*start_routine)(void *);
-    int update_time;
+    int update_every;
     int global_charts;
     int apps_charts;
+    int cgroup_charts;
     netdata_run_mode_t mode;
     uint32_t thread_id;
     int optional;
@@ -165,22 +175,21 @@ typedef struct ebpf_module {
     const char *config_file;
 } ebpf_module_t;
 
-extern int get_kernel_version(char *out, int size);
+extern int ebpf_get_kernel_version();
 extern int get_redhat_release();
 extern int has_condition_to_run(int version);
 extern char *ebpf_kernel_suffix(int version, int isrh);
-extern int ebpf_update_kernel(ebpf_data_t *ef);
+extern void ebpf_update_kernel(char *ks, size_t length, int isrh, int version);
 extern struct bpf_link **ebpf_load_program(char *plugins_dir,
                              ebpf_module_t *em,
                              char *kernel_string,
-                             struct bpf_object **obj,
-                             int *map_fd);
+                             struct bpf_object **obj);
 
 extern void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 extern int ebpf_load_config(struct config *config, char *filename);
-extern void ebpf_update_module_using_config(ebpf_module_t *modules);
 extern void ebpf_update_module(ebpf_module_t *em);
 extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
+extern char *ebpf_find_symbol(char *search);
 extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
 extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
 extern char **ebpf_fill_histogram_dimension(size_t maximum);

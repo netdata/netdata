@@ -196,7 +196,7 @@ FROM
     FROM pg_catalog.pg_ls_dir('pg_wal') AS wal(name)
     WHERE name ~ '^[0-9A-F]{24}$'
     ORDER BY
-        (pg_stat_file('pg_wal/'||name)).modification,
+        (pg_stat_file('pg_wal/'||name, true)).modification,
         wal.name DESC) sub;
 """,
     V96: """
@@ -223,7 +223,7 @@ FROM
     FROM pg_catalog.pg_ls_dir('pg_xlog') AS wal(name)
     WHERE name ~ '^[0-9A-F]{24}$'
     ORDER BY
-        (pg_stat_file('pg_xlog/'||name)).modification,
+        (pg_stat_file('pg_xlog/'||name, true)).modification,
         wal.name DESC) sub;
 """,
 }
@@ -336,18 +336,18 @@ WHERE d.datallowconn;
 QUERY_TABLE_STATS = {
     DEFAULT: """
 SELECT
-    ((sum(relpages) * 8) * 1024) AS table_size,
-    count(1)                     AS table_count
+    sum(relpages) * current_setting('block_size')::numeric AS table_size,
+    count(1) AS table_count
 FROM pg_class
-WHERE relkind IN ('r', 't');
+WHERE relkind IN ('r', 't', 'm');
 """,
 }
 
 QUERY_INDEX_STATS = {
     DEFAULT: """
 SELECT
-    ((sum(relpages) * 8) * 1024) AS index_size,
-    count(1)                     AS index_count
+    sum(relpages) * current_setting('block_size')::numeric AS index_size,
+    count(1) AS index_count
 FROM pg_class
 WHERE relkind = 'i';
 """,
@@ -455,7 +455,8 @@ FROM pg_stat_database
 WHERE
     has_database_privilege(
       (SELECT current_user), datname, 'connect')
-    AND NOT datname ~* '^template\d';
+    AND NOT datname ~* '^template\d'
+ORDER BY datname;
 """,
 }
 
@@ -576,8 +577,20 @@ FROM
         slot_type,
         COALESCE (
           floor(
-            (pg_wal_lsn_diff(pg_current_wal_lsn (),slot.restart_lsn)
-             - (pg_walfile_name_offset (restart_lsn)).file_offset) / (s.val)
+            CASE WHEN pg_is_in_recovery()
+            THEN (
+              pg_wal_lsn_diff(pg_last_wal_receive_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_wal_lsn_diff(restart_lsn, '0/0') %% s.val)
+            ) / s.val
+            ELSE (
+              pg_wal_lsn_diff(pg_current_wal_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_walfile_name_offset(restart_lsn)).file_offset
+            ) / s.val
+            END
           ),0) AS replslot_wal_keep
     FROM pg_replication_slots slot
     LEFT JOIN (
@@ -615,8 +628,20 @@ FROM
         slot_type,
         COALESCE (
           floor(
-            (pg_wal_lsn_diff(pg_current_wal_lsn (),slot.restart_lsn)
-             - (pg_walfile_name_offset (restart_lsn)).file_offset) / (s.val)
+            CASE WHEN pg_is_in_recovery()
+            THEN (
+              pg_wal_lsn_diff(pg_last_wal_receive_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_wal_lsn_diff(restart_lsn, '0/0') %% s.val)
+            ) / s.val
+            ELSE (
+              pg_wal_lsn_diff(pg_current_wal_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_walfile_name_offset(restart_lsn)).file_offset
+            ) / s.val
+            END
           ),0) AS replslot_wal_keep
     FROM pg_replication_slots slot
     LEFT JOIN (

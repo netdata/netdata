@@ -81,6 +81,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     int retval = 0;
     usec_t t;
     BUFFER *local_buffer = NULL;
+    BUFFER *log_buffer = buffer_create(NETDATA_WEB_REQUEST_URL_SIZE);
     RRDHOST *query_host = localhost;
 
 #ifdef NETDATA_WITH_ZLIB
@@ -115,6 +116,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
             goto cleanup;
         }
     }
+
+    buffer_strcat(log_buffer, query->data.http_api_v2.query);
 
     char *mysep = strchr(query->data.http_api_v2.query, '?');
     if (mysep) {
@@ -179,7 +182,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
             z_buffer->len += bytes_to_cpy;
         } while(z_ret != Z_STREAM_END);
         // so that web_client_build_http_header
-        // puts correct content lenght into header
+        // puts correct content length into header
         buffer_free(w->response.data);
         w->response.data = z_buffer;
         z_buffer = NULL;
@@ -226,7 +229,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         , dt_usec(&tv, &w->tv_ready) / 1000.0
         , dt_usec(&tv, &w->tv_in) / 1000.0
         , w->response.code
-        , strip_control_characters(query->data.http_api_v2.query)
+        , strip_control_characters((char *)buffer_tostring(log_buffer))
     );
 
 cleanup:
@@ -240,6 +243,7 @@ cleanup:
     buffer_free(w->response.header_output);
     freez(w);
     buffer_free(local_buffer);
+    buffer_free(log_buffer);
     return retval;
 }
 
@@ -257,6 +261,7 @@ static int alarm_state_update_query(struct aclk_query_thread *query_thr, aclk_qu
     return 0;
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static int register_node(struct aclk_query_thread *query_thr, aclk_query_t query) {
     // TODO create a pending registrations list
     // with some timeouts to detect registration requests that
@@ -273,16 +278,34 @@ static int node_state_update(struct aclk_query_thread *query_thr, aclk_query_t q
     return 0;
 }
 
+static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
+{
+    // this will be simplified when legacy support is removed
+    aclk_send_bin_message_subtopic_pid(query_thr->client, query->data.bin_payload.payload, query->data.bin_payload.size, query->data.bin_payload.topic, query->data.bin_payload.msg_name);
+    return 0;
+}
+#endif
+
 aclk_query_handler aclk_query_handlers[] = {
-    { .type = HTTP_API_V2,        .name = "http api request v2", .fnc = http_api_v2              },
-    { .type = ALARM_STATE_UPDATE, .name = "alarm state update",  .fnc = alarm_state_update_query },
-    { .type = METADATA_INFO,      .name = "info metadata",       .fnc = info_metadata            },
-    { .type = METADATA_ALARMS,    .name = "alarms metadata",     .fnc = alarms_metadata          },
-    { .type = CHART_NEW,          .name = "chart new",           .fnc = chart_query              },
-    { .type = CHART_DEL,          .name = "chart delete",        .fnc = info_metadata            },
-    { .type = REGISTER_NODE,      .name = "register node",       .fnc = register_node            },
-    { .type = NODE_STATE_UPDATE,  .name = "node state update",   .fnc = node_state_update        },
-    { .type = UNKNOWN,            .name = NULL,                  .fnc = NULL                     }
+    { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
+    { .type = ALARM_STATE_UPDATE,   .name = "alarm state update",       .fnc = alarm_state_update_query },
+    { .type = METADATA_INFO,        .name = "info metadata",            .fnc = info_metadata            },
+    { .type = METADATA_ALARMS,      .name = "alarms metadata",          .fnc = alarms_metadata          },
+    { .type = CHART_NEW,            .name = "chart new",                .fnc = chart_query              },
+    { .type = CHART_DEL,            .name = "chart delete",             .fnc = info_metadata            },
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    { .type = REGISTER_NODE,        .name = "register node",            .fnc = register_node            },
+    { .type = NODE_STATE_UPDATE,    .name = "node state update",        .fnc = node_state_update        },
+    { .type = CHART_DIMS_UPDATE,    .name = "chart and dim update bin", .fnc = send_bin_msg             },
+    { .type = CHART_CONFIG_UPDATED, .name = "chart config updated",     .fnc = send_bin_msg             },
+    { .type = CHART_RESET,          .name = "reset chart messages",     .fnc = send_bin_msg             },
+    { .type = RETENTION_UPDATED,    .name = "update retention info",    .fnc = send_bin_msg             },
+    { .type = UPDATE_NODE_INFO,     .name = "update node info",         .fnc = send_bin_msg             },
+    { .type = ALARM_LOG_HEALTH,     .name = "alarm log health",         .fnc = send_bin_msg             },
+    { .type = ALARM_PROVIDE_CFG,    .name = "provide alarm config",     .fnc = send_bin_msg             },
+    { .type = ALARM_SNAPSHOT,       .name = "alarm snapshot",           .fnc = send_bin_msg             },
+#endif
+    { .type = UNKNOWN,              .name = NULL,                       .fnc = NULL                     }
 };
 
 
@@ -334,7 +357,7 @@ void *aclk_query_main_thread(void *ptr)
     return NULL;
 }
 
-#define TASK_LEN_MAX 16
+#define TASK_LEN_MAX 22
 void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss_client client)
 {
     info("Starting %d query threads.", query_threads->count);
@@ -344,7 +367,7 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss
     for (int i = 0; i < query_threads->count; i++) {
         query_threads->thread_list[i].idx = i; //thread needs to know its index for statistics
 
-        if(unlikely(snprintf(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_QUERY_THREAD_NAME, i) < 0))
+        if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_QUERY_THREAD_NAME, i) < 0))
             error("snprintf encoding error");
         netdata_thread_create(
             &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,

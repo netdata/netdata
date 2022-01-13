@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
 
 // charts
 #define NETDATA_DC_HIT_CHART "dc_hit_ratio"
@@ -11,10 +13,20 @@
 #define NETDATA_DC_REQUEST_NOT_FOUND_CHART "dc_not_found"
 
 #define NETDATA_DIRECTORY_CACHE_SUBMENU "directory cache (eBPF)"
-#define NETDATA_DIRECTORY_FILESYSTEM_SUBMENU "Directory Cache (eBPF)"
 
 // configuration file
 #define NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE "dcstat.conf"
+
+// Contexts
+#define NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT "cgroup.dc_ratio"
+#define NETDATA_CGROUP_DC_REFERENCE_CONTEXT "cgroup.dc_reference"
+#define NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT "cgroup.dc_not_cache"
+#define NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT "cgroup.dc_not_found"
+
+#define NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT "services.dc_ratio"
+#define NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT "services.dc_reference"
+#define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "services.dc_not_cache"
+#define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "services.dc_not_found"
 
 #define NETDATA_LATENCY_DCSTAT_SLEEP_MS 700000ULL
 

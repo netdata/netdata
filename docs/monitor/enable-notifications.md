@@ -14,7 +14,7 @@ alarms](/docs/monitor/configure-alarms.md) to change the preconfigured threshold
 infrastructure.
 
 Netdata Cloud offers [centralized alarm notifications](#netdata-cloud) via email, which leverages the health status
-information already streamed to Netdata Cloud from claimed nodes to send notifications to those who have enabled them.
+information already streamed to Netdata Cloud from connected nodes to send notifications to those who have enabled them.
 
 The Netdata Agent has a [notification system](#netdata-agent) that supports more than a dozen services, such as email,
 Slack, PagerDuty, Twilio, Amazon SNS, Discord, and much more.
@@ -94,7 +94,7 @@ want to see alarm notifications from Netdata. Click the green **Add to Slack** b
 
 On the following page, you'll receive a **Webhook URL**. That's what you'll need to configure Netdata, so keep it handy.
 
-Navigate to your [Netdata config directory](/docs/configure/nodes.md#netdata-config-directory) and use `edit-config` to
+Navigate to your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) and use `edit-config` to
 open the `health_alarm_notify.conf` file:
 
 ```bash

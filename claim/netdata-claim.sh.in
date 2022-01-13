@@ -191,7 +191,7 @@ for arg in "$@"
 do
         case $arg in
                 -token=*) TOKEN=${arg:7} ;;
-                -url=*) URL_BASE=${arg:5} ;;
+                -url=*) [ -n "${arg:5}" ] && URL_BASE=${arg:5} ;;
                 -id=*) ID=${arg:4} ;;
                 -rooms=*) ROOMS=${arg:7} ;;
                 -hostname=*) HOSTNAME=${arg:10} ;;

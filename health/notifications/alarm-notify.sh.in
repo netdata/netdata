@@ -319,7 +319,7 @@ SLACK_WEBHOOK_URL=
 # Microsoft Teams configs
 MSTEAMS_WEBHOOK_URL=
 
-# Legacy Microsoft Teams configs for backwards compatability:
+# Legacy Microsoft Teams configs for backwards compatibility:
 declare -A role_recipients_msteam
 
 # rocketchat configs
@@ -939,7 +939,7 @@ send_email() {
     fi
 
     [ -n "${sender_email}" ] && opts+=(-f "${sender_email}")
-    [ -n "${sender_name}" ] && ${sendmail} -F 2>&1 | grep -q "requires an argument" && opts+=(-F "${sender_name}")
+    [ -n "${sender_name}" ] && ${sendmail} -F 2>&1 | head -1 | grep -qv "sendmail: unrecognized option: F" && opts+=(-F "${sender_name}")
 
     if [ "${debug}" = "1" ]; then
       echo >&2 "--- BEGIN sendmail command ---"
@@ -1012,10 +1012,21 @@ send_pushover() {
 # pushbullet sender
 
 send_pushbullet() {
-  local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 user
+  local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 userOrChannelTag
   if [ "${SEND_PUSHBULLET}" = "YES" ] && [ -n "${userapikey}" ] && [ -n "${recipients}" ] && [ -n "${message}" ] && [ -n "${title}" ]; then
-    #https://docs.pushbullet.com/#create-push
-    for user in ${recipients}; do
+
+    # https://docs.pushbullet.com/#create-push
+    # Accept specification of user(s) (PushBullet account email address) and/or channel tag(s), separated by spaces.
+    # If recipient begins with a "#" then send to channel tag, otherwise send to email recipient.
+
+    for userOrChannelTag in ${recipients}; do
+      if [ "${userOrChannelTag::1}" = "#" ]; then
+        userOrChannelTag_type="channel_tag"
+        userOrChannelTag="${userOrChannelTag:1}" # Remove hash from start of channel tag (required by pushbullet API)
+      else
+        userOrChannelTag_type="email"
+      fi
+
       httpcode=$(docurl \
         --header 'Access-Token: '${userapikey}'' \
         --header 'Content-Type: application/json' \
@@ -1023,7 +1034,7 @@ send_pushbullet() {
           cat <<EOF
                               {"title": "${title}",
                               "type": "link",
-                              "email": "${user}",
+                              "${userOrChannelTag_type}": "${userOrChannelTag}",
                               "body": "$(echo -n ${message})",
                               "url": "${url}",
                               "source_device_iden": "${source_device}"}
@@ -1031,10 +1042,10 @@ EOF
         ) "https://api.pushbullet.com/v2/pushes" -X POST)
 
       if [ "${httpcode}" = "200" ]; then
-        info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+        info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${userOrChannelTag}'"
         sent=$((sent + 1))
       else
-        error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
+        error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${userOrChannelTag}' with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -2137,12 +2148,12 @@ send_dynatrace() {
   [ "${SEND_DYNATRACE}" != "YES" ] && return 1
 
   local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
-  local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
+  local description="Netdata Notification for: ${host} ${chart}.${name} is ${status}"
   local payload=""
 
   payload=$(cat <<EOF
 {
-  "title": "NetData Alarm from ${host}",
+  "title": "Netdata Alarm from ${host}",
   "source" : "${DYNATRACE_ANNOTATION_TYPE}",
   "description" : "${description}",
   "eventType": "${DYNATRACE_EVENT}",
@@ -2685,6 +2696,13 @@ Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
 MIME-Version: 1.0
 Content-Type: multipart/alternative; boundary="multipart-boundary"
 ${email_thread_headers}
+X-Netdata-Severity: ${status,,}
+X-Netdata-Alert-Name: $name
+X-Netdata-Chart: $chart
+X-Netdata-Family: $family
+X-Netdata-Classification: $classification
+X-Netdata-Host: $host
+X-Netdata-Role: $roles
 
 This is a MIME-encoded multipart message
 
@@ -3251,7 +3269,7 @@ Content-Transfer-Encoding: 8bit
                     </tr>
                     <tr>
                       <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
-                        <div style="font-family:Open Sans, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#35414A;">Discuss and troubleshoot with others on the Netdata <a href="https://community.netdata.cloud/" class="link" style="color: #00AB44; text-decoration: none;">community forums</a></div>
+                        <div style="font-family:Open Sans, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#35414A;">Join the troubleshooting discussion for this alert on our <a href="https://community.netdata.cloud/t/${name//[._]/-}" class="link" style="color: #00AB44; text-decoration: none;">community forums</a>.</div>
                       </td>
                     </tr>
                     </tbody>
@@ -3424,6 +3442,13 @@ Subject: ${html_email_subject}
 MIME-Version: 1.0
 Content-Type: multipart/alternative; boundary="multipart-boundary"
 ${email_thread_headers}
+X-Netdata-Severity: ${status,,}
+X-Netdata-Alert-Name: $name
+X-Netdata-Chart: $chart
+X-Netdata-Family: $family
+X-Netdata-Classification: $classification
+X-Netdata-Host: $host
+X-Netdata-Role: $roles
 
 This is a MIME-encoded multipart message
 

@@ -4,6 +4,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
+  <a href="https://storage.googleapis.com/netdata-nightlies/latest-version.txt"><img src="https://img.shields.io/badge/dynamic/xml?url=https://storage.googleapis.com/netdata-nightlies/latest-version.txt&label=nightly%20release&query=/text()" alt="Nightly release"></a>
   <a href="https://travis-ci.com/netdata/netdata"><img src="https://travis-ci.com/netdata/netdata.svg?branch=master" alt="Build status"></a>
   <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
@@ -47,6 +48,7 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
   - [Docker](#docker)
   - [Other operating systems](#other-operating-systems)
   - [Post-installation](#post-installation)
+  - [Netdata Cloud](#netdata-cloud)
 - [How it works](#how-it-works)
 - [Infographic](#infographic)
 - [Documentation](#documentation)
@@ -167,6 +169,14 @@ Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which 
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
 
+### Netdata Cloud
+
+Netdata Cloud works with Netdata's free, open-source monitoring agent to help you monitor and troubleshoot every 
+layer of your systems to find weaknesses before they turn into outages. [Using both tools](https://learn.netdata.cloud/docs/agent/claim) 
+can help you turn data into insights immediately.
+
+[Get Netdata Cloud now!](https://app.netdata.cloud/)
+
 ## How it works
 
 Netdata is a highly efficient, highly modular, metrics management engine. Its lockless design makes it ideal for
@@ -214,7 +224,7 @@ Contributions are the lifeblood of open-source projects. While we continue to in
 
 - Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
 - We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
-- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2C+needs+triage&template=bug_report.md).
+- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
 - View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
 Package maintainers should read the guide on [building Netdata from source](/packaging/installer/methods/source.md) for

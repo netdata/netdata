@@ -9,12 +9,6 @@
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN 37
-#endif
-
 struct dictionary_singleton {
     char *key;
     char *result;
@@ -215,7 +209,7 @@ static int parse_passwd_response(const char *json_str, struct auth_data *auth) {
 
     json = json_tokener_parse(json_str);
     if (!json) {
-        error("JSON-C failed to parse the payload of http respons of /env endpoint");
+        error("JSON-C failed to parse the payload of http response of /env endpoint");
         return 1;
     }
 
@@ -365,7 +359,7 @@ static int aclk_parse_otp_error(const char *json_str) {
 
     json = json_tokener_parse(json_str);
     if (!json) {
-        error("JSON-C failed to parse the payload of http respons of /env endpoint");
+        error("JSON-C failed to parse the payload of http response of /env endpoint");
         return 1;
     }
 
@@ -736,7 +730,7 @@ static int parse_json_env(const char *json_str, aclk_env_t *env) {
 
     json = json_tokener_parse(json_str);
     if (!json) {
-        error("JSON-C failed to parse the payload of http respons of /env endpoint");
+        error("JSON-C failed to parse the payload of http response of /env endpoint");
         return 1;
     }
 
@@ -848,7 +842,11 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
         return 1;
     }
 
-    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=json$claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=json,proto&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
+#else
+    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=json&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
+#endif
     freez(agent_id);
 
     req.host = (char*)aclk_hostname;

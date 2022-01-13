@@ -89,11 +89,11 @@ example_check() {
 example_create() {
   # create the chart with 3 dimensions
   cat << EOF
-CHART example.random '' "Random Numbers Stacked Chart" "% of random numbers" random random stacked $((example_priority)) $example_update_every
+CHART example.random '' "Random Numbers Stacked Chart" "% of random numbers" random random stacked $((example_priority)) $example_update_every '' '' 'example'
 DIMENSION random1 '' percentage-of-absolute-row 1 1
 DIMENSION random2 '' percentage-of-absolute-row 1 1
 DIMENSION random3 '' percentage-of-absolute-row 1 1
-CHART example.random2 '' "A random number" "random number" random random area $((example_priority + 1)) $example_update_every
+CHART example.random2 '' "A random number" "random number" random random area $((example_priority + 1)) $example_update_every '' '' 'example'
 DIMENSION random '' absolute 1 1
 EOF
 
@@ -103,7 +103,7 @@ EOF
 # _update is called continuously, to collect the values
 example_update() {
   # the first argument to this function is the microseconds since last update
-  # pass this parameter to the BEGIN statement (see bellow).
+  # pass this parameter to the BEGIN statement (see below).
 
   example_get || return 1
 

@@ -4,14 +4,12 @@
 
 #include "daemon/common.h"
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN 37
-#endif
-
 int aclk_use_new_cloud_arch = 0;
 usec_t aclk_session_newarch = 0;
+
+aclk_env_t *aclk_env = NULL;
+
+int chart_batch_id;
 
 aclk_encoding_type_t aclk_encoding_type_t_from_str(const char *str) {
     if (!strcmp(str, "json")) {
@@ -53,6 +51,15 @@ void aclk_env_t_destroy(aclk_env_t *env) {
             freez(env->capabilities[i]);
         freez(env->capabilities);
     }
+}
+
+int aclk_env_has_capa(const char *capa)
+{
+    for (int i = 0; i < (int) aclk_env->capability_count; i++) {
+        if (!strcasecmp(capa, aclk_env->capabilities[i]))
+            return 1;
+    }
+    return 0;
 }
 
 #ifdef ACLK_LOG_CONVERSATION_DIR
@@ -110,15 +117,24 @@ struct topic_name {
     // in answer to /password endpoint
     const char *name;
 } topic_names[] = {
-    { .id = ACLK_TOPICID_CHART,       .name = "chart"                    },
-    { .id = ACLK_TOPICID_ALARMS,      .name = "alarms"                   },
-    { .id = ACLK_TOPICID_METADATA,    .name = "meta"                     },
-    { .id = ACLK_TOPICID_COMMAND,     .name = "inbox-cmd"                },
-    { .id = ACLK_TOPICID_AGENT_CONN,  .name = "agent-connection"         },
-    { .id = ACLK_TOPICID_CMD_NG_V1,   .name = "inbox-cmd-v1"             },
-    { .id = ACLK_TOPICID_CREATE_NODE, .name = "create-node-instance"     },
-    { .id = ACLK_TOPICID_NODE_CONN,   .name = "node-instance-connection" },
-    { .id = ACLK_TOPICID_UNKNOWN,     .name = NULL                       }
+    { .id = ACLK_TOPICID_CHART,                 .name = "chart"                    },
+    { .id = ACLK_TOPICID_ALARMS,                .name = "alarms"                   },
+    { .id = ACLK_TOPICID_METADATA,              .name = "meta"                     },
+    { .id = ACLK_TOPICID_COMMAND,               .name = "inbox-cmd"                },
+    { .id = ACLK_TOPICID_AGENT_CONN,            .name = "agent-connection"         },
+    { .id = ACLK_TOPICID_CMD_NG_V1,             .name = "inbox-cmd-v1"             },
+    { .id = ACLK_TOPICID_CREATE_NODE,           .name = "create-node-instance"     },
+    { .id = ACLK_TOPICID_NODE_CONN,             .name = "node-instance-connection" },
+    { .id = ACLK_TOPICID_CHART_DIMS,            .name = "chart-and-dims-updated"   },
+    { .id = ACLK_TOPICID_CHART_CONFIGS_UPDATED, .name = "chart-configs-updated"    },
+    { .id = ACLK_TOPICID_CHART_RESET,           .name = "reset-charts"             },
+    { .id = ACLK_TOPICID_RETENTION_UPDATED,     .name = "chart-retention-updated"  },
+    { .id = ACLK_TOPICID_NODE_INFO,             .name = "node-instance-info"       },
+    { .id = ACLK_TOPICID_ALARM_LOG,             .name = "alarm-log"                },
+    { .id = ACLK_TOPICID_ALARM_HEALTH,          .name = "alarm-health"             },
+    { .id = ACLK_TOPICID_ALARM_CONFIG,          .name = "alarm-config"             },
+    { .id = ACLK_TOPICID_ALARM_SNAPSHOT,        .name = "alarm-snapshot"           },
+    { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
 enum aclk_topics compulsory_topics_legacy[] = {
@@ -139,6 +155,15 @@ enum aclk_topics compulsory_topics_new_cloud_arch[] = {
     ACLK_TOPICID_CMD_NG_V1,
     ACLK_TOPICID_CREATE_NODE,
     ACLK_TOPICID_NODE_CONN,
+    ACLK_TOPICID_CHART_DIMS,
+    ACLK_TOPICID_CHART_CONFIGS_UPDATED,
+    ACLK_TOPICID_CHART_RESET,
+    ACLK_TOPICID_RETENTION_UPDATED,
+    ACLK_TOPICID_NODE_INFO,
+    ACLK_TOPICID_ALARM_LOG,
+    ACLK_TOPICID_ALARM_HEALTH,
+    ACLK_TOPICID_ALARM_CONFIG,
+    ACLK_TOPICID_ALARM_SNAPSHOT,
     ACLK_TOPICID_UNKNOWN
 };
 

@@ -16,7 +16,9 @@
  */
 inline int can_send_rrdset(struct instance *instance, RRDSET *st)
 {
+#ifdef NETDATA_INTERNAL_CHECKS
     RRDHOST *host = st->rrdhost;
+#endif
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
         return 0;
@@ -136,7 +138,7 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
  * Copy and sanitize name.
  *
  * @param d a destination string.
- * @param s a source sting.
+ * @param s a source string.
  * @param usable the number of characters to copy.
  * @return Returns the length of the copied string.
  */
@@ -161,7 +163,7 @@ inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
  * Copy and sanitize label.
  *
  * @param d a destination string.
- * @param s a source sting.
+ * @param s a source string.
  * @param usable the number of characters to copy.
  * @return Returns the length of the copied string.
  */
@@ -190,7 +192,7 @@ inline size_t prometheus_label_copy(char *d, const char *s, size_t usable)
  * Copy and sanitize units.
  *
  * @param d a destination string.
- * @param s a source sting.
+ * @param s a source string.
  * @param usable the number of characters to copy.
  * @param showoldunits set this flag to 1 to show old (before v1.12) units.
  * @return Returns the destination string.

@@ -183,6 +183,24 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     return 0;
 }
 
+// chart labels
+void rrdpush_send_clabels(RRDHOST *host, RRDSET *st) {
+    struct label_index *labels_c = &st->state->labels;
+    if (labels_c) {
+        netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+        struct label *lbl = labels_c->head;
+        while(lbl) {
+            buffer_sprintf(host->sender->build,
+                           "CLABEL \"%s\" \"%s\" %d\n", lbl->key, lbl->value, (int)lbl->label_source);
+
+            lbl = lbl->next;
+        }
+        if (labels_c->head)
+            buffer_sprintf(host->sender->build,"CLABEL_COMMIT\n");
+        netdata_rwlock_unlock(&host->labels.labels_rwlock);
+    }
+}
+
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
@@ -223,6 +241,10 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , (st->plugin_name)?st->plugin_name:""
             , (st->module_name)?st->module_name:""
     );
+
+    // send the chart labels
+    if (host->sender->version >= STREAM_VERSION_CLABELS)
+        rrdpush_send_clabels(host, st);
 
     // send the dimensions
     RRDDIM *rd;
@@ -265,7 +287,7 @@ static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
     RRDHOST *host = st->rrdhost;
     buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
     if (s->version >= VERSION_GAP_FILLING)
-        buffer_sprintf(host->sender->build, " %ld\n", st->last_collected_time.tv_sec);
+        buffer_sprintf(host->sender->build, " %"PRId64"\n", (int64_t)st->last_collected_time.tv_sec);
     else
         buffer_strcat(host->sender->build, "\n");
 
@@ -500,6 +522,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             utc_offset = (int32_t)strtol(value, NULL, 0);
         else if(!strcmp(name, "hops"))
             system_info->hops = (uint16_t) strtoul(value, NULL, 0);
+        else if(!strcmp(name, "ml_capable"))
+            system_info->ml_capable = strtoul(value, NULL, 0);
+        else if(!strcmp(name, "ml_enabled"))
+            system_info->ml_enabled = strtoul(value, NULL, 0);
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver"))
@@ -655,7 +681,13 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 host->receiver->shutdown = 1;
                 shutdown(host->receiver->fd, SHUT_RDWR);
                 host->receiver = NULL;      // Thread holds reference to structure
-                info("STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is dead (%ld sec), accepting new connection.", host->hostname, w->client_ip, w->client_port, age);
+                info(
+                    "STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - "
+                    "existing connection is dead (%"PRId64" sec), accepting new connection.",
+                    host->hostname,
+                    w->client_ip,
+                    w->client_port,
+                    (int64_t)age);
             }
             else {
                 netdata_mutex_unlock(&host->receiver_lock);
@@ -663,7 +695,13 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 rrd_unlock();
                 log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname,
                                       "REJECTED - ALREADY CONNECTED");
-                info("STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is active (within last %ld sec), rejecting new connection.", host->hostname, w->client_ip, w->client_port, age);
+                info(
+                    "STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - "
+                    "existing connection is active (within last %"PRId64" sec), rejecting new connection.",
+                    host->hostname,
+                    w->client_ip,
+                    w->client_port,
+                    (int64_t)age);
                 // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "This GUID is already streaming to this server");

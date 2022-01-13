@@ -99,7 +99,7 @@ reading to migrate this tutorial to a VM or Server of any sort.
 Let's start another container in the same fashion as we did the Netdata container. 
 
 ```sh
-docker run -it --name prometheus --hostname prometheus
+docker run -it --name prometheus --hostname prometheus \
 --network=netdata-tutorial -p 9090:9090  centos:latest '/bin/bash'
 ``` 
 
@@ -108,6 +108,12 @@ files later in this tutorial.
 
 ```sh
 yum install vim -y
+```
+
+You will also need `wget` and `curl` to download files and `sudo` if you are not root.
+
+```sh
+yum install curl sudo wget -y
 ```
 
 Prometheus provides a tarball of their latest stable versions [here](https://prometheus.io/download/).
@@ -129,7 +135,7 @@ This should get Prometheus installed into the container. Let's test that we can 
 interface.
 
 ```sh
-/opt/prometheus/prometheus
+/opt/prometheus/prometheus --config.file=/opt/prometheus/prometheus.yml
 ```
 
 Now attempt to go to <http://localhost:9090/>. You should be presented with the Prometheus homepage. This is a good
@@ -178,14 +184,14 @@ Prometheus's homepage and begin to type `netdata\_` Prometheus should auto compl
 
 ![](https://github.com/ldelossa/NetdataTutorial/raw/master/Screen%20Shot%202017-07-28%20at%205.13.43%20PM.png)
 
-Let's now start exploring how we can graph some metrics. Back in our NetData container lets get the CPU spinning with a
+Let's now start exploring how we can graph some metrics. Back in our Netdata container lets get the CPU spinning with a
 pointless busy loop. On the shell do the following:
 
 ```sh
 [root@netdata /]# while true; do echo "HOT HOT HOT CPU"; done
 ```
 
-Our NetData cpu graph should be showing some activity. Let's represent this in Prometheus. In order to do this let's
+Our Netdata cpu graph should be showing some activity. Let's represent this in Prometheus. In order to do this let's
 keep our metrics page open for reference: <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes>. We are
 setting out to graph the data in the CPU chart so let's search for `system.cpu` in the metrics page above. We come
 across a section of metrics with the first comments  `# COMMENT homogeneous chart "system.cpu", context "system.cpu",
@@ -211,18 +217,18 @@ query the dimension also. Place this into our query text box.
 
 ![](https://github.com/ldelossa/NetdataTutorial/raw/master/Screen%20Shot%202017-07-28%20at%205.54.40%20PM.png)
 
-Awesome, this is exactly what we wanted. If you haven't caught on yet we can emulate entire charts from NetData by using
+Awesome, this is exactly what we wanted. If you haven't caught on yet we can emulate entire charts from Netdata by using
 the `chart` dimension. If you'd like you can combine the `chart` and `instance` dimension to create per-instance charts.
 Let's give this a try: `netdata_system_cpu_percentage_average{chart="system.cpu", instance="netdata:19999"}`
 
-This is the basics of using Prometheus to query NetData. I'd advise everyone at this point to read [this
-page](/exporting/prometheus/#using-netdata-with-prometheus). The key point here is that NetData can export metrics from
+This is the basics of using Prometheus to query Netdata. I'd advise everyone at this point to read [this
+page](/exporting/prometheus/README.md#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
 its internal DB or can send metrics _as-collected_ by specifying the `source=as-collected` URL parameter like so.
 <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected> If you choose to use
 this method you will need to use Prometheus's set of functions here: <https://prometheus.io/docs/querying/functions/> to
 obtain useful metrics as you are now dealing with raw counters from the system. For example you will have to use the
 `irate()` function over a counter to get that metric's rate per second. If your graphing needs are met by using the
-metrics returned by NetData's internal database (not specifying any source= URL parameter) then use that. If you find
+metrics returned by Netdata's internal database (not specifying any source= URL parameter) then use that. If you find
 limitations then consider re-writing your queries using the raw data and using Prometheus functions to get the desired
 chart.
 

@@ -18,7 +18,7 @@ before_install:
 #
 install:
   - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python3-pip
-  - sudo pip install git-semver==0.3.2 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
+  - sudo pip3 install git-semver==0.3.2 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
   - source tests/installer/slack.sh
   - export NOTIF_CHANNEL="automation-beta"
   - if [ "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export NOTIF_CHANNEL="automation"; fi;
@@ -104,20 +104,11 @@ jobs:
 
     # We only publish if a TAG has been set during packaging
     - stage: Publish for release
-      name: Create release draft
-      git:
-        depth: false
-      env:
-        - RELEASE_CHANNEL=stable
-      before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github" "${NOTIF_CHANNEL}"
+      name: Trigger release build and draft release creation
       script:
-        - echo "GIT Branch:" && git branch
-        - echo "Last commit:" && git log -1
-        - echo "GIT Describe:" && git describe
-        - echo "packaging/version:" && cat packaging/version
-        - echo "Generating release artifacts" && .travis/create_artifacts.sh  # Could/should be a common storage to put this and share between jobs
-        - .travis/draft_release.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Draft release submission failed"
+        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | sed 's/^v//')"
+        - .travis/trigger_artifact_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "release"
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger release artifact build during nightly release" "${NOTIF_CHANNEL}"
 
     - name: Trigger Docker image build and publish
       script:
@@ -149,55 +140,11 @@ jobs:
     # This is the nightly execution step
     #
     - stage: Nightly release
-      name: Create nightly release artifacts, publish to GCS
+      name: Trigger nightly artifact build and upload
       script:
-        - echo "GIT Branch:" && git branch
-        - echo "Last commit:" && git log -1
-        - echo "GIT Describe:" && git describe
-        - echo "packaging/version:" && cat packaging/version
-        - .travis/create_artifacts.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly artifacts generation failed"
-      git:
-        depth: false
-      before_deploy:
-        echo "Preparing creds under ${TRAVIS_REPO_SLUG}";
-        if [ "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
-           openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
-        else
-           echo "Beta deployment stage in progress";
-           openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
-        fi;
-      deploy:
-        # Beta storage, used for testing purposes
-        - provider: gcs
-          edge:
-            branch: gcs-ng
-          project_id: netdata-storage
-          credentials: .travis/gcs-credentials.json
-          bucket: "netdata-dev-nightlies"
-          skip_cleanup: true
-          local_dir: "artifacts"
-          on:
-            # Only deploy on netdata/netdata, master branch, when artifacts directory is created
-            repo: ${TRAVIS_REPO_SLUG}
-            branch: master
-            condition: -d "artifacts" && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
-
-        # Production storage
-        - provider: gcs
-          edge:
-            branch: gcs-ng
-          project_id: netdata-storage
-          credentials: .travis/gcs-credentials.json
-          bucket: "netdata-nightlies"
-          skip_cleanup: true
-          local_dir: "artifacts"
-          on:
-            # Only deploy on netdata/netdata, master branch, when artifacts directory is created
-            repo: netdata/netdata
-            branch: master
-            condition: -d "artifacts" && ${TRAVIS_REPO_SLUG} = "netdata/netdata"
-      after_deploy: rm -f .travis/gcs-credentials.json
+        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | sed 's/^v//')"
+        - .travis/trigger_artifact_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "nightly"
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger release artifact build during nightly release" "${NOTIF_CHANNEL}"
 
     - name: Trigger Docker image build and publish
       script: .travis/trigger_docker_build.sh "${GITHUB_TOKEN}" "nightly"

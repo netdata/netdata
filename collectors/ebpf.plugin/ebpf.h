@@ -30,6 +30,7 @@
 #include "daemon/main.h"
 
 #include "ebpf_apps.h"
+#include "ebpf_cgroup.h"
 
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
@@ -73,7 +74,7 @@ typedef struct netdata_error_report {
 } netdata_error_report_t;
 
 extern ebpf_module_t ebpf_modules[];
-enum ebpf_module_indexes {
+enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SOCKET_IDX,
     EBPF_MODULE_CACHESTAT_IDX,
@@ -82,8 +83,27 @@ enum ebpf_module_indexes {
     EBPF_MODULE_SWAP_IDX,
     EBPF_MODULE_VFS_IDX,
     EBPF_MODULE_FILESYSTEM_IDX,
-    EBPF_MODULE_DISK_IDX
+    EBPF_MODULE_DISK_IDX,
+    EBPF_MODULE_MOUNT_IDX,
+    EBPF_MODULE_FD_IDX,
+    EBPF_MODULE_HARDIRQ_IDX,
+    EBPF_MODULE_SOFTIRQ_IDX,
+    EBPF_MODULE_OOMKILL_IDX,
+    EBPF_MODULE_SHM_IDX,
+    EBPF_MODULE_MDFLUSH_IDX,
+    /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
+    EBPF_OPTION_ALL_CHARTS,
+    EBPF_OPTION_VERSION,
+    EBPF_OPTION_HELP,
+    EBPF_OPTION_GLOBAL_CHART,
+    EBPF_OPTION_RETURN_MODE
 };
+
+typedef struct ebpf_tracepoint {
+    bool enabled;
+    char *class;
+    char *event;
+} ebpf_tracepoint_t;
 
 // Copied from musl header
 #ifndef offsetof
@@ -96,12 +116,16 @@ enum ebpf_module_indexes {
 
 // Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
+#define NETDATA_EBPF_IP_FAMILY "ip"
 #define NETDATA_FILESYSTEM_FAMILY "filesystem"
+#define NETDATA_EBPF_MOUNT_GLOBAL_FAMILY "mount_points"
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
 #define NETDATA_EBPF_SYSTEM_GROUP "system"
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
+#define NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU "swap (eBPF)"
+#define NETDATA_SYSTEM_IPC_SHM_SUBMENU "ipc shared memory"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
@@ -117,6 +141,8 @@ enum ebpf_module_indexes {
 #define EBPF_SYS_CLONE_IDX 11
 #define EBPF_MAX_MAPS 32
 
+#define EBPF_DEFAULT_UPDATE_EVERY 10
+
 enum ebpf_algorithms_list {
     NETDATA_EBPF_ABSOLUTE_IDX,
     NETDATA_EBPF_INCREMENTAL_IDX
@@ -131,6 +157,7 @@ extern pthread_mutex_t lock;
 extern int close_ebpf_plugin;
 extern int ebpf_nprocs;
 extern int running_on_kernel;
+extern int isrh;
 extern char *ebpf_plugin_dir;
 extern char kernel_string[64];
 
@@ -152,7 +179,9 @@ extern void ebpf_write_chart_cmd(char *type,
                                  char *family,
                                  char *charttype,
                                  char *context,
-                                 int order);
+                                 int order,
+                                 int update_every,
+                                 char *module);
 
 extern void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
 
@@ -168,7 +197,9 @@ extern void ebpf_create_chart(char *type,
                               int order,
                               void (*ncd)(void *, int),
                               void *move,
-                              int end);
+                              int end,
+                              int update_every,
+                              char *module);
 
 extern void write_begin_chart(char *family, char *name);
 
@@ -181,8 +212,6 @@ extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t 
 extern void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite,
                            char *dread, long long vread);
 
-extern void fill_ebpf_data(ebpf_data_t *ef);
-
 extern void ebpf_create_charts_on_apps(char *name,
                                        char *title,
                                        char *units,
@@ -190,11 +219,17 @@ extern void ebpf_create_charts_on_apps(char *name,
                                        char *charttype,
                                        int order,
                                        char *algorithm,
-                                       struct target *root);
+                                       struct target *root,
+                                       int update_every,
+                                       char *module);
 
 extern void write_end_chart();
 
 extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
+
+extern int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
+extern int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
+extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 
@@ -205,16 +240,21 @@ extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 #define EBPF_COMMON_DIMENSION_FILES "files"
+#define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
+#define EBPF_COMMON_DIMENSION_KILLS "kills"
 
 // Common variables
 extern int debug_enabled;
 extern struct pid_stat *root_of_pids;
+extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern struct pid_stat *root_of_pids;
 extern ebpf_process_stat_t *global_process_stat;
+extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
+extern int shm_fd_ebpf_cgroup;
+extern sem_t *shm_sem_ebpf_cgroup;
+extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
-extern int update_every;
 extern uint32_t finalized_threads;
 
 // Socket functions and variables
@@ -226,7 +266,7 @@ extern void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim
 extern collected_number get_value_from_structure(char *basis, size_t offset);
 extern void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
 extern void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
-                                      char *charttype, char *context, int order);
+                                      char *charttype, char *context, int order, int update_every);
 extern void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300

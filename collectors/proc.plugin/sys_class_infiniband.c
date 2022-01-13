@@ -37,7 +37,7 @@
     GEN(port_rcv_constraint_errors,      errors,  "Pkts rcvd discarded ",          1, __VA_ARGS__)  \
     GEN(port_xmit_discards,              errors,  "Pkts sent discarded",           1, __VA_ARGS__)  \
     GEN(port_xmit_wait,                  errors,  "Tick Wait to send",             1, __VA_ARGS__)  \
-    GEN(VL15_dropped,                    errors,  "Pkts missed ressource",         1, __VA_ARGS__)  \
+    GEN(VL15_dropped,                    errors,  "Pkts missed resource",         1, __VA_ARGS__)  \
     GEN(excessive_buffer_overrun_errors, errors,  "Buffer overrun",                1, __VA_ARGS__)  \
     GEN(link_downed,                     errors,  "Link Downed",                   1, __VA_ARGS__)  \
     GEN(link_error_recovery,             errors,  "Link recovered",                1, __VA_ARGS__)  \
@@ -481,8 +481,11 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
                 if (!p->discovered)
                     info(
-                        "Infiniband card %s port %s at speed %lu width %lu", dev_dent->d_name, port_dent->d_name,
-                        p->speed, p->width);
+                        "Infiniband card %s port %s at speed %" PRIu64 " width %" PRIu64 "",
+                        dev_dent->d_name,
+                        port_dent->d_name,
+                        p->speed,
+                        p->width);
 
                 p->discovered = 1;
             }

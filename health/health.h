@@ -27,6 +27,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS      0x00000040
 
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
+#define HEALTH_ENTRY_FLAG_ACLK_QUEUED           0x20000000
 #define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
 #ifndef HEALTH_LISTEN_PORT
@@ -63,6 +64,7 @@ extern ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
+        uuid_t config_hash_id,
         time_t when,
         const char *name,
         const char *chart,

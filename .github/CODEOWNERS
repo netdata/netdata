@@ -2,19 +2,19 @@
 # This way we prevent modifications which will be overwriten by automation.
 
 # Global (default) code owner
-* @ktsaou @Ferroin
+* @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @kaskavel @vkalintiris
-.github/ @Ferroin @kaskavel @vkalintiris
+.travis/ @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
+.github/ @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
 aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @Ferroin
-contrib/debian @Ferroin @vkalintiris
+build/ @Ferroin @iigorkarpov @maneamarius
+contrib/debian @Ferroin @iigorkarpov @maneamarius @vkalintiris
 collectors/ @vlvkobal
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
@@ -29,38 +29,39 @@ collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
 daemon/ @thiagoftsm
 database/ @thiagoftsm @vkalintiris
-docs/ @joelhans
+docs/ @DShreve2 @kickoke
 health/ @thiagoftsm @vlvkobal @vkalintiris
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
+ml/ @siamaktavakoli @vkalintiris
 libnetdata/ @thiagofsm
-packaging/ @Ferroin @vkalintiris
+packaging/ @Ferroin @iigorkarpov @maneamarius @vkalintiris
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
-system/ @Ferroin @vkalintiris
-tests/ @Ferroin @kaskavel @vkalintiris
+system/ @Ferroin @iigorkarpov @maneamarius @vkalintiris
+tests/ @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
 web/ @thiagoftsm @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin @vkalintiris
-*.md @joelhans
-Dockerfile* @Ferroin @knatsakis
+*.am @Ferroin @iigorkarpov @maneamarius @vkalintiris
+*.md @DShreve2 @kickoke
+Dockerfile* @Ferroin @iigorkarpov @maneamarius @vkalintiris
 
 # Ownership of specific files
-.gitignore @Ferroin @knatsakis @vkalintiris
-.travis.yml @Ferroin @knatsakis @kaskavel @vkalintiris
-.lgtm.yml @Ferroin @knatsakis
-.eslintrc @Ferroin @knatsakis
-.eslintignore @Ferroin @knatsakis
-.csslintrc @Ferroin @knatsakis
-.codeclimate.yml @Ferroin @knatsakis
-.codacy.yml @Ferroin @knatsakis
-.yamllint.yml @Ferroin @knatsakis
-netdata.spec.in @Ferroin @knatsakis @vkalintiris
-netdata-installer.sh @Ferroin @knatsakis @vkalintiris
-package.json @jacekkolasa @Ferroin @knatsakis
-packaging/version @netdatabot @Ferroin @knatsakis
+.gitignore @Ferroin @iigorkarpov @maneamarius @vkalintiris
+.travis.yml @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
+.lgtm.yml @Ferroin @iigorkarpov @maneamarius @vkalintiris
+.eslintrc @Ferroin @iigorkarpov @maneamarius @vkalintiris
+.eslintignore @Ferroin @iigorkarpov @maneamarius @vkalintiris
+.csslintrc @Ferroin @iigorkarpov @maneamarius @vkalintiris
+.codeclimate.yml @Ferroin @iigorkarpov @maneamarius @vkalintiris
+.codacy.yml @Ferroin @iigorkarpov @maneamarius @vkalintiris
+.yamllint.yml @Ferroin @iigorkarpov @maneamarius @vkalintiris
+netdata.spec.in @Ferroin @iigorkarpov @maneamarius @vkalintiris
+netdata-installer.sh @Ferroin @iigorkarpov @maneamarius @vkalintiris
+package.json @jacekkolasa @Ferroin @iigorkarpov @maneamarius @vkalintiris
+packaging/version @netdatabot @Ferroin @iigorkarpov @maneamarius @vkalintiris
 
-LICENSE.md @joelhans @Ferroin @vkalintiris
-CHANGELOG.md @netdatabot @Ferroin @vkalintiris
+LICENSE.md @DShreve2 @Ferroin @vkalintiris
+CHANGELOG.md @netdatabot @Ferroin @iigorkarpov @maneamarius @vkalintiris

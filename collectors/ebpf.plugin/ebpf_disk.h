@@ -3,12 +3,18 @@
 #ifndef NETDATA_EBPF_DISK_H
 #define NETDATA_EBPF_DISK_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_DISK "disk"
+
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/ebpf/ebpf.h"
 
 #define NETDATA_EBPF_PROC_PARTITIONS "/proc/partitions"
 
 #define NETDATA_LATENCY_DISK_SLEEP_MS 650000ULL
+
+// Process configuration name
+#define NETDATA_DISK_CONFIG_FILE "disk.conf"
 
 // Decode function extracted from: https://elixir.bootlin.com/linux/v5.10.8/source/include/linux/kdev_t.h#L7
 #define MINORBITS       20

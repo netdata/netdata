@@ -30,7 +30,7 @@ You can opt-out from sending anonymous statistics to Netdata through three diffe
 
 ## Agent Dashboard - PostHog JavaScript
 
-When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Netdata will initialiszes a PostHog session and masks various event attributes.
+When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Netdata initializes a PostHog session and masks various event attributes.
 
 _Note_: You can see the relevant code in the [dashboard repository](https://github.com/netdata/dashboard/blob/master/src/domains/global/sagas.ts#L107) where the `window.posthog.register()` call is made.  
 
@@ -68,7 +68,7 @@ Starting with v1.21, we additionally collect information about:
 
 -   Failures to build the dependencies required to use Cloud features.
 -   Unavailability of Cloud features in an agent.
--   Failures to connect to the Cloud in case the agent has been [claimed](/claim/README.md). This includes error codes
+-   Failures to connect to the Cloud in case the [connection process](/claim/README.md) has been completed. This includes error codes
     to inform the Netdata team about the reason why the connection failed.
 
 To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The
@@ -91,7 +91,7 @@ update. You can also export the environment variable `DO_NOT_TRACK` with a non-z
 
 When using Docker, **set your `DO_NOT_TRACK` environment variable to `1`.** You can set this variable with the following
 command: `export DO_NOT_TRACK=1`. When creating a container using Netdata's [Docker
-image](/packaging/docker/README.md#run-the-agent-with-the-docker-command) for the first time, this variable will disable
+image](/packaging/docker/README.md#create-a-new-netdata-agent-container) for the first time, this variable will disable
 the anonymous statistics script inside of the container.
 
 Each of these opt-out processes does the following:

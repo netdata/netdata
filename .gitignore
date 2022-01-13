@@ -85,6 +85,9 @@ packaging/installer/.environment.sh
 # netdata makeself downloads
 packaging/makeself/tmp/
 
+# Libbpf is always overwritten depending of kernel version
+packaging/libbpf.*
+
 # coverity
 cov-int/
 netdata-coverity-analysis.tgz
@@ -217,3 +220,6 @@ externaldeps/
 # vim sessions
 Session.vim
 Session.*.vim
+
+# Special exceptions
+!packaging/repoconfig/Makefile

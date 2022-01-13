@@ -110,7 +110,7 @@ scrape_configs:
       # You can use `prometheus_all_hosts` if you want Prometheus to set the `instance` to your hostname instead of IP 
       format: [prometheus]
       #
-      # sources: as-collected | raw | average | sum | volume
+      # source: as-collected | raw | average | sum | volume
       # default is: average
       #source: [as-collected]
       #
@@ -125,7 +125,7 @@ scrape_configs:
 
 #### Install nodes.yml
 
-The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the
+The following is completely optional, it will enable Prometheus to generate alerts from some Netdata sources. Tweak the
 values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and
 add a _- "nodes.yml"_ entry under the _rule_files:_ section in the example prometheus.yml file above.
 

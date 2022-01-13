@@ -51,7 +51,7 @@ documentation and the [enabling a connector](/docs/export/enable-connector.md) d
 -   **KairosDB**: [Graphite](/exporting/graphite/README.md), [OpenTSDB](/exporting/opentsdb/README.md)
 -   **M3DB**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **MetricFire**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
--   **MongoDB**: [MongoDB](/exporting/mongodb/)
+-   **MongoDB**: [MongoDB](/exporting/mongodb/README.md)
 -   **New Relic**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **OpenTSDB**: [OpenTSDB](/exporting/opentsdb/README.md), [Prometheus remote
     write](/exporting/prometheus/remote_write/README.md)
@@ -70,7 +70,7 @@ documentation and the [enabling a connector](/docs/export/enable-connector.md) d
 
 Can't find your preferred external time-series database? Ask our [community](https://community.netdata.cloud/) for
 solutions, or file an [issue on
-GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md).
+GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
 
 ## What's next?
 

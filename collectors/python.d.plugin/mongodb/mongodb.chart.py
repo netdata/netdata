@@ -250,10 +250,10 @@ CHARTS = {
         ]
     },
     'cursors': {
-        'options': [None, 'Currently openned cursors, cursors with timeout disabled and timed out cursors',
+        'options': [None, 'Currently opened cursors, cursors with timeout disabled and timed out cursors',
                     'cursors', 'database performance', 'mongodb.cursors', 'stacked'],
         'lines': [
-            ['cursor_total', 'openned', 'absolute', 1, 1],
+            ['cursor_total', 'opened', 'absolute', 1, 1],
             ['noTimeout', None, 'absolute', 1, 1],
             ['timedOut', None, 'incremental', 1, 1]
         ]

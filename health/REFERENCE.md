@@ -52,8 +52,11 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 -   The `every` line is **required** if not using `lookup`.
 -   Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`.
 -   A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
-    `!` for a negative match. Order is important, too! See our [simple patterns docs](../libnetdata/simple_pattern/) for
+    `!` for a negative match. Order is important, too! See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for
     more examples.
+-   Lines terminated by a `\` are spliced together with the next line. The backslash is removed and the following line is
+    joined with the current one. No space is inserted, so you may split a line anywhere, even in the middle of a word.
+    This comes in handy if your `info` line consists of several sentences.  
 
 | line                                                | required        | functionality                                                                         |
 | --------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
@@ -174,7 +177,7 @@ type: Database
 | Cgroups                  | Alerts for cpu and memory usage of control groups                                                |
 | Computing                | Alerts for shared computing applications (e.g. boinc)                                            |
 | Containers               | Container related alerts (e.g. docker instances)                                                 |
-| Database                 | Database systems (e.g. MySQL, Postgress, etc)                                                    |
+| Database                 | Database systems (e.g. MySQL, PostgreSQL, etc)                                                    |
 | Data Sharing             | Used to group together alerts for data sharing applications                                      |
 | DHCP                     | Alerts for dhcp related services                                                                 |
 | DNS                      | Alerts for dns related services                                                                  |
@@ -272,7 +275,7 @@ template: disk_svctm_alarm
 The `families` line, used only alongside templates, filters which families within the context this alarm should apply
 to. The value is a space-separated list.
 
-The value is a space-separate list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for
+The value is a space-separate list of simple patterns. See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for
 some examples.
 
 For example, you can create a template on the `disk.io` context, but filter it to only the `sda` and `sdb` families:
@@ -291,7 +294,7 @@ The format is:
 lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS] [foreach DIMENSIONS]
 ```
 
-Everything is the same with [badges](../web/api/badges/). In short:
+Everything is the same with [badges](/web/api/badges/README.md). In short:
 
 -   `METHOD` is one of `average`, `min`, `max`, `sum`, `incremental-sum`.
      This is required.
@@ -528,14 +531,14 @@ that will be applied to all hosts installed in the last decade with the followin
 host labels: installed = 201*
 ```
 
-See our [simple patterns docs](../libnetdata/simple_pattern/) for more examples.
+See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for more examples.
 
 ## Expressions
 
-Netdata has an internal [infix expression parser](../libnetdata/eval). This parses expressions and creates an internal
+Netdata has an internal [infix expression parser](/libnetdata/eval). This parses expressions and creates an internal
 structure that allows fast execution of them.
 
-These operators are supported `+`, `-`, `*`, `/`, `<`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`, `NOT`.
+These operators are supported `+`, `-`, `*`, `/`, `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`, `NOT`.
 Boolean operators result in either `1` (true) or `0` (false).
 
 The conditional evaluation operator `?` is supported too. Using this operator IF-THEN-ELSE conditional statements can be
@@ -599,15 +602,15 @@ You can find all the variables that can be used for a given chart, using
 Agent dashboard. For example, [variables for the `system.cpu` chart of the
 registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
 
-> If you don't know how to find the CHART_NAME, you can read about it [here](../web/README.md#charts).
+> If you don't know how to find the CHART_NAME, you can read about it [here](/web/README.md#charts).
 
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
 <details markdown="1"><summary>The variables below can be used in both chart alarms and context templates.</summary>
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
-templates for charts belonging to a given [context](../web/README.md#contexts). The reason is that all charts of a given
-context are essentially identical, with the only difference being the [family](../web/README.md#families) that
+templates for charts belonging to a given [context](/web/README.md#contexts). The reason is that all charts of a given
+context are essentially identical, with the only difference being the [family](/web/README.md#families) that
 identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway,
 unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
 
@@ -676,7 +679,7 @@ Check the `health/health.d/` directory for all alarms shipped with Netdata.
 
 Here are a few examples:
 
-### Example 1
+### Example 1 - check server alive
 
 A simple check if an apache server is alive:
 
@@ -736,7 +739,7 @@ If these result in non-zero or true, they trigger the alarm.
 So, the warning condition checks if we have not collected data from apache for 5
 iterations and the critical condition checks for 10 iterations.
 
-### Example 2
+### Example 2 - disk space
 
 Check if any of the disks is critically low on disk space:
 
@@ -757,7 +760,7 @@ So, the `calc` line finds the percentage of used space. `$this` resolves to this
 This is a repeating alarm and if the alarm becomes CRITICAL it repeats the notifications every 10 seconds. It also
 repeats notifications every 2 minutes if the alarm goes into WARNING mode.
 
-### Example 3
+### Example 3 - disk fill rate
 
 Predict if any disk will run out of space in the near future.
 
@@ -800,7 +803,7 @@ Once this alarm triggers we will receive an email like this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/17839993/87872b32-6802-11e6-8e08-b2e4afef93bb.png)
 
-### Example 4
+### Example 4 - dropped packets
 
 Check if any network interface is dropping packets:
 
@@ -820,7 +823,7 @@ Note that the drops chart does not exist if a network interface has never droppe
 When Netdata detects a dropped packet, it will add the chart and it will automatically attach this
 alarm to it.
 
-### Example 5
+### Example 5 - CPU usage
 
 Check if user or system dimension is using more than 50% of cpu:
 
@@ -839,7 +842,7 @@ The `lookup` line will calculate the average CPU usage from system and user in t
 the foreach in the `lookup` line, Netdata will create two independent alarms called `dim_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
-### Example 6
+### Example 6 - CPU usage
 
 Check if all dimensions are using more than 50% of cpu:
 
@@ -856,6 +859,32 @@ lookup: average -3s percentage foreach *
 
 The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds. In this case
 Netdata will create alarms for all dimensions of the chart.
+
+### Example 7 - Z-Score based alarm
+
+Derive a "[Z Score](https://en.wikipedia.org/wiki/Standard_score)" based alarm on `user` dimension of the `system.cpu` chart:
+
+```yaml
+ alarm: cpu_user_mean
+    on: system.cpu
+lookup: mean -60s of user
+ every: 10s
+
+ alarm: cpu_user_stddev
+    on: system.cpu
+lookup: stddev -60s of user
+ every: 10s
+
+ alarm: cpu_user_zscore
+    on: system.cpu
+lookup: mean -10s of user
+  calc: ($this - $cpu_user_mean) / $cpu_user_stddev
+ every: 10s
+  warn: $this < -2 or $this > 2
+  crit: $this < -3 or $this > 3
+```
+
+Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alarms, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
 
 ## Troubleshooting
 

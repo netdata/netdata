@@ -24,7 +24,7 @@ prebuilt method for collecting your required metric data.
 
 In this tutorial, you'll learn how to leverage the [Python programming language](https://www.python.org/) to build a
 custom data collector for the Netdata Agent. Follow along with your own dataset, using the techniques and best practices
-covered here, or use the included examples for collecting and organizing eithre random or weather data.
+covered here, or use the included examples for collecting and organizing either random or weather data.
 
 ## What you need to get started
 
@@ -48,7 +48,7 @@ The basic elements of a Netdata collector are:
 - `ORDER[]`: A list containing the charts to be displayed.
 - `CHARTS{}`: A dictionary containing the details for the charts to be displayed.
 - `data{}`: A dictionary containing the values to be displayed.
-- `get_data()`: The basic function of the plugin which will retrun to Netdata the correct values.
+- `get_data()`: The basic function of the plugin which will return to Netdata the correct values.
 
 Let's walk through these jobs and elements as independent elements first, then apply them to example Python code.
 
@@ -138,7 +138,7 @@ correct values.
 The `python.d` plugin has a number of framework classes that can be used to speed up the development of your python
 collector. Your class can inherit one of these framework classes, which have preconfigured methods.
 
-For example, the snippet bellow is from the [RabbitMQ
+For example, the snippet below is from the [RabbitMQ
 collector](https://github.com/netdata/netdata/blob/91f3268e9615edd393bd43de4ad8068111024cc9/collectors/python.d.plugin/rabbitmq/rabbitmq.chart.py#L273).
 This collector uses an HTTP endpoint and uses the `UrlService` framework class, which only needs to define an HTTP
 endpoint for data collection.
@@ -298,7 +298,7 @@ class Service(SimpleService):
     def get_data(self):
         #The data dict is basically all the values to be represented
         # The entries are in the format: { "dimension": value}
-        #And each "dimension" shoudl belong to a chart.
+        #And each "dimension" should belong to a chart.
         data = dict()
 
         self.populate_data()
@@ -356,7 +356,7 @@ chart:
 Next, time to add one more chart that visualizes the average, minimum, and maximum temperature values.
 
 Add a new entry in the `CHARTS` dictionary with the definition for the new chart. Since you want three values
-represented in this this chart, add three dimensions. You shoudl also use the same `FAMILY` value in the charts (`TEMP`)
+represented in this this chart, add three dimensions. You should also use the same `FAMILY` value in the charts (`TEMP`)
 so that those two charts are grouped together.
 
 ```python
@@ -418,7 +418,7 @@ configuration in [YAML](https://www.tutorialspoint.com/yaml/yaml_basics.htm) for
 - Create a configuration file in the same directory as the `<plugin_name>.chart.py`. Name it `<plugin_name>.conf`.
 - Define a `job`, which is an instance of the collector. It is useful when you want to collect data from different
   sources with different attributes. For example, we could gather data from 2 different weather stations, which use
-  different temperature measures: Fahrenheit and Celcius.
+  different temperature measures: Fahrenheit and Celsius.
 - You can define many different jobs with the same name, but with different attributes. Netdata will try each job
   serially and will stop at the first job that returns data. If multiple jobs have the same name, only one of them can
   run. This enables you to define different "ways" to fetch data from a particular data source so that the collector has
@@ -433,7 +433,7 @@ weather_station_1:
     name: 'Greece'
     endpoint: 'https://endpoint_1.com'
     port: 67
-    type: 'celcius'
+    type: 'celsius'
 weather_station_2:
     name: 'Florida USA'
     endpoint: 'https://endpoint_2.com'

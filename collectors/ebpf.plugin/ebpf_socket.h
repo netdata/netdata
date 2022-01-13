@@ -4,15 +4,11 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_SOCKET "socket"
+
 // Vector indexes
 #define NETDATA_UDP_START 3
-#define NETDATA_RETRANSMIT_START 5
-
-#define NETDATA_SOCKET_APPS_HASH_TABLE 0
-#define NETDATA_SOCKET_IPV4_HASH_TABLE 1
-#define NETDATA_SOCKET_IPV6_HASH_TABLE 2
-#define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
-#define NETDATA_SOCKET_LISTEN_TABLE 5
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
 
@@ -32,9 +28,12 @@
 
 enum ebpf_socket_table_list {
     NETDATA_SOCKET_TABLE_BANDWIDTH,
+    NETDATA_SOCKET_GLOBAL,
+    NETDATA_SOCKET_LPORTS,
     NETDATA_SOCKET_TABLE_IPV4,
     NETDATA_SOCKET_TABLE_IPV6,
-    NETDATA_SOCKET_TABLE_UDP
+    NETDATA_SOCKET_TABLE_UDP,
+    NETDATA_SOCKET_TABLE_CTRL
 };
 
 enum ebpf_socket_publish_index {
@@ -74,8 +73,9 @@ typedef enum ebpf_socket_idx {
     NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
-#define NETDATA_SOCKET_GROUP "Socket"
-#define NETDATA_NETWORK_CONNECTIONS_GROUP "Network connections"
+#define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
+#define NETDATA_NETWORK_CONNECTIONS_GROUP "network connections"
+#define NETDATA_CGROUP_NET_GROUP "network (eBPF)"
 
 // Global chart name
 #define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
@@ -112,6 +112,23 @@ typedef enum ebpf_socket_idx {
 
 #define NETDATA_MINIMUM_IPV4_CIDR 0
 #define NETDATA_MAXIMUM_IPV4_CIDR 32
+
+// Contexts
+#define NETDATA_CGROUP_SOCKET_BYTES_RECV_CONTEXT "cgroup.net_bytes_recv"
+#define NETDATA_CGROUP_SOCKET_BYTES_SEND_CONTEXT "cgroup.net_bytes_send"
+#define NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT "cgroup.net_tcp_recv"
+#define NETDATA_CGROUP_SOCKET_TCP_SEND_CONTEXT "cgroup.net_tcp_send"
+#define NETDATA_CGROUP_SOCKET_TCP_RETRANSMIT_CONTEXT "cgroup.net_retransmit"
+#define NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT "cgroup.net_udp_recv"
+#define NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT "cgroup.net_udp_send"
+
+#define NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT "services.net_bytes_recv"
+#define NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT "services.net_bytes_send"
+#define NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT "services.net_tcp_recv"
+#define NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT "services.net_tcp_send"
+#define NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT "services.net_retransmit"
+#define NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT "services.net_udp_recv"
+#define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "services.net_udp_send"
 
 typedef struct ebpf_socket_publish_apps {
     // Data read

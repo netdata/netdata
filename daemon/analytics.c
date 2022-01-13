@@ -150,7 +150,7 @@ void analytics_get_data(char *name, BUFFER *wb)
  */
 void analytics_log_prometheus(void)
 {
-    if (likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
         analytics_data.prometheus_hits++;
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.prometheus_hits);
@@ -163,7 +163,7 @@ void analytics_log_prometheus(void)
  */
 void analytics_log_shell(void)
 {
-    if (likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
         analytics_data.shell_hits++;
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.shell_hits);
@@ -176,7 +176,7 @@ void analytics_log_shell(void)
  */
 void analytics_log_json(void)
 {
-    if (likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
         analytics_data.json_hits++;
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.json_hits);
@@ -189,7 +189,7 @@ void analytics_log_json(void)
  */
 void analytics_log_dashboard(void)
 {
-    if (likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
         analytics_data.dashboard_hits++;
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
@@ -239,7 +239,7 @@ void analytics_mirrored_hosts(void)
 void analytics_exporters(void)
 {
     //when no exporters are available, an empty string will be sent
-    //decide if something else is more suitable (but propably not null)
+    //decide if something else is more suitable (but probably not null)
     BUFFER *bi = buffer_create(1000);
     analytics_exporting_connectors(bi);
     analytics_set_data_str(&analytics_data.netdata_exporting_connectors, (char *)buffer_tostring(bi));
@@ -494,10 +494,7 @@ void analytics_misc(void)
 {
 #ifdef ENABLE_ACLK
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
-    if (aclk_ng)
-        analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
-    else
-        analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "legacy");
+    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
 #else
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "false");
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "");
@@ -589,6 +586,7 @@ void analytics_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     debug(D_ANALYTICS, "Cleaning up...");
+    analytics_free_data();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -709,7 +707,7 @@ void set_late_global_environment()
     analytics_get_install_type();
 }
 
-static void get_system_timezone(void)
+void get_system_timezone(void)
 {
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
@@ -730,7 +728,7 @@ static void get_system_timezone(void)
     // use the contents of /etc/timezone
     if (!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
         timezone = buffer;
-        info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
+        info("TIMEZONE: using the contents of /etc/timezone");
     }
 
     // read the link /etc/localtime
@@ -915,8 +913,6 @@ void set_global_environment()
     setenv("NETDATA_LISTEN_PORT", default_port, 1);
     if (clean)
         freez(default_port);
-
-    get_system_timezone();
 
     // set the path we need
     char path[1024 + 1], *p = getenv("PATH");

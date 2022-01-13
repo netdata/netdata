@@ -20,7 +20,7 @@ static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg,
     const char *topic = aclk_get_topic(subtopic);
 
     if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting mesage send");
+        error("Couldn't get topic. Aborting message send");
         return;
     }
 
@@ -36,7 +36,7 @@ static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg,
 #endif
 }
 
-static uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
 #ifndef ACLK_LOG_CONVERSATION_DIR
     UNUSED(msgname);
@@ -74,7 +74,7 @@ static uint16_t aclk_send_message_subtopic_pid(mqtt_wss_client client, json_obje
     const char *topic = aclk_get_topic(subtopic);
 
     if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting mesage send");
+        error("Couldn't get topic. Aborting message send");
         return 0;
     }
 
@@ -188,7 +188,7 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
 
 // TODO handle this somehow on older json-c
 //    tmp = json_object_new_uint64(ts_us);
-// probably jso->_to_json_strinf -> custom function
+// probably jso->_to_json_string -> custom function
 //          jso->o.c_uint64 -> map this with pointer to signed int
 // commit that implements json_object_new_uint64 is 3c3b592
 // between 0.14 and 0.15
@@ -403,6 +403,7 @@ int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message)
     return pid;
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 // new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
     size_t len;
@@ -481,6 +482,7 @@ void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_conne
     aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
     freez(msg);
 }
+#endif /* ENABLE_NEW_CLOUD_PROTOCOL */
 
 #ifndef __GNUC__
 #pragma endregion
