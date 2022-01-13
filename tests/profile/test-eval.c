@@ -9,9 +9,8 @@
 
 #include "config.h"
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
 #include "database/rrdcalc.h"
-
-void netdata_cleanup_and_exit(int ret) { exit(ret); }
 
 /*
 void indent(int level, int show) {
@@ -260,15 +259,6 @@ void print_expression(EVAL_NODE *op, const char *failed_at, int error) {
 	}
 }
 */
-
-int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
-	(void)variable;
-	(void)hash;
-	(void)rc;
-	(void)result;
-
-	return 0;
-}
 
 int main(int argc, char **argv) {
 	if(argc != 2) {

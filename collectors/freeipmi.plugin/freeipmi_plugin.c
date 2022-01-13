@@ -16,6 +16,7 @@
  */
 
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,39 +40,6 @@
 #define IPMI_PARSE_DEVICE_SUNBMC_STR    "sunbmc"
 #define IPMI_PARSE_DEVICE_SUNBMC_STR2   "bmc"
 #define IPMI_PARSE_DEVICE_INTELDCMI_STR "inteldcmi"
-
-// ----------------------------------------------------------------------------
-
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
-
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    (void)action;
-    (void)action_result;
-    (void)action_data;
-    return;
-}
-
-// callbacks required by popen()
-void signals_block(void) {};
-void signals_unblock(void) {};
-void signals_reset(void) {};
-
-// callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
-    (void)variable;
-    (void)hash;
-    (void)rc;
-    (void)result;
-    return 0;
-};
-
-// required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
-
-// ----------------------------------------------------------------------------
 
 #include <ipmi_monitoring.h>
 #include <ipmi_monitoring_bitmasks.h>
