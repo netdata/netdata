@@ -3,6 +3,7 @@
 #include "web_api_v1.h"
 
 char *api_secret;
+extern int aclk_use_new_cloud_arch;
 
 static struct {
     const char *name;
@@ -984,24 +985,18 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
-#ifdef ACLK_NG
     buffer_strcat(wb, "\t\"aclk-ng-available\": true,\n");
-#else
-    buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
-#endif
-#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": true,\n");
 #else
     buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": false,\n");
 #endif
-#ifdef ACLK_LEGACY
-    buffer_strcat(wb, "\t\"aclk-legacy-available\": true,\n");
-#else
     buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
-#endif
     buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
 #else
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
+    buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
+    buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
 #endif
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
@@ -1011,11 +1006,18 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
         freez(agent_id);
     }
 #ifdef ENABLE_ACLK
-    if (aclk_connected)
+    if (aclk_connected) {
         buffer_strcat(wb, "\t\"aclk-available\": true,\n");
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        if (aclk_use_new_cloud_arch)
+            buffer_strcat(wb, "\t\"aclk-available-protocol\": \"New\",\n");
+        else
+#endif
+            buffer_strcat(wb, "\t\"aclk-available-protocol\": \"Legacy\",\n");
+    }
     else
 #endif
-        buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
+        buffer_strcat(wb, "\t\"aclk-available\": false,\n\t\"aclk-available-protocol\": null,\n");     // Intentionally valid with/without #ifdef above
 
     buffer_strcat(wb, "\t\"memory-mode\": ");
     analytics_get_data(analytics_data.netdata_config_memory_mode, wb);
