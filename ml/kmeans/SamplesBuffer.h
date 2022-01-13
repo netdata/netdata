@@ -20,8 +20,9 @@ public:
     Sample(CalculatedNumber *Buf, size_t N) : CNs(Buf), NumDims(N) {}
 
     void initDSample(DSample &DS) const {
-        for (size_t Idx = 0; Idx != NumDims; Idx++)
-            DS(Idx) = CNs[Idx];
+        for (size_t Idx = 0; Idx != NumDims; Idx++) {
+            DS(Idx) = std::abs(CNs[Idx]);
+        }
     }
 
     void add(const Sample &RHS) const {
