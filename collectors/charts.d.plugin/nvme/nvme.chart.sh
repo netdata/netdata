@@ -46,7 +46,7 @@ nvme_get() {
     percentage_used+="SET ${h} =$(sudo -n nvme smart-log "${i}" | awk -F: '/percentage_used/ { print $2}' | awk -F% '{print $1}')"$'\n'
 	
     # read the temperature in the nvme
-    temperature+="SET ${h} = $(sudo -n nvme smart-log ${i} | awk -F: '/temperature/ { print $2 }' | awk '{ print $1 }')"$'\n'
+    temperature+="SET ${h} = $(sudo -n nvme smart-log "${i}" | awk -F: '/temperature/ { print $2 }' | awk '{ print $1 }')"$'\n'
 	
     # read the power cycles in the nvme	
     power_cycles+="SET ${h} =$(sudo -n nvme smart-log "${i}" | awk -F: '/power_cycles/ { print $2 }')"$'\n'
