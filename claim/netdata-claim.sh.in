@@ -151,7 +151,14 @@ NETDATA_USER=$(get_config_value netdata global "run as user")
 gen_id() {
     local id
 
-    id="$(uuidgen)"
+    if command -v uuidgen > /dev/null 2>&1; then
+        id="$(uuidgen)"
+    elif [ -r /proc/sys/kernel/random/uuid ]; then
+        id="$(cat /proc/sys/kernel/random/uuid)"
+    else
+        echo >&2 "Unable to generate machine ID."
+        exit 18
+    fi
 
     if [ "${id}" = "8a795b0c-2311-11e6-8563-000c295076a6" ] || [ "${id}" = "4aed1458-1c3e-11e6-a53f-000c290fc8f5" ]; then
         gen_id
