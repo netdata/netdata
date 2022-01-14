@@ -363,6 +363,31 @@ static int rrdpush_receive(struct receiver_state *rpt)
         }
         netdata_mutex_unlock(&rpt->host->receiver_lock);
     }
+    else {
+        rrd_wrlock();
+        rrdhost_update(
+            rpt->host,
+            rpt->hostname,
+            rpt->registry_hostname,
+            rpt->machine_guid,
+            rpt->os,
+            rpt->timezone,
+            rpt->abbrev_timezone,
+            rpt->utc_offset,
+            rpt->tags,
+            rpt->program_name,
+            rpt->program_version,
+            rpt->update_every,
+            history,
+            mode,
+            (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO),
+            (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key),
+            rrdpush_destination,
+            rrdpush_api_key,
+            rrdpush_send_charts_matching,
+            rpt->system_info);
+        rrd_unlock();
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     int ssl = 0;
