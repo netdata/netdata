@@ -24,7 +24,7 @@ void Config::readMLConfig(void) {
 
     bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", true);
 
-    unsigned long SaveAnomalyPercentageEvery = 15 * 60;
+    unsigned long SaveAnomalyPercentageEvery = 5 * 60;
 
     /*
      * Read values
