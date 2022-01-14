@@ -38,7 +38,7 @@ To install Netdata, including all dependencies required to connect to Netdata Cl
 updates_, run the following as your normal user:
 
 ```bash
-wget -O kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 This script will preferentially use native DEB/RPM packages if we provide them for your platform.
@@ -111,7 +111,7 @@ option when you install or update Netdata using the [automatic one-line installa
 script](#automatic-one-line-installation-script).
 
 ```bash
-wget -O kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh --no-updates
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update

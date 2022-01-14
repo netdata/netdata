@@ -21,7 +21,7 @@ used, read the contents of the `.environment` file and look for a `REINSTALL_OPT
 optional parameters.
 
 ```bash
-rm -f ./kickstart.sh ; wget https://my-netdata.io/kickstart.sh && sh ./kickstart.sh --reinstall
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --reinstall
 ```
 
 ## Troubleshooting

@@ -26,7 +26,7 @@ Being community-created and -maintained we don't guarantee that the features mad
 To install Netdata using our automatic [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script) script you will just need to run:
 
 ```bash
-rm -f ./kickstart.sh ; wget https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 With this script, you are also able to connect your nodes directly to Netdata Cloud if you wish, see more details on [Connect an agent running in macOS](/claim/README.md#connect-an-agent-running-in-macos)
