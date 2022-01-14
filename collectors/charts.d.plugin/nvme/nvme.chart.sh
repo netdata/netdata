@@ -35,7 +35,7 @@ nvme_get() {
   # 4. USE LOCAL VARIABLES (global variables may overlap with other modules)
   nvme_list=$(sudo -n nvme list | awk '/nvme/ { print $1 }')
   local i=
-  for i in "${nvme_list[*]}";do
+  for i in ${nvme_list[*]}; do
     
     h=${i/\/dev\//}
 	
