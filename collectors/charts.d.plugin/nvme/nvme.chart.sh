@@ -40,7 +40,7 @@ nvme_get() {
     h=${i/\/dev\//}
 	
     # read the critical warning in the nvme
-    critical_warning+="SET ${h} =$(sudo -n nvme smart-log ${i} | awk -F: '/critical_warning/ { print $2 }')"$'\n'
+    critical_warning+="SET ${h} =$(sudo -n nvme smart-log "${i}" | awk -F: '/critical_warning/ { print $2 }')"$'\n'
 	
     # read the percentage used in the nvme	
     percentage_used+="SET ${h} =$(sudo -n nvme smart-log ${i} | awk -F: '/percentage_used/ { print $2}' | awk -F% '{print $1}')"$'\n'
