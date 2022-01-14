@@ -43,7 +43,7 @@ nvme_get() {
     critical_warning+="SET ${h} =$(sudo -n nvme smart-log "${i}" | awk -F: '/critical_warning/ { print $2 }')"$'\n'
 	
     # read the percentage used in the nvme	
-    percentage_used+="SET ${h} =$(sudo -n nvme smart-log ${i} | awk -F: '/percentage_used/ { print $2}' | awk -F% '{print $1}')"$'\n'
+    percentage_used+="SET ${h} =$(sudo -n nvme smart-log "${i}" | awk -F: '/percentage_used/ { print $2}' | awk -F% '{print $1}')"$'\n'
 	
     # read the temperature in the nvme
     temperature+="SET ${h} = $(sudo -n nvme smart-log ${i} | awk -F: '/temperature/ { print $2 }' | awk '{ print $1 }')"$'\n'
