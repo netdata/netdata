@@ -332,6 +332,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
                 "AC [%s (N/A)]: ACLK synchronization thread for %s is not yet linked to HOST.",
                 wc->node_id,
                 wc->host_guid);
+            freez(claim_id);
             return;
         }
     }
