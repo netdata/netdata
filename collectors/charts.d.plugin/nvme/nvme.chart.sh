@@ -2,16 +2,12 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# shellcheck shell=bash
-# no need for shebang - this file is loaded from charts.d.plugin
-# SPDX-License-Identifier: GPL-3.0-or-later
-
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
 #
-# Made by Alexandre Azedo | SRE <aazedo@gocontact.pt>
-# 2021
+# Made by Alexandre Azedo | SRE <aazedo@broadvoice.com>
+# 2022
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
