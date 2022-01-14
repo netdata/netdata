@@ -52,7 +52,7 @@ nvme_get() {
     power_cycles+="SET ${h} =$(sudo -n nvme smart-log ${i} | awk -F: '/power_cycles/ { print $2 }')"$'\n'
 	
     # read the power on hours in the nvme
-    power_on_hours+="SET ${h} =$(sudo -n nvme smart-log ${i} | awk -F: '/power_on_hours/ { print $2 }' | awk -F, '{ print $1 }')"$'\n'
+    power_on_hours+="SET ${h} =$(sudo -n nvme smart-log "${i}" | awk -F: '/power_on_hours/ { print $2 }' | awk -F, '{ print $1 }')"$'\n'
     
   done
   # this should return:
