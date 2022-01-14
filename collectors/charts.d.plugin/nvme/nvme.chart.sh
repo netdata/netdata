@@ -49,7 +49,7 @@ nvme_get() {
     temperature+="SET ${h} = $(sudo -n nvme smart-log ${i} | awk -F: '/temperature/ { print $2 }' | awk '{ print $1 }')"$'\n'
 	
     # read the power cycles in the nvme	
-    power_cycles+="SET ${h} =$(sudo -n nvme smart-log ${i} | awk -F: '/power_cycles/ { print $2 }')"$'\n'
+    power_cycles+="SET ${h} =$(sudo -n nvme smart-log "${i}" | awk -F: '/power_cycles/ { print $2 }')"$'\n'
 	
     # read the power on hours in the nvme
     power_on_hours+="SET ${h} =$(sudo -n nvme smart-log "${i}" | awk -F: '/power_on_hours/ { print $2 }' | awk -F, '{ print $1 }')"$'\n'
