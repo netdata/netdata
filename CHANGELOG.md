@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Better handle creation of UUID for claiming. [\#11974](https://github.com/netdata/netdata/pull/11974) ([Ferroin](https://github.com/Ferroin))
+- Fixes coverity 374746 [\#11973](https://github.com/netdata/netdata/pull/11973) ([MrZammler](https://github.com/MrZammler))
+- Bump follow-redirects from 1.13.2 to 1.14.7 [\#11972](https://github.com/netdata/netdata/pull/11972) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Fixes Wrong Chart Description [\#11970](https://github.com/netdata/netdata/pull/11970) ([underhood](https://github.com/underhood))
+- Bump engine.io from 4.1.0 to 4.1.2 [\#11968](https://github.com/netdata/netdata/pull/11968) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Perform a host metadata update on child reconnection [\#11965](https://github.com/netdata/netdata/pull/11965) ([stelfrag](https://github.com/stelfrag))
 - Remove bitfields from rrdhost. [\#11964](https://github.com/netdata/netdata/pull/11964) ([vkalintiris](https://github.com/vkalintiris))
 - Find host and pass host-\>health\_enabled to cloud AlarmLogHealth message [\#11960](https://github.com/netdata/netdata/pull/11960) ([MrZammler](https://github.com/MrZammler))
 - Updated SNMP v3 documentation [\#11959](https://github.com/netdata/netdata/pull/11959) ([kickoke](https://github.com/kickoke))
