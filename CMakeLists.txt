@@ -953,6 +953,8 @@ IF(ENABLE_ML)
             ml/Host.h
             ml/Host.cc
             ml/Query.h
+            ml/correlation/SpearmansRank.h
+            ml/correlation/SpearmansRank.cc
             ml/kmeans/KMeans.h
             ml/kmeans/KMeans.cc
             ml/kmeans/SamplesBuffer.h
