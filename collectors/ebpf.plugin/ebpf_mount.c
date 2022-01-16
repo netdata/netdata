@@ -238,7 +238,7 @@ void *ebpf_mount_thread(void *ptr)
     if (!em->enabled)
         goto endmount;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
         goto endmount;
     }

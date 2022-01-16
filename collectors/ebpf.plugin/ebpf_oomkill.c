@@ -386,7 +386,7 @@ void *ebpf_oomkill_thread(void *ptr)
         goto endoomkill;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
         goto endoomkill;
     }

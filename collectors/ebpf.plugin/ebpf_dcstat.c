@@ -964,7 +964,7 @@ void *ebpf_dcstat_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto enddcstat;

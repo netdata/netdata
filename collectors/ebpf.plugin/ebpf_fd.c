@@ -841,7 +841,7 @@ void *ebpf_fd_thread(void *ptr)
 
     ebpf_fd_allocate_global_vectors(em->apps_charts);
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
         goto endfd;
     }

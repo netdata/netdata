@@ -74,7 +74,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (!w->probe_links && w->enabled) {
             em->thread_name = w->syscall;
-            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &w->objects);
+            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
             if (!w->probe_links) {
                 em->thread_name = saved_name;
                 return -1;

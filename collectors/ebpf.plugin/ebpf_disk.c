@@ -821,7 +821,7 @@ void *ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
         goto enddisk;
     }
