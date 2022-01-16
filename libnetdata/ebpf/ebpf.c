@@ -357,6 +357,79 @@ static void ebpf_mount_name(char *out, size_t len, char *path, uint32_t kver, co
 
 //----------------------------------------------------------------------------------------------------------------------
 
+/**
+ * Statistics from targets
+ *
+ * Count the information from targets.
+ *
+ * @param report  the output structure
+ * @param targets  vector with information about the eBPF plugin.
+ */
+static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets_t *targets)
+{
+    if (!targets) {
+        report->probes = report->tracepoints = report->trampolines = 0;
+        return;
+    }
+
+    int i = 0;
+    while (targets[i].name) {
+        switch (targets[i].mode) {
+            case EBPF_LOAD_PROBE: {
+                report->probes++;
+                break;
+            }
+            case EBPF_LOAD_RETPROBE: {
+                report->retprobes++;
+                break;
+            }
+            case EBPF_LOAD_TRACEPOINT: {
+                report->tracepoints++;
+                break;
+            }
+            case EBPF_LOAD_TRAMPOLINE: {
+                report->trampolines++;
+                break;
+            }
+        }
+
+        i++;
+    }
+}
+
+/**
+ * Update General stats
+ *
+ * Update eBPF plugin statistics that has relationship with the thread.
+ *
+ * This function must be called with mutex associated to charts is locked.
+ *
+ * @param report  the output structure
+ * @param em      the structure with information about how the module/thread is working.
+ * @param loaded  how the eBPF program was loaded.
+ */
+void ebpf_update_general_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em, netdata_ebpf_load_mode_t loaded)
+{
+    report->threads++;
+
+    // It is not necessary to report more information.
+    if (!em->enabled)
+        return;
+
+    report->running++;
+
+    // In theory the `else if` is useless, because when this function is called, the module should not stay in
+    // EBPF_LOAD_PLAY_DICE. We have this additional condition to detect errors from developers.
+    if (loaded == EBPF_LOAD_LEGACY)
+        report->legacy++;
+    else if (loaded == EBPF_LOAD_CORE)
+        report->core++;
+
+    ebpf_stats_targets(report, em->targets);
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
 void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em)
 {
     pid->user_input = em->pid_map_size;

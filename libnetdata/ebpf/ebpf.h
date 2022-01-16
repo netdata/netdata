@@ -137,6 +137,39 @@ typedef struct ebpf_specify_name {
     bool retprobe;
 } ebpf_specify_name_t;
 
+typedef enum netdata_ebpf_load_mode {
+    EBPF_LOAD_LEGACY,        // Select legacy mode, this means we will load binaries
+    EBPF_LOAD_CORE,          // When CO-RE is used, it is necessary to use the souce code
+
+    EBPF_LOAD_PLAY_DICE      // Take a look on environment and choose the best option
+} netdata_ebpf_load_mode_t;
+
+typedef enum netdata_ebpf_program_loaded {
+    EBPF_LOAD_PROBE,         // Attach probes on targets
+    EBPF_LOAD_RETPROBE,      // Attach retprobes on targets
+    EBPF_LOAD_TRACEPOINT,    // This stores log given description about the errors raised
+    EBPF_LOAD_TRAMPOLINE,    // This attaches kprobe when the function is called
+} netdata_ebpf_program_loaded_t;
+
+typedef struct netdata_ebpf_targets {
+    char *name;
+    netdata_ebpf_program_loaded_t mode;
+} netdata_ebpf_targets_t;
+
+typedef struct ebpf_plugin_stats {
+    // Load options
+    uint32_t legacy;      // Legacy codes
+    uint32_t core;        // CO-RE codes, this means we are using source code compiled.
+
+    uint32_t threads;     // Total number of threads
+    uint32_t running;     // total number of threads running
+
+    uint32_t probes;      // Number of kprobes loaded
+    uint32_t retprobes;   // Number of kretprobes loaded
+    uint32_t tracepoints; // Number of tracepoints used
+    uint32_t trampolines; // Number of trampolines used
+} ebpf_plugin_stats_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -156,6 +189,7 @@ typedef struct ebpf_module {
     struct config *cfg;
     const char *config_file;
     uint64_t kernels;
+    netdata_ebpf_targets_t *targets;
 } ebpf_module_t;
 
 extern int ebpf_get_kernel_version();
@@ -173,6 +207,7 @@ extern char *ebpf_find_symbol(char *search);
 extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
 extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
 extern char **ebpf_fill_histogram_dimension(size_t maximum);
+extern void ebpf_update_general_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em, netdata_ebpf_load_mode_t loaded);
 
 // Histogram
 #define NETDATA_EBPF_HIST_MAX_BINS 24UL
