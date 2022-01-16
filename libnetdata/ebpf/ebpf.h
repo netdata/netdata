@@ -189,6 +189,7 @@ typedef struct ebpf_module {
     struct config *cfg;
     const char *config_file;
     uint64_t kernels;
+    netdata_ebpf_load_mode_t load;
     netdata_ebpf_targets_t *targets;
 } ebpf_module_t;
 
