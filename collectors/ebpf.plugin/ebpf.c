@@ -64,7 +64,6 @@ struct config collector_config = { .first_section = NULL,
                                               .rwlock = AVL_LOCK_INITIALIZER } };
 
 int running_on_kernel = 0;
-char kernel_string[64];
 int ebpf_nprocs;
 int isrh = 0;
 uint32_t finalized_threads = 1;

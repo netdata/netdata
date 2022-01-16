@@ -159,7 +159,6 @@ extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern int isrh;
 extern char *ebpf_plugin_dir;
-extern char kernel_string[64];
 
 extern pthread_mutex_t collect_data_mutex;
 extern pthread_cond_t collect_data_cond_var;
