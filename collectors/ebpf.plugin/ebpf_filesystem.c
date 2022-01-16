@@ -224,13 +224,16 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
 {
     int i;
     const char *saved_name = em->thread_name;
+    uint64_t kernels = em->kernels;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (!efp->probe_links && efp->flags & NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM) {
             em->thread_name = efp->filesystem;
+            em->kernels = efp->kernels;
             efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
             if (!efp->probe_links) {
                 em->thread_name = saved_name;
+                em->kernels = kernels;
                 return -1;
             }
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
@@ -243,6 +246,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
     em->thread_name = saved_name;
+    em->kernels = kernels;
 
     if (!dimensions) {
         dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
