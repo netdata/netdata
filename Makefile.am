@@ -244,6 +244,8 @@ ML_FILES += \
     ml/Host.h \
     ml/Host.cc \
     ml/Query.h \
+    ml/correlation/SpearmansRank.h \
+    ml/correlation/SpearmansRank.cc \
     ml/kmeans/KMeans.h \
     ml/kmeans/KMeans.cc \
     ml/kmeans/SamplesBuffer.h \
@@ -262,6 +264,7 @@ endif
 
 if ENABLE_ML_TESTS
 ML_TESTS_FILES = \
+    ml/correlation/Tests.cc \
     ml/kmeans/Tests.cc \
     ml/Tests.cc \
     $(NULL)
