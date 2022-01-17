@@ -128,6 +128,11 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
 #define NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU "swap (eBPF)"
 #define NETDATA_SYSTEM_IPC_SHM_SUBMENU "ipc shared memory"
+#define NETDATA_MONITORING_FAMILY "netdata"
+
+// Statistics charts
+#define NETDATA_EBPF_THREADS "ebpf_threads"
+#define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"

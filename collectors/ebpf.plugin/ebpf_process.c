@@ -58,6 +58,10 @@ struct config process_config = { .first_section = NULL,
 
 static struct netdata_static_thread cgroup_thread = {"EBPF CGROUP", NULL, NULL,
                                                     1, NULL, NULL,  NULL};
+
+static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
+static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
+
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -432,6 +436,78 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
+}
+
+/**
+ * Create chart for Statistic Thread
+ *
+ * Write to standard output current values for threads.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static inline void ebpf_create_statistic_thread_chart(ebpf_module_t *em)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_THREADS,
+                         "Threads info.",
+                         "threads",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         140000,
+                         em->update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_TOTAL],
+                                threads_stat[NETDATA_EBPF_THREAD_STAT_TOTAL],
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    ebpf_write_global_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_RUNNING],
+                                threads_stat[NETDATA_EBPF_THREAD_STAT_RUNNING],
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
+ * Create chart for Load Thread
+ *
+ * Write to standard output current values for load mode.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static inline void ebpf_create_statistic_load_chart(ebpf_module_t *em)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_LOAD_METHOD,
+                         "Load info.",
+                         "methods",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         140001,
+                         em->update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY],
+                                load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY],
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    ebpf_write_global_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE],
+                                load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE],
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
+ * Create Statistics Charts
+ *
+ * Create charts that will show statistics related to eBPF plugin.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static void ebpf_create_statistic_charts(ebpf_module_t *em)
+{
+    ebpf_create_statistic_thread_chart(em);
+
+    ebpf_create_statistic_load_chart(em);
 }
 
 /**
@@ -913,6 +989,24 @@ void ebpf_process_update_cgroup_algorithm()
 }
 
 /**
+ * Send Statistic Data
+ *
+ * Send statistic information to netdata.
+ */
+void ebpf_send_statistic_data()
+{
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_THREADS);
+    write_chart_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_TOTAL], (long long)plugin_statistics.threads);
+    write_chart_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_RUNNING], (long long)plugin_statistics.running);
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LOAD_METHOD);
+    write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY], (long long)plugin_statistics.legacy);
+    write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE], (long long)plugin_statistics.core);
+    write_end_chart();
+}
+
+/**
  * Main loop for this collector.
  *
  * @param em   the structure with thread information
@@ -967,8 +1061,10 @@ static void process_collector(ebpf_module_t *em)
                 }
             }
 
+            pthread_mutex_lock(&lock);
+            ebpf_send_statistic_data();
+
             if (thread_enabled) {
-                pthread_mutex_lock(&lock);
                 if (publish_global) {
                     ebpf_process_send_data(em);
                 }
@@ -980,11 +1076,9 @@ static void process_collector(ebpf_module_t *em)
                 if (cgroups) {
                     ebpf_process_send_cgroup_data(em);
                 }
-                pthread_mutex_unlock(&lock);
             }
+            pthread_mutex_unlock(&lock);
         }
-
-        pthread_mutex_unlock(&lock);
 
         fflush(stdout);
     }
@@ -1232,6 +1326,7 @@ void *ebpf_process_thread(void *ptr)
     }
 
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_create_statistic_charts(em);
 
     pthread_mutex_unlock(&lock);
 
