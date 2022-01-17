@@ -110,7 +110,14 @@ int ebpf_get_kernel_version()
         *move++ = *version++;
     *move = '\0';
 
-    return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + (int)str2l(patch));
+    // This new rule is fixing kernel version according the formula:
+    //     KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
+    // that was extracted from /usr/include/linux/version.h
+    int ipatch = str2l(patch);
+    if (ipatch > 255)
+        ipatch = 255;
+
+    return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + (int)ipatch);
 }
 
 int get_redhat_release()
