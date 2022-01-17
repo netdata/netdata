@@ -243,7 +243,6 @@ else
   total_crit_alarms="${26}"  # List of alarms in critical state
   classification="${27}"     # The class field from .conf files
   edit_command_line="${28}"  # The command to edit the alarm, with the line number
-  sender_host="${29}"        # The host sending this notification
 fi
 
 # -----------------------------------------------------------------------------
@@ -255,17 +254,6 @@ if [ -z ${args_host} ]; then
   args_host="${this_host}"
 else
   host="${args_host}"
-fi
-
-# -----------------------------------------------------------------------------
-# Do the same for sender_host (find a suitable hostname to use, if netdata did not supply a hostname)
-
-if [ -z ${sender_host} ]; then
-  this_host=$(hostname -s 2>/dev/null)
-  s_host="${this_host}"
-  sender_host="${this_host}"
-else
-  s_host="${sender_host}"
 fi
 
 # -----------------------------------------------------------------------------
@@ -2856,7 +2844,7 @@ if [ -n "$total_crit_alarms" ]; then
 fi
 
 if [ -n "$edit_command_line" ]; then
-    IFS='=' read -r edit_command line <<<"$edit_command_line"
+    IFS='=' read -r edit_command line s_host <<<"$edit_command_line"
 fi
 
 IFS='' read -r -d '' email_html_part <<EOF
@@ -3340,7 +3328,7 @@ Content-Transfer-Encoding: 8bit
                     <tr>
                       <td align="left" style="font-size:0px;padding:10px 25px;padding-top:8px;padding-left:0;word-break:break-word;">
                         <div style="font-family:Open Sans, sans-serif;font-size:12px;line-height:1.3;text-align:left;color:#35414A;">${edit_command} <br>
-                          The alarm to edit is at line {${line}}</div>
+                          <br>The alarm to edit is at line ${line}</div>
                       </td>
                     </tr>
                     </tbody>

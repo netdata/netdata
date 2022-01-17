@@ -209,7 +209,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         char *edit_command = sqlite3_column_bytes(res, 16) > 0 ?
                                  health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) :
-                                 strdupz("UNKNOWN=0");
+                                 strdupz("UNKNOWN=0=UNKNOWN");
         alarm_log.command = strdupz(edit_command);
 
         alarm_log.duration = (time_t) sqlite3_column_int64(res, 6);
@@ -695,7 +695,7 @@ void aclk_mark_alert_cloud_ack(char *uuid_str, uint64_t alerts_ack_sequence_id)
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_ENTRY *ae, RRDHOST *host)
 {
-    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
     char config_hash_id[GUID_LEN + 1];
     uuid_unparse_lower(ae->config_hash_id, config_hash_id);
 
