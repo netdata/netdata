@@ -392,9 +392,14 @@ function podman_validate_id() {
 
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
-CGROUP="${1}"
 NAME_NOT_FOUND=0
 NAME=
+
+if [ -n "$(echo "${1}" | grep -E '^/.+')" ]; then
+  CGROUP="$(echo "${1}" | sed 's|^/||')"
+else
+  CGROUP="${1}"
+fi
 
 # -----------------------------------------------------------------------------
 
