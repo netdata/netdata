@@ -981,6 +981,8 @@ void *ebpf_dcstat_thread(void *ptr)
                        algorithms, NETDATA_DCSTAT_IDX_END);
 
     ebpf_create_filesystem_charts(em->update_every);
+    ebpf_update_stats(&plugin_statistics, em);
+
     pthread_mutex_unlock(&lock);
 
     dcstat_collector(em);

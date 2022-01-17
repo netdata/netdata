@@ -3594,6 +3594,14 @@ netdataDashboard.context = {
         info: 'The netdata API response time measures the time netdata needed to serve requests. This time includes everything, from the reception of the first byte of a request, to the dispatch of the last byte of its reply, therefore it includes all network latencies involved (i.e. a client over a slow network will influence these metrics).'
     },
 
+    'netdata.ebpf_threads': {
+        info: 'Show total of threads, and also number of active threads. For more details about the threads, see <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs">official documentation</a>.'
+    },
+
+    'netdata.ebpf_load_methods': {
+        info: 'Show number of threads loaded using legacy code (indepdendent binary) or <code>CO-RE (Compile Once Run Everywhere)</code>.'
+    },
+
     // ------------------------------------------------------------------------
     // RETROSHARE
 
