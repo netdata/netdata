@@ -395,7 +395,7 @@ PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
 NAME_NOT_FOUND=0
 NAME=
 
-if [ -n "$(echo "${1}" | grep -E '^/.+')" ]; then
+if echo "${1}" | grep -Eq '^/.+'; then
   CGROUP="$(echo "${1}" | sed 's|^/||')"
 else
   CGROUP="${1}"
