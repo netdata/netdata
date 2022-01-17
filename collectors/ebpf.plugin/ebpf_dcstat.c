@@ -967,6 +967,7 @@ void *ebpf_dcstat_thread(void *ptr)
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto enddcstat;
     }
 
@@ -985,6 +986,9 @@ void *ebpf_dcstat_thread(void *ptr)
     dcstat_collector(em);
 
 enddcstat:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

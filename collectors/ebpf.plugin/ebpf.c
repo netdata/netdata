@@ -213,6 +213,10 @@ pthread_mutex_t mutex_cgroup_shm;
 //Network viewer
 ebpf_network_viewer_options_t network_viewer_opt;
 
+// Statistic
+ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .threads = 0, .tracepoints = 0,
+                                         .probes = 0, .retprobes = 0, .trampolines = 0};
+
 /*****************************************************************
  *
  *  FUNCTIONS USED TO CLEAN MEMORY AND OPERATE SYSTEM FILES
@@ -793,6 +797,20 @@ static inline void ebpf_disable_cgroups()
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_modules[i].cgroup_charts = 0;
     }
+}
+
+/**
+ * Update Disabled Plugins
+ *
+ * This function calls ebpf_update_stats to update statistics for collector.
+ *
+ * @param em  a pointer to `struct ebpf_module`
+ */
+void ebpf_update_disabled_plugin_stats(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&lock);
+    ebpf_update_stats(&plugin_statistics, em);
+    pthread_mutex_unlock(&lock);
 }
 
 /**

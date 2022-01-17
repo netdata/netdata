@@ -1214,6 +1214,7 @@ void *ebpf_process_thread(void *ptr)
     set_local_pointers();
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
@@ -1230,11 +1231,16 @@ void *ebpf_process_thread(void *ptr)
         ebpf_create_global_charts(em);
     }
 
+    ebpf_update_stats(&plugin_statistics, em);
+
     pthread_mutex_unlock(&lock);
 
     process_collector(em);
 
 endprocess:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     wait_for_all_threads_die();
     netdata_thread_cleanup_pop(1);
     return NULL;

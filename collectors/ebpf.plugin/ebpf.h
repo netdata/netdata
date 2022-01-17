@@ -257,6 +257,7 @@ extern sem_t *shm_sem_ebpf_cgroup;
 extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
 extern uint32_t finalized_threads;
+extern ebpf_plugin_stats_t plugin_statistics;
 
 // Socket functions and variables
 // Common functions
@@ -269,6 +270,7 @@ extern void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
 extern void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
                                       char *charttype, char *context, int order, int update_every);
 extern void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
+void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 

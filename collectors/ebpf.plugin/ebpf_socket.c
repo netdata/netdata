@@ -3363,6 +3363,7 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         error("Cannot initialize local mutex");
         goto endsocket;
     }
@@ -3376,6 +3377,7 @@ void *ebpf_socket_thread(void *ptr)
 
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
@@ -3390,12 +3392,17 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_create_global_charts(em);
 
+    ebpf_update_stats(&plugin_statistics, em);
+
     finalized_threads = 0;
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_every * USEC_PER_SEC), em);
 
 endsocket:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

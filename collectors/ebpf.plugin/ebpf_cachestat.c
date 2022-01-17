@@ -988,8 +988,11 @@ void *ebpf_cachestat_thread(void *ptr)
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endcachestat;
     }
+
+    ebpf_update_stats(&plugin_statistics, em);
 
     int algorithms[NETDATA_CACHESTAT_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
@@ -1006,6 +1009,9 @@ void *ebpf_cachestat_thread(void *ptr)
     cachestat_collector(em);
 
 endcachestat:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

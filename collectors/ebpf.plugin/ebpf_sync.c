@@ -387,7 +387,7 @@ void *ebpf_sync_thread(void *ptr)
         goto endsync;
 
     if (ebpf_sync_initialize_syscall(em)) {
-        pthread_mutex_unlock(&lock);
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endsync;
     }
 
@@ -400,11 +400,15 @@ void *ebpf_sync_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_create_sync_charts(em->update_every);
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     sync_collector(em);
 
 endsync:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

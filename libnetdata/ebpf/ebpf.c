@@ -406,9 +406,8 @@ static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets
  *
  * @param report  the output structure
  * @param em      the structure with information about how the module/thread is working.
- * @param loaded  how the eBPF program was loaded.
  */
-void ebpf_update_general_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em, netdata_ebpf_load_mode_t loaded)
+void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
 {
     report->threads++;
 
@@ -420,9 +419,9 @@ void ebpf_update_general_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em, n
 
     // In theory the `else if` is useless, because when this function is called, the module should not stay in
     // EBPF_LOAD_PLAY_DICE. We have this additional condition to detect errors from developers.
-    if (loaded == EBPF_LOAD_LEGACY)
+    if (em->load == EBPF_LOAD_LEGACY)
         report->legacy++;
-    else if (loaded == EBPF_LOAD_CORE)
+    else if (em->load == EBPF_LOAD_CORE)
         report->core++;
 
     ebpf_stats_targets(report, em->targets);

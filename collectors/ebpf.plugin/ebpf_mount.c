@@ -240,6 +240,7 @@ void *ebpf_mount_thread(void *ptr)
 
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endmount;
     }
 
@@ -250,11 +251,15 @@ void *ebpf_mount_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_create_mount_charts(em->update_every);
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     mount_collector(em);
 
 endmount:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -208,7 +208,7 @@ extern char *ebpf_find_symbol(char *search);
 extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
 extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
 extern char **ebpf_fill_histogram_dimension(size_t maximum);
-extern void ebpf_update_general_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em, netdata_ebpf_load_mode_t loaded);
+extern void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em);
 
 // Histogram
 #define NETDATA_EBPF_HIST_MAX_BINS 24UL
