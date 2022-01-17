@@ -46,6 +46,13 @@
 #define NETDATA_RH_8 2048
 
 /**
+ *  Kernel 5.15
+ *
+ *  331520 = 5*65536 + 15*256
+ */
+#define NETDATA_EBPF_KERNEL_5_15 331520
+
+/**
  *  Kernel 5.11
  *
  *  330240 = 5*65536 + 11*256
@@ -182,6 +189,7 @@ extern void ebpf_mount_config_name(char *filename, size_t length, char *path, co
 extern int ebpf_load_config(struct config *config, char *filename);
 extern void ebpf_update_module(ebpf_module_t *em);
 extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
+extern char *ebpf_find_symbol(char *search);
 extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
 extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
 extern char **ebpf_fill_histogram_dimension(size_t maximum);

@@ -288,7 +288,7 @@ pkg_check_modules(GRPC grpc)
 # -----------------------------------------------------------------------------
 # Detect libgoogleapis_cpp_pubsub_protos
 
-pkg_check_modules(PUBSUB googleapis_cpp_pubsub_protos)
+pkg_check_modules(PUBSUB google_cloud_cpp_pubsub_protos)
 # later we use:
 # ${PUBSUB_LIBRARIES}
 # ${PUBSUB_CFLAGS_OTHER}
@@ -346,6 +346,18 @@ IF(LINUX AND EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
     ENDIF(ELF_LIBRARIES)
 ENDIF()
 
+# -----------------------------------------------------------------------------
+# Detect ml dependencies
+file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_ML REGEX "^#define ENABLE_ML 1$")
+IF(DEFINE_ENABLE_ML MATCHES ".+" AND
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/kmeans/dlib/dlib/all/source.cpp" AND
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/json/single_include/nlohmann/json.hpp")
+    set(ENABLE_ML True)
+    list(APPEND NETDATA_COMMON_CFLAGS "-DDLIB_NO_GUI_SUPPORT")
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS "ml/kmeans/dlib")
+ELSE()
+    set(ENABLE_ML False)
+ENDIF()
 
 # -----------------------------------------------------------------------------
 # netdata files
@@ -922,9 +934,35 @@ set(DAEMON_FILES
         )
 
 set(ML_FILES
-        ml/ml.h
-        ml/ml-dummy.c
+    ml/ml.h
+    ml/ml-dummy.c
 )
+
+IF(ENABLE_ML)
+    list(APPEND ML_FILES
+            ml/BitBufferCounter.h
+            ml/BitBufferCounter.cc
+            ml/BitRateWindow.h
+            ml/BitRateWindow.cc
+            ml/Config.h
+            ml/Config.cc
+            ml/Database.h
+            ml/Database.cc
+            ml/Dimension.cc
+            ml/Dimension.h
+            ml/Host.h
+            ml/Host.cc
+            ml/Query.h
+            ml/kmeans/KMeans.h
+            ml/kmeans/KMeans.cc
+            ml/kmeans/SamplesBuffer.h
+            ml/kmeans/SamplesBuffer.cc
+            ml/kmeans/dlib/dlib/all/source.cpp
+            ml/json/single_include/nlohmann/json.hpp
+            ml/ml.cc
+            ml/ml-private.h
+    )
+ENDIF()
 
 set(NETDATA_FILES
         collectors/all.h
@@ -1021,7 +1059,38 @@ IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     message(STATUS "prometheus remote write backend: enabled")
 
     find_package(Protobuf REQUIRED)
-    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
+    
+    function(PROTOBUF_REMOTE_WRITE_GENERATE_CPP SRCS HDRS)
+        if(NOT ARGN)
+            message(SEND_ERROR "Error: PROTOBUF_REMOTE_WRITE_GENERATE_CPP() called without any proto files")
+            return()
+        endif()
+
+        set(${SRCS})
+        set(${HDRS})
+        foreach(FIL ${ARGN})
+            get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+            get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+            get_filename_component(FIL_WE ${FIL} NAME_WE)
+            set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+            set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+            list(APPEND ${SRCS} ${GENERATED_PB_CC})
+            list(APPEND ${HDRS} ${GENERATED_PB_H})
+            add_custom_command(
+            OUTPUT ${GENERATED_PB_CC}
+                    ${GENERATED_PB_H}
+            COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+            ARGS -I=${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write --cpp_out=${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write ${ABS_FIL}
+            DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+            COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+            VERBATIM )
+        endforeach()
+        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+        set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+        set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+    endfunction()
+
+    protobuf_remote_write_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
 
     list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
@@ -1115,6 +1184,7 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 # netdata
 
 IF(LINUX)
+    list(APPEND NETDATA_COMMON_LIBRARIES rt)
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
@@ -1298,7 +1368,6 @@ IF(ENABLE_PLUGIN_CGROUP_NETWORK)
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
 ENDIF()
-
 
 # -----------------------------------------------------------------------------
 # Unit tests

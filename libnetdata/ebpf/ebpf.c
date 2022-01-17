@@ -257,7 +257,9 @@ char *ebpf_kernel_suffix(int version, int isrh)
         else
             return "3.10";
     } else {
-        if (version >= NETDATA_EBPF_KERNEL_5_11)
+        if (version >= NETDATA_EBPF_KERNEL_5_15)
+            return "5.15";
+        else if (version >= NETDATA_EBPF_KERNEL_5_11)
             return "5.11";
         else if (version >= NETDATA_EBPF_KERNEL_5_10)
             return "5.10";
@@ -375,18 +377,21 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
     struct bpf_link **links = callocz(length , sizeof(struct bpf_link *));
     size_t i = 0;
     struct bpf_program *prog;
+    ebpf_specify_name_t *w;
     bpf_object__for_each_program(prog, obj)
     {
-        links[i] = bpf_program__attach(prog);
-        if (libbpf_get_error(links[i]) && names) {
+        if (names) {
             const char *name = bpf_program__name(prog);
-            ebpf_specify_name_t *w = ebpf_find_names(names, name);
-            if (w) {
-                enum bpf_prog_type type = bpf_program__get_type(prog);
-                if (type == BPF_PROG_TYPE_KPROBE)
-                    links[i] = bpf_program__attach_kprobe(prog, w->retprobe, w->optional);
-            }
-        }
+            w = ebpf_find_names(names, name);
+        } else
+            w = NULL;
+
+        if (w) {
+            enum bpf_prog_type type = bpf_program__get_type(prog);
+            if (type == BPF_PROG_TYPE_KPROBE)
+                links[i] = bpf_program__attach_kprobe(prog, w->retprobe, w->optional);
+        } else
+            links[i] = bpf_program__attach(prog);
 
         if (libbpf_get_error(links[i])) {
             links[i] = NULL;
@@ -483,7 +488,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     return ebpf_attach_programs(*obj, count_programs, em->names);
 }
 
-static char *ebpf_update_name(char *search)
+char *ebpf_find_symbol(char *search)
 {
     char filename[FILENAME_MAX + 1];
     char *ret = NULL;
@@ -521,7 +526,7 @@ void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em)
     size_t i = 0;
     while (opt[i].program_name) {
         opt[i].retprobe = (mode == MODE_RETURN);
-        opt[i].optional = ebpf_update_name(opt[i].function_to_attach);
+        opt[i].optional = ebpf_find_symbol(opt[i].function_to_attach);
 
         i++;
     }

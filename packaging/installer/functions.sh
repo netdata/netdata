@@ -184,9 +184,9 @@ netdata_banner() {
 # -----------------------------------------------------------------------------
 # portable service command
 
-service_cmd="$(command -v service 2> /dev/null)"
-rcservice_cmd="$(command -v rc-service 2> /dev/null)"
-systemctl_cmd="$(command -v systemctl 2> /dev/null)"
+service_cmd="$(command -v service 2> /dev/null || true)"
+rcservice_cmd="$(command -v rc-service 2> /dev/null || true)"
+systemctl_cmd="$(command -v systemctl 2> /dev/null || true)"
 service() {
 
   local cmd="${1}" action="${2}"

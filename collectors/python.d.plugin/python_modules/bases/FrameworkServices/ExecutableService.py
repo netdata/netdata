@@ -35,7 +35,7 @@ class ExecutableService(SimpleService):
         for line in std:
             try:
                 data.append(line.decode('utf-8'))
-            except TypeError:
+            except (TypeError, UnicodeDecodeError):
                 continue
 
         return data

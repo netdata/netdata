@@ -646,7 +646,7 @@ void *rrdpush_sender_thread(void *ptr) {
             if (s->version >= VERSION_GAP_FILLING) {
                 time_t now = now_realtime_sec();
                 sender_start(s);
-                buffer_sprintf(s->build, "TIMESTAMP %ld", now);
+                buffer_sprintf(s->build, "TIMESTAMP %"PRId64"", (int64_t)now);
                 sender_commit(s);
             }
             rrdpush_claimed_id(s->host);

@@ -209,7 +209,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         char *edit_command = sqlite3_column_bytes(res, 16) > 0 ?
                                  health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) :
-                                 strdupz("UNKNOWN=0");
+                                 strdupz("UNKNOWN=0=UNKNOWN");
         alarm_log.command = strdupz(edit_command);
 
         alarm_log.duration = (time_t) sqlite3_column_int64(res, 6);
@@ -321,6 +321,22 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     if (unlikely(!claim_id))
         return;
 
+    RRDHOST *host = wc->host;
+    if (unlikely(!host)) {
+        rrd_wrlock();
+        host = find_host_by_node_id(wc->node_id);
+        rrd_unlock();
+
+        if (unlikely(!host)) {
+            log_access(
+                "AC [%s (N/A)]: ACLK synchronization thread for %s is not yet linked to HOST.",
+                wc->node_id,
+                wc->host_guid);
+            freez(claim_id);
+            return;
+        }
+    }
+
     uint64_t first_sequence = 0;
     uint64_t last_sequence = 0;
     struct timeval first_timestamp;
@@ -370,7 +386,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     alarm_log.node_id =  wc->node_id;
     alarm_log.log_entries = log_entries;
     alarm_log.status = wc->alert_updates == 0 ? 2 : 1;
-    alarm_log.enabled = 1;
+    alarm_log.enabled = (int)host->health_enabled;
 
     wc->alert_sequence_id = last_sequence;
 
@@ -546,7 +562,9 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     rrd_wrlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
-        wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+        wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
+                 (struct aclk_database_worker_config *)host->dbsync_worker :
+                 (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
     rrd_unlock();
 
     if (unlikely(!host->health_enabled)) {
@@ -677,7 +695,7 @@ void aclk_mark_alert_cloud_ack(char *uuid_str, uint64_t alerts_ack_sequence_id)
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_ENTRY *ae, RRDHOST *host)
 {
-    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
     char config_hash_id[GUID_LEN + 1];
     uuid_unparse_lower(ae->config_hash_id, config_hash_id);
 
@@ -724,6 +742,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 }
 #endif
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
 {
     ALARM_ENTRY *ae = host->health_log.alarms;
@@ -737,6 +756,7 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
 
     return 0;
 }
+#endif
 
 #define ALARM_EVENTS_PER_CHUNK 10
 void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)

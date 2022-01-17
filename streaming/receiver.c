@@ -69,15 +69,33 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
         time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
         time_t gap = 0;
         if (prev == 0)
-            info("STREAM %s from %s: Initial connection (no gap to check), remote=%ld local=%ld slew=%ld",
-                 host->hostname, cd->cmd, remote_time, now, now-remote_time);
+            info(
+                "STREAM %s from %s: Initial connection (no gap to check), "
+                "remote=%"PRId64" local=%"PRId64" slew=%"PRId64"",
+                host->hostname,
+                cd->cmd,
+                (int64_t)remote_time,
+                (int64_t)now,
+                (int64_t)now - remote_time);
         else {
             gap = now - prev;
-            info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
-                 host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
+            info(
+                "STREAM %s from %s: Checking for gaps... "
+                "remote=%"PRId64" local=%"PRId64"..%"PRId64" slew=%"PRId64"  %"PRId64"-sec gap",
+                host->hostname,
+                cd->cmd,
+                (int64_t)remote_time,
+                (int64_t)prev,
+                (int64_t)now,
+                (int64_t)(remote_time - now),
+                (int64_t)gap);
         }
         char message[128];
-        sprintf(message,"REPLICATE %ld %ld\n", remote_time - gap, remote_time);
+        sprintf(
+            message,
+            "REPLICATE %"PRId64" %"PRId64"\n",
+            (int64_t)(remote_time - gap),
+            (int64_t)remote_time);
         int ret;
 #ifdef ENABLE_HTTPS
         SSL *conn = host->stream_ssl.conn ;
@@ -345,6 +363,31 @@ static int rrdpush_receive(struct receiver_state *rpt)
         }
         netdata_mutex_unlock(&rpt->host->receiver_lock);
     }
+    else {
+        rrd_wrlock();
+        rrdhost_update(
+            rpt->host,
+            rpt->hostname,
+            rpt->registry_hostname,
+            rpt->machine_guid,
+            rpt->os,
+            rpt->timezone,
+            rpt->abbrev_timezone,
+            rpt->utc_offset,
+            rpt->tags,
+            rpt->program_name,
+            rpt->program_version,
+            rpt->update_every,
+            history,
+            mode,
+            (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO),
+            (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key),
+            rrdpush_destination,
+            rrdpush_api_key,
+            rrdpush_send_charts_matching,
+            rpt->system_info);
+        rrd_unlock();
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     int ssl = 0;
@@ -441,10 +484,10 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
             rpt->host->health_delay_up_to = now_realtime_sec() + alarms_delay;
-            info("Postponing health checks for %ld seconds, on host '%s', because it was just connected."
-            , alarms_delay
-            , rpt->host->hostname
-            );
+            info(
+                "Postponing health checks for %" PRId64 " seconds, on host '%s', because it was just connected.",
+                (int64_t)alarms_delay,
+                rpt->host->hostname);
         }
     }
     rrdhost_unlock(rpt->host);

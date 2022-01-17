@@ -40,58 +40,62 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     time_t first_entry_t = rrdset_first_entry_t_nolock(st);
     time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
 
-    buffer_sprintf(wb,
-            "\t\t{\n"
-            "\t\t\t\"id\": \"%s\",\n"
-            "\t\t\t\"name\": \"%s\",\n"
-            "\t\t\t\"type\": \"%s\",\n"
-            "\t\t\t\"family\": \"%s\",\n"
-            "\t\t\t\"context\": \"%s\",\n"
-            "\t\t\t\"title\": \"%s (%s)\",\n"
-            "\t\t\t\"priority\": %ld,\n"
-            "\t\t\t\"plugin\": \"%s\",\n"
-            "\t\t\t\"module\": \"%s\",\n"
-            "\t\t\t\"enabled\": %s,\n"
-            "\t\t\t\"units\": \"%s\",\n"
-            "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
-            "\t\t\t\"chart_type\": \"%s\",\n"
-                    , st->id
-                    , st->name
-                    , st->type
-                    , st->family
-                    , st->context
-                    , st->title, st->name
-                    , st->priority
-                    , st->plugin_name?st->plugin_name:""
-                    , st->module_name?st->module_name:""
-                    , rrdset_flag_check(st, RRDSET_FLAG_ENABLED)?"true":"false"
-                    , st->units
-                    , st->name
-                    , rrdset_type_name(st->chart_type)
+    buffer_sprintf(
+        wb,
+        "\t\t{\n"
+        "\t\t\t\"id\": \"%s\",\n"
+        "\t\t\t\"name\": \"%s\",\n"
+        "\t\t\t\"type\": \"%s\",\n"
+        "\t\t\t\"family\": \"%s\",\n"
+        "\t\t\t\"context\": \"%s\",\n"
+        "\t\t\t\"title\": \"%s (%s)\",\n"
+        "\t\t\t\"priority\": %ld,\n"
+        "\t\t\t\"plugin\": \"%s\",\n"
+        "\t\t\t\"module\": \"%s\",\n"
+        "\t\t\t\"enabled\": %s,\n"
+        "\t\t\t\"units\": \"%s\",\n"
+        "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
+        "\t\t\t\"chart_type\": \"%s\",\n",
+        st->id,
+        st->name,
+        st->type,
+        st->family,
+        st->context,
+        st->title,
+        st->name,
+        st->priority,
+        st->plugin_name ? st->plugin_name : "",
+        st->module_name ? st->module_name : "",
+        rrdset_flag_check(st, RRDSET_FLAG_ENABLED) ? "true" : "false",
+        st->units,
+        st->name,
+        rrdset_type_name(st->chart_type));
+
+    if (likely(!skip_volatile))
+        buffer_sprintf(
+            wb,
+            "\t\t\t\"duration\": %"PRId64",\n",
+            (int64_t)(last_entry_t - first_entry_t + st->update_every) //st->entries * st->update_every
+        );
+
+    buffer_sprintf(
+        wb,
+        "\t\t\t\"first_entry\": %"PRId64",\n",
+        (int64_t)first_entry_t //rrdset_first_entry_t(st)
     );
 
     if (likely(!skip_volatile))
-        buffer_sprintf(wb,
-                "\t\t\t\"duration\": %ld,\n"
-            , last_entry_t - first_entry_t + st->update_every//st->entries * st->update_every
+        buffer_sprintf(
+            wb,
+            "\t\t\t\"last_entry\": %"PRId64",\n",
+            (int64_t)last_entry_t //rrdset_last_entry_t(st)
         );
 
-    buffer_sprintf(wb,
-                "\t\t\t\"first_entry\": %ld,\n"
-        , first_entry_t //rrdset_first_entry_t(st)
-    );
-
-    if (likely(!skip_volatile))
-        buffer_sprintf(wb,
-                "\t\t\t\"last_entry\": %ld,\n"
-            , last_entry_t//rrdset_last_entry_t(st)
-        );
-
-    buffer_sprintf(wb,
-                "\t\t\t\"update_every\": %d,\n"
-                "\t\t\t\"dimensions\": {\n"
-                       , st->update_every
-        );
+    buffer_sprintf(
+        wb,
+        "\t\t\t\"update_every\": %d,\n"
+        "\t\t\t\"dimensions\": {\n",
+        st->update_every);
 
     unsigned long memory = st->memsize;
 

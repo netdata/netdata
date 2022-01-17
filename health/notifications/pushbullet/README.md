@@ -14,20 +14,22 @@ And like this on your Android device:
 
 You will need:
 
-1.  Signup and Login to pushbullet.com
-2.  Get your Access Token, go to <https://www.pushbullet.com/#settings/account> and create a new one
-3.  Fill in the PUSHBULLET_ACCESS_TOKEN with that value
-4.  Add the recipient emails to DEFAULT_RECIPIENT_PUSHBULLET
-    !!PLEASE NOTE THAT IF THE RECIPIENT DOES NOT HAVE A PUSHBULLET ACCOUNT, PUSHBULLET SERVICE WILL SEND AN EMAIL!!
+1.  Sign up and log in to [pushbullet.com](pushbullet.com)
+2.  Create a new access token in your [account settings](https://www.pushbullet.com/#settings/account).
+3.  Fill in the `PUSHBULLET_ACCESS_TOKEN` with the newly generated access token.
+4.  Add the recipient emails or channel tags (each channel tag must be prefixed with #, e.g. #channeltag) to `DEFAULT_RECIPIENT_PUSHBULLET`.
+    > 🚨 The pushbullet notification service will send emails to the email recipient, regardless of if they have a pushbullet account.
 
-Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
+To add notification channels, run `/etc/netdata/edit-config health_alarm_notify.conf` 
+
+You can change the configuration like this:
 
 ```
 ###############################################################################
 # pushbullet (pushbullet.com) push notification options
 
-# multiple recipients can be given like this:
-#                  "user1@email.com user2@mail.com"
+# multiple recipients (a combination of email addresses or channel tags) can be given like this:
+#                  "user1@email.com user2@mail.com #channel1 #channel2"
 
 # enable/disable sending pushbullet notifications
 SEND_PUSHBULLET="YES"
@@ -35,14 +37,14 @@ SEND_PUSHBULLET="YES"
 # Signup and Login to pushbullet.com
 # To get your Access Token, go to https://www.pushbullet.com/#settings/account
 # And create a new access token
-# Then just set the recipients emails
-# Please note that the if the email in the DEFAULT_RECIPIENT_PUSHBULLET does
+# Then just set the recipients emails and/or channel tags (channel tags must be prefixed with #)
+# Please note that the if an email in the DEFAULT_RECIPIENT_PUSHBULLET does
 # not have a pushbullet account, the pushbullet service will send an email
 # to that address instead
 
 # Without an access token, Netdata cannot send pushbullet notifications.
 PUSHBULLET_ACCESS_TOKEN="o.Sometokenhere"
-DEFAULT_RECIPIENT_PUSHBULLET="admin1@example.com admin3@somemail.com"
+DEFAULT_RECIPIENT_PUSHBULLET="admin1@example.com admin3@somemail.com #examplechanneltag #anotherchanneltag"
 ```
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fpushbullet%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

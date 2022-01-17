@@ -81,7 +81,7 @@ field contains `go.d`, that collector uses the Go orchestrator.
 
 The output from the relevant command will provide valuable troubleshooting information. If you can't figure out how to
 enable the collector using the details from this output, feel free to [create an issue on our
-GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md) to get some
+GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) to get some
 help from our collectors experts.
 
 ## Enable and disable plugins

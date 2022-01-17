@@ -222,7 +222,7 @@ static void msg_callback_old_protocol(const char *topic, const void *msg, size_t
         return;
     }
 
-    aclk_handle_cloud_message(cmsg);
+    aclk_handle_cloud_cmd_message(cmsg);
 }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
