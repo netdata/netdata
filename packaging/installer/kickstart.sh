@@ -719,7 +719,7 @@ is_netdata_running() {
 
 claim() {
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
-  if [ -z "${INSTALL_PREFIX}" ]; then
+  if [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
     NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
