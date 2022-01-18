@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- fix\(updater\): checksum validation for static build [\#11986](https://github.com/netdata/netdata/pull/11986) ([ilyam8](https://github.com/ilyam8))
+- fix\(python.d\): ignore decoding errors in ExecutableService [\#11979](https://github.com/netdata/netdata/pull/11979) ([ilyam8](https://github.com/ilyam8))
+- Bump lodash from 4.17.19 to 4.17.21 [\#11976](https://github.com/netdata/netdata/pull/11976) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Better handle creation of UUID for claiming. [\#11974](https://github.com/netdata/netdata/pull/11974) ([Ferroin](https://github.com/Ferroin))
 - Fixes coverity 374746 [\#11973](https://github.com/netdata/netdata/pull/11973) ([MrZammler](https://github.com/MrZammler))
 - Bump follow-redirects from 1.13.2 to 1.14.7 [\#11972](https://github.com/netdata/netdata/pull/11972) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -58,6 +61,7 @@
 - Optimize rx msg name resolution [\#11811](https://github.com/netdata/netdata/pull/11811) ([underhood](https://github.com/underhood))
 - Ignore clangd cache directory. [\#11803](https://github.com/netdata/netdata/pull/11803) ([vkalintiris](https://github.com/vkalintiris))
 - fix tps decode, add memory usage chart [\#11797](https://github.com/netdata/netdata/pull/11797) ([neotf](https://github.com/neotf))
+- Add localhost hostname to the edit\_command [\#11793](https://github.com/netdata/netdata/pull/11793) ([MrZammler](https://github.com/MrZammler))
 - Add support to updater for updating native DEB/RPM installs with our official packages. [\#11753](https://github.com/netdata/netdata/pull/11753) ([Ferroin](https://github.com/Ferroin))
 - add note with link to guide for using on Pi [\#11605](https://github.com/netdata/netdata/pull/11605) ([andrewm4894](https://github.com/andrewm4894))
 
