@@ -386,7 +386,7 @@ jobs:
       - name: Verify that artifacts work with installer
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/artifacts
-        run: packaging/installer/kickstart.sh --dont-start-it --disable-telemetry --dont-wait
+        run: packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -427,7 +427,7 @@ jobs:
       - name: Verify that artifacts work with installer
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/artifacts
-        run: packaging/installer/kickstart-static64.sh --dont-start-it --disable-telemetry --dont-wait
+        run: packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

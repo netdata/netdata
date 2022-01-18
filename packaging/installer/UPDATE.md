@@ -23,75 +23,42 @@ icon in the local Agent dashboard's top navigation. This modal informs you wheth
 If you are not sure where your Netdata config directory is, see the [configuration doc](/docs/configure/nodes.md). In
 most installations, this is `/etc/netdata`.
 
-Use `cd` to navigate to the Netdata config directory, then use `ls -a` to look for a file called `.environment`.
+Use `cd` to navigate to the Netdata config directory, then use `ls -a` to look for a file called `.install-type`.
 
--   If the `.environment` file _does not_ exist, reinstall with your [package manager](#deb-or-rpm-packages).
--   If the `.environment` file _does_ exist, check its contents with `less .environment`.
-    -   If `IS_NETDATA_STATIC_BINARY` is `"yes"`, update using the [pre-built static
-        binary](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh).
-    -   In all other cases, update using the [one-line installer script](#one-line-installer-script-kickstartsh).
+-   If the `.install-type` file doex not exist, look for a file in the same directory called `.environment`.
+    -   If the `.environment` file does not exist, you probably installed Netdata using your system package manager
+        and should update it the same way you would run updates on the system itself.
+    -   If the `.environment` file does exist, then our [regular update method](#updates-for-most-systems) should
+        work correctly.
+-   If the `.install-type` file does exist, check it’s contents with `cat .install-type`.
+    -   If the `INSTALL_TYPE` key has a value of `custom`, you probably installed Netdata using your system
+        package manager and should update it the same way you would run updates on the system itself.
+    -   If the `INSTALL_TYPE` key has a value of `oci`, the install is from a Docker image.
+    -   Otherwise, the install should work with our [regular update method](#updates-for-most-systems).
 
 Next, use the appropriate method to update the Netdata Agent:
 
--   [One-line installer script (`kickstart.sh`)](#one-line-installer-script-kickstartsh)
--   [`.deb` or `.rpm` packages](#deb-or-rpm-packages)
--   [Pre-built static binary for 64-bit systems (`kickstart-static64.sh`)](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh)
+-   [Updates for most systems](#updates-for-most-systems)
 -   [Docker](#docker)
 -   [macOS](#macos)
 -   [Manual installation from Git](#manual-installation-from-git)
 
-## One-line installer script (`kickstart.sh`)
+## Updates for most systems
 
-If you installed Netdata using our one-line automatic installation script, run it again to update Netdata. Any custom
-settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists during this process.
-
-This script will automatically run the update script that was installed as part of the initial install (even if
-you disabled automatic updates) and preserve the existing install options you specified.
+In most cases, you can update netdata using our one-line installation script.  This script will automatically
+run the update script that was installed as part of the initial install (even if you disabled automatic updates)
+and preserve the existing install options you specified.
 
 If you installed Netdata using an installation prefix, you will need to add an `--install` option specifying
 that prefix to this command to make sure it finds Netdata.
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 > ❗ If the above command fails, you can [reinstall
 > Netdata](/packaging/installer/REINSTALL.md#one-line-installer-script-kickstartsh) to get the latest version. This also
 > preserves your [configuration](/docs/configure/nodes.md) in `netdata.conf` or other files.
-
-## `.deb` or `.rpm` packages
-
-If you installed Netdata with [`.deb` or `.rpm` packages](/packaging/installer/methods/packages.md), use your
-distribution's package manager to update Netdata. Any custom settings present in your Netdata configuration directory
-(typically at `/etc/netdata`) persists during this process.
-
-Your package manager grabs a new package from our hosted repository, updates the Netdata Agent, and restarts it.
-
-```bash
-apt-get install netdata     # Ubuntu/Debian
-dnf install netdata         # Fedora/RHEL
-yum install netdata         # CentOS
-zypper in netdata           # openSUSE
-```
-
-> You may need to escalate privileges using `sudo`.
-
-## Pre-built static binary for 64-bit systems (`kickstart-static64.sh`)
-
-If you installed Netdata using the pre-built static binary, run the `kickstart-static64.sh` script again to update
-Netdata. Any custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists
-during this process.
-
-This script will automatically run the update script that was installed as part of the initial install (even if
-you disabled automatic updates) and preserve the existing install options you specified.
-
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
-```
-
-> ❗ If the above command fails, you can [reinstall
-> Netdata](/packaging/installer/REINSTALL.md#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh) to get the
-> latest version. This also preserves your [configuration](/docs/configure/nodes.md) in `netdata.conf` or other files.
 
 ## Docker
 

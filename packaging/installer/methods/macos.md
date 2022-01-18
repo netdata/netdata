@@ -16,8 +16,8 @@ We recommend you to **[install Netdata with the our automatic one-line installat
 As an alternative you also have community-created and -maintained [**Homebrew
 package**](#install-netdata-with-the-homebrew-package). 
 
--   [Install Netdata via the Homebrew package](#install-netdata-with-the-homebrew-package)
--   [Install Netdata from source](#install-netdata-from-source)
+- [Install Netdata via the Homebrew package](#install-netdata-with-the-homebrew-package)
+- [Install Netdata from source](#install-netdata-from-source)
 
 Being community-created and -maintained we don't guarantee that the features made available on our installation script will also be available or give support to it.
 
@@ -26,10 +26,14 @@ Being community-created and -maintained we don't guarantee that the features mad
 To install Netdata using our automatic [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script) script you will just need to run:
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 With this script, you are also able to connect your nodes directly to Netdata Cloud if you wish, see more details on [Connect an agent running in macOS](/claim/README.md#connect-an-agent-running-in-macos)
+
+This currently only supports building Netdata locally, and requires dependencies to be handled either via Homebrew
+or MacPorts (we preferentially use Homebrew if both are found). By default, this will install Netdata under
+`/usr/local/netdata`.
 
 ## Install Netdata with the Homebrew package
 
