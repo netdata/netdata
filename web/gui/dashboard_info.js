@@ -3595,11 +3595,11 @@ netdataDashboard.context = {
     },
 
     'netdata.ebpf_threads': {
-        info: 'Show total of threads, and also number of active threads. For more details about the threads, see <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs">official documentation</a>.'
+        info: 'Show total number of threads and number of active threads. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs">official documentation</a>.'
     },
 
     'netdata.ebpf_load_methods': {
-        info: 'Show number of threads loaded using legacy code (indepdendent binary) or <code>CO-RE (Compile Once Run Everywhere)</code>.'
+        info: 'Show number of threads loaded using legacy code (independent binary) or <code>CO-RE (Compile Once Run Everywhere)</code>.'
     },
 
     // ------------------------------------------------------------------------
