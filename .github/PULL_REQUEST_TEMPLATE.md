@@ -2,9 +2,6 @@
 Describe the change in summary section, including rationale and design decisions.
 Include "Fixes #nnn" if you are fixing an existing issue.
 
-In "Component Name" section write which component is changed in this PR. This
-will help us review your PR quicker.
-
 In "Test Plan" provide enough detail on how you plan to test this PR so that a reviewer can validate your tests. If our CI covers sufficient tests, then state which tests cover the change.
 
 If you have more information you want to add, write them in "Additional
@@ -14,8 +11,6 @@ helpful if there is no related issue.
 -->
 
 ##### Summary
-
-##### Component Name
 
 ##### Test Plan
 
