@@ -388,9 +388,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
 
     debug(D_HEALTH, "executing command '%s'", command_to_run);
-    ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
-    ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
-    enqueue_alarm_notify_in_progress(ae);
+    /* ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS; */
+    /* ae->exec_spawn_serial = spawn_enq_cmd(command_to_run); */
+    /* enqueue_alarm_notify_in_progress(ae); */
 
     freez(edit_command);
     buffer_free(warn_alarms);
@@ -676,9 +676,13 @@ void *health_main(void *ptr) {
     rrdcalc_labels_unlink();
 
     unsigned int loop = 0;
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    unsigned int marked_aclk_reload_loop = 0;
+#endif
     while(!netdata_exit) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
+        log_access("Loop %u - %d - %u", loop, aclk_alert_reloaded, marked_aclk_reload_loop);
 
         int runnable = 0, apply_hibernation_delay = 0;
         time_t next_run = now + min_run_every;
@@ -701,6 +705,11 @@ void *health_main(void *ptr) {
                 logged = 1;
             }
         }
+
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+        if (aclk_alert_reloaded && !marked_aclk_reload_loop)
+            marked_aclk_reload_loop = loop;
+#endif
 
         rrd_rdlock();
 
@@ -1043,14 +1052,6 @@ void *health_main(void *ptr) {
                 rrdhost_unlock(host);
             }
 
-#ifdef ENABLE_ACLK
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-            if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > 2) {
-                sql_queue_removed_alerts_to_aclk(host);
-            }
-#endif
-#endif
-
             if (unlikely(netdata_exit))
                 break;
 
@@ -1075,9 +1076,16 @@ void *health_main(void *ptr) {
             health_alarm_wait_for_execution(ae);
         }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        if (netdata_cloud_setting && unlikely(aclk_alert_reloaded))
-            aclk_alert_reloaded = 0;
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+            if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > marked_aclk_reload_loop + 2) {
+                rrdhost_foreach_read(host) {
+                    if (unlikely(!host->health_enabled))
+                        continue;
+                    sql_queue_removed_alerts_to_aclk(host);
+                }
+                aclk_alert_reloaded = 0;
+                marked_aclk_reload_loop = 0;
+            }
 #endif
 
         rrd_unlock();
