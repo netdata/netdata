@@ -944,11 +944,11 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
         goto error_after_init_rrd_files;
     }
 
-    init_completion(&ctx->rrdengine_completion);
+    completion_init(&ctx->rrdengine_completion);
     fatal_assert(0 == uv_thread_create(&ctx->worker_config.thread, rrdeng_worker, &ctx->worker_config));
     /* wait for worker thread to initialize */
-    wait_for_completion(&ctx->rrdengine_completion);
-    destroy_completion(&ctx->rrdengine_completion);
+    completion_wait_for(&ctx->rrdengine_completion);
+    completion_destroy(&ctx->rrdengine_completion);
     uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
@@ -1009,13 +1009,13 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
         return;
     }
 
-    init_completion(&ctx->rrdengine_completion);
+    completion_init(&ctx->rrdengine_completion);
     cmd.opcode = RRDENG_QUIESCE;
     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
     /* wait for dbengine to quiesce */
-    wait_for_completion(&ctx->rrdengine_completion);
-    destroy_completion(&ctx->rrdengine_completion);
+    completion_wait_for(&ctx->rrdengine_completion);
+    completion_destroy(&ctx->rrdengine_completion);
 
     //metalog_prepare_exit(ctx->metalog_ctx);
 }

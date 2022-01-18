@@ -373,6 +373,8 @@ set(LIBNETDATA_FILES
         libnetdata/buffer/buffer.h
         libnetdata/clocks/clocks.c
         libnetdata/clocks/clocks.h
+        libnetdata/completion/completion.c
+        libnetdata/completion/completion.h
         libnetdata/dictionary/dictionary.c
         libnetdata/dictionary/dictionary.h
         libnetdata/eval/eval.c

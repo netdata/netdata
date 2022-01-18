@@ -144,6 +144,8 @@ LIBNETDATA_FILES = \
     libnetdata/circular_buffer/circular_buffer.h \
     libnetdata/clocks/clocks.c \
     libnetdata/clocks/clocks.h \
+    libnetdata/completion/completion.c \
+    libnetdata/completion/completion.h \
     libnetdata/dictionary/dictionary.c \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
