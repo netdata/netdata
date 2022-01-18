@@ -710,7 +710,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     }
     rrd_unlock();
 
-    rpt->last_msg_t = now_realtime_sec();
+    rpt->last_msg_t = now_realtime_sec(); // receiver spawn creation and a timestamp close to connection.
 
     rpt->host              = host;
     rpt->fd                = w->ifd;

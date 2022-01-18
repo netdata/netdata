@@ -11,10 +11,15 @@ enum REP_ARG {
     next = 2,
     ack = 3
 };
-// RDATA command with arguments TBD?? probably a timewindow struct
+// RDATA command with arguments TBD?? BEGIN SET END
 #define RDATA_CMD "RDATA"
 // GAP command with arguments TBD?? probably a timewindow struct
 #define GAP_CMD "GAP"
+#define RECEIVER_CMD_Q_MAX_SIZE (32768)
+
+typedef struct gaps_queue GAPS;
+typedef struct gap GAP;
+typedef struct time_window TIME_WINDOW;
 
 // Replication structs
 typedef struct replication_state {
@@ -26,6 +31,7 @@ typedef struct replication_state {
     // connection variables
     int socket;
     unsigned int connected;
+    //tx thread variables
     char connected_to[101];
     size_t reconnects_counter;
     size_t send_attempts;
@@ -40,6 +46,17 @@ typedef struct replication_state {
     BUFFER *build;
     char read_buffer[512];
     int read_len;
+    //rx thread variables    
+    time_t last_msg_t;
+    char *client_ip;
+    char *client_port;
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl ssl;
+#endif
+    char *program_name;
+    char *program_version;
+    // GAPS
+    GAPS *gaps_timeline;
 } REPLICATION_STATE;
 
 // GAP structs
@@ -51,12 +68,18 @@ typedef struct time_window {
 } TIME_WINDOW;
 
 typedef struct gap {
-    char *uid;
-    char *uuid;
-    char *status;
-    TIME_WINDOW t_window;
+    char *uid; // unique number for the GAP
+    char *uuid; // unique number for the host id
+    char *status; // a gap can be oncreation, ontransmission, filled
+    TIME_WINDOW t_window; // This is the time window variables of a gap
 } GAP;
 
-typedef struct gaps {
-    struct gap *gaps_timeline; 
+typedef struct gaps_queue {
+    unsigned head, tail;
+    struct gap gaps_timeline[RECEIVER_CMD_Q_MAX_SIZE];
+    uv_mutex_t gaps_mutex;
+    uv_cond_t gaps_cond;
+    unsigned queue_size;
+    uint8_t stop_thread; // if set to 1 the thread should shut down
+    time_t beginoftime;
 } GAPS;

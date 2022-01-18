@@ -418,6 +418,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
         close(rpt->fd);
         return 0;
     }
+    // Here is the first proof of connection with the sender thread.
+    // rpt->last_msg_t = now_realtime_sec();
 
     // remove the non-blocking flag from the socket
     if(sock_delnonblock(rpt->fd) < 0)
@@ -469,12 +471,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
-    // TBRemoved - Replaced by Web client spawn.
-    // Start replication receiver thread (Rx).
-    // if(rpt->replication->enabled 
-    // && !rpt->replication->spawned)
-    //     replication_receiver_thread_spawn(rpt->host);
-
     size_t count = streaming_parser(rpt, &cd, fp);
 
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->hostname,
@@ -495,6 +491,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
         rrdhost_wrlock(rpt->host);
         netdata_mutex_lock(&rpt->host->receiver_lock);
         if (rpt->host->receiver == rpt) {
+            // Here is the first proof of connection with the sender thread.
+            // rpt->last_msg_t = now_realtime_sec();            
             rpt->host->senders_disconnected_time = now_realtime_sec();
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_ORPHAN);
             if(health_enabled == CONFIG_BOOLEAN_AUTO)

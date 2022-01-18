@@ -11,6 +11,7 @@ static void replication_state_init(REPLICATION_STATE *state)
     memset(state, 0, sizeof(*state));
     netdata_mutex_init(&state->mutex);
 }
+
 static void replication_state_destroy(REPLICATION_STATE *state)
 {
     pthread_mutex_destroy(&state->mutex);
@@ -29,7 +30,7 @@ void replication_sender_init(struct sender_state *sender){
     replication_state_init(&tx_replication);
     sender->replication = &tx_replication;
     sender->replication->enabled = default_rrdpush_replication_enabled;
-    info("%s: Initialize Tx for host %s .", REPLICATION_MSG,sender->host->hostname);
+    info("%s: Initialize Tx for host %s .", REPLICATION_MSG, sender->host->hostname);
 }
 
 static unsigned int replication_rd_config(struct receiver_state *rpt, struct config *stream_config)
@@ -116,24 +117,90 @@ void replication_sender_thread_spawn(RRDHOST *host) {
 void replication_receiver_thread(void *ptr){
     netdata_thread_cleanup_push(replication_receiver_thread_cleanup_callback, ptr);
     struct receiver_state *rpt = (struct receiver_state *)ptr;
+    unsigned int rrdpush_replication_enabled =  rpt->replication->enabled;
+    GAPS *gaps_timeline = rpt->replication->gaps_timeline;
     //read configuration
     //create pluginds cd object
-    //verify stream version
-    //send the initial response REP ack
-    //connected
+    struct plugind cd = {
+            .enabled = 1,
+            .update_every = default_rrd_update_every,
+            .pid = 0,
+            .serial_failures = 0,
+            .successful_collections = 0,
+            .obsolete = 0,
+            .started_t = now_realtime_sec(),
+            .next = NULL,
+            .version = 0,
+    };
+
+    // put the client IP and port into the buffers used by plugins.d
+    snprintfz(cd.id,           CONFIG_MAX_NAME,  "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(cd.filename,     FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);    
+    // Respond with the REP ack command
+    info("%s %s [receive from [%s]:%s]: initializing replication communication...", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port);
+    char initial_response[HTTP_HEADER_SIZE];
+    if (rpt->stream_version >= VERSION_GAP_FILLING) {
+        info("%s %s [receive from [%s]:%s]: Netdata acknowledged replication over stream version %u.", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
+        sprintf(initial_response, "%s", REP_ACK_CMD);
+    } 
+    else {
+        info("%s %s [receive from [%s]:%s]: Netdata stream protocol does not support replication.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
+        sprintf(initial_response, "%s", "REP off");
+    }
+    debug(D_REPLICATION, "Initial REPLICATION response to %s: %s", rpt->client_ip, initial_response);
+    #ifdef ENABLE_HTTPS
+    rpt->host->stream_ssl.conn = rpt->ssl.conn;
+    rpt->host->stream_ssl.flags = rpt->ssl.flags;
+    if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+#else
+    if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
+#endif
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "REPLICATION CONNECTION FAILED - THIS HOST FAILED TO REPLY");
+        error("%s %s [receive from [%s]:%s]: failed to send replication acknowledgement command.", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port);
+        close(rpt->fd);
+        return 0;
+    }
+    // Here is the first proof of connection with the sender thread.
+
+    // remove the non-blocking flag from the socket
+    if(sock_delnonblock(rpt->fd) < 0)
+        error("%s %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
+
+    // convert the socket to a FILE *
+    FILE *fp = fdopen(rpt->fd, "r");
+    if(!fp) {
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "SOCKET CONVERSION TO FD FAILED - SOCKET ERROR");
+        error("%s %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
+        close(rpt->fd);
+        return 0;
+    }
+    
+    // call the plugins.d processor to receive the metrics
+    info("%s %s [receive from [%s]:%s]: filling replication gaps...", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port);
+    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "CONNECTED");
+
+    cd.version = rpt->stream_version;
     // Add here the receiver thread logic
     // Need a host
     // Need a PARSER_USER_OBJECT
     // Need a socket
     // need flags to deactivate the no necessary keywords
     // Add here the thread loop
-    // for(;;) {
-    //     // wait to connect
-    //     // send hi
-    //     // retrieve response
-    //     // if receive REP on and is about to //     // respond with REP off then send it 
-    //     // and shutdown the receiver thread ///     // on successfull transmission
-    // }
+    // for(;rrdpush_replication_enabled && !netdata_exit;)
+    // {
+    //     // check for outstanding cancellation requests
+    //     netdata_thread_testcancel();      
+
+    //     if(gaps_timeline->queue_size == 0){
+    //         // Send REP off CMD to the child agent.
+    //         break;
+    //     }
+
+    //     // send GAP uid ts tf te to the child agent        
+    //     // recv RDATA command from child agent
+    // }    
     // Closing thread - clean any resources allocated in this thread function
     netdata_thread_cleanup_pop(1);
     return NULL;    
@@ -274,7 +341,7 @@ int replication_receiver_thread_spawn(struct web_client *w, char *url) {
         }
     }
 
-    // Replication request rate limitation control
+    // Replication request rate limit control
     if(unlikely(web_client_replication_rate_t > 0)) {
         static netdata_mutex_t replication_rate_mutex = NETDATA_MUTEX_INITIALIZER;
         static volatile time_t last_replication_accepted_t = 0;
@@ -296,75 +363,48 @@ int replication_receiver_thread_spawn(struct web_client *w, char *url) {
         netdata_mutex_unlock(&replication_rate_mutex);
     }
 
-    /*
-     * Quick path for rejecting multiple connections. The lock taken is fine-grained - it only protects the receiver
-     * pointer within the host (if a host exists). This protects against multiple concurrent web requests hitting
-     * separate threads within the web-server and landing here. The lock guards the thread-shutdown sequence that
-     * detaches the receiver from the host. If the host is being created (first time-access) then we also use the
-     * lock to prevent race-hazard (two threads try to create the host concurrently, one wins and the other does a
-     * lookup to the now-attached structure).
-     */
-    struct receiver_state *rpt = callocz(1, sizeof(*rpt));
+    // What it does: if host doesn't exist prepare the receiver state struct
+    // and start the streaming receiver to create it.
+    // What I want:  If the host doesn't exist I should depend on streaming to create it. At this point, streaming should have already call the receiver thread to create the host. So if the host exists we continue with the call to the replication rx thread. If the host doesn't exist and host->receiver is NULL means that there was a problem with host creation during streaming or the REPLICATE command arrived earlier than the respective STREAM command. So do not start the Rx replication thread.The replication Tx thread in child should try to reconnect.
 
     rrd_rdlock();
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     if (unlikely(host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) /* Ignore archived hosts. */
         host = NULL;
-    if (host) {
-        rrdhost_wrlock(host);
-        netdata_mutex_lock(&host->receiver_lock);
-        rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
-        host->senders_disconnected_time = 0;
-        if (host->receiver != NULL) {
-            time_t age = now_realtime_sec() - host->receiver->last_msg_t;
-            if (age > 30) {
-                host->receiver->shutdown = 1;
-                shutdown(host->receiver->fd, SHUT_RDWR);
-                host->receiver = NULL;      // Thread holds reference to structure
-                info("%s %s [receive from [%s]:%s]: multiple replication connections for same host detected - existing connection is dead (%ld sec), accepting new connection.", REPLICATION_MSG, host->hostname, w->client_ip, w->client_port, age);
-            }
-            else {
-                netdata_mutex_unlock(&host->receiver_lock);
-                rrdhost_unlock(host);
-                rrd_unlock();
-                log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname,
-                                      "REJECTED - ALREADY CONNECTED");
-                info("%s %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is active (within last %ld sec), rejecting new connection.", REPLICATION_MSG, host->hostname, w->client_ip, w->client_port, age);
-                // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
-                buffer_flush(w->response.data);
-                buffer_strcat(w->response.data, "This GUID is already replicating to this server");
-                freez(rpt);
-                return 409;
-            }
-        }
-        host->receiver = rpt;
-        netdata_mutex_unlock(&host->receiver_lock);
-        rrdhost_unlock(host);
+    if(!host) {
+            rrd_unlock();
+            log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ABORT REPLICATION - HOST DOES NOT EXIST");
+            infoerr("%s - [received from [%s]:%s]: Host(%s) with machine GUID %s does not exist - Abort replication.", REPLICATION_MSG, w->client_ip, w->client_port, hostname, machine_guid);
+            return 409;
     }
+    // Chase race condition in case of two REPLICATE requests hit the web server. One should start the receiver replication thread
+    // and the other should be rejected.
+    // Verify this code: Host exists and replication is active.
+    rrdhost_wrlock(host);
+    if (host->receiver->replication != NULL) {
+        time_t age = now_realtime_sec() - host->receiver->replication->last_msg_t;
+        rrdhost_unlock(host);
+        rrd_unlock();
+        log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
+        info("%s %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is active (within last %ld sec), rejecting new connection.", REPLICATION_MSG, host->hostname, w->client_ip, w->client_port, age);
+        // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "This GUID is already replicating to this server");
+        return 409;
+    }
+    rrdhost_unlock(host);
     rrd_unlock();
 
-    rpt->last_msg_t = now_realtime_sec();
-
-    rpt->host              = host;
-    rpt->fd                = w->ifd;
-    rpt->key               = strdupz(key);
-    rpt->hostname          = strdupz(hostname);
-    rpt->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
-    rpt->machine_guid      = strdupz(machine_guid);
-    rpt->os                = strdupz(os);
-    rpt->timezone          = strdupz(timezone);
-    rpt->abbrev_timezone   = strdupz(abbrev_timezone);
-    rpt->utc_offset        = utc_offset;
-    rpt->tags              = (tags)?strdupz(tags):NULL;
-    rpt->client_ip         = strdupz(w->client_ip);
-    rpt->client_port       = strdupz(w->client_port);
-    rpt->update_every      = update_every;
-    rpt->system_info       = system_info;
-    rpt->stream_version    = stream_version;
+    // Host exists and replication is not active
+    // Initialize replication receiver structure.
+    replication_receiver_init(host->receiver, &stream_config);
+    host->receiver->replication->last_msg_t = now_realtime_sec();
+    host->receiver->replication->socket = w->ifd;
+    host->receiver->replication->client_ip = strdupz(w->client_ip);
+    host->receiver->replication->client_port = strdupz(w->client_port);
 #ifdef ENABLE_HTTPS
-    rpt->ssl.conn          = w->ssl.conn;
-    rpt->ssl.flags         = w->ssl.flags;
-
+    host->receiver->replication->ssl.conn = w->ssl.conn;
+    host->receiver->replication->ssl.flags = w->ssl.flags;
     w->ssl.conn = NULL;
     w->ssl.flags = NETDATA_SSL_START;
 #endif
@@ -376,18 +416,16 @@ int replication_receiver_thread_spawn(struct web_client *w, char *url) {
             t++;
         }
 
-        rpt->program_name = strdupz(w->user_agent);
-        if(t && *t) rpt->program_version = strdupz(t);
+        host->receiver->replication->program_name = strdupz(w->user_agent);
+        if(t && *t) host->receiver->replication->program_version = strdupz(t);
     }
-
-
 
     debug(D_SYSTEM, "starting REPLICATE receive thread.");
 
     char tag[FILENAME_MAX + 1];
-    snprintfz(tag, FILENAME_MAX, "REPLICATION_RECEIVER[%s,[%s]:%s]", rpt->hostname, w->client_ip, w->client_port);
+    snprintfz(tag, FILENAME_MAX, "REPLICATION_RECEIVER[%s,[%s]:%s]", host->hostname, w->client_ip, w->client_port);
 
-    if(netdata_thread_create(&rpt->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, replication_receiver_thread, (void *)rpt))
+    if(netdata_thread_create(&host->receiver->replication->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, replication_receiver_thread, (void *)(host->receiver)))
         error("Failed to create new REPLICATE receive thread for client.");
 
     // prevent the caller from closing the streaming socket
@@ -653,7 +691,7 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
          , REPLICATION_MSG
          , host->hostname
          , s->replication->connected_to
-         , version);
+         , s->version);
 
     if(sock_setnonblock(host->sender->replication->socket) < 0)
         error("%s %s [send to %s]: cannot set non-blocking mode for socket.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
@@ -722,6 +760,7 @@ size_t replication_parser(struct receiver_state *rpt, struct plugind *cd, FILE *
     user->cd = cd;
     user->trust_durations = 0;
 
+    // flags & PARSER_NO_PARSE_INIT to avoid default keyword
     PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
 
     if (unlikely(!parser)) {
@@ -736,8 +775,8 @@ size_t replication_parser(struct receiver_state *rpt, struct plugind *cd, FILE *
     // GAP - Gap metdata. Information to describe the gap (window_start/end, uuid, chart/dim_id)
     // RDATA - gap data transmission
     // Do I need these two commands in replication?
-    // parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
-    // parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
+    // parser_add_keyword(parser, "TIMESTAMP", pluginsd_suspend_this_action);
+    // parser_add_keyword(parser, "CLAIMED_ID", pluginsd_suspend_this_action);
 
     // These are not necessary for the replication parser. Normally I would suggest to assign an inactive action so the replication won't be able to use other functions that can trigger function execution not related with its tasks.
     parser->plugins_action->begin_action     = &pluginsd_suspend_this_action;
@@ -779,7 +818,51 @@ done:
     return result;
 }
 
-// gap processing
+// GAP creation and processing
+GAP *init_gap(){
+    GAP agap;
+    memset(&agap, 0, sizeof(GAP));
+    return &agap;
+}
+
+GAP *generate_new_gap(struct receiver_state *stream_recv){
+    GAP *newgap = init_gap();
+    // newgap->uid = uuidgen(); // find a way to create unique identifiers for gaps
+    newgap->uuid = stream_recv->machine_guid;
+    newgap->t_window.t_first = now_realtime_sec();
+    newgap->status = "oncreate";
+    return newgap;
+}
+
+int complete_new_gap(GAP *potential_gap){
+    if(!strcmp("oncreate", potential_gap->status)) {
+        error("%s: This GAP cannot be completed. Need to create it first.", REPLICATION_MSG);
+        return 0;
+    }
+    potential_gap->t_window.t_end = now_realtime_sec();
+    potential_gap->status = "oncompletion";
+    return 1;
+}
+
+int verify_new_gap(GAP *new_gap){
+    // Access memory to first time_t for all charts?
+    // Access memory to verify last time_t for all charts?
+    // update the gap time_first
+    // Update the gap timewindow
+    // Respect any retention period
+    // push the gap in the queue
+}
+
+// Push a new gap in the queue
+int push_gap(){}
+// Pop a new gap from the queue
+int pop_gap(){}
+// delete a gap from the queue
+int delete_gap(){}
+
+// transmit the gap information to the child nodes - send the GAP command
+int transmit_gap(){}
+
 // FSMs for replication protocol implementation
 // REP on
 // REP off
