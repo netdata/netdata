@@ -428,6 +428,7 @@ static void hardirq_collector(ebpf_module_t *em)
     pthread_mutex_lock(&lock);
     hardirq_create_charts(em->update_every);
     hardirq_create_static_dims();
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
