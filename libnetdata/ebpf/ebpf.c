@@ -113,13 +113,20 @@ int ebpf_get_kernel_version()
     // This new rule is fixing kernel version according the formula:
     //     KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
     // that was extracted from /usr/include/linux/version.h
-    int ipatch = str2l(patch);
+    int ipatch = (int)str2l(patch);
     if (ipatch > 255)
         ipatch = 255;
 
-    return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + (int)ipatch);
+    return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + ipatch);
 }
 
+/**
+ * Get RH release
+ *
+ * Read Red Hat release from /etc/redhat-release
+ *
+ * @return It returns RH release on success and -1 otherwise
+ */
 int get_redhat_release()
 {
     char buffer[VERSION_STRING_LEN + 1];
