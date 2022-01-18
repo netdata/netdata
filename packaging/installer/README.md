@@ -41,6 +41,12 @@ updates_, run the following as your normal user:
 wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
+Or, if you have cURL but not wget (such as on macOS):
+
+```bash
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+```
+
 This script will preferentially use native DEB/RPM packages if we provide them for your platform.
 
 To see more information about this installation script, including how to disable automatic updates, get nightly vs.
