@@ -270,7 +270,10 @@ int has_condition_to_run(int version)
  */
 static char *ebpf_select_kernel_name(uint32_t selector)
 {
-    static char *kernel_names[] = { "3.10", "4.14", "4.16", "4.18", "5.4", "5.10", "5.11", "5.15" };
+    static char *kernel_names[] = { NETDATA_IDX_STR_V3_10, NETDATA_IDX_STR_V4_14, NETDATA_IDX_STR_V4_16,
+                                    NETDATA_IDX_STR_V4_18, NETDATA_IDX_STR_V5_4,  NETDATA_IDX_STR_V5_10,
+                                    NETDATA_IDX_STR_V5_11, NETDATA_IDX_STR_V5_15
+                                  };
 
     return kernel_names[selector];
 }

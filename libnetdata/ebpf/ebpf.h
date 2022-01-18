@@ -82,6 +82,15 @@ enum netdata_kernel_idx {
     NETDATA_IDX_V5_15
 };
 
+#define NETDATA_IDX_STR_V3_10 "3.10"
+#define NETDATA_IDX_STR_V4_14 "4.14"
+#define NETDATA_IDX_STR_V4_16 "4.16"
+#define NETDATA_IDX_STR_V4_18 "4.18"
+#define NETDATA_IDX_STR_V5_4  "5.4"
+#define NETDATA_IDX_STR_V5_10 "5.10"
+#define NETDATA_IDX_STR_V5_11 "5.11"
+#define NETDATA_IDX_STR_V5_15 "5.15"
+
 /**
  * Minimum value has relationship with libbpf support.
  */
