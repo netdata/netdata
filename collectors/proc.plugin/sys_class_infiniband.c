@@ -540,7 +540,8 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 rrdset_flag_set(port->st_bytes, RRDSET_FLAG_DETAIL);
                 // On this chart, we want to have a KB/s so the dashboard will autoscale it
                 // The reported values are also per-lane, so we must multiply it by the width
-                FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, 8 * port->width, 1024, RRD_ALGORITHM_INCREMENTAL)
+                // x4 lanes multiplier as per Documentation/ABI/stable/sysfs-class-infiniband
+                FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, 4 * 8 * port->width, 1024, RRD_ALGORITHM_INCREMENTAL)
 
                 port->stv_speed = rrdsetvar_custom_chart_variable_create(port->st_bytes, "link_speed");
             } else
