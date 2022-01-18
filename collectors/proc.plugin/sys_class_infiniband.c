@@ -21,8 +21,8 @@
     FOREACH_COUNTER_ERRORS(GEN,  __VA_ARGS__)
 
 #define FOREACH_COUNTER_BYTES(GEN, ...)                                                             \
-    GEN(port_rcv_data,                   bytes,   "Received",                      1, __VA_ARGS__)  \
-    GEN(port_xmit_data,                  bytes,   "Sent",                         -1, __VA_ARGS__)
+    GEN(port_rcv_data,                   bytes,   "Received",                      4, __VA_ARGS__)  \
+    GEN(port_xmit_data,                  bytes,   "Sent",                         -4, __VA_ARGS__)
 
 #define FOREACH_COUNTER_PACKETS(GEN, ...)                                                           \
     GEN(port_rcv_packets,                packets, "Received",                      1, __VA_ARGS__)  \
