@@ -289,23 +289,23 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
 {
     if (is_rhf > 0) { // Is Red Hat family
         if (kver >= NETDATA_EBPF_KERNEL_4_11)
-            return 3;
+            return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
         if (kver >= NETDATA_EBPF_KERNEL_5_15)
-            return 7;
+            return NETDATA_IDX_V5_15;
         else if (kver >= NETDATA_EBPF_KERNEL_5_11)
-            return 6;
+            return NETDATA_IDX_V5_11;
         else if (kver >= NETDATA_EBPF_KERNEL_5_10)
-            return 5;
+            return NETDATA_IDX_V5_10;
         else if (kver >= NETDATA_EBPF_KERNEL_4_17)
-            return 4;
+            return NETDATA_IDX_V5_4;
         else if (kver >= NETDATA_EBPF_KERNEL_4_15)
-            return 2;
+            return NETDATA_IDX_V4_16;
         else if (kver >= NETDATA_EBPF_KERNEL_4_11)
-            return 1;
+            return NETDATA_IDX_V4_14;
     }
 
-    return 0;
+    return NETDATA_IDX_V3_10;
 }
 
 /**

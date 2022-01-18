@@ -71,6 +71,17 @@ enum netdata_kernel_flag {
     NETDATA_V5_15 = 1 << 7
 };
 
+enum netdata_kernel_idx {
+    NETDATA_IDX_V3_10,
+    NETDATA_IDX_V4_14,
+    NETDATA_IDX_V4_16,
+    NETDATA_IDX_V4_18,
+    NETDATA_IDX_V5_4 ,
+    NETDATA_IDX_V5_10,
+    NETDATA_IDX_V5_11,
+    NETDATA_IDX_V5_15
+};
+
 /**
  * Minimum value has relationship with libbpf support.
  */
