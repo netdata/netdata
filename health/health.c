@@ -1077,7 +1077,7 @@ void *health_main(void *ptr) {
         }
 
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-            if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > marked_aclk_reload_loop + 2) {
+        if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
                 rrdhost_foreach_read(host) {
                     if (unlikely(!host->health_enabled))
                         continue;
