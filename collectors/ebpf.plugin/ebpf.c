@@ -6,45 +6,8 @@
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
+#include "libnetdata/required_dummies.h"
 
-/*****************************************************************
- *
- *  FUNCTIONS USED BY NETDATA
- *
- *****************************************************************/
-
-// callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result)
-{
-    UNUSED(variable);
-    UNUSED(hash);
-    UNUSED(rc);
-    UNUSED(result);
-    return 0;
-};
-
-void send_statistics(const char *action, const char *action_result, const char *action_data)
-{
-    UNUSED(action);
-    UNUSED(action_result);
-    UNUSED(action_data);
-}
-
-// callbacks required by popen()
-void signals_block(void){};
-void signals_unblock(void){};
-void signals_reset(void){};
-
-// required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
-
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret)
-{
-    exit(ret);
-}
-
-// ----------------------------------------------------------------------
 /*****************************************************************
  *
  *  GLOBAL VARIABLES
