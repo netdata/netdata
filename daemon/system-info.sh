@@ -335,7 +335,7 @@ else
     # These translate to the prefixs of files in `/dev` indicating the device type.
     # They are sorted by lowest used device major number, with dynamically assigned ones at the end.
     # We use this to look up device major numbers in `/proc/devices`
-    device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme blkext'
+    device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme virtblk blkext'
 
     for name in ${device_names}; do
       if grep -qE " ${name}\$" /proc/devices; then
