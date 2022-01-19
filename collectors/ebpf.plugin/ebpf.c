@@ -1624,8 +1624,6 @@ static void ebpf_parse_args(int argc, char **argv)
 
         if (disable_cgroups)
             ebpf_disable_cgroups();
-
-        ebpf_enable_all_charts(disable_apps, disable_cgroups);
     }
 
     if (select_threads) {
