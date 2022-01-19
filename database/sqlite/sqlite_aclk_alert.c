@@ -607,6 +607,8 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
 
     db_execute(buffer_tostring(sql));
 
+    log_access("AC [%s (%s)]: Queued removed alerts.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
+
     buffer_free(sql);
 #endif
     return;
