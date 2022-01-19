@@ -5119,7 +5119,7 @@ netdataDashboard.context = {
     },
 
     'spigotmc.users': {
-        info: 'The number of currently connect users on the monitored Spigot server.'
+        info: 'The number of currently connected users on the monitored Spigot server.'
     },
 
     'boinc.tasks': {
