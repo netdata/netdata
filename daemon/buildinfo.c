@@ -207,8 +207,67 @@
 
 #define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
 
+// coverity[ +tainted_string_sanitize_content : arg-0 ]
+static inline void coverity_remove_taint(char *s)
+{
+    (void)s;
+}
+
+void read_install_type(void) {
+    char *filepath;
+    filepath = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 2));
+    sprintf(filepath, "%s/%s", netdata_configured_user_config_dir, ".install-type");
+    FILE *fp = fopen(filepath, "r");
+
+    if(fp) {
+        char *line = mallocz(sizeof(char) * (200 + 1));
+        while (fgets(line, 200, fp) != NULL) {
+            char *value = line;
+
+            while (*value && *value != '=') value++;
+
+            if (*value == '=') {
+                *value = '\0';
+                value++;
+                if (*value == '\'' || *value == '\"') value++;
+                char *end = value;
+                while (*end && *end != '\'' && *end != '\"' && *end != '\n') end++;
+                *end = '\0';
+                coverity_remove_taint(line);
+                coverity_remove_taint(value);
+            } else {
+                continue;
+            }
+
+            setenv(line, value, 1);
+        }
+        fclose(fp);
+        freez(line);
+    } else {
+        setenv("INSTALL_TYPE", "unknown", 1);
+    }
+
+    freez(filepath);
+}
+
 void print_build_info(void) {
+    read_install_type();
+    char *install_type = getenv("INSTALL_TYPE");
+    char *arch = getenv("PREBUILT_ARCH");
+    char *distro = getenv("PREBUILT_DISTRO");
+
+    if (install_type == NULL) {
+        install_type = "unknown";
+    }
+
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
+    printf("Install type: %s\n", install_type);
+    if (arch != NULL) {
+        printf("    Binary architecture: %s\n", arch);
+    }
+    if (distro != NULL) {
+        printf("    Packaging distro: %s\n", distro);
+    }
 
     printf("Features:\n");
     printf("    dbengine:                   %s\n", FEAT_YES_NO(FEAT_DBENGINE));
