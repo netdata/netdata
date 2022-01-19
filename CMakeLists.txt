@@ -310,9 +310,10 @@ pkg_check_modules(SNAPPY snappy)
 # -----------------------------------------------------------------------------
 # Detect libmongoc
 
-find_package(libmongoc-1.0)
+pkg_check_modules(MONGOC libmongoc-1.0)
 # later we use:
 # ${MONGOC_LIBRARIES}
+# ${MONGOC_CFLAGS_OTHER}
 # ${MONGOC_INCLUDE_DIRS}
 
 
@@ -1092,12 +1093,13 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # mongodb backend
 
-IF(libmongoc-1.0_FOUND)
+IF(MONGOC_LIBRARIES)
     message(STATUS "mongodb backend: enabled")
 
     list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES} ${MONGODB_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES ${MONGOC_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${MONGOC_INCLUDE_DIRS})
+    list(APPEND NETDATA_COMMON_CFLAGS ${MONGOC_CFLAGS_OTHER})
 ELSE()
     message(STATUS "mongodb backend: disabled (requires mongoc library)")
 ENDIF()
