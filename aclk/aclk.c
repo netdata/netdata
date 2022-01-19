@@ -320,7 +320,7 @@ static int handle_connection(mqtt_wss_client client)
             return 1;
         }
 
-        if (disconnect_req) {
+        if (disconnect_req || aclk_kill_link) {
             disconnect_req = 0;
             aclk_graceful_disconnect(client);
             aclk_queue_unlock();

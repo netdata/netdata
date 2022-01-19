@@ -136,6 +136,8 @@ void load_claiming_state(void)
     uuid_t uuid;
     rrdhost_aclk_state_lock(localhost);
     if (localhost->aclk_state.claimed_id) {
+        if (aclk_connected)
+            localhost->aclk_state.prev_claimed_id = strdupz(localhost->aclk_state.claimed_id);
         freez(localhost->aclk_state.claimed_id);
         localhost->aclk_state.claimed_id = NULL;
     }

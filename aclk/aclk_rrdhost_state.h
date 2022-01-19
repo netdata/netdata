@@ -30,6 +30,7 @@ typedef enum aclk_agent_state {
 
 typedef struct aclk_rrdhost_state {
     char *claimed_id; // Claimed ID if host has one otherwise NULL
+    char *prev_claimed_id; // Claimed ID if changed (reclaimed) during runtime
 
 #ifdef ACLK_LEGACY
     // per child popcorning

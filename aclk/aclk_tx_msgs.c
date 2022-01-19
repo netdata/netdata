@@ -420,7 +420,10 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         rrdhost_aclk_state_unlock(localhost);
         return 0;
     }
-    conn.claim_id = localhost->aclk_state.claimed_id;
+    if (localhost->aclk_state.prev_claimed_id)
+        conn.claim_id = localhost->aclk_state.prev_claimed_id;
+    else
+        conn.claim_id = localhost->aclk_state.claimed_id;
 
     char *msg = generate_update_agent_connection(&len, &conn);
     rrdhost_aclk_state_unlock(localhost);
@@ -432,6 +435,10 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
 
     pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
     freez(msg);
+    if (localhost->aclk_state.prev_claimed_id) {
+        freez(localhost->aclk_state.prev_claimed_id);
+        localhost->aclk_state.prev_claimed_id = NULL;
+    }
     return pid;
 }
 
