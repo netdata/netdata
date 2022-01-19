@@ -60,6 +60,7 @@ typedef struct ebpf_filesystem_partitions {
     uint32_t enabled;
 
     ebpf_addresses_t addresses;
+    uint64_t kernels;
 } ebpf_filesystem_partitions_t;
 
 extern void *ebpf_filesystem_thread(void *ptr);

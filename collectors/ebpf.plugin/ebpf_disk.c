@@ -817,12 +817,14 @@ void *ebpf_disk_thread(void *ptr)
     }
 
     if (pthread_mutex_init(&plot_mutex, NULL)) {
+        em->enabled = 0;
         error("Cannot initialize local mutex");
         goto enddisk;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
+        em->enabled = 0;
         goto enddisk;
     }
 
@@ -833,9 +835,16 @@ void *ebpf_disk_thread(void *ptr)
     ebpf_global_labels(disk_aggregated_data, disk_publish_aggregated, dimensions, dimensions, algorithms,
                        NETDATA_EBPF_HIST_MAX_BINS);
 
+    pthread_mutex_lock(&lock);
+    ebpf_update_stats(&plugin_statistics, em);
+    pthread_mutex_unlock(&lock);
+
     disk_collector(em);
 
 enddisk:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
 
     return NULL;

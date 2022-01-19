@@ -209,6 +209,7 @@ static void softirq_collector(ebpf_module_t *em)
     pthread_mutex_lock(&lock);
     softirq_create_charts(em->update_every);
     softirq_create_dims();
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
@@ -259,14 +260,18 @@ void *ebpf_softirq_thread(void *ptr)
         goto endsoftirq;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endsoftirq;
     }
 
     softirq_collector(em);
 
 endsoftirq:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
 
     return NULL;

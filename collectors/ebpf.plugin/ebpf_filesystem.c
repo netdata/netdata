@@ -38,7 +38,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .probe_links = NULL,
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0}},
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
      {.filesystem = "xfs",
       .optional_filesystem = NULL,
       .family = "xfs",
@@ -46,7 +47,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .probe_links = NULL,
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0}},
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
      {.filesystem = "nfs",
       .optional_filesystem = "nfs4",
       .family = "nfs",
@@ -54,7 +56,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .probe_links = NULL,
       .flags = NETDATA_FILESYSTEM_ATTR_CHARTS,
       .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0}},
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
      {.filesystem = "zfs",
       .optional_filesystem = NULL,
       .family = "zfs",
@@ -62,7 +65,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .probe_links = NULL,
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0}},
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
      {.filesystem = "btrfs",
       .optional_filesystem = NULL,
       .family = "btrfs",
@@ -70,7 +74,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .probe_links = NULL,
       .flags = NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE,
       .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = "btrfs_file_operations", .addr = 0}},
+      .addresses = {.function = "btrfs_file_operations", .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10},
      {.filesystem = NULL,
       .optional_filesystem = NULL,
       .family = NULL,
@@ -78,7 +83,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .probe_links = NULL,
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0}}};
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels = 0}};
 
 struct netdata_static_thread filesystem_threads = {"EBPF FS READ",
                                                    NULL, NULL, 1, NULL,
@@ -224,13 +230,16 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
 {
     int i;
     const char *saved_name = em->thread_name;
+    uint64_t kernels = em->kernels;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (!efp->probe_links && efp->flags & NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM) {
             em->thread_name = efp->filesystem;
-            efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &efp->objects);
+            em->kernels = efp->kernels;
+            efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
             if (!efp->probe_links) {
                 em->thread_name = saved_name;
+                em->kernels = kernels;
                 return -1;
             }
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
@@ -243,6 +252,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
     em->thread_name = saved_name;
+    em->kernels = kernels;
 
     if (!dimensions) {
         dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
@@ -640,7 +650,7 @@ void *ebpf_filesystem_thread(void *ptr)
         if (em->optional)
             info("Netdata cannot monitor the filesystems used on this host.");
 
-        em->enabled = 0;
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endfilesystem;
     }
 
@@ -651,11 +661,15 @@ void *ebpf_filesystem_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_create_fs_charts(em->update_every);
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     filesystem_collector(em);
 
 endfilesystem:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

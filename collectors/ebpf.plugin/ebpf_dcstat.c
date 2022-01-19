@@ -964,9 +964,10 @@ void *ebpf_dcstat_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto enddcstat;
     }
 
@@ -980,11 +981,16 @@ void *ebpf_dcstat_thread(void *ptr)
                        algorithms, NETDATA_DCSTAT_IDX_END);
 
     ebpf_create_filesystem_charts(em->update_every);
+    ebpf_update_stats(&plugin_statistics, em);
+
     pthread_mutex_unlock(&lock);
 
     dcstat_collector(em);
 
 enddcstat:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

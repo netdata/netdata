@@ -74,7 +74,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (!w->probe_links && w->enabled) {
             em->thread_name = w->syscall;
-            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &w->objects);
+            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
             if (!w->probe_links) {
                 em->thread_name = saved_name;
                 return -1;
@@ -387,7 +387,7 @@ void *ebpf_sync_thread(void *ptr)
         goto endsync;
 
     if (ebpf_sync_initialize_syscall(em)) {
-        pthread_mutex_unlock(&lock);
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endsync;
     }
 
@@ -400,11 +400,15 @@ void *ebpf_sync_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_create_sync_charts(em->update_every);
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     sync_collector(em);
 
 endsync:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

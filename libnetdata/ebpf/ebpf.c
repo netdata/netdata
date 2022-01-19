@@ -110,9 +110,23 @@ int ebpf_get_kernel_version()
         *move++ = *version++;
     *move = '\0';
 
-    return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + (int)str2l(patch));
+    // This new rule is fixing kernel version according the formula:
+    //     KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
+    // that was extracted from /usr/include/linux/version.h
+    int ipatch = (int)str2l(patch);
+    if (ipatch > 255)
+        ipatch = 255;
+
+    return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + ipatch);
 }
 
+/**
+ * Get RH release
+ *
+ * Read Red Hat release from /etc/redhat-release
+ *
+ * @return It returns RH release on success and -1 otherwise
+ */
 int get_redhat_release()
 {
     char buffer[VERSION_STRING_LEN + 1];
@@ -249,65 +263,188 @@ int has_condition_to_run(int version)
 
 //----------------------------------------------------------------------------------------------------------------------
 
-char *ebpf_kernel_suffix(int version, int isrh)
+/**
+ * Kernel Name
+ *
+ * Select kernel name used by eBPF programs
+ *
+ * Netdata delivers for users eBPF programs with specific suffixes that represent the kernels they were
+ * compiled, when we load the eBPF program, the suffix must be the nereast possible of the kernel running.
+ *
+ * @param selector select the kernel version.
+ *
+ * @return It returns the string to load kernel.
+ */
+static char *ebpf_select_kernel_name(uint32_t selector)
 {
-    if (isrh) {
-        if (version >= NETDATA_EBPF_KERNEL_4_11)
-            return "4.18";
-        else
-            return "3.10";
-    } else {
-        if (version >= NETDATA_EBPF_KERNEL_5_15)
-            return "5.15";
-        else if (version >= NETDATA_EBPF_KERNEL_5_11)
-            return "5.11";
-        else if (version >= NETDATA_EBPF_KERNEL_5_10)
-            return "5.10";
-        else if (version >= NETDATA_EBPF_KERNEL_4_17)
-            return "5.4";
-        else if (version >= NETDATA_EBPF_KERNEL_4_15)
-            return "4.16";
-        else if (version >= NETDATA_EBPF_KERNEL_4_11)
-            return "4.14";
+    static char *kernel_names[] = { NETDATA_IDX_STR_V3_10, NETDATA_IDX_STR_V4_14, NETDATA_IDX_STR_V4_16,
+                                    NETDATA_IDX_STR_V4_18, NETDATA_IDX_STR_V5_4,  NETDATA_IDX_STR_V5_10,
+                                    NETDATA_IDX_STR_V5_11, NETDATA_IDX_STR_V5_15
+                                  };
+
+    return kernel_names[selector];
+}
+
+/**
+ * Select Max Index
+ *
+ * Select last index that will be tested on host.
+ *
+ * @param is_rhf is Red Hat fammily?
+ * @param kver   the kernel version
+ *
+ * @return it returns the index to access kernel string.
+ */
+static int ebpf_select_max_index(int is_rhf, uint32_t kver)
+{
+    if (is_rhf > 0) { // Is Red Hat family
+        if (kver >= NETDATA_EBPF_KERNEL_4_11)
+            return NETDATA_IDX_V4_18;
+    } else { // Kernels from kernel.org
+        if (kver >= NETDATA_EBPF_KERNEL_5_15)
+            return NETDATA_IDX_V5_15;
+        else if (kver >= NETDATA_EBPF_KERNEL_5_11)
+            return NETDATA_IDX_V5_11;
+        else if (kver >= NETDATA_EBPF_KERNEL_5_10)
+            return NETDATA_IDX_V5_10;
+        else if (kver >= NETDATA_EBPF_KERNEL_4_17)
+            return NETDATA_IDX_V5_4;
+        else if (kver >= NETDATA_EBPF_KERNEL_4_15)
+            return NETDATA_IDX_V4_16;
+        else if (kver >= NETDATA_EBPF_KERNEL_4_11)
+            return NETDATA_IDX_V4_14;
     }
 
-    return NULL;
+    return NETDATA_IDX_V3_10;
+}
+
+/**
+ * Select Index
+ *
+ * Select index to load data.
+ *
+ * @param kernels is the variable with kernel versions.
+ * @param is_rhf  is Red Hat fammily?
+ * param  kver    the kernel version
+ */
+static uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
+{
+    uint32_t start = ebpf_select_max_index(is_rhf, kver);
+    uint32_t idx;
+
+    for (idx = start; idx; idx--) {
+        if (kernels & 1 << idx)
+            break;
+    }
+
+    return idx;
+}
+
+/**
+ *  Mount Name
+ *
+ *  Mount name of eBPF program to be loaded.
+ *
+ *  Netdata eBPF programs has the following format:
+ *
+ *      Tnetdata_ebpf_N.V.o
+ *
+ *  where:
+ *     T - Is the eBPF type. When starts with 'p', this means we are only adding probes,
+ *         and when they start with 'r' we are using retprobes.
+ *     N - The eBPF program name.
+ *     V - The kernel version in string format.
+ *
+ *  @param out       the vector where the name will be stored
+ *  @param path
+ *  @param len       the size of the out vector.
+ *  @param kver      the kernel version
+ *  @param name      the eBPF program name.
+ *  @param is_return is return or entry ?
+ */
+static void ebpf_mount_name(char *out, size_t len, char *path, uint32_t kver, const char *name, int is_return)
+{
+    char *version = ebpf_select_kernel_name(kver);
+    snprintfz(out, len, "%s/ebpf.d/%cnetdata_ebpf_%s.%s.o",
+              path,
+              (is_return) ? 'r' : 'p',
+              name,
+              version);
 }
 
 //----------------------------------------------------------------------------------------------------------------------
 
 /**
- *  Update Kernel
+ * Statistics from targets
  *
- *  Update string used to load eBPF programs
+ * Count the information from targets.
  *
- * @param ks      vector to store the value
- * @param length  available length to store kernel
- * @param isrh    Is a Red Hat distribution?
- * @param version the kernel version
+ * @param report  the output structure
+ * @param targets  vector with information about the eBPF plugin.
  */
-void ebpf_update_kernel(char *ks, size_t length, int isrh, int version)
+static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets_t *targets)
 {
-    char *kernel = ebpf_kernel_suffix(version, (isrh < 0) ? 0 : 1);
-    size_t len = strlen(kernel);
-    if (len > length)
-        len = length - 1;
-    strncpyz(ks, kernel, len);
-    ks[len] = '\0';
+    if (!targets) {
+        report->probes = report->tracepoints = report->trampolines = 0;
+        return;
+    }
+
+    int i = 0;
+    while (targets[i].name) {
+        switch (targets[i].mode) {
+            case EBPF_LOAD_PROBE: {
+                report->probes++;
+                break;
+            }
+            case EBPF_LOAD_RETPROBE: {
+                report->retprobes++;
+                break;
+            }
+            case EBPF_LOAD_TRACEPOINT: {
+                report->tracepoints++;
+                break;
+            }
+            case EBPF_LOAD_TRAMPOLINE: {
+                report->trampolines++;
+                break;
+            }
+        }
+
+        i++;
+    }
 }
 
-static int select_file(char *name, const char *program, size_t length, int mode, char *kernel_string)
+/**
+ * Update General stats
+ *
+ * Update eBPF plugin statistics that has relationship with the thread.
+ *
+ * This function must be called with mutex associated to charts is locked.
+ *
+ * @param report  the output structure
+ * @param em      the structure with information about how the module/thread is working.
+ */
+void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
 {
-    int ret = -1;
-    if (!mode)
-        ret = snprintf(name, length, "rnetdata_ebpf_%s.%s.o", program, kernel_string);
-    else if (mode == 1)
-        ret = snprintf(name, length, "dnetdata_ebpf_%s.%s.o", program, kernel_string);
-    else if (mode == 2)
-        ret = snprintf(name, length, "pnetdata_ebpf_%s.%s.o", program, kernel_string);
+    report->threads++;
 
-    return ret;
+    // It is not necessary to report more information.
+    if (!em->enabled)
+        return;
+
+    report->running++;
+
+    // In theory the `else if` is useless, because when this function is called, the module should not stay in
+    // EBPF_LOAD_PLAY_DICE. We have this additional condition to detect errors from developers.
+    if (em->load == EBPF_LOAD_LEGACY)
+        report->legacy++;
+    else if (em->load == EBPF_LOAD_CORE)
+        report->core++;
+
+    ebpf_stats_targets(report, em->targets);
 }
+
+//----------------------------------------------------------------------------------------------------------------------
 
 void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em)
 {
@@ -454,17 +591,28 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
     }
 }
 
-struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string,
+/**
+ * Load Program
+ *
+ * Load eBPF program into kernel
+ *
+ * @param plugins_dir    directory where binary are stored
+ * @param em             structure with information about eBPF program we will load.
+ * @param kver           the kernel version according /usr/include/linux/version.h
+ * @param is_rhf         is a kernel from Red Hat Family?
+ * @param obj            structure where we will store object loaded.
+ *
+ * @return it returns a link for each target we associated an eBPF program.
+ */
+struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf,
                                     struct bpf_object **obj)
 {
     char lpath[4096];
-    char lname[128];
 
-    int test = select_file(lname, em->thread_name, (size_t)127, em->mode, kernel_string);
-    if (test < 0 || test > 127)
-        return NULL;
+    uint32_t idx = ebpf_select_index(em->kernels, is_rhf, kver);
 
-    snprintf(lpath, 4096, "%s/ebpf.d/%s", plugins_dir, lname);
+    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode);
+
     *obj = bpf_object__open_file(lpath, NULL);
     if (libbpf_get_error(obj)) {
         error("Cannot open BPF object %s", lpath);
@@ -484,6 +632,10 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     ebpf_update_controller(em, *obj);
 
     size_t count_programs =  ebpf_count_programs(*obj);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("eBPF program %s loaded with success!", lpath);
+#endif
 
     return ebpf_attach_programs(*obj, count_programs, em->names);
 }
