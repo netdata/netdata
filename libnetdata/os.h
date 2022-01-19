@@ -6,15 +6,9 @@
 #include "libnetdata.h"
 
 // =====================================================================================================================
-// Linux
-
-#if (TARGET_OS == OS_LINUX)
-
-
-// =====================================================================================================================
 // FreeBSD
 
-#elif (TARGET_OS == OS_FREEBSD)
+#if __FreeBSD__
 
 #include <sys/sysctl.h>
 
@@ -35,28 +29,24 @@ extern int getsysctl_simple(const char *name, int *mib, size_t miblen, void *ptr
 
 extern int getsysctl(const char *name, int *mib, size_t miblen, void *ptr, size_t *len);
 
+#endif
 
 // =====================================================================================================================
 // MacOS
 
-#elif (TARGET_OS == OS_MACOS)
+#if __APPLE__
 
 #include <sys/sysctl.h>
 
 #define GETSYSCTL_BY_NAME(name, var) getsysctl_by_name(name, &(var), sizeof(var))
 extern int getsysctl_by_name(const char *name, void *ptr, size_t len);
 
-
-// =====================================================================================================================
-// unknown O/S
-
-#else
-#error unsupported operating system
 #endif
 
-
 // =====================================================================================================================
-// common for all O/S
+// common defs for Apple/FreeBSD/Linux
+
+extern const char *os_type;
 
 extern int processors;
 extern long get_system_cpus(void);

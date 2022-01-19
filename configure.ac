@@ -279,24 +279,21 @@ AC_MSG_CHECKING([operating system])
 case "$host_os" in
 freebsd*)
     build_target=freebsd
-    build_target_id=2
     CFLAGS="${CFLAGS} -I/usr/local/include -L/usr/local/lib"
     ;;
 darwin*)
     build_target=macos
-    build_target_id=3
     LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
     ;;
 *)
     build_target=linux
-    build_target_id=1
     ;;
 esac
 
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
-AC_MSG_RESULT([${build_target} with id ${build_target_id}])
+AC_MSG_RESULT([Host OS: ${build_target}])
 
 
 # -----------------------------------------------------------------------------
@@ -1538,7 +1535,6 @@ libconfigdir="${libdir}/netdata/conf.d"
 logdir="${localstatedir}/log/netdata"
 pluginsdir="${libexecdir}/netdata/plugins.d"
 
-AC_SUBST([build_target])
 AC_SUBST([varlibdir])
 AC_SUBST([registrydir])
 AC_SUBST([cachedir])
@@ -1560,7 +1556,6 @@ CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
 CPPFLAGS="\
-    -DTARGET_OS=${build_target_id} \
 	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
 	-DCACHE_DIR=\"\\\"${cachedir}\\\"\" \
 	-DCONFIG_DIR=\"\\\"${configdir}\\\"\" \

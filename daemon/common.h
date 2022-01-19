@@ -79,8 +79,8 @@
 // the netdata daemon
 #include "daemon.h"
 #include "main.h"
+#include "static_threads.h"
 #include "signals.h"
-#include "service.h"
 #include "commands.h"
 #include "analytics.h"
 

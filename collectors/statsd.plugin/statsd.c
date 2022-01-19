@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "statsd.h"
+#include "daemon/common.h"
 
 #define STATSD_CHART_PREFIX "statsd"
 
 #define PLUGIN_STATSD_NAME "statsd.plugin"
+
+#define STATSD_LISTEN_PORT 8125
+#define STATSD_LISTEN_BACKLOG 4096
 
 // --------------------------------------------------------------------------------------
 

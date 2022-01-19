@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "plugin_timex.h"
+#include "daemon/common.h"
 #include "sys/timex.h"
 
 #define PLUGIN_TIMEX_NAME "timex.plugin"
