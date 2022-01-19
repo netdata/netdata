@@ -147,7 +147,11 @@ static void aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obje
     json_object_to_file_ext(filename, msg, JSON_C_TO_STRING_PRETTY);
 #endif */
 
-    mqtt_wss_publish_pid(client, topic, full_msg, len,  MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish_pid_block(client, topic, full_msg, len,  MQTT_WSS_PUB_QOS1, &packet_id, 5000);
+    if (rc == MQTT_WSS_ERR_BLOCK_TIMEOUT)
+        error("Timeout sending binpacked message");
+    if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL)
+        error("Message is bigger than allowed maximum");
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
 #endif
