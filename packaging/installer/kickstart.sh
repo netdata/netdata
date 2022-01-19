@@ -994,10 +994,10 @@ try_package_install() {
 set_static_archive_urls() {
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
     latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-    export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${SYSARCH}-${latest}.gz.run"
+    export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${SYSARCH}-latest.gz.run"
     export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
   else
-    export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/netdata-latest.gz.run"
+    export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/netdata-${SYSARCH}-latest.gz.run"
     export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/sha256sums.txt"
   fi
 }
