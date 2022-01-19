@@ -851,6 +851,10 @@ void rrdhost_free(RRDHOST *host) {
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
     buffer_free(host->sender->build);
+#ifdef ENABLE_COMPRESSION
+    if (host->sender->compressor)
+        host->sender->compressor->destroy(&host->sender->compressor);
+#endif
     freez(host->sender);
     host->sender = NULL;
     if (netdata_exit) {

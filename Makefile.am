@@ -543,6 +543,7 @@ API_PLUGIN_FILES = \
 
 STREAMING_PLUGIN_FILES = \
     streaming/rrdpush.c \
+    streaming/compression.c \
     streaming/sender.c \
     streaming/receiver.c \
     streaming/rrdpush.h \

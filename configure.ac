@@ -155,6 +155,12 @@ AC_ARG_ENABLE(
     [enable_https="detect"]
 )
 AC_ARG_ENABLE(
+    [compression],
+    [AS_HELP_STRING([--enable-compression], [Enable LZ4 compression support @<:@default autodetect@:>@])],
+    ,
+    [enable_compression="detect"]
+)
+AC_ARG_ENABLE(
     [dbengine],
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
@@ -357,10 +363,15 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 AC_CHECK_LIB(
     [lz4],
+    [LZ4_initStream],
+    [LZ4_LIBS_FAST="-llz4"]
+)
+
+AC_CHECK_LIB(
+    [lz4],
     [LZ4_compress_default],
     [LZ4_LIBS="-llz4"]
 )
-
 
 # -----------------------------------------------------------------------------
 # zlib
@@ -516,6 +527,37 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+AC_MSG_CHECKING([if netdata compression should be used])
+if test "${enable_compression}" != "no"; then
+    if test "${LZ4_LIBS_FAST}"; then
+        LIBS_BKP="${LIBS}"
+        LIBS="${LZ4_LIBS_FAST}"
+        AC_TRY_LINK(
+            [ #include <lz4.h> ],
+            [
+                LZ4_stream_t* stream = LZ4_initStream(NULL, 0);
+            ],
+            [ enable_compression="yes"],
+            [ enable_compression="no" ]
+        )
+        LIBS="${LIBS_BKP}"
+        if test "${enable_compression}" == "yes"; then
+            OPTIONAL_LZ4_LIBS="${LZ4_LIBS_FAST}"
+            AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
+        fi
+    else
+        if test "${enable_compression}" == "yes"; then
+            AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable_compression. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
+            enable_compression="no"
+        fi
+        enable_compression="no"
+    fi
+else
+    enable_compression="no"
+fi
+AC_MSG_RESULT([${enable_compression}])
+AM_CONDITIONAL([ENABLE_COMPRESSION], [test "${enable_compression}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
