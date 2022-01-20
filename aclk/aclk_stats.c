@@ -261,7 +261,7 @@ static void aclk_stats_newproto_rx(uint32_t *aclk_proto_tx_msgs_sample)
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_protobuf_tx_types", NULL, "aclk", NULL, "Received new cloud architecture messages by their type.", "msg/s",
+            "netdata", "aclk_protobuf_rx_types", NULL, "aclk", NULL, "Received new cloud architecture messages by their type.", "msg/s",
             "netdata", "stats", 200010, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++) {
