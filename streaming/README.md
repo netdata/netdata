@@ -362,13 +362,19 @@ To check if your Netdata Agent has stream compression enabled, run the following
 ```
 Note: The `stream-compression` status can be `"enabled" | "disabled" | "N/A"`.
 
-Stream data compression is enabled by default on systems where LZ4 library v1.9.0+ is installed. A compressed data packet is determined and decompressed on the fly.
+A compressed data packet is determined and decompressed on the fly.
 
 #### Limitations
-The current implementation of streaming data compression has the limitation that the size of single data block transmitted must not exceed 16384 bytes. If single data block size exceeds this limit, stream data compression should be disabled.
+ This limitation will be withdrawn asap and is work-in-progress.
+
+The current implementation of streaming data compression can support only a few number of dimensions in a chart with names that cannot exceed the size of 16384 bytes. In case you experience stream connection problems or gaps in the charts please disable stream compresssion in the `stream.conf` file. This limitation can be seen in the error.log file with the sequence of the following messages: 
+```
+Compression error - data discarded
+Message size above limit:
+```
 
 #### How to enable stream compression
-Netdata Agents are shipped with data compression enabled by default. You can also configure which streams will use compression.
+Netdata Agents are shipped with data compression disabled by default. You can also configure which streams will use compression.
 
 With enabled stream compression, a Netdata Agent can negotiate streaming compression with other Netdata Agents. During the negotiation of streaming compression both Netdata Agents should support and enable compression in order to communicate over a compressed stream. The negotiation will result into an uncompressed stream, if one of the Netdata Agents doesn't support **or** has compression disabled.
 

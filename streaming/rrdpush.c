@@ -41,7 +41,7 @@ struct config stream_config = {
 
 unsigned int default_rrdpush_enabled = 0;
 #ifdef ENABLE_COMPRESSION
-unsigned int default_compression_enabled = 1;
+unsigned int default_compression_enabled = 0;
 #endif
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
