@@ -1521,3 +1521,17 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 
     return value;
 }
+
+char *get_value_from_key(char *buffer, char *key)
+{
+    char *s = NULL, *t = NULL;
+    s = t = buffer + strlen(key) + 2;
+    if (s) {
+        while (*s == '\'')
+            s++;
+        while (*++t != '\0');
+        while (--t > s && *t == '\'')
+            *t = '\0';
+    }
+    return s;
+}

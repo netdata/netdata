@@ -359,20 +359,6 @@ void analytics_alarms_notifications(void)
     buffer_free(b);
 }
 
-char *get_value_from_key(char *buffer, char *key)
-{
-    char *s = NULL, *t = NULL;
-    s = t = buffer + strlen(key) + 2;
-    if (s) {
-        while (*s == '\'')
-            s++;
-        while (*++t != '\0');
-        while (--t > s && *t == '\'')
-            *t = '\0';
-    }
-    return s;
-}
-
 /*
  * Checks for the existence of .install_type file and reads it
  */
