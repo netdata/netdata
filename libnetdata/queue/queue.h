@@ -7,8 +7,8 @@
 		
 typedef struct nodes				
 {
-	void *item;
-	struct nodes *next;			
+    void *item;
+    struct nodes *next;			
 } node;
 
 typedef struct Queues			
