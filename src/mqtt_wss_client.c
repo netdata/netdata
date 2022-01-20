@@ -1067,6 +1067,7 @@ static int mqtt_wss_handle_buffer_growth(mqtt_wss_client client, size_t msg_len)
 
         void *new_buf = mqtt_mq_realloc(&client->mqtt_client->mq, new_size, realloc);
         if (!new_buf) {
+            MQTT_PAL_MUTEX_UNLOCK(&client->mqtt_client->mutex);
             mws_error(client->log, "Realocation failed.");
             return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
         }
