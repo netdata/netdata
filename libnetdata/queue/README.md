@@ -5,7 +5,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/queue
 
 # Queue
 
-Queue is a thread-safe library to hanle queue processes with independent objects.
+Queue is a thread-safe library to handle queue processes with independent objects.
 
 Library includes functions below:
 
