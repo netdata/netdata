@@ -16,10 +16,10 @@ typedef struct Queues
     pthread_cond_t conde;
     pthread_cond_t condf;
     pthread_mutex_t lock;
-	node *front;			
-	node *rear;
-	int max;
-	int count;
+    node *front;			
+    node *rear;
+    int max;
+    int count;
 } Queue;
 
 Queue* initqueue(int max);
