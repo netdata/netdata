@@ -613,12 +613,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             .drop_on_publish_fail = 1
         };
 
-#if defined(ENABLE_NEW_CLOUD_PROTOCOL) && defined(ACLK_NEWARCH_DEVMODE)
-        aclk_use_new_cloud_arch = 1;
-        info("Switching ACLK to new protobuf protocol. Due to #define ACLK_NEWARCH_DEVMODE.");
-#else
         aclk_use_new_cloud_arch = 0;
-#endif
 
 #ifndef ACLK_DISABLE_CHALLENGE
         if (aclk_env) {
@@ -638,20 +633,19 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         if (netdata_exit)
             return 1;
 
-#ifndef ACLK_NEWARCH_DEVMODE
         if (aclk_env->encoding == ACLK_ENC_PROTO) {
 #ifndef ENABLE_NEW_CLOUD_PROTOCOL
             error("Cloud requested New Cloud Protocol to be used but this agent cannot support it!");
             continue;
-#endif
+#else
             if (!aclk_env_has_capa("proto")) {
                 error ("Can't encoding=proto without at least \"proto\" capability.");
                 continue;
             }
             info("Switching ACLK to new protobuf protocol. Due to /env response.");
             aclk_use_new_cloud_arch = 1;
-        }
 #endif
+        }
 
         memset(&auth_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->auth_endpoint, &auth_url)) {
