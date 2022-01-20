@@ -498,7 +498,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
     }
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
-        aclk_proto_tx_msgs_sample[msg_descriptor-rx_msgs]++;
+        aclk_proto_rx_msgs_sample[msg_descriptor-rx_msgs]++;
         ACLK_STATS_UNLOCK;
     }
     if (msg_descriptor->fnc(msg, msg_len)) {

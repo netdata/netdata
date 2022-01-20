@@ -67,7 +67,7 @@ extern struct aclk_metrics_per_sample {
 } aclk_metrics_per_sample;
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-extern uint32_t *aclk_proto_tx_msgs_sample;
+extern uint32_t *aclk_proto_rx_msgs_sample;
 #endif
 
 extern uint32_t *aclk_queries_per_thread;

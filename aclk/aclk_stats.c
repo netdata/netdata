@@ -8,7 +8,7 @@ struct {
     int query_thread_count;
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     unsigned int proto_hdl_cnt;
-    uint32_t *aclk_proto_tx_msgs_sample;
+    uint32_t *aclk_proto_rx_msgs_sample;
     RRDDIM **rx_msg_dims;
 #endif
 } aclk_stats_cfg; // there is only 1 stats thread at a time
@@ -20,7 +20,7 @@ struct aclk_qt_data {
 
 uint32_t *aclk_queries_per_thread = NULL;
 uint32_t *aclk_queries_per_thread_sample = NULL;
-uint32_t *aclk_proto_tx_msgs_sample = NULL;
+uint32_t *aclk_proto_rx_msgs_sample = NULL;
 
 struct aclk_metrics aclk_metrics = {
     .online = 0,
@@ -255,7 +255,7 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 const char *rx_handler_get_name(size_t i);
-static void aclk_stats_newproto_rx(uint32_t *aclk_proto_tx_msgs_sample)
+static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
 {
     static RRDSET *st = NULL;
 
@@ -271,7 +271,7 @@ static void aclk_stats_newproto_rx(uint32_t *aclk_proto_tx_msgs_sample)
         rrdset_next(st);
 
     for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++)
-        rrddim_set_by_pointer(st, aclk_stats_cfg.rx_msg_dims[i], aclk_proto_tx_msgs_sample[i]);
+        rrddim_set_by_pointer(st, aclk_stats_cfg.rx_msg_dims[i], rx_msgs_sample[i]);
 
     rrdset_done(st);
 }
@@ -291,8 +291,8 @@ void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cn
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     aclk_stats_cfg.proto_hdl_cnt = proto_hdl_cnt;
-    aclk_stats_cfg.aclk_proto_tx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_tx_msgs_sample));
-    aclk_proto_tx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_tx_msgs_sample));
+    aclk_stats_cfg.aclk_proto_rx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_rx_msgs_sample));
+    aclk_proto_rx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_rx_msgs_sample));
     aclk_stats_cfg.rx_msg_dims = callocz(proto_hdl_cnt, sizeof(RRDDIM*));
 #endif
 }
@@ -301,8 +301,8 @@ void aclk_stats_thread_cleanup()
 {
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     freez(aclk_stats_cfg.rx_msg_dims);
-    freez(aclk_proto_tx_msgs_sample);
-    freez(aclk_stats_cfg.aclk_proto_tx_msgs_sample);
+    freez(aclk_proto_rx_msgs_sample);
+    freez(aclk_stats_cfg.aclk_proto_rx_msgs_sample);
 #endif
     freez(aclk_qt_data);
     freez(aclk_queries_per_thread);
@@ -335,8 +335,8 @@ void *aclk_stats_main_thread(void *ptr)
         // during database rrd* operations
         memcpy(&per_sample, &aclk_metrics_per_sample, sizeof(struct aclk_metrics_per_sample));
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        memcpy(aclk_stats_cfg.aclk_proto_tx_msgs_sample, aclk_proto_tx_msgs_sample, sizeof(*aclk_proto_tx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
-        memset(aclk_proto_tx_msgs_sample, 0, sizeof(*aclk_proto_tx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
+        memcpy(aclk_stats_cfg.aclk_proto_rx_msgs_sample, aclk_proto_rx_msgs_sample, sizeof(*aclk_proto_rx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
+        memset(aclk_proto_rx_msgs_sample, 0, sizeof(*aclk_proto_rx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
 #endif
         memcpy(&permanent, &aclk_metrics, sizeof(struct aclk_metrics));
         memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
@@ -360,7 +360,7 @@ void *aclk_stats_main_thread(void *ptr)
         aclk_stats_query_time(&per_sample);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        aclk_stats_newproto_rx(aclk_stats_cfg.aclk_proto_tx_msgs_sample);
+        aclk_stats_newproto_rx(aclk_stats_cfg.aclk_proto_rx_msgs_sample);
 #endif
     }
 
