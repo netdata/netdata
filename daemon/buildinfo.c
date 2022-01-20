@@ -207,54 +207,36 @@
 
 #define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
 
-// coverity[ +tainted_string_sanitize_content : arg-0 ]
-static inline void coverity_remove_taint(char *s)
-{
-    (void)s;
-}
+void buildinfo_read_install_type(void) {
+    char *install_type_filename;
 
-void read_install_type(void) {
-    char *filepath;
-    filepath = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 2));
-    sprintf(filepath, "%s/%s", netdata_configured_user_config_dir, ".install-type");
-    FILE *fp = fopen(filepath, "r");
+    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
+    install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
+    snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
 
-    if(fp) {
-        char *line = mallocz(sizeof(char) * (200 + 1));
-        while (fgets(line, 200, fp) != NULL) {
-            char *value = line;
+    FILE *fp = fopen(install_type_filename, "r");
+    if (fp) {
+        char *s, buf[256 + 1];
+        size_t len = 0;
 
-            while (*value && *value != '=') value++;
-
-            if (*value == '=') {
-                *value = '\0';
-                value++;
-                if (*value == '\'' || *value == '\"') value++;
-                char *end = value;
-                while (*end && *end != '\'' && *end != '\"' && *end != '\n') end++;
-                *end = '\0';
-                coverity_remove_taint(line);
-                coverity_remove_taint(value);
-            } else {
-                continue;
-            }
-
-            setenv(line, value, 1);
+        while ((s = fgets_trim_len(buf, 256, fp, &len))) {
+            if (!strncmp(buf, "INSTALL_TYPE='", 14))
+                setenv("NETDATA_INSTALL_TYPE", (char *)get_value_from_key(buf, "INSTALL_TYPE"), 1);
+            else if (!strncmp(buf, "PREBUILT_ARCH='", 15))
+                setenv("NETDATA_PREBUILT_ARCH", (char *)get_value_from_key(buf, "PREBUILT_ARCH"), 1);
+            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
+                setenv("NETDATA_PREBUILT_DISTRO", (char *)get_value_from_key(buf, "PREBUILT_DISTRO"), 1);
         }
         fclose(fp);
-        freez(line);
-    } else {
-        setenv("INSTALL_TYPE", "unknown", 1);
     }
-
-    freez(filepath);
+    freez(install_type_filename);
 }
 
 void print_build_info(void) {
-    read_install_type();
-    char *install_type = getenv("INSTALL_TYPE");
-    char *arch = getenv("PREBUILT_ARCH");
-    char *distro = getenv("PREBUILT_DISTRO");
+    buildinfo_read_install_type();
+    char *install_type = getenv("NETDATA_INSTALL_TYPE");
+    char *arch = getenv("NETDATA_PREBUILT_ARCH");
+    char *distro = getenv("NETDATA_PREBUILT_DISTRO");
 
     if (install_type == NULL) {
         install_type = "unknown";
