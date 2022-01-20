@@ -18,6 +18,7 @@ SUBDIRS = \
     log \
     popen \
     procfile \
+    queue \
     simple_pattern \
     socket \
     statistical \

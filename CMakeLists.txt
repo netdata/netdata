@@ -401,7 +401,9 @@ set(LIBNETDATA_FILES
         libnetdata/socket/security.c
         libnetdata/socket/security.h
         libnetdata/circular_buffer/circular_buffer.c
-        libnetdata/circular_buffer/circular_buffer.h)
+        libnetdata/circular_buffer/circular_buffer.h
+        libnetdata/queue/queue.c
+        libnetdata/queue/queue.h)
 
 IF(ENABLE_PLUGIN_EBPF)
     list(APPEND LIBNETDATA_FILES

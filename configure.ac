@@ -1751,6 +1751,7 @@ AC_CONFIG_FILES([
     libnetdata/log/Makefile
     libnetdata/popen/Makefile
     libnetdata/procfile/Makefile
+    libnetdata/queue/Makefile
     libnetdata/simple_pattern/Makefile
     libnetdata/socket/Makefile
     libnetdata/statistical/Makefile
