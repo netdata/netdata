@@ -38,6 +38,7 @@ Additionally, the following build time features require additional dependencies:
     -   A recent version of CMake
     -   OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
     -   JSON-C (may be provided by the user as shown below, or by the system)
+    -   protobuf (Google Protocol Buffers) and protoc compiler
 
 ## Preparing the source tree
 
