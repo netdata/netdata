@@ -14,7 +14,24 @@ void sender_start(struct sender_state *s) {
 }
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
-static inline void deactivate_compression(struct sender_state *s);
+
+#ifdef ENABLE_COMPRESSION
+/*
+* In case of stream compression buffer oveflow
+* Inform the user through the error log file and 
+* deactivate compression by downgrading the stream protocol.
+*/
+static inline void deactivate_compression(struct sender_state *s)
+{
+    error("STREAM_COMPRESSION: Deactivating compression to avoid stream corruption");
+    default_compression_enabled = 0;
+    s->rrdpush_compression = 0;
+    s->version = STREAM_VERSION_CLABELS;
+    error("STREAM_COMPRESSION %s [send to %s]: Restarting connection without compression", s->host->hostname, s->connected_to);
+    rrdpush_sender_thread_close_socket(s->host);
+}
+#endif
+
 // Collector thread finishing a transmission
 void sender_commit(struct sender_state *s) {
     char *src = (char *)buffer_tostring(s->host->sender->build);
@@ -25,16 +42,16 @@ void sender_commit(struct sender_state *s) {
             if (s->compressor && s->rrdpush_compression) {
                 src_len = s->compressor->compress(s->compressor, src, src_len, &src);
                 if (!src_len) {
-                    // error("Compression error - data discarded");
                     info("SRC: %s", src);
-                    // if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
-                    //     s->overflow = 1;
                     deactivate_compression(s);
                     break;
                 }
             }
             if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+            {
+                info("STREAM_COMPRESSION: Sending with compression...");
                 s->overflow = 1;
+            }
         }
     } while (0);
 #else
@@ -169,20 +186,7 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
     if (se->kernel_version)
         freez(se->kernel_version);
 }
-/*
-* In case of stream compression buffer oveflow
-* Inform the user through the error log file and 
-* deactivate compression by downgrading the stream protocol.
-*/
-static inline void deactivate_compression(struct sender_state *s)
-{
-    error("Stream Compression Failed: Deactivating compression because it does not behaving properly!");
-    s->rrdpush_compression = 0;
-    s->version = STREAM_VERSION_CLABELS;
-    default_compression_enabled = 0;
-    error("STREAM_COMPRESSION %s [send to %s]: Restarting connection without compression", s->host->hostname, s->connected_to);
-    rrdpush_sender_thread_close_socket(s->host);
-}
+
 static inline long int parse_stream_version(RRDHOST *host, char *http)
 {
     long int stream_version = -1;
@@ -300,7 +304,7 @@ if(!s->rrdpush_compression)
                  "&ml_capable=%d"
                  "&ml_enabled=%d"
                  "&tags=%s"
-                 "&ver=%u"
+                 "&ver=%d"
                  "&NETDATA_SYSTEM_OS_NAME=%s"
                  "&NETDATA_SYSTEM_OS_ID=%s"
                  "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -430,6 +434,7 @@ if(!s->rrdpush_compression)
     int32_t version = (int32_t)parse_stream_version(host, http);
     if(version == -1) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
+        // error("Message sent is [%s]", http);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
