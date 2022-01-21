@@ -152,7 +152,7 @@ Number of charts depends on mongodb version, storage engine and other features (
 
     -   member (time when last heartbeat was received from replica set member)
 
-## prerequisite
+## Prerequisite
 
 Create a read-only user for Netdata in the admin database.
 
