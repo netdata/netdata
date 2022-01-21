@@ -332,9 +332,10 @@ With the introduction of TLS/SSL, the parent-child communication behaves as show
 | Yes|-/force/optional|Yes|yes|The parent-child stream is encrypted.|
 
 ### Streaming compression
-<a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/badge/Supported%20Netdata%20Agent-v1.33%2B-brightgreen" alt="Supported version Netdata agent release"></a>
 
-<a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/badge/Supported%20Netdata%20stream%20version-v5%2B-blue" alt="Supported version Netdata agent release"></a>
+[![Supported version Netdata Agent release](https://img.shields.io/badge/Supported%20Netdata%20Agent-v1.33%2B-brightgreen)](https://github.com/netdata/netdata/releases/latest)
+
+[![Supported version Netdata Agent release](https://img.shields.io/badge/Supported%20Netdata%20stream%20version-v5%2B-blue)](https://github.com/netdata/netdata/releases/latest)
 
 #### OS dependencies
 * Streaming compression is based on [lz4 v1.9.0+](https://github.com/lz4/lz4). The [lz4 v1.9.0+](https://github.com/lz4/lz4) library must be installed in your OS in order to enable streaming compression. Any lower version will disable Netdata streaming compression for compatibility purposes between the older versions of Netdata agents.
