@@ -371,7 +371,7 @@ void analytics_get_install_type(void)
     }
 
     if (t.prebuilt_distro != NULL) {
-        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, t.install_type);
+        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, t.prebuilt_distro);
     }
 
     freez(t.prebuilt_arch);
