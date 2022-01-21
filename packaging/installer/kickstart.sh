@@ -845,7 +845,7 @@ try_package_install() {
       pkg_vsep="_"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
-      uninstall_subcmd="uninstall"
+      uninstall_subcmd="purge"
       INSTALL_TYPE="binpkg-deb"
       ;;
     ubuntu)
@@ -858,7 +858,7 @@ try_package_install() {
       pkg_vsep="_"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
-      uninstall_subcmd="uninstall"
+      uninstall_subcmd="purge"
       INSTALL_TYPE="binpkg-deb"
       ;;
     centos)
