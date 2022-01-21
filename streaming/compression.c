@@ -56,8 +56,8 @@ static void lz4_compressor_destroy(struct compressor_state **state)
 
 /*
  * Compress the given block of data
- * Comprecced data will remain in the internal buffer until the next invokation
- * Return the size of compressed data block as result and the pointer to internal buffer  using the last argument
+ * Compressed data will remain in the internal buffer until the next invocation
+ * Return the size of compressed data block as result and the pointer to internal buffer using the last argument
  * or 0 in case of error
  */
 static size_t lz4_compressor_compress(struct compressor_state *state, const char *data, size_t size, char **out)
@@ -84,7 +84,7 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
             state->data->stream_buffer + state->data->stream_buffer_pos,
             state->buffer + SIGNATURE_SIZE, size, max_dst_size, 1);
     if (compressed_data_size < 0) {
-        error("Date compression error: %ld", compressed_data_size);
+        error("Data compression error: %ld", compressed_data_size);
         return 0;
     }
     state->data->stream_buffer_pos += size;
