@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Docs Bugfix: Fixed Markdown formatting [\#12026](https://github.com/netdata/netdata/pull/12026) ([kickoke](https://github.com/kickoke))
+- update README [\#12024](https://github.com/netdata/netdata/pull/12024) ([cboydstun](https://github.com/cboydstun))
 - \[Stream Compression\] - Compressor buffer overflow causes stream corruption. [\#12019](https://github.com/netdata/netdata/pull/12019) ([odynik](https://github.com/odynik))
 - mqtt\_websockets submodule to latest master \(fix \#12011\) [\#12015](https://github.com/netdata/netdata/pull/12015) ([underhood](https://github.com/underhood))
 - Remove uncessary call [\#12014](https://github.com/netdata/netdata/pull/12014) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -13,6 +15,7 @@
 - Remove internal dbengine header from spawn/spawn\_client.c [\#12009](https://github.com/netdata/netdata/pull/12009) ([vkalintiris](https://github.com/vkalintiris))
 - Fix typo in the dashboard\_info.js spigot part [\#12008](https://github.com/netdata/netdata/pull/12008) ([lokerhp](https://github.com/lokerhp))
 - Add support for NVME disks with blkext driver [\#12007](https://github.com/netdata/netdata/pull/12007) ([ralphm](https://github.com/ralphm))
+- Fix cleanup from a failed DEB install. [\#12006](https://github.com/netdata/netdata/pull/12006) ([Ferroin](https://github.com/Ferroin))
 - update go.d.plugin version to v0.31.2 [\#12005](https://github.com/netdata/netdata/pull/12005) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of static archive selection for installs. [\#12004](https://github.com/netdata/netdata/pull/12004) ([Ferroin](https://github.com/Ferroin))
 - fix\(python.d.plugin\): prefer python3 if available [\#12001](https://github.com/netdata/netdata/pull/12001) ([ilyam8](https://github.com/ilyam8))
