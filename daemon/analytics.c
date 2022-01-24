@@ -601,6 +601,12 @@ void analytics_gather_alert_data() {
     if(unlikely(!localhost->health_enabled))
         return;
 
+    int stock_enabled = (int)config_get_boolean(CONFIG_SECTION_HEALTH, "enable stock health configuration",
+                                                CONFIG_BOOLEAN_YES);
+
+    if (unlikely(!stock_enabled))
+        return;
+
     BUFFER *b = buffer_create(32768);
 
     if (unlikely(!start))

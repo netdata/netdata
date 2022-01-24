@@ -969,16 +969,16 @@ void write_alert_analytics(BUFFER *b, char *name, time_t in_clear, uint8_t t_in_
     buffer_strcat(b, "\t\t\t\t}");
 }
 
-#define SQL_GET_ALERT_ANALYTICS(guid, start, guid2, start2, end) "SELECT name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id FROM health_log_%s \
-where source like '%%usr/lib/netdata/conf.d/health.d/%%' \
+#define SQL_GET_ALERT_ANALYTICS(guid, dir, start, guid2, dir2, start2, end) "SELECT name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id FROM health_log_%s \
+where source like '%%%s%%' \
 and when_key < %ld \
 group by name, chart \
 having max(alarm_event_id) \
 UNION ALL \
 SELECT name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id FROM health_log_%s \
-where source like '%%usr/lib/netdata/conf.d/health.d/%%' \
+where source like '%%%s%%' \
 and (when_key >= %ld and when_key < %ld) \
-order by name, chart, when_key; ", guid, start, guid2, start2, end
+order by name, chart, when_key; ", guid, dir, start, guid2, dir2, start2, end
 int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) {
     sqlite3_stmt *res = NULL;
     int rc, cnt = 0;
@@ -1004,7 +1004,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_GET_ALERT_ANALYTICS(uuid_str, start, uuid_str, start, end));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_GET_ALERT_ANALYTICS(uuid_str, health_stock_config_dir(), start, uuid_str, health_stock_config_dir(), start, end));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
