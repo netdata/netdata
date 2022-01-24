@@ -55,14 +55,14 @@ EOF
 echo "${REQ_BODY}" > /tmp/alert_statistics.json
 
 # send the anonymous statistics to the Netdata PostHog
-# if [ -n "$(command -v curl 2> /dev/null)" ]; then
-#   curl --silent -o /dev/null --write-out '%{http_code}' -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" https://posthog.netdata.cloud/capture/
-# else
-#   wget -q -O - --no-check-certificate \
-#   --server-response \
-#   --method POST \
-#   --timeout=1 \
-#   --header 'Content-Type: application/json' \
-#   --body-data "${REQ_BODY}" \
-#    'https://posthog.netdata.cloud/capture/' 2>&1 | awk '/^  HTTP/{print $2}'
-# fi
+if [ -n "$(command -v curl 2> /dev/null)" ]; then
+  curl --silent -o /dev/null --write-out '%{http_code}' -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" https://posthog.netdata.cloud/capture/
+else
+  wget -q -O - --no-check-certificate \
+  --server-response \
+  --method POST \
+  --timeout=1 \
+  --header 'Content-Type: application/json' \
+  --body-data "${REQ_BODY}" \
+   'https://posthog.netdata.cloud/capture/' 2>&1 | awk '/^  HTTP/{print $2}'
+fi

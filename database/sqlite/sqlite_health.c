@@ -943,9 +943,8 @@ int alert_hash_and_store_config(
     return 1;
 }
 
-void write_alert_analytics(BUFFER *b, char *name, time_t in_clear, uint8_t t_in_clear, uint8_t n_in_clear, time_t in_warn, uint8_t t_in_warn, uint8_t n_in_warn, time_t in_crit, uint8_t t_in_crit, uint8_t n_in_crit, uint8_t no_of_alerts, BUFFER *db_entries) {
+void write_alert_analytics(BUFFER *b, char *name, time_t in_clear, uint8_t t_in_clear, uint8_t n_in_clear, time_t in_warn, uint8_t t_in_warn, uint8_t n_in_warn, time_t in_crit, uint8_t t_in_crit, uint8_t n_in_crit, uint8_t no_of_alerts) {
     buffer_sprintf(b, "\t\t\t\t\"%s\": {\n", name);
-    buffer_sprintf(b, "\t\t\t\t\"db_entries\": [ %s\n ],\n", buffer_tostring(db_entries));
     buffer_sprintf(b, "\t\t\t\t\"num_of_alerts\": %d,\n", no_of_alerts);
 
     buffer_strcat(b, "\t\t\t\t\t\"CLEAR\": {\n");
@@ -984,15 +983,12 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
     int rc, cnt = 0;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    BUFFER *db_entries = buffer_create(10000);
-
     char *name, *chart, *curr_alert = NULL, *curr_chart = NULL;
     time_t in_clear = 0, in_warn = 0, in_crit = 0, in_other = 0, total_range = 0, range = 0;
     uint8_t t_in_clear = 0, t_in_warn = 0, t_in_crit = 0, t_in_other = 0;
     uint8_t n_in_clear = 0, n_in_warn = 0, n_in_crit = 0;
     uint8_t no_of_alerts = 0, chart_change = 0;
     time_t when, exec_run_timestamp;
-    int db_entries_c=0;
     RRDCALC_STATUS status, last_status = RRDCALC_STATUS_UNDEFINED;
 
     if (unlikely(!db_meta)) {
@@ -1028,7 +1024,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
         }
 
         if (strcmp(name, curr_alert)){
-            write_alert_analytics(b, curr_alert, in_clear, t_in_clear, n_in_clear, in_warn, t_in_warn, n_in_warn, in_crit, t_in_crit, n_in_crit, no_of_alerts, db_entries);
+            write_alert_analytics(b, curr_alert, in_clear, t_in_clear, n_in_clear, in_warn, t_in_warn, n_in_warn, in_crit, t_in_crit, n_in_crit, no_of_alerts);
             buffer_strcat(b, ",\n");
 
             in_other = total_range;
@@ -1040,12 +1036,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
             chart_change = 1;
             curr_alert = name;
             curr_chart = chart;
-            buffer_reset(db_entries);
-            db_entries_c = 0;
         }
-
-        if (db_entries_c)
-            buffer_sprintf(db_entries, ",\n");
 
          if (strcmp(chart, curr_chart)) {
             curr_chart = chart;
@@ -1082,8 +1073,6 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     t_in_other++;
                     last_status = RRDCALC_STATUS_UNDEFINED;
                 }
-            buffer_sprintf(db_entries, "{ \"name\": \"%s\", \"chart\": \"%s\", \"status\": \"%s\", \"when\": %ld, \"notification\": %ld, \"after_start\": %s, \"in_other\": %ld, \"in_clear\": %ld, \"in_warn\": %ld, \"in_crit\": %ld }", curr_alert, curr_chart, rrdcalc_status2string(status), when, exec_run_timestamp, "false", in_other, in_clear, in_warn, in_crit);
-            db_entries_c++;
             cnt = 1;
             continue;
         }
@@ -1193,15 +1182,13 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     last_status = RRDCALC_STATUS_UNDEFINED;
                     t_in_other++;
                 }
-            buffer_sprintf(db_entries, "{ \"name\": \"%s\", \"chart\": \"%s\", \"status\": \"%s\", \"when\": %ld, \"notification\": %ld, \"after_start\": %s, \"in_other\": %ld, \"in_clear\": %ld, \"in_warn\": %ld, \"in_crit\": %ld }", curr_alert, curr_chart, rrdcalc_status2string(status), when, exec_run_timestamp, "true", in_other, in_clear, in_warn, in_crit);
-            db_entries_c++;
             cnt = 1;
             continue;
         }
    }
 
     if (likely(cnt)) {
-        write_alert_analytics(b, curr_alert, in_clear, t_in_clear, n_in_clear, in_warn, t_in_warn, n_in_warn, in_crit, t_in_crit, n_in_crit, no_of_alerts, db_entries);
+        write_alert_analytics(b, curr_alert, in_clear, t_in_clear, n_in_clear, in_warn, t_in_warn, n_in_warn, in_crit, t_in_crit, n_in_crit, no_of_alerts);
     }
 
     rc = sqlite3_finalize(res);

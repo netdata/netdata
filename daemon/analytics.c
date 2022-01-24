@@ -661,7 +661,7 @@ void *analytics_main(void *ptr)
 
     analytics_gather_immutable_meta_data();
     analytics_gather_mutable_meta_data();
-    /* send_statistics("META_START", "-", "-"); */
+    send_statistics("META_START", "-", "-");
     analytics_log_data();
 
     sec = 0;
@@ -676,7 +676,7 @@ void *analytics_main(void *ptr)
             continue;
 
         analytics_gather_mutable_meta_data();
-        /* send_statistics("META", "-", "-"); */
+        send_statistics("META", "-", "-");
         analytics_log_data();
         analytics_gather_alert_data();
         sec = 0;
