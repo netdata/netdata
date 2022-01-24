@@ -7,6 +7,8 @@
 
 #include "mqtt_wss_client.h"
 
+#include "aclk_query_queue.h"
+
 extern pthread_cond_t query_cond_wait;
 extern pthread_mutex_t query_lock_wait;
 #define QUERY_THREAD_WAKEUP pthread_cond_signal(&query_cond_wait)
@@ -28,5 +30,7 @@ struct aclk_query_threads {
 
 void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss_client client);
 void aclk_query_threads_cleanup(struct aclk_query_threads *query_threads);
+
+const char *aclk_query_get_name(aclk_query_type_t qt);
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H

@@ -2,6 +2,8 @@
 
 #include "aclk_stats.h"
 
+#include "aclk_query.h"
+
 netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
 int query_thread_count;
@@ -113,39 +115,21 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
 static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st = NULL;
-    static RRDDIM *rd_type_http = NULL;
-    static RRDDIM *rd_type_alarm_upd = NULL;
-    static RRDDIM *rd_type_metadata_info = NULL;
-    static RRDDIM *rd_type_metadata_alarms = NULL;
-    static RRDDIM *rd_type_chart_new = NULL;
-    static RRDDIM *rd_type_chart_del = NULL;
-    static RRDDIM *rd_type_register_node = NULL;
-    static RRDDIM *rd_type_node_upd = NULL;
+    static RRDDIM *dims[ACLK_QUERY_TYPE_COUNT];
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_processed_query_type", NULL, "aclk", NULL, "Query thread commands processed by their type", "cmd/s",
             "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rd_type_http = rrddim_add(st, "http", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_alarm_upd = rrddim_add(st, "alarm update", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_metadata_info = rrddim_add(st, "info metadata", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_metadata_alarms = rrddim_add(st, "alarms metadata", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_chart_new = rrddim_add(st, "chart new", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_chart_del = rrddim_add(st, "chart delete", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_register_node = rrddim_add(st, "register node", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_node_upd = rrddim_add(st, "node update", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
+            dims[i] = rrddim_add(st, aclk_query_get_name(i), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+
     } else
         rrdset_next(st);
 
-    rrddim_set_by_pointer(st, rd_type_http, per_sample->query_type_http);
-    rrddim_set_by_pointer(st, rd_type_alarm_upd, per_sample->query_type_alarm_upd);
-    rrddim_set_by_pointer(st, rd_type_metadata_info, per_sample->query_type_metadata_info);
-    rrddim_set_by_pointer(st, rd_type_metadata_alarms, per_sample->query_type_metadata_alarms);
-    rrddim_set_by_pointer(st, rd_type_chart_new, per_sample->query_type_chart_new);
-    rrddim_set_by_pointer(st, rd_type_chart_del, per_sample->query_type_chart_del);
-    rrddim_set_by_pointer(st, rd_type_register_node, per_sample->query_type_register_node);
-    rrddim_set_by_pointer(st, rd_type_node_upd, per_sample->query_type_node_upd);
+    for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
+        rrddim_set_by_pointer(st, dims[i], per_sample->queries_per_type[i]);
 
     rrdset_done(st);
 }
