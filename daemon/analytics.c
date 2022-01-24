@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "buildinfo.h"
 
 struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
@@ -359,47 +360,23 @@ void analytics_alarms_notifications(void)
     buffer_free(b);
 }
 
-char *get_value_from_key(char *buffer, char *key)
-{
-    char *s = NULL, *t = NULL;
-    s = t = buffer + strlen(key) + 2;
-    if (s) {
-        while (*s == '\'')
-            s++;
-        while (*++t != '\0');
-        while (--t > s && *t == '\'')
-            *t = '\0';
-    }
-    return s;
-}
-
-/*
- * Checks for the existence of .install_type file and reads it
- */
 void analytics_get_install_type(void)
 {
-    char *install_type_filename;
-    analytics_set_data_str(&analytics_data.netdata_install_type, "");
-    analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, "");
+    struct install_type_info t = get_install_type();
 
-    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
-    install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
-    snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
-
-    FILE *fp = fopen(install_type_filename, "r");
-    if (fp) {
-        char *s, buf[256 + 1];
-        size_t len = 0;
-
-        while ((s = fgets_trim_len(buf, 256, fp, &len))) {
-            if (!strncmp(buf, "INSTALL_TYPE='", 14))
-                analytics_set_data_str(&analytics_data.netdata_install_type, (char *)get_value_from_key(buf, "INSTALL_TYPE"));
-            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
-                analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, (char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
-        }
-        fclose(fp);
+    if (t.install_type == NULL) {
+        analytics_set_data_str(&analytics_data.netdata_install_type, "unknown");
+    } else {
+        analytics_set_data_str(&analytics_data.netdata_install_type, t.install_type);
     }
-    freez(install_type_filename);
+
+    if (t.prebuilt_distro != NULL) {
+        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, t.prebuilt_distro);
+    }
+
+    freez(t.prebuilt_arch);
+    freez(t.prebuilt_distro);
+    freez(t.install_type);
 }
 
 /*

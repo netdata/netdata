@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "./config.h"
 #include "common.h"
+#include "buildinfo.h"
 
 // Optional features
 
@@ -207,8 +208,70 @@
 
 #define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
 
+
+char *get_value_from_key(char *buffer, char *key) {
+    char *s = NULL, *t = NULL;
+    s = t = buffer + strlen(key) + 2;
+    if (s) {
+        while (*s == '\'')
+            s++;
+        while (*++t != '\0');
+        while (--t > s && *t == '\'')
+            *t = '\0';
+    }
+    return s;
+}
+
+struct install_type_info get_install_type() {
+    char *install_type_filename;
+    struct install_type_info ret = {.install_type = NULL, .prebuilt_arch = NULL, .prebuilt_distro = NULL};
+
+    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
+    install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
+    snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
+
+    FILE *fp = fopen(install_type_filename, "r");
+    if (fp) {
+        char *s, buf[256 + 1];
+        size_t len = 0;
+
+        while ((s = fgets_trim_len(buf, 256, fp, &len))) {
+            if (!strncmp(buf, "INSTALL_TYPE='", 14))
+                ret.install_type = strdupz((char *)get_value_from_key(buf, "INSTALL_TYPE"));
+            else if (!strncmp(buf, "PREBUILT_ARCH='", 15))
+                ret.prebuilt_arch = strdupz((char *)get_value_from_key(buf, "PREBUILT_ARCH"));
+            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
+                ret.prebuilt_distro = strdupz((char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
+        }
+        fclose(fp);
+    }
+    freez(install_type_filename);
+
+    return ret;
+}
+
 void print_build_info(void) {
+    struct install_type_info t = get_install_type();
+
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
+
+    if (t.install_type == NULL) {
+        printf("Install type: unknown\n");
+    } else {
+        printf("Install type: %s\n", t.install_type);
+    }
+
+    if (t.prebuilt_arch != NULL) {
+        printf("    Binary architecture: %s\n", t.prebuilt_arch);
+    }
+
+    if (t.prebuilt_distro != NULL) {
+        printf("    Packaging distro: %s\n", t.prebuilt_distro);
+    }
+
+    freez(t.install_type);
+    freez(t.prebuilt_arch);
+    freez(t.prebuilt_distro);
 
     printf("Features:\n");
     printf("    dbengine:                   %s\n", FEAT_YES_NO(FEAT_DBENGINE));
@@ -249,7 +312,6 @@ void print_build_info(void) {
     printf("    MongoDB:                 %s\n", FEAT_YES_NO(FEAT_MONGO));
     printf("    Prometheus Remote Write: %s\n", FEAT_YES_NO(FEAT_REMOTE_WRITE));
 };
-
 
 #define FEAT_JSON_BOOL(x) ((x) ? "true" : "false")
 // This intentionally does not use JSON-C so it works even if JSON-C is not present
