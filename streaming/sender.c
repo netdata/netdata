@@ -48,10 +48,9 @@ void sender_commit(struct sender_state *s) {
                 }
             }
             if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
-            {
-                info("STREAM_COMPRESSION: Sending with compression...");
                 s->overflow = 1;
-            }
+            else
+                (s->rrdpush_compression)?info("STREAM_COMPRESSION: Sending YES compression..."):info("STREAM_COMPRESSION: Sending NO compression...");
         }
     } while (0);
 #else

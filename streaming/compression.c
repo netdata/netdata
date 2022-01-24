@@ -67,7 +67,7 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
     if (!state || !size || !out)
         return 0;
     if (size > LZ4_MAX_MSG_SIZE) {
-        error("%s: Compression Failed - Message size %lu above compression buffer limit: %lu", STREAM_COMPRESSION_MSG, size, LZ4_MAX_MSG_SIZE);
+        error("%s: Compression Failed - Message size %lu above compression buffer limit: %d", STREAM_COMPRESSION_MSG, size, LZ4_MAX_MSG_SIZE);
         return 0;
     }
     size_t max_dst_size = LZ4_COMPRESSBOUND(size);
