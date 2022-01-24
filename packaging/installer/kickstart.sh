@@ -751,7 +751,7 @@ claim() {
 pkg_installed() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
-      dpkg -l "${1}" > /dev/null 2>&1
+      dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
       return $?
       ;;
     centos|fedora|opensuse)
