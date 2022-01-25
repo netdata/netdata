@@ -12,6 +12,7 @@
 - mqtt\_websockets submodule to latest master \(fix \#12011\) [\#12015](https://github.com/netdata/netdata/pull/12015) ([underhood](https://github.com/underhood))
 - Remove uncessary call [\#12014](https://github.com/netdata/netdata/pull/12014) ([thiagoftsm](https://github.com/thiagoftsm))
 - Updated idlejitter-plugin docs [\#12012](https://github.com/netdata/netdata/pull/12012) ([kickoke](https://github.com/kickoke))
+- Add install type info to `-W buildinfo` output. [\#12010](https://github.com/netdata/netdata/pull/12010) ([Ferroin](https://github.com/Ferroin))
 - Remove internal dbengine header from spawn/spawn\_client.c [\#12009](https://github.com/netdata/netdata/pull/12009) ([vkalintiris](https://github.com/vkalintiris))
 - Fix typo in the dashboard\_info.js spigot part [\#12008](https://github.com/netdata/netdata/pull/12008) ([lokerhp](https://github.com/lokerhp))
 - Add support for NVME disks with blkext driver [\#12007](https://github.com/netdata/netdata/pull/12007) ([ralphm](https://github.com/ralphm))
