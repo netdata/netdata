@@ -37,22 +37,22 @@ void sender_commit(struct sender_state *s) {
     char *src = (char *)buffer_tostring(s->host->sender->build);
     size_t src_len = s->host->sender->build->len;
 #ifdef ENABLE_COMPRESSION
-    do {
-        if (src && src_len) {
-            if (s->compressor && s->rrdpush_compression) {
-                src_len = s->compressor->compress(s->compressor, src, src_len, &src);
-                if (!src_len) {
-                    info("SRC: %s", src);
-                    deactivate_compression(s);
-                    break;
-                }
+    if (src && src_len) {
+        if (s->compressor && s->rrdpush_compression) {
+            src_len = s->compressor->compress(s->compressor, src, src_len, &src);
+            if (!src_len) {
+                info("SRC: %s", src);
+                deactivate_compression(s);
+                buffer_flush(s->build);
+                netdata_mutex_unlock(&s->mutex);
+                return;
             }
-            if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
-                s->overflow = 1;
-            else
-                (s->rrdpush_compression)?info("STREAM_COMPRESSION: Sending YES compression..."):info("STREAM_COMPRESSION: Sending NO compression...");
         }
-    } while (0);
+        if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+            s->overflow = 1;
+        else
+            (s->rrdpush_compression)?info("STREAM_COMPRESSION: Sending YES compression..."):info("STREAM_COMPRESSION: Sending NO compression...");
+    }
 #else
     if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
         s->overflow = 1;
