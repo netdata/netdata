@@ -356,7 +356,7 @@ download() {
   url="${1}"
   dest="${2}"
   if command -v curl > /dev/null 2>&1; then
-    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
+    run curl --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     run wget -T 15 -O "${dest}" "${url}" || return 1
   else
