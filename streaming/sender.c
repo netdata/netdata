@@ -41,7 +41,6 @@ void sender_commit(struct sender_state *s) {
         if (s->compressor && s->rrdpush_compression) {
             src_len = s->compressor->compress(s->compressor, src, src_len, &src);
             if (!src_len) {
-                info("SRC: %s", src);
                 deactivate_compression(s);
                 buffer_flush(s->build);
                 netdata_mutex_unlock(&s->mutex);
@@ -50,8 +49,6 @@ void sender_commit(struct sender_state *s) {
         }
         if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
             s->overflow = 1;
-        else
-            (s->rrdpush_compression)?info("STREAM_COMPRESSION: Sending YES compression..."):info("STREAM_COMPRESSION: Sending NO compression...");
     }
 #else
     if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
@@ -433,7 +430,6 @@ if(!s->rrdpush_compression)
     int32_t version = (int32_t)parse_stream_version(host, http);
     if(version == -1) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
-        // error("Message sent is [%s]", http);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
