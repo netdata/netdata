@@ -794,26 +794,26 @@ int main(int argc, char **argv) {
                         }
 
                         if(strcmp(optarg, "unittest") == 0) {
-/*                             if(unit_test_buffer()) return 1; */
-/*                             if(unit_test_str2ld()) return 1; */
-/*                             // No call to load the config file on this code-path */
-/*                             post_conf_load(&user); */
-/*                             get_netdata_configured_variables(); */
-/*                             default_rrd_update_every = 1; */
-/*                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM; */
-/*                             default_health_enabled = 0; */
-/*                             registry_init(); */
-/*                             if(rrd_init("unittest", NULL)) { */
-/*                                 fprintf(stderr, "rrd_init failed for unittest\n"); */
-/*                                 return 1; */
-/*                             } */
-/*                             default_rrdpush_enabled = 0; */
-/*                             if(run_all_mockup_tests()) return 1; */
-/*                             if(unit_test_storage()) return 1; */
-/* #ifdef ENABLE_DBENGINE */
-/*                             if(test_dbengine()) return 1; */
-/* #endif */
-/*                             if(test_sqlite()) return 1; */
+                            if(unit_test_buffer()) return 1;
+                            if(unit_test_str2ld()) return 1;
+                            // No call to load the config file on this code-path
+                            post_conf_load(&user);
+                            get_netdata_configured_variables();
+                            default_rrd_update_every = 1;
+                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+                            default_health_enabled = 0;
+                            registry_init();
+                            if(rrd_init("unittest", NULL)) {
+                                fprintf(stderr, "rrd_init failed for unittest\n");
+                                return 1;
+                            }
+                            default_rrdpush_enabled = 0;
+                            if(run_all_mockup_tests()) return 1;
+                            if(unit_test_storage()) return 1;
+#ifdef ENABLE_DBENGINE
+                            if(test_dbengine()) return 1;
+#endif
+                            if(test_sqlite()) return 1;
                             if(test_sql_alert_stats()) return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;

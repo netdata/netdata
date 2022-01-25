@@ -983,7 +983,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
     int rc, cnt = 0;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    char *name, *chart, *curr_alert = NULL, *curr_chart = NULL;
+    char *name = NULL, *chart = NULL, *curr_alert = NULL, *curr_chart = NULL;
     time_t in_clear = 0, in_warn = 0, in_crit = 0, in_other = 0, total_range = 0, range = 0;
     uint8_t t_in_clear = 0, t_in_warn = 0, t_in_crit = 0, t_in_other = 0;
     uint8_t n_in_clear = 0, n_in_warn = 0, n_in_crit = 0;
@@ -1017,8 +1017,8 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
         exec_run_timestamp = (time_t) sqlite3_column_int64(res, 4);
 
         if (!curr_alert) {
-            curr_alert = name;
-            curr_chart = chart;
+            curr_alert = strdupz(name);
+            curr_chart = strdupz(chart);
             in_other = total_range;
             chart_change = 1;
         }
@@ -1034,12 +1034,15 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
             n_in_clear = n_in_warn = n_in_crit = 0;
             no_of_alerts = 0;
             chart_change = 1;
-            curr_alert = name;
-            curr_chart = chart;
+            freez(curr_alert);
+            freez(curr_chart);
+            curr_alert = strdupz(name);
+            curr_chart = strdupz(chart);
         }
 
-         if (strcmp(chart, curr_chart)) {
-            curr_chart = chart;
+        if (strcmp(chart, curr_chart)) {
+            freez(curr_chart);
+            curr_chart = strdupz(chart);
             chart_change = 1;
             last_status = RRDCALC_STATUS_UNDEFINED;
         }
@@ -1074,6 +1077,8 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     last_status = RRDCALC_STATUS_UNDEFINED;
                 }
             cnt = 1;
+            freez(name);
+            freez(chart);
             continue;
         }
 
@@ -1183,6 +1188,8 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     t_in_other++;
                 }
             cnt = 1;
+            freez(name);
+            freez(chart);
             continue;
         }
    }
@@ -1190,6 +1197,9 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
     if (likely(cnt)) {
         write_alert_analytics(b, curr_alert, in_clear, t_in_clear, n_in_clear, in_warn, t_in_warn, n_in_warn, in_crit, t_in_crit, n_in_crit, no_of_alerts);
     }
+
+    freez(curr_alert);
+    freez(curr_chart);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
