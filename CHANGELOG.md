@@ -1,11 +1,12 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.33.0](https://github.com/netdata/netdata/tree/v1.33.0) (2022-01-26)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/1.32.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/1.32.1...v1.33.0)
 
 **Merged pull requests:**
 
+- Re-instate plugins\_action for clabels [\#12039](https://github.com/netdata/netdata/pull/12039) ([MrZammler](https://github.com/MrZammler))
 - Have cURL properly fail on non-2xx status codes in the installer. [\#12038](https://github.com/netdata/netdata/pull/12038) ([Ferroin](https://github.com/Ferroin))
 - Docs Bugfix: Fixed Markdown formatting [\#12026](https://github.com/netdata/netdata/pull/12026) ([kickoke](https://github.com/kickoke))
 - update README [\#12024](https://github.com/netdata/netdata/pull/12024) ([cboydstun](https://github.com/cboydstun))
