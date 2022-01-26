@@ -129,7 +129,6 @@ static int
         max_fds_cache_seconds = 60,
 #endif
         enable_detailed_uptime_charts = 0,
-        show_empty_groups = 0,
         enable_users_charts = 1,
         enable_groups_charts = 1,
         include_exited_childs = 1;
@@ -3508,7 +3507,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "processes", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && (w->processes || show_empty_groups)))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->processes);
     }
     send_END();
@@ -3949,11 +3948,6 @@ static void parse_args(int argc, char **argv)
             enable_detailed_uptime_charts = 1;
             continue;
         }
-        
-        if(strcmp("show-empty-groups", argv[i]) == 0) {
-            show_empty_groups = 1;
-            continue;
-        }
 
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
@@ -3989,10 +3983,6 @@ static void parse_args(int argc, char **argv)
                     " without-groups         disable reporting per user group charts\n"
                     "\n"
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
-                    "\n"
-                    " show-empty-groups      enable reporting the number of processes\n"
-                    "                        for all configured groups, even if they\n"
-                    "                        do not contain any active processes\n"
                     "\n"
 #ifndef __FreeBSD__
                     " fds-cache-secs N       cache the files of processed for N seconds\n"
