@@ -834,6 +834,9 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->container);
         freez(system_info->container_detection);
         freez(system_info->is_k8s_node);
+        freez(system_info->install_type);
+        freez(system_info->prebuilt_arch);
+        freez(system_info->prebuilt_dist);
         freez(system_info);
     }
 }
