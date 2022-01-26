@@ -3500,14 +3500,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(unlikely(w->exposed))
             send_SET(w->name, w->num_threads);
     }
     send_END();
 
     send_BEGIN(type, "processes", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(unlikely(w->exposed))
             send_SET(w->name, w->processes);
     }
     send_END();
