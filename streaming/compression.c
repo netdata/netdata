@@ -1,7 +1,7 @@
 #include "rrdpush.h"
-#include "lz4.h"
 
 #ifdef ENABLE_COMPRESSION
+#include "lz4.h"
 
 #define LZ4_MAX_MSG_SIZE 0x4000
 #define LZ4_STREAM_BUFFER_SIZE (0x10000 + LZ4_MAX_MSG_SIZE)
