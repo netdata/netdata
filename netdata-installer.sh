@@ -33,8 +33,8 @@ if [ "$(uname -s)" = 'Darwin' ]; then
     export LDFLAGS="${LDFLAGS} -L/usr/local/opt/openssl@1.1/lib"
   else
     if [ -d /usr/local/opt/openssl ]; then
-    export CFLAGS="${CFLAGS} -I/usr/local/opt/openssl/include"
-    export LDFLAGS="${LDFLAGS} -L/usr/local/opt/openssl/lib"
+      export CFLAGS="${CFLAGS} -I/usr/local/opt/openssl/include"
+      export LDFLAGS="${LDFLAGS} -L/usr/local/opt/openssl/lib"
     fi
   fi
 fi
