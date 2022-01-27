@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "queue.h"
 
 struct nodes{
 	void *item;
@@ -17,11 +17,13 @@ struct queues{
 	int count;
 };
 
-void enqueue(queue q, void* i)	
+int enqueue(queue q, void* i)	
 {		
-	//queue q = qp;								
 	node temp;
 	temp = (node) malloc(sizeof(struct nodes));
+	if (temp == NULL){
+		return 0;
+	}
 	pthread_mutex_lock(&q->lock);
 	while(q->count == q->max){
 		pthread_cond_wait(&q->condf, &q->lock);
@@ -39,11 +41,11 @@ void enqueue(queue q, void* i)
     	q->count++; 
 	pthread_cond_signal(&q->conde);
 	pthread_mutex_unlock(&q->lock);
+	return 1;
 }
 
 void* dequeue(queue q)			
 {			
-	//queue q = qp;							
 	void* temp = NULL;					
 	node temp2;	
 	pthread_mutex_lock(&q->lock);
