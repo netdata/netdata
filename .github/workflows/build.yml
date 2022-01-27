@@ -20,6 +20,32 @@ concurrency: # This keeps multiple instances of the job from running concurrentl
   group: release-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    env:
+        CPPFLAGS: "-I/usr/local/opt/openssl@3/include"
+        LDFLAGS: "-L/usr/local/opt/openssl@3/lib"
+        CFLAGS: "-I/usr/local/opt/openssl@3/include"
+        PKG_CONFIG_PATH: "/usr/local/opt/openssl@3/lib/pkgconfig"
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+         submodules: recursive
+         fetch-depth: 0
+    - name: install required packages
+      run: ./packaging/installer/dependencies/macos.sh --dont-wait --non-interactive
+      
+    - name: configure
+      run: |
+         autoreconf -ivf
+         ./configure --with-zlib --with-math --with-user=netdata --with-bundled-lws PKG_CONFIG_PATH="/usr/local/opt/openssl@3/lib/pkgconfig"
+    - name: make
+      run: make -j3
+    - name: make check
+      run: make check
+      
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball
     runs-on: ubuntu-latest
