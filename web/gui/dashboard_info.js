@@ -430,12 +430,6 @@ netdataDashboard.menu = {
         info: 'Information extracted from a server log file. <code>web_log</code> plugin incrementally parses the server log file to provide, in real-time, a break down of key server performance metrics. For web servers, an extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/web_log/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
-    'named': {
-        title: 'named',
-        icon: '<i class="fas fa-tag"></i>',
-        info: undefined
-    },
-
     'squid': {
         title: 'squid',
         icon: '<i class="fas fa-exchange-alt"></i>',
@@ -451,24 +445,6 @@ netdataDashboard.menu = {
     'apcupsd': {
         title: 'UPS',
         icon: '<i class="fas fa-battery-half"></i>',
-        info: undefined
-    },
-
-    'smawebbox': {
-        title: 'Solar Power',
-        icon: '<i class="fas fa-sun"></i>',
-        info: undefined
-    },
-
-    'fronius': {
-        title: 'Fronius',
-        icon: '<i class="fas fa-sun"></i>',
-        info: undefined
-    },
-
-    'stiebeleltron': {
-        title: 'Stiebel Eltron',
-        icon: '<i class="fas fa-thermometer-half"></i>',
         info: undefined
     },
 
@@ -4834,37 +4810,6 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ]
-    },
-    // ------------------------------------------------------------------------
-    // Fronius Solar Power
-
-    'fronius.power': {
-        info: 'Positive <code>Grid</code> values mean that power is coming from the grid. Negative values are excess power that is going back into the grid, possibly selling it. ' +
-            '<code>Photovoltaics</code> is the power generated from the solar panels. ' +
-            '<code>Accumulator</code> is the stored power in the accumulator, if one is present.'
-    },
-
-    'fronius.autonomy': {
-        commonMin: true,
-        commonMax: true,
-        valueRange: "[0, 100]",
-        info: 'The <code>Autonomy</code> is the percentage of how autonomous the installation is. An autonomy of 100 % means that the installation is producing more energy than it is needed. ' +
-            'The <code>Self consumption</code> indicates the ratio between the current power generated and the current load. When it reaches 100 %, the <code>Autonomy</code> declines, since the solar panels can not produce enough energy and need support from the grid.'
-    },
-
-    'fronius.energy.today': {
-        commonMin: true,
-        commonMax: true,
-        valueRange: "[0, null]"
-    },
-
-    // ------------------------------------------------------------------------
-    // Stiebel Eltron Heat pump installation
-
-    'stiebeleltron.system.roomtemp': {
-        commonMin: true,
-        commonMax: true,
-        valueRange: "[0, null]"
     },
 
     // ------------------------------------------------------------------------
