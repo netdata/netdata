@@ -100,7 +100,7 @@ part of your system might affect another.
 action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
 If you're completely new to Netdata, look at our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for a
-walkthrough of all its features. For a more expedited tour, see the [get started guide](/docs/get-started.md).
+walkthrough of all its features. For a more expedited tour, see the [get started guide](/docs/get-started.mdx).
 
 ### Enable temperature sensor monitoring
 

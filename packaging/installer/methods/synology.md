@@ -13,7 +13,7 @@ issue](https://github.com/SynoCommunity/spksrc/issues/2758), still open as of 20
 Chroot package is not suitable for DSM versions greater than version 5 and may corrupt system libraries and render the
 NAS unable to boot.
 
-The good news is that the [64-bit static installer](kickstart-64.md) works fine if your NAS is one that uses the amd64 architecture. It
+The good news is that our [one-line installation script](kickstart.md) works fine if your NAS is one that uses the amd64 architecture. It
 will install the content into `/opt/netdata`, making future removal safe and simple.
 
 ## Run as netdata user

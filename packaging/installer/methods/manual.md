@@ -220,8 +220,7 @@ cd netdata
 
 ### Connect node to Netdata Cloud during installation
 
-Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md) or
-[`kickstart-static64.sh`](/packaging/installer/methods/kickstart-64.md) methods, the `netdata-installer.sh` script does
+Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
 not allow you to automatically [connect](/claim/README.md) your node to Netdata Cloud immediately after installation.
 
 See the [connect to cloud](/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
