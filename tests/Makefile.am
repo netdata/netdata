@@ -21,10 +21,6 @@ dist_noinst_DATA = \
     web/easypiechart.percentage.spec.js \
     web/karma.conf.js \
     web/fixtures/easypiechart.chart.fixture1.html \
-    node.d/fronius.chart.spec.js \
-    node.d/fronius.parse.spec.js \
-    node.d/fronius.process.spec.js \
-    node.d/fronius.validation.spec.js \
     health_mgmtapi/health-cmdapi-test.sh.in \
     acls/acl.sh.in \
     urls/request.sh.in \
