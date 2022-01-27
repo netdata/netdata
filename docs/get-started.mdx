@@ -12,22 +12,33 @@ import { Install, InstallBox } from '../src/components/Install/'
 # Get started with Netdata
 
 Netdata is a free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from
-any physical or virtual system (we call them _nodes_) and organizes them in an easy-to-use and -navigate interface.
+any physical or virtual system (we call them _nodes_). These metrics are organized in an easy-to-use and -navigate interface.
 
 Together with [Netdata Cloud](https://learn.netdata.cloud/docs/cloud), you can monitor your entire infrastructure in
-real time and troubleshoot problems that threaten the health of your nodes before they occur.
+real time and troubleshoot problems that threaten the health of your nodes.
 
 Netdata runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices. It
 runs on Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters,
 Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
 
+## Install on Linux with one-line installer 
+
+The **recommended** way to install Netdata on a Linux node (physical, virtual, container, IoT) is our one-line
+[kickstart script](/packaging/installer/methods/kickstart.md). This script automatically installs dependencies and
+builds Netdata from its source code.
+
+Copy the script, paste it into your node's terminal, and hit `Enter` to begin the installation process.
+
+<OneLineInstall />
+
+Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
+troubleshooting with Netdata.
+
+## Other installation options
+
 <Install>
   <InstallBox
-    to="#install-on-linux-with-one-line-installer-recommended"
-    os="General Linux with one-line installer (recommended)"
-    svg="linux" />
-  <InstallBox
-    to="#run-netdata-with-docker"
+    to="/docs/agent/packaging/docker"
     os="Run with Docker" 
     svg="docker" />
   <InstallBox
@@ -38,14 +49,6 @@ Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` requi
     to="/docs/agent/packaging/installer/methods/macos"
     os="Install on macOS" 
     svg="macos" />
-  <InstallBox
-    to="/docs/agent/packaging/installer/methods/packages"
-    os="Linux with .deb/.rpm packages" 
-    svg="linux" />
-  <InstallBox
-    to="/docs/agent/packaging/installer/methods/kickstart-64"
-    os="Linux with static 64-bit binary" 
-    svg="linux" />
   <InstallBox
     to="/docs/agent/packaging/installer/methods/manual"
     os="Linux from Git" 
@@ -60,40 +63,6 @@ Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` requi
     svg="linux" />
 </Install>
 
-## Install on Linux with one-line installer (recommended)
-
-The **recommended** way to install Netdata on a Linux node (physical, virtual, container, IoT) is our one-line
-[kickstart script](/packaging/installer/methods/kickstart.md). This script automatically installs dependencies and
-builds Netdata from its source code.
-
-Copy the script, paste it into your node's terminal, and hit `Enter` to begin the installation process.
-
-<OneLineInstall />
-
-Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
-troubleshooting with Netdata.
-
-## Run Netdata with Docker
-
-You can also try out Netdata's capabilities in a [Docker container](/packaging/docker/README.md). Copy the following
-`docker run` command into your node and hit `Enter` to download and run the container.
-
-```bash
-docker run -d --name=netdata \
-  -p 19999:19999 \
-  -v netdataconfig:/etc/netdata \
-  -v netdatalib:/var/lib/netdata \
-  -v netdatacache:/var/cache/netdata \
-  -v /etc/passwd:/host/etc/passwd:ro \
-  -v /etc/group:/host/etc/group:ro \
-  -v /proc:/host/proc:ro \
-  -v /sys:/host/sys:ro \
-  -v /etc/os-release:/host/etc/os-release:ro \
-  --restart unless-stopped \
-  --cap-add SYS_PTRACE \
-  --security-opt apparmor=unconfined \
-  netdata/netdata
-```
 
 ## What's next?
 
