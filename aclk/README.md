@@ -91,8 +91,7 @@ You have two options if you prefer to disable the ACLK and not use Netdata Cloud
 ### Disable at installation
 
 You can pass the `--disable-cloud` parameter to the Agent installation when using a kickstart script
-([kickstart.sh](/packaging/installer/methods/kickstart.md) or
-[kickstart-static64.sh](/packaging/installer/methods/kickstart-64.md)), or a [manual installation from
+([kickstart.sh](/packaging/installer/methods/kickstart.md), or a [manual installation from
 Git](/packaging/installer/methods/manual.md).
 
 When you pass this parameter, the installer does not download or compile any extra libraries. Once running, the Agent

@@ -14,7 +14,7 @@ And like this on your Android device:
 
 You will need:
 
-1.  Sign up and log in to [pushbullet.com](pushbullet.com)
+1.  Sign up and log in to [pushbullet.com](https://www.pushbullet.com/)
 2.  Create a new access token in your [account settings](https://www.pushbullet.com/#settings/account).
 3.  Fill in the `PUSHBULLET_ACCESS_TOKEN` with the newly generated access token.
 4.  Add the recipient emails or channel tags (each channel tag must be prefixed with #, e.g. #channeltag) to `DEFAULT_RECIPIENT_PUSHBULLET`.

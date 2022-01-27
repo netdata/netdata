@@ -10,9 +10,6 @@ Welcome to the collector configuration reference guide.
 This guide contains detailed information about enabling/disabling plugins or modules, in addition a quick reference to
 the internal plugins API.
 
-To learn the basics of collecting metrics from other applications and services, see the [collector
-quickstart](QUICKSTART.md).
-
 ## Netdata's collector architecture
 
 Netdata has an intricate system for organizing and managing its collectors. **Collectors** are the processes/programs
@@ -23,8 +20,7 @@ MySQL database, among many others.
 
 For most users, enabling individual collectors for the application/service you're interested in is far more important
 than knowing which plugin it uses. See our [collectors list](/collectors/COLLECTORS.md) to see whether your favorite app/service has
-a collector, and then read the [collectors quickstart](/collectors/QUICKSTART.md) and the documentation for that specific collector
-to figure out how to enable it.
+a collector, and then read the documentation for that specific collector to figure out how to enable it.
 
 There are three types of plugins:
 
@@ -46,7 +42,6 @@ However, there are cases that auto-detection fails. Usually, the reason is that 
 allow Netdata to connect. In most of the cases, allowing the user `netdata` from `localhost` to connect and collect
 metrics, will automatically enable data collection for the application in question (it will require a Netdata restart).
 
-View our [collectors quickstart](/collectors/QUICKSTART.md) for explicit details on enabling and configuring collector modules.
 
 ## Troubleshoot a collector
 
