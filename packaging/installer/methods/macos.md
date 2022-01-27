@@ -71,7 +71,7 @@ to install some of Netdata's prerequisites. You can omit `cmake` in case you do 
 [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/).
 
 ```bash
-brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1 libtool cmake
+brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
 ```
 
 If you want to use the [database engine](/database/engine/README.md) to store your metrics, you need to download
