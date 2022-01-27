@@ -28,12 +28,16 @@ fi
 # -----------------------------------------------------------------------------
 # Pull in OpenSSL properly if on macOS
 if [ "$(uname -s)" = 'Darwin' ]; then
-  if [ -d /usr/local/opt/openssl@1.1 ]; then
-    export CFLAGS="${CFLAGS} -I/usr/local/opt/openssl@1.1/include"
-    export LDFLAGS="${LDFLAGS} -L/usr/local/opt/openssl@1.1/lib"
-  elif [ -d /usr/local/opt/openssl ]; then
-    export CFLAGS="${CFLAGS} -I/usr/local/opt/openssl/include"
-    export LDFLAGS="${LDFLAGS} -L/usr/local/opt/openssl/lib"
+  if brew --prefix --installed openssl; then
+    HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl)
+  elif brew --prefix --installed openssl@3; then
+    HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@3)
+  elif brew --prefix --installed openssl@1.1; then
+    HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@1.1)
+  fi
+  if [ -n "${HOMEBREW_OPENSSL_PREFIX}" ]; then
+    export CFLAGS="${CFLAGS} -I${HOMEBREW_OPENSSL_PREFIX}/include"
+    export LDFLAGS="${LDFLAGS} -L${HOMEBREW_OPENSSL_PREFIX}/lib"
   fi
 fi
 
