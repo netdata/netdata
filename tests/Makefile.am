@@ -15,12 +15,6 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_noinst_DATA = \
-    README.md \
-    web/lib/jasmine-jquery.js \
-    web/easypiechart.chart.spec.js \
-    web/easypiechart.percentage.spec.js \
-    web/karma.conf.js \
-    web/fixtures/easypiechart.chart.fixture1.html \
     health_mgmtapi/health-cmdapi-test.sh.in \
     acls/acl.sh.in \
     urls/request.sh.in \
