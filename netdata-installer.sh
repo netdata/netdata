@@ -28,11 +28,11 @@ fi
 # -----------------------------------------------------------------------------
 # Pull in OpenSSL properly if on macOS
 if [ "$(uname -s)" = 'Darwin' ]; then
-  if brew --prefix --installed openssl; then
+  if brew --prefix --installed openssl  > /dev/null 2>&1; then
     HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl)
-  elif brew --prefix --installed openssl@3; then
+  elif brew --prefix --installed openssl@3  > /dev/null 2>&1; then
     HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@3)
-  elif brew --prefix --installed openssl@1.1; then
+  elif brew --prefix --installed openssl@1.1  > /dev/null 2>&1; then
     HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@1.1)
   fi
   if [ -n "${HOMEBREW_OPENSSL_PREFIX}" ]; then
