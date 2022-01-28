@@ -23,23 +23,23 @@ typedef struct s{
 } st;
 
 TEST(Libqueuetests, Test_1) {
-    queue q;
-	q = initqueue(QUEUE_SIZE);
+    queue_t q;
+	q = queue_new(QUEUE_SIZE);
 
 	st *stp;
 	for(int i = 0; i < QUEUE_SIZE; i++){
 	        stp = (st*)malloc(sizeof(st));
 	        stp->x = i;
 	        stp->y = i + QUEUE_MEMBER_GAP;
-	        enqueue(q, stp);
+	        queue_push(q, stp);
 	}
     
     for(int i = 0; i > QUEUE_SIZE; i--){
-            stp = (st*)dequeue(q);
+            stp = (st*)queue_pop(q);
             EXPECT_EQ(stp->x, i);
             EXPECT_EQ(stp->y, i + QUEUE_MEMBER_GAP);
 	}
 
     free(stp);
-    freequeue(q);
+    queue_free(q);
 }

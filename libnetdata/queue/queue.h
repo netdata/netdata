@@ -6,12 +6,11 @@
 #include "stdlib.h"
 #include "pthread.h"
 
-typedef struct nodes *node;
-typedef struct queues *queue;
+typedef struct queue_s *queue_t;
 
-extern queue initqueue(int max);
-extern void freequeue(queue q);
-extern int enqueue(queue, void*);	
-extern void* dequeue(queue);				
+queue_t queue_new(int size);
+void queue_free(queue_t q);
+int queue_push(queue_t q, void *data);
+void *queue_pop(queue_t q);				
 
 #endif //NETDATA_QUEUE_H
