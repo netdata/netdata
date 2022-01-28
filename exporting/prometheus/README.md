@@ -17,10 +17,20 @@ are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM
 ### Installing Netdata
 
 There are number of ways to install Netdata according to [Installation](/packaging/installer/README.md). The suggested way
-of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
+of installing the latest Netdata and keep it upgrade automatically.
 
-```sh
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+<!-- candidate for reuse -->
+
+To install Netdata, run the following as your normal user:
+
+```bash
+wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
+```
+
+Or, if you have cURL but not wget (such as on macOS):
+
+```bash
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 At this point we should have Netdata listening on port 19999. Attempt to take your browser here:

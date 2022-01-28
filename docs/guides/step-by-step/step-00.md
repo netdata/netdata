@@ -46,9 +46,17 @@ This script will install Netdata from source, keep it up to date with nightly re
 [registry](/registry/README.md), and sends [_anonymous statistics_](/docs/anonymous-statistics.md) about how you use
 Netdata. We use this information to better understand how we can improve the Netdata experience for all our users.
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+To install Netdata, run the following as your normal user:
+
+´´´bash
+wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
+´´´
+Or, if you have cURL but not wget (such as on macOS):
+
+´´´bash
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+´´´
+
 
 Once finished, you'll have Netdata installed, and you'll be set up to get _nightly updates_ to get the latest features,
 improvements, and bugfixes.
