@@ -49,59 +49,7 @@ in the source tree to be used.
 
 ### Netdata cloud
 
-Netdata Cloud functionality requires custom builds of libmosquitto and
-libwebsockets.
-
-#### libmosquitto
-
-Netdata maintains a custom fork of libmosquitto at
-https://github.com/netdata/mosquitto with patches to allow for proper
-integration with libwebsockets, which is needed for correct operation of
-Netdata Cloud functionality. To prepare this library for the build system:
-
-1.  Verify the tag that Netdata expects to be used by checking the contents
-    of `packaging/mosquitto.version` in your Netdata sources.
-2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/mosquitto/releases and
-        downloading and unpacking the source code archive for that release.
-    -   Cloning the repository with `git` and checking out the required tag.
-3.  If building on a platform other than Linux, prepare the mosquitto
-    sources by running `cmake -D WITH_STATIC_LIBRARIES:boolean=YES .` in
-    the mosquitto source directory.
-4.  Build mosquitto by running `make -C lib` in the mosquitto source directory.
-5.  In the Netdata source directory, create a directory called `externaldeps/mosquitto`.
-6.  Copy `lib/mosquitto.h` from the mosquitto source directory to
-    `externaldeps/mosquitto/mosquitto.h` in the Netdata source tree.
-7.  Copy `lib/libmosquitto.a` from the mosquitto source directory to
-    `externaldeps/mosquitto/libmosquitto.a` in the Netdata source tree. If
-    building on a platform other than Linux, the file that needs to be
-    copied will instead be named `lib/libmosquitto_static.a`, but it
-    still needs to be copied to `externaldeps/mosquitto/libmosquitto.a`.
-
-#### libwebsockets
-
-Netdata uses the standard upstream version of libwebsockets located at
-https://github.com/warmcat/libwebsockets, but requires a build with SOCKS5
-support, which is not enabled by most pre-built versions. Currently,
-we do not support using a system copy of libwebsockets. To prepare this
-library for the build system:
-
-1.  Verify the tag that Netdata expects to be used by checking the contents
-    of `packaging/libwebsockets.version` in your Netdata sources.
-2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/warmcat/libwebsockets/releases and
-        downloading and unpacking the source code archive for that release.
-    -   Cloning the repository with `git` and checking out the required tag.
-3.  Prepare the libwebsockets sources by running `cmake -D
-    LWS_WITH_SOCKS5:bool=ON .` in the libwebsockets source directory.
-4.  Build libwebsockets by running `make` in the libwebsockets source
-    directory.
-5.  In the Netdata source directory, create a directory called
-    `externaldeps/libwebsockets`.
-6.  Copy `lib/libwebsockets.a` from the libwebsockets source directory to
-    `externaldeps/libwebsockets/libwebsockets.a` in the Netdata source tree.
-7.  Copy the entire contents of `include/` from the libwebsockets source
-    directory to `externaldeps/libwebsockets/include` in the Netdata source tree.
+!!! Note for reviewers: libmosquitto and libwebsockets are obsolete. Please ensure to add information about other possible dependencies, if any.
 
 #### JSON-C
 

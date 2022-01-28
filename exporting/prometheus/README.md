@@ -7,10 +7,6 @@ sidebar_label: Using Netdata with Prometheus
 
 # Using Netdata with Prometheus
 
-> IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.7. The new Prometheus exporting
-> connector for Netdata supports a lot more features and is aligned to the development of the rest of the Netdata
-> exporting connectors.
-
 Prometheus is a distributed monitoring system which offers a very simple setup along with a robust data model. Recently
 Netdata added support for Prometheus. I'm going to quickly show you how to install both Netdata and Prometheus on the
 same server. We can then use Grafana pointed at Prometheus to obtain long term metrics Netdata offers. I'm assuming we
@@ -207,9 +203,6 @@ this and click on 'targets' We should see the Netdata host as a scraped target.
 ---
 
 ## Netdata support for Prometheus
-
-> IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.6. The new format allows easier
-> queries for metrics and supports both `as collected` and normalized metrics.
 
 Before explaining the changes, we have to understand the key differences between Netdata and Prometheus.
 
