@@ -9,7 +9,7 @@ Queue is a thread-safe library to handle queue processes with independent object
 
 Library includes functions below:
 
-`Queue* initqueue(int max)`
-`void freequeue(Queue* q)`
-`void enqueue(void *q, void* item)`	
-`void* dequeue(void *q)`	
+- `Queue* initqueue(int max)`
+- `void freequeue(Queue* q)`
+- `void enqueue(void *q, void* item)`	
+- `void* dequeue(void *q)`	
