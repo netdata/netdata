@@ -14,11 +14,11 @@ alerts from many other monitoring tools on a single screen.
 ![Alerta dashboard](https://docs.alerta.io/_images/alerta-screen-shot-3.png "Alerta dashboard showing several alerts.")
 
 Alerta's advantage is the main view, where you can see all active alarms with the most recent state. You can also view an alert history. You can send Netadata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host
-Netadata configuration. 
+Netdata configuration. 
 
 ## Deploying Alerta
 
-The recommended setup is using a separated server, VM or container. If you have other NGINX or Apache servers in your organization,
+The recommended setup is using a dedicated server, VM or container. If you have other NGINX or Apache servers in your organization,
 it is recommended to proxy to this new server.
 
 You can install Alerta in several ways:
@@ -75,7 +75,6 @@ We can test alarms using the standard approach:
 > **Note** This script will send 3 alarms. 
 > Alerta will not show the alerts in the main page, because last alarm is "CLEAR".
 > To see the test alarms, you need to select "closed" alarms in the top-right lookup. 
->A little change in `alarm-notify.sh` that let us test each state one by one will be useful.
 
 For more information see the [Alerta documentation](https://docs.alerta.io)
 
