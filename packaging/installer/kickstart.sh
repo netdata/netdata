@@ -740,7 +740,20 @@ handle_existing_install() {
           fi
         fi
       else
-        fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed." F0103
+        if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+          progress "Attempting to claim existing install at ${ndprefix}."
+          INSTALL_PREFIX="${ndprefix}"
+          claim
+          ret=$?
+
+          cleanup
+          trap - EXIT
+          exit $ret
+        elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+          fatal "User asked to claim, but did not proide a claiming token." F0202
+        else
+          fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed." F0103
+        fi
       fi
       ;;
   esac
@@ -852,6 +865,10 @@ claim() {
     NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
   else
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
+  fi
+
+  if [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
+    fatal "Unable to find usable claiming script." F0106
   fi
 
   if ! is_netdata_running; then
