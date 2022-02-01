@@ -4,7 +4,6 @@
 
 #include "daemon/common.h"
 
-int aclk_use_new_cloud_arch = 0;
 usec_t aclk_session_newarch = 0;
 
 aclk_env_t *aclk_env = NULL;
@@ -137,6 +136,7 @@ struct topic_name {
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
+/* TODO this list is kept to remove the dups from newcloudarch topiclist
 enum aclk_topics compulsory_topics_legacy[] = {
     ACLK_TOPICID_CHART,
     ACLK_TOPICID_ALARMS,
@@ -144,6 +144,7 @@ enum aclk_topics compulsory_topics_legacy[] = {
     ACLK_TOPICID_COMMAND,
     ACLK_TOPICID_UNKNOWN
 };
+*/
 
 enum aclk_topics compulsory_topics_new_cloud_arch[] = {
 // TODO remove old topics once not needed anymore
@@ -289,7 +290,7 @@ int aclk_generate_topic_cache(struct json_object *json)
         }
     }
 
-    enum aclk_topics *compulsory_topics = aclk_use_new_cloud_arch ? compulsory_topics_new_cloud_arch : compulsory_topics_legacy;
+    enum aclk_topics *compulsory_topics = compulsory_topics_new_cloud_arch;
 
     for (int i = 0; compulsory_topics[i] != ACLK_TOPICID_UNKNOWN; i++) {
         if (!aclk_get_topic(compulsory_topics[i])) {

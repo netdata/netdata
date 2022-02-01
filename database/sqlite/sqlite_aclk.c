@@ -311,7 +311,7 @@ static void timer_cb(uv_timer_t* handle)
             wc->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
     }
 
-    if (aclk_use_new_cloud_arch && aclk_connected) {
+    if (aclk_connected) {
         if (wc->rotation_after && wc->rotation_after < now) {
             cmd.opcode = ACLK_DATABASE_NODE_INFO;
             aclk_database_enq_cmd_noblock(wc, &cmd);
@@ -811,7 +811,7 @@ void aclk_data_rotated(void)
 {
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 
-    if (!aclk_use_new_cloud_arch || !aclk_connected)
+    if (!aclk_connected)
         return;
 
     time_t next_rotation_time = now_realtime_sec()+ACLK_DATABASE_ROTATION_DELAY;

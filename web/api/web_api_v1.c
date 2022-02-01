@@ -3,7 +3,6 @@
 #include "web_api_v1.h"
 
 char *api_secret;
-extern int aclk_use_new_cloud_arch;
 
 static struct {
     const char *name;
@@ -1008,16 +1007,11 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef ENABLE_ACLK
     if (aclk_connected) {
         buffer_strcat(wb, "\t\"aclk-available\": true,\n");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        if (aclk_use_new_cloud_arch)
-            buffer_strcat(wb, "\t\"aclk-available-protocol\": \"New\",\n");
-        else
-#endif
-            buffer_strcat(wb, "\t\"aclk-available-protocol\": \"Legacy\",\n");
+        buffer_strcat(wb, "\t\"aclk-available-protocol\": \"New\",\n");
     }
     else
 #endif
-        buffer_strcat(wb, "\t\"aclk-available\": false,\n\t\"aclk-available-protocol\": null,\n");     // Intentionally valid with/without #ifdef above
+    buffer_strcat(wb, "\t\"aclk-available\": false,\n\t\"aclk-available-protocol\": null,\n");     // Intentionally valid with/without #ifdef above
 
     buffer_strcat(wb, "\t\"memory-mode\": ");
     analytics_get_data(analytics_data.netdata_config_memory_mode, wb);

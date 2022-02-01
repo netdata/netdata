@@ -206,7 +206,7 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
     int rc = 0;
     sqlite3_stmt *res = NULL;
 
-    if (!aclk_use_new_cloud_arch || !aclk_connected)
+    if (!aclk_connected)
         return;
 
     if (unlikely(!db_meta))
@@ -782,7 +782,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     UNUSED(cmd);
     int rc;
 
-    if (!aclk_use_new_cloud_arch || !aclk_connected)
+    if (!aclk_connected)
         return;
 
     char *claim_id = is_agent_claimed();
@@ -986,10 +986,6 @@ int queue_chart_to_aclk(RRDSET *st)
 #endif
     return 0;
 #else
-    if (!aclk_use_new_cloud_arch && aclk_connected) {
-        aclk_update_chart(st->rrdhost, st->id, 1);
-        return 0;
-    }
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                        st, ACLK_DATABASE_ADD_CHART);
 #endif

@@ -380,33 +380,6 @@ void aclk_alarm_state_msg(mqtt_wss_client client, json_object *msg)
     json_object_put(obj);
 }
 
-/*
- * Will generate disconnect message.
- * @param message if NULL it will generate LWT message (unexpected).
- *        Otherwise string pointed to by this parameter will be used as
- *        reason.
- */
-json_object *aclk_generate_disconnect(const char *message)
-{
-    json_object *tmp, *msg;
-
-    msg = create_hdr("disconnect", NULL, 0, 0, 2);
-
-    tmp = json_object_new_string(message ? message : "unexpected");
-    json_object_object_add(msg, "payload", tmp);
-
-    return msg;
-}
-
-int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message)
-{
-    int pid;
-    json_object *msg = aclk_generate_disconnect(message);
-    pid = aclk_send_message_subtopic_pid(client, msg, ACLK_TOPICID_METADATA);
-    json_object_put(msg);
-    return pid;
-}
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 // new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {

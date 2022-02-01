@@ -15,18 +15,6 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     //check aclk architecture and handle old json alarm update to cloud
     //include also the valid statuses for this case
 #ifdef ENABLE_ACLK
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (!aclk_use_new_cloud_arch && aclk_connected) {
-#endif
-
-        if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
-            ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
-            aclk_update_alarm(host, ae);
-        }
-#endif
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    }
-
     if (!claimed())
         return 0;
 

@@ -7,7 +7,6 @@
 
 // Helper stuff which should not have any further inside ACLK dependency
 // and are supposed not to be needed outside of ACLK
-extern int aclk_use_new_cloud_arch;
 extern usec_t aclk_session_newarch;
 
 extern int chart_batch_id;
