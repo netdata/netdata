@@ -20,8 +20,6 @@
 #include <fcntl.h>
 #endif
 
-#define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
-
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int disconnect_req = 0;
 
@@ -617,9 +615,7 @@ void *aclk_main(void *ptr)
         return NULL;
     }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     aclk_init_rx_msg_handlers();
-#endif
 
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
     // as it must notify the far end that it shutdown gracefully and avoid the LWT.
@@ -897,11 +893,7 @@ char *ng_aclk_state_json(void)
     tmp = json_object_new_string("Next Generation");
     json_object_object_add(msg, "aclk-implementation", tmp);
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     tmp = json_object_new_boolean(1);
-#else
-    tmp = json_object_new_boolean(0);
-#endif
     json_object_object_add(msg, "new-cloud-protocol-supported", tmp);
 
     char *agent_id = is_agent_claimed();
