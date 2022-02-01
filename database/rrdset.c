@@ -152,7 +152,18 @@ int rrdset_set_name(RRDSET *st, const char *name) {
 
     if(rrdset_index_find_name(host, b, 0)) {
         info("RRDSET: chart name '%s' on host '%s' already exists.", b, host->hostname);
-        return 0;
+        if(!strcmp(st->id, n) && !st->name) {
+            unsigned i = 1;
+
+            do {
+                snprintfz(b, CONFIG_MAX_VALUE, "%s_%u", n, i);
+                i++;
+            } while (rrdset_index_find_name(host, b, 0));
+
+            info("RRDSET: using name '%s' for chart '%s' on host '%s'.", b, n, host->hostname);
+        } else {
+            return 0;
+        }
     }
 
     if(st->name) {
