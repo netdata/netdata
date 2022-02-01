@@ -621,7 +621,7 @@ detect_existing_install() {
       ndprefix="$(dirname "$(dirname "${ndpath}")")"
     fi
 
-    if echo "${ndprefix}" | grep -Eq '/usr$'; then
+    if echo "${ndprefix}" | grep -Eq '^/usr$'; then
       ndprefix="$(dirname "${ndprefix}")"
     fi
   fi
@@ -859,12 +859,18 @@ claim() {
   fi
 
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
-  if [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
+  if command -v netdata-claim.sh > /dev/null 2>&1; then
+    NETDATA_CLAIM_PATH="$(command -v netdata-claim.sh)"
+  elif [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
     NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
   elif [ ! -d "${INSTALL_PREFIX}/netdata" ]; then
-    NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/usr/sbin/netdata-claim.sh"
+    if [ -d "${INSTALL_PREFIX}/usr" ]; then
+        NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/usr/sbin/netdata-claim.sh"
+    else
+        NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/sbin/netdata-claim.sh"
+    fi
   else
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
