@@ -863,6 +863,8 @@ claim() {
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
     NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
+  elif [ ! -d "${INSTALL_PREFIX}/netdata" ]; then
+    NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/usr/sbin/netdata-claim.sh"
   else
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
