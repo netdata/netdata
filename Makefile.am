@@ -762,13 +762,6 @@ endif #ENABLE_NEW_CLOUD_PROTOCOL
 
 endif #ENABLE_ACLK
 
-if ENABLE_ACLK
-ACLK_COMMON_FILES = \
-    aclk/aclk_collector_list.c \
-    aclk/aclk_collector_list.h \
-    $(NULL)
-endif
-
 ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_rrdhost_state.h \
     aclk/aclk_api.c \
@@ -893,7 +886,6 @@ NETDATA_FILES = \
     $(CLAIM_FILES) \
     $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
-    $(ACLK_COMMON_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(NULL)

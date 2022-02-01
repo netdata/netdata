@@ -10,7 +10,6 @@
 #include "aclk_query_queue.h"
 #include "aclk_util.h"
 #include "aclk_rx_msgs.h"
-#include "aclk_collector_list.h"
 #include "https_client.h"
 
 #include "aclk_proxy.h"
