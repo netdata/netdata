@@ -34,8 +34,8 @@
       "artifact_key": "centos7"
     },
     {
-      "distro": "centos:8",
-      "artifact_key": "centos8",
+      "distro": "rockylinux/rockylinux:8",
+      "artifact_key": "rockylinux8",
       "rmjsonc": "dnf remove -y json-c-devel"
     },
     {
