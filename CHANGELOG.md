@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix typo, tidy up sentence [\#12062](https://github.com/netdata/netdata/pull/12062) ([petecooper](https://github.com/petecooper))
 - Fix handling of non-x86 static builds in updater. [\#12055](https://github.com/netdata/netdata/pull/12055) ([Ferroin](https://github.com/Ferroin))
 - fix\(docs\): unresolved file references [\#12053](https://github.com/netdata/netdata/pull/12053) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.16. [\#12052](https://github.com/netdata/netdata/pull/12052) ([netdatabot](https://github.com/netdatabot))
