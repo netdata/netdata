@@ -60,7 +60,7 @@ If you don't have the free, open-source Netdata monitoring agent installed on yo
 kickstart command](/docs/get-started.mdx):
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 The Netdata Agent is now collecting metrics from your node every second. You don't need to jump into the dashboard yet,

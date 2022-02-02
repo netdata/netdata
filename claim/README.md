@@ -73,7 +73,7 @@ When coming from  [Nodes view page](https://learn.netdata.cloud/docs/cloud/visua
 If you want to connect a node that is running on a Linux environment, the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
@@ -101,7 +101,7 @@ The default user is `netdata`. Yours may be different, so pay attention to the o
 and run the script.
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 ### Connect an agent running in Docker
 
@@ -227,7 +227,7 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/methods/macos.md#install-netdata-with-our-automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
@@ -267,7 +267,7 @@ You can now move on to connecting. When you connect with the [kickstart](/packag
 append the same proxy setting you added to `netdata.conf`.
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy socks5h://203.0.113.0:1080
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy http://[user:pass@]host:ip
 ```
 
 Hit **Enter**. The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if
@@ -474,13 +474,13 @@ Our suggestion is to first run kickstart to upgrade your agent by running the co
 **Linux**
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 **macOS**
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install /usr/local/
 ```
 ### Claiming script
 
@@ -499,7 +499,7 @@ using `sudo`, or as the user running the Agent (typically `netdata`), and passin
 -hostname=HOSTNAME
     where HOSTNAME is the result of the hostname command by default.
 -proxy=PROXY_URL
-    where PROXY_URL is the endpoint of a SOCKS5 proxy.
+    where PROXY_URL is the endpoint of a HTTP or HTTPS proxy.
 ```
 
 For example, the following command connects an Agent and adds it to rooms `room1` and `room2`:

@@ -53,7 +53,7 @@ On Raspberry Pis running Raspbian, the best way to install Netdata is our one-li
 you to install dependencies, then compiles Netdata from source via [GitHub](https://github.com/netdata/netdata).
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 Once installed on a Raspberry Pi 4 with no accessories, Netdata starts collecting roughly 1,500 metrics every second and

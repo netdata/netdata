@@ -32,7 +32,7 @@ If you don't have the Netdata Agent installed already, visit the [installation g
 for the recommended instructions for your system. In most cases, you can use the one-line installation script:
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 Once installation finishes, open your browser and navigate to `http://NODE:19999`, replacing `NODE` with the IP address

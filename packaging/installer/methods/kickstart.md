@@ -19,7 +19,7 @@ The kickstart script works on all Linux distributions and macOS environments. By
 To install Netdata, run the following as your normal user:
 
 ```bash
-wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 Or, if you have cURL but not wget (such as on macOS):
@@ -89,15 +89,14 @@ area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
 - `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
   after the install.
 - `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
-- `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of
-  `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or `http://[user:pass@]host:ip` for an HTTP(S) proxy.
+- `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
   See [connecting through a proxy](/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`.
 
 For example:
 
 ```bash
-wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
 ```
 
 Please note that to run it you will either need to have root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](/claim/README.md#connect-an-agent-without-root-privileges) section.

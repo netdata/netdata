@@ -122,10 +122,6 @@ libraries to make this exporting connection exist. Since you most likely install
 script, all you have to do is run that script again. Don't worry—any configuration changes you made along the way will
 be retained!
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
-
 Now, from your Netdata config directory, initialize and edit a `exporting.conf` file to tell Netdata where to find the
 database you just created.
 
