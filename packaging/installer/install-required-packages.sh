@@ -695,6 +695,7 @@ declare -A pkg_json_c_dev=(
   ['sabayon']="dev-libs/json-c"
   ['suse']="libjson-c-devel"
   ['freebsd']="json-c"
+  ['macos']="json-c"
   ['default']="json-c-devel"
 )
 
@@ -828,7 +829,7 @@ declare -A pkg_libuuid_dev=(
   ['rhel']="libuuid-devel"
   ['ol']="libuuid-devel"
   ['suse']="libuuid-devel"
-  ['macos']="NOTREQUIRED"
+  ['macos']="ossp-uuid"
   ['freebsd']="e2fsprogs-libuuid"
   ['default']=""
 )
@@ -1171,7 +1172,7 @@ declare -A pkg_openssl=(
   ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
   ['freebsd']="openssl"
-  ['macos']="openssl@1.1"
+  ['macos']="openssl"
   ['default']="openssl-devel"
 )
 
