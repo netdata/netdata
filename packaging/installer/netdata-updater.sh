@@ -721,9 +721,10 @@ while [ -n "${1}" ]; do
     NETDATA_TMPDIR_PATH="${2}"
     shift 2
   elif [ "${1}" = "--enable-auto-updates" ]; then
-    case "${2}" in
+    AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+    case "${AUTO_UPDATE_TYPE}" in
       systemd|interval|crontab)
-        enable_netdata_updater "${2}"
+        enable_netdata_updater "${AUTO_UPDATE_TYPE}"
         exit $?
         ;;
       "")
