@@ -24,7 +24,7 @@ of installing the latest Netdata and keep it upgrade automatically.
 To install Netdata, run the following as your normal user:
 
 ```bash
-wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 Or, if you have cURL but not wget (such as on macOS):

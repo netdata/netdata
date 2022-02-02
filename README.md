@@ -122,7 +122,7 @@ updates](https://learn.netdata.cloud/docs/agent/packaging/installer#nightly-vs-s
 statistics](https://learn.netdata.cloud/docs/agent/anonymous-statistics).
 <!-- candidate for reuse -->
 ```bash
-wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 To view the Netdata dashboard, navigate to `http://localhost:19999`, or `http://NODE:19999`.

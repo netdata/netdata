@@ -70,7 +70,7 @@ the following command in your container.
 
 <!-- candidate for reuse -->
 ```sh
-wget -O ./kickstart.sh https://my-netdata.io/kickstart.sh && sh ./kickstart.sh --dont-wait
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-wait
 ```
 
 After the install completes you should be able to hit the Netdata dashboard at <http://localhost:19999/> (replace
