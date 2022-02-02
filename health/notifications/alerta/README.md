@@ -13,7 +13,7 @@ alerts from many other monitoring tools on a single screen.
 
 ![Alerta dashboard](https://docs.alerta.io/_images/alerta-screen-shot-3.png "Alerta dashboard showing several alerts.")
 
-Alerta's advantage is the main view, where you can see all active alarms with the most recent state. You can also view an alert history. You can send Netadata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host
+Alerta's advantage is the main view, where you can see all active alarms with the most recent state. You can also view an alert history. You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host
 Netdata configuration. 
 
 ## Deploying Alerta
