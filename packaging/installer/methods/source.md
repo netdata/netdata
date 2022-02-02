@@ -48,9 +48,6 @@ libraries and their header files must be copied into specific locations
 in the source tree to be used.
 
 ### Netdata cloud
-
-!!! Note for reviewers: libmosquitto and libwebsockets are obsolete. Please ensure to add information about other possible dependencies, if any.
-
 #### JSON-C
 
 Netdata requires the use of JSON-C for JSON parsing when using Netdata
