@@ -321,7 +321,11 @@ static int handle_connection(mqtt_wss_client client)
         }
 
         if (disconnect_req || aclk_kill_link) {
+            info("Going to restart connection due to disconnect_req=%s (cloud req), aclk_kill_link=%s (reclaim)",
+                disconnect_req ? "true" : "false",
+                aclk_kill_link ? "true" : "false");
             disconnect_req = 0;
+            aclk_kill_link = 0;
             aclk_graceful_disconnect(client);
             aclk_queue_unlock();
             aclk_shared_state.mqtt_shutdown_msg_id = -1;
