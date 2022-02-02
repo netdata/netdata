@@ -28,7 +28,7 @@ You can install Alerta in several ways:
 
 ## Sending alerts to Alerta
 
-1. Create an API key (if authentication in Alerta is enabled)
+### Step 1. Create an API key (if authentication in Alerta is enabled)
 
 You will need an API key to send messages from any source, if
 Alerta is configured to use authentication (recommended). 
