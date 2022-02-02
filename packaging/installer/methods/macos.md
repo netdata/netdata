@@ -80,7 +80,7 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
 3. Use the same terminal session to install some of Netdata's prerequisites using Homebrew. If you don't want to use [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/), you can omit `cmake`.
 
    ```bash
-   brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1 libtool cmake
+   brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
    ```
 
 4. Optional: If you want to use the [database engine](/database/engine/README.md) to store your metrics, you need to download
