@@ -226,9 +226,6 @@ USAGE: ${PROGRAM} [options]
   --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata.
   --dont-start-it            Do not (re)start netdata after installation.
   --dont-wait                Run installation in non-interactive mode.
-  --auto-update or -u        Install netdata-updater in cron to automatically check for updates once per day.
-  --auto-update-type         Override the auto-update scheduling mechanism detection, currently supported types
-                             are: systemd, interval, crontab.
   --stable-channel           Use packages from GitHub release pages instead of nightly updates.
                              This results in less frequent updates.
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
@@ -301,7 +298,6 @@ HEREDOC
 
 DONOTSTART=0
 DONOTWAIT=0
-AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
@@ -319,19 +315,8 @@ while [ -n "${1}" ]; do
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
-    "--auto-update" | "-u") AUTOUPDATE=1 ;;
-    "--auto-update-type")
-      AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
-      case "${AUTO_UPDATE_TYPE}" in
-        systemd|interval|crontab)
-          shift 1
-          ;;
-        *)
-          echo "Unrecognized value for --auto-update-type. Valid values are: systemd, interval, crontab"
-          exit 1
-          ;;
-      esac
-      ;;
+    "--auto-update" | "-u") ;;
+    "--auto-update-type") ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
     "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-freeipmi)}" | sed 's/$/ --enable-plugin-freeipmi/g')" ;;
@@ -1895,13 +1880,6 @@ echo >&2
 progress "Installing (but not enabling) the netdata updater tool"
 cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
 install_netdata_updater || run_failed "Cannot install netdata updater tool."
-
-progress "Check if we must enable/disable the netdata updater tool"
-if [ "${AUTOUPDATE}" = "1" ]; then
-  enable_netdata_updater "${AUTO_UPDATE_TYPE}" || run_failed "Cannot enable netdata updater tool"
-else
-  disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
-fi
 
 # -----------------------------------------------------------------------------
 progress "Wrap up environment set up"
