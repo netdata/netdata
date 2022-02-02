@@ -798,7 +798,10 @@ set_auto_updates() {
   fi
 
   if [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
-    if ! ${updater} --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
+    # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
+    if grep -qv '--enable-auto-updates' ${updater}; then
+      echo
+    elif ! ${updater} --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
       error "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
     fi
   else
@@ -1103,7 +1106,7 @@ try_static_install() {
 
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run ${ROOTCMD} sh "${tmpdir}/netdata-${SYSARCH}-latest.gz.run" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run ${ROOTCMD} sh "${tmpdir}/netdata-${SYSARCH}-latest.gz.run" ${opts} -- ${NETDATA_AUTO_UPDATES:+--auto-update} ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
@@ -1180,6 +1183,10 @@ build_and_install() {
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
     opts="${opts} --dont-wait"
+  fi
+
+  if [ "${NETDATA_AUTO_UPDATES}" -eq 1 ]; then
+    opts="${opts} --auto-update"
   fi
 
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
