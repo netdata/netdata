@@ -101,7 +101,7 @@ case "${DISTRO}" in
   fedora | oraclelinux)
     install_fedora_like
     ;;
-  centos)
+  centos | rockylinux)
     install_centos
     ;;
   opensuse)

@@ -23,7 +23,7 @@ jobs:
           - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "21.10", pkgclouddistro: ubuntu/impish, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: centos, version: "7", pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
-          - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
+          - {distro: rockylinux, version: "8", pkgclouddistro: el/8, format: rpm, base_image: rockylinux/rockylinux, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "35", pkgclouddistro: fedora/35, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
           - {distro: opensuse, version: "15.3", pkgclouddistro: opensuse/15.3, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}

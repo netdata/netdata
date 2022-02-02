@@ -156,7 +156,7 @@ To view the Netdata dashboard, navigate to `http://localhost:19999`, or `http://
 See our documentation for [additional operating
 systems](/packaging/installer/README.md#have-a-different-operating-system-or-want-to-try-another-method), including
 [Kubernetes](/packaging/installer/methods/kubernetes.md), [`.deb`/`.rpm`
-packages](/packaging/installer/methods/packages.md), and more.
+packages](/packaging/installer/methods/kickstart.md#native-packages), and more.
 
 ### Post-installation
 

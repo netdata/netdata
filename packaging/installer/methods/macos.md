@@ -82,7 +82,7 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    ```bash
    brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
    ```
-
+   
 4. Optional: If you want to use the [database engine](/database/engine/README.md) to store your metrics, you need to download
 and install the [Judy library](https://sourceforge.net/projects/judy/) before proceeding compiling Netdata.
 

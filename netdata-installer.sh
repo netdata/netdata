@@ -27,9 +27,23 @@ fi
 
 # -----------------------------------------------------------------------------
 # Pull in OpenSSL properly if on macOS
-if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ]; then
-  export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
-  export LDFLAGS="-L/usr/local/opt/openssl@1.1/lib"
+if [ "$(uname -s)" = 'Darwin' ]; then
+  if brew --prefix > /dev/null 2>&1; then
+    if brew --prefix --installed openssl > /dev/null 2>&1; then
+      HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl)
+    elif brew --prefix --installed openssl@3 > /dev/null 2>&1; then
+      HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@3)
+    elif brew --prefix --installed openssl@1.1 > /dev/null 2>&1; then
+      HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@1.1)
+    fi
+    if [ -n "${HOMEBREW_OPENSSL_PREFIX}" ]; then
+      export CFLAGS="${CFLAGS} -I${HOMEBREW_OPENSSL_PREFIX}/include"
+      export LDFLAGS="${LDFLAGS} -L${HOMEBREW_OPENSSL_PREFIX}/lib"
+    fi
+    HOMEBREW_PREFIX=$(brew --prefix)
+    export CFLAGS="${CFLAGS} -I${HOMEBREW_PREFIX}/include"
+    export LDFLAGS="${LDFLAGS} -L${HOMEBREW_PREFIX}/lib"
+  fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -232,8 +246,8 @@ USAGE: ${PROGRAM} [options]
   --disable-backend-prometheus-remote-write
   --enable-backend-mongodb   Enable MongoDB backend. Default: enable it when libmongoc is available.
   --disable-backend-mongodb
-  --enable-exporting-pubsub  Enable Google Cloud PupSub exporting connector. Default: enable it when
-                             libgoogle_cloud_cpp_pubsub_protos and libraries it depends on are available.
+  --enable-exporting-pubsub  Enable Google Cloud PubSub exporting connector. Default: enable it when
+                             libgoogle_cloud_cpp_pubsub_protos and its dependencies are available.
   --disable-exporting-pubsub
   --enable-lto               Enable Link-Time-Optimization. Default: disabled
   --disable-lto

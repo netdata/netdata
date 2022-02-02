@@ -304,18 +304,24 @@ update_available() {
 }
 
 set_tarball_urls() {
-  extension="tar.gz"
+  filename="netdata-latest.tar.gz"
 
   if [ "$2" = "yes" ]; then
-    extension="gz.run"
+    if [ -e /opt/netdata/etc/netdata/.install-type ]; then
+      # shellcheck disable=SC1091
+      . /opt/netdata/etc/netdata/.install-type
+      filename="netdata-${PREBUILT_ARCH}-latest.gz.run"
+    else
+      filename="netdata-x86_64-latest.gz.run"
+    fi
   fi
 
   if [ "$1" = "stable" ]; then
     latest="$(get_netdata_latest_tag /dev/stdout)"
-    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-latest.${extension}"
+    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
-    export NETDATA_TARBALL_URL="$NETDATA_NIGHTLIES_BASEURL/netdata-latest.${extension}"
+    export NETDATA_TARBALL_URL="$NETDATA_NIGHTLIES_BASEURL/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_NIGHTLIES_BASEURL/sha256sums.txt"
   fi
 }

@@ -17,7 +17,7 @@ completely new to Netdata, or have never tried health monitoring/performance tro
 guide is perfect for you.
 
 If you have monitoring experience, or would rather get straight into configuring Netdata to your needs, you can jump
-straight into code and configurations with our [getting started guide](/docs/get-started.md).
+straight into code and configurations with our [getting started guide](/docs/get-started.mdx).
 
 > This guide contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
 > other supported operating systems, like FreeBSD and macOS, but we can't make any guarantees.
