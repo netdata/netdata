@@ -1648,6 +1648,7 @@ int sql_store_chart_hash(
 
 void compute_chart_hash(RRDSET *st)
 {
+#ifdef ENABLE_HTTPS
     EVP_MD_CTX *evpctx;
     unsigned char hash_value[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
@@ -1693,6 +1694,9 @@ void compute_chart_hash(RRDSET *st)
         st->module_name,
         st->priority,
         st->chart_type);
+#else
+    UNUSED(st);
+#endif
     return;
 }
 
