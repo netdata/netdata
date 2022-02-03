@@ -115,7 +115,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
             CFRelease(properties);
             IOObjectRelease(drive_media);
 
-            if(unlikely(!diskstat.name || !*diskstat.name)) {
+            if(unlikely(!*diskstat.name)) {
                 IOObjectRelease(drive);
                 continue;
             }
