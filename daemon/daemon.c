@@ -102,7 +102,11 @@ int become_user(const char *username, int pid_fd) {
     gid_t *supplementary_groups = NULL;
     if(ngroups > 0) {
         supplementary_groups = mallocz(sizeof(gid_t) * ngroups);
+#ifdef __APPLE__
+        if(getgrouplist(username, gid, (int *)supplementary_groups, &ngroups) == -1) {
+#else
         if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
+#endif /* __APPLE__ */
             if(am_i_root)
                 error("Cannot get supplementary groups of user '%s'.", username);
 
