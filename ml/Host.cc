@@ -9,6 +9,17 @@
 
 using namespace ml;
 
+static std::pair<std::string, std::string>
+getHostSpecificIdAndTitle(RRDHOST *RH, const std::string &IdPrefix,
+                                       const std::string &TitlePrefix) {
+    std::stringstream IdSS, TitleSS;
+
+    IdSS << IdPrefix << "_" << RH->machine_guid;
+    TitleSS << TitlePrefix << " " << RH->hostname;
+
+    return {IdSS.str(), TitleSS.str()};
+}
+
 static void updateDimensionsChart(RRDHOST *RH,
                                   collected_number NumTrainedDimensions,
                                   collected_number NumNormalDimensions,
@@ -20,14 +31,17 @@ static void updateDimensionsChart(RRDHOST *RH,
     static thread_local RRDDIM *NumAnomalousDimensionsRD = nullptr;
 
     if (!RS) {
-        RS = rrdset_create(
-            RH, // host
+        std::string IdPrefix = "dimensions";
+        std::string TitlePrefix = "Anomaly detection dimensions for host";
+        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+
+        RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            "dimensions", // id
+            P.first.c_str(), // id
             NULL, // name
             "dimensions", // family
             NULL, // ctx
-            "Anomaly detection dimensions", // title
+            P.second.c_str(), // title
             "dimensions", // units
             "netdata", // plugin
             "ml", // module
@@ -60,14 +74,17 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
     static thread_local RRDDIM *AnomalyRateRD = nullptr;
 
     if (!RS) {
-        RS = rrdset_create(
-            RH, // host
+        std::string IdPrefix = "anomaly_rate";
+        std::string TitlePrefix = "Percentage of anomalous dimensions for host";
+        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+
+        RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            "anomaly_rate", // id
+            P.first.c_str(), // id
             NULL, // name
             "anomaly_rate", // family
             NULL, // ctx
-            "Percentage of anomalous dimensions", // title
+            P.second.c_str(), // title
             "percentage", // units
             "netdata", // plugin
             "ml", // module
@@ -91,14 +108,17 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
     static thread_local RRDDIM *WindowLengthRD = nullptr;
 
     if (!RS) {
-        RS = rrdset_create(
-            RH, // host
+        std::string IdPrefix = "detector_window";
+        std::string TitlePrefix = "Anomaly detector window length for host";
+        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+
+        RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            "detector_window", // id
+            P.first.c_str(), // id
             NULL, // name
             "detector_window", // family
             NULL, // ctx
-            "Anomaly detector window length", // title
+            P.second.c_str(), // title
             "seconds", // units
             "netdata", // plugin
             "ml", // module
@@ -126,14 +146,17 @@ static void updateEventsChart(RRDHOST *RH,
     static thread_local RRDDIM *NewAnomalyEventRD = nullptr;
 
     if (!RS) {
-        RS = rrdset_create(
-            RH, // host
+        std::string IdPrefix = "detector_events";
+        std::string TitlePrefix = "Anomaly events triggered for host";
+        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+
+        RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            "detector_events", // id
+            P.first.c_str(), // id
             NULL, // name
             "detector_events", // family
             NULL, // ctx
-            "Anomaly events triggered", // title
+            P.second.c_str(), // title
             "boolean", // units
             "netdata", // plugin
             "ml", // module
@@ -166,14 +189,17 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
     static thread_local RRDDIM *PredictiobDurationRD = nullptr;
 
     if (!RS) {
-        RS = rrdset_create(
-            RH, // host
+        std::string IdPrefix = "prediction_stats";
+        std::string TitlePrefix = "Time it took to run prediction for host";
+        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+
+        RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            "prediction_stats", // id
+            P.first.c_str(), // id
             NULL, // name
             "prediction_stats", // family
             NULL, // ctx
-            "Time it took to run prediction", // title
+            P.second.c_str(), // title
             "milliseconds", // units
             "netdata", // plugin
             "ml", // module
@@ -201,14 +227,17 @@ static void updateTrainingChart(RRDHOST *RH,
     static thread_local RRDDIM *MaxTrainingDurationRD = nullptr;
 
     if (!RS) {
-        RS = rrdset_create(
-            RH, // host
+        std::string IdPrefix = "training_stats";
+        std::string TitlePrefix = "Training step statistics for host";
+        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+
+        RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            "training_stats", // id
+            P.first.c_str(), // id
             NULL, // name
             "training_stats", // family
             NULL, // ctx
-            "Training step statistics", // title
+            P.second.c_str(), // title
             "milliseconds", // units
             "netdata", // plugin
             "ml", // module
@@ -231,12 +260,18 @@ static void updateTrainingChart(RRDHOST *RH,
 }
 
 void RrdHost::addDimension(Dimension *D) {
-    std::lock_guard<std::mutex> Lock(Mutex);
+	RRDDIM *AnomalyRateRD = rrddim_add(AnomalyRateRS, D->getID().c_str(), NULL,
+                                       1, 1000, RRD_ALGORITHM_ABSOLUTE);
+    D->setAnomalyRateRD(AnomalyRateRD);
 
-    DimensionsMap[D->getRD()] = D;
+	{
+		std::lock_guard<std::mutex> Lock(Mutex);
 
-    // Default construct mutex for dimension
-    LocksMap[D];
+		DimensionsMap[D->getRD()] = D;
+
+		// Default construct mutex for dimension
+	    LocksMap[D];
+	}
 }
 
 void RrdHost::removeDimension(Dimension *D) {
@@ -344,7 +379,7 @@ void TrainableHost::train() {
 }
 
 void DetectableHost::detectOnce() {
-    auto P = BRW.insert(AnomalyRate >= Cfg.HostAnomalyRateThreshold);
+    auto P = BRW.insert(WindowAnomalyRate >= Cfg.HostAnomalyRateThreshold);
     BitRateWindow::Edge Edge = P.first;
     size_t WindowLength = P.second;
 
@@ -361,6 +396,10 @@ void DetectableHost::detectOnce() {
     double TotalTrainingDuration = 0.0;
     double MaxTrainingDuration = 0.0;
 
+    bool CollectAnomalyRates = (++AnomalyRateTimer == Cfg.DBEngineAnomalyRateEvery);
+    if (CollectAnomalyRates)
+        rrdset_next(AnomalyRateRS);
+
     {
         std::lock_guard<std::mutex> Lock(Mutex);
 
@@ -371,7 +410,7 @@ void DetectableHost::detectOnce() {
 
             auto P = D->detect(WindowLength, ResetBitCounter);
             bool IsAnomalous = P.first;
-            double AnomalyRate = P.second;
+            double AnomalyScore = P.second;
 
             NumTrainedDimensions += D->isTrained();
 
@@ -382,16 +421,26 @@ void DetectableHost::detectOnce() {
             if (IsAnomalous)
                 NumAnomalousDimensions += 1;
 
-            if (NewAnomalyEvent && (AnomalyRate >= Cfg.ADDimensionRateThreshold))
-                DimsOverThreshold.push_back({ AnomalyRate, D->getID() });
+            if (NewAnomalyEvent && (AnomalyScore >= Cfg.ADDimensionRateThreshold))
+                DimsOverThreshold.push_back({ AnomalyScore, D->getID() });
+
+            D->updateAnomalyBitCounter(AnomalyRateRS, AnomalyRateTimer, IsAnomalous);
+
+            if (NewAnomalyEvent && (AnomalyScore >= Cfg.ADDimensionRateThreshold))
+                DimsOverThreshold.push_back({ AnomalyScore, D->getID() });
         }
 
         if (NumAnomalousDimensions)
-            AnomalyRate = static_cast<double>(NumAnomalousDimensions) / DimensionsMap.size();
+            WindowAnomalyRate = static_cast<double>(NumAnomalousDimensions) / DimensionsMap.size();
         else
-            AnomalyRate = 0.0;
+            WindowAnomalyRate = 0.0;
 
         NumNormalDimensions = DimensionsMap.size() - NumAnomalousDimensions;
+    }
+
+    if (CollectAnomalyRates) {
+        AnomalyRateTimer = 0;
+        rrdset_done(AnomalyRateRS);
     }
 
     this->NumAnomalousDimensions = NumAnomalousDimensions;
@@ -399,7 +448,7 @@ void DetectableHost::detectOnce() {
     this->NumTrainedDimensions = NumTrainedDimensions;
 
     updateDimensionsChart(getRH(), NumTrainedDimensions, NumNormalDimensions, NumAnomalousDimensions);
-    updateRateChart(getRH(), AnomalyRate * 10000.0);
+    updateRateChart(getRH(), WindowAnomalyRate * 10000.0);
     updateWindowLengthChart(getRH(), WindowLength);
     updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
     updateTrainingChart(getRH(), TotalTrainingDuration * 1000.0, MaxTrainingDuration * 1000.0);

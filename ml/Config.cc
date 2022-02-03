@@ -22,7 +22,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void Config::readMLConfig(void) {
     const char *ConfigSectionML = CONFIG_SECTION_ML;
 
-    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
+    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", true);
 
     /*
      * Read values
@@ -31,6 +31,8 @@ void Config::readMLConfig(void) {
     unsigned MaxTrainSamples = config_get_number(ConfigSectionML, "maximum num samples to train", 4 * 3600);
     unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 3600);
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
+
+    unsigned DBEngineAnomalyRateEvery = config_get_number(ConfigSectionML, "dbengine anomaly rate every", 60);
 
     unsigned DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
@@ -98,9 +100,19 @@ void Config::readMLConfig(void) {
 
     Cfg.EnableAnomalyDetection = EnableAnomalyDetection;
 
+#if 0
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
+
+    Cfg.DBEngineAnomalyRateEvery = DBEngineAnomalyRateEvery;
+#else
+    Cfg.MaxTrainSamples = 2 * 60;
+    Cfg.MinTrainSamples = 1 * 60;
+    Cfg.TrainEvery = 1 * 60;
+
+    Cfg.DBEngineAnomalyRateEvery = 1 * 5;
+#endif
 
     Cfg.DiffN = DiffN;
     Cfg.SmoothN = SmoothN;
@@ -120,9 +132,16 @@ void Config::readMLConfig(void) {
     Cfg.HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     Cfg.SP_HostsToSkip = simple_pattern_create(Cfg.HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 
-    Cfg.ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training",
+    // Always exclude anomaly_detection charts from training.
+    Cfg.ChartsToSkip = "anomaly_detection.* ";
+#if 0
+    Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training",
             "!system.* !cpu.* !mem.* !disk.* !disk_* "
             "!ip.* !ipv4.* !ipv6.* !net.* !net_* !netfilter.* "
             "!services.* !apps.* !groups.* !user.* !ebpf.* !netdata.* *");
+#else
+    Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training", "!system.cpu *");
+#endif
+
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 }

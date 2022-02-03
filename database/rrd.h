@@ -436,6 +436,7 @@ struct rrdset_volatile {
     uuid_t hash_id;
     struct label *new_labels;
     struct label_index labels;
+    bool is_ar_chart;
 };
 
 // ----------------------------------------------------------------------------

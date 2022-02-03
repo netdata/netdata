@@ -217,6 +217,7 @@ int rrdset2anything_api_v1(
         , time_t *latest_timestamp
         , struct context_param *context_param_list
         , char *chart_label_key
+        , int max_anomaly_rates
 ) {
 
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
@@ -227,6 +228,9 @@ int rrdset2anything_api_v1(
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
+
+    if (st->state->is_ar_chart)
+        ml_process_rrdr(r, max_anomaly_rates);
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 

@@ -22,8 +22,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.claim_id = is_agent_claimed();
     node_info.machine_guid = wc->host_guid;
     node_info.child = (wc->host != localhost);
-    node_info.ml_info.ml_capable = localhost->system_info->ml_capable;
-    node_info.ml_info.ml_enabled = wc->host->ml_host != NULL;
+    node_info.ml_info.ml_capable = ml_capable(localhost);
+    node_info.ml_info.ml_enabled = ml_enabled(wc->host);
     now_realtime_timeval(&node_info.updated_at);
 
     RRDHOST *host = wc->host;

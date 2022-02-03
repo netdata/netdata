@@ -73,9 +73,15 @@ inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
     rd->name = config_set_default(st->config_section, varname, name);
     rd->hash_name = simple_hash(rd->name);
-    rrddimvar_rename_all(rd);
+
+    if (!st->state->is_ar_chart)
+        rrddimvar_rename_all(rd);
+
     rd->exposed = 0;
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
+    ml_dimension_update_name(st, rd, name);
+
     return 1;
 }
 
@@ -438,7 +444,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         td->next = rd;
     }
 
-    if(host->health_enabled) {
+    if(host->health_enabled && !st->state->is_ar_chart) {
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);

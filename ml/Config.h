@@ -15,6 +15,8 @@ public:
     unsigned MinTrainSamples;
     unsigned TrainEvery;
 
+    unsigned DBEngineAnomalyRateEvery;
+
     unsigned DiffN;
     unsigned SmoothN;
     unsigned LagN;

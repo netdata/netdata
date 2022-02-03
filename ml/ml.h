@@ -8,9 +8,18 @@ extern "C" {
 #endif
 
 #include "daemon/common.h"
+#include "web/api/queries/rrdr.h"
+
+// This is an internal DBEngine function redeclared here so that we can free
+// the anomaly rate dimension, whenever its backing dimension is freed.
+extern void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated);
 
 typedef void* ml_host_t;
 typedef void* ml_dimension_t;
+
+bool ml_capable();
+
+bool ml_enabled(RRDHOST *RH);
 
 void ml_init(void);
 
@@ -30,6 +39,12 @@ char *ml_get_anomaly_events(RRDHOST *RH, const char *AnomalyDetectorName,
 
 char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
                                 int AnomalyDetectorVersion, time_t After, time_t Before);
+
+void ml_process_rrdr(RRDR *R, int MaxAnomalyRates);
+
+void ml_dimension_update_name(RRDSET *RS, RRDDIM *RD, const char *name);
+
+#define ML_ANOMALY_RATES_CHART_ID  "anomaly_detection.anomaly_rates"
 
 #if defined(ENABLE_ML_TESTS)
 int test_ml(int argc, char *argv[]);
