@@ -321,11 +321,24 @@ services:
 
 #### Giving group access to the Docker socket (less safe)
 
-**Important Note**: You should seriously consider the necessity of activating this option, as it grants to the `netdata`
+> You should seriously consider the necessity of activating this option, as it grants to the `netdata`
 user access to the privileged socket connection of docker service and therefore your whole machine.
 
 If you want to have your container names resolved by Netdata, make the `netdata` user be part of the group that owns the
 socket.
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    volumes:
+      # ... other volumes ...
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PGID=[GROUP NUMBER]
+```
 
 To achieve that just add environment variable `PGID=[GROUP NUMBER]` to the Netdata container, where `[GROUP NUMBER]` is
 practically the group id of the group assigned to the docker socket, on your host.
