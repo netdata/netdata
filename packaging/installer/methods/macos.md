@@ -83,16 +83,13 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
    ```
    
-4. Optional: If you want to use the [database engine](/database/engine/README.md) to store your metrics, you need to download
-and install the [Judy library](https://sourceforge.net/projects/judy/) before proceeding compiling Netdata.
-
-5. Download Netdata from our GitHub repository:
+4. Download Netdata from our GitHub repository:
 
    ```bash
    git clone https://github.com/netdata/netdata.git --recursive
    ```
 
-6. `cd` into the newly-created directory and then start the installer script:
+5. `cd` into the newly-created directory and then start the installer script:
 
    ```bash
    cd netdata/
