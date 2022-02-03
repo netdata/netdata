@@ -54,10 +54,6 @@ override_dh_install:
 
 	dh_install
 
-	# Copy the updater script
-	#
-	cp -v packaging/installer/netdata-updater.sh $(TOP)/usr/libexec/netdata/netdata-updater.sh
-
 	# Set the CUPS plugin install rule
 	#
 	mkdir -p $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d
@@ -78,6 +74,10 @@ override_dh_install:
 	mkdir -p "$(TOP)/var/log/netdata"
 	mkdir -p "$(TOP)/var/cache/netdata"
 	mkdir -p "$(TOP)/var/run/netdata"
+
+	# Copy the updater script
+	#
+	cp -v packaging/installer/netdata-updater.sh $(TOP)/usr/libexec/netdata/netdata-updater.sh
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
