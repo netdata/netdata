@@ -48,7 +48,7 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
 #endif
 
     // Do not export anomaly rates charts.
-    if (st->state->is_ar_chart)
+    if (st->state && st->state->is_ar_chart)
         return 0;
 
     if (st->exporting_flags == NULL)
