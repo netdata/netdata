@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 By default, the Netdata Agent automatically updates with the latest nightly or stable version depending on which
 you installed. If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly
-or stable version.
+or stable version. You can also [enable or disable automatic updates on an existing install](#control-automatic-updates).
 
 > 💡 Looking to reinstall the Netdata Agent to enable a feature, update an Agent that cannot update automatically, or
 > troubleshoot an error during the installation process? See our [reinstallation doc](/packaging/installer/REINSTALL.md)
@@ -21,7 +21,7 @@ icon in the local Agent dashboard's top navigation. This modal informs you wheth
 
 ## Determine which installation method you used
 
-On newer Netdata installs, you can use Netdata itself to determine the installation type by running:
+Starting with netdata v1.33.0, you can use Netdata itself to determine the installation type by running:
 
 ```bash
 netdata -W buildinfo | grep 'Install type:'
@@ -128,4 +128,31 @@ sudo ./netdata-installer.sh
 > ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
 > want to retain those settings, you need to set them again during this process.
 
+## Control automatic updates
 
+Starting with Netdata v1.34.0, you can easily enable or disable automatic updates on an existing installation
+using the updater script.
+
+For most installs on Linux, you can enable auto-updates with:
+
+```bash
+/usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
+```
+
+and disable them with:
+
+```bash
+/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+```
+
+For static installs, instead use:
+
+```bash
+/opt/netdata//usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
+```
+
+and:
+
+```bash
+/opt/netdata//usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+```
