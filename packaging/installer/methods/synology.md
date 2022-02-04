@@ -13,12 +13,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 > [submitting a PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md) 
 > with your recommended improvements or changes. Thank you!
 
-The documentation previously recommended installing the Debian Chroot package from the Synology community package
-sources and then running Netdata from within the chroot. This does not work, as the chroot environment does not have
-access to `/proc`, and therefore exposes very few metrics to Netdata. Additionally, [this
-issue](https://github.com/SynoCommunity/spksrc/issues/2758), still open as of 2018/06/24, indicates that the Debian
-Chroot package is not suitable for DSM versions greater than version 5 and may corrupt system libraries and render the
-NAS unable to boot.
 
 The good news is that our [one-line installation script](kickstart.md) works fine if your NAS is one that uses the amd64 architecture. It
 will install the content into `/opt/netdata`, making future removal safe and simple.
