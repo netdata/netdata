@@ -462,11 +462,19 @@ str_in_list() {
 confirm_root_support() {
   if [ "$(id -u)" -ne "0" ]; then
     if [ -z "${ROOTCMD}" ] && command -v sudo > /dev/null; then
-      ROOTCMD="sudo"
+      if [ "${INTERACTIVE}" -eq 0 ]; then
+        ROOTCMD="sudo -n"
+      else
+        ROOTCMD="sudo"
+      fi
     fi
 
     if [ -z "${ROOTCMD}" ] && command -v doas > /dev/null; then
-      ROOTCMD="doas"
+      if [ "${INTERACTIVE}" -eq 0 ]; then
+        ROOTCMD="doas -n"
+      else
+        ROOTCMD="doas"
+      fi
     fi
 
     if [ -z "${ROOTCMD}" ] && command -v pkexec > /dev/null; then
