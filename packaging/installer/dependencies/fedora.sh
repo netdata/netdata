@@ -1,39 +1,58 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << Ubuntu: [18.04] [20.04] [20.10] [21.04] [21.10] >> | << Linux Mint >>
+# << Fedora: [24->35] >>
 
 set -e
 
 NON_INTERACTIVE=0
 DONT_WAIT=0
 
-package_tree="
-  git
+os_version() {
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck disable=SC2002
+    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2
+  else
+    echo "Erorr: Cannot determine OS version!"
+    exit 1
+  fi
+}
+
+if [[ $(os_version) -gt 24 ]]; then
+  ulogd_pkg=
+else
+  ulogd_pkg=ulogd
+fi
+
+declare -a package_tree=(
+  findutils
   gcc
-  g++
+  gcc-c++
   make
-  automake
-  cmake
   autoconf
   autoconf-archive
   autogen
+  automake
   libtool
-  pkg-config
+  cmake
+  nmap-ncat
+  zlib-devel
+  libuuid-devel
+  libmnl-devel
+  json-c-devel
+  libuv-devel
+  lz4-devel
+  openssl-devel
+  Judy-devel
+  elfutils-libelf-devel
+  git
+  pkgconfig
   tar
   curl
   gzip
-  netcat
-  zlib1g-dev
-  uuid-dev
-  libmnl-dev
-  libjson-c-dev
-  libuv1-dev
-  liblz4-dev
-  libssl-dev
-  libjudy-dev
-  libelf-dev
   python3
-  "
+  "${ulogd_pkg}"
+)
+
 usage() {
   cat << EOF
 OPTIONS:
@@ -76,27 +95,25 @@ check_flags ${@}
 
 packages_to_install=
 
-for package in $package_tree; do
-  if dpkg -s "$package" &> /dev/null; then
+# shellcheck disable=SC2068
+for package in ${package_tree[@]}; do
+  if rpm -q "$package" &> /dev/null; then
     echo "Package '${package}' is installed"
   else
-    echo "Package '${package}' is NOT installed"
+    echo "Package '$package' is NOT installed"
     packages_to_install="$packages_to_install $package"
   fi
 done
 
-if [[ -z "$packages_to_install" ]]; then
+if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
-  echo "packages_to_install:" "$packages_to_install"
+  echo "packages_to_install:" "${packages_to_install[@]}"
   opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
-    export DEBIAN_FRONTEND="noninteractive"
-    opts="${opts} -yq"
+    opts="-y"
   fi
-  echo "Running apt-get update and updating your APT caches ..."
-  apt-get update
-  # shellcheck disable=SC2086
-  apt-get install ${opts} $packages_to_install
+  # shellcheck disable=SC2068
+  dnf install ${opts} ${packages_to_install[@]}
 fi
