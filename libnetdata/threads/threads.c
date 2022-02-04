@@ -147,6 +147,7 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
     pthread_set_name_np(ut, threadname);
 #elif defined(__APPLE__)
     // Apple can only set its own name
+    UNUSED(ut);
 #else
     ret = pthread_setname_np(ut, threadname);
 #endif

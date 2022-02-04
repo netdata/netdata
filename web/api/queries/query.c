@@ -347,11 +347,11 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
 // ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
 
-static inline RRDR_VALUE_FLAGS *rrdr_line_options(RRDR *r, long rrdr_line) {
+static inline RRDR_VALUE_FLAGS *UNUSED_FUNCTION(rrdr_line_options)(RRDR *r, long rrdr_line) {
     return &r->o[ rrdr_line * r->d ];
 }
 
-static inline calculated_number *rrdr_line_values(RRDR *r, long rrdr_line) {
+static inline calculated_number *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rrdr_line) {
     return &r->v[ rrdr_line * r->d ];
 }
 

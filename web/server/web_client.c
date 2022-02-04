@@ -582,14 +582,14 @@ static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char 
     return func(host, w, url);
 }
 
-static inline int check_host_and_dashboard_acl_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
+static inline int UNUSED_FUNCTION(check_host_and_dashboard_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
     if(!web_client_can_access_dashboard(w))
         return web_client_permission_denied(w);
 
     return check_host_and_call(host, w, url, func);
 }
 
-static inline int check_host_and_mgmt_acl_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
+static inline int UNUSED_FUNCTION(check_host_and_mgmt_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
     if(!web_client_can_access_mgmt(w))
         return web_client_permission_denied(w);
 

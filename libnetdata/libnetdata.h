@@ -304,6 +304,13 @@ extern char *find_and_replace(const char *src, const char *find, const char *rep
 /* misc. */
 
 #define UNUSED(x) (void)(x)
+
+#ifdef __GNUC__
+#define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
+#else
+#define UNUSED_FUNCTION(x) UNUSED_##x
+#endif
+
 #define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
 
 // Taken from linux kernel

@@ -343,13 +343,7 @@ static void sched_getscheduler_report(void) {
         }
     }
 }
-#else // !HAVE_SCHED_GETSCHEDULER
-static void sched_getscheduler_report(void) {
-#ifdef HAVE_GETPRIORITY
-    info("Running with priority %d", getpriority(PRIO_PROCESS, 0));
-#endif // HAVE_GETPRIORITY
-}
-#endif // !HAVE_SCHED_GETSCHEDULER
+#endif /* HAVE_SCHED_GETSCHEDULER */
 
 #ifdef HAVE_SCHED_SETSCHEDULER
 
@@ -422,11 +416,11 @@ fallback:
 report:
     sched_getscheduler_report();
 }
-#else // !HAVE_SCHED_SETSCHEDULER
+#else /* HAVE_SCHED_SETSCHEDULER */
 static void sched_setscheduler_set(void) {
     process_nice_level();
 }
-#endif // !HAVE_SCHED_SETSCHEDULER
+#endif /* HAVE_SCHED_SETSCHEDULER */
 
 int become_daemon(int dont_fork, const char *user)
 {
