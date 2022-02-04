@@ -419,8 +419,9 @@ get_system_info() {
           opensuse-leap)
             DISTRO_COMPAT_NAME="opensuse"
             ;;
-          rhel)
+          rocky|rhel)
             DISTRO_COMPAT_NAME="centos"
+            SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
             ;;
           *)
             DISTRO_COMPAT_NAME="unknown"
