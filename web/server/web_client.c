@@ -439,7 +439,7 @@ int mysendfile(struct web_client *w, char *filename) {
     sock_setnonblock(w->ifd);
 
     w->response.data->contenttype = contenttype_for_filename(webfilename);
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, statbuf.st_size, w->ifd, w->ofd);
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, webfilename, (int64_t)statbuf.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
     web_client_enable_wait_receive(w);
