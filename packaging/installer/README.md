@@ -5,6 +5,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 import { Install, InstallBox } from '../../../src/components/Install/'
 
+import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
 # Installation guide
 
 Netdata is a monitoring agent designed to run on all your systems: physical and virtual servers, containers, even
@@ -37,15 +38,11 @@ This method is fully automatic on all Linux distributions, including Ubuntu, Deb
 To install Netdata, including all dependencies required to connect to Netdata Cloud, and get _automatic nightly
 updates_, run the following as your normal user:
 
-```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-```
+<OneLineInstallWget/>
 
 Or, if you have cURL but not wget (such as on macOS):
 
-```bash
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-```
+<OneLineInstallCurl/>
 
 This script will preferentially use native DEB/RPM packages if we provide them for your platform.
 
