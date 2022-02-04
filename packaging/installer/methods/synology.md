@@ -6,6 +6,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Install Netdata on Synology
 
+> 💡 This document is maintained by Netdata's community, and may not be completely up-to-date. Please double-check the
+> details of the installation process, before proceeding.
+>
+> You can help improve this document by 
+> [submitting a PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md) 
+> with your recommended improvements or changes. Thank you!
+
 The documentation previously recommended installing the Debian Chroot package from the Synology community package
 sources and then running Netdata from within the chroot. This does not work, as the chroot environment does not have
 access to `/proc`, and therefore exposes very few metrics to Netdata. Additionally, [this
