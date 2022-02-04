@@ -73,7 +73,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
     // NEEDED BY: do_space, do_inodes
     struct statfs *mntbuf;
     int mntsize, i;
-    char mntonname[MNAMELEN + 1];
     char title[4096 + 1];
 
     // NEEDED BY: do_bandwidth
