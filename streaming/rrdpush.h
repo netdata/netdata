@@ -131,5 +131,6 @@ extern void replication_receiver_init(struct receiver_state *receiver, struct co
 extern void replication_sender_thread_spawn(RRDHOST *host);
 extern int replication_receiver_thread_spawn(struct web_client *w, char *url);
 extern void replication_sender_thread_stop(RRDHOST *host);
+extern void *replication_sender_thread(void *ptr);
 
 #endif //NETDATA_RRDPUSH_H

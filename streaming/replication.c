@@ -2,7 +2,10 @@
 #include "rrdpush.h"
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-static void replication_receiver_thread_cleanup_callback(RRDHOST *host);
+extern struct config stream_config;
+extern int netdata_use_ssl_on_stream;
+
+static void replication_receiver_thread_cleanup_callback(void *host);
 static void replication_sender_thread_cleanup_callback(void *ptr);
 
 // Thread Initialization
@@ -61,8 +64,237 @@ void replication_receiver_init(struct receiver_state *receiver, struct config *s
     info("%s: Initialize Rx for host %s ", REPLICATION_MSG, receiver->host->hostname);
 }
 
+// Connection management & socket handling functions
+//Close the socket of the replication sender thread
+static void replication_sender_thread_close_socket(RRDHOST *host) {
+    host->sender->replication->connected = 0;
+
+    if(host->sender->replication->socket != -1) {
+        close(host->sender->replication->socket);
+        host->sender->replication->socket = -1;
+    }
+}
+
+extern void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host);
+extern void rrdpush_clean_encoded(stream_encoded_t *se);
+
+// Connect to parent. The REPLICATE command over HTTP req triggers the receiver thread in parent.
+//TODO: revise the logic of the communication
+static int replication_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
+
+    struct timeval tv = {
+            .tv_sec = timeout,
+            .tv_usec = 0
+    };
+
+    // make sure the socket is closed
+    replication_sender_thread_close_socket(host);
+
+    debug(D_REPLICATION, "%s: Attempting to connect...", REPLICATION_MSG);
+    info("%s %s [send to %s]: connecting...", REPLICATION_MSG, host->hostname, host->rrdpush_send_destination);
+
+    host->sender->replication->socket = connect_to_one_of(
+            host->rrdpush_send_destination
+            , default_port
+            , &tv
+            , &s->replication->reconnects_counter
+            , s->replication->connected_to
+            , sizeof(s->replication->connected_to)-1
+    );
+
+    if(unlikely(host->sender->replication->socket == -1)) {
+        error("%s %s [send to %s]: failed to connect", REPLICATION_MSG, host->hostname, host->rrdpush_send_destination);
+        return 0;
+    }
+
+    info("%s %s [send to %s]: initializing communication...", REPLICATION_MSG, host->hostname, s->replication->connected_to);
+
+#ifdef ENABLE_HTTPS
+    if( netdata_client_ctx ){
+        host->ssl.flags = NETDATA_SSL_START;
+        if (!host->ssl.conn){
+            host->ssl.conn = SSL_new(netdata_client_ctx);
+            if(!host->ssl.conn){
+                error("Failed to allocate SSL structure.");
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            }
+        }
+        else{
+            SSL_clear(host->ssl.conn);
+        }
+
+        if (host->ssl.conn)
+        {
+            if (SSL_set_fd(host->ssl.conn, host->sender->replication->socket) != 1) {
+                error("Failed to set the socket to the SSL on socket fd %d.", host->sender->replication->socket);
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            } else{
+                host->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+            }
+        }
+    }
+    else {
+        host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+    }
+#endif
+
+    stream_encoded_t se;
+    rrdpush_encode_variable(&se, host);
+    // Add here any extra information to transmit with the.
+    char http[HTTP_HEADER_SIZE + 1];
+    int eol = snprintfz(http, HTTP_HEADER_SIZE,
+            "%s key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%s"
+                 "&NETDATA_PROTOCOL_VERSION=%u"
+                 " HTTP/1.1\r\n"
+                 "User-Agent: %s\r\n"
+                 "Accept: */*\r\n\r\n"
+                 , REPLICATE_CMD
+                 , host->rrdpush_send_api_key
+                 , host->hostname
+                 , host->registry_hostname
+                 , host->machine_guid
+                 , default_rrd_update_every
+                 , host->timezone
+                 , host->abbrev_timezone
+                 , host->utc_offset
+                 , host->system_info->hops + 1
+                 , (host->tags) ? host->tags : ""
+                 , host->program_version
+                 , STREAMING_PROTOCOL_CURRENT_VERSION
+                 , host->program_name);
+    http[eol] = 0x00;
+    rrdpush_clean_encoded(&se);
+
+
+#ifdef ENABLE_HTTPS
+    if (!host->ssl.flags) {
+        ERR_clear_error();
+        SSL_set_connect_state(host->ssl.conn);
+        int err = SSL_connect(host->ssl.conn);
+        if (err != 1){
+            err = SSL_get_error(host->ssl.conn, err);
+            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
+            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+                replication_sender_thread_close_socket(host);
+                return 0;
+            }else {
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            }
+        }
+        else {
+            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+                if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
+                    if ( security_test_certificate(host->ssl.conn)) {
+                        error("Closing the replication stream connection, because the server SSL certificate is not valid.");
+                        replication_sender_thread_close_socket(host);
+                        return 0;
+                    }
+                }
+            }
+        }
+    }
+    if(send_timeout(&host->ssl,host->sender->replication->socket, http, strlen(http), 0, timeout) == -1) {
+#else
+    if(send_timeout(host->sender->replication->socket, http, strlen(http), 0, timeout) == -1) {
+#endif
+        error("%s %s [send to %s]: failed to send HTTP header to remote netdata.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
+        replication_sender_thread_close_socket(host);
+        return 0;
+    }
+
+    info("%s %s [send to %s]: waiting response from remote netdata...", REPLICATION_MSG, host->hostname, s->replication->connected_to);
+
+    ssize_t received;
+#ifdef ENABLE_HTTPS
+    received = recv_timeout(&host->ssl,host->sender->replication->socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    if(received == -1) {
+#else
+    received = recv_timeout(host->sender->replication->socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    if(received == -1) {
+#endif
+        error("%s %s [send to %s]: remote netdata does not respond.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
+        replication_sender_thread_close_socket(host);
+        return 0;
+    }
+
+    http[received] = '\0';
+    debug(D_REPLICATION, "Response to sender from far end: %s", http);
+    // REP ack should be in the beggining of the response
+    // TODO: Verify the final commands (strings, numbers???) - a simple parser function can be used here.
+    if(unlikely(memcmp(http, REP_ACK_CMD, (size_t)strlen(REP_ACK_CMD)))) {
+        error("%s %s [send to %s]: server is not replying properly (is it a netdata?).", REPLICATION_MSG, host->hostname, s->connected_to);
+        replication_sender_thread_close_socket(host);
+        return 0;
+    }
+    s->replication->connected = 1;
+    // END of REP ack checking.
+
+    info("%s %s [send to %s]: established replication communication with a parent using protocol version %d - ready to replicate metrics..."
+         , REPLICATION_MSG
+         , host->hostname
+         , s->replication->connected_to
+         , s->version);
+
+    if(sock_setnonblock(host->sender->replication->socket) < 0)
+        error("%s %s [send to %s]: cannot set non-blocking mode for socket.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
+
+    // TODO: Check the linux manual for sock tcp enlarge. If I remember well this does nothing. The SE Linux provides a file that needs priviledged access to modify this variable.
+    if(sock_enlarge_out(host->sender->replication->socket) < 0)
+        error("%s %s [send to %s]: cannot enlarge the socket buffer.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
+
+    debug(D_REPLICATION, "%s: Connected on fd %d...", REPLICATION_MSG, host->sender->replication->socket);
+
+    return 1;
+}
+
+static void replication_sender_thread_data_flush(RRDHOST *host) {
+    netdata_mutex_lock(&host->sender->replication->mutex);
+
+    size_t len = cbuffer_next_unsafe(host->sender->replication->buffer, NULL);
+    if (len)
+        error("%s %s [send]: discarding %zu bytes of metrics already in the buffer.", REPLICATION_MSG, host->hostname, len);
+
+    cbuffer_remove_unsafe(host->sender->replication->buffer, len);
+    netdata_mutex_unlock(&host->sender->replication->mutex);
+}
+
+// Higher level wrap function for connection management and socket metadata updates.
+static void replication_attempt_to_connect(struct sender_state *state)
+{
+    state->replication->send_attempts = 0;
+
+    if(replication_sender_thread_connect_to_parent(state->host, state->default_port, state->timeout, state)) {
+        state->replication->last_sent_t = now_monotonic_sec();
+
+        // reset the buffer, to properly gaps and replicate commands
+        replication_sender_thread_data_flush(state->host);
+
+        // send from the beginning
+        state->replication->begin = 0;
+
+        // make sure the next reconnection will be immediate
+        state->replication->not_connected_loops = 0;
+
+        // reset the bytes we have sent for this session
+        state->replication->sent_bytes_on_this_connection = 0;
+
+        // Update the connection state flag
+        state->replication->connected = 1;
+    }
+    else {
+        // increase the failed connections counter
+        state->replication->not_connected_loops++;
+
+        // reset the number of bytes sent
+        state->replication->sent_bytes_on_this_connection = 0;
+
+        // slow re-connection on repeating errors
+        sleep_usec(USEC_PER_SEC * state->replication->reconnect_delay); // seconds
+    }
+}
+
 // Thread creation
-void replication_sender_thread(void *ptr) {
+void *replication_sender_thread(void *ptr) {
     struct sender_state *s = (struct sender_state *) ptr;
     unsigned int rrdpush_replication_enabled = s->replication->enabled;
     
@@ -114,7 +346,7 @@ void replication_sender_thread_spawn(RRDHOST *host) {
     netdata_mutex_unlock(&host->sender->replication->mutex);
 }
 
-void replication_receiver_thread(void *ptr){
+void *replication_receiver_thread(void *ptr){
     netdata_thread_cleanup_push(replication_receiver_thread_cleanup_callback, ptr);
     struct receiver_state *rpt = (struct receiver_state *)ptr;
     unsigned int rrdpush_replication_enabled =  rpt->replication->enabled;
@@ -146,7 +378,7 @@ void replication_receiver_thread(void *ptr){
         sprintf(initial_response, "%s", REP_ACK_CMD);
     } 
     else {
-        info("%s %s [receive from [%s]:%s]: Netdata stream protocol does not support replication.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
+        info("%s [receive from [%s]:%s]: Netdata stream protocol does not support replication.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
         sprintf(initial_response, "%s", "REP off");
     }
     debug(D_REPLICATION, "Initial REPLICATION response to %s: %s", rpt->client_ip, initial_response);
@@ -205,6 +437,10 @@ void replication_receiver_thread(void *ptr){
     netdata_thread_cleanup_pop(1);
     return NULL;    
 }
+
+extern int rrdpush_receiver_too_busy_now(struct web_client *w);
+
+extern int rrdpush_receiver_permission_denied(struct web_client *w);
 
 int replication_receiver_thread_spawn(struct web_client *w, char *url) {
     info("clients wants to REPLICATE metrics.");
@@ -469,7 +705,7 @@ static void replication_sender_thread_cleanup_callback(void *ptr) {
     netdata_mutex_unlock(&host->sender->replication->mutex);
 }
 
-void replication_receiver_thread_cleanup_callback(RRDHOST *host)
+void replication_receiver_thread_cleanup_callback(void *host)
 {
     // follow the receiver clean-up
     // destroy the replication rx structs
@@ -507,238 +743,12 @@ void replication_sender_thread_stop(RRDHOST *host) {
     }
 }
 
-// Connection management & socket handling functions
-//Close the socket of the replication sender thread
-static void replication_sender_thread_close_socket(RRDHOST *host) {
-    host->sender->replication->connected = 0;
-
-    if(host->sender->replication->socket != -1) {
-        close(host->sender->replication->socket);
-        host->sender->replication->socket = -1;
-    }
-}
-
-static void replication_sender_thread_data_flush(RRDHOST *host) {
-    netdata_mutex_lock(&host->sender->replication->mutex);
-
-    size_t len = cbuffer_next_unsafe(host->sender->replication->buffer, NULL);
-    if (len)
-        error("%s %s [send]: discarding %zu bytes of metrics already in the buffer.", REPLICATION_MSG, host->hostname, len);
-
-    cbuffer_remove_unsafe(host->sender->replication->buffer, len);
-    netdata_mutex_unlock(&host->sender->replication->mutex);
-}
-
 // static inline int parse_replication_ack(char *http)
 // {
 //     if(unlikely(memcmp(http, REP_ACK_CMD, (size_t)strlen(REP_ACK_CMD))))
 //         return 1;
 //     return 0;
 // }
-
-// Connect to parent. The REPLICATE command over HTTP req triggers the receiver thread in parent.
-//TODO: revise the logic of the communication
-static int replication_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
-
-    struct timeval tv = {
-            .tv_sec = timeout,
-            .tv_usec = 0
-    };
-
-    // make sure the socket is closed
-    replication_sender_thread_close_socket(host);
-
-    debug(D_REPLICATION, "%s: Attempting to connect...", REPLICATION_MSG);
-    info("%s %s [send to %s]: connecting...", REPLICATION_MSG, host->hostname, host->rrdpush_send_destination);
-
-    host->sender->replication->socket = connect_to_one_of(
-            host->rrdpush_send_destination
-            , default_port
-            , &tv
-            , &s->replication->reconnects_counter
-            , s->replication->connected_to
-            , sizeof(s->replication->connected_to)-1
-    );
-
-    if(unlikely(host->sender->replication->socket == -1)) {
-        error("%s %s [send to %s]: failed to connect", REPLICATION_MSG, host->hostname, host->rrdpush_send_destination);
-        return 0;
-    }
-
-    info("%s %s [send to %s]: initializing communication...", REPLICATION_MSG, host->hostname, s->replication->connected_to);
-
-#ifdef ENABLE_HTTPS
-    if( netdata_client_ctx ){
-        host->ssl.flags = NETDATA_SSL_START;
-        if (!host->ssl.conn){
-            host->ssl.conn = SSL_new(netdata_client_ctx);
-            if(!host->ssl.conn){
-                error("Failed to allocate SSL structure.");
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-            }
-        }
-        else{
-            SSL_clear(host->ssl.conn);
-        }
-
-        if (host->ssl.conn)
-        {
-            if (SSL_set_fd(host->ssl.conn, host->sender->replication->socket) != 1) {
-                error("Failed to set the socket to the SSL on socket fd %d.", host->sender->replication->socket);
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-            } else{
-                host->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
-            }
-        }
-    }
-    else {
-        host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-    }
-#endif
-
-    stream_encoded_t se;
-    rrdpush_encode_variable(&se, host);
-    // Add here any extra information to transmit with the.
-    char http[HTTP_HEADER_SIZE + 1];
-    int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "%s key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%u"
-                 "&NETDATA_PROTOCOL_VERSION=%s"
-                 " HTTP/1.1\r\n"
-                 "User-Agent: %s/%s\r\n"
-                 "Accept: */*\r\n\r\n"
-                 , REPLICATE_CMD
-                 , host->rrdpush_send_api_key
-                 , host->hostname
-                 , host->registry_hostname
-                 , host->machine_guid
-                 , default_rrd_update_every
-                 , host->timezone
-                 , host->abbrev_timezone
-                 , host->utc_offset
-                 , host->system_info->hops + 1
-                 , (host->tags) ? host->tags : ""
-                 , STREAMING_PROTOCOL_CURRENT_VERSION
-                 , host->program_name
-                 , host->program_version);
-    http[eol] = 0x00;
-    rrdpush_clean_encoded(&se);
-
-
-#ifdef ENABLE_HTTPS
-    if (!host->ssl.flags) {
-        ERR_clear_error();
-        SSL_set_connect_state(host->ssl.conn);
-        int err = SSL_connect(host->ssl.conn);
-        if (err != 1){
-            err = SSL_get_error(host->ssl.conn, err);
-            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
-            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
-                replication_sender_thread_close_socket(host);
-                return 0;
-            }else {
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-            }
-        }
-        else {
-            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
-                if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
-                    if ( security_test_certificate(host->ssl.conn)) {
-                        error("Closing the replication stream connection, because the server SSL certificate is not valid.");
-                        replication_sender_thread_close_socket(host);
-                        return 0;
-                    }
-                }
-            }
-        }
-    }
-    if(send_timeout(&host->ssl,host->sender->replication->socket, http, strlen(http), 0, timeout) == -1) {
-#else
-    if(send_timeout(host->sender->replication->socket, http, strlen(http), 0, timeout) == -1) {
-#endif
-        error("%s %s [send to %s]: failed to send HTTP header to remote netdata.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
-        replication_sender_thread_close_socket(host);
-        return 0;
-    }
-
-    info("%s %s [send to %s]: waiting response from remote netdata...", REPLICATION_MSG, host->hostname, s->replication->connected_to);
-
-    ssize_t received;
-#ifdef ENABLE_HTTPS
-    received = recv_timeout(&host->ssl,host->sender->replication->socket, http, HTTP_HEADER_SIZE, 0, timeout);
-    if(received == -1) {
-#else
-    received = recv_timeout(host->sender->replication->socket, http, HTTP_HEADER_SIZE, 0, timeout);
-    if(received == -1) {
-#endif
-        error("%s %s [send to %s]: remote netdata does not respond.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
-        replication_sender_thread_close_socket(host);
-        return 0;
-    }
-
-    http[received] = '\0';
-    debug(D_REPLICATION, "Response to sender from far end: %s", http);
-    // REP ack should be in the beggining of the response
-    // TODO: Verify the final commands (strings, numbers???) - a simple parser function can be used here.
-    if(unlikely(memcmp(http, REP_ACK_CMD, (size_t)strlen(REP_ACK_CMD)))) {
-        error("%s %s [send to %s]: server is not replying properly (is it a netdata?).", REPLICATION_MSG, host->hostname, s->connected_to);
-        replication_sender_thread_close_socket(host);
-        return 0;
-    }
-    s->replication->connected = 1;
-    // END of REP ack checking.
-
-    info("%s %s [send to %s]: established replication communication with a parent using protocol version %d - ready to replicate metrics..."
-         , REPLICATION_MSG
-         , host->hostname
-         , s->replication->connected_to
-         , s->version);
-
-    if(sock_setnonblock(host->sender->replication->socket) < 0)
-        error("%s %s [send to %s]: cannot set non-blocking mode for socket.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
-
-    // TODO: Check the linux manual for sock tcp enlarge. If I remember well this does nothing. The SE Linux provides a file that needs priviledged access to modify this variable.
-    if(sock_enlarge_out(host->sender->replication->socket) < 0)
-        error("%s %s [send to %s]: cannot enlarge the socket buffer.", REPLICATION_MSG, host->hostname, s->replication->connected_to);
-
-    debug(D_REPLICATION, "%s: Connected on fd %d...", REPLICATION_MSG, host->sender->replication->socket);
-
-    return 1;
-}
-
-// Higher level wrap function for connection management and socket metadata updates.
-static void replication_attempt_to_connect(struct sender_state *state)
-{
-    state->replication->send_attempts = 0;
-
-    if(replication_sender_thread_connect_to_parent(state->host, state->default_port, state->timeout, state)) {
-        state->replication->last_sent_t = now_monotonic_sec();
-
-        // reset the buffer, to properly gaps and replicate commands
-        replication_sender_thread_data_flush(state->host);
-
-        // send from the beginning
-        state->replication->begin = 0;
-
-        // make sure the next reconnection will be immediate
-        state->replication->not_connected_loops = 0;
-
-        // reset the bytes we have sent for this session
-        state->replication->sent_bytes_on_this_connection = 0;
-
-        // Update the connection state flag
-        state->replication->connected = 1;
-    }
-    else {
-        // increase the failed connections counter
-        state->replication->not_connected_loops++;
-
-        // reset the number of bytes sent
-        state->replication->sent_bytes_on_this_connection = 0;
-
-        // slow re-connection on repeating errors
-        sleep_usec(USEC_PER_SEC * state->replication->reconnect_delay); // seconds
-    }
-}
 
 // Memory Mode access
 void collect_replication_gap_data(){
@@ -748,6 +758,55 @@ void collect_replication_gap_data(){
 void update_memory_index(){
     //dbengine
     //other memory modes?
+}
+
+/* Produce a full line if one exists, statefully return where we start next time.
+ * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
+ */
+static char *receiver_next_line(struct receiver_state *r, int *pos) {
+    int start = *pos, scan = *pos;
+    if (scan >= r->read_len) {
+        r->read_len = 0;
+        return NULL;
+    }
+    while (scan < r->read_len && r->read_buffer[scan] != '\n')
+        scan++;
+    if (scan < r->read_len && r->read_buffer[scan] == '\n') {
+        *pos = scan+1;
+        r->read_buffer[scan] = 0;
+        return &r->read_buffer[start];
+    }
+    memmove(r->read_buffer, &r->read_buffer[start], r->read_len - start);
+    r->read_len -= start;
+    return NULL;
+}
+
+/* The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
+ */
+static int receiver_read(struct receiver_state *r, FILE *fp) {
+#ifdef ENABLE_HTTPS
+    if (r->ssl.conn && !r->ssl.flags) {
+        ERR_clear_error();
+        int desired = sizeof(r->read_buffer) - r->read_len - 1;
+        int ret = SSL_read(r->ssl.conn, r->read_buffer + r->read_len, desired);
+        if (ret > 0 ) {
+            r->read_len += ret;
+            return 0;
+        }
+        // Don't treat SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE differently on blocking socket
+        u_long err;
+        char buf[256];
+        while ((err = ERR_get_error()) != 0) {
+            ERR_error_string_n(err, buf, sizeof(buf));
+            error("STREAM %s [receive from %s] ssl error: %s", r->hostname, r->client_ip, buf);
+        }
+        return 1;
+    }
+#endif
+    if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp))
+        return 1;
+    r->read_len = strlen(r->read_buffer);
+    return 0;
 }
 
 // Replication parser & commands
@@ -820,9 +879,9 @@ done:
 
 // GAP creation and processing
 GAP *init_gap(){
-    GAP agap;
-    memset(&agap, 0, sizeof(GAP));
-    return &agap;
+    GAP *agap = malloc(sizeof(GAP));
+    //memset(&agap, 0, sizeof(GAP));
+    return agap;
 }
 
 GAP *generate_new_gap(struct receiver_state *stream_recv){

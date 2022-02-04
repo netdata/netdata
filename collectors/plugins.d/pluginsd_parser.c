@@ -725,11 +725,12 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
 // GAP
 // RDATA
 // Add an incative plugins_action for security reasons. All the parser instances should not be able to use all the available actions.
-PARSER_RC pluginsd_suspend_this_action(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_suspend_this_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations)
 {
-    UNUSED(words);
+    UNUSED(st);
     UNUSED(user);    
-    UNUSED(plugins_action);
+    UNUSED(microseconds);
+    UNUSED(trust_durations);
     error("This keyword is not supported from the parser!");
     //Parser continues?
     return PARSER_RC_OK;
