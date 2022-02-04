@@ -70,7 +70,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         do_uptime               = config_get_boolean("plugin:macos:sysctl", "system uptime", 1);
     }
 
-    RRDSET *st;
+    RRDSET *st = NULL;
 
     int i;
     size_t size;
