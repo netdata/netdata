@@ -428,7 +428,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
         iov = uv_buf_init(buf, size_bytes);
         ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
         if (ret < 0) {
-            error("uv_fs_read: pos=%"PRId64", %s", pos, uv_strerror(ret));
+            error("uv_fs_read: pos=%"PRIu64", %s", pos, uv_strerror(ret));
             uv_fs_req_cleanup(&req);
             goto skip_file;
         }
