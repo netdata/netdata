@@ -720,10 +720,107 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
     return PARSER_RC_OK;
 }
 
-// Add the pluginsd_action for the replication commands
-// REP
-// GAP
-// RDATA
+// Pluginsd_action for the replication commands
+PARSER_RC pluginsd_rep_action(void *user, RRDSET *st)
+{
+    UNUSED(user);
+    UNUSED(st);
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_gap_action(void *user, RRDSET *st)
+{
+    UNUSED(user);
+    UNUSED(st);
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_rdata_action(void *user, RRDSET *st)
+{
+    UNUSED(user);
+    UNUSED(st);
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_rep(char **words, void *user, PLUGINSD_ACTION  *pluginr_action)
+{
+    UNUSED(pluginr_action);
+
+    char *command = words[1];
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!command)) {
+        error("requested a REP without a command for host '%s'. Disabling it.", host->hostname);
+        goto disable;
+    }
+
+    if(strcmp(PLUGINSD_KEYWORD_REP_ON, command) == 0){
+        //Call REP ON function
+        return PARSER_RC_OK;
+    }
+
+    if(strcmp(PLUGINSD_KEYWORD_REP_OFF, command) == 0){
+        //Call REP OFF function
+        return PARSER_RC_OK;
+    }
+
+    if(strcmp(PLUGINSD_KEYWORD_REP_ACK, command) == 0){
+        //Call REP ACK function
+        return PARSER_RC_OK;
+    }
+
+    if(strcmp(PLUGINSD_KEYWORD_REP_PAUSE, command) == 0){
+        //Call REP PAUSE function
+        return PARSER_RC_OK;
+    }
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC pluginsd_gap(char **words, void *user, PLUGINSD_ACTION  *pluginr_action){
+    UNUSED(pluginr_action);
+
+    char *uuid = words[1];
+    char *ts = words[2];
+    char *te = words[3];
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!uuid || !ts || !te)) {
+        error("requested a GAP without parameters for host '%s'. Disabling it.", host->hostname);
+        goto disable;
+    }
+
+    //Call GAP function with parameters
+    return PARSER_RC_OK;
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC pluginsd_rdata(char **words, void *user, PLUGINSD_ACTION  *pluginr_action){
+    UNUSED(pluginr_action);
+
+    char *chartid = words[1];
+    char *dimid = words[2];
+    char *ts = words[3];
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!chartid || !dimid || !ts)) {
+        error("requested a RDATA without parameters for host '%s'. Disabling it.", host->hostname);
+        goto disable;
+    }
+
+    //Call RDATA function with parameters
+    return PARSER_RC_OK;
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
 // Add an incative plugins_action for security reasons. All the parser instances should not be able to use all the available actions.
 PARSER_RC pluginsd_suspend_this_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations)
 {

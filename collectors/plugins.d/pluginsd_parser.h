@@ -38,8 +38,10 @@ extern PARSER_RC pluginsd_label_action(void *user, char *key, char *value, LABEL
 extern PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, struct label *new_labels);
 extern PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, struct label *new_labels);
 extern PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, LABEL_SOURCE source);
-//Add the Replication command actions below
+//Replication action functions
 extern PARSER_RC pluginsd_suspend_this_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations);
-
+extern PARSER_RC pluginsd_rep_action(void *user, RRDSET *st);
+extern PARSER_RC pluginsd_gap_action(void *user, RRDSET *st);
+extern PARSER_RC pluginsd_rdata_action(void *user, RRDSET *st);
 
 #endif //NETDATA_PLUGINSD_PARSER_H
