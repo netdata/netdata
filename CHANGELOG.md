@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- docs: add a note that the "Install Netdata on Synology" is maintained by community [\#12086](https://github.com/netdata/netdata/pull/12086) ([ilyam8](https://github.com/ilyam8))
+- disable\_ebpf\_socket: Disable thread while race condition is fixed [\#12085](https://github.com/netdata/netdata/pull/12085) ([thiagoftsm](https://github.com/thiagoftsm))
+- add native installation for rockylinux [\#12081](https://github.com/netdata/netdata/pull/12081) ([maneamarius](https://github.com/maneamarius))
 - Remove mention of libJudy in installation documentation for macOS [\#12080](https://github.com/netdata/netdata/pull/12080) ([vlvkobal](https://github.com/vlvkobal))
 - docs: improve "Docker container names resolution" section [\#12079](https://github.com/netdata/netdata/pull/12079) ([ilyam8](https://github.com/ilyam8))
 - Fix aclk\_kill\_link reconnect endless loop [\#12074](https://github.com/netdata/netdata/pull/12074) ([underhood](https://github.com/underhood))
