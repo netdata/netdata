@@ -399,34 +399,42 @@ get_system_info() {
       elif [ -s "/usr/lib/os-release" ] && [ -r "/usr/lib/os-release" ]; then
         os_release_file="/usr/lib/os-release"
       else
-        fatal "Cannot find an os-release file ..." F0401
+        warning "Cannot find an os-release file ..."
       fi
 
-      # shellcheck disable=SC1090
-      . "${os_release_file}"
+      if [ -n "${os_release_file}" ]; then
+        # shellcheck disable=SC1090
+        . "${os_release_file}"
 
-      DISTRO="${ID}"
-      SYSVERSION="${VERSION_ID}"
-      SYSCODENAME="${VERSION_CODENAME}"
-      SYSARCH="$(uname -m)"
+        DISTRO="${ID}"
+        SYSVERSION="${VERSION_ID}"
+        SYSCODENAME="${VERSION_CODENAME}"
+        SYSARCH="$(uname -m)"
 
-      supported_compat_names="debian ubuntu centos fedora opensuse"
+        supported_compat_names="debian ubuntu centos fedora opensuse"
 
-      if str_in_list "${DISTRO}" "${supported_compat_names}"; then
-        DISTRO_COMPAT_NAME="${DISTRO}"
+        if str_in_list "${DISTRO}" "${supported_compat_names}"; then
+            DISTRO_COMPAT_NAME="${DISTRO}"
+        else
+            case "${DISTRO}" in
+            opensuse-leap)
+                DISTRO_COMPAT_NAME="opensuse"
+                ;;
+            rocky|rhel)
+                DISTRO_COMPAT_NAME="centos"
+                SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
+                ;;
+            *)
+                DISTRO_COMPAT_NAME="unknown"
+                ;;
+            esac
+        fi
       else
-        case "${DISTRO}" in
-          opensuse-leap)
-            DISTRO_COMPAT_NAME="opensuse"
-            ;;
-          rocky|rhel)
-            DISTRO_COMPAT_NAME="centos"
-            SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
-            ;;
-          *)
-            DISTRO_COMPAT_NAME="unknown"
-            ;;
-        esac
+        DISTRO="unknown"
+        DISTRO_COMPAT_NAME="unknown"
+        SYSVERSION="unknown"
+        SYSCODENAME="unknown"
+        SYSARCH="$(uname -m)"
       fi
       ;;
     Darwin)
