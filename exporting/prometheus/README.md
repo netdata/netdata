@@ -2,8 +2,9 @@
 title: "Export metrics to Prometheus"
 description: "Export Netdata metrics to Prometheus for archiving and further analysis."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/prometheus/README.md
-sidebar_label: Using Netdata with Prometheus
+sidebar_label: "Using Netdata with Prometheus"
 -->
+import { OneLineInstallWget, OneLineInstallCurl } from '../../src/components/OneLineInstall/'
 
 # Using Netdata with Prometheus
 
@@ -23,15 +24,11 @@ of installing the latest Netdata and keep it upgrade automatically.
 
 To install Netdata, run the following as your normal user:
 
-```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-```
+<OneLineInstallWget/>
 
 Or, if you have cURL but not wget (such as on macOS):
 
-```bash
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-```
+<OneLineInstallCurl/>
 
 At this point we should have Netdata listening on port 19999. Attempt to take your browser here:
 

@@ -3,6 +3,7 @@ title: "The step-by-step Netdata guide"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-00.md
 -->
+import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
 
 # The step-by-step Netdata guide
 
@@ -48,14 +49,11 @@ Netdata. We use this information to better understand how we can improve the Net
 
 To install Netdata, run the following as your normal user:
 
-´´´bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-´´´
+<OneLineInstallWget/>
+
 Or, if you have cURL but not wget (such as on macOS):
 
-´´´bash
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-´´´
+<OneLineInstallCurl/>
 
 
 Once finished, you'll have Netdata installed, and you'll be set up to get _nightly updates_ to get the latest features,

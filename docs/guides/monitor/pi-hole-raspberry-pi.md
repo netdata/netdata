@@ -4,6 +4,7 @@ description: "Monitor Pi-hole metrics, plus Raspberry Pi system metrics, in minu
 image: /img/seo/guides/monitor/netdata-pi-hole-raspberry-pi.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/pi-hole-raspberry-pi.md
 -->
+import { OneLineInstallWget } from '../../../src/components/OneLineInstall/'
 
 # Monitor Pi-hole (and a Raspberry Pi) with Netdata
 
@@ -52,9 +53,7 @@ possible historic data.
 On Raspberry Pis running Raspbian, the best way to install Netdata is our one-line kickstart script. This script asks
 you to install dependencies, then compiles Netdata from source via [GitHub](https://github.com/netdata/netdata).
 
-```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-```
+<OneLineInstallWget/>
 
 Once installed on a Raspberry Pi 4 with no accessories, Netdata starts collecting roughly 1,500 metrics every second and
 populates its dashboard with more than 250 charts.
