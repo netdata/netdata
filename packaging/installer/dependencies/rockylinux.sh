@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << Oracle Linux: [8] >>
+# << Rocky Linux:[8.5] >>
 
 set -e
 
@@ -19,7 +19,6 @@ declare -a package_tree=(
   pkgconfig
   cmake
   nmap-ncat
-  tar
   zlib-devel
   libuuid-devel
   libmnl-devel
@@ -30,6 +29,7 @@ declare -a package_tree=(
   python3
   elfutils-libelf-devel
   git
+  tar
   curl
   gzip
 )
@@ -88,35 +88,53 @@ check_flags() {
   fi
 }
 
-validate_tree_ol() {
-
-  opts=
+validate_tree_rockylinux() {
+  local opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     opts="-y"
   fi
 
-
   echo >&2 " > Checking for config-manager ..."
-  if ! dnf config-manager &> /dev/null; then
+  if ! dnf config-manager; then
     if prompt "config-manager not found, shall I install it?"; then
       dnf ${opts} install 'dnf-command(config-manager)'
     fi
   fi
 
-  echo " > Checking for CodeReady Builder ..."
-  if ! dnf repolist | grep ol8_codeready_builder; then
-    if prompt "CodeReadyBuilder not found, shall I install it?"; then
-      dnf ${opts} config-manager --set-enabled ol8_codeready_builder || enable_repo
+  echo >&2 " > Checking for PowerTools ..."
+  if ! dnf repolist | grep PowerTools; then
+    if prompt "PowerTools not found, shall I install it?"; then
+      dnf ${opts} config-manager --set-enabled powertools || enable_powertools_repo
     fi
   fi
+
+  echo >&2 " > Updating libarchive ..."
+  dnf ${opts} install libarchive
 
   dnf makecache --refresh
 }
 
+enable_powertools_repo() {
+  if ! dnf repolist | grep -q powertools; then
+    cat > /etc/yum.repos.d/powertools.repo <<-EOF
+    [powertools]
+    name=Rocky Linux \$releasever - PowerTools
+    mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=\$basearch&repo=PowerTools-\$releasever
+    #baseurl=http://dl.rockylinux.org/\$contentdir/\$releasever/PowerTools/\$basearch/os/
+    gpgcheck=1
+    enabled=1
+    gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+EOF
+  else
+    echo "Something went wrong!"
+    exit 1
+  fi
+}
+
 # shellcheck disable=SC2068
 check_flags ${@}
-validate_tree_ol
+validate_tree_rockylinux
 
 packages_to_install=
 
@@ -133,12 +151,12 @@ done
 if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
+  echo "packages_to_install:" "${packages_to_install[@]}"
   opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     opts="-y"
   fi
-  echo "packages_to_install:" "${packages_to_install[@]}"
   # shellcheck disable=SC2068
   dnf install ${opts} ${packages_to_install[@]}
 fi
