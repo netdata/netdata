@@ -29,7 +29,7 @@ NETDATA_STATISTICS_ALERTS="${6}"
 REQ_BODY="$(cat << EOF
 {
     "api_key": "mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y",
-    "event": "${ACTION} ${ACTION_RESULT}",
+    "event": "${ACTION}",
     "properties": {
         "distinct_id": "${NETDATA_REGISTRY_UNIQUE_ID}",
         "\$current_url": "agent backend",
