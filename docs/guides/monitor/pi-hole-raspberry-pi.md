@@ -1,11 +1,11 @@
----
+<!--
 title: "Monitor Pi-hole (and a Raspberry Pi) with Netdata"
 description: "Monitor Pi-hole metrics, plus Raspberry Pi system metrics, in minutes and completely for free with Netdata's open-source monitoring agent."
 image: /img/seo/guides/monitor/netdata-pi-hole-raspberry-pi.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/pi-hole-raspberry-pi.md
----
+-->
 
-import { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
+import { OneLineInstallWget } from '../../../src/components/OneLineInstall/'
 
 # Monitor Pi-hole (and a Raspberry Pi) with Netdata
 
