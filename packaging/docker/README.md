@@ -404,7 +404,6 @@ proxy.
 version: '3'
 volumes:
   caddy_data:
-    external: true
   caddy_config:
 
 services:
