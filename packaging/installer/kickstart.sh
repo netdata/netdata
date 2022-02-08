@@ -412,7 +412,7 @@ get_system_info() {
         SYSCODENAME="${VERSION_CODENAME}"
         SYSARCH="$(uname -m)"
 
-        supported_compat_names="debian ubuntu centos fedora opensuse"
+        supported_compat_names="debian ubuntu centos fedora opensuse ol"
 
         if str_in_list "${DISTRO}" "${supported_compat_names}"; then
             DISTRO_COMPAT_NAME="${DISTRO}"
@@ -423,13 +423,18 @@ get_system_info() {
                 ;;
             rocky|rhel)
                 DISTRO_COMPAT_NAME="centos"
-                SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
                 ;;
             *)
                 DISTRO_COMPAT_NAME="unknown"
                 ;;
             esac
         fi
+
+        case "${DISTRO_COMPAT_NAME}" in
+          centos|ol)
+            SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
+            ;;
+        esac
       else
         DISTRO="unknown"
         DISTRO_COMPAT_NAME="unknown"
@@ -772,7 +777,7 @@ pkg_installed() {
       dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
       return $?
       ;;
-    centos|fedora|opensuse)
+    centos|fedora|opensuse|ol)
       rpm -q "${1}" > /dev/null 2>&1
       return $?
       ;;
@@ -789,7 +794,7 @@ netdata_avail_check() {
       env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
       return $?
       ;;
-    centos|fedora)
+    centos|fedora|ol)
       # shellcheck disable=SC2086
       ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
       return $?
@@ -831,7 +836,7 @@ check_special_native_deps() {
 }
 
 try_package_install() {
-  if [ -z "${DISTRO}" ]; then
+  if [ -z "${DISTRO}" ] || [ "${DISTRO}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
     return 1
   fi
@@ -920,6 +925,22 @@ try_package_install() {
       pkg_vsep="-"
       pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
       repo_update_opts=""
+      uninstall_subcmd="remove"
+      INSTALL_TYPE="binpkg-rpm"
+      ;;
+    ol)
+      if command -v dnf > /dev/null; then
+        pm_cmd="dnf"
+        repo_subcmd="makecache"
+      else
+        pm_cmd="yum"
+      fi
+      repo_prefix="ol/${SYSVERSION}"
+      pkg_type="rpm"
+      pkg_suffix=".noarch"
+      pkg_vsep="-"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
       uninstall_subcmd="remove"
       INSTALL_TYPE="binpkg-rpm"
       ;;
