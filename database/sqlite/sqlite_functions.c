@@ -1646,8 +1646,14 @@ int sql_store_chart_hash(
     return 1;
 }
 
+/*
+  chart hashes are used for cloud communication.
+  if cloud is disabled or openssl is not available (which will prevent cloud connectivity)
+  skip hash calculations
+*/
 void compute_chart_hash(RRDSET *st)
 {
+#if !defined DISABLE_CLOUD && defined ENABLE_HTTPS
     EVP_MD_CTX *evpctx;
     unsigned char hash_value[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
@@ -1693,6 +1699,9 @@ void compute_chart_hash(RRDSET *st)
         st->module_name,
         st->priority,
         st->chart_type);
+#else
+    UNUSED(st);
+#endif
     return;
 }
 

@@ -890,11 +890,19 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     return 1;
 }
 
+/*
+  alert hashes are used for cloud communication.
+  if cloud is disabled or openssl is not available (which will prevent cloud connectivity)
+  skip hash calculations
+*/
+#if !defined DISABLE_CLOUD && defined ENABLE_HTTPS
 #define DIGEST_ALERT_CONFIG_VAL(v) ((v) ? EVP_DigestUpdate(evpctx, (v), strlen((v))) : EVP_DigestUpdate(evpctx, "", 1))
+#endif
 int alert_hash_and_store_config(
     uuid_t hash_id,
     struct alert_config *cfg)
 {
+#if !defined DISABLE_CLOUD && defined ENABLE_HTTPS
     EVP_MD_CTX *evpctx;
     unsigned char hash_value[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
@@ -939,6 +947,10 @@ int alert_hash_and_store_config(
 
     /* store everything, so it can be recreated when not in memory or just a subset ? */
     (void)sql_store_alert_config_hash( (uuid_t *)&hash_value, cfg);
+#else
+    UNUSED(hash_id);
+    UNUSED(cfg);
+#endif
 
     return 1;
 }
