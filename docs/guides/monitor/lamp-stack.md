@@ -7,6 +7,7 @@ author_title: "Editorial Director, Technical & Educational Resources"
 author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/lamp-stack.md
 -->
+import { OneLineInstallWget } from '../../../src/components/OneLineInstall/'
 
 # LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata
 
@@ -59,9 +60,7 @@ To follow this tutorial, you need:
 If you don't have the free, open-source Netdata monitoring agent installed on your node yet, get started with a [single
 kickstart command](/docs/get-started.mdx):
 
-```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-```
+<OneLineInstallWget/>
 
 The Netdata Agent is now collecting metrics from your node every second. You don't need to jump into the dashboard yet,
 but if you're curious, open your favorite browser and navigate to `http://localhost:19999` or `http://NODE:19999`,
