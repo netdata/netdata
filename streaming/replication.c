@@ -7,17 +7,44 @@ extern int netdata_use_ssl_on_stream;
 
 static void replication_receiver_thread_cleanup_callback(void *host);
 static void replication_sender_thread_cleanup_callback(void *ptr);
+static void print_replication_state(REPLICATION_STATE *state);
 
 // Thread Initialization
 static void replication_state_init(REPLICATION_STATE *state)
 {
+    info("REP STATE INIT");
     memset(state, 0, sizeof(*state));
+    memset(state->buffer, 0, sizeof(*state->buffer));
+    memset(state->read_buffer, 0, sizeof(*state->read_buffer));
+#ifdef ENABLE_HTTPS
+    memset(&state->ssl, 0, sizeof(state->ssl));
+#endif
+    memset(state->gaps_timeline, 0, sizeof(*state->gaps_timeline));
     netdata_mutex_init(&state->mutex);
+}
+
+static void print_replication_state(REPLICATION_STATE *state){
+    info("%s: Replication State is ...\n pthread_id: %lu\n, enabled: %u\n, spawned: %u\n, socket: %d\n, connected: %u\n, connected_to: %s\n, reconnects_counter: %lu\n",
+    REPLICATION_MSG,
+    state->thread,
+    state->enabled,
+    state->spawned,
+    state->socket,
+    state->connected,
+    state->connected_to,
+    state->reconnects_counter        
+    );
 }
 
 static void replication_state_destroy(REPLICATION_STATE *state)
 {
     pthread_mutex_destroy(&state->mutex);
+    freez(state->buffer);
+    freez(state->read_buffer);
+    freez(state->gaps_timeline);
+#ifdef ENABLE_HTTPS
+    freez(&state->ssl);
+#endif    
     freez(state);
 }
 
@@ -33,7 +60,8 @@ void replication_sender_init(struct sender_state *sender){
     replication_state_init(&tx_replication);
     sender->replication = &tx_replication;
     sender->replication->enabled = default_rrdpush_replication_enabled;
-    info("%s: Initialize Tx for host %s .", REPLICATION_MSG, sender->host->hostname);
+    info("%s: Initialize REP Tx state during host creation %s .", REPLICATION_MSG, sender->host->hostname);
+    // print_replication_state(&tx_replication);
 }
 
 static unsigned int replication_rd_config(struct receiver_state *rpt, struct config *stream_config)
@@ -297,6 +325,7 @@ static void replication_attempt_to_connect(struct sender_state *state)
 void *replication_sender_thread(void *ptr) {
     struct sender_state *s = (struct sender_state *) ptr;
     unsigned int rrdpush_replication_enabled = s->replication->enabled;
+    info("%s Replication sender thread is starting", REPLICATION_MSG);
     
     // attempt to connect to parent
     // Read the config for sending in replication
@@ -333,7 +362,9 @@ void *replication_sender_thread(void *ptr) {
 
 void replication_sender_thread_spawn(RRDHOST *host) {
     netdata_mutex_lock(&host->sender->replication->mutex);
-
+    
+    print_replication_state(host->sender->replication);
+    
     if(!host->sender->replication->spawned) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLICATION_SENDER[%s]", host->hostname);
@@ -910,17 +941,25 @@ int verify_new_gap(GAP *new_gap){
     // Update the gap timewindow
     // Respect any retention period
     // push the gap in the queue
+    return 0;
 }
 
 // Push a new gap in the queue
-int push_gap(){}
+int push_gap(){
+    return 0;
+}
 // Pop a new gap from the queue
-int pop_gap(){}
+int pop_gap(){
+    return 0;
+}
 // delete a gap from the queue
-int delete_gap(){}
-
+int delete_gap(){
+    return 0;
+}
 // transmit the gap information to the child nodes - send the GAP command
-int transmit_gap(){}
+int transmit_gap(){
+    return 0;
+}
 
 // FSMs for replication protocol implementation
 // REP on
