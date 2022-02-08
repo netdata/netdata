@@ -3,6 +3,16 @@
 name: Repository Packages
 on:
   workflow_dispatch: null
+  pull_request:
+    paths:
+      - packaging/repoconfig/**
+      - .github/workflows/repoconfig-packages.yml
+  push:
+    branches:
+      - master
+    paths:
+      - packaging/repoconfig/**
+      - .github/workflows/repoconfig-packages.yml
 env:
   DO_NOT_TRACK: 1
 jobs:
@@ -51,6 +61,7 @@ jobs:
               -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: Upload Packages
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         shell: bash
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
