@@ -219,10 +219,6 @@ static void health_reload_host(RRDHOST *host) {
  * Reload the host configuration for all hosts.
  */
 void health_reload(void) {
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_setting)
-        aclk_single_update_disable();
-#endif
     rrd_rdlock();
 
     RRDHOST *host;
@@ -231,13 +227,8 @@ void health_reload(void) {
 
     rrd_unlock();
 #ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
-        aclk_single_update_enable();
-        aclk_alarm_reload();
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    if (netdata_cloud_setting)
         aclk_alert_reloaded = 1;
-#endif
-    }
 #endif
 }
 

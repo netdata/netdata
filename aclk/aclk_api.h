@@ -15,7 +15,6 @@ extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
 
 extern int aclk_disable_runtime;
-extern int aclk_disable_single_updates;
 
 extern int aclk_stats_enabled;
 extern int aclk_alert_reloaded;
@@ -24,9 +23,6 @@ extern int aclk_ng;
 
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr);
-
-void aclk_single_update_disable();
-void aclk_single_update_enable();
 
 void aclk_alarm_reload(void);
 
