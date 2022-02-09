@@ -633,11 +633,7 @@ ACLK_FILES = \
     mqtt_websockets/c-rbuf/include/ringbuffer.h \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/MQTT-C/src/mqtt.c \
-    mqtt_websockets/MQTT-C/include/mqtt.h
-    $(NULL)
-
-if ENABLE_NEW_CLOUD_PROTOCOL
-ACLK_FILES += \
+    mqtt_websockets/MQTT-C/include/mqtt.h \
     aclk/aclk_charts_api.c \
     aclk/aclk_charts_api.h \
     aclk/aclk_alarm_api.c \
@@ -757,8 +753,6 @@ aclk/aclk-schemas/proto/alarm/v1/stream.pb.h: aclk/aclk-schemas/proto/alarm/v1/s
 aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h: aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-endif #ENABLE_NEW_CLOUD_PROTOCOL
 
 endif #ENABLE_ACLK
 
