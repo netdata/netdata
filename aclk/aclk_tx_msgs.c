@@ -166,17 +166,6 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
     return obj;
 }
 
-static char *create_uuid()
-{
-    uuid_t uuid;
-    char *uuid_str = mallocz(36 + 1);
-
-    uuid_generate(uuid);
-    uuid_unparse(uuid, uuid_str);
-
-    return uuid_str;
-}
-
 #ifndef __GNUC__
 #pragma endregion
 #endif

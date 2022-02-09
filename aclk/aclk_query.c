@@ -20,14 +20,6 @@ typedef struct aclk_query_handler {
     int(*fnc)(struct aclk_query_thread *query_thr, aclk_query_t query);
 } aclk_query_handler;
 
-static int info_metadata(struct aclk_query_thread *query_thr, aclk_query_t query)
-{
-    aclk_send_info_metadata(query_thr->client,
-        !query->data.metadata_info.initial_on_connect,
-        query->data.metadata_info.host);
-    return 0;
-}
-
 static usec_t aclk_web_api_v1_request(RRDHOST *host, struct web_client *w, char *url)
 {
     usec_t t;
@@ -265,7 +257,6 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
-    { .type = METADATA_INFO,        .name = "info metadata",            .fnc = info_metadata            },
 //#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     { .type = REGISTER_NODE,        .name = "register node",            .fnc = register_node            },
     { .type = NODE_STATE_UPDATE,    .name = "node state update",        .fnc = node_state_update        },

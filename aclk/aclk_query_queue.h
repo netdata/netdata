@@ -11,7 +11,6 @@
 
 typedef enum {
     UNKNOWN,
-    METADATA_INFO,
     HTTP_API_V2,
     REGISTER_NODE,
     NODE_STATE_UPDATE,
@@ -24,11 +23,6 @@ typedef enum {
     ALARM_PROVIDE_CFG,
     ALARM_SNAPSHOT
 } aclk_query_type_t;
-
-struct aclk_query_metadata {
-    RRDHOST *host;
-    int initial_on_connect;
-};
 
 struct aclk_query_http_api_v2 {
     char *payload;
@@ -63,7 +57,6 @@ struct aclk_query {
     // TODO maybe remove?
     int version;
     union {
-        struct aclk_query_metadata metadata_info;
         struct aclk_query_http_api_v2 http_api_v2;
         node_instance_creation_t node_creation;
         node_instance_connection_t node_update;
