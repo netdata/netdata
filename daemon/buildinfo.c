@@ -10,7 +10,9 @@
 #ifdef ENABLE_ACLK
 #define FEAT_CLOUD 1
 #define FEAT_CLOUD_MSG ""
+#define NEW_CLOUD_PROTO 1
 #else
+#define NEW_CLOUD_PROTO 0
 #ifdef DISABLE_CLOUD
 #define FEAT_CLOUD 0
 #define FEAT_CLOUD_MSG "(by user request)"
@@ -18,12 +20,6 @@
 #define FEAT_CLOUD 0
 #define FEAT_CLOUD_MSG ""
 #endif
-#endif
-
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-#define NEW_CLOUD_PROTO 1
-#else
-#define NEW_CLOUD_PROTO 0
 #endif
 
 #ifdef ENABLE_DBENGINE
