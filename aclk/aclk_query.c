@@ -247,12 +247,6 @@ cleanup:
     return retval;
 }
 
-static int chart_query(struct aclk_query_thread *query_thr, aclk_query_t query)
-{
-    aclk_chart_msg(query_thr->client, query->data.chart_add_del.host, query->data.chart_add_del.chart_name);
-    return 0;
-}
-
 static int register_node(struct aclk_query_thread *query_thr, aclk_query_t query) {
     // TODO create a pending registrations list
     // with some timeouts to detect registration requests that
@@ -280,8 +274,6 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
     { .type = METADATA_INFO,        .name = "info metadata",            .fnc = info_metadata            },
     { .type = METADATA_ALARMS,      .name = "alarms metadata",          .fnc = alarms_metadata          },
-    { .type = CHART_NEW,            .name = "chart new",                .fnc = chart_query              },
-    { .type = CHART_DEL,            .name = "chart delete",             .fnc = info_metadata            },
 //#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     { .type = REGISTER_NODE,        .name = "register node",            .fnc = register_node            },
     { .type = NODE_STATE_UPDATE,    .name = "node state update",        .fnc = node_state_update        },

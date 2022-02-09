@@ -288,38 +288,6 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
     json_object_put(msg);
 }
 
-void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart)
-{
-    json_object *msg, *payload;
-    BUFFER *tmp_buffer;
-    RRDSET *st;
-    
-    st = rrdset_find(host, chart);
-    if (!st)
-        st = rrdset_find_byname(host, chart);
-    if (!st) {
-        info("FAILED to find chart %s", chart);
-        return;
-    }
-
-    tmp_buffer = buffer_create(BUFFER_INITIAL_SIZE);
-    rrdset2json(st, tmp_buffer, NULL, NULL, 1);
-    payload = json_tokener_parse(tmp_buffer->buffer);
-    if (!payload) {
-        error("Failed to parse JSON from rrdset2json");
-        buffer_free(tmp_buffer);
-        return;
-    }
-
-    msg = create_hdr("chart", NULL, 0, 0, ACLK_VERSION);
-    json_object_object_add(msg, "payload", payload);
-
-    aclk_send_message_subtopic(client, msg, ACLK_TOPICID_CHART);
-
-    buffer_free(tmp_buffer);
-    json_object_put(msg);
-}
-
 // new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
     size_t len;

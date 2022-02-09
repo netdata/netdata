@@ -55,10 +55,6 @@ static inline volatile uint32_t *aclk_stats_qmetric_for_qtype(aclk_query_type_t 
             return &aclk_metrics_per_sample.query_type_metadata_info;
         case METADATA_ALARMS:
             return &aclk_metrics_per_sample.query_type_metadata_alarms;
-        case CHART_NEW:
-            return &aclk_metrics_per_sample.query_type_chart_new;
-        case CHART_DEL:
-            return &aclk_metrics_per_sample.query_type_chart_del;
         case REGISTER_NODE:
             return &aclk_metrics_per_sample.query_type_register_node;
         case NODE_STATE_UPDATE:
@@ -142,10 +138,6 @@ void aclk_query_free(aclk_query_t query)
         freez(query->data.http_api_v2.payload);
         if (query->data.http_api_v2.query != query->dedup_id)
             freez(query->data.http_api_v2.query);
-        break;
-
-    case CHART_NEW:
-        freez(query->data.chart_add_del.chart_name);
         break;
 
     case NODE_STATE_UPDATE:

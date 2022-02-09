@@ -24,10 +24,6 @@ extern int aclk_ng;
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr);
 
-void aclk_alarm_reload(void);
-
-int aclk_update_chart(RRDHOST *host, char *chart_name, int create);
-
 void aclk_host_state_update(RRDHOST *host, int connect);
 
 #define NETDATA_ACLK_HOOK                                                                                              \

@@ -14,8 +14,6 @@ typedef enum {
     METADATA_INFO,
     METADATA_ALARMS,
     HTTP_API_V2,
-    CHART_NEW,
-    CHART_DEL,
     REGISTER_NODE,
     NODE_STATE_UPDATE,
     CHART_DIMS_UPDATE,
@@ -31,11 +29,6 @@ typedef enum {
 struct aclk_query_metadata {
     RRDHOST *host;
     int initial_on_connect;
-};
-
-struct aclk_query_chart_add_del {
-    RRDHOST *host;
-    char* chart_name;
 };
 
 struct aclk_query_http_api_v2 {
@@ -74,7 +67,6 @@ struct aclk_query {
         struct aclk_query_metadata metadata_info;
         struct aclk_query_metadata metadata_alarms;
         struct aclk_query_http_api_v2 http_api_v2;
-        struct aclk_query_chart_add_del chart_add_del;
         node_instance_creation_t node_creation;
         node_instance_connection_t node_update;
         struct aclk_bin_payload bin_payload;

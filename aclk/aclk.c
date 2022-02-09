@@ -711,27 +711,6 @@ void aclk_alarm_reload(void)
 
     aclk_queue_query(aclk_query_new(METADATA_ALARMS));
 }
-
-int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
-{
-    struct aclk_query *query;
-
-    if (host == localhost ? aclk_popcorn_check_bump() : aclk_popcorn_check())
-        return 0;
-
-    query = aclk_query_new(create ? CHART_NEW : CHART_DEL);
-    if(create) {
-        query->data.chart_add_del.host = host;
-        query->data.chart_add_del.chart_name = strdupz(chart_name);
-    } else {
-        query->data.metadata_info.host = host;
-        query->data.metadata_info.initial_on_connect = 0;
-    }
-
-    aclk_queue_query(query);
-    return 0;
-}
-
 void aclk_host_state_update(RRDHOST *host, int cmd)
 {
     uuid_t node_id;
