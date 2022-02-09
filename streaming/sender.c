@@ -411,7 +411,7 @@ static void attempt_to_connect(struct sender_state *state)
         state->host->rrdpush_sender_connected = 1;
 
         // Start replication sender thread (Tx).
-        info("%s Replication is ?", REPLICATION_MSG);
+        info("%s Replication is %s", REPLICATION_MSG, (state->replication->enabled ? "enabled" : "disabled"));
         if(state->replication->enabled)
             replication_sender_thread_spawn(state->host);
     }

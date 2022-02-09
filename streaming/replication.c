@@ -9,17 +9,21 @@ static void replication_receiver_thread_cleanup_callback(void *host);
 static void replication_sender_thread_cleanup_callback(void *ptr);
 static void print_replication_state(REPLICATION_STATE *state);
 
+static GAPS* gaps_timeline_create() {
+
+}
+
 // Thread Initialization
 static void replication_state_init(REPLICATION_STATE *state)
 {
-    info("REP STATE INIT");
+    info("%s: REP STATE INIT", REPLICATION_MSG);
     memset(state, 0, sizeof(*state));
-    memset(state->buffer, 0, sizeof(*state->buffer));
-    memset(state->read_buffer, 0, sizeof(*state->read_buffer));
-#ifdef ENABLE_HTTPS
-    memset(&state->ssl, 0, sizeof(state->ssl));
-#endif
-    memset(state->gaps_timeline, 0, sizeof(*state->gaps_timeline));
+    state->buffer = cbuffer_new(1024, 1024*1024);
+    state->build = buffer_create(1);
+// #ifdef ENABLE_HTTPS
+//     memset(&state->ssl, 0, sizeof(state->ssl));
+// #endif
+//     memset(state->gaps_timeline, 0, sizeof(*state->gaps_timeline));
     netdata_mutex_init(&state->mutex);
 }
 
@@ -56,12 +60,11 @@ void replication_sender_init(struct sender_state *sender){
         return;
     }
 
-    REPLICATION_STATE tx_replication;
-    replication_state_init(&tx_replication);
-    sender->replication = &tx_replication;
+    sender->replication = (REPLICATION_STATE *)callocz(1, sizeof(REPLICATION_STATE));
+    replication_state_init(sender->replication);
     sender->replication->enabled = default_rrdpush_replication_enabled;
     info("%s: Initialize REP Tx state during host creation %s .", REPLICATION_MSG, sender->host->hostname);
-    // print_replication_state(&tx_replication);
+    print_replication_state(sender->replication);
 }
 
 static unsigned int replication_rd_config(struct receiver_state *rpt, struct config *stream_config)
@@ -85,11 +88,11 @@ void replication_receiver_init(struct receiver_state *receiver, struct config *s
         info("%s:  Could not initialize Rx replication thread. Replication is disabled or not supported!", REPLICATION_MSG);
         return;
     }
-    REPLICATION_STATE rx_replication;
-    replication_state_init(&rx_replication);
-    receiver->replication = &rx_replication;
+    receiver->replication = (REPLICATION_STATE *)callocz(1, sizeof(REPLICATION_STATE));
+    replication_state_init(receiver->replication);
     receiver->replication->enabled = rrdpush_replication_enable;
     info("%s: Initialize Rx for host %s ", REPLICATION_MSG, receiver->host->hostname);
+    print_replication_state(receiver->replication);
 }
 
 // Connection management & socket handling functions
@@ -171,8 +174,8 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
     // Add here any extra information to transmit with the.
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "%s key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%s"
-                 "&NETDATA_PROTOCOL_VERSION=%u"
+            "%s key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%u"
+                 "&NETDATA_PROTOCOL_VERSION=%s"
                  " HTTP/1.1\r\n"
                  "User-Agent: %s\r\n"
                  "Accept: */*\r\n\r\n"
@@ -187,8 +190,8 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
                  , host->utc_offset
                  , host->system_info->hops + 1
                  , (host->tags) ? host->tags : ""
-                 , host->program_version
                  , STREAMING_PROTOCOL_CURRENT_VERSION
+                 , host->program_version
                  , host->program_name);
     http[eol] = 0x00;
     rrdpush_clean_encoded(&se);
@@ -349,9 +352,12 @@ void *replication_sender_thread(void *ptr) {
         netdata_thread_testcancel();
         
         // try to connect
-        if(!s->replication->connected)
+        // if(!s->replication->connected)
+        if((s->replication->not_connected_loops < 3)) {
             replication_attempt_to_connect(s);
-        // Tmp solution to test the thread cleanup process
+            // Tmp solution to test the thread cleanup process
+            s->replication->not_connected_loops++;            
+        }
         else
             break;
     }
@@ -362,7 +368,8 @@ void *replication_sender_thread(void *ptr) {
 
 void replication_sender_thread_spawn(RRDHOST *host) {
     netdata_mutex_lock(&host->sender->replication->mutex);
-    
+
+    //TDRemoved Replication
     print_replication_state(host->sender->replication);
     
     if(!host->sender->replication->spawned) {

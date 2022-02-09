@@ -87,7 +87,7 @@ int rrdpush_init() {
     if (!default_rrdpush_replication_enabled
     || (STREAMING_PROTOCOL_CURRENT_VERSION < VERSION_GAP_FILLING)
     || !default_rrdpush_enabled) {
-        error("STREAM [send]: Cannot enable replication mechanism - Streaming is disabled.");
+        error("%s [send]: Cannot enable replication mechanism - Streaming is disabled.", REPLICATION_MSG);
         default_rrdpush_replication_enabled = 0;
     }
 
