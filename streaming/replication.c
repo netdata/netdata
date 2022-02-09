@@ -249,7 +249,8 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
     }
 
     http[received] = '\0';
-    debug(D_REPLICATION, "Response to sender from far end: %s", http);
+    // debug(D_REPLICATION, "Response to sender from far end: %s", http);
+    info("%s: Response to sender from far end: %s", REPLICATION_MSG, http);
     // REP ack should be in the beggining of the response
     // TODO: Verify the final commands (strings, numbers???) - a simple parser function can be used here.
     if(unlikely(memcmp(http, REP_ACK_CMD, (size_t)strlen(REP_ACK_CMD)))) {
@@ -419,7 +420,8 @@ void *replication_receiver_thread(void *ptr){
         info("%s [receive from [%s]:%s]: Netdata stream protocol does not support replication.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
         sprintf(initial_response, "%s", "REP off");
     }
-    debug(D_REPLICATION, "Initial REPLICATION response to %s: %s", rpt->client_ip, initial_response);
+    // debug(D_REPLICATION, "Initial REPLICATION response to %s: %s", rpt->client_ip, initial_response);
+    info("%s: Initial REPLICATION response to %s: %s", REPLICATION_MSG, rpt->client_ip, initial_response);
     #ifdef ENABLE_HTTPS
     rpt->host->stream_ssl.conn = rpt->ssl.conn;
     rpt->host->stream_ssl.flags = rpt->ssl.flags;
