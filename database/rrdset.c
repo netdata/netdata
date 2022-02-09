@@ -1791,14 +1791,14 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
     time_t mark = now_realtime_sec();
 #endif
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) {
             int live = ((mark - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
             if (unlikely(live != rd->state->aclk_live_status)) {

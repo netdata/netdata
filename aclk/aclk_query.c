@@ -261,7 +261,6 @@ static int alarm_state_update_query(struct aclk_query_thread *query_thr, aclk_qu
     return 0;
 }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static int register_node(struct aclk_query_thread *query_thr, aclk_query_t query) {
     // TODO create a pending registrations list
     // with some timeouts to detect registration requests that
@@ -284,7 +283,6 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
     aclk_send_bin_message_subtopic_pid(query_thr->client, query->data.bin_payload.payload, query->data.bin_payload.size, query->data.bin_payload.topic, query->data.bin_payload.msg_name);
     return 0;
 }
-#endif
 
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
@@ -293,7 +291,7 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = METADATA_ALARMS,      .name = "alarms metadata",          .fnc = alarms_metadata          },
     { .type = CHART_NEW,            .name = "chart new",                .fnc = chart_query              },
     { .type = CHART_DEL,            .name = "chart delete",             .fnc = info_metadata            },
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+//#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     { .type = REGISTER_NODE,        .name = "register node",            .fnc = register_node            },
     { .type = NODE_STATE_UPDATE,    .name = "node state update",        .fnc = node_state_update        },
     { .type = CHART_DIMS_UPDATE,    .name = "chart and dim update bin", .fnc = send_bin_msg             },
@@ -304,7 +302,7 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = ALARM_LOG_HEALTH,     .name = "alarm log health",         .fnc = send_bin_msg             },
     { .type = ALARM_PROVIDE_CFG,    .name = "provide alarm config",     .fnc = send_bin_msg             },
     { .type = ALARM_SNAPSHOT,       .name = "alarm snapshot",           .fnc = send_bin_msg             },
-#endif
+//#endif
     { .type = UNKNOWN,              .name = NULL,                       .fnc = NULL                     }
 };
 

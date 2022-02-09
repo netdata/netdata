@@ -20,13 +20,11 @@ void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart);
 
 void aclk_alarm_state_msg(mqtt_wss_client client, json_object *msg);
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 // new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable);
 char *aclk_generate_lwt(size_t *size);
 
 void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creation_t *node_creation);
 void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_connection_t *node_connection);
-#endif
 
 #endif

@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_chart.h"
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
 #include "../../aclk/aclk_charts_api.h"
 #include "../../aclk/aclk.h"
 
@@ -973,21 +973,17 @@ int queue_dimension_to_aclk(RRDDIM *rd)
     return rc;
 }
 
-#endif //ENABLE_NEW_CLOUD_PROTOCOL
+#endif //ENABLE_ACLK
 
 // ST is read locked
 int queue_chart_to_aclk(RRDSET *st)
 {
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
 #ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id, 1);
-#else
-    UNUSED(st);
-#endif
-    return 0;
-#else
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                        st, ACLK_DATABASE_ADD_CHART);
+#else
+    UNUSED(st);
+    return 0;
 #endif
 }
 
