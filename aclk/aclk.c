@@ -34,8 +34,6 @@ netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
 struct aclk_shared_state aclk_shared_state = {
-    .agent_state = ACLK_HOST_INITIALIZING,
-    .last_popcorn_interrupt = 0,
     .mqtt_shutdown_msg_id = -1,
     .mqtt_shutdown_msg_rcvd = 0
 };
@@ -287,29 +285,6 @@ static int handle_connection(mqtt_wss_client client)
             QUERY_THREAD_WAKEUP;
         }
     }
-    return 0;
-}
-
-inline static int aclk_popcorn_check()
-{
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
-        ACLK_SHARED_STATE_UNLOCK;
-        return 1;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
-    return 0;
-}
-
-inline static int aclk_popcorn_check_bump()
-{
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
-        aclk_shared_state.last_popcorn_interrupt = now_realtime_sec();
-        ACLK_SHARED_STATE_UNLOCK;
-        return 1;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
     return 0;
 }
 
@@ -626,7 +601,6 @@ void *aclk_main(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 #endif
-    aclk_popcorn_check_bump(); // start localhost popcorn timer
     query_threads.count = read_query_thread_count();
 
     if (wait_till_cloud_enabled())
