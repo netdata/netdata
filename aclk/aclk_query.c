@@ -257,7 +257,6 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
-//#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     { .type = REGISTER_NODE,        .name = "register node",            .fnc = register_node            },
     { .type = NODE_STATE_UPDATE,    .name = "node state update",        .fnc = node_state_update        },
     { .type = CHART_DIMS_UPDATE,    .name = "chart and dim update bin", .fnc = send_bin_msg             },
@@ -268,7 +267,6 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = ALARM_LOG_HEALTH,     .name = "alarm log health",         .fnc = send_bin_msg             },
     { .type = ALARM_PROVIDE_CFG,    .name = "provide alarm config",     .fnc = send_bin_msg             },
     { .type = ALARM_SNAPSHOT,       .name = "alarm snapshot",           .fnc = send_bin_msg             },
-//#endif
     { .type = UNKNOWN,              .name = NULL,                       .fnc = NULL                     }
 };
 
