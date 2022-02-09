@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Docs improvement: Added interactive kickstart scripts where possible [\#12098](https://github.com/netdata/netdata/pull/12098) ([kickoke](https://github.com/kickoke))
 - Make a lack of an os-release file non-fatal on install. [\#12087](https://github.com/netdata/netdata/pull/12087) ([Ferroin](https://github.com/Ferroin))
 - docs: add a note that the "Install Netdata on Synology" is maintained by community [\#12086](https://github.com/netdata/netdata/pull/12086) ([ilyam8](https://github.com/ilyam8))
 - disable\_ebpf\_socket: Disable thread while race condition is fixed [\#12085](https://github.com/netdata/netdata/pull/12085) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -13,6 +14,7 @@
 - Remove mention of libJudy in installation documentation for macOS [\#12080](https://github.com/netdata/netdata/pull/12080) ([vlvkobal](https://github.com/vlvkobal))
 - docs: improve "Docker container names resolution" section [\#12079](https://github.com/netdata/netdata/pull/12079) ([ilyam8](https://github.com/ilyam8))
 - Fix aclk\_kill\_link reconnect endless loop [\#12074](https://github.com/netdata/netdata/pull/12074) ([underhood](https://github.com/underhood))
+- Disable hashes for charts and alerts if openssl is not available [\#12071](https://github.com/netdata/netdata/pull/12071) ([MrZammler](https://github.com/MrZammler))
 - fix typo, tidy up sentence [\#12062](https://github.com/netdata/netdata/pull/12062) ([petecooper](https://github.com/petecooper))
 - Docs install cleanup [\#12057](https://github.com/netdata/netdata/pull/12057) ([kickoke](https://github.com/kickoke))
 - Fix handling of non-x86 static builds in updater. [\#12055](https://github.com/netdata/netdata/pull/12055) ([Ferroin](https://github.com/Ferroin))
@@ -23,6 +25,7 @@
 - Updated the docs to match new install script [\#12042](https://github.com/netdata/netdata/pull/12042) ([kickoke](https://github.com/kickoke))
 - Fix handling of removed packages with leftover config files in package check. [\#12033](https://github.com/netdata/netdata/pull/12033) ([Ferroin](https://github.com/Ferroin))
 - update existing OS dependencies scripts and add scripts for fedora an… [\#11963](https://github.com/netdata/netdata/pull/11963) ([maneamarius](https://github.com/maneamarius))
+- Posix [\#11961](https://github.com/netdata/netdata/pull/11961) ([maneamarius](https://github.com/maneamarius))
 - Updated formatting issues and copy [\#11944](https://github.com/netdata/netdata/pull/11944) ([kickoke](https://github.com/kickoke))
 - Replace CentOS 8 with RockyLinux 8 in CI and package builds. [\#11801](https://github.com/netdata/netdata/pull/11801) ([Ferroin](https://github.com/Ferroin))
 
