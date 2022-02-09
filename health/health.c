@@ -667,7 +667,7 @@ void *health_main(void *ptr) {
     rrdcalc_labels_unlink();
 
     unsigned int loop = 0;
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
     unsigned int marked_aclk_reload_loop = 0;
 #endif
     while(!netdata_exit) {
@@ -696,7 +696,7 @@ void *health_main(void *ptr) {
             }
         }
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
         if (aclk_alert_reloaded && !marked_aclk_reload_loop)
             marked_aclk_reload_loop = loop;
 #endif
@@ -1066,7 +1066,7 @@ void *health_main(void *ptr) {
             health_alarm_wait_for_execution(ae);
         }
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
         if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
                 rrdhost_foreach_read(host) {
                     if (unlikely(!host->health_enabled))
