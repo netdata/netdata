@@ -218,14 +218,6 @@ AC_ARG_ENABLE(
     [ enable_cloud="detect" ]
 )
 
-AC_ARG_WITH(
-    [new-cloud-protocol],
-    [AS_HELP_STRING([--with-new-cloud-protocol],
-                    [Requires New Cloud Protocol support to be built])],
-    [new_cloud_protocol="$withval"],
-    [new_cloud_protocol="detect"]
-)
-
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
 fi
@@ -766,16 +758,16 @@ AC_MSG_CHECKING([if Cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
 
 if test "$enable_cloud" != "no"; then
-    AC_MSG_NOTICE([Checking if ACLK Next Generation can be built])
+    AC_MSG_NOTICE([Checking if ACLK can be built])
     can_enable_ng="yes"
-    AC_MSG_CHECKING([if git submodules present for ACLK Next Generation])
+    AC_MSG_CHECKING([if git submodules present for ACLK])
     if test -f "mqtt_websockets/src/mqtt_wss_client.c"; then
         AC_MSG_RESULT([yes])
     else
         AC_MSG_RESULT([no])
         can_enable_ng="no"
     fi
-    AC_MSG_CHECKING([if SSL available for ACLK Next Generation])
+    AC_MSG_CHECKING([if SSL available for ACLK])
     if test -n "${SSL_LIBS}"; then
         AC_MSG_RESULT([yes])
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
@@ -783,8 +775,30 @@ if test "$enable_cloud" != "no"; then
     else
         AC_MSG_RESULT([no])
     fi
-    AC_MSG_CHECKING([if JSON-C available for ACLK Next Generation])
+    AC_MSG_CHECKING([if JSON-C available for ACLK])
     if test "$enable_jsonc" != "yes"; then
+        AC_MSG_RESULT([no])
+        can_enable_ng="no"
+    else
+        AC_MSG_RESULT([yes])
+    fi
+
+    AC_MSG_CHECKING([if protobuf available for ACLK New Cloud Protocol])
+    if test "${have_libprotobuf}" != "yes"; then
+        AC_MSG_RESULT([no])
+        can_enable_ng="no"
+    else
+        AC_MSG_RESULT([yes])
+    fi
+    AC_MSG_CHECKING([if protoc available for ACLK New Cloud Protocol])
+    if test "${have_protoc}" != "yes"; then
+        AC_MSG_RESULT([no])
+        can_enable_ng="no"
+    else
+        AC_MSG_RESULT([yes])
+    fi
+    AC_MSG_CHECKING([if C++ compiler available for ACLK New Cloud Protocol])
+    if test "${have_CXX_compiler}" != "yes"; then
         AC_MSG_RESULT([no])
         can_enable_ng="no"
     else
@@ -799,46 +813,10 @@ if test "$enable_cloud" != "no"; then
     if test "$can_enable_ng" = "yes"; then
         enable_aclk="yes"
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
-    fi
-
-    if test "$new_cloud_protocol" != "no"; then
-        can_build_new_cloud_protocol="yes"
-        AC_MSG_CHECKING([if protobuf available for New Cloud Protocol])
-        if test "${have_libprotobuf}" != "yes"; then
-            AC_MSG_RESULT([no])
-            can_build_new_cloud_protocol="no"
-        else
-            AC_MSG_RESULT([yes])
-        fi
-        AC_MSG_CHECKING([if protoc available for New Cloud Protocol])
-        if test "${have_protoc}" != "yes"; then
-            AC_MSG_RESULT([no])
-            can_build_new_cloud_protocol="no"
-        else
-            AC_MSG_RESULT([yes])
-        fi
-        AC_MSG_CHECKING([if C++ compiler available for New Cloud Protocol])
-        if test "${have_CXX_compiler}" != "yes"; then
-            AC_MSG_RESULT([no])
-            can_build_new_cloud_protocol="no"
-        else
-            AC_MSG_RESULT([yes])
-        fi
-
-        AC_MSG_CHECKING([ACLK Next Generation can support New Cloud protocol])
-        AC_MSG_RESULT([${can_build_new_cloud_protocol}])
-        if test "$new_cloud_protocol" = "yes" -a "$can_build_new_cloud_protocol" != "yes"; then
-            AC_MSG_ERROR([Requested new cloud protocol support but it can't be build])
-        fi
-        if test "$can_build_new_cloud_protocol" = "yes"; then
-            new_cloud_protocol="yes"
-            AC_DEFINE([ENABLE_NEW_CLOUD_PROTOCOL], [1], [New protobuf based Netdata Cloud Protocol Support])
-            OPTIONAL_ACLK_CFLAGS="${OPTIONAL_ACLK_CFLAGS} -I \$(abs_top_srcdir)/aclk/aclk-schemas"
-            OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
-            CXX11FLAG="-std=c++11"
-            OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
-        fi
+        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
+        OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
+        CXX11FLAG="-std=c++11"
+        OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
     fi
 fi
 
@@ -849,7 +827,6 @@ fi
 AC_SUBST([enable_cloud])
 AC_SUBST([enable_aclk])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
-AM_CONDITIONAL([ENABLE_NEW_CLOUD_PROTOCOL], [test "${can_build_new_cloud_protocol}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # apps.plugin
