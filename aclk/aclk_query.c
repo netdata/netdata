@@ -253,14 +253,6 @@ static int chart_query(struct aclk_query_thread *query_thr, aclk_query_t query)
     return 0;
 }
 
-static int alarm_state_update_query(struct aclk_query_thread *query_thr, aclk_query_t query)
-{
-    aclk_alarm_state_msg(query_thr->client, query->data.alarm_update);
-    // aclk_alarm_state_msg frees the json object including the header it generates
-    query->data.alarm_update = NULL;
-    return 0;
-}
-
 static int register_node(struct aclk_query_thread *query_thr, aclk_query_t query) {
     // TODO create a pending registrations list
     // with some timeouts to detect registration requests that
@@ -286,7 +278,6 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
-    { .type = ALARM_STATE_UPDATE,   .name = "alarm state update",       .fnc = alarm_state_update_query },
     { .type = METADATA_INFO,        .name = "info metadata",            .fnc = info_metadata            },
     { .type = METADATA_ALARMS,      .name = "alarms metadata",          .fnc = alarms_metadata          },
     { .type = CHART_NEW,            .name = "chart new",                .fnc = chart_query              },

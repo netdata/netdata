@@ -27,7 +27,6 @@ void *aclk_starter(void *ptr);
 void aclk_alarm_reload(void);
 
 int aclk_update_chart(RRDHOST *host, char *chart_name, int create);
-int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 
 void aclk_host_state_update(RRDHOST *host, int connect);
 

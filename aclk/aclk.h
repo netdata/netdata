@@ -33,7 +33,6 @@ extern struct aclk_shared_state {
 } aclk_shared_state;
 
 void aclk_alarm_reload(void);
-int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 
 /* Informs ACLK about created/deleted chart
  * @param create 0 - if chart was deleted, other if chart created

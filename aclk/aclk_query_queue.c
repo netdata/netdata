@@ -51,8 +51,6 @@ static inline volatile uint32_t *aclk_stats_qmetric_for_qtype(aclk_query_type_t 
     switch (qtype) {
         case HTTP_API_V2:
             return &aclk_metrics_per_sample.query_type_http;
-        case ALARM_STATE_UPDATE:
-            return &aclk_metrics_per_sample.query_type_alarm_upd;
         case METADATA_INFO:
             return &aclk_metrics_per_sample.query_type_metadata_info;
         case METADATA_ALARMS:
@@ -148,11 +146,6 @@ void aclk_query_free(aclk_query_t query)
 
     case CHART_NEW:
         freez(query->data.chart_add_del.chart_name);
-        break;
-    
-    case ALARM_STATE_UPDATE:
-        if (query->data.alarm_update)
-            json_object_put(query->data.alarm_update);
         break;
 
     case NODE_STATE_UPDATE:
