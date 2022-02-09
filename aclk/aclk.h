@@ -32,7 +32,6 @@ extern struct aclk_shared_state {
     int mqtt_shutdown_msg_rcvd;
 } aclk_shared_state;
 
-void aclk_alarm_reload(void);
 void aclk_host_state_update(RRDHOST *host, int cmd);
 
 void aclk_send_node_instances(void);

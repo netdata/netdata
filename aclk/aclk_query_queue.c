@@ -53,8 +53,6 @@ static inline volatile uint32_t *aclk_stats_qmetric_for_qtype(aclk_query_type_t 
             return &aclk_metrics_per_sample.query_type_http;
         case METADATA_INFO:
             return &aclk_metrics_per_sample.query_type_metadata_info;
-        case METADATA_ALARMS:
-            return &aclk_metrics_per_sample.query_type_metadata_alarms;
         case REGISTER_NODE:
             return &aclk_metrics_per_sample.query_type_register_node;
         case NODE_STATE_UPDATE:

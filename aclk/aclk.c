@@ -696,21 +696,6 @@ exit:
     return NULL;
 }
 
-// TODO this is taken over as workaround from old ACLK
-// fix this in both old and new ACLK
-extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
-
-void aclk_alarm_reload(void)
-{
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
-        ACLK_SHARED_STATE_UNLOCK;
-        return;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
-
-    aclk_queue_query(aclk_query_new(METADATA_ALARMS));
-}
 void aclk_host_state_update(RRDHOST *host, int cmd)
 {
     uuid_t node_id;
