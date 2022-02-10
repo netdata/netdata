@@ -1321,6 +1321,13 @@ void rrdset_done(RRDSET *st) {
             if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
             }
+            if (likely(st->dimensions)) {
+                struct aclk_database_worker_config *wc = st->rrdhost->dbsync_worker;
+                if (likely(wc))
+                    wc->update_node_after = now_realtime_sec() + ACLK_NODE_UPDATE_DELAY;
+                if (likely(!queue_chart_to_aclk(st)))
+                    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+            }
         }
     }
 #endif

@@ -712,6 +712,7 @@ void aclk_database_worker(void *arg)
                                     wc->hostname = strdupz(wc->host->hostname);
                                 aclk_del_worker_thread(wc);
                                 wc->node_info_send = 1;
+                                wc->update_node_after = now_realtime_sec() + ACLK_NODE_UPDATE_DELAY;
                             }
                         }
                     }
