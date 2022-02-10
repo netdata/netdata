@@ -3,9 +3,9 @@ title: "Installation guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
 -->
 
-import { Install, InstallBox } from '../../src/components/Install/'
+import { Install, InstallBox } from '../../../src/components/Install/'
 
-import { OneLineInstallWget, OneLineInstallCurl } from '../../src/components/OneLineInstall/'
+import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
 
 # Installation guide
 
