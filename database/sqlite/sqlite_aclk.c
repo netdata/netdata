@@ -420,6 +420,13 @@ static void timer_cb(uv_timer_t* handle)
     }
 
     if (aclk_connected) {
+
+        if (wc->update_node_after && wc->update_node_after < now && wc->host && wc->host != localhost) {
+            cmd.opcode = ACLK_DATABASE_UPDATE_NODE_STATE;
+            if (!aclk_database_enq_cmd_noblock(wc, &cmd))
+                wc->update_node_after = 0;
+        }
+
         if (wc->rotation_after && wc->rotation_after < now) {
             cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
             if (!aclk_database_enq_cmd_noblock(wc, &cmd))
