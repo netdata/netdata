@@ -7,7 +7,7 @@ author_title: "Editorial Director, Technical & Educational Resources"
 author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/lamp-stack.md
 -->
-import { OneLineInstallWget } from '../../../src/components/OneLineInstall/'
+import { OneLineInstallWget } from '../../src/components/OneLineInstall/'
 
 # LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata
 

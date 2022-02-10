@@ -3,7 +3,7 @@ title: "The step-by-step Netdata guide"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-00.md
 -->
-import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
+import { OneLineInstallWget, OneLineInstallCurl } from '../../src/components/OneLineInstall/'
 
 # The step-by-step Netdata guide
 
