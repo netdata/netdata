@@ -10,7 +10,7 @@ static void replication_sender_thread_cleanup_callback(void *ptr);
 static void print_replication_state(REPLICATION_STATE *state);
 
 static GAPS* gaps_timeline_create() {
-
+    return NULL;
 }
 
 // Thread Initialization
@@ -20,6 +20,7 @@ static void replication_state_init(REPLICATION_STATE *state)
     memset(state, 0, sizeof(*state));
     state->buffer = cbuffer_new(1024, 1024*1024);
     state->build = buffer_create(1);
+    state->socket = -1;
 // #ifdef ENABLE_HTTPS
 //     memset(&state->ssl, 0, sizeof(state->ssl));
 // #endif
@@ -224,7 +225,7 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
             }
         }
     }
-    if(send_timeout(&host->ssl,host->sender->replication->socket, http, strlen(http), 0, timeout) == -1) {
+    if(send_timeout(&host->ssl, host->sender->replication->socket, http, strlen(http), 0, timeout) == -1) {
 #else
     if(send_timeout(host->sender->replication->socket, http, strlen(http), 0, timeout) == -1) {
 #endif
@@ -251,6 +252,7 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
     http[received] = '\0';
     // debug(D_REPLICATION, "Response to sender from far end: %s", http);
     info("%s: Response to sender from far end: %s", REPLICATION_MSG, http);
+    print_replication_state(s->replication);
     // REP ack should be in the beggining of the response
     // TODO: Verify the final commands (strings, numbers???) - a simple parser function can be used here.
     if(unlikely(memcmp(http, REP_ACK_CMD, (size_t)strlen(REP_ACK_CMD)))) {
@@ -354,7 +356,7 @@ void *replication_sender_thread(void *ptr) {
         
         // try to connect
         // if(!s->replication->connected)
-        if((s->replication->not_connected_loops < 3)) {
+        if((s->replication->not_connected_loops < 3) && !s->replication->connected) {
             replication_attempt_to_connect(s);
             // Tmp solution to test the thread cleanup process
             s->replication->not_connected_loops++;            
@@ -389,7 +391,7 @@ void *replication_receiver_thread(void *ptr){
     netdata_thread_cleanup_push(replication_receiver_thread_cleanup_callback, ptr);
     struct receiver_state *rpt = (struct receiver_state *)ptr;
     unsigned int rrdpush_replication_enabled =  rpt->replication->enabled;
-    GAPS *gaps_timeline = rpt->replication->gaps_timeline;
+    // GAPS *gaps_timeline = rpt->replication->gaps_timeline;
     //read configuration
     //create pluginds cd object
     struct plugind cd = {
@@ -405,53 +407,53 @@ void *replication_receiver_thread(void *ptr){
     };
 
     // put the client IP and port into the buffers used by plugins.d
-    snprintfz(cd.id,           CONFIG_MAX_NAME,  "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(cd.filename,     FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);    
+    snprintfz(cd.id,           CONFIG_MAX_NAME,  "%s:%s", rpt->replication->client_ip, rpt->replication->client_port);
+    snprintfz(cd.filename,     FILENAME_MAX,     "%s:%s", rpt->replication->client_ip, rpt->replication->client_port);
+    snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->replication->client_ip, rpt->replication->client_port);
+    snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->replication->client_ip, rpt->replication->client_port);    
     // Respond with the REP ack command
-    info("%s %s [receive from [%s]:%s]: initializing replication communication...", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port);
+    info("%s %s [receive from [%s]:%s]: initializing replication communication...", REPLICATION_MSG, rpt->host->hostname, rpt->replication->client_ip, rpt->replication->client_port);
     char initial_response[HTTP_HEADER_SIZE];
     if (rpt->stream_version >= VERSION_GAP_FILLING) {
-        info("%s %s [receive from [%s]:%s]: Netdata acknowledged replication over stream version %u.", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
+        info("%s %s [receive from [%s]:%s]: Netdata acknowledged replication over stream version %u.", REPLICATION_MSG, rpt->host->hostname, rpt->replication->client_ip, rpt->replication->client_port, rpt->stream_version);
         sprintf(initial_response, "%s", REP_ACK_CMD);
     } 
     else {
-        info("%s [receive from [%s]:%s]: Netdata stream protocol does not support replication.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
+        info("%s [receive from [%s]:%s]: Netdata stream protocol does not support replication.", rpt->host->hostname, rpt->replication->client_ip, rpt->replication->client_port);
         sprintf(initial_response, "%s", "REP off");
     }
     // debug(D_REPLICATION, "Initial REPLICATION response to %s: %s", rpt->client_ip, initial_response);
-    info("%s: Initial REPLICATION response to %s: %s", REPLICATION_MSG, rpt->client_ip, initial_response);
+    info("%s: Initial REPLICATION response to [%s:%s]: %s", REPLICATION_MSG, rpt->replication->client_ip, rpt->replication->client_port, initial_response);
     #ifdef ENABLE_HTTPS
-    rpt->host->stream_ssl.conn = rpt->ssl.conn;
-    rpt->host->stream_ssl.flags = rpt->ssl.flags;
-    if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+    rpt->host->stream_ssl.conn = rpt->replication->ssl.conn;
+    rpt->host->stream_ssl.flags = rpt->replication->ssl.flags;
+    if(send_timeout(&rpt->replication->ssl, rpt->replication->socket, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 #else
-    if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
+    if(send_timeout(rpt->replication->socket, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
 #endif
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "REPLICATION CONNECTION FAILED - THIS HOST FAILED TO REPLY");
-        error("%s %s [receive from [%s]:%s]: failed to send replication acknowledgement command.", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port);
-        close(rpt->fd);
+        log_stream_connection(rpt->replication->client_ip, rpt->replication->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "REPLICATION CONNECTION FAILED - THIS HOST FAILED TO REPLY");
+        error("%s %s [receive from [%s]:%s]: failed to send replication acknowledgement command.", REPLICATION_MSG, rpt->host->hostname, rpt->replication->client_ip, rpt->replication->client_port);
+        close(rpt->replication->socket);
         return 0;
     }
     // Here is the first proof of connection with the sender thread.
 
     // remove the non-blocking flag from the socket
-    if(sock_delnonblock(rpt->fd) < 0)
-        error("%s %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
+    if(sock_delnonblock(rpt->replication->socket) < 0)
+        error("%s %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", REPLICATION_MSG, rpt->host->hostname, rpt->replication->client_ip, rpt->replication->client_port, rpt->replication->socket);
 
     // convert the socket to a FILE *
     FILE *fp = fdopen(rpt->fd, "r");
     if(!fp) {
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "SOCKET CONVERSION TO FD FAILED - SOCKET ERROR");
-        error("%s %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
-        close(rpt->fd);
+        log_stream_connection(rpt->replication->client_ip, rpt->replication->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "SOCKET CONVERSION TO FD FAILED - SOCKET ERROR");
+        error("%s %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", REPLICATION_MSG, rpt->host->hostname, rpt->replication->client_ip, rpt->replication->client_port, rpt->replication->socket);
+        close(rpt->replication->socket);
         return 0;
     }
     
     // call the plugins.d processor to receive the metrics
-    info("%s %s [receive from [%s]:%s]: filling replication gaps...", REPLICATION_MSG, rpt->host->hostname, rpt->client_ip, rpt->client_port);
-    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "CONNECTED");
+    info("%s %s [receive from [%s]:%s]: filling replication gaps...", REPLICATION_MSG, rpt->host->hostname, rpt->replication->client_ip, rpt->replication->client_port);
+    log_stream_connection(rpt->replication->client_ip, rpt->replication->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "CONNECTED");
 
     cd.version = rpt->stream_version;
     // Add here the receiver thread logic
@@ -749,6 +751,7 @@ void replication_receiver_thread_cleanup_callback(void *host)
 {
     // follow the receiver clean-up
     // destroy the replication rx structs
+    info("%s: Hey you, add something here...I need to cleanup the receiver thread!!! :P", REPLICATION_MSG);
 }
 
 // Any join, start, stop, wait, etc thread function goes here.
