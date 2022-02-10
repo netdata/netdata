@@ -150,6 +150,7 @@ telemetry_event() {
     "error_code": "${3}",
     "error_message": "${2}",
     "install_options": "${KICKSTART_OPTIONS}",
+    "install_interactivity": "${INTERACTIVE}",
     "total_runtime": "${total_duration}",
     "selected_install_method": "${SELECTED_INSTALL_METHOD}",
     "netdata_release_channel": "${RELEASE_CHANNEL:-null}",
