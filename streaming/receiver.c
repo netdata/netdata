@@ -705,6 +705,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
     // new child connected
     if (netdata_cloud_setting)
         aclk_host_state_update(rpt->host, 1);
+    // new slave connected
+    if (netdata_cloud_setting) {
+        struct aclk_database_worker_config *wc = rpt->host->dbsync_worker;
+        if (likely(wc))
+            wc->update_node_after = now_realtime_sec() + ACLK_NODE_UPDATE_DELAY;
+    }
 #endif
 
     rrdcontext_host_child_connected(rpt->host);
