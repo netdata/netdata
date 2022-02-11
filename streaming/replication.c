@@ -111,7 +111,7 @@ extern void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host);
 extern void rrdpush_clean_encoded(stream_encoded_t *se);
 
 // Connect to parent. The REPLICATE command over HTTP req triggers the receiver thread in parent.
-//TODO: revise the logic of the communication
+// TODO: revise the logic of the communication
 static int replication_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
 
     struct timeval tv = {
@@ -349,7 +349,8 @@ void *replication_sender_thread(void *ptr) {
     //     // if reponse is REP off - exit
     // }
     //Implementation...
-    for(;rrdpush_replication_enabled && !netdata_exit;)
+    int send_count = 1;
+    for(;rrdpush_replication_enabled && !netdata_exit && send_count < 100;)
     {
         // check for outstanding cancellation requests
         netdata_thread_testcancel();
@@ -361,8 +362,31 @@ void *replication_sender_thread(void *ptr) {
             // Tmp solution to test the thread cleanup process
             s->replication->not_connected_loops++;            
         }
-        else
-            break;
+        else {
+            char http[256];
+            sprintf(http, "Erdem was here %d", send_count);
+            send_count ++;
+            if(send_timeout(&s->host->sender->replication->ssl, s->host->sender->replication->socket, http, strlen(http), 0, s->timeout) == -1) {
+                error("%s %s [send to %s]: failed to send HTTP header to remote netdata.", REPLICATION_MSG, s->host->hostname, s->replication->connected_to);
+                replication_sender_thread_close_socket(s->host);
+                return 0;
+            }
+
+                info("%s %s [send to %s]: waiting response from remote netdata...", REPLICATION_MSG,  s->host->hostname, s->replication->connected_to);
+
+                ssize_t received;
+
+                received = recv_timeout(&s->host->sender->replication->ssl, s->host->sender->replication->socket, http, HTTP_HEADER_SIZE, 0, s->timeout);
+                if(received == -1) {
+                    error("%s %s [send to %s]: remote netdata does not respond.", REPLICATION_MSG,  s->host->hostname, s->replication->connected_to);
+                    replication_sender_thread_close_socket(s->host);
+                    return 0;
+                }
+
+                http[received] = '\0';
+                // debug(D_REPLICATION, "Response to sender from far end: %s", http);
+                info("%s: Response to sender from far end: %s", REPLICATION_MSG, http);
+        }
     }
     // Closing thread - clean up any resources allocated here
     netdata_thread_cleanup_pop(1);
@@ -424,7 +448,7 @@ void *replication_receiver_thread(void *ptr){
     }
     // debug(D_REPLICATION, "Initial REPLICATION response to %s: %s", rpt->client_ip, initial_response);
     info("%s: Initial REPLICATION response to [%s:%s]: %s", REPLICATION_MSG, rpt->replication->client_ip, rpt->replication->client_port, initial_response);
-    #ifdef ENABLE_HTTPS
+#ifdef ENABLE_HTTPS
     rpt->host->stream_ssl.conn = rpt->replication->ssl.conn;
     rpt->host->stream_ssl.flags = rpt->replication->ssl.flags;
     if(send_timeout(&rpt->replication->ssl, rpt->replication->socket, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
@@ -476,8 +500,39 @@ void *replication_receiver_thread(void *ptr){
     //     // recv RDATA command from child agent
     // }    
     // Closing thread - clean any resources allocated in this thread function
+
+    int send_count = 100;
+    for(;rrdpush_replication_enabled && !netdata_exit && send_count > 0;)
+    {
+        // check for outstanding cancellation requests
+        netdata_thread_testcancel();
+        char http[256];
+        sprintf(http, "Erdem was here %d", send_count);
+        send_count --;
+        if(send_timeout(&rpt->replication->ssl, rpt->replication->socket, http, strlen(http), 0, rpt->timeout) == -1) {
+            error("%s %s [send to %s]: failed to send HTTP header to remote netdata.", REPLICATION_MSG, rpt->host->hostname, rpt->replication->connected_to);
+            replication_sender_thread_close_socket(rpt->host);
+            return 0;
+        }
+
+        info("%s %s [send to %s]: waiting response from remote netdata...", REPLICATION_MSG,  rpt->host->hostname, rpt->replication->connected_to);
+
+        ssize_t received;
+
+        received = recv_timeout(&rpt->host->sender->replication->ssl, rpt->host->sender->replication->socket, http, HTTP_HEADER_SIZE, 0, rpt->timeout);
+        if(received == -1) {
+            error("%s %s [send to %s]: remote netdata does not respond.", REPLICATION_MSG,  rpt->host->hostname, rpt->replication->connected_to);
+            replication_sender_thread_close_socket(rpt->host);
+            return 0;
+        }
+
+        http[received] = '\0';
+        // debug(D_REPLICATION, "Response to sender from far end: %s", http);
+        info("%s: Response to sender from far end: %s", REPLICATION_MSG, http);
+    }
+    // Closing thread - clean up any resources allocated here
     netdata_thread_cleanup_pop(1);
-    return NULL;    
+    return NULL;   
 }
 
 extern int rrdpush_receiver_too_busy_now(struct web_client *w);

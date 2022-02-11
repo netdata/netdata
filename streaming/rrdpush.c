@@ -88,7 +88,7 @@ int rrdpush_init() {
     || (STREAMING_PROTOCOL_CURRENT_VERSION < VERSION_GAP_FILLING)
     || !default_rrdpush_enabled) {
         error("%s [send]: Cannot enable replication mechanism - Streaming is disabled.", REPLICATION_MSG);
-        default_rrdpush_replication_enabled = 0;
+        default_rrdpush_replication_enabled = 1;
     }
 
 #ifdef ENABLE_HTTPS
