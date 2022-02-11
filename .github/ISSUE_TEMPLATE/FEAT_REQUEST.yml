@@ -1,0 +1,62 @@
+name: "Netdata Agent: Feature request"
+description: "Submit a feature request and help us improve our free and open-source Netdata Agent"
+title: "[Feat]: "
+labels: ["feature request", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "### Thank you for contributing to our project!"
+  - type: markdown
+    attributes:
+      value: |
+        Submit a feature request and help us improve our free and open-source Netdata Agent.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: |
+        Is your feature request intended to solve a problem? If so, provide a description of the problem.
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: |
+        Provide a clear and concise description of the feature you want or need.
+    validations:
+      required: true
+  - type: dropdown
+    id: importance
+    attributes:
+      label: Importance
+      description: |
+        Help us to understand the importance of your feature request. Choose "blocker" if lack of this feature stops you from using Netdata Agent.
+      options:
+        - "nice to have"
+        - "really want"
+        - "must have"
+        - "blocker"
+    validations:
+      required: true
+  - type: textarea
+    id: value-proposition
+    attributes:
+      label: Value proposition
+      description: |
+        Help us to understand why we need this feaure. Describe benefits that users receive if we implement this feature request.
+      value: |
+        1.
+        2.
+        3.
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-implementation
+    attributes:
+      label: Proposed implementation
+      description: |
+        Share your proposal if you have any ideas on how this feature can be implemented.
+    validations:
+      required: false
