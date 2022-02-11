@@ -390,7 +390,7 @@ executed internally by the caddy server.
 
 ```caddyfile
 netdata.example.org {
-  proxy / netdata:19999
+  reverse_proxy netdata:19999
   tls admin@example.org
 }
 ```
@@ -403,19 +403,19 @@ proxy.
 ```yaml
 version: '3'
 volumes:
-  caddy:
+  caddy_data:
+  caddy_config:
 
 services:
   caddy:
-    image: abiosoft/caddy
+    image: caddy:2
     ports:
-      - 80:80
-      - 443:443
+      - "80:80"
+      - "443:443"
     volumes:
-      - /opt/Caddyfile:/etc/Caddyfile
-      - $HOME/.caddy:/root/.caddy
-    environment:
-      ACME_AGREE: 'true'
+      - /opt/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
   netdata:
     restart: always
     hostname: netdata.example.org
