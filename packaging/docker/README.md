@@ -408,7 +408,7 @@ volumes:
 
 services:
   caddy:
-    image: caddy:<version>
+    image: caddy:2
     ports:
       - "80:80"
       - "443:443"
