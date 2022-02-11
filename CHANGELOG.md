@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- Docs: Fix paths to install boxes [\#12109](https://github.com/netdata/netdata/pull/12109) ([kickoke](https://github.com/kickoke))
+- Docs fix: Match the new install box component name [\#12106](https://github.com/netdata/netdata/pull/12106) ([kickoke](https://github.com/kickoke))
+- Add proper support for Oracle Linux native packages to installer. [\#12101](https://github.com/netdata/netdata/pull/12101) ([Ferroin](https://github.com/Ferroin))
 - Docs improvement: Added interactive kickstart scripts where possible [\#12098](https://github.com/netdata/netdata/pull/12098) ([kickoke](https://github.com/kickoke))
+- Properly handle non-interactive installs as non-root users. [\#12089](https://github.com/netdata/netdata/pull/12089) ([Ferroin](https://github.com/Ferroin))
+- Add info about installer interactivity to anonymous installer telemetry events. [\#12088](https://github.com/netdata/netdata/pull/12088) ([Ferroin](https://github.com/Ferroin))
 - Make a lack of an os-release file non-fatal on install. [\#12087](https://github.com/netdata/netdata/pull/12087) ([Ferroin](https://github.com/Ferroin))
 - docs: add a note that the "Install Netdata on Synology" is maintained by community [\#12086](https://github.com/netdata/netdata/pull/12086) ([ilyam8](https://github.com/ilyam8))
 - disable\_ebpf\_socket: Disable thread while race condition is fixed [\#12085](https://github.com/netdata/netdata/pull/12085) ([thiagoftsm](https://github.com/thiagoftsm))
