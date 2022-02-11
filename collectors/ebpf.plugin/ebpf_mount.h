@@ -10,9 +10,9 @@
 
 #define NETDATA_LATENCY_MOUNT_SLEEP_MS 700000ULL
 
-#define NETDATA_EBPF_MOUNT_CALLS "call"
-#define NETDATA_EBPF_MOUNT_ERRORS "error"
-#define NETDATA_EBPF_MOUNT_FAMILY "mount (eBPF)"
+#define NETDATA_EBPF_MOUNT_CALLS "ebpf_calls"
+#define NETDATA_EBPF_MOUNT_ERRORS "ebpf_errors"
+#define NETDATA_EBPF_MOUNT_FAMILY "mount calls (eBPF)"
 
 // Process configuration name
 #define NETDATA_MOUNT_CONFIG_FILE "mount.conf"

@@ -5839,11 +5839,11 @@ netdataDashboard.context = {
         info: 'Netdata is attaching <code>kprobes</code> for when the function <code>btrfs_sync_file</code>.'
     },
 
-    'mount_points.call': {
+    'mount.ebpf_calls': {
         info: 'Monitor calls to syscalls <code>mount(2)</code> and <code>umount(2)</code> that are responsible for attaching or removing filesystems.'
     },
 
-    'mount_points.error': {
+    'mount.ebpf_errors': {
         info: 'Monitor errors in calls to syscalls <code>mount(2)</code> and <code>umount(2)</code>.'
     },
 
