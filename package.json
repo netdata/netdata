@@ -10,7 +10,7 @@
     "jasmine-growl-reporter": "^2.0.0",
     "jasmine-node": "BrainDoctor/jasmine-node",
     "jasmine-reporters": "^2.3.2",
-    "karma": "^6.0.2",
+    "karma": "^6.3.14",
     "karma-chrome-launcher": "^3.1.0",
     "karma-coverage": "^2.0.1",
     "karma-firefox-launcher": "^1.2.0",
