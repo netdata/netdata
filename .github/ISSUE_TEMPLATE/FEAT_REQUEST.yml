@@ -42,7 +42,7 @@ body:
   - type: textarea
     id: value-proposition
     attributes:
-      label: Value proposition.
+      label: Value proposition
       description: |
         Help us to understand why we need this feaure. Describe benefits that users receive if we implement this feature request.
       value: |
