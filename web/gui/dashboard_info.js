@@ -2973,10 +2973,10 @@ netdataDashboard.context = {
         info: 'The average time for discard/flush requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
     },
 
-    'disk.space': {
-        info: 'Disk space utilization. reserved for root is automatically reserved by the system to prevent the root user from getting out of space.'
+    'mount.space': {
+        info: 'Mount point space utilization. reserved for root is automatically reserved by the system to prevent the root user from getting out of space.'
     },
-    'disk.inodes': {
+    'mount.inodes': {
         info: 'Inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
