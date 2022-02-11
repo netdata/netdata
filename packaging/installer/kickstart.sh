@@ -525,9 +525,11 @@ update() {
   fi
 }
 
-handle_existing_install() {
+detect_existing_install() {
   if pkg_installed netdata; then
     ndprefix="/"
+  elif [ -n "${INSTALL_PREFIX}" ]; then
+    ndprefix="${INSTALL_PREFIX}"
   else
     if [ -n "${INSTALL_PREFIX}" ]; then
       searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
@@ -562,7 +564,13 @@ handle_existing_install() {
     fi
   fi
 
-  if [ -z "${ndprefix}" ]; then
+  INSTALL_PREFIX="${ndprefix}"
+}
+
+handle_existing_install() {
+  detect_existing_install
+
+  if [ -z "${INSTALL_PREFIX}" ] || [ -z "${INSTALL_TYPE}" ]; then
     progress "No existing installations of netdata found, assuming this is a fresh install."
     return 0
   fi
@@ -570,13 +578,13 @@ handle_existing_install() {
   case "${INSTALL_TYPE}" in
     kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
-        warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
+        warning "Found an existing netdata install at ${INSTALL_PREFIX}, but could not determine the install type."
       else
-        progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
+        progress "Found an existing netdata install at ${INSTALL_PREFIX}, with installation type '${INSTALL_TYPE}'."
       fi
 
       if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
-        progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
+        progress "Found an existing netdata install at ${INSTALL_PREFIX}, but user requested reinstall, continuing."
 
         case "${INSTALL_TYPE}" in
           binpkg-*) NETDATA_ONLY_NATIVE=1 ;;
@@ -604,21 +612,20 @@ handle_existing_install() {
 
       if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ] && echo "${INSTALL_TYPE}" | grep -vq "binpkg-*"; then
         if ! update; then
-          warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
+          warning "Unable to find usable updater script, not updating existing install at ${INSTALL_PREFIX}."
         fi
       else
-        warning "Not updating existing install at ${ndprefix}."
+        warning "Not updating existing install at ${INSTALL_PREFIX}."
       fi
 
       if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-        progress "Attempting to claim existing install at ${ndprefix}."
-        INSTALL_PREFIX="${ndprefix}"
+        progress "Attempting to claim existing install at ${INSTALL_PREFIX}."
         claim
         ret=$?
       elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
         fatal "User asked to claim, but did not proide a claiming token." F0202
       else
-        progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
+        progress "Not attempting to claim existing install at ${INSTALL_PREFIX} (no claiming token provided)."
       fi
 
       cleanup
@@ -642,7 +649,7 @@ handle_existing_install() {
           fi
         fi
       else
-        fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed." F0103
+        fatal "Found an existing netdata install at ${INSTALL_PREFIX}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed." F0103
       fi
       ;;
   esac
