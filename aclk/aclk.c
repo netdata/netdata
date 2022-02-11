@@ -819,6 +819,16 @@ void *aclk_main(void *ptr)
         if (aclk_attempt_to_connect(mqttwss_client))
             goto exit_full;
 
+#if defined(ENABLE_ACLK) && !defined(ENABLE_NEW_CLOUD_PROTOCOL)
+        error_report("############################  WARNING  ###############################");
+        error_report("#       Your agent is configured to connect to cloud but has         #");
+        error_report("#      no protobuf protocol support (uses legacy JSON protocol)      #");
+        error_report("#  Legacy protocol will be deprecated soon (planned 1st March 2022)  #");
+        error_report("#  Visit following link for more info and instructions how to solve  #");
+        error_report("#   https://www.netdata.cloud/blog/netdata-clouds-new-architecture   #");
+        error_report("######################################################################");
+#endif
+
         // warning this assumes the popcorning is relative short (3s)
         // if that changes call mqtt_wss_service from within
         // to keep OpenSSL, WSS and MQTT connection alive
