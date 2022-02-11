@@ -165,9 +165,9 @@ int do_getmntinfo(int update_every, usec_t dt) {
         if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
             error("FREEBSD: getmntinfo() failed");
             do_space = 0;
-            error("DISABLED: disk_space.* charts");
+            error("DISABLED: mount_space.* charts");
             do_inodes = 0;
-            error("DISABLED: disk_inodes.* charts");
+            error("DISABLED: mount_inodes.* charts");
             error("DISABLED: getmntinfo module");
             return 1;
         } else {
@@ -222,11 +222,11 @@ int do_getmntinfo(int update_every, usec_t dt) {
                     if (unlikely(!m->st_space)) {
                         snprintfz(title, 4096, "Disk Space Usage for %s [%s]",
                                   mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
-                        m->st_space = rrdset_create_localhost("disk_space",
+                        m->st_space = rrdset_create_localhost("mount_space",
                                                               mntbuf[i].f_mntonname,
                                                               NULL,
                                                               mntbuf[i].f_mntonname,
-                                                              "disk.space",
+                                                              "mount.space",
                                                               title,
                                                               "GiB",
                                                               "freebsd.plugin",
@@ -263,11 +263,11 @@ int do_getmntinfo(int update_every, usec_t dt) {
                     if (unlikely(!m->st_inodes)) {
                         snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]",
                                   mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
-                        m->st_inodes = rrdset_create_localhost("disk_inodes",
+                        m->st_inodes = rrdset_create_localhost("mount_inodes",
                                                                mntbuf[i].f_mntonname,
                                                                NULL,
                                                                mntbuf[i].f_mntonname,
-                                                               "disk.inodes",
+                                                               "mount.inodes",
                                                                title,
                                                                "inodes",
                                                                "freebsd.plugin",

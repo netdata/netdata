@@ -435,9 +435,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
         if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
             error("MACOS: getmntinfo() failed");
             do_space = 0;
-            error("DISABLED: disk_space.X");
+            error("DISABLED: mount_space.X");
             do_inodes = 0;
-            error("DISABLED: disk_inodes.X");
+            error("DISABLED: mount_inodes.X");
         } else {
             for (i = 0; i < mntsize; i++) {
                 if (mntbuf[i].f_flags == MNT_RDONLY ||
@@ -453,15 +453,15 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------------
 
                 if (likely(do_space)) {
-                    st = rrdset_find_active_bytype_localhost("disk_space", mntbuf[i].f_mntonname);
+                    st = rrdset_find_active_bytype_localhost("mount_space", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
                         snprintfz(title, 4096, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         st = rrdset_create_localhost(
-                                "disk_space"
+                                "mount_space"
                                 , mntbuf[i].f_mntonname
                                 , NULL
                                 , mntbuf[i].f_mntonname
-                                , "disk.space"
+                                , "mount.space"
                                 , title
                                 , "GiB"
                                 , "macos.plugin"
@@ -486,15 +486,15 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------------
 
                 if (likely(do_inodes)) {
-                    st = rrdset_find_active_bytype_localhost("disk_inodes", mntbuf[i].f_mntonname);
+                    st = rrdset_find_active_bytype_localhost("mount_inodes", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
                         snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         st = rrdset_create_localhost(
-                                "disk_inodes"
+                                "mount_inodes"
                                 , mntbuf[i].f_mntonname
                                 , NULL
                                 , mntbuf[i].f_mntonname
-                                , "disk.inodes"
+                                , "mount.inodes"
                                 , title
                                 , "inodes"
                                 , "macos.plugin"

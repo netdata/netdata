@@ -127,7 +127,7 @@ labeled `webserver`:
 
 ```yaml
     template: disk_fill_rate
-          on: disk.space
+          on: mount.space
       lookup: max -1s at -30m unaligned of avail
         calc: ($this - $avail) / (30 * 60)
        every: 15s

@@ -150,15 +150,15 @@ groups:
           summary: Memory alert for container node '{{ $labels.job }}'
 
       - alert: node_low_root_filesystem_space_20
-        expr: 100 / sum(netdata_disk_space_GB_average{family="/"}) by (job)
-          * sum(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}) by (job) < 20
+        expr: 100 / sum(netdata_mount_space_GB_average{family="/"}) by (job)
+          * sum(netdata_mount_space_GB_average{family="/",dimension=~"avail|cached"}) by (job) < 20
         for: 1m
         annotations:
           description: '{{ $labels.job }} root filesystem space is {{ humanize $value}}%.'
           summary: Root filesystem alert for container node '{{ $labels.job }}'
 
       - alert: node_root_filesystem_fill_rate_6h
-        expr: predict_linear(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}[1h], 6 * 3600) < 0
+        expr: predict_linear(netdata_mount_space_GB_average{family="/",dimension=~"avail|cached"}[1h], 6 * 3600) < 0
         for: 1h
         labels:
           severity: critical

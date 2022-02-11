@@ -105,7 +105,7 @@ int mount_point_is_protected(char *mount_point)
     return 0;
 }
 
-static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+static inline void do_mount_space_stats(struct mountinfo *mi, int update_every) {
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
 
@@ -281,7 +281,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         if(unlikely(!m->st_space)) {
             m->do_space = CONFIG_BOOLEAN_YES;
-            m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
+            m->st_space = rrdset_find_active_bytype_localhost("mount_space", disk);
             if(unlikely(!m->st_space)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mi->mount_source);
@@ -323,7 +323,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         if(unlikely(!m->st_inodes)) {
             m->do_inodes = CONFIG_BOOLEAN_YES;
-            m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
+            m->st_inodes = rrdset_find_active_bytype_localhost("mount_inodes", disk);
             if(unlikely(!m->st_inodes)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mi->mount_source);
@@ -420,7 +420,7 @@ void *diskspace_main(void *ptr) {
             if(mi->flags & MOUNTINFO_READONLY && !strcmp(mi->root, mi->mount_point))
                 continue;
 
-            do_disk_space_stats(mi, update_every);
+            do_mount_space_stats(mi, update_every);
             if(unlikely(netdata_exit)) break;
         }
 
