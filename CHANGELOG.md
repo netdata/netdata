@@ -6,10 +6,12 @@
 
 **Merged pull requests:**
 
+- Update dashboard to version v2.20.18. [\#12117](https://github.com/netdata/netdata/pull/12117) ([netdatabot](https://github.com/netdatabot))
 - Docs: Fix paths to install boxes [\#12109](https://github.com/netdata/netdata/pull/12109) ([kickoke](https://github.com/kickoke))
 - Docs fix: Match the new install box component name [\#12106](https://github.com/netdata/netdata/pull/12106) ([kickoke](https://github.com/kickoke))
 - Add proper support for Oracle Linux native packages to installer. [\#12101](https://github.com/netdata/netdata/pull/12101) ([Ferroin](https://github.com/Ferroin))
 - Docs improvement: Added interactive kickstart scripts where possible [\#12098](https://github.com/netdata/netdata/pull/12098) ([kickoke](https://github.com/kickoke))
+- Update syntax for Caddy v2 [\#12092](https://github.com/netdata/netdata/pull/12092) ([mohammed90](https://github.com/mohammed90))
 - Properly handle non-interactive installs as non-root users. [\#12089](https://github.com/netdata/netdata/pull/12089) ([Ferroin](https://github.com/Ferroin))
 - Add info about installer interactivity to anonymous installer telemetry events. [\#12088](https://github.com/netdata/netdata/pull/12088) ([Ferroin](https://github.com/Ferroin))
 - Make a lack of an os-release file non-fatal on install. [\#12087](https://github.com/netdata/netdata/pull/12087) ([Ferroin](https://github.com/Ferroin))
@@ -20,6 +22,7 @@
 - docs: improve "Docker container names resolution" section [\#12079](https://github.com/netdata/netdata/pull/12079) ([ilyam8](https://github.com/ilyam8))
 - Fix aclk\_kill\_link reconnect endless loop [\#12074](https://github.com/netdata/netdata/pull/12074) ([underhood](https://github.com/underhood))
 - Disable hashes for charts and alerts if openssl is not available [\#12071](https://github.com/netdata/netdata/pull/12071) ([MrZammler](https://github.com/MrZammler))
+- Adds legacy protocol deprecation banner to agent log [\#12065](https://github.com/netdata/netdata/pull/12065) ([underhood](https://github.com/underhood))
 - fix typo, tidy up sentence [\#12062](https://github.com/netdata/netdata/pull/12062) ([petecooper](https://github.com/petecooper))
 - Docs install cleanup [\#12057](https://github.com/netdata/netdata/pull/12057) ([kickoke](https://github.com/kickoke))
 - Fix handling of non-x86 static builds in updater. [\#12055](https://github.com/netdata/netdata/pull/12055) ([Ferroin](https://github.com/Ferroin))
@@ -329,7 +332,6 @@
 - End of support for Ubuntu 16.04 [\#11556](https://github.com/netdata/netdata/pull/11556) ([Ferroin](https://github.com/Ferroin))
 - Add alert message support for ACLK new architecture [\#11552](https://github.com/netdata/netdata/pull/11552) ([MrZammler](https://github.com/MrZammler))
 - Anomaly Detection MVP [\#11548](https://github.com/netdata/netdata/pull/11548) ([vkalintiris](https://github.com/vkalintiris))
-- Fix handling of claiming in kickstart script when running as non-root. [\#11507](https://github.com/netdata/netdata/pull/11507) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
