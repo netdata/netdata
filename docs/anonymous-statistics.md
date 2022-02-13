@@ -86,11 +86,11 @@ installation, including manual, offline, and macOS installations. Create the fil
 
 **Pass the option `--disable-telemetry` to any of the installer scripts in the [installation
 docs](/packaging/installer/README.md).** You can append this option during the initial installation or a manual
-update. You can also export the environment variable `DO_NOT_TRACK` with a non-zero or non-empty value
-(e.g: `export DO_NOT_TRACK=1`).
+update. You can also export the environment variable `DISABLE_TELEMETRY` with a non-zero or non-empty value
+(e.g: `export DISABLE_TELEMETRY=1`).
 
-When using Docker, **set your `DO_NOT_TRACK` environment variable to `1`.** You can set this variable with the following
-command: `export DO_NOT_TRACK=1`. When creating a container using Netdata's [Docker
+When using Docker, **set your `DISABLE_TELEMETRY` environment variable to `1`.** You can set this variable with the following
+command: `export DISABLE_TELEMETRY=1`. When creating a container using Netdata's [Docker
 image](/packaging/docker/README.md#create-a-new-netdata-agent-container) for the first time, this variable will disable
 the anonymous statistics script inside of the container.
 
