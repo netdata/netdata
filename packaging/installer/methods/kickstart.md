@@ -73,7 +73,7 @@ should not need to use special values for any of these):
 - `ROOTCMD`: Used to specify a command to use to run another command with root privileges if needed. By default
   we try to use sudo, doas, or pkexec (in that order of preference), but if you need special options for one of
   those to work, or have a different tool to do the same thing on your system, you can specify it here.
-- `DO_NOT_TRACK`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
+- `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
 - `NETDATA_INSTALLER_OPTIONS`: Specifies extra options to pass to the static installer or local build script.
 
 ### Connect node to Netdata Cloud during installation
