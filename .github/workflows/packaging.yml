@@ -16,7 +16,7 @@ on:
         name: Package version
         required: false
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 concurrency:
   group: packages-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
@@ -136,11 +136,11 @@ jobs:
       - name: Build Packages
         shell: bash
         run: |
-          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 -e VERSION=${{ env.pkg_version }} --platform=${{ matrix.platform }} -v $PWD:/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ env.pkg_version }} --platform=${{ matrix.platform }} -v $PWD:/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Test Packages
         shell: bash
         run: |
-          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 -e DISTRO=${{ matrix.distro }} -e VERSION=${{ env.pkg_version }} -e DISTRO_VERSION=${{ env.version }} --platform=${{ matrix.platform }} -v $PWD:/netdata ${{ matrix.base_image }}:${{ env.version }} /netdata/.github/scripts/pkg-test.sh
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} -e VERSION=${{ env.pkg_version }} -e DISTRO_VERSION=${{ env.version }} --platform=${{ matrix.platform }} -v $PWD:/netdata ${{ matrix.base_image }}:${{ env.version }} /netdata/.github/scripts/pkg-test.sh
       - name: Save Packages
         uses: actions/upload-artifact@v2
         with:

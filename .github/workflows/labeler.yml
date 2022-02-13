@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: '*/10 * * * *'
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 jobs:
   labeler:
     runs-on: ubuntu-latest
