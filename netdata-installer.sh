@@ -411,6 +411,13 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
+if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
+  [ -n "$DISABLE_TELEMETRY" ] ||
+  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
+  [ -n "$DO_NOT_TRACK" ]; then
+  NETDATA_DISABLE_TELEMETRY=1
+fi
+
 make="make"
 # See: https://github.com/netdata/netdata/issues/9163
 if [ "$(uname -s)" = "FreeBSD" ]; then
@@ -1694,13 +1701,6 @@ install_ebpf
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
-
-if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
-  [ -n "$DISABLE_TELEMETRY" ] ||
-  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
-  [ -n "$DO_NOT_TRACK" ]; then
-  NETDATA_DISABLE_TELEMETRY=1
-fi
 
 # Opt-out from telemetry program
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
