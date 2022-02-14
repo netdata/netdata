@@ -562,7 +562,7 @@ static inline void do_dimension_fixedstep(
     calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
     time_t db_now = now;
-
+    time_t first_time_t = rrddim_first_entry_t(rd);
     for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; points_added < points_wanted ; now += dt) {
         // make sure we return data in the proper time range
         if(unlikely(now > before_wanted)) {
@@ -586,7 +586,11 @@ static inline void do_dimension_fixedstep(
         }
 #endif
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
-        storage_number n = rd->state->query_ops.next_metric(&handle, &db_now);
+        storage_number n;
+        if (rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && now <= first_time_t)
+            n = SN_EMPTY_SLOT;
+        else
+            n = rd->state->query_ops.next_metric(&handle, &db_now);
         if(unlikely(db_now > before_wanted)) {
 #ifdef NETDATA_INTERNAL_CHECKS
             r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
