@@ -2,7 +2,7 @@
 
 #include "ssv.h"
 
-void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, const char *separator, const char *suffix) {
+void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, const char *separator, const char *suffix, RRDDIM *temp_rd) {
     //info("RRD2SSV(): %s: BEGIN", r->st->id);
     long i;
 
@@ -17,7 +17,7 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
     // for each line in the array
     for(i = start; i != end ;i += step) {
         int all_values_are_null = 0;
-        calculated_number v = rrdr2value(r, i, options, &all_values_are_null);
+        calculated_number v = rrdr2value(r, i, options, &all_values_are_null, temp_rd);
 
         if(likely(i != start)) {
             if(r->min > v) r->min = v;

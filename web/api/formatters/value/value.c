@@ -3,7 +3,7 @@
 #include "value.h"
 
 
-inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null) {
+inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, RRDDIM *temp_rd) {
     if (r->st_needs_lock)
         rrdset_check_rdlock(r->st);
 
