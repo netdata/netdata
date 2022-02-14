@@ -20,7 +20,7 @@ inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *
     int set_min_max = 0;
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
-        for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+        for (c = 0, d = temp_rd ? temp_rd : r->st->dimensions; d && c < r->d; c++, d = d->next) {
             calculated_number n = cn[c];
 
             if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
@@ -34,7 +34,7 @@ inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *
     }
 
     // for each dimension
-    for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+    for (c = 0, d = temp_rd ? temp_rd : r->st->dimensions; d && c < r->d; c++, d = d->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
