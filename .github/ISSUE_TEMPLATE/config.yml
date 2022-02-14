@@ -1,14 +1,15 @@
+# Ref: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository#configuring-the-template-chooser
 blank_issues_enabled: false
 contact_links:
-  - name: "Bug report: Netdata Cloud"
+  - name: "Netdata Agent: Question"
+    url: https://github.com/netdata/netdata/discussions/new?category=q-a
+    about: Ask a question about Netdata Agent
+  - name: "Netdata Agent Dashboard"
+    url: https://github.com/netdata/dashboard/issues/new/choose
+    about: Create a report to help us improve our dashboard
+  - name: "Netdata Cloud"
     url: https://github.com/netdata/netdata-cloud/issues/new/choose
     about: Create a report to help us improve our web application
-  - name: Help
-    url: https://community.netdata.cloud/c/support/13
-    about: We offer community-driven support on our community forums
-  - name: Feature request
-    url: https://community.netdata.cloud/c/feature-requests/7
-    about: Make a feature request for Netdata Cloud or the Netdata Agent
   - name: Community
     url: https://netdata.cloud/community
     about: If you don't know where to start, visit our community page!
