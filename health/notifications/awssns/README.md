@@ -46,7 +46,7 @@ To enable SNS:
 4. Optional: To change the notification format for SNS notifications, change the `AWSSNS_MESSAGE_FORMAT` variable in `health_alarm_notify.conf`. 
 This variable supports all the same variables you can use in custom notifications.
 
-   The format default format looks like this: 
+   The default format looks like this: 
    ```bash
    AWSSNS_MESSAGE_FORMAT="${status} on ${host} at ${date}: ${chart} ${value_string}"
    ```
