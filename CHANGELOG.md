@@ -1,11 +1,12 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.33.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.33.0...v1.33.1)
 
 **Merged pull requests:**
 
+- docs: rename kickstart install badges units [\#12131](https://github.com/netdata/netdata/pull/12131) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.18. [\#12117](https://github.com/netdata/netdata/pull/12117) ([netdatabot](https://github.com/netdatabot))
 - Docs: Fix paths to install boxes [\#12109](https://github.com/netdata/netdata/pull/12109) ([kickoke](https://github.com/kickoke))
 - Docs fix: Match the new install box component name [\#12106](https://github.com/netdata/netdata/pull/12106) ([kickoke](https://github.com/kickoke))
