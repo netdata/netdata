@@ -22,7 +22,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void Config::readMLConfig(void) {
     const char *ConfigSectionML = CONFIG_SECTION_ML;
 
-    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", true);
+    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
 
     /*
      * Read values
@@ -60,6 +60,8 @@ void Config::readMLConfig(void) {
     MaxTrainSamples = clamp(MaxTrainSamples, 1 * 3600u, 6 * 3600u);
     MinTrainSamples = clamp(MinTrainSamples, 1 * 3600u, 6 * 3600u);
     TrainEvery = clamp(TrainEvery, 1 * 3600u, 6 * 3600u);
+
+    DBEngineAnomalyRateEvery = clamp(DBEngineAnomalyRateEvery, 1 * 60u, 15 * 60u);
 
     DiffN = clamp(DiffN, 0u, 1u);
     SmoothN = clamp(SmoothN, 0u, 5u);
@@ -100,19 +102,11 @@ void Config::readMLConfig(void) {
 
     Cfg.EnableAnomalyDetection = EnableAnomalyDetection;
 
-#if 0
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
 
     Cfg.DBEngineAnomalyRateEvery = DBEngineAnomalyRateEvery;
-#else
-    Cfg.MaxTrainSamples = 2 * 60;
-    Cfg.MinTrainSamples = 1 * 60;
-    Cfg.TrainEvery = 1 * 60;
-
-    Cfg.DBEngineAnomalyRateEvery = 1 * 5;
-#endif
 
     Cfg.DiffN = DiffN;
     Cfg.SmoothN = SmoothN;
@@ -134,14 +128,9 @@ void Config::readMLConfig(void) {
 
     // Always exclude anomaly_detection charts from training.
     Cfg.ChartsToSkip = "anomaly_detection.* ";
-#if 0
     Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training",
             "!system.* !cpu.* !mem.* !disk.* !disk_* "
             "!ip.* !ipv4.* !ipv6.* !net.* !net_* !netfilter.* "
             "!services.* !apps.* !groups.* !user.* !ebpf.* !netdata.* *");
-#else
-    Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training", "!system.cpu *");
-#endif
-
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 }
