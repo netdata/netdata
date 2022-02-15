@@ -12,7 +12,7 @@ on:
         default: nightly
         required: true
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true

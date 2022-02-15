@@ -291,7 +291,7 @@ jobs:
           echo "::set-output name=image::$(cut -d ':' -f 3 image-info.txt)"
       - name: Install netdata and run the updater on ${{ matrix.distro }}
         run: |
-          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
                 /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2

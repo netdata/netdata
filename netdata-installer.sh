@@ -266,7 +266,7 @@ USAGE: ${PROGRAM} [options]
   --zlib-is-really-here or
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
-  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)
+  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
 
 Netdata will by default be compiled with gcc optimization -O2
@@ -411,6 +411,13 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
+if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
+  [ -n "$DISABLE_TELEMETRY" ] ||
+  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
+  [ -n "$DO_NOT_TRACK" ]; then
+  NETDATA_DISABLE_TELEMETRY=1
+fi
+
 make="make"
 # See: https://github.com/netdata/netdata/issues/9163
 if [ "$(uname -s)" = "FreeBSD" ]; then
@@ -515,8 +522,8 @@ if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
   ${TPUT_YELLOW}${TPUT_BOLD}NOTE${TPUT_RESET}:
   Anonymous usage stats will be collected and sent to Netdata.
   To opt-out, pass --disable-telemetry option to the installer or export
-  the environment variable DO_NOT_TRACK to a non-zero or non-empty value
-  (e.g: export DO_NOT_TRACK=1).
+  the environment variable DISABLE_TELEMETRY to a non-zero or non-empty value
+  (e.g: export DISABLE_TELEMETRY=1).
 
 BANNER4
 fi
@@ -1606,7 +1613,7 @@ remove_old_ebpf() {
     mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.d.conf"
   fi
 
-  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
+  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
     echo >&2 "Removing old eBPF programs with patch."
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
@@ -1694,10 +1701,6 @@ install_ebpf
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
-
-if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
-  NETDATA_DISABLE_TELEMETRY=1
-fi
 
 # Opt-out from telemetry program
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then

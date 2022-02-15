@@ -4,7 +4,7 @@ name: Review
 on:
   pull_request: null
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 concurrency:
   group: review-${{ github.ref }}
   cancel-in-progress: true

@@ -29,7 +29,14 @@ NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
 RELEASE_CHANNEL="nightly"
 
-NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK:-0}"
+if [ -n "$DISABLE_TELEMETRY" ]; then
+  NETDATA_DISABLE_TELEMETRY="${DISABLE_TELEMETRY}"
+elif [ -n "$DO_NOT_TRACK" ]; then
+  NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK}"
+else
+  NETDATA_DISABLE_TELEMETRY=0
+fi
+
 NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
 NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:-""}"
 TELEMETRY_API_KEY="${NETDATA_POSTHOG_API_KEY:-mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y}"
@@ -83,7 +90,7 @@ Additionally, this script may use the following environment variables:
                              default we try to use sudo, doas, or pkexec (in that order of preference), but if
                              you need special options for one of those to work, or have a different tool to do
                              the same thing on your system, you can specify it here.
-  DO_NOT_TRACK               If set to a value other than 0, behave as if \`--disable-telemetry\` was specified.
+  DISABLE_TELEMETRY          If set to a value other than 0, behave as if \`--disable-telemetry\` was specified.
   NETDATA_INSTALLER_OPTIONS: Specifies extra options to pass to the static installer or local build script.
 
 HEREDOC

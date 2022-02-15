@@ -65,8 +65,8 @@ ARG NETDATA_UID=201
 ARG NETDATA_GID=201
 ENV DOCKER_GRP netdata
 ENV DOCKER_USR netdata
-# If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
-#ENV DO_NOT_TRACK=1
+# If DISABLE_TELEMETRY is set, it will disable anonymous stats collection and reporting
+#ENV DISABLE_TELEMETRY=1
 
 # Copy files over
 RUN mkdir -p /opt/src /var/log/netdata && \

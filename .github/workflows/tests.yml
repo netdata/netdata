@@ -15,7 +15,7 @@ on:
       - '**.c'
       - '**.h'
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
