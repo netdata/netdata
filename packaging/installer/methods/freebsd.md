@@ -105,4 +105,4 @@ The `netdata-updater.sh` script will update your Agent.
 | `--zlib-is-really-here` or `--libs-are-really-here` | If you get errors about missing zlib or libuuid but you know it is available, you might have a broken pkg-config. Use this option to proceed without checking pkg-config|
 |`--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)|
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Ffreebsd&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

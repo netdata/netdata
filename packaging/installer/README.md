@@ -220,4 +220,4 @@ Our current build process has some issues when using certain configurations of t
 section on `nonrepresentable section on output`
 errors](/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+
