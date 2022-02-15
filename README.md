@@ -35,12 +35,6 @@ People get addicted to Netdata. Once you use it on your systems, there's no goin
 ![Users who are addicted to
 Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
 
-> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.31.0, May 19, 2021**
->
-> The v1.31.0 release of Netdata comes with re-packaged and redesigned elements of the dashboard to help you focus on
-> your metrics, even more Linux kernel insights via eBPF, on-node machine learning to help you find anomalies, and much
-> more.
-
 ## Menu
 
 - [Features](#features)
