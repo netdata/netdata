@@ -12,7 +12,7 @@ import { OneLineInstallWget, OneLineInstallCurl } from '../../../../../src/compo
 This page covers detailed instructions on using and configuring the automatic one-line installation script named
 `kickstart.sh`.
 
-The kickstart script works on all Linux distributions and macOS environments. By default, automatic nightly updates are enabled. If you are installing on macOS, make sure to check the [install documentation for macOS](packaging/installer/methods/macos.md) before continuing.
+The kickstart script works on all Linux distributions and macOS environments. By default, automatic nightly updates are enabled. If you are installing on macOS, make sure to check the [install documentation for macOS](macos.md) before continuing.
 
 > If you are unsure whether you want nightly or stable releases, read the [installation guide](/packaging/installer/README.md#nightly-vs-stable-releases). 
 > If you want to turn off [automatic updates](/packaging/installer/README.md#automatic-updates), use the `--no-updates` option. You can find more installation options below.
