@@ -1069,14 +1069,6 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
     run mkdir "${NETDATA_PREFIX}/etc/netdata/node.d"
   fi
 
-  # move the node.d config files
-  for x in named sma_webbox snmp; do
-    for y in "" ".old" ".orig"; do
-      if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ] && [ ! -f "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}" ]; then
-        run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}"
-      fi
-    done
-  done
 fi
 
 # -----------------------------------------------------------------------------
