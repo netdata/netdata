@@ -80,6 +80,7 @@ USAGE: kickstart.sh [options]
   --claim-only               If there is an existing install, only try to claim it, not update it.
   --claim-*                  Specify other options for the claiming script.
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
+  --uninstall		     Uninstall netdata.
 
 Additionally, this script may use the following environment variables:
 
@@ -532,6 +533,27 @@ update() {
   fi
 }
 
+uninstall() {
+  get_system_info
+  detect_existing_install
+
+  if [ $INTERACTIVE = 0 ]; then
+    FLAGS="--yes --force"
+  else
+    FLAGS="--yes"
+  fi
+
+  if [ -f "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" ]; then
+    echo "Found existing netdata-uninstaller. Runing it.."
+    ${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh $FLAGS
+  else
+    echo "Downloading netdata-uninstaller ..."
+    wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh -O /tmp/netdata-uninstaller.sh
+    chmod +x /tmp/netdata-uninstaller.sh
+    /tmp/netdata-uninstaller.sh $FLAGS
+  fi
+}
+
 detect_existing_install() {
   if pkg_installed netdata; then
     ndprefix="/"
@@ -572,6 +594,7 @@ detect_existing_install() {
   fi
 
   INSTALL_PREFIX="${ndprefix}"
+
 }
 
 handle_existing_install() {
@@ -1322,6 +1345,17 @@ install_on_freebsd() {
 
 # ======================================================================
 # Main program
+
+while [ -n "${1}" ]; do
+  case "${1}" in
+    "--uninstall")
+      uninstall
+      trap - EXIT
+      exit 0
+      ;;
+  esac
+  shift 1
+done
 
 setup_terminal || echo > /dev/null
 
