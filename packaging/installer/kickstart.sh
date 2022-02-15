@@ -1392,7 +1392,7 @@ while [ -n "${1}" ]; do
       NETDATA_CLAIM_URL="${2}"
       shift 1
       ;;
-    "--claim-*")
+    "--claim-"*)
       optname="$(echo "${1}" | cut -d '-' -f 4-)"
       case "${optname}" in
         id|proxy|user|hostname)
