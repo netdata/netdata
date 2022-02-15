@@ -52,7 +52,7 @@ curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/n
 ```
 The Netdata Agent is installed under `/usr/local/netdata` on your machine. Your machine will also show up as a node in your Netdata Cloud.
 
-If you experience issues while claiming your node, follow the steps in our [Troubleshooting](claim/README.md#troubleshooting) documentation.
+If you experience issues while claiming your node, follow the steps in our [Troubleshooting](/claim/README.md#troubleshooting) documentation.
 ## Install Netdata via Homebrew
 
 To install Netdata and all its dependencies, run Homebrew using the following command: 
