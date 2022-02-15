@@ -40,7 +40,7 @@ static void updateDimensionsChart(RRDHOST *RH,
             P.first.c_str(), // id
             NULL, // name
             "dimensions", // family
-            NULL, // ctx
+            "anomaly_detection.dimensions", // ctx
             P.second.c_str(), // title
             "dimensions", // units
             "netdata", // plugin
@@ -83,7 +83,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
             P.first.c_str(), // id
             NULL, // name
             "anomaly_rate", // family
-            NULL, // ctx
+            "anomaly_detection.anomaly_rate", // ctx
             P.second.c_str(), // title
             "percentage", // units
             "netdata", // plugin
@@ -117,7 +117,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
             P.first.c_str(), // id
             NULL, // name
             "detector_window", // family
-            NULL, // ctx
+            "anomaly_detection.detector_window", // ctx
             P.second.c_str(), // title
             "seconds", // units
             "netdata", // plugin
@@ -155,7 +155,7 @@ static void updateEventsChart(RRDHOST *RH,
             P.first.c_str(), // id
             NULL, // name
             "detector_events", // family
-            NULL, // ctx
+            "anomaly_detection.detector_events", // ctx
             P.second.c_str(), // title
             "boolean", // units
             "netdata", // plugin
@@ -198,7 +198,7 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
             P.first.c_str(), // id
             NULL, // name
             "prediction_stats", // family
-            NULL, // ctx
+            "anomaly_detection.prediction_stats", // ctx
             P.second.c_str(), // title
             "milliseconds", // units
             "netdata", // plugin
@@ -236,7 +236,7 @@ static void updateTrainingChart(RRDHOST *RH,
             P.first.c_str(), // id
             NULL, // name
             "training_stats", // family
-            NULL, // ctx
+            "anomaly_detection.training_stats", // ctx
             P.second.c_str(), // title
             "milliseconds", // units
             "netdata", // plugin
