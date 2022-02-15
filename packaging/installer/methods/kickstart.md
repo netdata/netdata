@@ -78,10 +78,16 @@ should not need to use special values for any of these):
 
 ### Connect node to Netdata Cloud during installation
 
-The `kickstart.sh` script accepts additional parameters to automatically [connect](/claim/README.md) your node to Netdata
-Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
-Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Connect Nodes** in the [Spaces management
-area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+The `kickstart.sh` script accepts additional parameters to automatically [connect](/claim/README.md) your node to Netdata Cloud immediately after installation. 
+
+> Note: You either need to run the command with root privileges or run it with the user that is running the agent.  More details: [Connect an agent without root privileges](/claim/README.md#connect-an-agent-without-root-privileges) section.
+
+To automatically claim nodes after installation: 
+
+1. Sign in to [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces)
+2. Go to the [Spaces management area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces)
+3. Click on **Connect Nodes**
+4. Find the `token` and `rooms` strings and specify your nodes:
 
 - `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
   after the install.
@@ -95,8 +101,6 @@ For example:
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
 ```
-
-Please note that to run it you will either need to have root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](/claim/README.md#connect-an-agent-without-root-privileges) section.
 
 ### Native packages
 
