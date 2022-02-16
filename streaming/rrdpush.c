@@ -51,8 +51,8 @@ int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 char *netdata_ssl_ca_path = NULL;
 char *netdata_ssl_ca_file = NULL;
 #endif
-volatile int children_in_flight;
-volatile double children_consumed_rate;
+int children_in_flight;
+double children_consumed_rate;
 
 static void load_stream_conf() {
     errno = 0;
@@ -680,14 +680,17 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             if (last_stream_check_t != now) {
                 children_in_flight_rate = (float)(children_in_flight) / (float)(now - last_stream_check_t);
                 if (!children_consumed_rate) {
-                    web_client_streaming_rate_t = 5L;
+                    web_client_streaming_rate_t = 10L;
                 }
                 else {
                     if ( children_in_flight_rate > children_consumed_rate ) {
-                        if (web_client_streaming_rate_t < (5 + children_in_flight/50)) web_client_streaming_rate_t++;
+                        if (web_client_streaming_rate_t < (10 + (long int)children_in_flight/30) && web_client_streaming_rate_t < 15) web_client_streaming_rate_t++;
                     } else {
-                        if (web_client_streaming_rate_t > (1 + children_in_flight/50)) web_client_streaming_rate_t--;
+                        if (web_client_streaming_rate_t > (2 + (long int)children_in_flight/30)) web_client_streaming_rate_t--;
                     }
+                    if (web_client_streaming_rate_t < (long int)children_in_flight/30) {
+                           if (web_client_streaming_rate_t < 15) web_client_streaming_rate_t = (long int)children_in_flight/30;
+                   }
                 }
 		
                 info ("[%s]: children in flight rate [%ld] - [%f] ([%d]) / ([%ld] - [%ld]) - Consumed [%f]", hostname, web_client_streaming_rate_t, children_in_flight_rate, children_in_flight, (long)now, (long)last_stream_check_t, children_consumed_rate);

@@ -4,7 +4,7 @@
 
 extern struct config stream_config;
 extern double children_consumed_rate;
-volatile unsigned int children_consumed;
+unsigned int children_consumed;
 
 void destroy_receiver_state(struct receiver_state *rpt) {
     freez(rpt->key);
