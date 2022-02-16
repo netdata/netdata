@@ -326,7 +326,11 @@ if [ "${VERBOSE}" == 1 ]; then
 fi
 
 attempt_contact () {
-        eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt" 2>&1
+        if [ "${URLTOOL}" = "curl" ] ; then
+                eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
+        else
+                eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt" 2>&1
+        fi
         URLCOMMAND_EXIT_CODE=$?
         if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
         # We consider the server issuing an error response a successful attempt at communicating
