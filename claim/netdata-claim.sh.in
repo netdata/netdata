@@ -296,7 +296,7 @@ if [ "${URLTOOL}" = "curl" ] ; then
                 URLCOMMAND="${URLCOMMAND} -x \"${PROXY}\""
         fi
 else
-        URLCOMMAND="wget -T 15 -O -  -q --save-headers --server-response --content-on-error=on --method=PUT \
+        URLCOMMAND="wget -T 15 -O -  -q --server-response --content-on-error=on --method=PUT \
         --body-file=\"${CLAIMING_DIR}/tmpin.txt\""
         if [ "${NOPROXY}" = "yes" ] ; then
                 URLCOMMAND="${URLCOMMAND} --no-proxy"
