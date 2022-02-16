@@ -15,10 +15,6 @@ ACLK:
   - aclk/**/*
   - mqtt_websockets
 
-area/backends:
-  - backends/*
-  - backends/**/*
-
 area/claim:
   - claim/*
 

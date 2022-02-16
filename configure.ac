@@ -71,10 +71,10 @@ AC_ARG_ENABLE(
     [enable_plugin_xenstat="detect"]
 )
 AC_ARG_ENABLE(
-    [backend-kinesis],
-    [AS_HELP_STRING([--enable-backend-kinesis], [enable kinesis backend @<:@default autodetect@:>@])],
+    [exporting-kinesis],
+    [AS_HELP_STRING([--enable-exporting-kinesis], [enable kinesis exporting connector @<:@default autodetect@:>@])],
     ,
-    [enable_backend_kinesis="detect"]
+    [enable_exporting_kinesis="detect"]
 )
 AC_ARG_ENABLE(
     [exporting-pubsub],
@@ -83,16 +83,16 @@ AC_ARG_ENABLE(
     [enable_exporting_pubsub="detect"]
 )
 AC_ARG_ENABLE(
-    [backend-prometheus-remote-write],
-    [AS_HELP_STRING([--enable-backend-prometheus-remote-write], [enable prometheus remote write backend @<:@default autodetect@:>@])],
+    [exporting-prometheus-remote-write],
+    [AS_HELP_STRING([--enable-exporting-prometheus-remote-write], [enable prometheus remote write exporting connector @<:@default autodetect@:>@])],
     ,
-    [enable_backend_prometheus_remote_write="detect"]
+    [enable_exporting_prometheus_remote_write="detect"]
 )
 AC_ARG_ENABLE(
-    [backend-mongodb],
-    [AS_HELP_STRING([--enable-backend-mongodb], [enable mongodb backend @<:@default autodetect@:>@])],
+    [exporting-mongodb],
+    [AS_HELP_STRING([--enable-exporting-mongodb], [enable mongodb exporting @<:@default autodetect@:>@])],
     ,
-    [enable_backend_mongodb="detect"]
+    [enable_exporting_mongodb="detect"]
 )
 AC_ARG_ENABLE(
     [pedantic],
@@ -1246,7 +1246,7 @@ AM_CONDITIONAL([ENABLE_PLUGIN_SLABINFO], [test "${enable_plugin_slabinfo}" = "ye
 
 
 # -----------------------------------------------------------------------------
-# AWS Kinesis backend - libaws-cpp-sdk-kinesis, libaws-cpp-sdk-core, libssl, libcrypto, libcurl
+# AWS Kinesis exporting connector - libaws-cpp-sdk-kinesis, libaws-cpp-sdk-core, libssl, libcrypto, libcurl
 
 PKG_CHECK_MODULES(
     [LIBCRYPTO],
@@ -1298,39 +1298,39 @@ PKG_CHECK_MODULES(
     [have_libaws_cpp_sdk_kinesis=no]
 )
 
-test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_kinesis}" != "yes" && \
+test "${enable_exporting_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_kinesis}" != "yes" && \
     AC_MSG_ERROR([libaws-cpp-sdk-kinesis required but not found. try installing AWS C++ SDK])
 
-test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_core}" != "yes" && \
+test "${enable_exporting_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_core}" != "yes" && \
     AC_MSG_ERROR([libaws-cpp-sdk-core required but not found. try installing AWS C++ SDK])
 
-test "${enable_backend_kinesis}" = "yes" -a "${have_libcurl}" != "yes" && \
+test "${enable_exporting_kinesis}" = "yes" -a "${have_libcurl}" != "yes" && \
     AC_MSG_ERROR([libcurl required but not found])
 
-test "${enable_backend_kinesis}" = "yes" -a "${have_libssl}" != "yes" && \
+test "${enable_exporting_kinesis}" = "yes" -a "${have_libssl}" != "yes" && \
     AC_MSG_ERROR([libssl required but not found])
 
-test "${enable_backend_kinesis}" = "yes" -a "${have_libcrypto}" != "yes" && \
+test "${enable_exporting_kinesis}" = "yes" -a "${have_libcrypto}" != "yes" && \
     AC_MSG_ERROR([libcrypto required but not found])
 
-AC_MSG_CHECKING([if kinesis backend should be enabled])
-if test "${enable_backend_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" = "yes" \
+AC_MSG_CHECKING([if kinesis exporting connector should be enabled])
+if test "${enable_exporting_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" = "yes" \
                                             -a "${have_libaws_cpp_sdk_core}" = "yes" \
                                             -a "${have_libcurl}" = "yes" \
                                             -a "${have_libssl}" = "yes" \
                                             -a "${have_libcrypto}" = "yes"; then
-    enable_backend_kinesis="yes"
+    enable_exporting_kinesis="yes"
     AC_DEFINE([HAVE_KINESIS], [1], [libaws-cpp-sdk-kinesis usability])
     OPTIONAL_KINESIS_CFLAGS="${LIBCRYPTO_CFLAGS} ${LIBSSL_CFLAGS} ${LIBCURL_CFLAGS}"
     CXX11FLAG="${AWS_CPP_SDK_KINESIS_CFLAGS} ${AWS_CPP_SDK_CORE_CFLAGS}"
     OPTIONAL_KINESIS_LIBS="${AWS_CPP_SDK_KINESIS_LIBS} ${AWS_CPP_SDK_CORE_LIBS} \
                            ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
 else
-    enable_backend_kinesis="no"
+    enable_exporting_kinesis="no"
 fi
 
-AC_MSG_RESULT([${enable_backend_kinesis}])
-AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "yes"])
+AC_MSG_RESULT([${enable_exporting_kinesis}])
+AM_CONDITIONAL([ENABLE_EXPORTING_KINESIS], [test "${enable_exporting_kinesis}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -1365,7 +1365,7 @@ test "${enable_pubsub}" = "yes" -a "${have_grpc}" != "yes" && \
 test "${enable_pubsub}" = "yes" -a "${have_pubsub_protos}" != "yes" && \
     AC_MSG_ERROR([libgoogleapis_cpp_pubsub_protos required but not found. try installing googleapis])
 
-test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler}" != "yes" && \
+test "${enable_exporting_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler}" != "yes" && \
     AC_MSG_ERROR([C++ compiler required but not found. try installing g++])
 
 AC_MSG_CHECKING([if pubsub exporting connector should be enabled])
@@ -1384,7 +1384,7 @@ AM_CONDITIONAL([ENABLE_EXPORTING_PUBSUB], [test "${enable_exporting_pubsub}" = "
 
 
 # -----------------------------------------------------------------------------
-# Prometheus remote write backend - libprotobuf, libsnappy, protoc
+# Prometheus remote write exporting connector - libprotobuf, libsnappy, protoc
 
 AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
 
@@ -1421,22 +1421,22 @@ AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
 
 AC_MSG_RESULT([${have_libsnappy}])
 
-test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libprotobuf}" != "yes" && \
+test "${enable_exporting_prometheus_remote_write}" = "yes" -a "${have_libprotobuf}" != "yes" && \
     AC_MSG_ERROR([libprotobuf required but not found. try installing protobuf])
 
-test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libsnappy}" != "yes" && \
+test "${enable_exporting_prometheus_remote_write}" = "yes" -a "${have_libsnappy}" != "yes" && \
     AC_MSG_ERROR([libsnappy required but not found. try installing snappy])
 
-test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_protoc}" != "yes" && \
+test "${enable_exporting_prometheus_remote_write}" = "yes" -a "${have_protoc}" != "yes" && \
     AC_MSG_ERROR([protoc compiler required but not found. try installing protobuf])
 
-test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler}" != "yes" && \
+test "${enable_exporting_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler}" != "yes" && \
     AC_MSG_ERROR([C++ compiler required but not found. try installing g++])
 
-AC_MSG_CHECKING([if prometheus remote write backend should be enabled])
-if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
+AC_MSG_CHECKING([if prometheus remote write exporting connector should be enabled])
+if test "${enable_exporting_prometheus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
-    enable_backend_prometheus_remote_write="yes"
+    enable_exporting_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${SNAPPY_CFLAGS} -I \$(abs_top_srcdir)/exporting/prometheus/remote_write"
     CXX11FLAG="-std=c++11"
@@ -1444,15 +1444,15 @@ if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotob
     OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
     OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
 else
-    enable_backend_prometheus_remote_write="no"
+    enable_exporting_prometheus_remote_write="no"
 fi
 
-AC_MSG_RESULT([${enable_backend_prometheus_remote_write}])
-AM_CONDITIONAL([ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE], [test "${enable_backend_prometheus_remote_write}" = "yes"])
+AC_MSG_RESULT([${enable_exporting_prometheus_remote_write}])
+AM_CONDITIONAL([ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE], [test "${enable_exporting_prometheus_remote_write}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
-# MongoDB backend - libmongoc
+# MongoDB exporting connector - libmongoc
 
 PKG_CHECK_MODULES(
     [LIBMONGOC],
@@ -1461,21 +1461,21 @@ PKG_CHECK_MODULES(
     [have_libmongoc=no]
 )
 
-test "${enable_backend_mongodb}" = "yes" -a "${have_libmongoc}" != "yes" && \
+test "${enable_exporting_mongodb}" = "yes" -a "${have_libmongoc}" != "yes" && \
     AC_MSG_ERROR([libmongoc required but not found. Try installing `mongoc`.])
 
-AC_MSG_CHECKING([if mongodb backend should be enabled])
-if test "${enable_backend_mongodb}" != "no" -a "${have_libmongoc}" = "yes"; then
-    enable_backend_mongodb="yes"
+AC_MSG_CHECKING([if mongodb exporting connector should be enabled])
+if test "${enable_exporting_mongodb}" != "no" -a "${have_libmongoc}" = "yes"; then
+    enable_exporting_mongodb="yes"
     AC_DEFINE([HAVE_MONGOC], [1], [libmongoc usability])
     OPTIONAL_MONGOC_CFLAGS="${LIBMONGOC_CFLAGS}"
     OPTIONAL_MONGOC_LIBS="${LIBMONGOC_LIBS}"
 else
-    enable_backend_mongodb="no"
+    enable_exporting_mongodb="no"
 fi
 
-AC_MSG_RESULT([${enable_backend_mongodb}])
-AM_CONDITIONAL([ENABLE_BACKEND_MONGODB], [test "${enable_backend_mongodb}" = "yes"])
+AC_MSG_RESULT([${enable_exporting_mongodb}])
+AM_CONDITIONAL([ENABLE_EXPORTING_MONGODB], [test "${enable_exporting_mongodb}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -1523,9 +1523,9 @@ AC_MSG_RESULT([${enable_lto}])
 
 # -----------------------------------------------------------------------------
 
-if test "${enable_backend_kinesis}" = "yes" -o \
+if test "${enable_exporting_kinesis}" = "yes" -o \
         "${enable_exporting_pubsub}" = "yes" -o \
-        "${enable_backend_prometheus_remote_write}" = "yes" -o \
+        "${enable_exporting_prometheus_remote_write}" = "yes" -o \
         "${new_cloud_protocol}" = "yes" -o \
         "${build_ml}" = "yes"; then
     enable_cxx_linker="yes"
@@ -1688,14 +1688,6 @@ AC_DEFINE_UNQUOTED(
 AC_CONFIG_FILES([
     Makefile
     netdata.spec
-    backends/graphite/Makefile
-    backends/json/Makefile
-    backends/Makefile
-    backends/opentsdb/Makefile
-    backends/prometheus/Makefile
-    backends/prometheus/remote_write/Makefile
-    backends/aws_kinesis/Makefile
-    backends/mongodb/Makefile
     collectors/Makefile
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile

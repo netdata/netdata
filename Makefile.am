@@ -99,7 +99,6 @@ dist_noinst_SCRIPTS = \
 # Compile netdata binaries
 
 SUBDIRS += \
-    backends \
     collectors \
     daemon \
     database \
@@ -580,19 +579,6 @@ WEB_PLUGIN_FILES = \
     web/server/static/static-threaded.h \
     $(NULL)
 
-BACKENDS_PLUGIN_FILES = \
-    backends/backends.c \
-    backends/backends.h \
-    backends/graphite/graphite.c \
-    backends/graphite/graphite.h \
-    backends/json/json.c \
-    backends/json/json.h \
-    backends/opentsdb/opentsdb.c \
-    backends/opentsdb/opentsdb.h \
-    backends/prometheus/backend_prometheus.c \
-    backends/prometheus/backend_prometheus.h \
-    $(NULL)
-
 CLAIM_FILES = \
     claim/claim.c \
     claim/claim.h \
@@ -831,23 +817,6 @@ MONGODB_EXPORTING_FILES = \
     exporting/mongodb/mongodb.h \
     $(NULL)
 
-KINESIS_BACKEND_FILES = \
-    backends/aws_kinesis/aws_kinesis.c \
-    backends/aws_kinesis/aws_kinesis.h \
-    backends/aws_kinesis/aws_kinesis_put_record.cc \
-    backends/aws_kinesis/aws_kinesis_put_record.h \
-    $(NULL)
-
-PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
-    backends/prometheus/remote_write/remote_write.cc \
-    backends/prometheus/remote_write/remote_write.h \
-    $(NULL)
-
-MONGODB_BACKEND_FILES = \
-    backends/mongodb/mongodb.c \
-    backends/mongodb/mongodb.h \
-    $(NULL)
-
 DAEMON_FILES = \
     daemon/buildinfo.c \
     daemon/buildinfo.h \
@@ -877,7 +846,6 @@ NETDATA_FILES = \
     $(DAEMON_FILES) \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
-    $(BACKENDS_PLUGIN_FILES) \
     $(EXPORTING_ENGINE_FILES) \
     $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
@@ -1065,8 +1033,8 @@ if ENABLE_PLUGIN_SLABINFO
         $(NULL)
 endif
 
-if ENABLE_BACKEND_KINESIS
-    netdata_SOURCES += $(KINESIS_BACKEND_FILES) $(KINESIS_EXPORTING_FILES)
+if ENABLE_EXPORTING_KINESIS
+    netdata_SOURCES += $(KINESIS_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
 endif
 
@@ -1075,17 +1043,17 @@ if ENABLE_EXPORTING_PUBSUB
     netdata_LDADD += $(OPTIONAL_PUBSUB_LIBS)
 endif
 
-if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
-    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES) $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
+if ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE
+    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS) \
         $(OPTIONAL_PROTOBUF_LIBS) \
         $(NULL)
-    BACKEND_PROMETHEUS_BUILT_SOURCES = \
+    EXPORTING_PROMETHEUS_BUILT_SOURCES = \
         exporting/prometheus/remote_write/remote_write.pb.cc \
         exporting/prometheus/remote_write/remote_write.pb.h \
         $(NULL)
-    BUILT_SOURCES += $(BACKEND_PROMETHEUS_BUILT_SOURCES)
-    nodist_netdata_SOURCES += $(BACKEND_PROMETHEUS_BUILT_SOURCES)
+    BUILT_SOURCES += $(EXPORTING_PROMETHEUS_BUILT_SOURCES)
+    nodist_netdata_SOURCES += $(EXPORTING_PROMETHEUS_BUILT_SOURCES)
 
 exporting/prometheus/remote_write/remote_write.pb.cc \
 exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote_write/remote_write.proto
@@ -1093,8 +1061,8 @@ exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote
 
 endif
 
-if ENABLE_BACKEND_MONGODB
-    netdata_SOURCES += $(MONGODB_BACKEND_FILES) $(MONGODB_EXPORTING_FILES)
+if ENABLE_EXPORTING_MONGODB
+    netdata_SOURCES += $(MONGODB_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
 endif
 
@@ -1217,7 +1185,7 @@ if ENABLE_UNITTESTS
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
-if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
+if ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE
     exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
     exporting_tests_exporting_engine_testdriver_LDADD += \
         $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS) \
@@ -1229,9 +1197,9 @@ if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
         -Wl,--wrap=add_label \
         -Wl,--wrap=add_metric \
         $(NULL)
-    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BACKEND_PROMETHEUS_BUILT_SOURCES)
+    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(EXPORTING_PROMETHEUS_BUILT_SOURCES)
 endif
-if ENABLE_BACKEND_KINESIS
+if ENABLE_EXPORTING_KINESIS
     exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)
     exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_KINESIS_LIBS)
     exporting_tests_exporting_engine_testdriver_LDFLAGS += \
@@ -1251,7 +1219,7 @@ if ENABLE_EXPORTING_PUBSUB
         -Wl,--wrap=pubsub_get_result \
         $(NULL)
 endif
-if ENABLE_BACKEND_MONGODB
+if ENABLE_EXPORTING_MONGODB
     exporting_tests_exporting_engine_testdriver_SOURCES += $(MONGODB_EXPORTING_FILES)
     exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_MONGOC_LIBS)
     exporting_tests_exporting_engine_testdriver_LDFLAGS += \

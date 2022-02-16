@@ -745,19 +745,6 @@ set(STREAMING_PLUGIN_FILES
         streaming/sender.c
         )
 
-set(BACKENDS_PLUGIN_FILES
-        backends/backends.c
-        backends/backends.h
-        backends/graphite/graphite.c
-        backends/graphite/graphite.h
-        backends/json/json.c
-        backends/json/json.h
-        backends/opentsdb/opentsdb.c
-        backends/opentsdb/opentsdb.h
-        backends/prometheus/backend_prometheus.c
-        backends/prometheus/backend_prometheus.h
-        )
-
 set(CLAIM_PLUGIN_FILES
         claim/claim.c
         claim/claim.h
@@ -884,23 +871,6 @@ set(MONGODB_EXPORTING_FILES
         exporting/mongodb/mongodb.h
         )
 
-set(KINESIS_BACKEND_FILES
-        backends/aws_kinesis/aws_kinesis.c
-        backends/aws_kinesis/aws_kinesis.h
-        backends/aws_kinesis/aws_kinesis_put_record.cc
-        backends/aws_kinesis/aws_kinesis_put_record.h
-        )
-
-set(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES
-        backends/prometheus/remote_write/remote_write.cc
-        backends/prometheus/remote_write/remote_write.h
-        )
-
-set(MONGODB_BACKEND_FILES
-        backends/mongodb/mongodb.c
-        backends/mongodb/mongodb.h
-        )
-
 set(DAEMON_FILES
         daemon/buildinfo.c
         daemon/buildinfo.h
@@ -960,7 +930,6 @@ set(NETDATA_FILES
         collectors/all.h
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
-        ${BACKENDS_PLUGIN_FILES}
         ${EXPORTING_ENGINE_FILES}
         ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
@@ -997,25 +966,25 @@ add_definitions(
 )
 
 # -----------------------------------------------------------------------------
-# kinesis backend
+# kinesis exporting connector
 
 IF(KINESIS_LIBRARIES AND AWS_CORE_LIBRARIES AND HAVE_AWS_EVENT_STREAM AND HAVE_AWS_COMMON AND HAVE_AWS_CHECKSUMS AND
    CRYPTO_LIBRARIES AND SSL_LIBRARIES AND CURL_LIBRARIES)
-    SET(ENABLE_BACKEND_KINESIS True)
+    SET(ENABLE_EXPORTING_KINESIS True)
 ELSE()
-    SET(ENABLE_BACKEND_KINESIS False)
+    SET(ENABLE_EXPORTING_KINESIS False)
 ENDIF()
 
-IF(ENABLE_BACKEND_KINESIS)
-    message(STATUS "kinesis backend: enabled")
-    list(APPEND NETDATA_FILES ${KINESIS_BACKEND_FILES} ${KINESIS_EXPORTING_FILES})
+IF(ENABLE_EXPORTING_KINESIS)
+    message(STATUS "kinesis exporting: enabled")
+    list(APPEND NETDATA_FILES ${KINESIS_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES ${KINESIS_LIBRARIES} ${AWS_CORE_LIBRARIES}
                                          ${CRYPTO_LIBRARIES} ${SSL_LIBRARIES} ${CURL_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${KINESIS_INCLUDE_DIRS} ${AWS_CORE_INCLUDE_DIRS}
                                             ${CRYPTO_INCLUDE_DIRS} ${SSL_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
     list(APPEND NETDATA_COMMON_CFLAGS ${CRYPTO_CFLAGS_OTHER} ${SSL_CFLAGS_OTHER} ${CURL_CFLAGS_OTHER})
 ELSE()
-    message(STATUS "kinesis backend: disabled (requires AWS SDK for C++)")
+    message(STATUS "kinesis exporting: disabled (requires AWS SDK for C++)")
 ENDIF()
 
 # -----------------------------------------------------------------------------
@@ -1038,16 +1007,16 @@ ELSE()
 ENDIF()
 
 # -----------------------------------------------------------------------------
-# prometheus remote write backend
+# prometheus remote write exporting connector
 
 IF(PROTOBUF_LIBRARIES AND SNAPPY_LIBRARIES)
-    SET(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE True)
+    SET(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE True)
 ELSE()
-    SET(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE False)
+    SET(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE False)
 ENDIF()
 
-IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
-    message(STATUS "prometheus remote write backend: enabled")
+IF(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE)
+    message(STATUS "prometheus remote write exporting: enabled")
 
     find_package(Protobuf REQUIRED)
     
@@ -1083,26 +1052,26 @@ IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
 
     protobuf_remote_write_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
 
-    list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
+    list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
     list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER} ${SNAPPY_CFLAGS_OTHER})
 ELSE()
-    message(STATUS "prometheus remote write backend: disabled (requires protobuf and snappy libraries)")
+    message(STATUS "prometheus remote write exporting: disabled (requires protobuf and snappy libraries)")
 ENDIF()
 
 # -----------------------------------------------------------------------------
-# mongodb backend
+# mongodb exporting connector
 
 IF(MONGOC_LIBRARIES)
-    message(STATUS "mongodb backend: enabled")
+    message(STATUS "mongodb exporting: enabled")
 
-    list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES} ${MONGODB_EXPORTING_FILES})
+    list(APPEND NETDATA_FILES ${MONGODB_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES ${MONGOC_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${MONGOC_INCLUDE_DIRS})
     list(APPEND NETDATA_COMMON_CFLAGS ${MONGOC_CFLAGS_OTHER})
 ELSE()
-    message(STATUS "mongodb backend: disabled (requires mongoc library)")
+    message(STATUS "mongodb exporting: disabled (requires mongoc library)")
 ENDIF()
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
@@ -1223,7 +1192,7 @@ ELSEIF(MACOS)
 
 ENDIF()
 
-IF(ENABLE_BACKEND_KINESIS OR ENABLE_EXPORTING_PUBSUB OR ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
+IF(ENABLE_EXPORTING_KINESIS OR ENABLE_EXPORTING_PUBSUB OR ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE)
     set_property(TARGET netdata PROPERTY CXX_STANDARD 11)
     set_property(TARGET netdata PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
@@ -1397,7 +1366,7 @@ if(BUILD_TESTING)
     set(KINESIS_LINK_OPTIONS)
     set(PUBSUB_LINK_OPTIONS)
     set(MONGODB_LINK_OPTIONS)
-if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
+if(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE)
     list(APPEND EXPORTING_ENGINE_FILES ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(
         APPEND PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS
@@ -1407,7 +1376,7 @@ if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
         -Wl,--wrap=add_metric
     )
 endif()
-if(ENABLE_BACKEND_KINESIS)
+if(ENABLE_EXPORTING_KINESIS)
     list(APPEND EXPORTING_ENGINE_FILES ${KINESIS_EXPORTING_FILES})
     list(
         APPEND KINESIS_LINK_OPTIONS
