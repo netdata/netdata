@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
+
 #include <linux/netfilter/nfnetlink_conntrack.h>
 #include <libmnl/libmnl.h>
 #include <libnetfilter_acct/libnetfilter_acct.h>
@@ -22,34 +24,6 @@ static inline size_t mnl_buffer_size() {
     return (size_t)s;
 }
 
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
-
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    (void) action;
-    (void) action_result;
-    (void) action_data;
-    return;
-}
-
-// callbacks required by popen()
-void signals_block(void) {};
-void signals_unblock(void) {};
-void signals_reset(void) {};
-
-// callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
-    (void)variable;
-    (void)hash;
-    (void)rc;
-    (void)result;
-    return 0;
-};
-
-// required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
 // variables
 static int debug = 0;
 static int netdata_update_every = 1;
@@ -690,7 +664,11 @@ static void nfacct_send_metrics() {
         if(likely(d->updated)) {
             if(unlikely(!d->packets_dimension_added)) {
                 d->packets_dimension_added = 1;
-                printf("CHART netfilter.nfacct_packets '' 'Netfilter Accounting Packets' 'packets/s'\n");
+                printf(
+                    "CHART netfilter.nfacct_packets '' 'Netfilter Accounting Packets' 'packets/s' 'nfacct' '' stacked %d %d %s\n",
+                    NETDATA_CHART_PRIO_NETFILTER_PACKETS,
+                    nfacct_root.update_every,
+                    PLUGIN_NFACCT_NAME);
                 printf("DIMENSION %s '' incremental 1 %d\n", d->name, nfacct_root.update_every);
             }
         }
@@ -721,7 +699,11 @@ static void nfacct_send_metrics() {
         if(likely(d->updated)) {
             if(unlikely(!d->bytes_dimension_added)) {
                 d->bytes_dimension_added = 1;
-                printf("CHART netfilter.nfacct_bytes '' 'Netfilter Accounting Bandwidth' 'kilobytes/s'\n");
+                printf(
+                    "CHART netfilter.nfacct_bytes '' 'Netfilter Accounting Bandwidth' 'kilobytes/s' 'nfacct' '' stacked %d %d %s\n",
+                    NETDATA_CHART_PRIO_NETFILTER_BYTES,
+                    nfacct_root.update_every,
+                    PLUGIN_NFACCT_NAME);
                 printf("DIMENSION %s '' incremental 1 %d\n", d->name, 1000 * nfacct_root.update_every);
             }
         }

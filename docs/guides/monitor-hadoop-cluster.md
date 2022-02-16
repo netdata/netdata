@@ -73,8 +73,7 @@ The JSON result for a DataNode's `/jmx` endpoint is slightly different:
 ```json
 {
   "beans" : [ {
-    "name" : "Hadoop:service=DataNode,name=DataNodeActivity-dev-slave-01.dev.loc
-al-9866",
+    "name" : "Hadoop:service=DataNode,name=DataNodeActivity-dev-slave-01.dev.local-9866",
     "modelerType" : "DataNodeActivity-dev-slave-01.dev.local-9866",
     "tag.SessionId" : null,
     "tag.Context" : "dfs",
@@ -192,7 +191,7 @@ documentation](/health/README.md).
 
 If you're having issues with Netdata auto-detecting your HDFS/Zookeeper servers, or want to help improve how Netdata
 collects or presents metrics from these services, feel free to [file an
-issue](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md).
+issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
 
 -   Read up on the [HDFS configuration
     file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/hdfs.conf) to understand how to configure

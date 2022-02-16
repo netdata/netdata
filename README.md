@@ -4,6 +4,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
+  <a href="https://storage.googleapis.com/netdata-nightlies/latest-version.txt"><img src="https://img.shields.io/badge/dynamic/xml?url=https://storage.googleapis.com/netdata-nightlies/latest-version.txt&label=nightly%20release&query=/text()" alt="Nightly release"></a>
   <a href="https://travis-ci.com/netdata/netdata"><img src="https://travis-ci.com/netdata/netdata.svg?branch=master" alt="Build status"></a>
   <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
@@ -34,12 +35,6 @@ People get addicted to Netdata. Once you use it on your systems, there's no goin
 ![Users who are addicted to
 Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
 
-> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.30.0, March 31, 2021**
->
-> The v1.30.0 release of Netdata brings major improvements to our packaging and completely replaces Google Analytics/GTM
-> for product telemetry. We're also releasing the first changes in an upcoming overhaul to both our dashboard UI/UX and
-> the suite of preconfigured alarms that comes with every installation.
-
 ## Menu
 
 - [Features](#features)
@@ -47,6 +42,7 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
   - [Docker](#docker)
   - [Other operating systems](#other-operating-systems)
   - [Post-installation](#post-installation)
+  - [Netdata Cloud](#netdata-cloud)
 - [How it works](#how-it-works)
 - [Infographic](#infographic)
 - [Documentation](#documentation)
@@ -118,9 +114,9 @@ and builds all dependencies, including those required to connect to [Netdata Clo
 choose, and enables [automatic nightly
 updates](https://learn.netdata.cloud/docs/agent/packaging/installer#nightly-vs-stable-releases) and [anonymous
 statistics](https://learn.netdata.cloud/docs/agent/anonymous-statistics).
-
+<!-- candidate for reuse -->
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 To view the Netdata dashboard, navigate to `http://localhost:19999`, or `http://NODE:19999`.
@@ -154,7 +150,7 @@ To view the Netdata dashboard, navigate to `http://localhost:19999`, or `http://
 See our documentation for [additional operating
 systems](/packaging/installer/README.md#have-a-different-operating-system-or-want-to-try-another-method), including
 [Kubernetes](/packaging/installer/methods/kubernetes.md), [`.deb`/`.rpm`
-packages](/packaging/installer/methods/packages.md), and more.
+packages](/packaging/installer/methods/kickstart.md#native-packages), and more.
 
 ### Post-installation
 
@@ -166,6 +162,14 @@ Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
+
+### Netdata Cloud
+
+Netdata Cloud works with Netdata's free, open-source monitoring agent to help you monitor and troubleshoot every 
+layer of your systems to find weaknesses before they turn into outages. [Using both tools](https://learn.netdata.cloud/docs/agent/claim) 
+can help you turn data into insights immediately.
+
+[Get Netdata Cloud now!](https://app.netdata.cloud/)
 
 ## How it works
 
@@ -214,7 +218,7 @@ Contributions are the lifeblood of open-source projects. While we continue to in
 
 - Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
 - We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
-- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2C+needs+triage&template=bug_report.md).
+- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
 - View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
 Package maintainers should read the guide on [building Netdata from source](/packaging/installer/methods/source.md) for

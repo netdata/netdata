@@ -207,7 +207,7 @@ void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, str
         }
     }
     if (xt_io_descr->completion)
-        complete(xt_io_descr->completion);
+        completion_mark_complete(xt_io_descr->completion);
     freez(xt_io_descr);
 }
 
@@ -336,7 +336,7 @@ after_crc_check:
         /* care, we don't hold the descriptor mutex */
         if (have_read_error) {
             /* Applications should make sure NULL values match 0 as does SN_EMPTY_SLOT */
-            memset(page, 0, descr->page_length);
+            memset(page, SN_EMPTY_SLOT, descr->page_length);
         } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
             (void) memcpy(page, xt_io_descr->buf + payload_offset + page_offset, descr->page_length);
         } else {
@@ -360,7 +360,7 @@ after_crc_check:
         freez(uncompressed_buf);
     }
     if (xt_io_descr->completion)
-        complete(xt_io_descr->completion);
+        completion_mark_complete(xt_io_descr->completion);
     uv_fs_req_cleanup(req);
     free(xt_io_descr->buf);
     freez(xt_io_descr);
@@ -634,7 +634,7 @@ void flush_pages_cb(uv_fs_t* req)
         rrdeng_page_descr_mutex_unlock(ctx, descr);
     }
     if (xt_io_descr->completion)
-        complete(xt_io_descr->completion);
+        completion_mark_complete(xt_io_descr->completion);
     uv_fs_req_cleanup(req);
     free(xt_io_descr->buf);
     freez(xt_io_descr);
@@ -712,7 +712,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     if (!count) {
         debug(D_RRDENGINE, "%s: no pages eligible for flushing.", __func__);
         if (completion)
-            complete(completion);
+            completion_mark_complete(completion);
         return 0;
     }
     wc->inflight_dirty_pages += count;
@@ -861,6 +861,7 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     wc->now_deleting_files = NULL;
 
     wc->cleanup_thread_deleting_files = 0;
+    aclk_data_rotated();
 
     /* interrupt event loop */
     uv_stop(wc->loop);
@@ -974,7 +975,7 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
     }
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
         ctx->quiesce = QUIESCED;
-        complete(&ctx->rrdengine_completion);
+        completion_mark_complete(&ctx->rrdengine_completion);
     }
 }
 
@@ -1170,7 +1171,7 @@ void rrdeng_worker(void* arg)
 
     wc->error = 0;
     /* wake up initialization thread */
-    complete(&ctx->rrdengine_completion);
+    completion_mark_complete(&ctx->rrdengine_completion);
 
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
@@ -1210,7 +1211,7 @@ void rrdeng_worker(void* arg)
                 wal_flush_transaction_buffer(wc);
                 if (!rrdeng_threads_alive(wc)) {
                     ctx->quiesce = QUIESCED;
-                    complete(&ctx->rrdengine_completion);
+                    completion_mark_complete(&ctx->rrdengine_completion);
                 }
                 break;
             case RRDENG_READ_PAGE:
@@ -1225,7 +1226,7 @@ void rrdeng_worker(void* arg)
             case RRDENG_FLUSH_PAGES: {
                 if (wc->now_invalidating_dirty_pages) {
                     /* Do not flush if the disk cannot keep up */
-                    complete(cmd.completion);
+                    completion_mark_complete(cmd.completion);
                 } else {
                     (void)do_flush_pages(wc, 1, cmd.completion);
                 }
@@ -1275,7 +1276,7 @@ error_after_loop_init:
 
     wc->error = UV_EAGAIN;
     /* wake up initialization thread */
-    complete(&ctx->rrdengine_completion);
+    completion_mark_complete(&ctx->rrdengine_completion);
 }
 
 /* C entry point for development purposes

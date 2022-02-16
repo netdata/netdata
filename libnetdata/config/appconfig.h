@@ -91,6 +91,7 @@
 #define CONFIG_SECTION_HEALTH     "health"
 #define CONFIG_SECTION_BACKEND    "backend"
 #define CONFIG_SECTION_STREAM     "stream"
+#define CONFIG_SECTION_ML         "ml"
 #define CONFIG_SECTION_EXPORTING  "exporting:global"
 #define CONFIG_SECTION_PROMETHEUS "prometheus:exporter"
 #define CONFIG_SECTION_HOST_LABEL "host labels"

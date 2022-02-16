@@ -3,6 +3,8 @@
 #ifndef NETDATA_RRDENGINELIB_H
 #define NETDATA_RRDENGINELIB_H
 
+#include "libnetdata/libnetdata.h"
+
 /* Forward declarations */
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -11,13 +13,6 @@ struct rrdengine_instance;
 #define STR(x) STR_HELPER(x)
 
 #define BITS_PER_ULONG (sizeof(unsigned long) * 8)
-
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN (37)
-#endif
-
-/* Taken from linux kernel */
-#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
 #define ALIGN_BYTES_FLOOR(x) (((x) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
 #define ALIGN_BYTES_CEILING(x) ((((x) + RRDENG_BLOCK_SIZE - 1) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
@@ -77,43 +72,6 @@ static inline unsigned long ulong_compare_and_swap(volatile unsigned long *ptr,
 /* Workaround for OS X */
 #define O_DIRECT (0)
 #endif
-
-struct completion {
-    uv_mutex_t mutex;
-    uv_cond_t cond;
-    volatile unsigned completed;
-};
-
-static inline void init_completion(struct completion *p)
-{
-    p->completed = 0;
-    fatal_assert(0 == uv_cond_init(&p->cond));
-    fatal_assert(0 == uv_mutex_init(&p->mutex));
-}
-
-static inline void destroy_completion(struct completion *p)
-{
-    uv_cond_destroy(&p->cond);
-    uv_mutex_destroy(&p->mutex);
-}
-
-static inline void wait_for_completion(struct completion *p)
-{
-    uv_mutex_lock(&p->mutex);
-    while (0 == p->completed) {
-        uv_cond_wait(&p->cond, &p->mutex);
-    }
-    fatal_assert(1 == p->completed);
-    uv_mutex_unlock(&p->mutex);
-}
-
-static inline void complete(struct completion *p)
-{
-    uv_mutex_lock(&p->mutex);
-    p->completed = 1;
-    uv_mutex_unlock(&p->mutex);
-    uv_cond_broadcast(&p->cond);
-}
 
 static inline int crc32cmp(void *crcp, uLong crc)
 {

@@ -101,7 +101,11 @@ static void health_silencers_init(void) {
                 freez(str);
             }
         } else {
-            error("Health silencers file %s has the size %ld that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, length, HEALTH_SILENCERS_MAX_FILE_LEN);
+            error(
+                "Health silencers file %s has the size %" PRId64 " that is out of range[ 1 , %d ]. Aborting read.",
+                silencers_filename,
+                (int64_t)length,
+                HEALTH_SILENCERS_MAX_FILE_LEN);
         }
         fclose(fd);
     } else {
@@ -230,6 +234,9 @@ void health_reload(void) {
     if (netdata_cloud_setting) {
         aclk_single_update_enable();
         aclk_alarm_reload();
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        aclk_alert_reloaded = 1;
+#endif
     }
 #endif
 }
@@ -308,26 +315,44 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     int n_warn=0, n_crit=0;
     RRDCALC *rc;
     EVAL_EXPRESSION *expr=NULL;
+    BUFFER *warn_alarms, *crit_alarms;
+
+    warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
     for(rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
-        if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
-            n_warn++;
-            if (ae->alarm_id == rc->id)
-                expr=rc->warning;
+        if (unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
+            if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
+                if (n_warn)
+                    buffer_strcat(warn_alarms, ",");
+                buffer_strcat(warn_alarms, rc->name);
+                buffer_strcat(warn_alarms, "=");
+                buffer_snprintf(warn_alarms, 11, "%"PRId64"", (int64_t)rc->last_status_change);
+                n_warn++;
+            } else if (ae->alarm_id == rc->id)
+                expr = rc->warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
-            n_crit++;
-            if (ae->alarm_id == rc->id)
-                expr=rc->critical;
+            if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
+                if (n_crit)
+                    buffer_strcat(crit_alarms, ",");
+                buffer_strcat(crit_alarms, rc->name);
+                buffer_strcat(crit_alarms, "=");
+                buffer_snprintf(crit_alarms, 11, "%"PRId64"", (int64_t)rc->last_status_change);
+                n_crit++;
+            } else if (ae->alarm_id == rc->id)
+                expr = rc->critical;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
             if (ae->alarm_id == rc->id)
-                expr=rc->warning;
+                expr = rc->warning;
         }
     }
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d'",
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
+
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -352,7 +377,11 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               (expr && expr->source)?expr->source:"NOSOURCE",
               (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
               n_warn,
-              n_crit
+              n_crit,
+              buffer_tostring(warn_alarms),
+              buffer_tostring(crit_alarms),
+              ae->classification?ae->classification:"Unknown",
+              edit_command
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
@@ -362,6 +391,10 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
     enqueue_alarm_notify_in_progress(ae);
+
+    freez(edit_command);
+    buffer_free(warn_alarms);
+    buffer_free(crit_alarms);
 
     return; //health_alarm_wait_for_execution
 done:
@@ -635,12 +668,17 @@ void *health_main(void *ptr) {
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
+    int cleanup_sql_every_loop = 7200 / min_run_every;
+
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
     rrdcalc_labels_unlink();
 
     unsigned int loop = 0;
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    unsigned int marked_aclk_reload_loop = 0;
+#endif
     while(!netdata_exit) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
@@ -652,9 +690,10 @@ void *health_main(void *ptr) {
         if (unlikely(check_if_resumed_from_suspension())) {
             apply_hibernation_delay = 1;
 
-            info("Postponing alarm checks for %ld seconds, because it seems that the system was just resumed from suspension.",
-                 hibernation_delay
-            );
+            info(
+                "Postponing alarm checks for %"PRId64" seconds, "
+                "because it seems that the system was just resumed from suspension.",
+                (int64_t)hibernation_delay);
         }
 
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
@@ -666,6 +705,11 @@ void *health_main(void *ptr) {
             }
         }
 
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+        if (aclk_alert_reloaded && !marked_aclk_reload_loop)
+            marked_aclk_reload_loop = loop;
+#endif
+
         rrd_rdlock();
 
         RRDHOST *host;
@@ -674,9 +718,10 @@ void *health_main(void *ptr) {
                 continue;
 
             if (unlikely(apply_hibernation_delay)) {
-
-                info("Postponing health checks for %ld seconds, on host '%s'.", hibernation_delay, host->hostname
-                );
+                info(
+                    "Postponing health checks for %"PRId64" seconds, on host '%s'.",
+                    (int64_t)hibernation_delay,
+                    host->hostname);
 
                 host->health_delay_up_to = now + hibernation_delay;
             }
@@ -688,6 +733,9 @@ void *health_main(void *ptr) {
                 info("Resuming health checks on host '%s'.", host->hostname);
                 host->health_delay_up_to = 0;
             }
+
+            if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
+                sql_health_alarm_log_cleanup(host);
 
             rrdhost_rdlock(host);
 
@@ -929,7 +977,7 @@ void *health_main(void *ptr) {
 
                         if(likely(!rrdcalc_isrepeating(rc))) {
                             ALARM_ENTRY *ae = health_create_alarm_entry(
-                                    host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                                    host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
                                     rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                     rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
                                     rc->delay_last,
@@ -979,7 +1027,7 @@ void *health_main(void *ptr) {
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
                         rc->last_repeat = now;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                                host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
                                 rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                 rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
                                 rc->delay_last,
@@ -1027,8 +1075,19 @@ void *health_main(void *ptr) {
             health_alarm_wait_for_execution(ae);
         }
 
-        rrd_unlock();
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+        if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
+                rrdhost_foreach_read(host) {
+                    if (unlikely(!host->health_enabled))
+                        continue;
+                    sql_queue_removed_alerts_to_aclk(host);
+                }
+                aclk_alert_reloaded = 0;
+                marked_aclk_reload_loop = 0;
+            }
+#endif
 
+        rrd_unlock();
 
         if(unlikely(netdata_exit))
             break;

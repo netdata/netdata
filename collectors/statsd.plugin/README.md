@@ -4,8 +4,6 @@ description: "The Netdata Agent is a fully-featured StatsD server that collects 
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md
 -->
 
-# statsd.plugin
-
 StatsD is a system to collect data from any application. Applications send metrics to it, usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.
 
 If you want to learn more about the StatsD protocol, we have written a [blog post](https://www.netdata.cloud/blog/introduction-to-statsd/) about it!
@@ -19,9 +17,9 @@ Since statsd is embedded in Netdata, it means you now have a statsd server embed
 
 Netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
 
-# Available StatsD collectors
+## Available StatsD collectors
 
-Netdata ships with collectors implemented using the StatsD collector. They are configuration files (as you will read bellow), but they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
+Netdata ships with collectors implemented using the StatsD collector. They are configuration files (as you will read below), but they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
 
 On these charts, we can have alarms as with any metric and chart.
 
@@ -64,7 +62,7 @@ Netdata fully supports the StatsD protocol. All StatsD client libraries can be u
      - Timers use `|ms`
      - Histograms use `|h`
   
-     The only difference between the two, is the `units` of the charts, as timers report *miliseconds*.
+     The only difference between the two, is the `units` of the charts, as timers report *milliseconds*.
 
      [Sampling rate](#sampling-rates) is supported.
 
@@ -102,7 +100,7 @@ When sending multiple packets over UDP, it is important not to exceed the networ
 
 Netdata will accept UDP packets up to 9000 bytes, but the underlying network will not exceed MTU. 
 
-> You can read more about the network maxium transmission unit(MTU) in this cloudflare [article](https://www.cloudflare.com/en-gb/learning/network-layer/what-is-mtu/).
+> You can read more about the network maximum transmission unit(MTU) in this cloudflare [article](https://www.cloudflare.com/en-gb/learning/network-layer/what-is-mtu/).
 
 ## Configuration
 
@@ -532,7 +530,7 @@ Using the client library by [sivy/node-statsd](https://github.com/sivy/node-stat
 You can also use StatsD with:
 - Golang, thanks to [alexcesaro/statsd](https://github.com/alexcesaro/statsd)
 - Ruby, thanks to [reinh/statsd](https://github.com/reinh/statsd)
-- Java, thanks to [DataDog/java-docstatsd-client](https://github.com/DataDog/java-dogstatsd-client)
+- Java, thanks to [DataDog/java-dogstatsd-client](https://github.com/DataDog/java-dogstatsd-client)
 
 
 ### Shell

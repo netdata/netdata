@@ -16,15 +16,14 @@ You can:
 
 You can also add Netdata charts to existing web pages.
 
-Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its
-**[html source](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/demo.html)**.
+Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**.
 
 You should also look at the [custom dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
-supported charts. The code is [here](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard.html).
+supported charts. The code is [here](http://netdata.firehol.org/dashboard.html).
 
 If you plan to put the dashboard on TV, check out
-[tv.html](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/tv.html). Here's is a screenshot of it,
+[tv.html](http://netdata.firehol.org/tv.html). Here's is a screenshot of it,
 monitoring two servers on the same page:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
@@ -39,6 +38,10 @@ the HTML and JS code is `/usr/share/netdata/web`. The main dashboard is also in
 that directory and called `index.html`.\
 Note: index.html has a different syntax. Don't use it as a template for simple
 custom dashboards.
+
+> Some operating systems will use `/opt/netdata/usr/share/netdata/web` as the web directory. If you're not sure where
+> yours is, navigate to `http://NODE:19999/netdata.conf` in your browser, replacing `NODE` with the IP address or hostname
+> of your node, and find the `# web files directory = ` setting. The value listed is the web directory for your system.
 
 ## Example empty dashboard
 

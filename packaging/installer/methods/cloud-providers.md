@@ -25,11 +25,7 @@ aims to document some of those steps for popular cloud providers.
 ## Recommended installation methods for cloud providers
 
 The best installation method depends on the instance's operating system, distribution, and version. For Linux instances,
-we recommend either the [`kickstart.sh` automatic installation script](kickstart.md) or [.deb/.rpm
-packages](packages.md).
-
-To see the full list of approved methods for each operating system/version we support, see our [distribution
-matrix](../../DISTRIBUTIONS.md). That table will guide you to the various supported methods for your cloud instance.
+we recommend the [`kickstart.sh` automatic installation script](kickstart.md).
 
 If you have issues with Netdata after installation, look to the sections below to find the issue you're experiencing,
 followed by the solution for your provider.

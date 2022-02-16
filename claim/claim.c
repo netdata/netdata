@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "claim.h"
-#include "../registry/registry_internals.h"
-#ifndef ACLK_NG
-#include "../aclk/legacy/aclk_common.h"
-#else
-#include "../aclk/aclk.h"
-#endif
+#include "registry/registry_internals.h"
+#include "aclk/aclk_api.h"
 
 char *claiming_pending_arguments = NULL;
 
@@ -140,6 +136,8 @@ void load_claiming_state(void)
     uuid_t uuid;
     rrdhost_aclk_state_lock(localhost);
     if (localhost->aclk_state.claimed_id) {
+        if (aclk_connected)
+            localhost->aclk_state.prev_claimed_id = strdupz(localhost->aclk_state.claimed_id);
         freez(localhost->aclk_state.claimed_id);
         localhost->aclk_state.claimed_id = NULL;
     }

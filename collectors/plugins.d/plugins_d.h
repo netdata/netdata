@@ -3,19 +3,7 @@
 #ifndef NETDATA_PLUGINS_D_H
 #define NETDATA_PLUGINS_D_H 1
 
-#include "../../daemon/common.h"
-
-#define NETDATA_PLUGIN_HOOK_PLUGINSD \
-    { \
-        .name = "PLUGINSD", \
-        .config_section = NULL, \
-        .config_name = NULL, \
-        .enabled = 1, \
-        .thread = NULL, \
-        .init_routine = NULL, \
-        .start_routine = pluginsd_main \
-    },
-
+#include "daemon/common.h"
 
 #define PLUGINSD_FILE_SUFFIX ".plugin"
 #define PLUGINSD_FILE_SUFFIX_LEN strlen(PLUGINSD_FILE_SUFFIX)
@@ -70,8 +58,6 @@ struct plugind {
 };
 
 extern struct plugind *pluginsd_root;
-
-extern void *pluginsd_main(void *ptr);
 
 extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
 extern int pluginsd_split_words(char *str, char **words, int max_words, char *recover_string, char **recover_location, int max_recover);

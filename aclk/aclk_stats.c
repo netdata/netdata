@@ -4,8 +4,6 @@
 
 netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
-int aclk_stats_enabled;
-
 int query_thread_count;
 
 // data ACLK stats need per query thread
@@ -112,7 +110,87 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
-#define MAX_DIM_NAME 16
+static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample)
+{
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_type_http = NULL;
+    static RRDDIM *rd_type_alarm_upd = NULL;
+    static RRDDIM *rd_type_metadata_info = NULL;
+    static RRDDIM *rd_type_metadata_alarms = NULL;
+    static RRDDIM *rd_type_chart_new = NULL;
+    static RRDDIM *rd_type_chart_del = NULL;
+    static RRDDIM *rd_type_register_node = NULL;
+    static RRDDIM *rd_type_node_upd = NULL;
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_processed_query_type", NULL, "aclk", NULL, "Query thread commands processed by their type", "cmd/s",
+            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        rd_type_http = rrddim_add(st, "http", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_type_alarm_upd = rrddim_add(st, "alarm update", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_type_metadata_info = rrddim_add(st, "info metadata", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_type_metadata_alarms = rrddim_add(st, "alarms metadata", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_type_chart_new = rrddim_add(st, "chart new", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_type_chart_del = rrddim_add(st, "chart delete", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_type_register_node = rrddim_add(st, "register node", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_type_node_upd = rrddim_add(st, "node update", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st);
+
+    rrddim_set_by_pointer(st, rd_type_http, per_sample->query_type_http);
+    rrddim_set_by_pointer(st, rd_type_alarm_upd, per_sample->query_type_alarm_upd);
+    rrddim_set_by_pointer(st, rd_type_metadata_info, per_sample->query_type_metadata_info);
+    rrddim_set_by_pointer(st, rd_type_metadata_alarms, per_sample->query_type_metadata_alarms);
+    rrddim_set_by_pointer(st, rd_type_chart_new, per_sample->query_type_chart_new);
+    rrddim_set_by_pointer(st, rd_type_chart_del, per_sample->query_type_chart_del);
+    rrddim_set_by_pointer(st, rd_type_register_node, per_sample->query_type_register_node);
+    rrddim_set_by_pointer(st, rd_type_node_upd, per_sample->query_type_node_upd);
+
+    rrdset_done(st);
+}
+
+static char *cloud_req_http_type_names[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT] = {
+    "other",
+    "info",
+    "data",
+    "alarms",
+    "alarm_log",
+    "chart",
+    "charts"
+    // if you change then update `ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT`.
+};
+
+int aclk_cloud_req_http_type_to_idx(const char *name)
+{
+    for (int i = 1; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
+        if (!strcmp(cloud_req_http_type_names[i], name))
+            return i;
+    return 0;
+}
+
+static void aclk_stats_cloud_req_http_type(struct aclk_metrics_per_sample *per_sample)
+{
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_rq_types[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT];
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_cloud_req_http_type", NULL, "aclk", NULL, "Requests received from cloud via HTTP by their type", "req/s",
+            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        for (int i = 0; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
+            rd_rq_types[i] = rrddim_add(st, cloud_req_http_type_names[i], NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st);
+
+    for (int i = 0; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
+        rrddim_set_by_pointer(st, rd_rq_types[i], per_sample->cloud_req_http_by_type[i]);
+
+    rrdset_done(st);
+}
+
+#define MAX_DIM_NAME 22
 static void aclk_stats_query_threads(uint32_t *queries_per_thread)
 {
     static RRDSET *st = NULL;
@@ -122,10 +200,10 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
-            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200009, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < query_thread_count; i++) {
-            if (snprintf(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
+            if (snprintfz(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
                 error("snprintf encoding error");
             aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -149,7 +227,7 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_time", NULL, "aclk", NULL, "Time it took to process cloud requested DB queries", "us",
-            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+            "netdata", "stats", 200008, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_rq_avg = rrddim_add(st, "avg", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         rd_rq_max = rrddim_add(st, "max", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -218,6 +296,9 @@ void *aclk_stats_main_thread(void *ptr)
 #endif
 
         aclk_stats_cloud_req(&per_sample);
+        aclk_stats_cloud_req_type(&per_sample);
+        aclk_stats_cloud_req_http_type(&per_sample);
+
         aclk_stats_query_threads(aclk_queries_per_thread_sample);
 
         aclk_stats_query_time(&per_sample);

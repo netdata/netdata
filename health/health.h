@@ -3,18 +3,7 @@
 #ifndef NETDATA_HEALTH_H
 #define NETDATA_HEALTH_H 1
 
-#include "../daemon/common.h"
-
-#define NETDATA_PLUGIN_HOOK_HEALTH \
-    { \
-        .name = "HEALTH", \
-        .config_section = NULL, \
-        .config_name = NULL, \
-        .enabled = 1, \
-        .thread = NULL, \
-        .init_routine = NULL, \
-        .start_routine = health_main \
-    },
+#include "daemon/common.h"
 
 extern unsigned int default_health_enabled;
 
@@ -27,6 +16,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS      0x00000040
 
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
+#define HEALTH_ENTRY_FLAG_ACLK_QUEUED           0x20000000
 #define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
 #ifndef HEALTH_LISTEN_PORT
@@ -42,7 +32,6 @@ extern unsigned int default_health_enabled;
 extern char *silencers_filename;
 
 extern void health_init(void);
-extern void *health_main(void *ptr);
 
 extern void health_reload(void);
 
@@ -63,6 +52,7 @@ extern ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
+        uuid_t config_hash_id,
         time_t when,
         const char *name,
         const char *chart,
@@ -95,6 +85,8 @@ extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 extern void *health_cmdapi_thread(void *ptr);
 
 extern void health_label_log_save(RRDHOST *host);
+
+extern char *health_edit_command_from_source(const char *source);
 
 extern SIMPLE_PATTERN *health_pattern_from_foreach(char *s);
 

@@ -23,6 +23,10 @@ dist_config_SCRIPTS = \
     edit-config \
     $(NULL)
 
+dist_config_DATA = \
+    .install-type \
+    $(NULL)
+
 # Explicitly install directories to avoid permission issues due to umask
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(configdir)

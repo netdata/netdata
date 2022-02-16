@@ -12,6 +12,8 @@ Collects database health and performance metrics.
 
 -   `python-psycopg2` package. You have to install it manually and make sure that it is available to the `netdata` user, either using `pip`, the package manager of your Linux distribution, or any other method you prefer.
 
+-   PostgreSQL v9.4+
+
 Following charts are drawn:
 
 1.  **Database size** MB
@@ -67,6 +69,23 @@ Following charts are drawn:
 11. **Locks on db** count per type
 
     -   locks
+
+12. **Standby delta** KB
+
+    - sent delta
+    - write delta
+    - flush delta
+    - replay delta
+
+13. **Standby lag** seconds
+
+    - write lag
+    - flush lag
+    - replay lag
+
+14. **Average number of blocking transactions in db** processes
+
+    - blocking
 
 ## Configuration
 

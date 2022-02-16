@@ -7,6 +7,7 @@ author_title: "Editorial Director, Technical & Educational Resources"
 author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/lamp-stack.md
 -->
+import { OneLineInstallWget } from '../../src/components/OneLineInstall/'
 
 # LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata
 
@@ -59,9 +60,7 @@ To follow this tutorial, you need:
 If you don't have the free, open-source Netdata monitoring agent installed on your node yet, get started with a [single
 kickstart command](/docs/get-started.mdx):
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+<OneLineInstallWget/>
 
 The Netdata Agent is now collecting metrics from your node every second. You don't need to jump into the dashboard yet,
 but if you're curious, open your favorite browser and navigate to `http://localhost:19999` or `http://NODE:19999`,
@@ -89,7 +88,7 @@ metrics](https://httpd.apache.org/docs/2.4/mod/mod_status.html), which is just _
 
 The Netdata Agent also comes with a [web log
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog), which reads Apache's access
-log file, procesess each line, and converts them into per-second metrics. On Debian systems, it reads the file at
+log file, processes each line, and converts them into per-second metrics. On Debian systems, it reads the file at
 `/var/log/apache2/access.log`.
 
 At installation, the Netdata Agent adds itself to the [`adm`
@@ -167,7 +166,7 @@ If the Netdata Agent isn't already open in your browser, open a new tab and navi
 
 > If you [signed up](https://app.netdata.cloud/sign-up?cloudRoute=/spaces) for Netdata Cloud earlier, you can also view
 > the exact same LAMP stack metrics there, plus additional features, like drag-and-drop custom dashboards. Be sure to
-> [claim your node](/claim/README.md) to start streaming metrics to your browser through Netdata Cloud.
+> [connecting your node](/claim/README.md) to start streaming metrics to your browser through Netdata Cloud.
 
 Netdata automatically organizes all metrics and charts onto a single page for easy navigation. Peek at gauges to see
 overall system performance, then scroll down to see more. Click-and-drag with your mouse to pan _all_ charts back and

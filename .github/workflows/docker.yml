@@ -4,43 +4,94 @@ on:
   push:
     branches:
       - master
-  pull_request:
+  pull_request: null
   workflow_dispatch:
     inputs:
       version:
         name: Version Tag
         default: nightly
         required: true
+env:
+  DISABLE_TELEMETRY: 1
+concurrency:
+  group: docker-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 jobs:
-  docker-build:
-    name: Docker Build
+  docker-test:
+    name: Docker Runtime Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
         with:
           submodules: recursive
-      - name: Determine if we should push changes and which tags to use
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Test Build
+        uses: docker/build-push-action@v2
+        with:
+          load: true
+          push: false
+          tags: netdata/netdata:test
+      - name: Test Image
+        run: .github/scripts/docker-test.sh
+
+  docker-ci:
+    if: github.event_name != 'workflow_dispatch'
+    name: Docker Alt Arch Builds
+    needs: docker-test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platforms:
+          - linux/i386
+          - linux/arm/v7
+          - linux/arm64
+          - linux/ppc64le
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Setup QEMU
+        if: matrix.platforms != 'linux/i386'
+        uses: docker/setup-qemu-action@v1
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build
+        uses: docker/build-push-action@v2
+        with:
+          platforms: ${{ matrix.platforms }}
+          load: false
+          push: false
+          tags: netdata/netdata:test
+
+  docker-publish:
+    if: github.event_name == 'workflow_dispatch'
+    name: Docker Build and Publish
+    needs: docker-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Determine which tags to use
+        if: github.event.inputs.version != 'nightly'
         run: |
-          echo "publish=true" >> $GITHUB_ENV
           echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ github.event.inputs.version }})" >> $GITHUB_ENV
-      - name: Determine if we should push changes and which tags to use
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == 'nightly'
+      - name: Determine which tags to use
+        if: github.event.inputs.version == 'nightly'
         run: |
-          echo "publish=true" >> $GITHUB_ENV
           echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> $GITHUB_ENV
-      - name: Determine if we should push changes and which tags to use
-        if: github.event_name != 'workflow_dispatch'
-        run: |
-          echo "publish=false" >> $GITHUB_ENV
-          echo "tags=netdata/netdata:test" >> $GITHUB_ENV
+      - name: Mark image as official
+        if: github.repository == 'netdata/netdata'
+        run: echo "OFFICIAL_IMAGE=true" >> $GITHUB_ENV
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v1
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v1
       - name: Docker Hub Login
-        if: github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
@@ -48,14 +99,15 @@ jobs:
       - name: Docker Build
         uses: docker/build-push-action@v2
         with:
-          platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64
-          push: ${{ env.publish }}
+          platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
+          push: true
           tags: ${{ env.tags }}
+          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
+          SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Docker Build failed:'
           SLACK_USERNAME: 'GitHub Actions'

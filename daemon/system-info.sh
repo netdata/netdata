@@ -12,6 +12,7 @@ ARCHITECTURE="$(uname -m)"
 
 CONTAINER="unknown"
 CONT_DETECTION="none"
+CONTAINER_IS_OFFICIAL_IMAGE="${NETDATA_OFFICIAL_IMAGE:-false}"
 
 if [ -z "${VIRTUALIZATION}" ]; then
   VIRTUALIZATION="unknown"
@@ -334,7 +335,7 @@ else
     # These translate to the prefixs of files in `/dev` indicating the device type.
     # They are sorted by lowest used device major number, with dynamically assigned ones at the end.
     # We use this to look up device major numbers in `/proc/devices`
-    device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme'
+    device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme virtblk blkext'
 
     for name in ${device_names}; do
       if grep -qE " ${name}\$" /proc/devices; then
@@ -381,6 +382,7 @@ echo "NETDATA_CONTAINER_OS_ID_LIKE=${CONTAINER_ID_LIKE}"
 echo "NETDATA_CONTAINER_OS_VERSION=${CONTAINER_VERSION}"
 echo "NETDATA_CONTAINER_OS_VERSION_ID=${CONTAINER_VERSION_ID}"
 echo "NETDATA_CONTAINER_OS_DETECTION=${CONTAINER_OS_DETECTION}"
+echo "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE=${CONTAINER_IS_OFFICIAL_IMAGE}"
 echo "NETDATA_HOST_OS_NAME=${HOST_NAME}"
 echo "NETDATA_HOST_OS_ID=${HOST_ID}"
 echo "NETDATA_HOST_OS_ID_LIKE=${HOST_ID_LIKE}"

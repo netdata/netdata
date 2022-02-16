@@ -1,0 +1,550 @@
+---
+# Ci code for building release artifacts.
+name: Build
+on:
+  push: # Master branch checks only validate the build and generate artifacts for testing.
+    branches:
+      - master
+  pull_request: null # PR checks only validate the build and generate artifacts for testing.
+  workflow_dispatch: # Dispatch runs build and validate, then push to the appropriate storage location.
+    inputs:
+      type:
+        description: Build Type
+        default: nightly
+        required: true
+      version:
+        description: Version Tag
+        default: nightly
+        required: true
+concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
+  group: release-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  build-dist: # Build the distribution tarball and store it as an artifact.
+    name: Build Distribution Tarball
+    runs-on: ubuntu-latest
+    outputs:
+      distfile: ${{ steps.build.outputs.distfile }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Mark Stable
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
+        run: |
+          sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh
+      - name: Build
+        id: build
+        run: |
+          mkdir -p artifacts
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
+          autoreconf -ivf
+          ./configure --prefix=/usr \
+                      --sysconfdir=/etc \
+                      --localstatedir=/var \
+                      --libexecdir=/usr/libexec \
+                      --with-zlib \
+                      --with-math \
+                      --with-user=netdata
+          make dist
+          echo "::set-output name=distfile::$(find . -name 'netdata-*.tar.gz')"
+          cp netdata-*.tar.gz artifacts/
+      - name: Store
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-tarball
+          path: artifacts/*.tar.gz
+          retention-days: 30
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Distribution tarball build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Distribution tarball build failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  build-static: # Build the static binary archives, and store them as artifacts.
+    name: Build Static
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - 'x86_64'
+          - 'armv7l'
+          - 'aarch64'
+          - 'ppc64le'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Mark Stable
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
+        run: |
+          sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh packaging/makeself/install-or-update.sh
+      - name: Build
+        run: .github/scripts/build-static.sh ${{ matrix.arch }}
+      - name: Store
+        uses: actions/upload-artifact@v2
+        with:
+          name: static-archive
+          path: artifacts/*.gz.run
+          retention-days: 30
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Static build for ${{ matrix.arch }} failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Static build for ${{ matrix.arch }} failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  matrix: # Generate the shared build matrix for our build tests.
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        shell: python3 {0}
+        run: |
+          from ruamel.yaml import YAML
+          import json
+          yaml = YAML(typ='safe')
+          with open('.github/data/distros.yml') as f:
+              data = yaml.load(f)
+          del data['platform_map']
+          for i, v in enumerate(data['include']):
+              data['include'][i]['artifact_key'] = data['include'][i]['distro'] + str(data['include'][i]['version']).replace('.', '')
+              if 'packages' in data['include'][i]:
+                  del data['include'][i]['packages']
+              if 'base_image' in data['include'][i]:
+                  data['include'][i]['distro'] = data['include'][i]['base_image']
+                  del data['include'][i]['base_image']
+              data['include'][i]['distro'] = ':'.join([data['include'][i]['distro'], str(data['include'][i]['version'])])
+              del data['include'][i]['version']
+          matrix = json.dumps(data, sort_keys=True)
+          print('Generated Matrix: ' + matrix)
+          print('::set-output name=matrix::' + matrix)
+
+  prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
+    name: Prepare Test Environments
+    runs-on: ubuntu-latest
+    needs:
+      - matrix
+    strategy:
+      # Unlike the actal build tests, this completes _very_ fast (average of about 3 minutes for each job), so we
+      # just run everything in parallel instead lof limiting job concurrency.
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build test environment
+        uses: docker/build-push-action@v2
+        with:
+          push: false
+          load: false
+          file: .github/dockerfiles/Dockerfile.build_test
+          build-args: |
+            BASE=${{ matrix.distro }}
+            PRE=${{ matrix.env_prep }}
+            RMJSONC=${{ matrix.jsonc_removal }}
+          outputs: type=oci,dest=/tmp/image.tar
+          tags: test:${{ matrix.artifact_key }}
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.artifact_key }}-test-env
+          path: /tmp/image.tar
+          retention-days: 30
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Test environment preparation for ${{ matrix.distro }} failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Test environment preparation for ${{ matrix.distro }} failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  source-build: # Test various source build arrangements.
+    name: Test Source Build
+    runs-on: ubuntu-latest
+    needs:
+      - matrix
+      - prepare-test-images
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Fetch test environment
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ matrix.artifact_key }}-test-env
+      - name: Load test environment
+        id: load
+        run: |
+          docker load --input image.tar | tee image-info.txt
+          echo "::set-output name=image::$(cut -d ':' -f 3 image-info.txt)"
+      - name: Regular build on ${{ matrix.distro }}
+        run: |
+          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+              /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
+      - name: netdata-installer on ${{ matrix.distro }}, disable cloud
+        run: |
+          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
+      - name: netdata-installer on ${{ matrix.distro }}, require cloud
+        run: |
+          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+      - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
+        if: matrix.jsonc_removal != ''
+        run: |
+          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Build tests for ${{ matrix.distro }} failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Build tests for ${{ matrix.distro }} failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  updater-check: # Test the generated dist archive using the updater code.
+    name: Test Generated Distfile and Updater Code
+    runs-on: ubuntu-latest
+    needs:
+      - build-dist
+      - matrix
+      - prepare-test-images
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    services:
+      apache: # This gets used to serve the dist tarball for the updater script.
+        image: httpd:2.4
+        ports:
+          - 8080:80
+        volumes:
+          - ${{ github.workspace }}:/usr/local/apache2/htdocs/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Fetch dist tarball artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: dist-tarball
+          path: dist-tarball
+      - name: Prepare artifact directory
+        run: |
+          mkdir -p artifacts || exit 1
+          echo "9999.0.0-0" > artifacts/latest-version.txt || exit 1
+          cp dist-tarball/* artifacts || exit 1
+          cd artifacts || exit 1
+          ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
+          sha256sum -b ./* > "sha256sums.txt" || exit 1
+          cat sha256sums.txt
+      - name: Fetch test environment
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ matrix.artifact_key }}-test-env
+      - name: Load test environment
+        id: load
+        run: |
+          docker load --input image.tar | tee image-info.txt
+          echo "::set-output name=image::$(cut -d ':' -f 3 image-info.txt)"
+      - name: Install netdata and run the updater on ${{ matrix.distro }}
+        run: |
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
+                /netdata/.github/scripts/run-updater-check.sh
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Updater checks for ${{ matrix.distro }} failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Updater checks for ${{ matrix.distro }} failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  prepare-upload: # Consolidate the artifacts for uploading or releasing.
+    name: Prepare Artifacts
+    runs-on: ubuntu-latest
+    needs:
+      - build-dist
+      - build-static
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare Environment
+        run: mkdir -p artifacts
+      - name: Retrieve Dist Tarball
+        uses: actions/download-artifact@v2
+        with:
+          name: dist-tarball
+          path: dist-tarball
+      - name: Retrieve Static Build Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: static-archive
+          path: static-archive
+      - name: Prepare Artifacts
+        working-directory: ./artifacts/
+        run: |
+          mv ../dist-tarball/* . || exit 1
+          mv ../static-archive/* . || exit 1
+          ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
+          cp ../packaging/version ./latest-version.txt || exit 1
+          sha256sum -b ./* > sha256sums.txt || exit 1
+          cat sha256sums.txt
+      - name: Store Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: final-artifacts
+          path: artifacts/*
+          retention-days: 30
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to prepare release artifacts for upload:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Failed to prepare release artifacts for upload."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
+    name: Test Consolidated Artifacts (Source)
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-upload
+    services:
+      apache: # This gets used to serve the dist tarball for the updater script.
+        image: httpd:2.4
+        ports:
+          - 8080:80
+        volumes:
+          - ${{ github.workspace }}:/usr/local/apache2/htdocs/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Fetch artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: final-artifacts
+          path: artifacts
+      - name: Verify that artifacts work with installer
+        env:
+          NETDATA_TARBALL_BASEURL: http://localhost:8080/artifacts
+        run: packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Artifact verification for source tarball failed.'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Artifact verification for source tarball failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  artifact-verification-static: # Verify the static installer works with the consolidated artifacts.
+    name: Test Consolidated Artifacts (Static)
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-upload
+    services:
+      apache: # This gets used to serve the static archives.
+        image: httpd:2.4
+        ports:
+          - 8080:80
+        volumes:
+          - ${{ github.workspace }}:/usr/local/apache2/htdocs/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Fetch artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: final-artifacts
+          path: artifacts
+      - name: Verify that artifacts work with installer
+        env:
+          NETDATA_TARBALL_BASEURL: http://localhost:8080/artifacts
+        run: packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Artifact verification for static build failed.'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Artifact verification for static build failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  upload-nightly: # Upload the nightly build artifacts to GCS.
+    name: Upload Nightly Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly'
+    needs:
+      - updater-check
+      - source-build
+      - artifact-verification-dist
+      - artifact-verification-static
+    steps:
+      - name: Retrieve Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: final-artifacts
+          path: final-artifacts
+      - name: Setup Gcloud
+        uses: google-github-actions/setup-gcloud@v0.5.0
+        with:
+          project_id: ${{ secrets.GCP_NIGHTLY_STORAGE_PROJECT }}
+          service_account_key: ${{ secrets.GCP_STORAGE_SERVICE_ACCOUNT_KEY }}
+          export_default_credentials: true
+      - name: Upload Artifacts
+        uses: google-github-actions/upload-cloud-storage@v0.5.0
+        with:
+          destination: ${{ secrets.GCP_NIGHTLY_STORAGE_BUCKET }}
+          gzip: false
+          path: ./final-artifacts
+          parent: false
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to upload nightly release artifacts:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Failed to upload nightly release artifacts."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  upload-release: # Create the draft release and upload the build artifacts.
+    name: Create Release Draft
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release'
+    needs:
+      - updater-check
+      - source-build
+      - artifact-verification-dist
+      - artifact-verification-static
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Retrieve Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: final-artifacts
+          path: final-artifacts
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: false
+          artifactErrorsFailBuild: true
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run'
+          draft: true
+          tag: ${{ github.event.inputs.version }}
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to draft release:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Failed to draft release."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name == 'workflow_dispatch'
+          }}

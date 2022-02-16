@@ -3,7 +3,7 @@
 #ifndef NETDATA_SPAWN_H
 #define NETDATA_SPAWN_H 1
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 #define SPAWN_SERVER_COMMAND_LINE_ARGUMENT "--special-spawn-server"
 

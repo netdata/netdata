@@ -2,14 +2,11 @@
 title: "Export metrics to Prometheus"
 description: "Export Netdata metrics to Prometheus for archiving and further analysis."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/prometheus/README.md
-sidebar_label: Using Netdata with Prometheus
+sidebar_label: "Using Netdata with Prometheus"
 -->
+import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
 
 # Using Netdata with Prometheus
-
-> IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.7. The new Prometheus exporting
-> connector for Netdata supports a lot more features and is aligned to the development of the rest of the Netdata
-> exporting connectors.
 
 Prometheus is a distributed monitoring system which offers a very simple setup along with a robust data model. Recently
 Netdata added support for Prometheus. I'm going to quickly show you how to install both Netdata and Prometheus on the
@@ -21,11 +18,17 @@ are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM
 ### Installing Netdata
 
 There are number of ways to install Netdata according to [Installation](/packaging/installer/README.md). The suggested way
-of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
+of installing the latest Netdata and keep it upgrade automatically.
 
-```sh
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+<!-- candidate for reuse -->
+
+To install Netdata, run the following as your normal user:
+
+<OneLineInstallWget/>
+
+Or, if you have cURL but not wget (such as on macOS):
+
+<OneLineInstallCurl/>
 
 At this point we should have Netdata listening on port 19999. Attempt to take your browser here:
 
@@ -128,46 +131,46 @@ scrape_configs:
 
 #### Install nodes.yml
 
-The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the
+The following is completely optional, it will enable Prometheus to generate alerts from some Netdata sources. Tweak the
 values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and
 add a _- "nodes.yml"_ entry under the _rule_files:_ section in the example prometheus.yml file above.
 
 ```yaml
 groups:
-- name: nodes
+  - name: nodes
 
-  rules:
-  - alert: node_high_cpu_usage_70
-    expr: avg(rate(netdata_cpu_cpu_percentage_average{dimension="idle"}[1m])) by (job) > 70
-    for: 1m
-    annotations:
-      description: '{{ $labels.job }} on ''{{ $labels.job }}'' CPU usage is at {{ humanize $value }}%.'
-      summary: CPU alert for container node '{{ $labels.job }}'
+    rules:
+      - alert: node_high_cpu_usage_70
+        expr: sum(sum_over_time(netdata_system_cpu_percentage_average{dimension=~"(user|system|softirq|irq|guest)"}[10m])) by (job) / sum(count_over_time(netdata_system_cpu_percentage_average{dimension="idle"}[10m])) by (job) > 70
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} on ''{{ $labels.job }}'' CPU usage is at {{ humanize $value }}%.'
+          summary: CPU alert for container node '{{ $labels.job }}'
 
-  - alert: node_high_memory_usage_70
-    expr: 100 / sum(netdata_system_ram_MB_average) by (job) 
-      * sum(netdata_system_ram_MB_average{dimension=~"free|cached"}) by (job) < 30
-    for: 1m
-    annotations:
-      description: '{{ $labels.job }} memory usage is {{ humanize $value}}%.'
-      summary: Memory alert for container node '{{ $labels.job }}'
+      - alert: node_high_memory_usage_70
+        expr: 100 / sum(netdata_system_ram_MB_average) by (job)
+          * sum(netdata_system_ram_MB_average{dimension=~"free|cached"}) by (job) < 30
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} memory usage is {{ humanize $value}}%.'
+          summary: Memory alert for container node '{{ $labels.job }}'
 
-  - alert: node_low_root_filesystem_space_20
-    expr: 100 / sum(netdata_disk_space_GB_average{family="/"}) by (job)
-      * sum(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}) by (job) < 20
-    for: 1m
-    annotations:
-      description: '{{ $labels.job }} root filesystem space is {{ humanize $value}}%.'
-      summary: Root filesystem alert for container node '{{ $labels.job }}'
+      - alert: node_low_root_filesystem_space_20
+        expr: 100 / sum(netdata_disk_space_GB_average{family="/"}) by (job)
+          * sum(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}) by (job) < 20
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} root filesystem space is {{ humanize $value}}%.'
+          summary: Root filesystem alert for container node '{{ $labels.job }}'
 
-  - alert: node_root_filesystem_fill_rate_6h
-    expr: predict_linear(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}[1h], 6 * 3600) < 0
-    for: 1h
-    labels:
-      severity: critical
-    annotations:
-      description: Container node {{ $labels.job }} root filesystem is going to fill up in 6h.
-      summary: Disk fill alert for Swarm node '{{ $labels.job }}'
+      - alert: node_root_filesystem_fill_rate_6h
+        expr: predict_linear(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}[1h], 6 * 3600) < 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          description: Container node {{ $labels.job }} root filesystem is going to fill up in 6h.
+          summary: Disk fill alert for Swarm node '{{ $labels.job }}'
 ```
 
 #### Install prometheus.service
@@ -207,9 +210,6 @@ this and click on 'targets' We should see the Netdata host as a scraped target.
 ---
 
 ## Netdata support for Prometheus
-
-> IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.6. The new format allows easier
-> queries for metrics and supports both `as collected` and normalized metrics.
 
 Before explaining the changes, we have to understand the key differences between Netdata and Prometheus.
 

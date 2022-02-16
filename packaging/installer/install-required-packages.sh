@@ -17,10 +17,10 @@ fi
 
 # These options control which packages we are going to install
 # They can be pre-set, but also can be controlled with command line options
-PACKAGES_NETDATA=${PACKAGES_NETDATA-0}
+PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
 PACKAGES_NETDATA_NODEJS=${PACKAGES_NETDATA_NODEJS-0}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
-PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-0}
+PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-1}
 PACKAGES_NETDATA_PYTHON_MYSQL=${PACKAGES_NETDATA_PYTHON_MYSQL-0}
 PACKAGES_NETDATA_PYTHON_POSTGRES=${PACKAGES_NETDATA_PYTHON_POSTGRES-0}
 PACKAGES_NETDATA_PYTHON_MONGO=${PACKAGES_NETDATA_PYTHON_MONGO-0}
@@ -31,8 +31,8 @@ PACKAGES_FIREQOS=${PACKAGES_FIREQOS-0}
 PACKAGES_UPDATE_IPSETS=${PACKAGES_UPDATE_IPSETS-0}
 PACKAGES_NETDATA_DEMO_SITE=${PACKAGES_NETDATA_DEMO_SITE-0}
 PACKAGES_NETDATA_SENSORS=${PACKAGES_NETDATA_SENSORS-0}
-PACKAGES_NETDATA_DATABASE=${PACKAGES_NETDATA_DATABASE-0}
-PACKAGES_NETDATA_EBPF=${PACKAGES_NETDATA_EBPF-0}
+PACKAGES_NETDATA_DATABASE=${PACKAGES_NETDATA_DATABASE-1}
+PACKAGES_NETDATA_EBPF=${PACKAGES_NETDATA_EBPF-1}
 
 # needed commands
 lsb_release=$(command -v lsb_release 2> /dev/null)
@@ -124,9 +124,9 @@ Supported packages (you can append many of them):
 
     - sensors        install lm_sensors for monitoring h/w sensors
 
-    - firehol-all    packages required for FireHOL, FireQoS, update-ipsets
+    - firehol-all    packages required for FireHOL, FireQOS, update-ipsets
     - firehol        packages required for FireHOL
-    - fireqos        packages required for FireQoS
+    - fireqos        packages required for FireQOS
     - update-ipsets  packages required for update-ipsets
 
     - demo           packages required for running a netdata demo site
@@ -198,7 +198,7 @@ get_os_release() {
   eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
   for x in "${ID}" ${ID_LIKE}; do
     case "${x,,}" in
-      alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | rhel | sabayon | sles | suse | ubuntu)
+      alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
         distribution="${x}"
         version="${VERSION_ID}"
         codename="${VERSION}"
@@ -345,7 +345,7 @@ user_picks_distribution() {
     if [ "${REPLY}" = "yum" ] && [ -z "${distribution}" ]; then
       REPLY=
       while [ -z "${REPLY}" ]; do
-        if ! read -r -p "yum in centos, rhel or fedora? > "; then
+        if ! read -r -p "yum in centos, rhel, ol or fedora? > "; then
           continue
         fi
 
@@ -353,11 +353,14 @@ user_picks_distribution() {
           fedora | rhel)
             distribution="rhel"
             ;;
+          ol)
+            distribution="ol"
+            ;;
           centos)
             distribution="centos"
             ;;
           *)
-            echo >&2 "Please enter 'centos', 'fedora' or 'rhel'."
+            echo >&2 "Please enter 'centos', 'fedora', 'ol' or 'rhel'."
             REPLY=
             ;;
         esac
@@ -416,13 +419,13 @@ detect_package_manager_from_distribution() {
       fi
       ;;
 
-    centos* | clearos*)
-      echo >&2 "You should have EPEL enabled to install all the prerequisites."
-      echo >&2 "Check: http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/"
-      package_installer="install_yum"
+    centos* | clearos* | rocky*)
+      package_installer=""
       tree="centos"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
+      [ -n "${yum}" ] && package_installer="install_yum"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ]; then
-        echo >&2 "command 'yum' is required to install packages on a '${distribution} ${version}' system."
+        echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
       ;;
@@ -430,8 +433,19 @@ detect_package_manager_from_distribution() {
     fedora* | redhat* | red\ hat* | rhel*)
       package_installer=
       tree="rhel"
-      [ -n "${yum}" ] && package_installer="install_yum"
       [ -n "${dnf}" ] && package_installer="install_dnf"
+      [ -n "${yum}" ] && package_installer="install_yum"
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
+        echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
+        exit 1
+      fi
+      ;;
+
+    ol*)
+      package_installer=
+      tree="ol"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
+      [ -n "${yum}" ] && package_installer="install_yum"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
@@ -499,7 +513,13 @@ check_package_manager() {
     dnf)
       [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${dnf}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_dnf"
-      tree="rhel"
+      if [ "${distribution}" = "centos" ]; then
+        tree="centos"
+      elif [ "${distribution}" = "ol" ]; then
+        tree="ol"
+      else
+        tree="rhel"
+      fi
       detection="user-input"
       return 0
       ;;
@@ -550,6 +570,8 @@ check_package_manager() {
       package_installer="install_yum"
       if [ "${distribution}" = "centos" ]; then
         tree="centos"
+      elif [ "${distribution}" = "ol" ]; then
+        tree="ol"
       else
         tree="rhel"
       fi
@@ -673,6 +695,7 @@ declare -A pkg_json_c_dev=(
   ['sabayon']="dev-libs/json-c"
   ['suse']="libjson-c-devel"
   ['freebsd']="json-c"
+  ['macos']="json-c"
   ['default']="json-c-devel"
 )
 
@@ -719,6 +742,21 @@ declare -A pkg_gcc=(
   ['clearlinux']="c-basic"
   ['macos']="NOTREQUIRED"
   ['default']="gcc"
+)
+
+# g++, required for building protobuf
+# All three cases of this not being required are systems that implicitly
+# include g++ when installing gcc.
+declare -A pkg_gxx=(
+  ['alpine']="g++"
+  ['arch']="NOTREQUIRED"
+  ['clearlinux']="c-basic"
+  ['debian']="g++"
+  ['gentoo']="NOTREQUIRED"
+  ['macos']="NOTREQUIRED"
+  ['ubuntu']="g++"
+  ['freebsd']="NOTREQUIRED"
+  ['default']="gcc-c++"
 )
 
 declare -A pkg_gdb=(
@@ -772,6 +810,7 @@ declare -A pkg_libz_dev=(
   ['gentoo']="sys-libs/zlib"
   ['sabayon']="sys-libs/zlib"
   ['rhel']="zlib-devel"
+  ['ol']="zlib-devel"
   ['suse']="zlib-devel"
   ['clearlinux']="devpkg-zlib"
   ['macos']="NOTREQUIRED"
@@ -788,8 +827,9 @@ declare -A pkg_libuuid_dev=(
   ['gentoo']="sys-apps/util-linux"
   ['sabayon']="sys-apps/util-linux"
   ['rhel']="libuuid-devel"
+  ['ol']="libuuid-devel"
   ['suse']="libuuid-devel"
-  ['macos']="NOTREQUIRED"
+  ['macos']="ossp-uuid"
   ['freebsd']="e2fsprogs-libuuid"
   ['default']=""
 )
@@ -802,6 +842,7 @@ declare -A pkg_libmnl_dev=(
   ['gentoo']="net-libs/libmnl"
   ['sabayon']="net-libs/libmnl"
   ['rhel']="libmnl-devel"
+  ['ol']="libmnl-devel"
   ['suse']="libmnl-devel"
   ['clearlinux']="devpkg-libmnl"
   ['macos']="NOTREQUIRED"
@@ -859,6 +900,7 @@ declare -A pkg_netcat=(
   ['gentoo']="net-analyzer/netcat"
   ['sabayon']="net-analyzer/gnu-netcat"
   ['rhel']="nmap-ncat"
+  ['ol']="nmap-ncat"
   ['suse']="netcat-openbsd"
   ['clearlinux']="sysadmin-basic"
   ['arch']="gnu-netcat"
@@ -903,6 +945,7 @@ declare -A pkg_pkg_config=(
   ['gentoo']="virtual/pkgconfig"
   ['sabayon']="virtual/pkgconfig"
   ['rhel']="pkgconfig"
+  ['ol']="pkgconfig"
   ['suse']="pkg-config"
   ['freebsd']="pkgconf"
   ['clearlinux']="c-basic"
@@ -934,6 +977,7 @@ declare -A pkg_python_mysqldb=(
 
   # exceptions
   ['fedora-24']="python2-mysql"
+  ['ol-8']="WARNING|"
 )
 
 declare -A pkg_python3_mysqldb=(
@@ -944,6 +988,7 @@ declare -A pkg_python3_mysqldb=(
   ['gentoo']="dev-python/mysqlclient"
   ['sabayon']="dev-python/mysqlclient"
   ['rhel']="WARNING|"
+  ['ol']="WARNING|"
   ['suse']="WARNING|"
   ['clearlinux']="WARNING|"
   ['macos']="WARNING|"
@@ -975,6 +1020,7 @@ declare -A pkg_python_psycopg2=(
   ['gentoo']="dev-python/psycopg"
   ['sabayon']="dev-python/psycopg:2"
   ['rhel']="python-psycopg2"
+  ['ol']="python-psycopg2"
   ['suse']="python-psycopg2"
   ['clearlinux']="WARNING|"
   ['macos']="WARNING|"
@@ -989,6 +1035,7 @@ declare -A pkg_python3_psycopg2=(
   ['gentoo']="dev-python/psycopg"
   ['sabayon']="dev-python/psycopg:2"
   ['rhel']="WARNING|"
+  ['ol']="WARNING|"
   ['suse']="WARNING|"
   ['clearlinux']="WARNING|"
   ['macos']="WARNING|"
@@ -998,6 +1045,7 @@ declare -A pkg_python3_psycopg2=(
   ['centos-8']="python38-psycopg2"
   ['rhel-7']="python3-psycopg2"
   ['rhel-8']="python38-psycopg2"
+  ['ol-8']="python3-psycopg2"
 )
 
 declare -A pkg_python_pip=(
@@ -1028,6 +1076,7 @@ declare -A pkg_python_pymongo=(
   ['suse']="python-pymongo"
   ['clearlinux']="WARNING|"
   ['rhel']="WARNING|"
+  ['ol']="WARNING|"
   ['macos']="WARNING|"
   ['default']="python-pymongo"
 )
@@ -1041,6 +1090,7 @@ declare -A pkg_python3_pymongo=(
   ['suse']="python3-pymongo"
   ['clearlinux']="WARNING|"
   ['rhel']="WARNING|"
+  ['ol']="WARNING|"
   ['freebsd']="py37-pymongo"
   ['macos']="WARNING|"
   ['default']="python3-pymongo"
@@ -1049,6 +1099,7 @@ declare -A pkg_python3_pymongo=(
   ['centos-8']="python3-pymongo"
   ['rhel-7']="python36-pymongo"
   ['rhel-8']="python3-pymongo"
+  ['ol-8']="python3-pymongo"
 )
 
 declare -A pkg_python_requests=(
@@ -1084,6 +1135,7 @@ declare -A pkg_python3_requests=(
   ['centos-8']="python3-requests"
   ['rhel-7']="python36-requests"
   ['rhel-8']="python3-requests"
+  ['ol-8']="python3-requests"
 )
 
 declare -A pkg_lz4=(
@@ -1120,7 +1172,7 @@ declare -A pkg_openssl=(
   ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
   ['freebsd']="openssl"
-  ['macos']="openssl@1.1"
+  ['macos']="openssl"
   ['default']="openssl-devel"
 )
 
@@ -1187,6 +1239,7 @@ declare -A pkg_valgrind=(
 declare -A pkg_ulogd=(
   ['centos']="WARNING|"
   ['rhel']="WARNING|"
+  ['ol']="WARNING|"
   ['clearlinux']="WARNING|"
   ['gentoo']="app-admin/ulogd"
   ['arch']="ulogd"
@@ -1216,6 +1269,7 @@ declare -A pkg_libelf=(
   ['fedora']="elfutils-libelf-devel"
   ['centos']="elfutils-libelf-devel"
   ['rhel']="elfutils-libelf-devel"
+  ['ol']="elfutils-libelf-devel"
   ['clearlinux']="devpkg-elfutils"
   ['suse']="libelf-devel"
   ['macos']="NOTREQUIRED"
@@ -1291,6 +1345,7 @@ packages() {
 
   require_cmd gcc ||
     require_cmd gcc-multilib || suitable_package gcc
+  require_cmd g++ || suitable_package gxx
 
   require_cmd make || suitable_package make
   require_cmd autoconf || suitable_package autoconf
@@ -1524,6 +1579,30 @@ validate_tree_freebsd() {
   fi
 }
 
+validate_tree_ol() {
+  local opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+
+  if [[ "${version}" =~ ^8(\..*)?$ ]]; then
+    echo " > Checking for CodeReady Builder ..."
+    if ! run ${sudo} dnf repolist | grep -q codeready; then
+      if prompt "CodeReady Builder not found, shall I install it?"; then
+        cat > /etc/yum.repos.d/ol8_codeready.repo <<-EOF
+	[ol8_codeready_builder]
+	name=Oracle Linux \$releasever CodeReady Builder (\$basearch)
+	baseurl=http://yum.oracle.com/repo/OracleLinux/OL8/codeready/builder/\$basearch
+	gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+	gpgcheck=1
+	enabled=1
+	EOF
+      fi
+    fi
+  fi
+}
+
 validate_tree_centos() {
   local opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
@@ -1533,16 +1612,9 @@ validate_tree_centos() {
 
   echo >&2 " > CentOS Version: ${version} ..."
 
-  echo >&2 " > Checking for epel ..."
-  if ! rpm -qa | grep epel > /dev/null; then
-    if prompt "epel not found, shall I install it?"; then
-      run ${sudo} yum ${opts} install epel-release
-    fi
-  fi
-
   if [[ "${version}" =~ ^8(\..*)?$ ]]; then
     echo >&2 " > Checking for config-manager ..."
-    if ! run yum ${sudo} config-manager; then
+    if ! run ${sudo} yum config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
         run ${sudo} yum ${opts} install 'dnf-command(config-manager)'
       fi
@@ -1555,16 +1627,19 @@ validate_tree_centos() {
       fi
     fi
 
-    echo >&2 " > Checking for Okay ..."
-    if ! rpm -qa | grep okay > /dev/null; then
-      if prompt "okay not found, shall I install it?"; then
-        run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-5.el8.noarch.rpm
-      fi
-    fi
+    echo >&2 " > Updating libarchive ..."
+    run ${sudo} yum ${opts} install libarchive
 
     echo >&2 " > Installing Judy-devel directly ..."
-    run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
+    run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.3.0+757+d382997d.x86_64.rpm
 
+  elif [[ "${version}" =~ ^7(\..*)?$ ]]; then
+    echo >&2 " > Checking for EPEL ..."
+    if ! rpm -qa | grep epel-release > /dev/null; then
+      if prompt "EPEL not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install epel-release
+      fi
+    fi
   elif [[ "${version}" =~ ^6\..*$ ]]; then
     echo >&2 " > Detected CentOS 6.x ..."
     echo >&2 " > Checking for Okay ..."
@@ -1601,7 +1676,7 @@ install_yum() {
   read -r -a yum_opts <<< "${opts}"
 
   # install the required packages
-  run ${sudo} yum "${yum_opts[@]}" install "${@}" # --enablerepo=epel-testing
+  run ${sudo} yum "${yum_opts[@]}" install "${@}"
 }
 
 # -----------------------------------------------------------------------------

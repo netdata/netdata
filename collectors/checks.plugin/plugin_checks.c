@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "plugin_checks.h"
-
-#ifdef NETDATA_INTERNAL_CHECKS
+#include "daemon/common.h"
 
 static void checks_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -125,5 +123,3 @@ void *checks_main(void *ptr) {
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
-
-#endif // NETDATA_INTERNAL_CHECKS

@@ -31,7 +31,7 @@ section](/daemon/config/README.md#global-section-options) of `netdata.conf`.
 ```
 
 Read our doc on [increasing long-term metrics storage](/docs/store/change-metrics-storage.md) for details, including a
-[calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+[calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 to help you determine the exact settings for your desired retention period.
 
 ### Reduce the data collection frequency

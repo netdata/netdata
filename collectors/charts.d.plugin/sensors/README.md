@@ -19,20 +19,37 @@ The plugin will provide charts for all configured system sensors
 
 The plugin will create Netdata charts for:
 
-1.  **Temperature**
-2.  **Voltage**
-3.  **Current**
-4.  **Power**
-5.  **Fans Speed**
-6.  **Energy**
-7.  **Humidity**
+1. **Temperature**
+2. **Voltage**
+3. **Current**
+4. **Power**
+5. **Fans Speed**
+6. **Energy**
+7. **Humidity**
 
 One chart for every sensor chip found and each of the above will be created.
 
+## Enable the collector
+
+The `sensors` collector is disabled by default. To enable it, edit the `charts.d.conf` file using `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config charts.d.conf
+```
+
+It also needs to be set to "force" to be enabled:
+
+```shell
+# example=force
+sensors=force
+```
+
 ## Configuration
 
-Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

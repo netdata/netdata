@@ -1,7 +1,6 @@
 Source: netdata
-Build-Depends: debhelper (>= 9),
+Build-Depends: debhelper (>= 9.20160709),
                dh-autoreconf,
-               dh-systemd (>= 1.5),
                dpkg-dev (>= 1.13.19),
                zlib1g-dev,
                uuid-dev,
@@ -39,6 +38,11 @@ Depends: adduser,
          openssl,
          ${misc:Depends},
          ${shlibs:Depends}
+Conflicts: netdata-core,
+           netdata-plugins-bash,
+           netdata-plugins-python,
+           netdata-plugins-nodejs,
+           netdata-web
 Pre-Depends: dpkg (>= 1.17.14)
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)

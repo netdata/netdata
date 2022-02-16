@@ -69,7 +69,7 @@ static inline pfwords *pfwords_new(void) {
 }
 
 static inline void pfwords_reset(pfwords *fw) {
-    // debug(D_PROCFILE, PF_PREFIX ":   reseting words");
+    // debug(D_PROCFILE, PF_PREFIX ":   resetting words");
     fw->len = 0;
 }
 
@@ -115,7 +115,7 @@ static inline pflines *pflines_new(void) {
 }
 
 static inline void pflines_reset(pflines *fl) {
-    // debug(D_PROCFILE, PF_PREFIX ":   reseting lines");
+    // debug(D_PROCFILE, PF_PREFIX ":   resetting lines");
 
     fl->len = 0;
 }

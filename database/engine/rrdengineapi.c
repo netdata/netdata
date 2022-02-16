@@ -49,7 +49,7 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
+void rrdeng_metric_init(RRDDIM *rd)
 {
     struct page_cache *pg_cache;
     struct rrdengine_instance *ctx;
@@ -68,7 +68,6 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-    rd->state->metric_uuid = dim_uuid;
     if (host != localhost && host->rrdeng_ctx == &multidb_ctx)
         is_multihost_child = 1;
 
@@ -82,20 +81,17 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         /* First time we see the legacy UUID or metric belongs to child host in multi-host DB.
          * Drop legacy support, normal path */
 
-        if (unlikely(!rd->state->metric_uuid))
-            rd->state->metric_uuid = create_dimension_uuid(rd->rrdset, rd);
-
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t));
+        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &rd->state->metric_uuid, sizeof(uuid_t));
         if (likely(NULL != PValue)) {
             page_index = *PValue;
         }
         uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
         if (NULL == PValue) {
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
-            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t), PJE0);
+            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &rd->state->metric_uuid, sizeof(uuid_t), PJE0);
             fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(rd->state->metric_uuid);
+            *PValue = page_index = create_page_index(&rd->state->metric_uuid);
             page_index->prev = pg_cache->metrics_index.last_page_index;
             pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
@@ -106,15 +102,12 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
                                                 &multihost_legacy_uuid);
 
-        if (unlikely(!rd->state->metric_uuid))
-            rd->state->metric_uuid = mallocz(sizeof(uuid_t));
+        int need_to_store = uuid_compare(rd->state->metric_uuid, multihost_legacy_uuid);
 
-        int need_to_store = (dim_uuid == NULL || uuid_compare(*rd->state->metric_uuid, multihost_legacy_uuid));
-
-        uuid_copy(*rd->state->metric_uuid, multihost_legacy_uuid);
+        uuid_copy(rd->state->metric_uuid, multihost_legacy_uuid);
 
         if (unlikely(need_to_store))
-            (void)sql_store_dimension(rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
+            (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                 rd->algorithm);
 
     }
@@ -951,11 +944,11 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
         goto error_after_init_rrd_files;
     }
 
-    init_completion(&ctx->rrdengine_completion);
+    completion_init(&ctx->rrdengine_completion);
     fatal_assert(0 == uv_thread_create(&ctx->worker_config.thread, rrdeng_worker, &ctx->worker_config));
     /* wait for worker thread to initialize */
-    wait_for_completion(&ctx->rrdengine_completion);
-    destroy_completion(&ctx->rrdengine_completion);
+    completion_wait_for(&ctx->rrdengine_completion);
+    completion_destroy(&ctx->rrdengine_completion);
     uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
@@ -1016,13 +1009,13 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
         return;
     }
 
-    init_completion(&ctx->rrdengine_completion);
+    completion_init(&ctx->rrdengine_completion);
     cmd.opcode = RRDENG_QUIESCE;
     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
     /* wait for dbengine to quiesce */
-    wait_for_completion(&ctx->rrdengine_completion);
-    destroy_completion(&ctx->rrdengine_completion);
+    completion_wait_for(&ctx->rrdengine_completion);
+    completion_destroy(&ctx->rrdengine_completion);
 
     //metalog_prepare_exit(ctx->metalog_ctx);
 }

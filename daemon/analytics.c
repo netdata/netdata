@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "buildinfo.h"
 
 struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
+extern void analytics_exporting_connectors_ssl (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
-extern int aclk_connected;
+extern int aclk_connected, aclk_use_new_cloud_arch;
 
 struct collector {
     char *plugin;
@@ -51,9 +53,16 @@ void analytics_log_data(void)
     debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE     : [%s]", analytics_data.netdata_config_hosts_available);
     debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_AVAILABLE       : [%s]", analytics_data.netdata_host_cloud_available);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_AVAILABLE        : [%s]", analytics_data.netdata_host_aclk_available);
+    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_PROTOCOL         : [%s]", analytics_data.netdata_host_aclk_protocol);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.netdata_host_aclk_implementation);
     debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.netdata_host_agent_claimed);
     debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_AVAILABLE     : [%s]", analytics_data.netdata_config_https_available);
+    debug(D_ANALYTICS, "NETDATA_INSTALL_TYPE               : [%s]", analytics_data.netdata_install_type);
+    debug(D_ANALYTICS, "NETDATA_PREBUILT_DISTRO            : [%s]", analytics_data.netdata_prebuilt_distro);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PRIVATE_REGISTRY : [%s]", analytics_data.netdata_config_is_private_registry);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_USE_PRIVATE_REGISTRY: [%s]", analytics_data.netdata_config_use_private_registry);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_OOM_SCORE           : [%s]", analytics_data.netdata_config_oom_score);
 }
 
 /*
@@ -90,9 +99,16 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_config_hosts_available);
     freez(analytics_data.netdata_host_cloud_available);
     freez(analytics_data.netdata_host_aclk_available);
+    freez(analytics_data.netdata_host_aclk_protocol);
     freez(analytics_data.netdata_host_aclk_implementation);
     freez(analytics_data.netdata_host_agent_claimed);
     freez(analytics_data.netdata_host_cloud_enabled);
+    freez(analytics_data.netdata_config_https_available);
+    freez(analytics_data.netdata_install_type);
+    freez(analytics_data.netdata_config_is_private_registry);
+    freez(analytics_data.netdata_config_use_private_registry);
+    freez(analytics_data.netdata_config_oom_score);
+    freez(analytics_data.netdata_prebuilt_distro);
 }
 
 /*
@@ -137,7 +153,7 @@ void analytics_get_data(char *name, BUFFER *wb)
  */
 void analytics_log_prometheus(void)
 {
-    if (likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
         analytics_data.prometheus_hits++;
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.prometheus_hits);
@@ -150,7 +166,7 @@ void analytics_log_prometheus(void)
  */
 void analytics_log_shell(void)
 {
-    if (likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
         analytics_data.shell_hits++;
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.shell_hits);
@@ -163,7 +179,7 @@ void analytics_log_shell(void)
  */
 void analytics_log_json(void)
 {
-    if (likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
         analytics_data.json_hits++;
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.json_hits);
@@ -176,12 +192,21 @@ void analytics_log_json(void)
  */
 void analytics_log_dashboard(void)
 {
-    if (likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
         analytics_data.dashboard_hits++;
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
     }
+}
+
+/*
+ * Called when setting the oom score
+ */
+void analytics_report_oom_score(long long int score){
+    char b[7];
+    snprintfz(b, 6, "%d", (int)score);
+    analytics_set_data(&analytics_data.netdata_config_oom_score, b);
 }
 
 void analytics_mirrored_hosts(void)
@@ -217,7 +242,7 @@ void analytics_mirrored_hosts(void)
 void analytics_exporters(void)
 {
     //when no exporters are available, an empty string will be sent
-    //decide if something else is more suitable (but propably not null)
+    //decide if something else is more suitable (but probably not null)
     BUFFER *bi = buffer_create(1000);
     analytics_exporting_connectors(bi);
     analytics_set_data_str(&analytics_data.netdata_exporting_connectors, (char *)buffer_tostring(bi));
@@ -335,6 +360,43 @@ void analytics_alarms_notifications(void)
     buffer_free(b);
 }
 
+void analytics_get_install_type(void)
+{
+    struct install_type_info t = get_install_type();
+
+    if (t.install_type == NULL) {
+        analytics_set_data_str(&analytics_data.netdata_install_type, "unknown");
+    } else {
+        analytics_set_data_str(&analytics_data.netdata_install_type, t.install_type);
+    }
+
+    if (t.prebuilt_distro != NULL) {
+        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, t.prebuilt_distro);
+    }
+
+    freez(t.prebuilt_arch);
+    freez(t.prebuilt_distro);
+    freez(t.install_type);
+}
+
+/*
+ * Pick up if https is actually used
+ */
+void analytics_https(void)
+{
+    BUFFER *b = buffer_create(30);
+#ifdef ENABLE_HTTPS
+    analytics_exporting_connectors_ssl(b);
+    buffer_strcat(b, netdata_client_ctx && localhost->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE && localhost->rrdpush_sender_connected == 1 ? "streaming|" : "|");
+    buffer_strcat(b, netdata_srv_ctx ? "web" : "");
+#else
+    buffer_strcat(b, "||");
+#endif
+
+    analytics_set_data_str(&analytics_data.netdata_config_https_available, (char *)buffer_tostring(b));
+    buffer_free(b);
+}
+
 void analytics_charts(void)
 {
     RRDSET *st;
@@ -405,24 +467,46 @@ void analytics_alarms(void)
 }
 
 /*
- * Misc attributes to get (run from meta)
+ * Misc attributes to get (run from start)
  */
 void analytics_misc(void)
 {
 #ifdef ENABLE_ACLK
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
-#ifdef ACLK_NG
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
 #else
-    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "legacy");
-#endif
-#else
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "false");
+    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "");
 #endif
 
+    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO) ? "true" : "false");
+
+    analytics_set_data(&analytics_data.netdata_config_is_private_registry, "false");
+    analytics_set_data(&analytics_data.netdata_config_use_private_registry, "false");
+
+    if (strcmp(
+        config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io"),
+        "https://registry.my-netdata.io"))
+        analytics_set_data(&analytics_data.netdata_config_use_private_registry, "true");
+
+    //do we need both registry to announce and enabled to indicate that this is a private registry ?
+    if (config_get_boolean(CONFIG_SECTION_REGISTRY, "enabled", CONFIG_BOOLEAN_NO) &&
+        web_server_mode != WEB_SERVER_MODE_NONE)
+        analytics_set_data(&analytics_data.netdata_config_is_private_registry, "true");
+}
+
+void analytics_aclk(void)
+{
 #ifdef ENABLE_ACLK
-    if (aclk_connected)
+    if (aclk_connected) {
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "true");
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        if (aclk_use_new_cloud_arch)
+            analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "New");
+        else
+#endif
+            analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "Legacy");
+    }
     else
 #endif
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "false");
@@ -430,13 +514,14 @@ void analytics_misc(void)
 
 /*
  * Get the meta data, called from the thread once after the original delay
- * These are values that won't change between agent restarts, and therefore
+ * These are values that won't change during agent runtime, and therefore
  * don't try to read them on each META event send
  */
 void analytics_gather_immutable_meta_data(void)
 {
     analytics_misc();
     analytics_exporters();
+    analytics_https();
 }
 
 /*
@@ -452,6 +537,7 @@ void analytics_gather_mutable_meta_data(void)
     analytics_alarms();
     analytics_charts();
     analytics_metrics();
+    analytics_aclk();
 
     rrdhost_unlock(localhost);
 
@@ -490,6 +576,7 @@ void analytics_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     debug(D_ANALYTICS, "Cleaning up...");
+    analytics_free_data();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -521,7 +608,7 @@ void *analytics_main(void *ptr)
 
     analytics_gather_immutable_meta_data();
     analytics_gather_mutable_meta_data();
-    send_statistics("META", "-", "-");
+    send_statistics("META_START", "-", "-");
     analytics_log_data();
 
     sec = 0;
@@ -567,7 +654,6 @@ void set_late_global_environment()
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
     analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
-    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO) ? "true" : "false");
 
 #ifdef DISABLE_CLOUD
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "false");
@@ -607,9 +693,11 @@ void set_late_global_environment()
         analytics_set_data_str(&analytics_data.netdata_buildinfo, (char *)buffer_tostring(bi));
         buffer_free(bi);
     }
+
+    analytics_get_install_type();
 }
 
-static void get_system_timezone(void)
+void get_system_timezone(void)
 {
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
@@ -630,7 +718,7 @@ static void get_system_timezone(void)
     // use the contents of /etc/timezone
     if (!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
         timezone = buffer;
-        info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
+        info("TIMEZONE: using the contents of /etc/timezone");
     }
 
     // read the link /etc/localtime
@@ -696,6 +784,46 @@ static void get_system_timezone(void)
         timezone = "unknown";
 
     netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
+
+    //get the utc offset, and the timezone as returned by strftime
+    //will be sent to the cloud
+    //Note: This will need an agent restart to get new offset on time change (dst, etc).
+    {
+        time_t t;
+        struct tm *tmp, tmbuf;
+        char zone[FILENAME_MAX + 1];
+        char sign[2], hh[3], mm[3];
+
+        t = now_realtime_sec();
+        tmp = localtime_r(&t, &tmbuf);
+
+        if (tmp != NULL) {
+            if (strftime(zone, FILENAME_MAX, "%Z", tmp) == 0) {
+                netdata_configured_abbrev_timezone = strdupz("UTC");
+            } else
+                netdata_configured_abbrev_timezone = strdupz(zone);
+
+            if (strftime(zone, FILENAME_MAX, "%z", tmp) == 0) {
+                netdata_configured_utc_offset = 0;
+            } else {
+                sign[0] = zone[0] == '-' || zone[0] == '+' ? zone[0] : '0';
+                sign[1] = '\0';
+                hh[0] = isdigit(zone[1]) ? zone[1] : '0';
+                hh[1] = isdigit(zone[2]) ? zone[2] : '0';
+                hh[2] = '\0';
+                mm[0] = isdigit(zone[3]) ? zone[3] : '0';
+                mm[1] = isdigit(zone[4]) ? zone[4] : '0';
+                mm[2] = '\0';
+
+                netdata_configured_utc_offset = (str2i(hh) * 3600) + (str2i(mm) * 60);
+                netdata_configured_utc_offset =
+                    sign[0] == '-' ? -netdata_configured_utc_offset : netdata_configured_utc_offset;
+            }
+        } else {
+            netdata_configured_abbrev_timezone = strdupz("UTC");
+            netdata_configured_utc_offset = 0;
+        }
+    }
 }
 
 void set_global_environment()
@@ -751,8 +879,15 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "null");
     analytics_set_data(&analytics_data.netdata_host_aclk_implementation, "null");
     analytics_set_data(&analytics_data.netdata_host_aclk_available, "null");
+    analytics_set_data(&analytics_data.netdata_host_aclk_protocol, "null");
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, "null");
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "null");
+    analytics_set_data(&analytics_data.netdata_config_https_available, "null");
+    analytics_set_data(&analytics_data.netdata_install_type, "null");
+    analytics_set_data(&analytics_data.netdata_config_is_private_registry, "null");
+    analytics_set_data(&analytics_data.netdata_config_use_private_registry, "null");
+    analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
+    analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
@@ -769,8 +904,6 @@ void set_global_environment()
     setenv("NETDATA_LISTEN_PORT", default_port, 1);
     if (clean)
         freez(default_port);
-
-    get_system_timezone();
 
     // set the path we need
     char path[1024 + 1], *p = getenv("PATH");
@@ -834,7 +967,7 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
         as_script,
         action,
         action_result,
@@ -868,18 +1001,30 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_config_hosts_available,
         analytics_data.netdata_host_cloud_available,
         analytics_data.netdata_host_aclk_available,
+        analytics_data.netdata_host_aclk_protocol,
         analytics_data.netdata_host_aclk_implementation,
         analytics_data.netdata_host_agent_claimed,
-        analytics_data.netdata_host_cloud_enabled);
+        analytics_data.netdata_host_cloud_enabled,
+        analytics_data.netdata_config_https_available,
+        analytics_data.netdata_install_type,
+        analytics_data.netdata_config_is_private_registry,
+        analytics_data.netdata_config_use_private_registry,
+        analytics_data.netdata_config_oom_score,
+        analytics_data.netdata_prebuilt_distro);
 
     info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
     FILE *fp = mypopen(command_to_run, &command_pid);
     if (fp) {
-        char buffer[100 + 1];
-        while (fgets(buffer, 100, fp) != NULL)
-            ;
-        mypclose(fp, command_pid);
+        char buffer[4 + 1];
+        char *s = fgets(buffer, 4, fp);
+        int exit_code = mypclose(fp, command_pid);
+        if (exit_code)
+            error("Execution of anonymous statistics script returned %d.", exit_code);
+        if (s && strncmp(buffer, "200", 3))
+            error("Execution of anonymous statistics script returned http code %s.", buffer);
+    } else {
+        error("Failed to run anonymous statistics script %s.", as_script);
     }
     freez(command_to_run);
 }

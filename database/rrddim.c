@@ -119,7 +119,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 // RRDDIM legacy data collection functions
 
 static void rrddim_collect_init(RRDDIM *rd) {
-    rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
+    rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
 }
 static void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number) {
     (void)point_in_time;
@@ -210,7 +210,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
         }
     }
 #ifdef ENABLE_ACLK
-    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
 }
 
@@ -232,7 +232,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            store_active_dimension(rd->state->metric_uuid);
+            store_active_dimension(&rd->state->metric_uuid);
             rd->state->collect_ops.init(rd);
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
             rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
@@ -242,7 +242,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         }
         if (unlikely(rc)) {
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
-            (void)sql_store_dimension(rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
+            (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                                       rd->algorithm);
         }
         rrdset_unlock(st);
@@ -386,11 +386,14 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->last_collected_time.tv_sec = 0;
     rd->last_collected_time.tv_usec = 0;
     rd->rrdset = st;
-    rd->state = mallocz(sizeof(*rd->state));
+    rd->state = callocz(1, sizeof(*rd->state));
+#ifdef ENABLE_ACLK
+    rd->state->aclk_live_status = -1;
+#endif
+    (void) find_dimension_uuid(st, rd, &(rd->state->metric_uuid));
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        uuid_t *dim_uuid = find_dimension_uuid(st, rd);
-        rrdeng_metric_init(rd, dim_uuid);
+        rrdeng_metric_init(rd);
         rd->state->collect_ops.init = rrdeng_store_metric_init;
         rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
         rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
@@ -402,9 +405,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
 #endif
     } else {
-        rd->state->metric_uuid = find_dimension_uuid(st, rd);
-        if (unlikely(!rd->state->metric_uuid))
-            rd->state->metric_uuid = create_dimension_uuid(rd->rrdset, rd);
         rd->state->collect_ops.init         = rrddim_collect_init;
         rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
         rd->state->collect_ops.finalize     = rrddim_collect_finalize;
@@ -415,7 +415,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.latest_time    = rrddim_query_latest_time;
         rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
     }
-    store_active_dimension(rd->state->metric_uuid);
+    store_active_dimension(&rd->state->metric_uuid);
     rd->state->collect_ops.init(rd);
     // append this dimension
     if(!st->dimensions)
@@ -454,9 +454,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     calc_link_to_rrddim(rd);
 
+    ml_new_dimension(rd);
+
     rrdset_unlock(st);
 #ifdef ENABLE_ACLK
-    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
     return(rd);
 }
@@ -466,6 +468,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
 void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 {
+    ml_delete_dimension(rd);
+
 #ifndef ENABLE_ACLK
     UNUSED(db_rotated);
 #endif
@@ -475,7 +479,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
         uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
         if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             /* This metric has no data and no references */
-            delete_dimension_uuid(rd->state->metric_uuid);
+            delete_dimension_uuid(&rd->state->metric_uuid);
         }
     }
 
@@ -499,7 +503,6 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
         error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rd->id, st->id);
 
     // free(rd->annotations);
-    freez(rd->state->metric_uuid);
 
     RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
     switch(rrd_memory_mode) {
@@ -525,7 +528,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
     }
 #ifdef ENABLE_ACLK
     if (db_rotated || RRD_MEMORY_MODE_DBENGINE != rrd_memory_mode)
-        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
 }
 
@@ -546,7 +549,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
 
     rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
 #ifdef ENABLE_ACLK
-    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
     return 0;
 }
@@ -563,7 +566,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
 #ifdef ENABLE_ACLK
-    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
     return 0;
 }
@@ -578,7 +581,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 #ifdef ENABLE_ACLK
-    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
 }
 
@@ -587,7 +590,7 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
 #ifdef ENABLE_ACLK
-    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
 }
 

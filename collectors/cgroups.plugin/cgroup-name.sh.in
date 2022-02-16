@@ -118,24 +118,37 @@ function add_lbl_prefix() {
 # pod level cgroup name format: 'pod_<namespace>_<pod_name>'
 # container level cgroup name format: 'cntr_<namespace>_<pod_name>_<container_name>'
 function k8s_get_kubepod_name() {
-  # GKE /sys/fs/cgroup/*/ tree:
+  # GKE /sys/fs/cgroup/*/ (cri=docker, cgroups=v1):
   # |-- kubepods
   # |   |-- burstable
   # |   |   |-- pod98cee708-023b-11eb-933d-42010a800193
   # |   |   |   |-- 922161c98e6ea450bf665226cdc64ca2aa3e889934c2cff0aec4325f8f78ac03
-  # |   |       `-- a5d223eec35e00f5a1c6fa3e3a5faac6148cdc1f03a2e762e873b7efede012d7
   # |   `-- pode314bbac-d577-11ea-a171-42010a80013b
   # |       |-- 7d505356b04507de7b710016d540b2759483ed5f9136bb01a80872b08f771930
-  # |       `-- 88ab4683b99cfa7cc8c5f503adf7987dd93a3faa7c4ce0d17d419962b3220d50
   #
-  # Minikube (v1.8.2) /sys/fs/cgroup/*/ tree:
+  # GKE /sys/fs/cgroup/*/ (cri=containerd, cgroups=v1):
+  # |-- kubepods.slice
+  # |   |-- kubepods-besteffort.slice
+  # |   |   |-- kubepods-besteffort-pode1465238_4518_4c21_832f_fd9f87033dad.slice
+  # |   |   |   |-- cri-containerd-66be9b2efdf4d85288c319b8c1a2f50d2439b5617e36f45d9d0d0be1381113be.scope
+  # |   `-- kubepods-pod91f5b561_369f_4103_8015_66391059996a.slice
+  # |       |-- cri-containerd-24c53b774a586f06abc058619b47f71d9d869ac50c92898adbd199106fd0aaeb.scope
+  #
+  # GKE /sys/fs/cgroup/*/ (cri=crio, cgroups=v1):
+  # |-- kubepods.slice
+  # |   |-- kubepods-besteffort.slice
+  # |   |   |-- kubepods-besteffort-podad412dfe_3589_4056_965a_592356172968.slice
+  # |   |   |   |-- crio-77b019312fd9825828b70214b2c94da69c30621af2a7ee06f8beace4bc9439e5.scope
+  #
+  # Minikube (v1.8.2) /sys/fs/cgroup/*/ (cri=docker, cgroups=v1):
   # |-- kubepods.slice
   # |   |-- kubepods-besteffort.slice
   # |   |   |-- kubepods-besteffort-pod10fb5647_c724_400c_b9cc_0e6eae3110e7.slice
   # |   |   |   |-- docker-36e5eb5056dfdf6dbb75c0c44a1ecf23217fe2c50d606209d8130fcbb19fb5a7.scope
-  # |   |   |   `-- docker-87e18c2323621cf0f635c53c798b926e33e9665c348c60d489eef31ee1bd38d7.scope
   #
-  # NOTE: cgroups plugin uses '_' to join dir names, so it is <parent>_<child>_<child>_...
+  # NOTE: cgroups plugin
+  # - uses '_' to join dir names (so it is <parent>_<child>_<child>_...)
+  # - replaces '.' with '-'
 
   local fn="${FUNCNAME[0]}"
   local id="${1}"
@@ -157,9 +170,9 @@ function k8s_get_kubepod_name() {
     # kubepods_kubepods-<QOS_CLASS>
     name=${clean_id//-/_}
     name=${name/#kubepods_kubepods/kubepods}
-  elif [[ $clean_id =~ .+pod[a-f0-9_-]+_docker-([a-f0-9]+)$ ]]; then
-    # ...pod<POD_UID>_docker-<CONTAINER_ID> (POD_UID w/ "_")
-    cntr_id=${BASH_REMATCH[1]}
+  elif [[ $clean_id =~ .+pod[a-f0-9_-]+_(docker|crio|cri-containerd)-([a-f0-9]+)$ ]]; then
+    # ...pod<POD_UID>_(docker|crio|cri-containerd)-<CONTAINER_ID> (POD_UID w/ "_")
+    cntr_id=${BASH_REMATCH[2]}
   elif [[ $clean_id =~ .+pod[a-f0-9-]+_([a-f0-9]+)$ ]]; then
     # ...pod<POD_UID>_<CONTAINER_ID>
     cntr_id=${BASH_REMATCH[1]}
@@ -252,7 +265,7 @@ function k8s_get_kubepod_name() {
   jq_filter+='container_name=\"\(.name)\",'
   jq_filter+='container_id=\"\(.containerID)\"'
   jq_filter+='") | '
-  jq_filter+='sub("docker://";"")' # containerID: docker://a346da9bc0e3eaba6b295f64ac16e02f2190db2cef570835706a9e7a36e2c722
+  jq_filter+='sub("(docker|cri-o|containerd)://";"")' # containerID: docker://a346da9bc0e3eaba6b295f64ac16e02f2190db2cef570835706a9e7a36e2c722
 
   local containers
   if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then

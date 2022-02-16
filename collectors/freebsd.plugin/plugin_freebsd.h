@@ -5,20 +5,6 @@
 
 #include "daemon/common.h"
 
-#if (TARGET_OS == OS_FREEBSD)
-
-#define NETDATA_PLUGIN_HOOK_FREEBSD \
-    { \
-        .name = "PLUGIN[freebsd]", \
-        .config_section = CONFIG_SECTION_PLUGINS, \
-        .config_name = "freebsd", \
-        .enabled = 1, \
-        .thread = NULL, \
-        .init_routine = NULL, \
-        .start_routine = freebsd_main \
-    },
-
-
 #include <sys/sysctl.h>
 
 #define KILO_FACTOR 1024
@@ -26,8 +12,6 @@
 #define GIGA_FACTOR 1073741824  // 1024 * 1024 * 1024
 
 #define MAX_INT_DIGITS 10 // maximum number of digits for int
-
-void *freebsd_main(void *ptr);
 
 extern int freebsd_plugin_init();
 
@@ -64,11 +48,5 @@ extern int do_kern_devstat(int update_every, usec_t dt);
 extern int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt);
 extern int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt);
 extern int do_ipfw(int update_every, usec_t dt);
-
-#else // (TARGET_OS == OS_FREEBSD)
-
-#define NETDATA_PLUGIN_HOOK_FREEBSD
-
-#endif // (TARGET_OS == OS_FREEBSD)
 
 #endif /* NETDATA_PLUGIN_FREEBSD_H */

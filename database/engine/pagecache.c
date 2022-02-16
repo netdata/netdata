@@ -289,20 +289,25 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
             ++failures;
             uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
-            init_completion(&compl);
+            completion_init(&compl);
             cmd.opcode = RRDENG_FLUSH_PAGES;
             cmd.completion = &compl;
             rrdeng_enq_cmd(&ctx->worker_config, &cmd);
             /* wait for some pages to be flushed */
             debug(D_RRDENGINE, "%s: waiting for pages to be written to disk before evicting.", __func__);
-            wait_for_completion(&compl);
-            destroy_completion(&compl);
+            completion_wait_for(&compl);
+            completion_destroy(&compl);
 
             if (unlikely(failures > 1)) {
-                unsigned long slots;
+                unsigned long slots, usecs_to_sleep;
                 /* exponential backoff */
                 slots = random() % (2LU << MIN(failures, FAILURES_CEILING));
-                (void)sleep_usec(slots * exp_backoff_slot_usec);
+                usecs_to_sleep = slots * exp_backoff_slot_usec;
+
+                if (usecs_to_sleep >= USEC_PER_SEC)
+                    error("Page cache is full. Sleeping for %llu second(s).", usecs_to_sleep / USEC_PER_SEC);
+
+                (void)sleep_usec(usecs_to_sleep);
             }
             uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
         }

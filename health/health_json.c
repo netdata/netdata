@@ -14,12 +14,19 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
 }
 
 void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
+    char config_hash_id[GUID_LEN + 1];
+    uuid_unparse_lower(ae->config_hash_id, config_hash_id);
+
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
+                    "\t\t\"utc_offset\": %d,\n"
+                    "\t\t\"timezone\": \"%s\",\n"
                     "\t\t\"unique_id\": %u,\n"
                     "\t\t\"alarm_id\": %u,\n"
                     "\t\t\"alarm_event_id\": %u,\n"
+                    "\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\"name\": \"%s\",\n"
                     "\t\t\"chart\": \"%s\",\n"
                     "\t\t\"family\": \"%s\",\n"
@@ -34,6 +41,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"recipient\": \"%s\",\n"
                     "\t\t\"exec_code\": %d,\n"
                     "\t\t\"source\": \"%s\",\n"
+                    "\t\t\"command\": \"%s\",\n"
                     "\t\t\"units\": \"%s\",\n"
                     "\t\t\"when\": %lu,\n"
                     "\t\t\"duration\": %lu,\n"
@@ -49,9 +57,12 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\"silenced\": \"%s\",\n"
                    , host->hostname
+                   , host->utc_offset
+                   , host->abbrev_timezone
                    , ae->unique_id
                    , ae->alarm_id
                    , ae->alarm_event_id
+                   , config_hash_id
                    , ae->name
                    , ae->chart
                    , ae->family
@@ -66,6 +77,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , ae->recipient?ae->recipient:host->health_default_recipient
                    , ae->exec_code
                    , ae->source
+                   , edit_command
                    , ae->units?ae->units:""
                    , (unsigned long)ae->when
                    , (unsigned long)ae->duration
@@ -114,6 +126,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
     buffer_strcat(wb, "\t}");
 
     freez(replaced_info);
+    freez(edit_command);
 }
 
 void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
@@ -178,9 +191,13 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
         }
     }
 
+    char hash_id[GUID_LEN + 1];
+    uuid_unparse_lower(rc->config_hash_id, hash_id);
+
     buffer_sprintf(wb,
             "\t\t\"%s.%s\": {\n"
                     "\t\t\t\"id\": %lu,\n"
+                    "\t\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\t\"name\": \"%s\",\n"
                     "\t\t\t\"chart\": \"%s\",\n"
                     "\t\t\t\"family\": \"%s\",\n"
@@ -212,6 +229,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"last_repeat\": \"%lu\",\n"
                    , rc->chart, rc->name
                    , (unsigned long)rc->id
+                   , hash_id
                    , rc->name
                    , rc->chart
                    , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""

@@ -1,0 +1,145 @@
+# This defines the full set of distros we run CI on.
+---
+platform_map: # map packaging architectures to docker platforms
+  i386: linux/i386
+  amd64: linux/amd64
+  armhf: linux/arm/v7
+  arm64: linux/arm64/v8
+include:
+  - &alpine
+    distro: alpine
+    version: edge
+    env_prep: |
+      apk add -U bash
+    jsonc_removal: |
+      apk del json-c-dev
+  - <<: *alpine
+    version: "3.15"
+  - <<: *alpine
+    version: "3.14"
+  - <<: *alpine
+    version: "3.13"
+  - <<: *alpine
+    version: "3.12"
+
+  - distro: archlinux
+    version: latest
+    env_prep: |
+      pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
+
+  - distro: rockylinux
+    version: "8"
+    base_image: rockylinux/rockylinux
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    packages:
+      type: rpm
+      repo_distro: el/8
+      arches:
+        - amd64
+        - arm64
+  - distro: centos
+    version: "7"
+    packages:
+      type: rpm
+      repo_distro: el/7
+      arches:
+        - amd64
+
+  - &debian
+    distro: debian
+    version: "11"
+    env_prep: |
+      apt-get update
+    jsonc_removal: |
+      apt-get purge -y libjson-c-dev
+    packages: &debian_packages
+      type: deb
+      repo_distro: debian/bullseye
+      arches:
+        - i386
+        - amd64
+        - armhf
+        - arm64
+  - <<: *debian
+    version: "10"
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/buster
+  - <<: *debian
+    version: "9"
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/stretch
+
+  - &fedora
+    distro: fedora
+    version: "35"
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    packages: &fedora_packages
+      type: rpm
+      repo_distro: fedora/35
+      arches:
+        - amd64
+        - armhf
+        - arm64
+  - <<: *fedora
+    version: "34"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/34
+
+  - &opensuse
+    distro: opensuse
+    version: "15.3"
+    base_image: opensuse/leap
+    jsonc_removal: |
+      zypper rm -y libjson-c-devel
+    packages:
+      type: rpm
+      repo_distro: opensuse/15.3
+      arches:
+        - amd64
+        - arm64
+
+  - distro: oraclelinux
+    version: "8"
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    packages:
+      type: rpm
+      repo_distro: ol/8
+      arches:
+        - amd64
+        - arm64
+
+  - &ubuntu
+    distro: ubuntu
+    version: "21.10"
+    env_prep: |
+      rm -f /etc/apt/apt.conf.d/docker && apt-get update
+    jsonc_removal: |
+      apt-get remove -y libjson-c-dev
+    packages: &ubuntu_packages
+      type: deb
+      repo_distro: ubuntu/impish
+      arches:
+        - amd64
+        - armhf
+        - arm64
+  - <<: *ubuntu
+    version: "20.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/focal
+  - <<: *ubuntu
+    version: "18.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/bionic
+      arches:
+        - i386
+        - amd64
+        - armhf
+        - arm64

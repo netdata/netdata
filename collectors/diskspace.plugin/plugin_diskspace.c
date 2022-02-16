@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "plugin_diskspace.h"
+#include "../proc.plugin/plugin_proc.h"
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
 
@@ -79,6 +79,28 @@ int mount_point_cleanup(void *entry, void *data) {
         rrdset_obsolete_and_pointer_null(mp->st_space);
         rrdset_obsolete_and_pointer_null(mp->st_inodes);
     }
+
+    return 0;
+}
+
+// for the full list of protected mount points look at
+// https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L142-L149
+// https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L180-L194
+static const char *systemd_protected_mount_points[] = {
+    "/home",
+    "/root",
+    "/usr",
+    "/boot",
+    "/efi",
+    "/etc",
+    NULL
+};
+
+int mount_point_is_protected(char *mount_point)
+{
+    for (size_t i = 0; systemd_protected_mount_points[i] != NULL; i++)
+        if (!strcmp(mount_point, systemd_protected_mount_points[i]))
+            return 1;
 
     return 0;
 }
@@ -190,7 +212,12 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
         return;
 
-    if(unlikely(mi->flags & MOUNTINFO_READONLY && !m->collected && m->do_space != CONFIG_BOOLEAN_YES && m->do_inodes != CONFIG_BOOLEAN_YES))
+    if (unlikely(
+            mi->flags & MOUNTINFO_READONLY &&
+            !mount_point_is_protected(mi->mount_point) &&
+            !m->collected &&
+            m->do_space != CONFIG_BOOLEAN_YES &&
+            m->do_inodes != CONFIG_BOOLEAN_YES))
         return;
 
     struct statvfs buff_statvfs;
@@ -387,6 +414,10 @@ void *diskspace_main(void *ptr) {
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
 
             if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
+                continue;
+
+            // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
+            if(mi->flags & MOUNTINFO_READONLY && !strcmp(mi->root, mi->mount_point))
                 continue;
 
             do_disk_space_stats(mi, update_every);

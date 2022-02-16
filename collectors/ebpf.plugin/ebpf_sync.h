@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_SYNC_H
 #define NETDATA_EBPF_SYNC_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_SYNC "sync"
+
 // charts
 #define NETDATA_EBPF_SYNC_CHART "sync"
 #define NETDATA_EBPF_MSYNC_CHART "memory_map"
@@ -34,8 +37,6 @@ typedef struct ebpf_sync_syscalls {
 
     struct bpf_object *objects;
     struct bpf_link **probe_links;
-
-    ebpf_data_t kernel_info;
 } ebpf_sync_syscalls_t;
 
 enum netdata_sync_charts {
@@ -46,9 +47,10 @@ enum netdata_sync_charts {
 };
 
 enum netdata_sync_table {
-    NETDATA_SYNC_GLOBLAL_TABLE
+    NETDATA_SYNC_GLOBAL_TABLE
 };
 
 extern void *ebpf_sync_thread(void *ptr);
+extern struct config sync_config;
 
 #endif /* NETDATA_EBPF_SYNC_H */

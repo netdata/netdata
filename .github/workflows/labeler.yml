@@ -3,7 +3,9 @@
 name: Pull Request Labeler
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/10 * * * *'
+env:
+  DISABLE_TELEMETRY: 1
 jobs:
   labeler:
     runs-on: ubuntu-latest

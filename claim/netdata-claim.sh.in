@@ -151,7 +151,14 @@ NETDATA_USER=$(get_config_value netdata global "run as user")
 gen_id() {
     local id
 
-    id="$(uuidgen)"
+    if command -v uuidgen > /dev/null 2>&1; then
+        id="$(uuidgen)"
+    elif [ -r /proc/sys/kernel/random/uuid ]; then
+        id="$(cat /proc/sys/kernel/random/uuid)"
+    else
+        echo >&2 "Unable to generate machine ID."
+        exit 18
+    fi
 
     if [ "${id}" = "8a795b0c-2311-11e6-8563-000c295076a6" ] || [ "${id}" = "4aed1458-1c3e-11e6-a53f-000c290fc8f5" ]; then
         gen_id
@@ -191,7 +198,7 @@ for arg in "$@"
 do
         case $arg in
                 -token=*) TOKEN=${arg:7} ;;
-                -url=*) URL_BASE=${arg:5} ;;
+                -url=*) [ -n "${arg:5}" ] && URL_BASE=${arg:5} ;;
                 -id=*) ID=${arg:4} ;;
                 -rooms=*) ROOMS=${arg:7} ;;
                 -hostname=*) HOSTNAME=${arg:10} ;;
@@ -379,7 +386,9 @@ fi
 
 if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
-        echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
+        if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
+                echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
+        fi
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; set -e; exit 2)
 
         # Rewrite the cloud.conf on the disk
@@ -418,7 +427,7 @@ HERE_DOC
                 exit $EXIT_CODE
         fi
         echo >&2 "${PROXYMSG}The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud."
-        exit 5
+        [ "$NETDATA_RUNNING" -eq 0 ] && exit 0 || exit 5
 fi
 
 echo >&2 "Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""

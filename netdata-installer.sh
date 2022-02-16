@@ -1,20 +1,23 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # SPDX-License-Identifier: GPL-3.0-or-later
-# shellcheck disable=SC2046,SC2086,SC2166
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
-  local path=""
-  while read -r; do
-    if [[ ! ${path} =~ (^|:)"${REPLY}"(:|$) ]]; then
+  path=""
+  tmp="$(mktemp)"
+  (echo  "${PATH}" | tr ":" "\n") > "$tmp"
+  while read -r REPLY;
+  do
+    if echo "${path}" | grep -v "(^|:)${REPLY}(:|$)"; then
       [ -n "${path}" ] && path="${path}:"
       path="${path}${REPLY}"
     fi
-  done < <(echo "${PATH}" | tr ":" "\n")
-
-  [ -n "${path}" ] && [[ ${PATH} =~ /bin ]] && [[ ${PATH} =~ /sbin ]] && export PATH="${path}"
-}
+  done < "$tmp"
+rm "$tmp"
+  [ -n "${path}" ]
+export PATH="${path%:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin}"
+} > /dev/null
 uniquepath
 
 PROGRAM="$0"
@@ -27,9 +30,23 @@ fi
 
 # -----------------------------------------------------------------------------
 # Pull in OpenSSL properly if on macOS
-if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ]; then
-  export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
-  export LDFLAGS="-L/usr/local/opt/openssl@1.1/lib"
+if [ "$(uname -s)" = 'Darwin' ]; then
+  if brew --prefix > /dev/null 2>&1; then
+    if brew --prefix --installed openssl > /dev/null 2>&1; then
+      HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl)
+    elif brew --prefix --installed openssl@3 > /dev/null 2>&1; then
+      HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@3)
+    elif brew --prefix --installed openssl@1.1 > /dev/null 2>&1; then
+      HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@1.1)
+    fi
+    if [ -n "${HOMEBREW_OPENSSL_PREFIX}" ]; then
+      export CFLAGS="${CFLAGS} -I${HOMEBREW_OPENSSL_PREFIX}/include"
+      export LDFLAGS="${LDFLAGS} -L${HOMEBREW_OPENSSL_PREFIX}/lib"
+    fi
+    HOMEBREW_PREFIX=$(brew --prefix)
+    export CFLAGS="${CFLAGS} -I${HOMEBREW_PREFIX}/include"
+    export LDFLAGS="${LDFLAGS} -L${HOMEBREW_PREFIX}/lib"
+  fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -44,7 +61,6 @@ cd "${NETDATA_SOURCE_DIR}" || exit 1
 # -----------------------------------------------------------------------------
 # figure out an appropriate temporary directory
 _cannot_use_tmpdir() {
-  local testfile ret
   testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
   ret=0
 
@@ -94,8 +110,7 @@ print_deferred_errors() {
   if [ -n "${NETDATA_DEFERRED_ERRORS}" ]; then
     echo >&2
     echo >&2 "The following non-fatal errors were encountered during the installation process:"
-    # shellcheck disable=SC2059
-    printf >&2 "${NETDATA_DEFERRED_ERRORS}"
+    printf '%s' >&2 "${NETDATA_DEFERRED_ERRORS}"
     echo >&2
   fi
 }
@@ -105,10 +120,10 @@ print_deferred_errors() {
 
 if [ -f "${INSTALLER_DIR}/packaging/installer/functions.sh" ]; then
   # shellcheck source=packaging/installer/functions.sh
-  source "${INSTALLER_DIR}/packaging/installer/functions.sh" || exit 1
+  . "${INSTALLER_DIR}/packaging/installer/functions.sh" || exit 1
 else
   # shellcheck source=packaging/installer/functions.sh
-  source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
+  . "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
 download_go() {
@@ -116,7 +131,10 @@ download_go() {
 }
 
 # make sure we save all commands we run
+# Variable is used by code in the packaging/installer/functions.sh
+# shellcheck disable=SC2034
 run_logfile="netdata-installer.log"
+
 
 # -----------------------------------------------------------------------------
 # fix PKG_CHECK_MODULES error
@@ -133,19 +151,22 @@ umask 002
 renice 19 $$ > /dev/null 2> /dev/null
 
 # you can set CFLAGS before running installer
+# shellcheck disable=SC2269
 LDFLAGS="${LDFLAGS}"
 CFLAGS="${CFLAGS--O2}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
+# shellcheck disable=SC2269
 ACLK="${ACLK}"
 
 # keep a log of this command
-# shellcheck disable=SC2129
-printf "\n# " >> netdata-installer.log
-date >> netdata-installer.log
-printf 'CFLAGS="%s" ' "${CFLAGS}" >> netdata-installer.log
-printf 'LDFLAGS="%s" ' "${LDFLAGS}" >> netdata-installer.log
-printf "%q " "${PROGRAM}" "${@}" >> netdata-installer.log
-printf "\n" >> netdata-installer.log
+{
+	printf "\n# "
+	date
+	printf 'CFLAGS="%s" ' "${CFLAGS}"
+	printf 'LDFLAGS="%s" ' "${LDFLAGS}"
+	printf "%s" "${PROGRAM}" "${@}"
+	printf "\n"
+} >> netdata-installer.log
 
 REINSTALL_OPTIONS="$(
   printf "%s" "${*}"
@@ -195,7 +216,8 @@ NONROOT
 }
 
 usage() {
-  netdata_banner "installer command line options"
+  netdata_banner
+  progress "installer command line options"
   cat << HEREDOC
 
 USAGE: ${PROGRAM} [options]
@@ -215,7 +237,6 @@ USAGE: ${PROGRAM} [options]
   --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
-  --aclk-ng                  Forces build of ACLK Next Generation which is fallback by default.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -232,14 +253,21 @@ USAGE: ${PROGRAM} [options]
   --disable-backend-prometheus-remote-write
   --enable-backend-mongodb   Enable MongoDB backend. Default: enable it when libmongoc is available.
   --disable-backend-mongodb
-  --enable-lto               Enable Link-Time-Optimization. Default: enabled
+  --enable-exporting-pubsub  Enable Google Cloud PubSub exporting connector. Default: enable it when
+                             libgoogle_cloud_cpp_pubsub_protos and its dependencies are available.
+  --disable-exporting-pubsub
+  --enable-lto               Enable Link-Time-Optimization. Default: disabled
   --disable-lto
+  --enable-ml                Enable anomaly detection with machine learning. (Default: autodetect)
+  --disable-ml
   --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
   --use-system-lws           Use a system copy of libwebsockets instead of bundling our own (default is to use the bundled copy).
+  --use-system-protobuf      Use a system copy of libprotobuf instead of bundling our own (default is to use the bundled copy).
   --zlib-is-really-here or
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
-  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)
+  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
+  --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -270,6 +298,7 @@ DONOTWAIT=0
 AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
+NETDATA_ENABLE_ML=""
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
@@ -277,7 +306,10 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
-    "--use-system-lws") USE_SYSTEM_LWS=1 ;;
+    "--use-system-protobuf")
+      USE_SYSTEM_PROTOBUF=1
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--without-bundled-protobuf}" | sed 's/$/ --without-bundled-protobuf/g')"
+    ;;
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
@@ -296,40 +328,52 @@ while [ -n "${1}" ]; do
       ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
-    "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi" ;;
-    "--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi" ;;
-    "--disable-https") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-https/} --disable-https" ;;
+    "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-freeipmi)}" | sed 's/$/ --enable-plugin-freeipmi/g')" ;;
+    "--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-freeipmi)}" | sed 's/$/ --disable-plugin-freeipmi/g')" ;;
+    "--disable-https") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-https)}" | sed 's/$/ --disable-plugin-https/g')" ;;
     "--disable-dbengine")
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-dbengine/} --disable-dbengine"
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-dbengine)}" | sed 's/$/ --disable-dbengine/g')"
       NETDATA_DISABLE_DBENGINE=1
       ;;
-    "--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct" ;;
-    "--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct" ;;
-    "--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat" ;;
-    "--disable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-xenstat/} --disable-plugin-xenstat" ;;
-    "--enable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-kinesis/} --enable-backend-kinesis" ;;
-    "--disable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-kinesis/} --disable-backend-kinesis" ;;
-    "--enable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-prometheus-remote-write/} --enable-backend-prometheus-remote-write" ;;
-    "--disable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-prometheus-remote-write/} --disable-backend-prometheus-remote-write" ;;
-    "--enable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-mongodb/} --enable-backend-mongodb" ;;
-    "--disable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-mongodb/} --disable-backend-mongodb" ;;
-    "--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto" ;;
-    "--disable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto" ;;
-    "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
+    "--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-nfacct)}" | sed 's/$/ --enable-plugin-nfacct/g')" ;;
+    "--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-nfacct)}" | sed 's/$/ --disable-plugin-nfacct/g')" ;;
+    "--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-xenstat)}" | sed 's/$/ --enable-plugin-xenstat/g')" ;;
+    "--disable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-xenstat)}" | sed 's/$/ --disable-plugin-xenstat/g')" ;;
+    "--enable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-backend-kinesis)}" | sed 's/$/ --enable-backend-kinesis/g')" ;;
+    "--disable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-backend-kinesis)}" | sed 's/$/ --disable-backend-kinesis/g')" ;;
+    "--enable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-backend-prometheus-remote-write)}" | sed 's/$/ --enable-backend-prometheus-remote-write/g')" ;;
+    "--disable-backend-prometheus-remote-write")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-backend-prometheus-remote-write)}" | sed 's/$/ --disable-backend-prometheus-remote-write/g')"
+      NETDATA_DISABLE_PROMETHEUS=1
+      ;;
+    "--enable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-backend-mongodb)}" | sed 's/$/ --enable-backend-mongodb/g')" ;;
+    "--disable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-backend-mongodb)}" | sed 's/$/ --disable-backend-mongodb/g')" ;;
+    "--enable-exporting-pubsub") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-pubsub)}" | sed  's/$/ --enable-exporting-pubsub/g')" ;;
+    "--disable-exporting-pubsub") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-pubsub)}" | sed 's/$/ --disable-exporting-pubsub/g')" ;;
+    "--enable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-lto)}" | sed 's/$/ --enable-lto/g')" ;;
+    "--enable-ml")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-ml)}" | sed 's/$/ --enable-ml/g')"
+      NETDATA_ENABLE_ML=1
+      ;;
+    "--disable-ml")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
+      NETDATA_ENABLE_ML=0
+      ;;
+    "--enable-ml-tests") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-ml-tests)}" | sed 's/$/ --enable-ml-tests/g')" ;;
+    "--disable-ml-tests") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml-tests)}" | sed 's/$/ --disable-ml-tests/g')" ;;
+    "--disable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-lto)}" | sed 's/$/ --disable-lto/g')" ;;
+    "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-x86-sse)}" | sed 's/$/ --disable-x86-sse/g')" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
-    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ebpf/} --disable-ebpf" ;;
-    "--aclk-ng")
-      NETDATA_ACLK_NG=1
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--with-aclk-ng/} --with-aclk-ng"
-      ;;
+    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')" ;;
+    "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
       else
         NETDATA_DISABLE_CLOUD=1
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
+        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-cloud)}" | sed 's/$/ --disable-cloud/g')"
       fi
       ;;
     "--require-cloud")
@@ -337,7 +381,7 @@ while [ -n "${1}" ]; do
         echo "Cloud explicitly disabled, ignoring --require-cloud."
       else
         NETDATA_REQUIRE_CLOUD=1
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-cloud/} --enable-cloud"
+        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-cloud)}" | sed 's/$/ --enable-cloud/g')"
       fi
       ;;
     "--build-json-c")
@@ -348,6 +392,10 @@ while [ -n "${1}" ]; do
       ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
+      shift 1
+      ;;
+    "--install-no-prefix")
+      NETDATA_PREFIX="${2}"
       shift 1
       ;;
     "--help" | "-h")
@@ -363,6 +411,13 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
+if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
+  [ -n "$DISABLE_TELEMETRY" ] ||
+  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
+  [ -n "$DO_NOT_TRACK" ]; then
+  NETDATA_DISABLE_TELEMETRY=1
+fi
+
 make="make"
 # See: https://github.com/netdata/netdata/issues/9163
 if [ "$(uname -s)" = "FreeBSD" ]; then
@@ -370,12 +425,57 @@ if [ "$(uname -s)" = "FreeBSD" ]; then
   NETDATA_CONFIGURE_OPTIONS="$NETDATA_CONFIGURE_OPTIONS --disable-dependency-tracking"
 fi
 
-# replace multiple spaces with a single space
-NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
+if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
+  mega="$((1024 * 1024))"
+  base=1024
+  scale=256
 
-if [ "${UID}" -ne 0 ]; then
+  # shellcheck disable=SC2086
+  if [ -n "${MAKEOPTS}" ]; then
+    proc_count="$(echo ${MAKEOPTS} | grep -oE '\-j *[[:digit:]]+' | tr -d '\-j ')"
+  else
+    proc_count="$(find_processors)"
+  fi
+
+  target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
+  total_ram="$(grep MemTotal /proc/meminfo | cut -d ':' -f 2 | tr -d ' kB')"
+  total_ram="$((total_ram * 1024))"
+
+  if [ "${total_ram}" -le "$((base * mega))" ] && [ -z "${NETDATA_ENABLE_ML}" ]; then
+    NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
+    NETDATA_ENABLE_ML=0
+  fi
+
+  if [ -z "${MAKEOPTS}" ]; then
+    MAKEOPTS="-j${proc_count}"
+
+    while [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ]; do
+      proc_count="$((proc_count - 1))"
+      target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
+      MAKEOPTS="-j${proc_count}"
+    done
+  else
+    if [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ] && [ -z "${SKIP_RAM_CHECK}" ]; then
+      target_ram="$(echo "${target_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
+      total_ram="$(echo "${total_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
+      run_failed "Netdata needs ${target_ram} of RAM to safely install, but this system only has ${total_ram}."
+      run_failed "Insufficient RAM available for an install. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
+      exit 2
+    fi
+  fi
+fi
+
+# set default make options
+if [ -z "${MAKEOPTS}" ]; then
+  MAKEOPTS="-j$(find_processors)"
+elif echo "${MAKEOPTS}" | grep -vqF -e "-j"; then
+  MAKEOPTS="${MAKEOPTS} -j$(find_processors)"
+fi
+
+if [ "$(id -u)" -ne 0 ]; then
   if [ -z "${NETDATA_PREFIX}" ]; then
-    netdata_banner "wrong command line options!"
+    netdata_banner
+	progress "wrong command line options!"
     banner_nonroot_install "${@}"
     exit 1
   else
@@ -383,7 +483,8 @@ if [ "${UID}" -ne 0 ]; then
   fi
 fi
 
-netdata_banner "real-time performance monitoring, done right!"
+netdata_banner
+progress "real-time performance monitoring, done right!"
 cat << BANNER1
 
   You are about to build and install netdata to your system.
@@ -403,7 +504,7 @@ cat << BANNER1
    - log files      in ${TPUT_CYAN}${NETDATA_PREFIX}/var/log/netdata${TPUT_RESET}
 BANNER1
 
-[ "${UID}" -eq 0 ] && cat << BANNER2
+[ "$(id -u)" -eq 0 ] && cat << BANNER2
    - pid file       at ${TPUT_CYAN}${NETDATA_PREFIX}/var/run/netdata.pid${TPUT_RESET}
    - logrotate file at ${TPUT_CYAN}/etc/logrotate.d/netdata${TPUT_RESET}
 BANNER2
@@ -421,8 +522,8 @@ if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
   ${TPUT_YELLOW}${TPUT_BOLD}NOTE${TPUT_RESET}:
   Anonymous usage stats will be collected and sent to Netdata.
   To opt-out, pass --disable-telemetry option to the installer or export
-  the environment variable DO_NOT_TRACK to a non-zero or non-empty value
-  (e.g: export DO_NOT_TRACK=1).
+  the environment variable DISABLE_TELEMETRY to a non-zero or non-empty value
+  (e.g: export DISABLE_TELEMETRY=1).
 
 BANNER4
 fi
@@ -430,19 +531,22 @@ fi
 have_autotools=
 if [ "$(type autoreconf 2> /dev/null)" ]; then
   autoconf_maj_min() {
-    local maj min IFS=.-
-
+    OLDIFS=$IFS
+    IFS=.-
     maj=$1
     min=$2
 
+    # shellcheck disable=SC2046
     set -- $(autoreconf -V | sed -ne '1s/.* \([^ ]*\)$/\1/p')
+    # shellcheck disable=SC2086
     eval $maj=\$1 $min=\$2
+    IFS=$OLDIFS
   }
   autoconf_maj_min AMAJ AMIN
 
   if [ "$AMAJ" -gt 2 ]; then
     have_autotools=Y
-  elif [ "$AMAJ" -eq 2 -a "$AMIN" -ge 60 ]; then
+  elif [ "$AMAJ" -eq 2 ] && [ "$AMIN" -ge 60 ]; then
     have_autotools=Y
   else
     echo "Found autotools $AMAJ.$AMIN"
@@ -455,7 +559,8 @@ if [ ! "$have_autotools" ]; then
   if [ -f configure ]; then
     echo "Will skip autoreconf step"
   else
-    netdata_banner "autotools v2.60 required"
+    netdata_banner
+	progress "autotools v2.60 required"
     cat << "EOF"
 
 -------------------------------------------------------------------------------
@@ -471,11 +576,11 @@ fi
 
 if [ ${DONOTWAIT} -eq 0 ]; then
   if [ -n "${NETDATA_PREFIX}" ]; then
-    echo -n "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
+    printf '%s' "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
   else
-    echo -n "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to your system${TPUT_RESET} > "
+    printf '%s' "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to your system${TPUT_RESET} > "
   fi
-  read -ern1
+  read -r REPLY
   if [ "$REPLY" != '' ]; then
     exit 1
   fi
@@ -483,7 +588,8 @@ if [ ${DONOTWAIT} -eq 0 ]; then
 fi
 
 build_error() {
-  netdata_banner "sorry, it failed to build..."
+  netdata_banner
+  progress "sorry, it failed to build..."
   cat << EOF
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -535,198 +641,85 @@ fi
 trap build_error EXIT
 
 # -----------------------------------------------------------------------------
-
-build_libmosquitto() {
-  local env_cmd=''
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
-  fi
-
-  if [ "$(uname -s)" = Linux ]; then
-    run ${env_cmd} make -C "${1}/lib"
-  else
-    pushd ${1} > /dev/null || return 1
-    if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-      run ${env_cmd} cmake \
-        -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
-        -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
-        -D WITH_STATIC_LIBRARIES:boolean=YES \
-        .
-    else
-      run ${env_cmd} cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
-    fi
-    run ${env_cmd} make -C lib
-    run mv lib/libmosquitto_static.a lib/libmosquitto.a
-    popd || return 1
-  fi
-}
-
-copy_libmosquitto() {
-  target_dir="${PWD}/externaldeps/mosquitto"
-
-  run mkdir -p "${target_dir}"
-
-  run cp "${1}/lib/libmosquitto.a" "${target_dir}"
-  run cp "${1}/lib/mosquitto.h" "${target_dir}"
-}
-
-bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${NETDATA_ACLK_NG}" ]; then
-    echo "Skipping libmosquitto"
-    return 0
-  fi
-
-  progress "Prepare custom libmosquitto version"
-
-  MOSQUITTO_PACKAGE_VERSION="$(cat packaging/mosquitto.version)"
-
-  tmp="$(mktemp -d -t netdata-mosquitto-XXXXXX)"
-  MOSQUITTO_PACKAGE_BASENAME="${MOSQUITTO_PACKAGE_VERSION}.tar.gz"
-
-  if fetch_and_verify "mosquitto" \
-    "https://github.com/netdata/mosquitto/archive/${MOSQUITTO_PACKAGE_BASENAME}" \
-    "${MOSQUITTO_PACKAGE_BASENAME}" \
-    "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}"; then
-    if run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" -C "${tmp}" &&
-      build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" &&
-      copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" &&
-      rm -rf "${tmp}"; then
-      run_ok "libmosquitto built and prepared."
-    else
-      run_failed "Failed to build libmosquitto."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        exit 1
-      else
-        defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
-      fi
-    fi
-  else
-    run_failed "Unable to fetch sources for libmosquitto."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-      exit 1
-    else
-      defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
-    fi
-  fi
-}
-
-bundle_libmosquitto
-
-# -----------------------------------------------------------------------------
-
-build_libwebsockets() {
-  local env_cmd=''
+build_protobuf() {
+  env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
-  pushd "${1}" > /dev/null || exit 1
-
-  if [ "$(uname)" = "Darwin" ]; then
-    run patch -p1 << "EOF"
---- a/lib/plat/unix/private.h
-+++ b/lib/plat/unix/private.h
-@@ -164,6 +164,8 @@ delete_from_fd(const struct lws_context *context, int fd);
-  * but happily have something equivalent in the SO_NOSIGPIPE flag.
-  */
- #ifdef __APPLE__
-+/* iOS SDK 12+ seems to define it, undef it for compatibility both ways */
-+#undef MSG_NOSIGNAL
- #define MSG_NOSIGNAL SO_NOSIGPIPE
- #endif
-EOF
-
-    # shellcheck disable=SC2181
-    if [ $? -ne 0 ]; then
-      return 1
-    fi
+  cd "${1}" > /dev/null || return 1
+  # shellcheck disable=SC2086
+  if ! run ${env_cmd} ./configure --disable-shared --without-zlib --disable-dependency-tracking --with-pic; then
+    cd - > /dev/null || return 1
+    return 1
   fi
 
-  if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-    run ${env_cmd} cmake \
-      -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
-      -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
-      -D LWS_WITH_SOCKS5:bool=ON \
-      -D LWS_IPV6:bool=ON \
-      $CMAKE_FLAGS \
-      .
-  else
-    run ${env_cmd} cmake \
-      -D LWS_WITH_SOCKS5:bool=ON \
-      -D LWS_IPV6:bool=ON \
-      $CMAKE_FLAGS \
-      .
+  # shellcheck disable=SC2086
+  if ! run ${env_cmd} $make ${MAKEOPTS}; then
+    cd - > /dev/null || return 1
+    return 1
   fi
-  run ${env_cmd} make -j$(find_processors)
-  popd > /dev/null || exit 1
+
+  cd - > /dev/null || return 1
 }
 
-copy_libwebsockets() {
-  target_dir="${PWD}/externaldeps/libwebsockets"
+copy_protobuf() {
+  target_dir="${PWD}/externaldeps/protobuf"
 
   run mkdir -p "${target_dir}" || return 1
-
-  run cp "${1}/lib/libwebsockets.a" "${target_dir}/libwebsockets.a" || return 1
-  run cp -r "${1}/include" "${target_dir}" || return 1
+  run cp -a "${1}/src" "${target_dir}" || return 1
 }
 
-bundle_libwebsockets() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${USE_SYSTEM_LWS}" ] || [ -n "${NETDATA_ACLK_NG}" ]; then
+bundle_protobuf() {
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ]; then
+    echo "Skipping protobuf"
     return 0
   fi
 
-  if [ -z "$(command -v cmake)" ]; then
-    run_failed "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-    defer_error_highlighted "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+  if [ -n "${USE_SYSTEM_PROTOBUF}" ]; then
+    echo "Skipping protobuf"
+    defer_error "You have requested use of a system copy of protobuf. This should work, but it is not recommended as it's very likely to break if you upgrade the currently installed version of protobuf."
     return 0
   fi
 
-  progress "Prepare libwebsockets"
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling protobuf."
 
-  LIBWEBSOCKETS_PACKAGE_VERSION="$(cat packaging/libwebsockets.version)"
+  PROTOBUF_PACKAGE_VERSION="$(cat packaging/protobuf.version)"
 
-  tmp="$(mktemp -d -t netdata-libwebsockets-XXXXXX)"
-  LIBWEBSOCKETS_PACKAGE_BASENAME="v${LIBWEBSOCKETS_PACKAGE_VERSION}.tar.gz"
+  tmp="$(mktemp -d -t netdata-protobuf-XXXXXX)"
+  PROTOBUF_PACKAGE_BASENAME="protobuf-cpp-${PROTOBUF_PACKAGE_VERSION}.tar.gz"
 
-  if fetch_and_verify "libwebsockets" \
-    "https://github.com/warmcat/libwebsockets/archive/${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
-    "${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+  if fetch_and_verify "protobuf" \
+    "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_PACKAGE_VERSION}/${PROTOBUF_PACKAGE_BASENAME}" \
+    "${PROTOBUF_PACKAGE_BASENAME}" \
     "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBWEBSOCKETS}"; then
-    if run tar -xf "${tmp}/${LIBWEBSOCKETS_PACKAGE_BASENAME}" -C "${tmp}" &&
-      build_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
-      copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
+    "${NETDATA_LOCAL_TARBALL_VERRIDE_PROTOBUF}"; then
+    if run tar -xf "${tmp}/${PROTOBUF_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
+      copy_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
-      run_ok "libwebsockets built and prepared."
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-lws=externaldeps/libwebsockets"
+      run_ok "protobuf built and prepared."
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
     else
-      run_failed "Failed to build libwebsockets."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        exit 1
-      else
-        defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
-      fi
+      run_failed "Failed to build protobuf."
+      defer_error_highlighted "Failed to build protobuf. You may not be able to connect this node to Netdata Cloud."
     fi
   else
-    run_failed "Unable to fetch sources for libwebsockets."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-      exit 1
-    else
-      defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
-    fi
+    run_failed "Unable to fetch sources for protobuf."
+    defer_error_highlighted "Unable to fetch sources for protobuf. You may not be able to connect this node to Netdata Cloud."
   fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
-bundle_libwebsockets
+bundle_protobuf
 
 # -----------------------------------------------------------------------------
 
 build_judy() {
-  local env_cmd=''
-  local libtoolize="libtoolize"
+  env_cmd=''
+  libtoolize="libtoolize"
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
@@ -736,18 +729,19 @@ build_judy() {
     libtoolize="glibtoolize"
   fi
 
-  pushd "${1}" > /dev/null || return 1
+  cd "${1}" > /dev/null || return 1
+  # shellcheck disable=SC2086
   if run ${env_cmd} ${libtoolize} --force --copy &&
     run ${env_cmd} aclocal &&
     run ${env_cmd} autoheader &&
     run ${env_cmd} automake --add-missing --force --copy --include-deps &&
     run ${env_cmd} autoconf &&
     run ${env_cmd} ./configure &&
-    run ${env_cmd} make -C src &&
+    run ${env_cmd} ${make} ${MAKEOPTS} -C src &&
     run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o; then
-    popd > /dev/null || return 1
+    cd - > /dev/null || return 1
   else
-    popd > /dev/null || return 1
+    cd - > /dev/null || return 1
     return 1
   fi
 }
@@ -763,7 +757,7 @@ copy_judy() {
 
 bundle_judy() {
   # If --build-judy flag or no Judy on the system and we're building the dbengine, bundle our own libJudy.
-  # shellcheck disable=SC2235
+  # shellcheck disable=SC2235,SC2030,SC2031
   if [ -n "${NETDATA_DISABLE_DBENGINE}" ] || ([ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ]); then
     return 0
   elif [ -n "${NETDATA_BUILD_JUDY}" ]; then
@@ -771,6 +765,8 @@ bundle_judy() {
   elif [ ! -e /usr/include/Judy.h ]; then
     progress "/usr/include/Judy.h does not exist, but we need libJudy, building our own copy"
   fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libJudy."
 
   progress "Prepare libJudy"
 
@@ -789,10 +785,12 @@ bundle_judy() {
       copy_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "libJudy built and prepared."
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-libJudy=externaldeps/libJudy"
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-libJudy"
     else
       run_failed "Failed to build libJudy."
       if [ -n "${NETDATA_BUILD_JUDY}" ]; then
+        [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+
         exit 1
       else
         defer_error_highlighted "Failed to build libJudy. dbengine support will be disabled."
@@ -801,28 +799,33 @@ bundle_judy() {
   else
     run_failed "Unable to fetch sources for libJudy."
     if [ -n "${NETDATA_BUILD_JUDY}" ]; then
+      [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for libJudy. dbengine support will be disabled."
     fi
   fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_judy
 
 # -----------------------------------------------------------------------------
-
 build_jsonc() {
-  local env_cmd=''
+  env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
-  pushd "${1}" > /dev/null || exit 1
+  cd "${1}" > /dev/null || exit 1
+  # shellcheck disable=SC2086
   run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
-  run ${env_cmd} make
-  popd > /dev/null || exit 1
+  # shellcheck disable=SC2086
+  run ${env_cmd} ${make} ${MAKEOPTS}
+  cd - > /dev/null || exit 1
 }
 
 copy_jsonc() {
@@ -831,6 +834,7 @@ copy_jsonc() {
   run mkdir -p "${target_dir}" "${target_dir}/json-c" || return 1
 
   run cp "${1}/libjson-c.a" "${target_dir}/libjson-c.a" || return 1
+  # shellcheck disable=SC2086
   run cp ${1}/*.h "${target_dir}/json-c" || return 1
 }
 
@@ -845,6 +849,8 @@ bundle_jsonc() {
     defer_error_highlighted "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
     return 0
   fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling JSON-C."
 
   progress "Prepare JSON-C"
 
@@ -865,30 +871,50 @@ bundle_jsonc() {
       run_ok "JSON-C built and prepared."
     else
       run_failed "Failed to build JSON-C."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        exit 1
-      else
-        defer_error_highlighted "Failed to build JSON-C. Netdata Cloud support will be disabled."
-      fi
+      defer_error_highlighted "Failed to build JSON-C. Netdata Cloud support will be disabled."
     fi
   else
     run_failed "Unable to fetch sources for JSON-C."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-      exit 1
-    else
-      defer_error_highlighted "Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled."
-    fi
+    defer_error_highlighted "Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled."
   fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_jsonc
 
 # -----------------------------------------------------------------------------
 
+get_kernel_version() {
+  r="$(uname -r | cut -f 1 -d '-')"
+
+  tmpfile="$(mktemp)"
+  echo "${r}" | tr '.' ' ' > "${tmpfile}"
+
+  read -r maj min patch _ < "${tmpfile}"
+
+  rm -f "${tmpfile}"
+
+  printf "%03d%03d%03d" "${maj}" "${min}" "${patch}"
+}
+
+rename_libbpf_packaging() {
+  if [ "$(get_kernel_version)" -ge "004014000" ]; then
+    cp packaging/current_libbpf.checksums packaging/libbpf.checksums
+    cp packaging/current_libbpf.version packaging/libbpf.version
+  else
+    cp packaging/libbpf_0_0_9.checksums packaging/libbpf.checksums
+    cp packaging/libbpf_0_0_9.version packaging/libbpf.version
+  fi
+}
+
+
 build_libbpf() {
-  pushd "${1}/src" > /dev/null || exit 1
-  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
-  popd > /dev/null || exit 1
+  cd "${1}/src" > /dev/null || exit 1
+  mkdir root build
+  # shellcheck disable=SC2086
+  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
+  cd - > /dev/null || exit 1
 }
 
 copy_libbpf() {
@@ -910,6 +936,10 @@ bundle_libbpf() {
   if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
   fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
+
+  rename_libbpf_packaging
 
   progress "Prepare libbpf"
 
@@ -944,6 +974,8 @@ bundle_libbpf() {
       defer_error_highlighted "Unable to fetch sources for libbpf. You may not be able to use eBPF plugin."
     fi
   fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_libbpf
@@ -964,17 +996,20 @@ fi
 if [ -d ./.git ] ; then
   echo >&2
   progress "Updating tags in git to ensure a consistent version number"
-  run git fetch <remote> 'refs/tags/*:refs/tags/*' || true
+  run git fetch -t || true
 fi
 
 # -----------------------------------------------------------------------------
 echo >&2
+
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Configuring Netdata."
 progress "Run autotools to configure the build environment"
 
 if [ "$have_autotools" ]; then
   run autoreconf -ivf || exit 1
 fi
 
+# shellcheck disable=SC2086
 run ./configure \
   --prefix="${NETDATA_PREFIX}/usr" \
   --sysconfdir="${NETDATA_PREFIX}/etc" \
@@ -987,10 +1022,14 @@ run ./configure \
   ${NETDATA_CONFIGURE_OPTIONS} \
   CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" || exit 1
 
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+
 # remove the build_error hook
 trap - EXIT
 
 # -----------------------------------------------------------------------------
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building Netdata."
+
 progress "Cleanup compilation directory"
 
 run $make clean
@@ -998,9 +1037,14 @@ run $make clean
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-run $make -j$(find_processors) || exit 1
+# shellcheck disable=SC2086
+run $make ${MAKEOPTS} || exit 1
+
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
 # -----------------------------------------------------------------------------
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Netdata."
+
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
 
 # migrate existing configuration files
@@ -1015,7 +1059,7 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
   # move the charts.d config files
   for x in apache ap cpu_apps cpufreq example exim hddtemp load_average mem_apps mysql nginx nut opensips phpfpm postfix sensors squid tomcat; do
     for y in "" ".old" ".orig"; do
-      if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" -a ! -f "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}" ]; then
+      if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ] && [ ! -f "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}" ]; then
         run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}"
       fi
     done
@@ -1028,7 +1072,7 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
   # move the node.d config files
   for x in named sma_webbox snmp; do
     for y in "" ".old" ".orig"; do
-      if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" -a ! -f "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}" ]; then
+      if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ] && [ ! -f "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}" ]; then
         run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}"
       fi
     done
@@ -1045,20 +1089,9 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 
   progress "Backup existing netdata configuration before installing it"
 
-  if [ "${BASH_VERSINFO[0]}" -ge "4" ]; then
-    declare -A configs_signatures=()
-    if [ -f "configs.signatures" ]; then
-      source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
-    fi
-  fi
-
   config_signature_matches() {
-    local md5="${1}" file="${2}"
-
-    if [ "${BASH_VERSINFO[0]}" -ge "4" ]; then
-      [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
-      return 1
-    fi
+    md5="${1}"
+    file="${2}"
 
     if [ -f "configs.signatures" ]; then
       grep "\['${md5}'\]='${file}'" "configs.signatures" > /dev/null
@@ -1069,18 +1102,18 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
   }
 
   # clean up stock config files from the user configuration directory
-  while IFS= read -r -d '' x; do
+  (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r  x; do
     if [ -f "${x}" ]; then
       # find it relative filename
-      f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
+      f=$("$x" | sed "${NETDATA_PREFIX}/etc/netdata/")
 
       # find the stock filename
-      t="${f/.conf.installer_backup.*/.conf}"
-      t="${t/.conf.old/.conf}"
-      t="${t/.conf.orig/.conf}"
-      t="${t/orig\//}"
+      t=$("${f}" | sed ".conf.installer_backup.*/.conf")
+      t=$("${t}" | sed ".conf.old/.conf")
+      t=$("${t}" | sed ".conf.orig/.conf")
+      t=$("${t}" | sed "orig//")
 
-      if [ -z "${md5sum}" -o ! -x "${md5sum}" ]; then
+      if [ -z "${md5sum}" ] || [ ! -x "${md5sum}" ]; then
         # we don't have md5sum - keep it
         echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED}is not known to distribution${TPUT_RESET}. Keeping it."
       else
@@ -1088,9 +1121,10 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
         md5="$(${md5sum} < "${x}" | cut -d ' ' -f 1)"
 
         if config_signature_matches "${md5}" "${t}"; then
-          # it is a stock version - remove it
+	  # it is a stock version - remove it
           echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
           run rm -f "${x}"
+	  # shellcheck disable=SC2030
           deleted_stock_configs=$((deleted_stock_configs + 1))
         else
           # edited by user - keep it
@@ -1098,7 +1132,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
         fi
       fi
     fi
-  done < <(find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \))
+  done
 fi
 touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 
@@ -1110,14 +1144,14 @@ run $make install || exit 1
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
 
-run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.timer -a \! -name \*.logrotate -exec chmod 755 {} \;
+run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.timer -a \! -name \*.logrotate -a \! -name \.install-type -exec chmod 755 {} \;
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
 
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
 NETDATA_ADDED_TO_GROUPS=""
-if [ "${UID}" -eq 0 ]; then
+if [ "$(id -u)" -eq 0 ]; then
   progress "Adding group 'netdata'"
   portable_add_group netdata || :
 
@@ -1147,7 +1181,9 @@ progress "Read installation options from netdata.conf"
 
 # function to extract values from the config file
 config_option() {
-  local section="${1}" key="${2}" value="${3}"
+  section="${1}"
+  key="${2}"
+  value="${3}"
 
   if [ -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
     "${NETDATA_PREFIX}/usr/sbin/netdata" \
@@ -1160,7 +1196,7 @@ config_option() {
 }
 
 # the user netdata will run as
-if [ "${UID}" = "0" ]; then
+if [ "$(id -u)" = "0" ]; then
   NETDATA_USER="$(config_option "global" "run as user" "netdata")"
   ROOT_USER="root"
 else
@@ -1174,7 +1210,7 @@ echo >&2 "Netdata user and group is finally set to: ${NETDATA_USER}/${NETDATA_GR
 # the owners of the web files
 NETDATA_WEB_USER="$(config_option "web" "web files owner" "${NETDATA_USER}")"
 NETDATA_WEB_GROUP="${NETDATA_GROUP}"
-if [ "${UID}" = "0" ] && [ "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]; then
+if [ "$(id -u)" = "0" ] && [ "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]; then
   NETDATA_WEB_GROUP="$(id -g -n "${NETDATA_WEB_USER}")"
   [ -z "${NETDATA_WEB_GROUP}" ] && NETDATA_WEB_GROUP="${NETDATA_WEB_USER}"
 fi
@@ -1230,6 +1266,7 @@ fi
 [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
 
 helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
+# shellcheck disable=SC2031
 [ ${deleted_stock_configs} -eq 0 ] && helplink=""
 for link in "orig" "${helplink}"; do
   if [ -n "${link}" ]; then
@@ -1274,7 +1311,7 @@ run chmod 770 "${NETDATA_CLAIMING_DIR}"
 
 # --- plugins ----
 
-if [ "${UID}" -eq 0 ]; then
+if [ "$(id -u)" -eq 0 ]; then
   # find the admin group
   admin_group=
   test -z "${admin_group}" && getent group root > /dev/null 2>&1 && admin_group="root"
@@ -1285,6 +1322,7 @@ if [ "${UID}" -eq 0 ]; then
   run chown -R "root:${admin_group}" "${NETDATA_PREFIX}/usr/libexec/netdata"
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
+  # shellcheck disable=SC2086
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chown :${NETDATA_GROUP} {} \;
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0750 {} \;
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
@@ -1317,29 +1355,29 @@ if [ "${UID}" -eq 0 ]; then
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin" ]; then
-    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin" ]; then
-    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
     run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
     run sh -c "setcap cap_perfmon+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin\" || setcap cap_sys_admin+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin\""
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin" ]; then
-    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
     run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
     run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping" ]; then
-    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin" ]; then
-    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
   fi
 
@@ -1360,6 +1398,8 @@ else
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 fi
 
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+
 # -----------------------------------------------------------------------------
 
 # govercomp compares go.d.plugin versions. Exit codes:
@@ -1367,6 +1407,8 @@ fi
 # 1 - version1 > version2
 # 2 - version2 > version1
 # 3 - error
+
+# shellcheck disable=SC2086
 govercomp() {
   # version in file:
   # - v0.14.0
@@ -1379,23 +1421,26 @@ govercomp() {
   # - go.d.plugin, version: v0.14.1-1-g4c5f98c-dirty
 
   # we need to compare only MAJOR.MINOR.PATCH part
-  local ver1 ver2
   ver1=$(echo "$1" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
   ver2=$(echo "$2" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
 
-  local IFS=.
-  read -ra ver1 <<< "$ver1"
-  read -ra ver2 <<< "$ver2"
-
-  if [ ${#ver1[@]} -eq 0 ] || [ ${#ver2[@]} -eq 0 ]; then
+  if [ ${#ver1} -eq 0 ] || [ ${#ver2} -eq 0 ]; then
     return 3
   fi
 
-  local i
-  for ((i = 0; i < ${#ver1[@]}; i++)); do
-    if [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
+  num1=$(echo $ver1 | grep -o -E '\.' | wc -l)
+  num2=$(echo $ver2 | grep -o -E '\.' | wc -l)
+
+  if [ ${num1} -ne ${num2} ]; then
+          return 3
+  fi
+
+  for i in $(seq 1 $((num1+1))); do
+          x=$(echo $ver1 | cut -d'.' -f$i)
+          y=$(echo $ver2 | cut -d'.' -f$i)
+    if [ "${x}" -gt "${y}" ]; then
       return 1
-    elif [ "${ver2[i]}" -gt "${ver1[i]}" ]; then
+    elif [ "${y}" -gt "${x}" ]; then
       return 2
     fi
   done
@@ -1407,9 +1452,6 @@ should_install_go() {
   if [ -n "${NETDATA_DISABLE_GO+x}" ]; then
     return 1
   fi
-
-  local version_in_file
-  local binary_version
 
   version_in_file="$(cat packaging/go.d.version 2> /dev/null)"
   binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2> /dev/null)
@@ -1427,24 +1469,26 @@ install_go() {
     return 0
   fi
 
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing go.d.plugin."
+
   # When updating this value, ensure correct checksums in packaging/go.d.checksums
   GO_PACKAGE_VERSION="$(cat packaging/go.d.version)"
-  ARCH_MAP=(
-    'i386::386'
-    'i686::386'
-    'x86_64::amd64'
-    'aarch64::arm64'
-    'armv64::arm64'
-    'armv6l::arm'
-    'armv7l::arm'
-    'armv5tel::arm'
-  )
+  ARCH_MAP='
+    i386::386
+    i686::386
+    x86_64::amd64
+    aarch64::arm64
+    armv64::arm64
+    armv6l::arm
+    armv7l::arm
+    armv5tel::arm
+  '
 
   progress "Install go.d.plugin"
   ARCH=$(uname -m)
   OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-  for index in "${ARCH_MAP[@]}"; do
+  for index in ${ARCH_MAP}; do
     KEY="${index%%::*}"
     VALUE="${index##*::}"
     if [ "$KEY" = "$ARCH" ]; then
@@ -1474,6 +1518,7 @@ install_go() {
     defer_error "go.d plugin download failed, go.d plugin will not be available"
     echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
     echo >&2
+    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
     return 0
   fi
 
@@ -1489,6 +1534,7 @@ install_go() {
 
     run_failed "go.d.plugin package files checksum validation failed."
     defer_error "go.d.plugin package files checksum validation failed, go.d.plugin will not be available"
+    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
     return 0
   fi
 
@@ -1498,38 +1544,18 @@ install_go() {
   run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
   run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
-  run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
-  run mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-  if [ "${UID}" -eq 0 ]; then
+  run tar -xf "${tmp}/${GO_PACKAGE_BASENAME}"
+  run mv "${GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  if [ "$(id -u)" -eq 0 ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   fi
   run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   rm -rf "${tmp}"
-  return 0
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 install_go
-
-function get_kernel_version() {
-  r="$(uname -r | cut -f 1 -d '-')"
-
-  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
-
-  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
-}
-
-function get_rh_version() {
-  if [ ! -f /etc/redhat-release ]; then
-    printf "000000000"
-    return
-  fi
-
-  r="$(cut -f 4 -d ' ' < /etc/redhat-release)"
-
-  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
-
-  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
-}
 
 detect_libc() {
   libc=
@@ -1557,9 +1583,9 @@ should_install_ebpf() {
     return 1
   fi
 
-  if [ "$(uname -s)" != "Linux" ]; then
-    run_failed "Currently eBPF is only supported on Linux."
-    defer_error "Currently eBPF is only supported on Linux."
+  if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
+    run_failed "Currently eBPF is only supported on Linux on X86_64."
+    defer_error "Currently eBPF is only supported on Linux on X86_64."
     return 1
   fi
 
@@ -1587,7 +1613,7 @@ remove_old_ebpf() {
     mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.d.conf"
   fi
 
-  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
+  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
     echo >&2 "Removing old eBPF programs with patch."
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
@@ -1606,12 +1632,20 @@ remove_old_ebpf() {
     echo >&2 "Removing old ebpf_kernel_reject_list.txt."
     rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt"
   fi
+
+  # Remove old reset script
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh" ]; then
+    echo >&2 "Removing old reset_netdata_trace.sh."
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh"
+  fi
 }
 
 install_ebpf() {
   if ! should_install_ebpf; then
     return 0
   fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing eBPF code."
 
   remove_old_ebpf
 
@@ -1633,6 +1667,8 @@ install_ebpf() {
     run_failed "Failed to download eBPF collector package"
     echo 2>&" Removing temporary directory ${tmp} ..."
     rm -rf "${tmp}"
+
+    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
     return 1
   fi
 
@@ -1647,6 +1683,8 @@ install_ebpf() {
     RET=$?
     if [ "${RET}" != "0" ]; then
       rm -rf "${tmp}"
+
+      [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
       return 1
     fi
   fi
@@ -1655,7 +1693,7 @@ install_ebpf() {
 
   rm -rf "${tmp}"
 
-  return 0
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 progress "eBPF Kernel Collector"
@@ -1663,10 +1701,6 @@ install_ebpf
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
-
-if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
-  NETDATA_DISABLE_TELEMETRY=1
-fi
 
 # Opt-out from telemetry program
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
@@ -1693,7 +1727,7 @@ if grep -q docker /proc/1/cgroup > /dev/null 2>&1; then
     is_systemd_running="$( (pgrep -q -f systemd && echo "1") || echo "NO")"
   fi
 
-  if [ "${is_systemd_running}" == "1" ]; then
+  if [ "${is_systemd_running}" = "1" ]; then
     echo >&2 "Found systemd within the docker container, running install_netdata_service() method"
     install_netdata_service || run_failed "Cannot install netdata init service."
   else
@@ -1791,7 +1825,7 @@ if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
   # -----------------------------------------------------------------------------
   progress "Check apps.plugin"
 
-  if [ "${UID}" -ne 0 ]; then
+  if [ "$(id -u)" -ne 0 ]; then
     cat << SETUID_WARNING
 
 ${TPUT_BOLD}apps.plugin needs privileges${TPUT_RESET}
@@ -1826,8 +1860,8 @@ if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-uninstaller.sh ]; then
   rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-uninstaller.sh
 fi
 
-sed "s|ENVIRONMENT_FILE=\"/etc/netdata/.environment\"|ENVIRONMENT_FILE=\"${NETDATA_PREFIX}/etc/netdata/.environment\"|" packaging/installer/netdata-uninstaller.sh > ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh
-chmod 750 ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh
+sed "s|ENVIRONMENT_FILE=\"/etc/netdata/.environment\"|ENVIRONMENT_FILE=\"${NETDATA_PREFIX}/etc/netdata/.environment\"|" packaging/installer/netdata-uninstaller.sh > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh"
+chmod 750 "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh"
 
 # -----------------------------------------------------------------------------
 progress "Basic netdata instructions"
@@ -1858,7 +1892,7 @@ install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
 progress "Check if we must enable/disable the netdata updater tool"
 if [ "${AUTOUPDATE}" = "1" ]; then
-  enable_netdata_updater ${AUTO_UPDATE_TYPE} || run_failed "Cannot enable netdata updater tool"
+  enable_netdata_updater "${AUTO_UPDATE_TYPE}" || run_failed "Cannot enable netdata updater tool"
 else
   disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
 fi
@@ -1873,11 +1907,12 @@ cat << EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
 LDFLAGS="${LDFLAGS}"
+MAKEOPTS="${MAKEOPTS}"
 NETDATA_TMPDIR="${TMPDIR}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
-INSTALL_UID="${UID}"
+INSTALL_UID="$(id -u)"
 NETDATA_GROUP="${NETDATA_GROUP}"
 REINSTALL_OPTIONS="${REINSTALL_OPTIONS}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
@@ -1898,9 +1933,11 @@ echo >&2
 progress "We are done!"
 
 if [ ${started} -eq 1 ]; then
-  netdata_banner "is installed and running now!"
+  netdata_banner
+  progress "is installed and running now!"
 else
-  netdata_banner "is installed now!"
+  netdata_banner
+  progress "is installed now!"
 fi
 
 echo >&2 "  enjoy real-time performance and health monitoring..."

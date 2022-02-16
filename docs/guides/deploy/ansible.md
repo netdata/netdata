@@ -7,11 +7,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/depl
 
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](https://learn.netdata.cloud/docs/get) is zero-configuration, highly adaptable, and
-compatible with tons of different operating systems and Linux distributions. You can use it on bare metal, VMs,
-containers, and everything in-between.
+Netdata's [one-line kickstart](/docs/get-started.mdx) is zero-configuration, highly adaptable, and compatible with tons
+of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
+in-between.
 
-But what if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible. What if you need to
+But what if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible? What if you need to
 deploy Netdata across an entire infrastructure with many nodes? What if you want to make this deployment reliable,
 repeatable, and idempotent? What if you want to write and deploy your infrastructure or cloud monitoring system like
 code?
@@ -22,7 +22,7 @@ those operations over standard and secure SSH connections. There's no agent to i
 have to worry about is your application and your monitoring software. 
 
 Ansible has some competition from the likes of [Puppet](https://puppet.com/) or [Chef](https://www.chef.io/), but the
-most valuable feature about Ansible is that every is **idempotent**. From the [Ansible
+most valuable feature about Ansible is **idempotent**. From the [Ansible
 glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
 > An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
@@ -33,7 +33,7 @@ operate. When you deploy Netdata with Ansible, you're also deploying _monitoring
 
 In this guide, we'll walk through the process of using an [Ansible
 playbook](https://github.com/netdata/community/tree/main/netdata-agent-deployment/ansible-quickstart) to automatically
-deploy the Netdata Agent to any number of distributed nodes, manage the configuration of each node, and claim them to
+deploy the Netdata Agent to any number of distributed nodes, manage the configuration of each node, and connect them to
 your Netdata Cloud account. You'll go from some unmonitored nodes to a infrastructure monitoring solution in a matter of
 minutes.
 
@@ -98,7 +98,7 @@ two different SSH keys supplied by AWS.
 
 ### Edit the `vars/main.yml` file
 
-In order to claim your node(s) to your Space in Netdata Cloud, and see all their metrics in real-time in [composite
+In order to connect your node(s) to your Space in Netdata Cloud, and see all their metrics in real-time in [composite
 charts](/docs/visualize/overview-infrastructure.md) or perform [Metric
 Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations), you need to set the `claim_token`
 and `claim_room` variables.
@@ -120,7 +120,7 @@ claim_rooms: XXXXX
 Change the `dbengine_multihost_disk_space` if you want to change the metrics retention policy by allocating more or less
 disk space for storing metrics. The default is 2048 Mib, or 2 GiB. 
 
-Because we're claiming this node to Netdata Cloud, and will view its dashboards there instead of via the IP address or
+Because we're connecting this node to Netdata Cloud, and will view its dashboards there instead of via the IP address or
 hostname of the node, the playbook disables that local dashboard by setting `web_mode` to `none`. This gives a small
 security boost by not allowing any unwanted access to the local dashboard.
 
@@ -147,7 +147,7 @@ Next, Ansible makes changes to each node according to the `tasks` defined in the
 [returns](https://docs.ansible.com/ansible/latest/reference_appendices/common_return_values.html#changed) whether each
 task results in a changed, failure, or was skipped entirely.
 
-The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the claiming
+The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
 
 ## What's next?

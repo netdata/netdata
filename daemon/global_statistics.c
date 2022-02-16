@@ -157,7 +157,7 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
-        __atomic_compare_exchange(&global_statistics.web_usec_max, &gs->web_usec_max, &n, 1, __ATOMIC_SEQ_CST,
+        __atomic_compare_exchange(&global_statistics.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_SEQ_CST,
                                   __ATOMIC_SEQ_CST);
     }
 #else
@@ -172,7 +172,7 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
 #endif
 }
 
-void global_statistics_charts(void) {
+static void global_statistics_charts(void) {
     static unsigned long long old_web_requests = 0,
                               old_web_usec = 0,
                               old_content_size = 0,

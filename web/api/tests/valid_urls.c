@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../../libnetdata/libnetdata.h"
-#include "../../../libnetdata/required_dummies.h"
-#include "../../../database/rrd.h"
-#include "../../../web/server/web_client.h"
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
+#include "database/rrd.h"
+#include "web/server/web_client.h"
 #include <setjmp.h>
 #include <cmocka.h>
 #include <stdbool.h>
@@ -410,7 +410,7 @@ static void empty_url(void **state)
 }
 
 /* If the %-escape is being performed at the correct time then the url should not be treated as a query, but instead
-   as a path "/api/v1/info?blah?" which should despatch into the API with the given values.
+   as a path "/api/v1/info?blah?" which should dispatch into the API with the given values.
 */
 static void not_a_query(void **state)
 {

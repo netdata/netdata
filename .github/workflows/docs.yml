@@ -9,6 +9,8 @@ on:
   pull_request:
     paths:
       - '**.md'
+env:
+  DISABLE_TELEMETRY: 1
 jobs:
   markdown-link-check:
     name: Broken Links

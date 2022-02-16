@@ -15,32 +15,62 @@ on:
       version:
         name: Package version
         required: false
+env:
+  DISABLE_TELEMETRY: 1
+concurrency:
+  group: packages-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 jobs:
+  matrix:
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        shell: python3 {0}
+        run: |
+          from ruamel.yaml import YAML
+          import json
+          yaml = YAML(typ='safe')
+          entries = list()
+
+          with open('.github/data/distros.yml') as f:
+              data = yaml.load(f)
+
+          for i, v in enumerate(data['include']):
+              if 'packages' in data['include'][i]:
+                  for arch in data['include'][i]['packages']['arches']:
+                      entries.append({
+                          'distro': data['include'][i]['distro'],
+                          'version': data['include'][i]['version'],
+                          'pkgclouddistro': data['include'][i]['packages']['repo_distro'],
+                          'format': data['include'][i]['packages']['type'],
+                          'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
+                          'platform': data['platform_map'][arch],
+                          'arch': arch
+                      })
+
+          entries.sort(key=lambda k: (k['arch'], k['distro'], k['version']))
+          matrix = json.dumps({'include': entries}, sort_keys=True)
+          print('Generated Matrix: ' + matrix)
+          print('::set-output name=matrix::' + matrix)
+
   build:
     name: Build
     runs-on: ubuntu-latest
     env:
       DOCKER_CLI_EXPERIMENTAL: enabled
+    needs:
+      - matrix
     strategy:
-      matrix:
-        include:
-          - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
-          - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/i386, arch: i386}
-          - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
-          - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/i386, arch: i386}
-          - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
-          - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
-          - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "20.10", pkgclouddistro: ubuntu/groovy, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: centos, version: "7", pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
-          - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
-          - {distro: fedora, version: "32", pkgclouddistro: fedora/32, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
-          - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
-          - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
-          - {distro: opensuse, version: "15.2", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
       # We intentiaonally disable the fail-fast behavior so that a
       # build failure for one version doesn't prevent us from publishing
       # successfully built and tested packages for another version.
@@ -52,14 +82,14 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0 # We need full history for versioning
-          submodules: true
+          submodules: recursive
       - name: Checkout Tag # Otherwise check out the tag that triggered this.
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v2
         with:
           ref: ${{ github.event.ref }}
           fetch-depth: 0 # We need full history for versioning
-          submodules: true
+          submodules: recursive
       - name: Check Base Branch
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
@@ -86,35 +116,44 @@ jobs:
             echo "pkg_version=$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')" >> $GITHUB_ENV
           fi
       - name: Setup QEMU
-        if: matrix.platform != 'linux/amd64'
+        if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386'
         uses: docker/setup-qemu-action@v1
-      - name: Setup Buildx
-        uses: docker/setup-buildx-action@v1
       - name: Prepare Docker Environment
         shell: bash
         run: |
           echo '{"cgroup-parent": "/actions_job", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
           sudo service docker restart
-      - name: Build Packages
-        uses: docker/build-push-action@v2
-        with:
-          platforms: ${{ matrix.platform }}
-          file: packaging/Dockerfile.packager
-          tags: local/package-builder:${{ matrix.distro}}${{ matrix.version }}
-          push: false
-          load: true
-          build-args: |
-            ARCH=${{ matrix.arch }}
-            DISTRO=${{ matrix.distro }}
-            TEST_BASE=${{ matrix.base_image }}
-            DISTRO_VERSION=${{ matrix.version }}
-            PKG_VERSION=${{ env.pkg_version }}
-      - name: Extract Packages
+      - name: Set Base Image Version
         shell: bash
         run: |
-          mkdir -p artifacts
-          docker run --platform ${{ matrix.platform }} -v $PWD/artifacts:/artifacts local/package-builder:${{ matrix.distro }}${{ matrix.version }}
-      - name: Upload
+          if [ -z "${{ matrix.alias }}" ] ; then
+            echo "version=${{ matrix.version }}" >> $GITHUB_ENV
+          else
+            echo "version=${{ matrix.alias }}" >> $GITHUB_ENV
+          fi
+      - name: Fetch base image
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 900
+          command: |
+            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ env.version }}
+            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+      - name: Build Packages
+        shell: bash
+        run: |
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ env.pkg_version }} --platform=${{ matrix.platform }} -v $PWD:/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+      - name: Test Packages
+        shell: bash
+        run: |
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} -e VERSION=${{ env.pkg_version }} -e DISTRO_VERSION=${{ env.version }} --platform=${{ matrix.platform }} -v $PWD:/netdata ${{ matrix.base_image }}:${{ env.version }} /netdata/.github/scripts/pkg-test.sh
+      - name: Save Packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
+          path: ${{ github.workspace }}/artifacts/*
+      - name: Upload to PackageCloud
         if: github.event_name == 'workflow_dispatch'
         shell: bash
         env:
@@ -122,7 +161,7 @@ jobs:
         run: |
           echo "Packages to upload:\n$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank ${{ env.repo }}/${{ matrix.pkgclouddistro }} ${pkgfile} || true
+            .github/scripts/package_cloud_wrapper.sh yank ${{ env.repo }}/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
             .github/scripts/package_cloud_wrapper.sh push ${{ env.repo }}/${{ matrix.pkgclouddistro }} ${pkgfile}
           done
       - name: Clean
@@ -137,7 +176,6 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Package Build failed:'
           SLACK_USERNAME: 'GitHub Actions'

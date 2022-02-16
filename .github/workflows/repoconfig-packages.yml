@@ -1,0 +1,116 @@
+---
+# Handles building of binary packages for the agent.
+name: Repository Packages
+on:
+  workflow_dispatch: null
+  pull_request:
+    paths:
+      - packaging/repoconfig/**
+      - .github/workflows/repoconfig-packages.yml
+  push:
+    branches:
+      - master
+    paths:
+      - packaging/repoconfig/**
+      - .github/workflows/repoconfig-packages.yml
+env:
+  DISABLE_TELEMETRY: 1
+jobs:
+  matrix:
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        shell: python3 {0}
+        run: |
+          from ruamel.yaml import YAML
+          import json
+          yaml = YAML(typ='safe')
+          entries = list()
+
+          with open('.github/data/distros.yml') as f:
+              data = yaml.load(f)
+
+          for i, v in enumerate(data['include']):
+              if 'packages' in data['include'][i]:
+                  entries.append({
+                      'distro': data['include'][i]['distro'],
+                      'version': data['include'][i]['version'],
+                      'pkgclouddistro': data['include'][i]['packages']['repo_distro'],
+                      'format': data['include'][i]['packages']['type'],
+                      'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
+                      'platform': data['platform_map']['amd64'],
+                      'arch': 'amd64'
+                  })
+
+          entries.sort(key=lambda k: (k['arch'], k['distro'], k['version']))
+          matrix = json.dumps({'include': entries}, sort_keys=True)
+          print('Generated Matrix: ' + matrix)
+          print('::set-output name=matrix::' + matrix)
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      DISABLE_TELEMETRY: 1
+      DOCKER_CLI_EXPERIMENTAL: enabled
+    needs:
+      - matrix
+    strategy:
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+      # We intentiaonally disable the fail-fast behavior so that a
+      # build failure for one version doesn't prevent us from publishing
+      # successfully built and tested packages for another version.
+      fail-fast: false
+      max-parallel: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        # Unlike normally, we do not need a deep clone or submodules for this.
+      - name: Fetch base image
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 900
+          command: docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
+      - name: Build Packages
+        shell: bash
+        run: |
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --platform ${{ matrix.platform }} \
+              -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
+              /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
+      - name: Upload Packages
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
+        run: |
+          echo "Packages to upload:\n$(ls artifacts/*.${{ matrix.format }})"
+          for pkgfile in artifacts/*.${{ matrix.format }} ; do
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} ${pkgfile}
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} ${pkgfile}
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} ${pkgfile}
+          done
+      - name: Failure Notification
+        if: ${{ failure() }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Repository Package Build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "${{ matrix.pkgclouddistro }} ${{ matrix.version }} repository package build failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

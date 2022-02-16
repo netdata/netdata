@@ -4,6 +4,7 @@ description: "Monitor Pi-hole metrics, plus Raspberry Pi system metrics, in minu
 image: /img/seo/guides/monitor/netdata-pi-hole-raspberry-pi.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/pi-hole-raspberry-pi.md
 -->
+import { OneLineInstallWget } from '../../src/components/OneLineInstall/'
 
 # Monitor Pi-hole (and a Raspberry Pi) with Netdata
 
@@ -52,9 +53,7 @@ possible historic data.
 On Raspberry Pis running Raspbian, the best way to install Netdata is our one-line kickstart script. This script asks
 you to install dependencies, then compiles Netdata from source via [GitHub](https://github.com/netdata/netdata).
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+<OneLineInstallWget/>
 
 Once installed on a Raspberry Pi 4 with no accessories, Netdata starts collecting roughly 1,500 metrics every second and
 populates its dashboard with more than 250 charts.
@@ -100,7 +99,7 @@ part of your system might affect another.
 action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
 If you're completely new to Netdata, look at our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for a
-walkthrough of all its features. For a more expedited tour, see the [get started guide](/docs/getting-started.md).
+walkthrough of all its features. For a more expedited tour, see the [get started guide](/docs/get-started.mdx).
 
 ### Enable temperature sensor monitoring
 
@@ -137,7 +136,7 @@ more than 256.
 ```
 
 Use our [database sizing
-calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 and [guide on storing historical metrics](/docs/guides/longer-metrics-storage.md) to help you determine the right
 setting for your Raspberry Pi.
 
