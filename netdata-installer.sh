@@ -345,15 +345,20 @@ while [ -n "${1}" ]; do
     "--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-nfacct)}" | sed 's/$/ --disable-plugin-nfacct/g')" ;;
     "--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-xenstat)}" | sed 's/$/ --enable-plugin-xenstat/g')" ;;
     "--disable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-xenstat)}" | sed 's/$/ --disable-plugin-xenstat/g')" ;;
-    "--enable-exporting-kinesis") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-kinesis)}" | sed 's/$/ --enable-exporting-kinesis/g')" ;;
-    "--disable-exporting-kinesis") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-kinesis)}" | sed 's/$/ --disable-exporting-kinesis/g')" ;;
-    "--enable-exporting-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-prometheus-remote-write)}" | sed 's/$/ --enable-exporting-prometheus-remote-write/g')" ;;
-    "--disable-exporting-prometheus-remote-write")
+    "--enable-exporting-kinesis" | "--enable-backend-kinesis")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-kinesis)}" | sed 's/$/ --enable-exporting-kinesis/g')" ;;
+    "--disable-exporting-kinesis" | "--disable-backend-kinesis")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-kinesis)}" | sed 's/$/ --disable-exporting-kinesis/g')" ;;
+    "--enable-exporting-prometheus-remote-write" | "--enable-backend-prometheus-remote-write")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-prometheus-remote-write)}" | sed 's/$/ --enable-exporting-prometheus-remote-write/g')" ;;
+    "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write")
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-prometheus-remote-write)}" | sed 's/$/ --disable-exporting-prometheus-remote-write/g')"
       NETDATA_DISABLE_PROMETHEUS=1
       ;;
-    "--enable-exporting-mongodb") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-mongodb)}" | sed 's/$/ --enable-exporting-mongodb/g')" ;;
-    "--disable-exporting-mongodb") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-mongodb)}" | sed 's/$/ --disable-exporting-mongodb/g')" ;;
+    "--enable-exporting-mongodb" | "--enable-backend-mongodb")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-mongodb)}" | sed 's/$/ --enable-exporting-mongodb/g')" ;;
+    "--disable-exporting-mongodb" | "--disable-backend-mongodb")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-mongodb)}" | sed 's/$/ --disable-exporting-mongodb/g')" ;;
     "--enable-exporting-pubsub") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-pubsub)}" | sed  's/$/ --enable-exporting-pubsub/g')" ;;
     "--disable-exporting-pubsub") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-pubsub)}" | sed 's/$/ --disable-exporting-pubsub/g')" ;;
     "--enable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-lto)}" | sed 's/$/ --enable-lto/g')" ;;
