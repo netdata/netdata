@@ -19,7 +19,7 @@ This config file **is not needed by default**. Netdata works fine out of the box
     settings.
 4.  `[health]` to [configure](#health-section-options) general settings for [health monitoring](/health/README.md)
 5.  `[registry]` for the [Netdata registry](/registry/README.md).
-6.  `[backend]` to set up [streaming and replication](/streaming/README.md) options.
+6.  `[backend]` the backends subsystem was removed in 1.34.0. Use the [exporting engine](/exporting/README.md).
 7.  `[statsd]` for the general settings of the [stats.d.plugin](/collectors/statsd.plugin/README.md).
 8.  `[plugin:NAME]` sections for each collector plugin, under the comment [Per plugin configuration](#per-plugin-configuration).
 9.  `[CHART_NAME]` sections for each chart defined, under the comment [Per chart configuration](#per-chart-configuration).
@@ -131,7 +131,7 @@ To understand what this section is and how it should be configured, please refer
 
 ### [backend]
 
-Refer to the [streaming and replication](/streaming/README.md) documentation.
+The backends subsystem was removed in 1.34.0. Use the [exporting engine](/exporting/README.md) instead.
 
 ## Per-plugin configuration
 

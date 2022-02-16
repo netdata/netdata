@@ -93,12 +93,11 @@ The `netdata-updater.sh` script will update your Agent.
 | `--disable-plugin-nfacct` | Disable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available|
 | `--enable-plugin-xenstat` | Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available|
 | `--disable-plugin-xenstat` | Disable the xenstat plugin|
-| `--enable-backend-kinesis` | Enable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|                           
-| `--disable-backend-kinesis` | Disable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|
-| `--enable-backend-prometheus-remote-write` | Enable Prometheus remote write backend. Default: enable it when libprotobuf and libsnappy are available|
-| `--disable-backend-prometheus-remote-write` | Disable Prometheus remote write backend. Default: enable it when libprotobuf and libsnappy are available|
-| `--enable-backend-mongodb` | Enable MongoDB backend. Default: enable it when libmongoc is available|
-| `--disable-backend-mongodb` | Disable MongoDB backend|
+| `--disable-exporting-kinesis` | Disable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|
+| `--enable-exporting-prometheus-remote-write` | Enable Prometheus remote write exporting connector. Default: enable it when libprotobuf and libsnappy are available|
+| `--disable-exporting-prometheus-remote-write` | Disable Prometheus remote write exporting connector. Default: enable it when libprotobuf and libsnappy are available|
+| `--enable-exporting-mongodb` | Enable MongoDB exporting connector. Default: enable it when libmongoc is available|
+| `--disable-exporting-mongodb` | Disable MongoDB exporting connector|
 | `--enable-lto` | Enable Link-Time-Optimization. Default: enabled|
 | `--disable-lto` | Disable Link-Time-Optimization. Default: enabled|
 | `--disable-x86-sse` | Disable SSE instructions. By default SSE optimizations are enabled|

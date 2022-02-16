@@ -40,10 +40,8 @@ our [collectors' configuration reference](/collectors/REFERENCE.md).
 **[Dashboards](/web/README.md)**: Visualize your newly-collect metrics in real-time using Netdata's [built-in
 dashboard](/web/gui/README.md). 
 
-**[Backends](/backends/README.md)**: Extend our built-in [database engine](/database/engine/README.md), which supports
-long-term metrics storage, by archiving metrics to like Graphite, Prometheus, MongoDB, TimescaleDB, and more.
-
-**[Exporting](/exporting/README.md)**: An experimental refactoring of our backends system with a modular system and
-support for exporting metrics to multiple systems simultaneously.
+**[Exporting](/exporting/README.md)**: Extend our built-in [database engine](/database/engine/README.md), which supports
+long-term metrics storage, by archiving metrics to external databases like Graphite, Prometheus, MongoDB, TimescaleDB, and more.
+It can export metrics to multiple databases simultaneously.
 
 

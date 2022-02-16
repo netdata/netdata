@@ -13,5 +13,4 @@ Also, they are super fast in printing and appending data to the string and its `
 is just a lookup (it does not traverse the string).
 
 Netdata uses `BUFFER`s for preparing web responses and buffering data to be sent upstream or
-to backend databases.
-
+to external databases.
