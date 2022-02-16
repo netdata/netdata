@@ -545,12 +545,12 @@ uninstall() {
 
   if [ -f "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" ]; then
     echo "Found existing netdata-uninstaller. Runing it.."
-    ${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh $FLAGS
+    ${ROOTCMD} "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" $FLAGS
   else
     echo "Downloading netdata-uninstaller ..."
-    wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh -O /tmp/netdata-uninstaller.sh
-    chmod +x /tmp/netdata-uninstaller.sh
-    /tmp/netdata-uninstaller.sh $FLAGS
+    wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh -O "${tmpdir}/netdata-uninstaller.sh"
+    chmod +x "${tmpdir}/netdata-uninstaller.sh"
+    ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS
   fi
 }
 
@@ -1346,17 +1346,6 @@ install_on_freebsd() {
 # ======================================================================
 # Main program
 
-while [ -n "${1}" ]; do
-  case "${1}" in
-    "--uninstall")
-      uninstall
-      trap - EXIT
-      exit 0
-      ;;
-  esac
-  shift 1
-done
-
 setup_terminal || echo > /dev/null
 
 while [ -n "${1}" ]; do
@@ -1395,6 +1384,9 @@ while [ -n "${1}" ]; do
     "--install")
       INSTALL_PREFIX="${2}"
       shift 1
+      ;;
+    "--uninstall")
+      ACTION="uninstall"
       ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1
@@ -1453,6 +1445,12 @@ check_claim_opts
 confirm_root_support
 get_system_info
 confirm_install_prefix
+
+if [ "${ACTION}" = "uninstall" ]; then
+  uninstall
+  trap - EXIT
+  exit 0
+fi
 
 tmpdir="$(create_tmp_directory)"
 progress "Using ${tmpdir} as a temporary directory."

@@ -21,6 +21,7 @@ where:
 
 FILE_REMOVAL_STATUS=0
 ENVIRONMENT_FILE="/etc/netdata/.environment"
+# shellcheck disable=SC2034
 INTERACTIVITY="-i"
 YES=0
 while :; do
@@ -65,21 +66,46 @@ if [ "$(id -u)" -ne 0 ]; then
   fi
 fi
 
+user_input() {
+  TEXT="$1 [y/n]"
+
+  while true; do
+    echo "$TEXT"
+    read -r yn
+
+    case "$yn" in
+       [Yy]*) return 0;;
+       [Nn]*) return 1;;
+       *) echo "Please answer yes or no.";;
+     esac
+   done
+}
+
 if [ -x "$(command -v apt-get)" ]; then
   if dpkg -s netdata > /dev/null; then
-    echo "Found netdata native installation. Removing it."
-    apt-get remove netdata ${FLAG}
+    echo "Found netdata native installation"
+    if user_input "Do you want to remove netdata? "; then
+      apt-get remove netdata ${FLAG}
+    fi
+
     if dpkg -s netdata-repo-edge > /dev/null; then
-      apt-get remove netdata-repo-edge ${FLAG}
+      if user_input "Do you want to remove netdata-repo-edge? "; then
+        apt-get remove netdata-repo-edge ${FLAG}
+      fi
     fi
     exit 0
   fi
 elif [ -x "$(command -v dnf)" ]; then
   if rpm -q netdata > /dev/null; then
-    echo "Found netdata native installation. Removing it."
-    dnf remove netdata ${FLAG}
+    echo "Found netdata native installation."
+    if user_input "Do you want to remove netdata? "; then
+      dnf remove netdata ${FLAG}
+    fi
+
     if rpm -q netdata-repo-edge > /dev/null; then
-      dnf remove netdata-repo-edge ${FLAG}
+      if user_input "Do you want to remove netdata-repo-edge? "; then
+        dnf remove netdata-repo-edge ${FLAG}
+      fi
     fi
     exit 0
   fi
@@ -324,30 +350,21 @@ quit_msg() {
   fi
 }
 
-user_input() {
-  TEXT="$1"
-  echo "$TEXT"
-
-  read -r REPLY
-  if [ "$REPLY" != '' ]; then
-    echo "Exit uninstaller"
-    exit 1
-  fi
-}
-
 rm_file() {
   FILE="$1"
   if [ -f "${FILE}" ]; then
-    user_input "Press ENTER to delete file '$FILE' > "
-    run rm -v "${FILE}"
+    if user_input "Do you want to delete this file '$FILE' ? "; then
+      run rm -v "${FILE}"
+    fi
   fi
 }
 
 rm_dir() {
   DIR="$1"
   if [ -n "$DIR" ] && [ -d "$DIR" ]; then
-    user_input "Press ENTER to recursively delete directory '$DIR' > "
-    run rm -v -f -R "${DIR}"
+    if user_input "Do you want to delete this directory '$DIR' ? "; then
+      run rm -v -f -R "${DIR}"
+    fi
   fi
 }
 
@@ -477,7 +494,7 @@ stop_all_netdata() {
 trap quit_msg EXIT
 
 detect_existing_install() {
-
+  # shellcheck disable=SC2154
   ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
 
   if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
@@ -498,6 +515,7 @@ detect_existing_install() {
 
 #shellcheck source=/dev/null
 detect_existing_install
+# shellcheck disable=SC1090
 . "${INSTALL_PREFIX}${ENVIRONMENT_FILE}" || exit 1
 
 #### STOP NETDATA
@@ -540,16 +558,19 @@ FILE_REMOVAL_STATUS=1
 
 #### REMOVE NETDATA USER FROM ADDED GROUPS
 if [ -n "$NETDATA_ADDED_TO_GROUPS" ]; then
-  user_input "Press ENTER to delete 'netdata' from following groups: '$NETDATA_ADDED_TO_GROUPS' > "
-  for group in $NETDATA_ADDED_TO_GROUPS; do
-    portable_del_user_from_group "${group}" "netdata"
-  done
+  if user_input "Do you want to delete 'netdata' from following groups: '$NETDATA_ADDED_TO_GROUPS' ? "; then
+    for group in $NETDATA_ADDED_TO_GROUPS; do
+      portable_del_user_from_group "${group}" "netdata"
+    done
+  fi
 fi
 
 #### REMOVE USER
-user_input "Press ENTER to delete 'netdata' system user > "
-portable_del_user "netdata" || :
+if user_input "Do you want to delete 'netdata' system user ? "; then
+  portable_del_user "netdata" || :
+fi
 
 ### REMOVE GROUP
-user_input "Press ENTER to delete 'netdata' system group > "
-portable_del_group "netdata" || :
+if user_input "Do you want to delete 'netdata' system group ? "; then
+  portable_del_group "netdata" || :
+fi
