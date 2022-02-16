@@ -692,9 +692,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                            if (web_client_streaming_rate_t < 15) web_client_streaming_rate_t = (long int)children_in_flight/30;
                    }
                 }
-		
-                info ("[%s]: children in flight rate [%ld] - [%f] ([%d]) / ([%ld] - [%ld]) - Consumed [%f]", hostname, web_client_streaming_rate_t, children_in_flight_rate, children_in_flight, (long)now, (long)last_stream_check_t, children_consumed_rate);
-
             }
         }
     }
