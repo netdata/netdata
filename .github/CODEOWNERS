@@ -8,11 +8,6 @@
 .travis/ @Ferroin @iigorkarpov @maneamarius @kaskavel
 .github/ @Ferroin @iigorkarpov @maneamarius @kaskavel
 aclk/ @stelfrag @underhood
-backends/ @thiagoftsm @vlvkobal
-backends/graphite/ @thiagoftsm @vlvkobal
-backends/json/ @thiagoftsm @vlvkobal
-backends/opentsdb/ @thiagoftsm @vlvkobal
-backends/prometheus/ @vlvkobal @thiagoftsm
 build/ @Ferroin @iigorkarpov @maneamarius
 contrib/debian @Ferroin @iigorkarpov @maneamarius
 collectors/ @vlvkobal
