@@ -3130,7 +3130,7 @@ netdataDashboard.context = {
         '<p><b>Arcsz</b> - actual size. '+
         '<b>Target</b> - target size that the ARC is attempting to maintain (adaptive). '+
         '<b>Min</b> - minimum size limit. When the ARC is asked to shrink, it will stop shrinking at this value. '+
-        '<b>Min</b> - maximum size limit.</p>'
+        '<b>Max</b> - maximum size limit.</p>'
     },
 
     'zfs.l2_size': {
