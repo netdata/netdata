@@ -3,6 +3,8 @@
 #include "rrdpush.h"
 
 extern struct config stream_config;
+extern double children_consumed_rate;
+volatile unsigned int children_consumed;
 
 void destroy_receiver_state(struct receiver_state *rpt) {
     freez(rpt->key);
@@ -648,6 +650,25 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     cd.version = rpt->stream_version;
 
+    if (!strncmp(web_client_streaming_rate, "auto", 4)) {
+        children_consumed++;
+        if (children_consumed) {
+            static time_t first_consumed_check_t = 0;
+
+            time_t now = now_realtime_sec();
+
+            if (!first_consumed_check_t) {
+                first_consumed_check_t = now;
+            }
+
+            if (first_consumed_check_t != now) {
+                children_consumed_rate = (float)(children_consumed) / (float)(now - first_consumed_check_t);
+                if (!children_consumed_rate) first_consumed_check_t = now;
+            }
+        }
+    }
+
+    info ("Will register in cloud");
 #if defined(ENABLE_ACLK)
     // in case we have cloud connection we inform cloud
     // new slave connected
@@ -662,6 +683,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
 
+    info ("Will un-cregister in cloud");
 #if defined(ENABLE_ACLK)
     // in case we have cloud connection we inform cloud
     // new slave connected

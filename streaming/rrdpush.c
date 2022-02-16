@@ -51,6 +51,8 @@ int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 char *netdata_ssl_ca_path = NULL;
 char *netdata_ssl_ca_file = NULL;
 #endif
+volatile int children_in_flight;
+volatile double children_consumed_rate;
 
 static void load_stream_conf() {
     errno = 0;
@@ -641,6 +643,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         }
     }
 
+    children_in_flight++;
+
     if(unlikely(web_client_streaming_rate_t > 0)) {
         static netdata_mutex_t stream_rate_mutex = NETDATA_MUTEX_INITIALIZER;
         static volatile time_t last_stream_accepted_t = 0;
@@ -655,11 +659,41 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             netdata_mutex_unlock(&stream_rate_mutex);
             rrdhost_system_info_free(system_info);
             error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Will be allowed in %ld secs.", w->client_ip, w->client_port, (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
+            children_in_flight--;
             return rrdpush_receiver_too_busy_now(w);
         }
 
         last_stream_accepted_t = now;
         netdata_mutex_unlock(&stream_rate_mutex);
+    }
+
+    if (!strncmp(web_client_streaming_rate, "auto", 4)) {
+        if (children_in_flight) {
+            static time_t last_stream_check_t = 0;
+            double children_in_flight_rate = 0;
+        
+            time_t now = now_realtime_sec();
+
+            if (last_stream_check_t == 0)
+                last_stream_check_t = now;
+
+            if (last_stream_check_t != now) {
+                children_in_flight_rate = (float)(children_in_flight) / (float)(now - last_stream_check_t);
+                if (!children_consumed_rate) {
+                    web_client_streaming_rate_t = 5L;
+                }
+                else {
+                    if ( children_in_flight_rate > children_consumed_rate ) {
+                        if (web_client_streaming_rate_t < 5) web_client_streaming_rate_t++;
+                    } else {
+                        if (web_client_streaming_rate_t > 1) web_client_streaming_rate_t--;
+                    }
+                }
+		
+                info ("[%s]: children in flight rate [%ld] - [%f] ([%d]) / ([%ld] - [%ld]) - Consumed [%f]", hostname, web_client_streaming_rate_t, children_in_flight_rate, children_in_flight, (long)now, (long)last_stream_check_t, children_consumed_rate);
+
+            }
+        }
     }
 
     /*
@@ -712,6 +746,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "This GUID is already streaming to this server");
                 freez(rpt);
+                children_in_flight--;
                 return 409;
             }
         }
