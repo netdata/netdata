@@ -36,7 +36,7 @@ extern "C" {
 #define D_CONNECT_TO        0x0000000001000000
 #define D_RRDHOST           0x0000000002000000
 #define D_LOCKS             0x0000000004000000
-#define D_BACKEND           0x0000000008000000
+#define D_EXPORTING         0x0000000008000000
 #define D_STATSD            0x0000000010000000
 #define D_POLLFD            0x0000000020000000
 #define D_STREAM            0x0000000040000000

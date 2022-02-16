@@ -14,10 +14,10 @@ char *netdata_configured_hostname = "test_global_host";
 
 char log_line[MAX_LOG_LINE + 1];
 
-BACKEND_OPTIONS global_backend_options = 0;
-const char *global_backend_source = "average";
-const char *global_backend_prefix = "netdata";
-const char *global_backend_send_charts_matching = "*";
+EXPORTING_OPTIONS global_exporting_options = 0;
+const char *global_exporting_source = "average";
+const char *global_exporting_prefix = "netdata";
+const char *global_exporting_send_charts_matching = "*";
 
 void init_connectors_in_tests(struct engine *engine)
 {
@@ -235,7 +235,7 @@ static void test_rrdhost_is_exportable(void **state)
     assert_string_equal(log_line, "enabled exporting of host 'localhost' for instance 'instance_name'");
 
     assert_ptr_not_equal(localhost->exporting_flags, NULL);
-    assert_int_equal(localhost->exporting_flags[0], RRDHOST_FLAG_BACKEND_SEND);
+    assert_int_equal(localhost->exporting_flags[0], RRDHOST_FLAG_EXPORTING_SEND);
 }
 
 static void test_false_rrdhost_is_exportable(void **state)
@@ -255,7 +255,7 @@ static void test_false_rrdhost_is_exportable(void **state)
     assert_string_equal(log_line, "disabled exporting of host 'localhost' for instance 'instance_name'");
 
     assert_ptr_not_equal(localhost->exporting_flags, NULL);
-    assert_int_equal(localhost->exporting_flags[0], RRDHOST_FLAG_BACKEND_DONT_SEND);
+    assert_int_equal(localhost->exporting_flags[0], RRDHOST_FLAG_EXPORTING_DONT_SEND);
 }
 
 static void test_rrdset_is_exportable(void **state)

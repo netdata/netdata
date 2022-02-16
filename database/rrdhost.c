@@ -1239,32 +1239,32 @@ static struct label *rrdhost_load_labels_from_tags(void)
         return NULL;
 
     struct label *label_list = NULL;
-    BACKEND_TYPE type = BACKEND_TYPE_UNKNOWN;
+    EXPORTING_CONNECTOR_TYPE type = EXPORTING_CONNECTOR_TYPE_UNKNOWN;
 
     if (config_exists(CONFIG_SECTION_BACKEND, "enabled")) {
         if (config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", CONFIG_BOOLEAN_NO) != CONFIG_BOOLEAN_NO) {
             const char *type_name = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
-            type = backend_select_type(type_name);
+            type = exporting_select_type(type_name);
         }
     }
 
     switch (type) {
-        case BACKEND_TYPE_GRAPHITE:
+        case EXPORTING_CONNECTOR_TYPE_GRAPHITE:
             label_list = parse_simple_tags(
                 label_list, localhost->tags, '=', ';', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
                 DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
-        case BACKEND_TYPE_OPENTSDB_USING_TELNET:
+        case EXPORTING_CONNECTOR_TYPE_OPENTSDB:
             label_list = parse_simple_tags(
                 label_list, localhost->tags, '=', ' ', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
                 DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
-        case BACKEND_TYPE_OPENTSDB_USING_HTTP:
+        case EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP:
             label_list = parse_simple_tags(
                 label_list, localhost->tags, ':', ',', STRIP_QUOTES, STRIP_QUOTES,
                 DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
-        case BACKEND_TYPE_JSON:
+        case EXPORTING_CONNECTOR_TYPE_JSON:
             label_list = parse_json_tags(label_list, localhost->tags);
             break;
         default:

@@ -109,7 +109,7 @@ calculated_number exporting_calculate_value_from_stored_data(
     if (unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
         debug(
-            D_BACKEND,
+            D_EXPORTING,
             "EXPORTING: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
             host->hostname,
             st->id,
@@ -143,7 +143,7 @@ calculated_number exporting_calculate_value_from_stored_data(
     rd->state->query_ops.finalize(&handle);
     if (unlikely(!counter)) {
         debug(
-            D_BACKEND,
+            D_EXPORTING,
             "EXPORTING: %s.%s.%s: no values stored in database for range %lu to %lu",
             host->hostname,
             st->id,

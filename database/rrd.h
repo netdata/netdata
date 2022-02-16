@@ -469,15 +469,15 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_STORE_FIRST         = 1 << 9, // if set, do not eliminate the first collection during interpolation
     RRDSET_FLAG_HETEROGENEOUS       = 1 << 10, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
     RRDSET_FLAG_HOMOGENEOUS_CHECK   = 1 << 11, // if set, the chart should be checked to determine if the dimensions are homogeneous
-    RRDSET_FLAG_HIDDEN              = 1 << 12, // if set, do not show this chart on the dashboard, but use it for backends
+    RRDSET_FLAG_HIDDEN              = 1 << 12, // if set, do not show this chart on the dashboard, but use it for exporting
     RRDSET_FLAG_SYNC_CLOCK          = 1 << 13, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
     RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14, // this is marked by the collector/module when a chart has obsolete dimensions
     // No new values have been collected for this chart since agent start or it was marked RRDSET_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED            = 1 << 15,
     RRDSET_FLAG_ACLK                = 1 << 16,
-    RRDSET_FLAG_BACKEND_SEND        = 1 << 17, // if set, this chart should be sent to backends
-    RRDSET_FLAG_BACKEND_IGNORE      = 1 << 18 // if set, this chart should not be sent to backends
+    RRDSET_FLAG_EXPORTING_SEND        = 1 << 17, // if set, this chart should be sent to external databases
+    RRDSET_FLAG_EXPORTING_IGNORE      = 1 << 18 // if set, this chart should not be sent to external databases
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -632,8 +632,8 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
     RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
     RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2, // delete the entire host when orphan
-    RRDHOST_FLAG_BACKEND_SEND           = 1 << 3, // send it to backends
-    RRDHOST_FLAG_BACKEND_DONT_SEND      = 1 << 4, // don't send it to backends
+    RRDHOST_FLAG_EXPORTING_SEND           = 1 << 3, // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND      = 1 << 4, // don't send it to external databases
     RRDHOST_FLAG_ARCHIVED               = 1 << 5, // The host is archived, no collected charts yet
     RRDHOST_FLAG_MULTIHOST              = 1 << 6, // Host belongs to localhost/megadb
 } RRDHOST_FLAGS;

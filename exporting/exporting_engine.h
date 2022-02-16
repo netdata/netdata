@@ -51,11 +51,11 @@ typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_JSON_HTTP,               // Send data in JSON format using HTTP API
     EXPORTING_CONNECTOR_TYPE_OPENTSDB,                // Send data to OpenTSDB using telnet API
     EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP,           // Send data to OpenTSDB using HTTP API
-    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // User selected to use Prometheus backend
+    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // Send data using Prometheus remote write protocol
     EXPORTING_CONNECTOR_TYPE_KINESIS,                 // Send message to AWS Kinesis
     EXPORTING_CONNECTOR_TYPE_PUBSUB,                  // Send message to Google Cloud Pub/Sub
     EXPORTING_CONNECTOR_TYPE_MONGODB,                 // Send data to MongoDB collection
-    EXPORTING_CONNECTOR_TYPE_NUM                      // Number of backend types
+    EXPORTING_CONNECTOR_TYPE_NUM                      // Number of exporting connector types
 } EXPORTING_CONNECTOR_TYPE;
 
 struct engine;

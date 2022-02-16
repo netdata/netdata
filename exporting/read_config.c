@@ -194,7 +194,7 @@ struct engine *read_exporting_config()
     static struct engine *engine = NULL;
     struct connector_instance_list {
         struct connector_instance local_ci;
-        EXPORTING_CONNECTOR_TYPE backend_type;
+        EXPORTING_CONNECTOR_TYPE exporting_type;
 
         struct connector_instance_list *next;
     };
@@ -238,21 +238,22 @@ struct engine *read_exporting_config()
         prometheus_exporter_instance->config.update_every =
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
-        // wait for backend subsystem to be initialized
-        for (int retries = 0; !global_backend_source && retries < 1000; retries++)
+        // wait for backends subsystem to be initialized
+        // TODO: should we still wait here?
+        for (int retries = 0; !global_exporting_source && retries < 1000; retries++)
             sleep_usec(10000);
 
-        if (!global_backend_source)
-            global_backend_source = "average";
+        if (!global_exporting_source)
+            global_exporting_source = "average";
 
-        prometheus_exporter_instance->config.options |= global_backend_options & EXPORTING_OPTIONS_SOURCE_BITS;
+        prometheus_exporter_instance->config.options |= global_exporting_options & EXPORTING_OPTIONS_SOURCE_BITS;
 
-        char *data_source = prometheus_config_get("data source", global_backend_source);
+        char *data_source = prometheus_config_get("data source", global_exporting_source);
         prometheus_exporter_instance->config.options =
             exporting_parse_data_source(data_source, prometheus_exporter_instance->config.options);
 
         if (prometheus_config_get_boolean(
-                "send names instead of ids", global_backend_options & EXPORTING_OPTION_SEND_NAMES))
+                "send names instead of ids", global_exporting_options & EXPORTING_OPTION_SEND_NAMES))
             prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
         else
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
@@ -268,18 +269,17 @@ struct engine *read_exporting_config()
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
         prometheus_exporter_instance->config.charts_pattern = simple_pattern_create(
-            prometheus_config_get("send charts matching", global_backend_send_charts_matching),
+            prometheus_config_get("send charts matching", global_exporting_send_charts_matching),
             NULL,
             SIMPLE_PATTERN_EXACT);
         prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create(
             prometheus_config_get("send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
-        prometheus_exporter_instance->config.prefix = prometheus_config_get("prefix", global_backend_prefix);
+        prometheus_exporter_instance->config.prefix = prometheus_config_get("prefix", global_exporting_prefix);
 
         prometheus_exporter_instance->config.initialized = 1;
     }
 
-    // TODO: change BACKEND to EXPORTING
     while (get_connector_instance(&local_ci)) {
         info("Processing connector instance (%s)", local_ci.instance_name);
 
@@ -290,7 +290,7 @@ struct engine *read_exporting_config()
 
             tmp_ci_list = (struct connector_instance_list *)callocz(1, sizeof(struct connector_instance_list));
             memcpy(&tmp_ci_list->local_ci, &local_ci, sizeof(local_ci));
-            tmp_ci_list->backend_type = exporting_select_type(local_ci.connector_name);
+            tmp_ci_list->exporting_type = exporting_select_type(local_ci.connector_name);
             tmp_ci_list->next = tmp_ci_list_prev;
             tmp_ci_list_prev = tmp_ci_list;
             instances_to_activate++;
@@ -320,34 +320,34 @@ struct engine *read_exporting_config()
 
         info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
 
-        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_UNKNOWN) {
+        if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_UNKNOWN) {
             error("Unknown exporting connector type");
             goto next_connector_instance;
         }
 
 #ifndef ENABLE_PROMETHEUS_REMOTE_WRITE
-        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
+        if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
             error("Prometheus Remote Write support isn't compiled");
             goto next_connector_instance;
         }
 #endif
 
 #ifndef HAVE_KINESIS
-        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_KINESIS) {
+        if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_KINESIS) {
             error("AWS Kinesis support isn't compiled");
             goto next_connector_instance;
         }
 #endif
 
 #ifndef ENABLE_EXPORTING_PUBSUB
-        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_PUBSUB) {
+        if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_PUBSUB) {
             error("Google Cloud Pub/Sub support isn't compiled");
             goto next_connector_instance;
         }
 #endif
 
 #ifndef HAVE_MONGOC
-        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_MONGODB) {
+        if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_MONGODB) {
             error("MongoDB support isn't compiled");
             goto next_connector_instance;
         }
@@ -358,7 +358,7 @@ struct engine *read_exporting_config()
         engine->instance_root = tmp_instance;
 
         tmp_instance->engine = engine;
-        tmp_instance->config.type = tmp_ci_list->backend_type;
+        tmp_instance->config.type = tmp_ci_list->exporting_type;
 
         instance_name = tmp_ci_list->local_ci.instance_name;
 
