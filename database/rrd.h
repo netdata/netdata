@@ -461,8 +461,8 @@ typedef enum rrdset_flags {
                                               // (the master data set should be the one that has the same family and is not detail)
     RRDSET_FLAG_DEBUG               = 1 << 2, // enables or disables debugging for a chart
     RRDSET_FLAG_OBSOLETE            = 1 << 3, // this is marked by the collector/module as obsolete
-    RRDSET_FLAG_EXPORTING_SEND      = 1 << 4, // if set, this chart should be sent to Prometheus web API
-    RRDSET_FLAG_EXPORTING_IGNORE    = 1 << 5, // if set, this chart should not be sent to Prometheus web API
+    RRDSET_FLAG_EXPORTING_SEND      = 1 << 4, // if set, this chart should be sent to Prometheus web API and external databases
+    RRDSET_FLAG_EXPORTING_IGNORE    = 1 << 5, // if set, this chart should not be sent to Prometheus web API and external databases
     RRDSET_FLAG_UPSTREAM_SEND       = 1 << 6, // if set, this chart should be sent upstream (streaming)
     RRDSET_FLAG_UPSTREAM_IGNORE     = 1 << 7, // if set, this chart should not be sent upstream (streaming)
     RRDSET_FLAG_UPSTREAM_EXPOSED    = 1 << 8, // if set, we have sent this chart definition to netdata parent (streaming)
@@ -476,8 +476,6 @@ typedef enum rrdset_flags {
     // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED            = 1 << 15,
     RRDSET_FLAG_ACLK                = 1 << 16,
-    RRDSET_FLAG_EXPORTING_SEND        = 1 << 17, // if set, this chart should be sent to external databases
-    RRDSET_FLAG_EXPORTING_IGNORE      = 1 << 18 // if set, this chart should not be sent to external databases
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC

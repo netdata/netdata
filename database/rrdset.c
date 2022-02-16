@@ -190,8 +190,6 @@ int rrdset_set_name(RRDSET *st, const char *name) {
 
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND);
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -870,8 +868,6 @@ RRDSET *rrdset_create_custom(
     rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
     rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND);
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
