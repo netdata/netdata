@@ -586,7 +586,7 @@ handle_existing_install() {
     kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
         warning "Found an existing netdata install at ${INSTALL_PREFIX}, but could not determine the install type."
-        warning "Usually this means you installed Netdata through your distribution’s regualr package repositories or some other unsupported method."
+        warning "Usually this means you installed Netdata through your distribution’s regular package repositories or some other unsupported method."
       else
         progress "Found an existing netdata install at ${INSTALL_PREFIX}, with installation type '${INSTALL_TYPE}'."
       fi
@@ -615,7 +615,7 @@ handle_existing_install() {
 
         return 0
       elif [ "${INSTALL_TYPE}" = "unknown" ]; then
-        fatal "We do not support trying to update or claim installations when we cannot determine the install type.\nYou will need to uninstall the existing install using the same method you used to install it to proceed." F0106
+        fatal "We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed." F0106
       fi
 
       ret=0
