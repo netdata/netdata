@@ -38,6 +38,8 @@ jobs:
       - name: Read build matrix
         id: set-matrix
         shell: python3 {0}
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           from ruamel.yaml import YAML
           import json
@@ -52,7 +54,7 @@ jobs:
           with open('.github/data/distros.yml') as f:
               data = yaml.load(f)
 
-          if "${{ github.event_name }}" == "pull_request" and re.search(FULL_CI_REGEX, "${{ github.event.pull_request.body }}", re.I) is Null:
+          if "${{ github.event_name }}" == "pull_request" and re.search(FULL_CI_REGEX, os.environ["PR_BODY"], re.I) is None:
               run_limited = True
 
           for i, v in enumerate(data['include']):
