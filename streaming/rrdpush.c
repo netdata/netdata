@@ -684,9 +684,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 }
                 else {
                     if ( children_in_flight_rate > children_consumed_rate ) {
-                        if (web_client_streaming_rate_t < 5) web_client_streaming_rate_t++;
+                        if (web_client_streaming_rate_t < (5 + children_in_flight/50)) web_client_streaming_rate_t++;
                     } else {
-                        if (web_client_streaming_rate_t > 1) web_client_streaming_rate_t--;
+                        if (web_client_streaming_rate_t > (1 + children_in_flight/50)) web_client_streaming_rate_t--;
                     }
                 }
 		

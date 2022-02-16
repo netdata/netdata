@@ -683,7 +683,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
 
-    info ("Will un-cregister in cloud");
+    info ("Will un-register in cloud");
 #if defined(ENABLE_ACLK)
     // in case we have cloud connection we inform cloud
     // new slave connected
