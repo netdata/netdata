@@ -34,6 +34,12 @@ typedef enum exporting_options {
     (EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_SOURCE_DATA_SUM)
 #define EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) (exporting_options & EXPORTING_OPTIONS_SOURCE_BITS)
 
+extern int global_exporting_update_every;
+extern EXPORTING_OPTIONS global_exporting_options;
+extern const char *global_exporting_source;
+extern const char *global_exporting_prefix;
+extern const char *global_exporting_send_charts_matching;
+
 #define sending_labels_configured(instance)                                                                            \
     (instance->config.options & (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))
 
@@ -264,6 +270,8 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 
 int rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
 int rrdset_is_exportable(struct instance *instance, RRDSET *st);
+
+extern EXPORTING_OPTIONS exporting_parse_data_source(const char *source, EXPORTING_OPTIONS backend_options);
 
 calculated_number exporting_calculate_value_from_stored_data(
     struct instance *instance,

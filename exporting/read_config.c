@@ -2,6 +2,12 @@
 
 #include "exporting_engine.h"
 
+int global_exporting_update_every = 10;
+EXPORTING_OPTIONS global_exporting_options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
+const char *global_exporting_source = NULL;
+const char *global_exporting_prefix = "netdata";
+const char *global_exporting_send_charts_matching = "*";
+
 struct config exporting_config = { .first_section = NULL,
                                    .last_section = NULL,
                                    .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -160,7 +166,7 @@ EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type)
     return EXPORTING_CONNECTOR_TYPE_UNKNOWN;
 }
 
-EXPORTING_OPTIONS exporting_parse_data_source(const char *data_source, EXPORTING_OPTIONS exporting_options)
+inline EXPORTING_OPTIONS exporting_parse_data_source(const char *data_source, EXPORTING_OPTIONS exporting_options)
 {
     if (!strcmp(data_source, "raw") || !strcmp(data_source, "as collected") || !strcmp(data_source, "as-collected") ||
         !strcmp(data_source, "as_collected") || !strcmp(data_source, "ascollected")) {
@@ -238,13 +244,21 @@ struct engine *read_exporting_config()
         prometheus_exporter_instance->config.update_every =
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
-        // wait for backends subsystem to be initialized
-        // TODO: should we still wait here?
-        for (int retries = 0; !global_exporting_source && retries < 1000; retries++)
-            sleep_usec(10000);
+        // ------------------------------------------------------------------------
+        // collect backward compatibility configuration options
 
-        if (!global_exporting_source)
-            global_exporting_source = "average";
+        global_exporting_update_every =
+            (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", global_exporting_update_every);
+        global_exporting_source = config_get(CONFIG_SECTION_BACKEND, "data source", "average");
+
+        if(config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", (global_exporting_options & EXPORTING_OPTION_SEND_NAMES)))
+            global_exporting_options |= EXPORTING_OPTION_SEND_NAMES;
+        else
+            global_exporting_options &= ~EXPORTING_OPTION_SEND_NAMES;
+        global_exporting_options = exporting_parse_data_source(global_exporting_source, global_exporting_options);
+
+        global_exporting_prefix = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
+        global_exporting_send_charts_matching = config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*");
 
         prometheus_exporter_instance->config.options |= global_exporting_options & EXPORTING_OPTIONS_SOURCE_BITS;
 
