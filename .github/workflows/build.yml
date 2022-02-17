@@ -314,7 +314,6 @@ jobs:
               Regular build: ${{ steps.build-basic.outcome }}
               netdata-installer, disable cloud: ${{ steps.build-no-cloud.outcome }}
               netdata-installer, require cloud: ${{ steps.build-cloud.outcome }}
-              netdata-installer, require ACLK-NG: ${{ steps.build-aclk-ng.outcome }}
               netdata-installer, no JSON-C: ${{ steps.build-no-jsonc.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
