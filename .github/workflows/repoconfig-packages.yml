@@ -23,8 +23,10 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
       - name: Prepare tools
+        id: prepare
         run: |
           sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
