@@ -139,15 +139,7 @@ typedef struct ebpf_socket_publish_apps {
     uint64_t retransmit;         // Number of times tcp_retransmit was called
     uint64_t call_udp_sent;      // Number of times udp_sendmsg was called
     uint64_t call_udp_received;  // Number of times udp_recvmsg was called
-
-    // Publish information.
-    uint64_t publish_sent_bytes;
-    uint64_t publish_received_bytes;
-    uint64_t publish_tcp_sent;
-    uint64_t publish_tcp_received;
-    uint64_t publish_retransmit;
-    uint64_t publish_udp_sent;
-    uint64_t publish_udp_received;
+    uint64_t call_close;         // Number of times tcp_close was called
 } ebpf_socket_publish_apps_t;
 
 typedef struct ebpf_network_viewer_dimension_names {
