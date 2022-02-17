@@ -207,7 +207,7 @@ banner_root_notify() {
   Netdata will work, but a few data collection modules that
   require root access will fail.
 
-  If you installing netdata permanently on your system, run
+  If you are installing netdata permanently on your system, run
   the installer like this:
 
      ${TPUT_YELLOW}${TPUT_BOLD}sudo $PROGRAM ${@}${TPUT_RESET}
@@ -223,50 +223,50 @@ usage() {
 USAGE: ${PROGRAM} [options]
        where options include:
 
-  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata
-  --dont-start-it            Do not (re)start netdata after installation
-  --dont-wait                Run installation in non-interactive mode
-  --auto-update or -u        Install netdata-updater in cron to update netdata automatically once per day
+  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata.
+  --dont-start-it            Do not (re)start netdata after installation.
+  --dont-wait                Run installation in non-interactive mode.
+  --auto-update or -u        Install netdata-updater in cron to automatically check for updates once per day.
   --auto-update-type         Override the auto-update scheduling mechanism detection, currently supported types
-                             are: systemd, interval, crontab
-  --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
+                             are: systemd, interval, crontab.
+  --stable-channel           Use packages from GitHub release pages instead of nightly updates.
                              This results in less frequent updates.
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
-  --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
+  --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
-  --disable-plugin-freeipmi
-  --disable-https            Explicitly disable TLS support
-  --disable-dbengine         Explicitly disable DB engine support
+  --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
+  --disable-https            Explicitly disable TLS support.
+  --disable-dbengine         Explicitly disable DB engine support.
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
-  --disable-plugin-nfacct
-  --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available
-  --disable-plugin-xenstat   Disable the xenstat plugin.
-  --enable-backend-kinesis   Enable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries
-                             it depends on are available.
-  --disable-backend-kinesis
+  --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
+  --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
+  --disable-plugin-xenstat   Explicitly disable the xenstat plugin.
+  --enable-backend-kinesis   Enable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and its dependencies
+                             are available.
+  --disable-backend-kinesis  Explicitly disable AWS Kinesis backend.
   --enable-backend-prometheus-remote-write Enable Prometheus remote write backend. Default: enable it when libprotobuf and
                              libsnappy are available.
-  --disable-backend-prometheus-remote-write
+  --disable-backend-prometheus-remote-write Explicitly disable Prometheus remote write backend.
   --enable-backend-mongodb   Enable MongoDB backend. Default: enable it when libmongoc is available.
-  --disable-backend-mongodb
+  --disable-backend-mongodb  Explicitly disable MongoDB backend.
   --enable-exporting-pubsub  Enable Google Cloud PubSub exporting connector. Default: enable it when
                              libgoogle_cloud_cpp_pubsub_protos and its dependencies are available.
-  --disable-exporting-pubsub
-  --enable-lto               Enable Link-Time-Optimization. Default: disabled
-  --disable-lto
-  --enable-ml                Enable anomaly detection with machine learning. (Default: autodetect)
-  --disable-ml
-  --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
-  --use-system-lws           Use a system copy of libwebsockets instead of bundling our own (default is to use the bundled copy).
-  --use-system-protobuf      Use a system copy of libprotobuf instead of bundling our own (default is to use the bundled copy).
-  --zlib-is-really-here or
-  --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
+  --disable-exporting-pubsub Explicitly disable Google Cloud PubSub exporting connector.
+  --enable-lto               Enable link-time optimization. Default: disabled.
+  --disable-lto              Explicitly disable link-time optimization.
+  --enable-ml                Enable anomaly detection with machine learning. Default: autodetect.
+  --disable-ml               Explicitly disable anomaly detection with machine learning.
+  --disable-x86-sse          Disable SSE instructions & optimizations. Default: enabled.
+  --use-system-lws           Use a system copy of libwebsockets instead of bundled copy. Default: bundled.
+  --use-system-protobuf      Use a system copy of libprotobuf instead of bundled copy. Default: bundled.
+  --zlib-is-really-here
+  --libs-are-really-here     If you see errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
-  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
+  --disable-telemetry        Opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
 
 Netdata will by default be compiled with gcc optimization -O2
@@ -284,7 +284,13 @@ or use the following if both LDFLAGS and CFLAGS need to be overridden:
 
 For the installer to complete successfully, you will need these packages installed:
 
-  gcc make autoconf automake pkg-config zlib1g-dev (or zlib-devel) uuid-dev (or libuuid-devel)
+  gcc
+  make
+  autoconf
+  automake
+  pkg-config
+  zlib1g-dev (or zlib-devel)
+  uuid-dev (or libuuid-devel)
 
 For the plugins, you will at least need:
 
