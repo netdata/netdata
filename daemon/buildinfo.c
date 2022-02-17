@@ -60,16 +60,11 @@
 // Optional libraries
 
 #ifdef HAVE_PROTOBUF
-#if defined(ACLK_NG) || defined(ENABLE_PROMETHEUS_REMOTE_WRITE)
 #define FEAT_PROTOBUF 1
 #ifdef BUNDLED_PROTOBUF
 #define FEAT_PROTOBUF_BUNDLED " (bundled)"
 #else
 #define FEAT_PROTOBUF_BUNDLED " (system)"
-#endif
-#else
-#define FEAT_PROTOBUF 0
-#define FEAT_PROTOBUF_BUNDLED ""
 #endif
 #else
 #define FEAT_PROTOBUF 0
