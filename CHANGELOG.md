@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- fix: CPU frequency calculation in system-info.sh [\#12162](https://github.com/netdata/netdata/pull/12162) ([ilyam8](https://github.com/ilyam8))
+- kickstart.sh: fix quoting for globbing [\#12148](https://github.com/netdata/netdata/pull/12148) ([fayak](https://github.com/fayak))
 - Documentation: Fixed broken links [\#12142](https://github.com/netdata/netdata/pull/12142) ([kickoke](https://github.com/kickoke))
+- Fix typo in ZFS ARC Cache size info [\#12138](https://github.com/netdata/netdata/pull/12138) ([dvdmuckle](https://github.com/dvdmuckle))
 - rename DO\_NOT\_TRACK to DISABLE\_TELEMETRY [\#12126](https://github.com/netdata/netdata/pull/12126) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
