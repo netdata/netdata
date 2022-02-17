@@ -93,7 +93,7 @@ area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
 For example:
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2
 ```
 
 Please note that to run it you will either need to have root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](/claim/README.md#connect-an-agent-without-root-privileges) section.
