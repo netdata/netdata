@@ -1353,8 +1353,6 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
 
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
-    netdata_socket_idx_t removeme;
-    int removesock = 0;
 
     netdata_socket_t *values = socket_values;
     size_t length = ebpf_nprocs*sizeof(netdata_socket_t);
@@ -1371,22 +1369,12 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
             continue;
         }
 
-        if (removesock)
-            bpf_map_delete_elem(fd, &removeme);
-
         if (network_connection) {
-            removesock = 0;
             hash_accumulator(values, &key, family, end);
         }
 
-        if (removesock)
-            removeme = key;
-
         key = next_key;
     }
-
-    if (removesock)
-        bpf_map_delete_elem(fd, &removeme);
 
     test = bpf_map_lookup_elem(fd, &next_key, values);
     if (test < 0) {
@@ -1394,12 +1382,8 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
     }
 
     if (network_connection) {
-        removesock = 0;
         hash_accumulator(values, &next_key, family, end);
     }
-
-    if (removesock)
-        bpf_map_delete_elem(fd, &next_key);
 }
 
 /**
