@@ -1295,11 +1295,10 @@ netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_sock
  *
  * @param values        the values used to calculate the data.
  * @param key           the key to store  data.
- * @param removesock    check if this socket must be removed .
  * @param family        the connection family
  * @param end           the values size.
  */
-static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int *removesock, int family, int end)
+static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int family, int end)
 {
     uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
     uint16_t retransmit = 0;
@@ -1320,8 +1319,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
 
         if (w->ct > ct)
             ct = w->ct;
-
-        *removesock += (int)w->removeme;
     }
 
     values[0].recv_packets += precv;
@@ -1329,7 +1326,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].recv_bytes   += brecv;
     values[0].sent_bytes   += bsent;
     values[0].retransmit   += retransmit;
-    values[0].removeme     += (uint8_t)*removesock;
     values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
     values[0].ct           = ct;
 
@@ -1380,7 +1376,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
 
         if (network_connection) {
             removesock = 0;
-            hash_accumulator(values, &key, &removesock, family, end);
+            hash_accumulator(values, &key, family, end);
         }
 
         if (removesock)
@@ -1399,7 +1395,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
 
     if (network_connection) {
         removesock = 0;
-        hash_accumulator(values, &next_key, &removesock, family, end);
+        hash_accumulator(values, &next_key, family, end);
     }
 
     if (removesock)
