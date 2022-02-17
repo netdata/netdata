@@ -238,10 +238,9 @@ typedef struct netdata_socket {
     uint64_t sent_bytes;
     uint64_t first; // First timestamp
     uint64_t ct;   // Current timestamp
-    uint16_t retransmit; // It is never used with UDP
-    uint8_t protocol;
-    uint8_t removeme;
-    uint32_t reserved;
+    uint32_t retransmit; // It is never used with UDP
+    uint16_t protocol;
+    uint16_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
 
 
