@@ -130,7 +130,7 @@ jobs:
                 ;;
             esac
           else
-            echo "::set-output name=pkg_version::$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')"
+            echo "::set-output name=version::$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')"
             echo "::set-output name=retention::0"
           fi
       - name: Failure Notification
