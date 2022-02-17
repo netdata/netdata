@@ -55,6 +55,25 @@ jobs:
           matrix = json.dumps({'include': entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
           print('::set-output name=matrix::' + matrix)
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Repository Package Build matrix generation failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: >-
+              ${{ github.repository }}: Failed to generate build matrix for repository package build.
+              Checkout: ${{ steps.checkout.outcome }}
+              Prepare Tools: ${{ steps.prepare.outcome }}
+              Read Build Matrix: ${{ steps.set-matrix.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+          }}
 
   build:
     name: Build

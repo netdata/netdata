@@ -660,7 +660,6 @@ jobs:
         if: >-
           ${{
             failure()
-            && startsWith(github.ref, 'refs/heads/master')
             && github.event_name == 'workflow_dispatch'
           }}
       - name: Success Notification
@@ -676,6 +675,5 @@ jobs:
         if: >-
           ${{
             success()
-            && startsWith(github.ref, 'refs/heads/master')
             && github.event_name == 'workflow_dispatch'
           }}
