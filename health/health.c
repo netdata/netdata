@@ -1004,7 +1004,7 @@ void *health_main(void *ptr) {
                 RRDCALC *rc;
                 for(rc = host->alarms; rc ; rc = rc->next) {
                     int repeat_every = 0;
-                    if(unlikely(rrdcalc_isrepeating(rc))) {
+                    if(unlikely(rrdcalc_isrepeating(rc) && rc->delay_up_to_timestamp <= now)) {
                         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUN_ONCE;
                             repeat_every = rc->warn_repeat_every;
