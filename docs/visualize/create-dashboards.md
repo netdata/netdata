@@ -61,4 +61,4 @@ While it's useful to see real-time metrics on flexible dashboards, you need ways
 strikes. Every Netdata Agent comes with a health watchdog that uses [alarms](/docs/monitor/configure-alarms.md) and
 [notifications](/docs/monitor/enable-notifications.md) to notify you of issues seconds after they strike.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fvisualize%2Fcreate-dashboards&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

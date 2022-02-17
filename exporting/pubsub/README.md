@@ -35,4 +35,4 @@ Next, create the credentials JSON file by following Google Cloud's [authenticati
 `chmod 400 google_cloud_credentials.json; chown netdata google_cloud_credentials.json`. Set the `credentials file`
 option to the full path of the file.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fexporting%2Fpubsub%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

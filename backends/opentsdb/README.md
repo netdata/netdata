@@ -35,4 +35,3 @@ After your proxy is configured, make the following changes to `netdata.conf`:
 In this example, we used the port `8082` for our reverse proxy. If your reverse proxy listens on a different port,
 change the `destination = localhost:8082` line accordingly.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2Fopentsdb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
