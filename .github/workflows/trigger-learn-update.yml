@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - "**.md"
+      - "**.mdx?"
       - "packaging/installer/kickstart.sh"
 concurrency:
   group: learn-trigger-${{ github.ref }}
