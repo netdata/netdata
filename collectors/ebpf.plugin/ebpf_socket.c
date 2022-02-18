@@ -1555,6 +1555,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
     curr->retransmit = eb->retransmit;
     curr->call_udp_sent = eb->call_udp_sent;
     curr->call_udp_received = eb->call_udp_received;
+    curr->call_close = eb->close;
 }
 
 /**
@@ -1575,6 +1576,7 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
         total->retransmit += move->retransmit;
         total->call_udp_sent += move->call_udp_sent;
         total->call_udp_received += move->call_udp_received;
+        total->close += move->close;
     }
 }
 
@@ -1632,6 +1634,7 @@ static void ebpf_update_socket_cgroup()
                 publish->retransmit = in->retransmit;
                 publish->call_udp_sent = in->call_udp_sent;
                 publish->call_udp_received = in->call_udp_received;
+                publish->call_close = in->call_close;
             } else {
                 if (!bpf_map_lookup_elem(fd, &pid, eb)) {
                     ebpf_socket_bandwidth_accumulator(eb);
@@ -1645,6 +1648,7 @@ static void ebpf_update_socket_cgroup()
                     publish->retransmit = out->retransmit;
                     publish->call_udp_sent = out->call_udp_sent;
                     publish->call_udp_received = out->call_udp_received;
+                    publish->call_close = out->close;
                 }
             }
         }
@@ -1675,6 +1679,7 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
         accumulator.retransmit += w->retransmit;
         accumulator.call_udp_received += w->call_udp_received;
         accumulator.call_udp_sent += w->call_udp_sent;
+        accumulator.call_close += w->close;
 
         pids = pids->next;
     }
@@ -1686,6 +1691,7 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
     socket->retransmit = (accumulator.retransmit >= socket->retransmit) ? accumulator.retransmit : socket->retransmit;
     socket->call_udp_sent = (accumulator.call_udp_sent >= socket->call_udp_sent) ? accumulator.call_udp_sent : socket->call_udp_sent;
     socket->call_udp_received = (accumulator.call_udp_received >= socket->call_udp_received) ? accumulator.call_udp_received : socket->call_udp_received;
+    socket->call_close = (accumulator.call_close >= socket->call_close) ? accumulator.call_close : socket->call_close;
 }
 
 /**
