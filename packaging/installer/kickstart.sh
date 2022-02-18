@@ -64,8 +64,9 @@ USAGE: kickstart.sh [options]
   --dont-start-it            Do not start the agent by default (only for static installs or local builds)
   --stable-channel           Install a stable version instead of a nightly build (default: install a nightly build)
   --nightly-channel          Install a nightly build instead of a stable version
-  --no-updates               Do not enable automatic updates (default: enable automatic updates)
+  --no-updates               Do not enable automatic updates (default: enable automatic updates using the best supported scheduling method)
   --auto-update              Enable automatic updates.
+  --auto-update-type         Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
   --disable-telemetry        Opt-out of anonymous statistics.
   --native-only              Only install if native binary packages are available.
   --static-only              Only install if a static build is available.
@@ -785,6 +786,30 @@ claim() {
 }
 
 # ======================================================================
+# Auto-update handling code.
+set_auto_updates() {
+  if [ -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh" ]; then
+    updater="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
+  elif [ -x "${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh" ]; then
+    updater="${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh"
+  else
+    warning "Could not find netdata-updater.sh."
+    return 0
+  fi
+
+  if [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
+    # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
+    if grep -qv '--enable-auto-updates' ${updater}; then
+      echo
+    elif ! ${updater} --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
+      error "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
+    fi
+  else
+    ${updater} --disable-auto-updates
+  fi
+}
+
+# ======================================================================
 # Native package install code.
 
 # Check for an already installed package with a given name.
@@ -1228,6 +1253,7 @@ install_on_linux() {
     case "$?" in
       0)
         NETDATA_INSTALL_SUCCESSFUL=1
+        INSTALL_PREFIX="/"
         ;;
       1)
         fatal "Unable to install on this system." F0300
@@ -1342,6 +1368,18 @@ while [ -n "${1}" ]; do
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
     "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
+    "--auto-update-method")
+      NETDATA_AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+      case "${NETDATA_AUTO_UPDATE_TYPE}" in
+        systemd|interval|crontab)
+          shift 1
+          ;;
+        *)
+          echo "Unrecognized value for --auto-update-type. Valid values are: systemd, interval, crontab"
+          exit 1
+          ;;
+      esac
+      ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
     "--reinstall-even-if-unsafe") NETDATA_UNSAFE_REINSTALL=1 ;;
     "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
@@ -1440,6 +1478,8 @@ if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
 elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
   soft_disable_cloud
 fi
+
+set_auto_updates
 
 telemetry_event INSTALL_SUCCESS "" ""
 cleanup
