@@ -11,19 +11,6 @@ concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  checksum-checks:
-    name: Checksums
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git clone repository
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - name: Run checksum checks on kickstart files
-        env:
-          LOCAL_ONLY: "true"
-        run: |
-          ./tests/installer/checksums.sh
   libressl-checks:
     name: LibreSSL
     runs-on: ubuntu-latest

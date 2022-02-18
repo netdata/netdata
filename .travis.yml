@@ -125,11 +125,8 @@ jobs:
 
     # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
     - stage: Nightly operations
-      name: Kickstart files integrity testing (extended)
-      script: ./tests/installer/checksums.sh
-
       # This is generating the changelog for nightly release and publish it
-    - name: Generate nightly changelog
+      name: Generate nightly changelog
       script:
         - ".travis/nightlies.sh"
         - ".travis/check_changelog_last_modification.sh"
