@@ -148,11 +148,11 @@ and disable them with:
 For static installs, instead use:
 
 ```bash
-/opt/netdata//usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
+/opt/netdata/usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
 ```
 
 and:
 
 ```bash
-/opt/netdata//usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+/opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
 ```
