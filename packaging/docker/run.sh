@@ -9,13 +9,26 @@
 # Author  : Austin S. Hemmelgarn <austin@netdata.cloud>
 set -e
 
+if [ ! -w / ]; then
+  if [ "${EUID}" -eq 0 ]; then
+    echo >&2 "WARNING: This Docker host appears to not properly support newer stat system calls. This is known to cause issues with Netdata (most notably, nodes running on such hosts **cannot be claimed**)."
+    echo >&2 "WARNING: To resolve this, please do one of the following:"
+    echo >&2 "WARNING:     * Update to a newer version of Docker and libseccomp (NOTE: This is the only possible resolution for Docker Swarm users)"
+    echo >&2 "WARNING:     * Download the default seccomp profile from https://raw.githubusercontent.com/moby/moby/master/profiles/seccomp/default.json, replace 'SCMP_ACT_ERRNO' on line 2 with 'SCMP_ACT_TRACE', and then add '--security-opt=seccomp=default.json' to the options being passed to 'docker run' when creating the netdata container."
+    echo >&2 "WARNING:     * Add '--security-opt=seccomp=unconfined' to the options being used to run the Netdata container (WARNING: This will significantly reduce the security of the container itself.)."
+  else
+    echo >&2 "ERROR: This container must be started in such a way that the entrypoint is runnning as EUID 0 inside the container. Current EUID is ${EUID}."
+    echo >&2 "ERROR: If you want the agent to run as a non-default user ID after the container is initialized, please set DOCKER_USR in the environment to the desired user name instead."
+    exit 1
+  fi
+fi
+
 if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   [ -n "$DISABLE_TELEMETRY" ] ||
   [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
   [ -n "$DO_NOT_TRACK" ]; then
   touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
-
 
 BALENA_PGID=$(ls -nd /var/run/balena.sock | awk '{print $4}')
 DOCKER_PGID=$(ls -nd /var/run/docker.sock | awk '{print $4}')
