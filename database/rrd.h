@@ -756,6 +756,9 @@ struct rrdhost_system_info {
     uint16_t hops;
     bool ml_capable;
     bool ml_enabled;
+    char *install_type;
+    char *prebuilt_arch;
+    char *prebuilt_dist;
 };
 
 struct rrdhost {

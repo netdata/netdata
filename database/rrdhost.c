@@ -834,6 +834,9 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->container);
         freez(system_info->container_detection);
         freez(system_info->is_k8s_node);
+        freez(system_info->install_type);
+        freez(system_info->prebuilt_arch);
+        freez(system_info->prebuilt_dist);
         freez(system_info);
     }
 }
@@ -1070,6 +1073,18 @@ static struct label *rrdhost_load_auto_labels(void)
     if (localhost->system_info->is_k8s_node)
         label_list =
             add_label_to_list(label_list, "_is_k8s_node", localhost->system_info->is_k8s_node, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->install_type)
+        label_list =
+            add_label_to_list(label_list, "_install_type", localhost->system_info->install_type, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->prebuilt_arch)
+        label_list =
+            add_label_to_list(label_list, "_prebuilt_arch", localhost->system_info->prebuilt_arch, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->prebuilt_dist)
+        label_list =
+            add_label_to_list(label_list, "_prebuilt_dist", localhost->system_info->prebuilt_dist, LABEL_SOURCE_AUTO);
 
     label_list = add_aclk_host_labels(label_list);
 
