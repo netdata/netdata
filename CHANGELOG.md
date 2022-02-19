@@ -8,11 +8,14 @@
 
 - tidy up the installer script usage message [\#12171](https://github.com/netdata/netdata/pull/12171) ([petecooper](https://github.com/petecooper))
 - Remove check for ACLK\_NG and PROMETHEUS\_WRITE in order to assume PROTOBUF [\#12168](https://github.com/netdata/netdata/pull/12168) ([MrZammler](https://github.com/MrZammler))
+- add `stress-ng` and `gremlin` to apps\_groups.conf [\#12165](https://github.com/netdata/netdata/pull/12165) ([andrewm4894](https://github.com/andrewm4894))
 - Fix alerts to raise correctly when the delay and repeat parameters are used together. [\#12164](https://github.com/netdata/netdata/pull/12164) ([erdem2000](https://github.com/erdem2000))
+- fix: claiming with wget [\#12163](https://github.com/netdata/netdata/pull/12163) ([ilyam8](https://github.com/ilyam8))
 - fix: CPU frequency calculation in system-info.sh [\#12162](https://github.com/netdata/netdata/pull/12162) ([ilyam8](https://github.com/ilyam8))
 - Docs fix: Claim nodes in the kickstart script [\#12161](https://github.com/netdata/netdata/pull/12161) ([kickoke](https://github.com/kickoke))
 - kickstart.sh: fix quoting for globbing [\#12148](https://github.com/netdata/netdata/pull/12148) ([fayak](https://github.com/fayak))
 - Removed Google Analytics from the docs [\#12145](https://github.com/netdata/netdata/pull/12145) ([kickoke](https://github.com/kickoke))
+- Docs: Improved kickstart's cloud installation docs [\#12143](https://github.com/netdata/netdata/pull/12143) ([kickoke](https://github.com/kickoke))
 - Documentation: Fixed broken links [\#12142](https://github.com/netdata/netdata/pull/12142) ([kickoke](https://github.com/kickoke))
 - Fix typo in ZFS ARC Cache size info [\#12138](https://github.com/netdata/netdata/pull/12138) ([dvdmuckle](https://github.com/dvdmuckle))
 - Fix data query option allow\_past to correctly work in memory mode ram and save [\#12136](https://github.com/netdata/netdata/pull/12136) ([stelfrag](https://github.com/stelfrag))
@@ -20,6 +23,8 @@
 - Fix the format=array output in context queries [\#12129](https://github.com/netdata/netdata/pull/12129) ([stelfrag](https://github.com/stelfrag))
 - rename DO\_NOT\_TRACK to DISABLE\_TELEMETRY [\#12126](https://github.com/netdata/netdata/pull/12126) ([ilyam8](https://github.com/ilyam8))
 - feat\(apps.plugin\): group Apple Filing Protocol daemons into `afp` group [\#12078](https://github.com/netdata/netdata/pull/12078) ([ilyam8](https://github.com/ilyam8))
+- Overhaul handling of auto-updates in the installer code. [\#12076](https://github.com/netdata/netdata/pull/12076) ([Ferroin](https://github.com/Ferroin))
+- adds install method to /api/v1/info as label [\#12040](https://github.com/netdata/netdata/pull/12040) ([underhood](https://github.com/underhood))
 - Show the number of processes/threads for empty apps groups [\#11834](https://github.com/netdata/netdata/pull/11834) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
@@ -352,9 +357,6 @@
 - add proc\_net\_snmp6 charts info [\#11565](https://github.com/netdata/netdata/pull/11565) ([ilyam8](https://github.com/ilyam8))
 - eBPF Shared Memory system call tracking [\#11560](https://github.com/netdata/netdata/pull/11560) ([UmanShahzad](https://github.com/UmanShahzad))
 - Add shared memory to cgroup [\#11559](https://github.com/netdata/netdata/pull/11559) ([thiagoftsm](https://github.com/thiagoftsm))
-- End of support for Ubuntu 16.04 [\#11556](https://github.com/netdata/netdata/pull/11556) ([Ferroin](https://github.com/Ferroin))
-- Add alert message support for ACLK new architecture [\#11552](https://github.com/netdata/netdata/pull/11552) ([MrZammler](https://github.com/MrZammler))
-- Anomaly Detection MVP [\#11548](https://github.com/netdata/netdata/pull/11548) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
