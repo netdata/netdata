@@ -298,8 +298,7 @@ def get_username_by_pid_safe(pid, passwd_file):
     try:
         if IS_INSIDE_DOCKER:
             return passwd_file[uid][0]
-        else:
-            return pwd.getpwuid(uid)[0]
+        return pwd.getpwuid(uid)[0]
     except KeyError:
         return str(uid)
 
