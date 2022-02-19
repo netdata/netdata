@@ -271,10 +271,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 
 # ###########################################################
-# Install updater script
-install -m 755 -p packaging/installer/netdata-updater.sh "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/netdata-updater.sh"
-
-# ###########################################################
 # logrotate settings
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
 install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
@@ -548,8 +544,6 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
-* Wed Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
-- Bundle updater script in native packages.
 * Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
 - Remove support code for legacy ACLK implementation.
 * Wed Sep 16 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-14

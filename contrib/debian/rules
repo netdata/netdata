@@ -75,10 +75,6 @@ override_dh_install:
 	mkdir -p "$(TOP)/var/cache/netdata"
 	mkdir -p "$(TOP)/var/run/netdata"
 
-	# Copy the updater script
-	#
-	cp -v packaging/installer/netdata-updater.sh $(TOP)/usr/libexec/netdata/netdata-updater.sh
-
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
 	mkdir -p "$(TOP)/usr/share/netdata/www"
@@ -111,10 +107,6 @@ override_dh_installdocs:
 
 override_dh_fixperms:
 	dh_fixperms
-
-	# Updater script should be executable
-	#
-	chmod 0755 $(TOP)/usr/libexec/netdata/netdata-updater.sh
 
 	# apps.plugin should only be runnable by the netdata user. It will be
 	# given extra capabilities in the postinst script.
