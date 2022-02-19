@@ -56,7 +56,7 @@ static void lz4_compressor_destroy(struct compressor_state **state)
 
 /*
  * Compress the given block of data
- * Comprecced data will remain in the internal buffer until the next invokation
+ * Comprecced data will remain in the internal buffer until the next invocation
  * Return the size of compressed data block as result and the pointer to internal buffer  using the last argument
  * or 0 in case of error
  */
@@ -98,7 +98,7 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
 }
 
 /*
- * Create and initalize compressor state
+ * Create and initialize compressor state
  * Return the pointer to compressor_state structure created
  */
 struct compressor_state *create_compressor()
@@ -318,7 +318,7 @@ static size_t lz4_decompressor_get(struct decompressor_state *state, char *data,
 }
 
 /*
- * Create and initalize decompressor state
+ * Create and initialize decompressor state
  * Return the pointer to decompressor_state structure created
  */
 struct decompressor_state *create_decompressor()
