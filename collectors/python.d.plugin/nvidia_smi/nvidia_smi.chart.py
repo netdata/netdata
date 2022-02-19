@@ -294,14 +294,14 @@ def get_username_by_pid_safe(pid, passwd_file):
     try:
         uid = os.stat(path).st_uid
     except (OSError, IOError):
-            return ''
-    if IS_INSIDE_DOCKER:
-        try:
+        return ''
+    try:
+        if IS_INSIDE_DOCKER:
             return passwd_file[uid][0]
-        except KeyError:
-            return str(uid)
-    else:
-        return pwd.getpwuid(uid)[0]
+        else:
+            return pwd.getpwuid(uid)[0]
+    except KeyError:
+        return str(uid)
 
 
 class GPU:
