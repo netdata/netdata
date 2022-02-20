@@ -1197,9 +1197,18 @@ try_build_install() {
   download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"
   download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"
 
-  if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0005
-  fi
+  case "${SYSTYPE}" in
+  FreeBSD)
+    if ! safe_sha256sum -c "$(grep netdata-latest.tar.gz sha256sums.txt | cut -f1 -d' ')" netdata-latest.tar.gz >/dev/null 2>&1; then
+      fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0005
+    fi
+    ;;
+  *)
+    if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
+      fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0005
+    fi
+    ;;
+  esac
 
   run tar -xf "${tmpdir}/netdata-latest.tar.gz" -C "${tmpdir}"
   rm -rf "${tmpdir}/netdata-latest.tar.gz" > /dev/null 2>&1
