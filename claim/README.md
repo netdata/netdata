@@ -137,7 +137,8 @@ To resolve, do one of the following:
 - Create a custom profile and pass it for the container.
 - Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
 
-How to create a custom profile:
+<details>
+<summary>See how to create a custom profile</summary>>
 
 - download the moby default seccomp profile and change `defaultAction` to `SCMP_ACT_TRACE` on line 2.
 
@@ -173,6 +174,8 @@ When using `docker stack deploy`:
 
 Change the default profile globally by adding `--seccomp-profile=/etc/docker/seccomp.json` to the options passed to
 dockerd on startup.
+
+</details>
 
 #### Using environment variables
 
