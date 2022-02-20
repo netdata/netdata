@@ -1199,7 +1199,7 @@ try_build_install() {
 
   case "${SYSTYPE}" in
   FreeBSD)
-    if ! safe_sha256sum -c "$(grep netdata-latest.tar.gz sha256sums.txt | cut -f1 -d' ')" netdata-latest.tar.gz >/dev/null 2>&1; then
+    if ! safe_sha256sum -c "$(grep netdata-latest.tar.gz sha256sum.txt | cut -f1 -d' ')" netdata-latest.tar.gz >/dev/null 2>&1; then
       fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0005
     fi
     ;;
