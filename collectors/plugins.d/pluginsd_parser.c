@@ -746,7 +746,10 @@ PARSER_RC pluginsd_rep(char **words, void *user, PLUGINSD_ACTION  *pluginr_actio
 {
     UNUSED(pluginr_action);
 
+    PARSER_USER_OBJECT *usr = (PARSER_USER_OBJECT *) user;
+
     char *command = words[1];
+    info("Pluginsd_rep recevied %s, %s\n", words[1]);
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     if (unlikely(!command)) {
@@ -755,21 +758,26 @@ PARSER_RC pluginsd_rep(char **words, void *user, PLUGINSD_ACTION  *pluginr_actio
     }
 
     if(strcmp(PLUGINSD_KEYWORD_REP_ON, command) == 0){
+        info("REP ON command is received!\n"); 
+        send_message((REPLICATION_STATE *)usr->opaque, "REP ACK");
         //Call REP ON function
         return PARSER_RC_OK;
     }
 
     if(strcmp(PLUGINSD_KEYWORD_REP_OFF, command) == 0){
+        info("REP OFF command is received!\n");
         //Call REP OFF function
         return PARSER_RC_OK;
     }
 
     if(strcmp(PLUGINSD_KEYWORD_REP_ACK, command) == 0){
+        info("REP ACK command is received!\n");
         //Call REP ACK function
         return PARSER_RC_OK;
     }
 
     if(strcmp(PLUGINSD_KEYWORD_REP_PAUSE, command) == 0){
+        info("REP PAUSE command is received!\n");
         //Call REP PAUSE function
         return PARSER_RC_OK;
     }

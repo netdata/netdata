@@ -23,11 +23,14 @@ typedef struct time_window TIME_WINDOW;
 
 // Replication structs
 typedef struct replication_state {
+    RRDHOST *host;
     // thread variables
     netdata_thread_t thread;
     netdata_mutex_t mutex;
     unsigned int enabled; // result of configuration and negotiation. Runtime flag
-    unsigned int spawned;// if the replication thread has been spawned    
+    unsigned int spawned;// if the replication thread has been spawned 
+    //state variables
+    int excom;   
     // connection variables
     int socket;
     unsigned int connected;
@@ -37,11 +40,13 @@ typedef struct replication_state {
     size_t send_attempts;
     size_t begin;
     size_t not_connected_loops;
+    size_t sent_bytes;
     size_t sent_bytes_on_this_connection;
     time_t last_sent_t;
     usec_t reconnect_delay;
     // buffer variables
     //TBD: is the mutex for thread management sufficient also for handling access management to the buffers.
+    unsigned int overflow:1; //?
     struct circular_buffer *buffer;
     BUFFER *build;
     char read_buffer[512];
