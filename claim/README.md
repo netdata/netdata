@@ -127,7 +127,7 @@ The nodes running on the following hosts **cannot be claimed**:
 To check if your kernel supports `seccomp`:
 
 ```cmd
-# grep CONFIG_SECCOMP= /boot/config-$(uname -r) 2>/dev/null
+# grep CONFIG_SECCOMP= /boot/config-$(uname -r) 2>/dev/null || zgrep CONFIG_SECCOMP  /proc/config.gz 2>/dev/null
 CONFIG_SECCOMP=y
 ```
 
