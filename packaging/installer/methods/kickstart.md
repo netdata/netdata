@@ -48,7 +48,7 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--non-interactive`: Don’t prompt for anything and assume yes whenever possible, overriding any automatic detection of an interactive run.
 - `--interactive`: Act as if running interactively, even if automatic detection indicates a run is non-interactive.
 - `--dont-wait`: Synonym for `--non-interactive`
-- `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not gauranteed to work.
+- `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
 - `--nightly-channel`: Use a nightly build instead of a stable release (this is the default).
 - `--stable-channel`: Use a stable release instead of a nightly build.
 - `--auto-update`: Enable automatic updates (this is the default).

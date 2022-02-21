@@ -2099,7 +2099,7 @@
           },
           "agent-claimed": {
             "type": "boolean",
-            "description": "Informs whether this agent has been added to a space in the cloud (User has to perform claiming). If false (user didnt perform claiming) agent will never attempt any cloud connection."
+            "description": "Informs whether this agent has been added to a space in the cloud (User has to perform claiming). If false (user didn't perform claiming) agent will never attempt any cloud connection."
           },
           "claimed-id": {
             "type": "string",

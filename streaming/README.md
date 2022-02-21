@@ -368,7 +368,7 @@ A compressed data packet is determined and decompressed on the fly.
 #### Limitations
  This limitation will be withdrawn asap and is work-in-progress.
 
-The current implementation of streaming data compression can support only a few number of dimensions in a chart with names that cannot exceed the size of 16384 bytes. In case you experience stream connection problems or gaps in the charts please disable stream compresssion in the `stream.conf` file. This limitation can be seen in the error.log file with the sequence of the following messages: 
+The current implementation of streaming data compression can support only a few number of dimensions in a chart with names that cannot exceed the size of 16384 bytes. In case you experience stream connection problems or gaps in the charts please disable stream compression in the `stream.conf` file. This limitation can be seen in the error.log file with the sequence of the following messages: 
 ```
 Compression error - data discarded
 Message size above limit:
