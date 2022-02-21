@@ -122,7 +122,7 @@ The nodes running on the following hosts **cannot be claimed**:
 
 - `libseccomp` version less than v2.3.3.
 - Docker version less than v18.04.0-ce.
-- the kernel is configured with CONFIG_SECCOMP enabled.
+- The kernel is configured with CONFIG_SECCOMP enabled.
 
 To check if your kernel supports `seccomp`:
 
