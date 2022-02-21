@@ -80,6 +80,7 @@ USAGE: kickstart.sh [options]
   --claim-only               If there is an existing install, only try to claim it, not update it.
   --claim-*                  Specify other options for the claiming script.
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
+  --uninstall                Uninstall netdata.
 
 Additionally, this script may use the following environment variables:
 
@@ -265,14 +266,14 @@ run_failed() {
 
 ESCAPED_PRINT_METHOD=
 # shellcheck disable=SC3050
-if printf "%q " test > /dev/null 2>&1; then
+if printf "%s " test > /dev/null 2>&1; then
   ESCAPED_PRINT_METHOD="printfq"
 fi
 
 escaped_print() {
   if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
     # shellcheck disable=SC3050
-    printf "%q " "${@}"
+    printf "%s " "${@}"
   else
     printf "%s" "${*}"
   fi
@@ -532,6 +533,27 @@ update() {
   fi
 }
 
+uninstall() {
+  get_system_info
+  detect_existing_install
+
+  if [ $INTERACTIVE = 0 ]; then
+    FLAGS="--yes --force"
+  else
+    FLAGS="--yes"
+  fi
+
+  if [ -f "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" ]; then
+    echo "Found existing netdata-uninstaller. Running it.."
+    ${ROOTCMD} "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" $FLAGS
+  else
+    echo "Downloading netdata-uninstaller ..."
+    wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh -O "${tmpdir}/netdata-uninstaller.sh"
+    chmod +x "${tmpdir}/netdata-uninstaller.sh"
+    ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS
+  fi
+}
+
 detect_existing_install() {
   if pkg_installed netdata; then
     ndprefix="/"
@@ -564,7 +586,7 @@ detect_existing_install() {
     typefile="${ndprefix}/etc/netdata/.install-type"
     if [ -r "${typefile}" ]; then
       ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
-      # shellcheck disable=SC1091
+      # shellcheck disable=SC1090
       . "${tmpdir}/install-type"
     else
       INSTALL_TYPE="unknown"
@@ -1091,7 +1113,7 @@ try_static_install() {
   if [ -f "${install_type_file}" ]; then
     ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
     ${ROOTCMD} chown "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1090
     . "${tmpdir}/install-type"
     cat > "${tmpdir}/install-type" <<- EOF
 	INSTALL_TYPE='kickstart-static'
@@ -1365,6 +1387,9 @@ while [ -n "${1}" ]; do
       INSTALL_PREFIX="${2}"
       shift 1
       ;;
+    "--uninstall")
+      ACTION="uninstall"
+      ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1
       NETDATA_ONLY_STATIC=0
@@ -1422,6 +1447,12 @@ check_claim_opts
 confirm_root_support
 get_system_info
 confirm_install_prefix
+
+if [ "${ACTION}" = "uninstall" ]; then
+  uninstall
+  trap - EXIT
+  exit 0
+fi
 
 tmpdir="$(create_tmp_directory)"
 progress "Using ${tmpdir} as a temporary directory."
