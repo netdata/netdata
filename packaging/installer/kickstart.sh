@@ -586,7 +586,7 @@ detect_existing_install() {
     typefile="${ndprefix}/etc/netdata/.install-type"
     if [ -r "${typefile}" ]; then
       ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
-      # shellcheck disable=SC1090
+      # shellcheck disable=SC1090,SC1091
       . "${tmpdir}/install-type"
     else
       INSTALL_TYPE="unknown"
@@ -1113,7 +1113,7 @@ try_static_install() {
   if [ -f "${install_type_file}" ]; then
     ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
     ${ROOTCMD} chown "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
-    # shellcheck disable=SC1090
+    # shellcheck disable=SC1090,SC1091
     . "${tmpdir}/install-type"
     cat > "${tmpdir}/install-type" <<- EOF
 	INSTALL_TYPE='kickstart-static'
