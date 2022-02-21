@@ -131,25 +131,25 @@ To check if your kernel supports `seccomp`:
 CONFIG_SECCOMP=y
 ```
 
-To resolve, do one of the following:
+To resolve the issue, do one of the following actions:
 
-- Update to a newer version of Docker and `libseccomp` (recommended).
-- Create a custom profile and pass it for the container.
-- Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
+1. Update to a newer version of Docker and `libseccomp` (recommended).
+2. Create a custom profile and pass it for the container.
+3. Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
 
 <details>
 <summary>See how to create a custom profile</summary>
 
-- download the moby default seccomp profile and change `defaultAction` to `SCMP_ACT_TRACE` on line 2.
+1. Download the moby default seccomp profile and change `defaultAction` to `SCMP_ACT_TRACE` on line 2.
 
 ```cmd
 sudo wget https://raw.githubusercontent.com/moby/moby/master/profiles/seccomp/default.json -O /etc/docker/seccomp.json
 sudo sed -i '2s/SCMP_ACT_ERRNO/SCMP_ACT_TRACE/' /etc/docker/seccomp.json
 ```
 
-- explicitly specify the new policy for the container.
+2. Specify the new policy for the container explicitly.
 
-When using `docker run`:
+- When using `docker run`:
 
 ```cmd
 docker run -d --name=netdata \
@@ -157,7 +157,7 @@ docker run -d --name=netdata \
   ...
 ```
 
-When using `docker-compose`:
+- When using `docker-compose`:
 
 > :warning: The security_opt option is ignored when deploying a stack in swarm mode.
 
@@ -170,7 +170,7 @@ services:
     ...
 ```
 
-When using `docker stack deploy`:
+- When using `docker stack deploy`:
 
 Change the default profile globally by adding `--seccomp-profile=/etc/docker/seccomp.json` to the options passed to
 dockerd on startup.
