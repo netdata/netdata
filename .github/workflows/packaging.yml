@@ -91,8 +91,8 @@ jobs:
       fail-fast: false
       max-parallel: 8
     steps:
-      - name: Checkout PR # Checkout the PR if it's a PR.
-        if: github.event_name == 'pull_request'
+      - name: Checkout # Checkout the repo if it’s not a tag.
+        if: github.event_name != 'workflow_dispatch'
         uses: actions/checkout@v2
         with:
           fetch-depth: 0 # We need full history for versioning
