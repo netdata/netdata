@@ -508,11 +508,16 @@ void aclk_database_worker(void *arg)
                     aclk_update_retention(wc, cmd);
                     aclk_process_dimension_deletion(wc, cmd);
                     break;
-#endif
 
 // NODE_INSTANCE DETECTION
+                case ACLK_DATABASE_ORPHAN_HOST:
+                    wc->host = NULL;
+                    wc->is_orphan = 1;
+                    aclk_add_worker_thread(wc);
+                    break;
+#endif
                 case ACLK_DATABASE_TIMER:
-                    if (unlikely(localhost && !wc->host)) {
+                    if (unlikely(localhost && !wc->host && !wc->is_orphan)) {
                         if (claimed()) {
                             wc->host = rrdhost_find_by_guid(wc->host_guid, 0);
                             if (wc->host) {

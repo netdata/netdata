@@ -125,6 +125,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_CHART_ACK,
     ACLK_DATABASE_UPD_RETENTION,
     ACLK_DATABASE_DIM_DELETION,
+    ACLK_DATABASE_ORPHAN_HOST,
 #endif
     ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CLEANUP,
@@ -194,6 +195,7 @@ struct aclk_database_worker_config {
     int chart_pending;
     int chart_reset_count;
     volatile unsigned is_shutting_down;
+    volatile unsigned is_orphan;
     struct aclk_database_worker_config  *next;
 };
 
