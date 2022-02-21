@@ -144,25 +144,38 @@ int rrdset_set_name(RRDSET *st, const char *name) {
 
     debug(D_RRD_CALLS, "rrdset_set_name() old: '%s', new: '%s'", st->name?st->name:"", name);
 
-    char b[CONFIG_MAX_VALUE + 1];
-    char n[RRD_ID_LENGTH_MAX + 1];
+    char full_name[RRD_ID_LENGTH_MAX + 1];
+    char sanitized_name[CONFIG_MAX_VALUE + 1];
+    char new_name[CONFIG_MAX_VALUE + 1];
 
-    snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
-    rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
+    snprintfz(full_name, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
+    rrdset_strncpyz_name(sanitized_name, full_name, CONFIG_MAX_VALUE);
+    strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
 
-    if(rrdset_index_find_name(host, b, 0)) {
-        info("RRDSET: chart name '%s' on host '%s' already exists.", b, host->hostname);
-        return 0;
+    if(rrdset_index_find_name(host, new_name, 0)) {
+        info("RRDSET: chart name '%s' on host '%s' already exists.", new_name, host->hostname);
+        if(!strcmp(st->id, full_name) && !st->name) {
+            unsigned i = 1;
+
+            do {
+                snprintfz(new_name, CONFIG_MAX_VALUE, "%s_%u", sanitized_name, i);
+                i++;
+            } while (rrdset_index_find_name(host, new_name, 0));
+
+            info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, host->hostname);
+        } else {
+            return 0;
+        }
     }
 
     if(st->name) {
         rrdset_index_del_name(host, st);
-        st->name = config_set_default(st->config_section, "name", b);
+        st->name = config_set_default(st->config_section, "name", new_name);
         st->hash_name = simple_hash(st->name);
         rrdsetvar_rename_all(st);
     }
     else {
-        st->name = config_get(st->config_section, "name", b);
+        st->name = config_get(st->config_section, "name", new_name);
         st->hash_name = simple_hash(st->name);
     }
 
