@@ -135,9 +135,7 @@ To resolve the issue, do one of the following actions:
 
 1. Update to a newer version of Docker and `libseccomp` (recommended).
 2. Create a custom profile and pass it for the container.
-3.
-Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (
-unsafe, not recommended).
+3. Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
 
 <details>
 <summary>See how to create a custom profile</summary>
