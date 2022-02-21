@@ -139,15 +139,7 @@ typedef struct ebpf_socket_publish_apps {
     uint64_t retransmit;         // Number of times tcp_retransmit was called
     uint64_t call_udp_sent;      // Number of times udp_sendmsg was called
     uint64_t call_udp_received;  // Number of times udp_recvmsg was called
-
-    // Publish information.
-    uint64_t publish_sent_bytes;
-    uint64_t publish_received_bytes;
-    uint64_t publish_tcp_sent;
-    uint64_t publish_tcp_received;
-    uint64_t publish_retransmit;
-    uint64_t publish_udp_sent;
-    uint64_t publish_udp_received;
+    uint64_t call_close;         // Number of times tcp_close was called
 } ebpf_socket_publish_apps_t;
 
 typedef struct ebpf_network_viewer_dimension_names {
@@ -238,10 +230,9 @@ typedef struct netdata_socket {
     uint64_t sent_bytes;
     uint64_t first; // First timestamp
     uint64_t ct;   // Current timestamp
-    uint16_t retransmit; // It is never used with UDP
-    uint8_t protocol;
-    uint8_t removeme;
-    uint32_t reserved;
+    uint32_t retransmit; // It is never used with UDP
+    uint16_t protocol;
+    uint16_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
 
 
