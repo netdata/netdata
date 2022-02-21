@@ -88,6 +88,7 @@ ignored_sections_regex = re.compile(
         | (?:Expander|Enclosure|SEP|Port[ ]Name:)[ ].+
         | .+[ ]at[ ]Port[ ]\S+,[ ]Box[ ]\d+,[ ].+
         | Mirror[ ]Group[ ]\d+:
+        | Disk[ ]Partition[ ]Information
     $
     ''',
     re.X
