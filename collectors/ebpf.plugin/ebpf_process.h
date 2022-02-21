@@ -39,6 +39,21 @@
 #define NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT "services.task_exit"
 #define NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT "services.task_error"
 
+// Statistical information
+enum netdata_ebpf_thread_stats{
+    NETDATA_EBPF_THREAD_STAT_TOTAL,
+    NETDATA_EBPF_THREAD_STAT_RUNNING,
+
+    NETDATA_EBPF_THREAD_STAT_END
+};
+
+enum netdata_ebpf_load_mode_stats{
+    NETDATA_EBPF_LOAD_STAT_LEGACY,
+    NETDATA_EBPF_LOAD_STAT_CORE,
+
+    NETDATA_EBPF_LOAD_STAT_END
+};
+
 // Index from kernel
 typedef enum ebpf_process_index {
     NETDATA_KEY_CALLS_DO_EXIT,

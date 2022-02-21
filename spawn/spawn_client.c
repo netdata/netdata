@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "spawn.h"
-#include "database/engine/rrdenginelib.h"
 
 static uv_process_t process;
 static uv_pipe_t spawn_channel;
@@ -201,7 +200,7 @@ void spawn_client(void *arg)
     spawn_thread_error = 0;
     spawn_thread_shutdown = 0;
     /* wake up initialization thread */
-    complete(completion);
+    completion_mark_complete(completion);
 
     prot_buffer_len = 0;
     ret = uv_read_start((uv_stream_t *)&spawn_channel, on_read_alloc, on_pipe_read);
@@ -237,5 +236,5 @@ error_after_loop_init:
     freez(loop);
 
     /* wake up initialization thread */
-    complete(completion);
+    completion_mark_complete(completion);
 }

@@ -834,6 +834,9 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->container);
         freez(system_info->container_detection);
         freez(system_info->is_k8s_node);
+        freez(system_info->install_type);
+        freez(system_info->prebuilt_arch);
+        freez(system_info->prebuilt_dist);
         freez(system_info);
     }
 }
@@ -851,6 +854,10 @@ void rrdhost_free(RRDHOST *host) {
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
     buffer_free(host->sender->build);
+#ifdef ENABLE_COMPRESSION
+    if (host->sender->compressor)
+        host->sender->compressor->destroy(&host->sender->compressor);
+#endif
     freez(host->sender);
     host->sender = NULL;
     if (netdata_exit) {
@@ -950,6 +957,7 @@ void rrdhost_free(RRDHOST *host) {
 
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
+    freez(host->aclk_state.prev_claimed_id);
     freez((void *)host->tags);
     free_label_list(host->labels.head);
     freez((void *)host->os);
@@ -1065,6 +1073,18 @@ static struct label *rrdhost_load_auto_labels(void)
     if (localhost->system_info->is_k8s_node)
         label_list =
             add_label_to_list(label_list, "_is_k8s_node", localhost->system_info->is_k8s_node, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->install_type)
+        label_list =
+            add_label_to_list(label_list, "_install_type", localhost->system_info->install_type, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->prebuilt_arch)
+        label_list =
+            add_label_to_list(label_list, "_prebuilt_arch", localhost->system_info->prebuilt_arch, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->prebuilt_dist)
+        label_list =
+            add_label_to_list(label_list, "_prebuilt_dist", localhost->system_info->prebuilt_dist, LABEL_SOURCE_AUTO);
 
     label_list = add_aclk_host_labels(label_list);
 

@@ -129,13 +129,29 @@ jobs:
         uses: actions/checkout@v2
       - name: Prepare tools
         run: |
-          sudo apt-get update && sudo apt-get install -y jq
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
+        shell: python3 {0}
         run: |
-          TASKS="$(jq -c . .github/data/build-matrix.json)"
-          echo "Generated Matrix: $TASKS"
-          echo "::set-output name=matrix::$TASKS"
+          from ruamel.yaml import YAML
+          import json
+          yaml = YAML(typ='safe')
+          with open('.github/data/distros.yml') as f:
+              data = yaml.load(f)
+          del data['platform_map']
+          for i, v in enumerate(data['include']):
+              data['include'][i]['artifact_key'] = data['include'][i]['distro'] + str(data['include'][i]['version']).replace('.', '')
+              if 'packages' in data['include'][i]:
+                  del data['include'][i]['packages']
+              if 'base_image' in data['include'][i]:
+                  data['include'][i]['distro'] = data['include'][i]['base_image']
+                  del data['include'][i]['base_image']
+              data['include'][i]['distro'] = ':'.join([data['include'][i]['distro'], str(data['include'][i]['version'])])
+              del data['include'][i]['version']
+          matrix = json.dumps(data, sort_keys=True)
+          print('Generated Matrix: ' + matrix)
+          print('::set-output name=matrix::' + matrix)
 
   prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
     name: Prepare Test Environments
@@ -160,8 +176,8 @@ jobs:
           file: .github/dockerfiles/Dockerfile.build_test
           build-args: |
             BASE=${{ matrix.distro }}
-            PRE=${{ matrix.pre }}
-            RMJSONC=${{ matrix.rmjsonc }}
+            PRE=${{ matrix.env_prep }}
+            RMJSONC=${{ matrix.jsonc_removal }}
           outputs: type=oci,dest=/tmp/image.tar
           tags: test:${{ matrix.artifact_key }}
       - name: Upload image artifact
@@ -224,7 +240,7 @@ jobs:
           docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
-        if: matrix.rmjsonc != ''
+        if: matrix.jsonc_removal != ''
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
               /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
@@ -291,7 +307,7 @@ jobs:
           echo "::set-output name=image::$(cut -d ':' -f 3 image-info.txt)"
       - name: Install netdata and run the updater on ${{ matrix.distro }}
         run: |
-          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
                 /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -386,7 +402,7 @@ jobs:
       - name: Verify that artifacts work with installer
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/artifacts
-        run: packaging/installer/kickstart.sh --dont-start-it --disable-telemetry --dont-wait
+        run: packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -427,7 +443,7 @@ jobs:
       - name: Verify that artifacts work with installer
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/artifacts
-        run: packaging/installer/kickstart-static64.sh --dont-start-it --disable-telemetry --dont-wait
+        run: packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -461,7 +477,7 @@ jobs:
           name: final-artifacts
           path: final-artifacts
       - name: Setup Gcloud
-        uses: google-github-actions/setup-gcloud@v0.3
+        uses: google-github-actions/setup-gcloud@v0.5.0
         with:
           project_id: ${{ secrets.GCP_NIGHTLY_STORAGE_PROJECT }}
           service_account_key: ${{ secrets.GCP_STORAGE_SERVICE_ACCOUNT_KEY }}

@@ -227,4 +227,4 @@ multiplying the value of `out` by -1, Netdata creates the negative values seen i
 ![The system.io chart on a macOS
 laptop](https://user-images.githubusercontent.com/1153921/69286708-2cfb3900-0bb1-11ea-9fcd-dd8fbb2adf11.png)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdaemon%2Fconfig%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

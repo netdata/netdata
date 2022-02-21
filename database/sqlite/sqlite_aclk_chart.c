@@ -318,7 +318,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 
     uint64_t first_sequence;
     uint64_t last_sequence;
-    time_t last_timestamp;
+    time_t last_timestamp = 0;
 
     BUFFER *sql = buffer_create(1024);
 
@@ -682,7 +682,9 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     while(host) {
         if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
             rrd_unlock();
-            wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+            wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
+                     (struct aclk_database_worker_config *)host->dbsync_worker :
+                     (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
             if (likely(wc)) {
                 wc->chart_reset_count++;
                 __sync_synchronize();
@@ -979,6 +981,8 @@ int queue_chart_to_aclk(RRDSET *st)
 #ifndef ENABLE_NEW_CLOUD_PROTOCOL
 #ifdef ENABLE_ACLK
     aclk_update_chart(st->rrdhost, st->id, 1);
+#else
+    UNUSED(st);
 #endif
     return 0;
 #else

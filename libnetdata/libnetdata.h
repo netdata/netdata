@@ -274,7 +274,6 @@ extern int verify_netdata_host_prefix();
 extern int recursively_delete_dir(const char *path, const char *reason);
 
 extern volatile sig_atomic_t netdata_exit;
-extern const char *os_type;
 
 extern const char *program_version;
 
@@ -303,8 +302,20 @@ extern char *find_and_replace(const char *src, const char *find, const char *rep
 #define KILOBITS_IN_A_MEGABIT 1000
 
 /* misc. */
+
 #define UNUSED(x) (void)(x)
+
+#ifdef __GNUC__
+#define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
+#else
+#define UNUSED_FUNCTION(x) UNUSED_##x
+#endif
+
 #define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
+
+// Taken from linux kernel
+#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
+
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);
@@ -318,6 +329,7 @@ extern char *netdata_configured_host_prefix;
 #include "avl/avl.h"
 #include "inlined.h"
 #include "clocks/clocks.h"
+#include "completion/completion.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
 #ifdef ENABLE_HTTPS

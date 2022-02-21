@@ -3,6 +3,7 @@ title: "The step-by-step Netdata guide"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-00.md
 -->
+import { OneLineInstallWget, OneLineInstallCurl } from '../../src/components/OneLineInstall/'
 
 # The step-by-step Netdata guide
 
@@ -17,7 +18,7 @@ completely new to Netdata, or have never tried health monitoring/performance tro
 guide is perfect for you.
 
 If you have monitoring experience, or would rather get straight into configuring Netdata to your needs, you can jump
-straight into code and configurations with our [getting started guide](/docs/getting-started.md).
+straight into code and configurations with our [getting started guide](/docs/get-started.mdx).
 
 > This guide contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
 > other supported operating systems, like FreeBSD and macOS, but we can't make any guarantees.
@@ -46,9 +47,14 @@ This script will install Netdata from source, keep it up to date with nightly re
 [registry](/registry/README.md), and sends [_anonymous statistics_](/docs/anonymous-statistics.md) about how you use
 Netdata. We use this information to better understand how we can improve the Netdata experience for all our users.
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+To install Netdata, run the following as your normal user:
+
+<OneLineInstallWget/>
+
+Or, if you have cURL but not wget (such as on macOS):
+
+<OneLineInstallCurl/>
+
 
 Once finished, you'll have Netdata installed, and you'll be set up to get _nightly updates_ to get the latest features,
 improvements, and bugfixes.
@@ -111,4 +117,4 @@ MongoDB, TimescaleDB, and others.
 
 Run Netdata behind an Nginx proxy to improve performance, and enable TLS/HTTPS for better security.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-00&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

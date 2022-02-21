@@ -68,8 +68,9 @@ link](/packaging/installer/README.md), the Netdata devs give us several one-line
 any issues with these one liners and their bootstrapping scripts so far (If you guys run into anything do share). Run
 the following command in your container.
 
+<!-- candidate for reuse -->
 ```sh
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-wait
 ```
 
 After the install completes you should be able to hit the Netdata dashboard at <http://localhost:19999/> (replace
@@ -262,4 +263,4 @@ achieved you do not have to think about the monitoring system until Prometheus c
 happens there are options presented in the Prometheus documentation for solving this. Hope this was helpful, happy
 monitoring.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fexporting%2FWALKTHROUGH&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

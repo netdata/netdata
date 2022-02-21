@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "buildinfo.h"
 
 struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
 extern void analytics_exporting_connectors_ssl (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
-extern int aclk_connected;
+extern int aclk_connected, aclk_use_new_cloud_arch;
 
 struct collector {
     char *plugin;
@@ -52,6 +53,7 @@ void analytics_log_data(void)
     debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE     : [%s]", analytics_data.netdata_config_hosts_available);
     debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_AVAILABLE       : [%s]", analytics_data.netdata_host_cloud_available);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_AVAILABLE        : [%s]", analytics_data.netdata_host_aclk_available);
+    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_PROTOCOL         : [%s]", analytics_data.netdata_host_aclk_protocol);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.netdata_host_aclk_implementation);
     debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.netdata_host_agent_claimed);
     debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
@@ -97,6 +99,7 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_config_hosts_available);
     freez(analytics_data.netdata_host_cloud_available);
     freez(analytics_data.netdata_host_aclk_available);
+    freez(analytics_data.netdata_host_aclk_protocol);
     freez(analytics_data.netdata_host_aclk_implementation);
     freez(analytics_data.netdata_host_agent_claimed);
     freez(analytics_data.netdata_host_cloud_enabled);
@@ -357,47 +360,17 @@ void analytics_alarms_notifications(void)
     buffer_free(b);
 }
 
-char *get_value_from_key(char *buffer, char *key)
-{
-    char *s = NULL, *t = NULL;
-    s = t = buffer + strlen(key) + 2;
-    if (s) {
-        while (*s == '\'')
-            s++;
-        while (*++t != '\0');
-        while (--t > s && *t == '\'')
-            *t = '\0';
-    }
-    return s;
-}
-
-/*
- * Checks for the existence of .install_type file and reads it
- */
 void analytics_get_install_type(void)
 {
-    char *install_type_filename;
-    analytics_set_data_str(&analytics_data.netdata_install_type, "");
-    analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, "");
-
-    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
-    install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
-    snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
-
-    FILE *fp = fopen(install_type_filename, "r");
-    if (fp) {
-        char *s, buf[256 + 1];
-        size_t len = 0;
-
-        while ((s = fgets_trim_len(buf, 256, fp, &len))) {
-            if (!strncmp(buf, "INSTALL_TYPE='", 14))
-                analytics_set_data_str(&analytics_data.netdata_install_type, (char *)get_value_from_key(buf, "INSTALL_TYPE"));
-            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
-                analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, (char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
-        }
-        fclose(fp);
+    if (localhost->system_info->install_type == NULL) {
+        analytics_set_data_str(&analytics_data.netdata_install_type, "unknown");
+    } else {
+        analytics_set_data_str(&analytics_data.netdata_install_type, localhost->system_info->install_type);
     }
-    freez(install_type_filename);
+
+    if (localhost->system_info->prebuilt_dist != NULL) {
+        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, localhost->system_info->prebuilt_dist);
+    }
 }
 
 /*
@@ -488,7 +461,7 @@ void analytics_alarms(void)
 }
 
 /*
- * Misc attributes to get (run from meta)
+ * Misc attributes to get (run from start)
  */
 void analytics_misc(void)
 {
@@ -499,13 +472,6 @@ void analytics_misc(void)
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "false");
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "");
 #endif
-
-#ifdef ENABLE_ACLK
-    if (aclk_connected)
-        analytics_set_data(&analytics_data.netdata_host_aclk_available, "true");
-    else
-#endif
-        analytics_set_data(&analytics_data.netdata_host_aclk_available, "false");
 
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO) ? "true" : "false");
 
@@ -521,6 +487,23 @@ void analytics_misc(void)
     if (config_get_boolean(CONFIG_SECTION_REGISTRY, "enabled", CONFIG_BOOLEAN_NO) &&
         web_server_mode != WEB_SERVER_MODE_NONE)
         analytics_set_data(&analytics_data.netdata_config_is_private_registry, "true");
+}
+
+void analytics_aclk(void)
+{
+#ifdef ENABLE_ACLK
+    if (aclk_connected) {
+        analytics_set_data(&analytics_data.netdata_host_aclk_available, "true");
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        if (aclk_use_new_cloud_arch)
+            analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "New");
+        else
+#endif
+            analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "Legacy");
+    }
+    else
+#endif
+        analytics_set_data(&analytics_data.netdata_host_aclk_available, "false");
 }
 
 /*
@@ -548,6 +531,7 @@ void analytics_gather_mutable_meta_data(void)
     analytics_alarms();
     analytics_charts();
     analytics_metrics();
+    analytics_aclk();
 
     rrdhost_unlock(localhost);
 
@@ -889,6 +873,7 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "null");
     analytics_set_data(&analytics_data.netdata_host_aclk_implementation, "null");
     analytics_set_data(&analytics_data.netdata_host_aclk_available, "null");
+    analytics_set_data(&analytics_data.netdata_host_aclk_protocol, "null");
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, "null");
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "null");
     analytics_set_data(&analytics_data.netdata_config_https_available, "null");
@@ -976,7 +961,7 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
         as_script,
         action,
         action_result,
@@ -1010,6 +995,7 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_config_hosts_available,
         analytics_data.netdata_host_cloud_available,
         analytics_data.netdata_host_aclk_available,
+        analytics_data.netdata_host_aclk_protocol,
         analytics_data.netdata_host_aclk_implementation,
         analytics_data.netdata_host_agent_claimed,
         analytics_data.netdata_host_cloud_enabled,

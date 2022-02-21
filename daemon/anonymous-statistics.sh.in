@@ -18,7 +18,11 @@ ACTION_DATA=$(echo "${ACTION_DATA}" | tr '"' "'")
 # -------------------------------------------------------------------------------------------------
 # check opt-out
 
-if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ] || [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ] ||
+  [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
+  [ -n "$DISABLE_TELEMETRY" ] ||
+  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
+  [ -n "$DO_NOT_TRACK" ]; then
   exit 0
 fi
 
@@ -54,15 +58,16 @@ NETDATA_CONFIG_IS_PARENT="${29}"
 NETDATA_CONFIG_HOSTS_AVAILABLE="${30}"
 NETDATA_HOST_CLOUD_AVAILABLE="${31}"
 NETDATA_HOST_ACLK_AVAILABLE="${32}"
-NETDATA_HOST_ACLK_IMPLEMENTATION="${33}"
-NETDATA_HOST_AGENT_CLAIMED="${34}"
-NETDATA_HOST_CLOUD_ENABLED="${35}"
-NETDATA_CONFIG_HTTPS_AVAILABLE="${36}"
-NETDATA_INSTALL_TYPE="${37}"
-NETDATA_IS_PRIVATE_REGISTRY="${38}"
-NETDATA_USE_PRIVATE_REGISTRY="${39}"
-NETDATA_CONFIG_OOM_SCORE="${40}"
-NETDATA_PREBUILT_DISTRO="${41}"
+NETDATA_HOST_ACLK_PROTOCOL="${33}"
+NETDATA_HOST_ACLK_IMPLEMENTATION="${34}"
+NETDATA_HOST_AGENT_CLAIMED="${35}"
+NETDATA_HOST_CLOUD_ENABLED="${36}"
+NETDATA_CONFIG_HTTPS_AVAILABLE="${37}"
+NETDATA_INSTALL_TYPE="${38}"
+NETDATA_IS_PRIVATE_REGISTRY="${39}"
+NETDATA_USE_PRIVATE_REGISTRY="${40}"
+NETDATA_CONFIG_OOM_SCORE="${41}"
+NETDATA_PREBUILT_DISTRO="${42}"
 
 
 # define body of request to be sent
@@ -147,6 +152,7 @@ REQ_BODY="$(cat << EOF
         "host_cloud_enabled": ${NETDATA_HOST_CLOUD_ENABLED},
         "host_agent_claimed": ${NETDATA_HOST_AGENT_CLAIMED},
         "host_aclk_available": ${NETDATA_HOST_ACLK_AVAILABLE},
+        "host_aclk_protocol": ${NETDATA_HOST_ACLK_PROTOCOL},
         "host_aclk_implementation": ${NETDATA_HOST_ACLK_IMPLEMENTATION},
         "mirrored_host_count": ${NETDATA_MIRRORED_HOST_COUNT},
         "mirrored_hosts_reachable": ${NETDATA_MIRRORED_HOSTS_REACHABLE},

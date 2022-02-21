@@ -6,14 +6,15 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Install Netdata on Synology
 
-The documentation previously recommended installing the Debian Chroot package from the Synology community package
-sources and then running Netdata from within the chroot. This does not work, as the chroot environment does not have
-access to `/proc`, and therefore exposes very few metrics to Netdata. Additionally, [this
-issue](https://github.com/SynoCommunity/spksrc/issues/2758), still open as of 2018/06/24, indicates that the Debian
-Chroot package is not suitable for DSM versions greater than version 5 and may corrupt system libraries and render the
-NAS unable to boot.
+> 💡 This document is maintained by Netdata's community, and may not be completely up-to-date. Please double-check the
+> details of the installation process, before proceeding.
+>
+> You can help improve this document by 
+> [submitting a PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md) 
+> with your recommended improvements or changes. Thank you!
 
-The good news is that the [64-bit static installer](kickstart-64.md) works fine if your NAS is one that uses the amd64 architecture. It
+
+The good news is that our [one-line installation script](kickstart.md) works fine if your NAS is one that uses the amd64 architecture. It
 will install the content into `/opt/netdata`, making future removal safe and simple.
 
 ## Run as netdata user
@@ -57,4 +58,4 @@ installed. You'll have to do this manually:
 
 3. Make sure `/etc/rc.netdata` is executable: `chmod 0755 /etc/rc.netdata`.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fsynology&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

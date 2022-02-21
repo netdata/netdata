@@ -2,14 +2,11 @@
 title: "Export metrics to Prometheus"
 description: "Export Netdata metrics to Prometheus for archiving and further analysis."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/prometheus/README.md
-sidebar_label: Using Netdata with Prometheus
+sidebar_label: "Using Netdata with Prometheus"
 -->
+import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
 
 # Using Netdata with Prometheus
-
-> IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.7. The new Prometheus exporting
-> connector for Netdata supports a lot more features and is aligned to the development of the rest of the Netdata
-> exporting connectors.
 
 Prometheus is a distributed monitoring system which offers a very simple setup along with a robust data model. Recently
 Netdata added support for Prometheus. I'm going to quickly show you how to install both Netdata and Prometheus on the
@@ -21,11 +18,17 @@ are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM
 ### Installing Netdata
 
 There are number of ways to install Netdata according to [Installation](/packaging/installer/README.md). The suggested way
-of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
+of installing the latest Netdata and keep it upgrade automatically.
 
-```sh
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+<!-- candidate for reuse -->
+
+To install Netdata, run the following as your normal user:
+
+<OneLineInstallWget/>
+
+Or, if you have cURL but not wget (such as on macOS):
+
+<OneLineInstallCurl/>
 
 At this point we should have Netdata listening on port 19999. Attempt to take your browser here:
 
@@ -207,9 +210,6 @@ this and click on 'targets' We should see the Netdata host as a scraped target.
 ---
 
 ## Netdata support for Prometheus
-
-> IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.6. The new format allows easier
-> queries for metrics and supports both `as collected` and normalized metrics.
 
 Before explaining the changes, we have to understand the key differences between Netdata and Prometheus.
 
@@ -458,4 +458,4 @@ through a web proxy, or when multiple Prometheus servers are NATed to a single I
 `&server=NAME` to the URL. This `NAME` is used by Netdata to uniquely identify each Prometheus server and keep track of
 its last access time.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fexporting%2Fprometheus%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

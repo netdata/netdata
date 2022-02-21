@@ -11,51 +11,39 @@ consolidate and de-duplicate alerts from multiple sources for quick
 ‘at-a-glance’ visualisation. With just one system you can monitor
 alerts from many other monitoring tools on a single screen.
 
-![](https://docs.alerta.io/en/latest/_images/alerta-screen-shot-3.png)
+![Alerta dashboard](https://docs.alerta.io/_images/alerta-screen-shot-3.png "Alerta dashboard showing several alerts.")
 
-Netadata alarms can be sent to Alerta so you can see in one place
-alerts coming from many Netdata hosts or also from a multi-host
-Netadata configuration. The big advantage over other notifications
-systems is that there is a main view of all active alarms with
-the most recent state, and it is also possible to view alarm history.
+Alerta's advantage is the main view, where you can see all active alarms with the most recent state. You can also view an alert history. You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host
+Netdata configuration. 
 
 ## Deploying Alerta
 
-It is recommended to set up the server in a separated server, VM or
-container. If you have other Nginx or Apache server in your organization,
+The recommended setup is using a dedicated server, VM or container. If you have other NGINX or Apache servers in your organization,
 it is recommended to proxy to this new server.
 
-The easiest way to install Alerta is to use the Docker image available
-on [Docker hub][1]. Alternatively, follow the ["getting started"][2]
-tutorial to deploy Alerta to an Ubuntu server. More advanced
-configurations are out os scope of this tutorial but information
-about different deployment scenarios can be found in the  [docs][3].
+You can install Alerta in several ways:
+- **Docker**: Alerta provides a [Docker image](https://hub.docker.com/r/alerta/alerta-web/) to get you started quickly.
+- **Deployment on Ubuntu server**: Alerta's [getting started tutorial](https://docs.alerta.io/gettingstarted/tutorial-1-deploy-alerta.html) walks you through this process. 
+- **Advanced deployment scenarios**: More ways to install and deploy Alerta are documented on the [Alerta docs](http://docs.alerta.io/en/latest/deployment.html).
 
-[1]: https://hub.docker.com/r/alerta/alerta-web/
+## Sending alerts to Alerta
 
-[2]: http://alerta.readthedocs.io/en/latest/gettingstarted/tutorial-1-deploy-alerta.html
-
-[3]: http://docs.alerta.io/en/latest/deployment.html
-
-## Send alarms to Alerta
-
-Step 1. Create an API key (if authentication is enabled)
+### Step 1. Create an API key (if authentication in Alerta is enabled)
 
 You will need an API key to send messages from any source, if
-Alerta is configured to use authentication (recommended). To
-create an API key go to "Configuration -> API Keys" and create
-a new API key called "netdata" with `write:alerts` permission.
+Alerta is configured to use authentication (recommended). 
 
-Step 2. configure Netdata to send alarms to Alerta
+Create a new API key in Alerta: 
+1. Go to *Configuration* > *API Keys* 
+2. Create a new API key called "netdata" with `write:alerts` permission.
 
-On your system run:
-
+### Step 2. Configure Netdata to send alerts to Alerta
+1. Edit the `health_alarm_notify.conf` by running:
 ```sh
 /etc/netdata/edit-config health_alarm_notify.conf
 ```
 
-and modify the file as below:
-
+2. Modify the file as below:
 ```
 # enable/disable sending alerta notifications
 SEND_ALERTA="YES"
@@ -84,11 +72,10 @@ We can test alarms using the standard approach:
 /opt/netdata/netdata-plugins/plugins.d/alarm-notify.sh test
 ```
 
-Note: Netdata will send 3 alarms, and because last alarm is "CLEAR"
-you will not see them in main Alerta page, you need to select to see
-"closed" alarm in top-right lookup. A little change in `alarm-notify.sh`
-that let us test each state one by one will be useful.
+> **Note** This script will send 3 alarms. 
+> Alerta will not show the alerts in the main page, because last alarm is "CLEAR".
+> To see the test alarms, you need to select "closed" alarms in the top-right lookup. 
 
-For more information see <https://docs.alerta.io>
+For more information see the [Alerta documentation](https://docs.alerta.io)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Falerta%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

@@ -6,24 +6,11 @@ on:
       - master
   pull_request: null
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  checksum-checks:
-    name: Checksums
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git clone repository
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - name: Run checksum checks on kickstart files
-        env:
-          LOCAL_ONLY: "true"
-        run: |
-          ./tests/installer/checksums.sh
   libressl-checks:
     name: LibreSSL
     runs-on: ubuntu-latest

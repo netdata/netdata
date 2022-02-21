@@ -58,7 +58,10 @@ while [ "${1}" ]; do
   shift 1
 done
 
-if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
+  [ -n "$DISABLE_TELEMETRY" ] ||
+  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
+  [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_DISABLE_TELEMETRY=1
   REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemetry"
 fi
@@ -212,9 +215,9 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 # -----------------------------------------------------------------------------
 
-progress "fix plugin permissions"
+progress "changing plugins ownership and setting setuid"
 
-for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin; do
+for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin perf.plugin slabinfo.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then

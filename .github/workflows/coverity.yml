@@ -9,7 +9,7 @@ on:
       - .github/workflows/coverity.yml
       - coverity-scan.sh
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 concurrency:
   group: coverity-${{ github.ref }}
   cancel-in-progress: true

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "./config.h"
 #include "common.h"
+#include "buildinfo.h"
 
 // Optional features
 
@@ -49,19 +50,21 @@
 #define FEAT_ML 0
 #endif
 
+#ifdef  ENABLE_COMPRESSION
+#define  FEAT_STREAM_COMPRESSION 1
+#else
+#define  FEAT_STREAM_COMPRESSION 0
+#endif  //ENABLE_COMPRESSION
+
+
 // Optional libraries
 
 #ifdef HAVE_PROTOBUF
-#if defined(ACLK_NG) || defined(ENABLE_PROMETHEUS_REMOTE_WRITE)
 #define FEAT_PROTOBUF 1
 #ifdef BUNDLED_PROTOBUF
 #define FEAT_PROTOBUF_BUNDLED " (bundled)"
 #else
 #define FEAT_PROTOBUF_BUNDLED " (system)"
-#endif
-#else
-#define FEAT_PROTOBUF 0
-#define FEAT_PROTOBUF_BUNDLED ""
 #endif
 #else
 #define FEAT_PROTOBUF 0
@@ -200,8 +203,70 @@
 
 #define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
 
+
+char *get_value_from_key(char *buffer, char *key) {
+    char *s = NULL, *t = NULL;
+    s = t = buffer + strlen(key) + 2;
+    if (s) {
+        while (*s == '\'')
+            s++;
+        while (*++t != '\0');
+        while (--t > s && *t == '\'')
+            *t = '\0';
+    }
+    return s;
+}
+
+void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt_dist) {
+    char *install_type_filename;
+
+    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
+    install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
+    snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
+
+    FILE *fp = fopen(install_type_filename, "r");
+    if (fp) {
+        char *s, buf[256 + 1];
+        size_t len = 0;
+
+        while ((s = fgets_trim_len(buf, 256, fp, &len))) {
+            if (!strncmp(buf, "INSTALL_TYPE='", 14))
+                *install_type = strdupz((char *)get_value_from_key(buf, "INSTALL_TYPE"));
+            else if (!strncmp(buf, "PREBUILT_ARCH='", 15))
+                *prebuilt_arch = strdupz((char *)get_value_from_key(buf, "PREBUILT_ARCH"));
+            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
+                *prebuilt_dist = strdupz((char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
+        }
+        fclose(fp);
+    }
+    freez(install_type_filename);
+}
+
 void print_build_info(void) {
+    char *install_type = NULL;
+    char *prebuilt_arch = NULL;
+    char *prebuilt_distro = NULL;
+    get_install_type(&install_type, &prebuilt_arch, &prebuilt_distro);
+
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
+
+    if (install_type == NULL) {
+        printf("Install type: unknown\n");
+    } else {
+        printf("Install type: %s\n", install_type);
+    }
+
+    if (prebuilt_arch != NULL) {
+        printf("    Binary architecture: %s\n", prebuilt_arch);
+    }
+
+    if (prebuilt_distro != NULL) {
+        printf("    Packaging distro: %s\n", prebuilt_distro);
+    }
+
+    freez(install_type);
+    freez(prebuilt_arch);
+    freez(prebuilt_distro);
 
     printf("Features:\n");
     printf("    dbengine:                   %s\n", FEAT_YES_NO(FEAT_DBENGINE));
@@ -212,6 +277,7 @@ void print_build_info(void) {
     printf("    ACLK Legacy:                %s\n", FEAT_YES_NO(0));
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
+    printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
 
     printf("Libraries:\n");
     printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
@@ -242,7 +308,6 @@ void print_build_info(void) {
     printf("    Prometheus Remote Write: %s\n", FEAT_YES_NO(FEAT_REMOTE_WRITE));
 };
 
-
 #define FEAT_JSON_BOOL(x) ((x) ? "true" : "false")
 // This intentionally does not use JSON-C so it works even if JSON-C is not present
 // This is used for anonymous statistics reporting, so it intentionally
@@ -265,6 +330,7 @@ void print_build_info_json(void) {
 
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
+    printf("    \"stream-compression\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
     printf("  },\n");
 
     printf("  \"libs\": {\n");
@@ -311,6 +377,7 @@ void analytics_build_info(BUFFER *b) {
     if(NEW_CLOUD_PROTO)      buffer_strcat (b, "|New Cloud Protocol Support");
     if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
     if(FEAT_ML)              buffer_strcat (b, "|Machine Learning");
+    if(FEAT_STREAM_COMPRESSION) buffer_strcat (b, "|Stream Compression");
 
     if(FEAT_PROTOBUF)        buffer_strcat (b, "|protobuf");
     if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");

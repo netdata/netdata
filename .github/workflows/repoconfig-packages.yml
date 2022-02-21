@@ -3,31 +3,69 @@
 name: Repository Packages
 on:
   workflow_dispatch: null
+  pull_request:
+    paths:
+      - packaging/repoconfig/**
+      - .github/workflows/repoconfig-packages.yml
+  push:
+    branches:
+      - master
+    paths:
+      - packaging/repoconfig/**
+      - .github/workflows/repoconfig-packages.yml
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 jobs:
+  matrix:
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        shell: python3 {0}
+        run: |
+          from ruamel.yaml import YAML
+          import json
+          yaml = YAML(typ='safe')
+          entries = list()
+
+          with open('.github/data/distros.yml') as f:
+              data = yaml.load(f)
+
+          for i, v in enumerate(data['include']):
+              if 'packages' in data['include'][i]:
+                  entries.append({
+                      'distro': data['include'][i]['distro'],
+                      'version': data['include'][i]['version'],
+                      'pkgclouddistro': data['include'][i]['packages']['repo_distro'],
+                      'format': data['include'][i]['packages']['type'],
+                      'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
+                      'platform': data['platform_map']['amd64'],
+                      'arch': 'amd64'
+                  })
+
+          entries.sort(key=lambda k: (k['arch'], k['distro'], k['version']))
+          matrix = json.dumps({'include': entries}, sort_keys=True)
+          print('Generated Matrix: ' + matrix)
+          print('::set-output name=matrix::' + matrix)
+
   build:
     name: Build
     runs-on: ubuntu-latest
     env:
-      DO_NOT_TRACK: 1
+      DISABLE_TELEMETRY: 1
       DOCKER_CLI_EXPERIMENTAL: enabled
+    needs:
+      - matrix
     strategy:
-      # This needs to be kept in sync with the matrix in packaging.yml, but should only include the AMD64 lines.
-      matrix:
-        include:
-          - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
-          - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
-          - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "21.10", pkgclouddistro: ubuntu/impish, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: centos, version: "7", pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
-          - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
-          - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
-          - {distro: fedora, version: "35", pkgclouddistro: fedora/35, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
-          - {distro: opensuse, version: "15.3", pkgclouddistro: opensuse/15.3, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
-          - {distro: oraclelinux, version: "8", pkgclouddistro: ol/8, format: rpm, base_image: oraclelinux, platform: linux/amd64, arch: amd64}
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
       # We intentiaonally disable the fail-fast behavior so that a
       # build failure for one version doesn't prevent us from publishing
       # successfully built and tested packages for another version.
@@ -47,10 +85,11 @@ jobs:
       - name: Build Packages
         shell: bash
         run: |
-          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --platform ${{ matrix.platform }} \
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --platform ${{ matrix.platform }} \
               -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: Upload Packages
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         shell: bash
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}

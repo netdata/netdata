@@ -250,7 +250,8 @@ if [ -r /sys/devices/system/cpu/cpu0/cpufreq/base_frequency ]; then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
   fi
 
-  CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency)"
+  value="$(cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency)"
+  CPU_FREQ="$((value * 1000))"
 elif [ -n "${possible_cpu_freq}" ]; then
   CPU_FREQ="${possible_cpu_freq}"
 elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ]; then
@@ -258,7 +259,8 @@ elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ]; then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
   fi
 
-  CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
+  value="$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
+  CPU_FREQ="$((value * 1000))"
 fi
 
 freq_units="$(echo "${CPU_FREQ}" | cut -f 2 -d ' ')"
@@ -335,7 +337,7 @@ else
     # These translate to the prefixs of files in `/dev` indicating the device type.
     # They are sorted by lowest used device major number, with dynamically assigned ones at the end.
     # We use this to look up device major numbers in `/proc/devices`
-    device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme'
+    device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme virtblk blkext'
 
     for name in ${device_names}; do
       if grep -qE " ${name}\$" /proc/devices; then

@@ -5,15 +5,15 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 import { Install, InstallBox } from '../../../src/components/Install/'
 
+import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
+
 # Installation guide
 
 Netdata is a monitoring agent designed to run on all your systems: physical and virtual servers, containers, even
 IoT/edge devices. Netdata runs on Linux, FreeBSD, macOS, Kubernetes, Docker, and all their derivatives.
 
 The best way to install Netdata is with our [**automatic one-line installation
-script**](#automatic-one-line-installation-script), which works with all Linux distributions and macOS environments, or our [**.deb/rpm
-packages**](/packaging/installer/methods/packages.md), which seamlessly install with your distribution's package
-manager.
+script**](#automatic-one-line-installation-script), which works with all Linux distributions and most macOS environments.
 
 If you want to install Netdata with Docker, on a Kubernetes cluster, or a different operating system, see [Have a
 different operating system, or want to try another
@@ -36,24 +36,20 @@ _actively_ contributing to Netdata's future.
 
 This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others, as well as on mac OS environments.
 
-To install Netdata from source, including all dependencies required to connect to Netdata Cloud, and get _automatic
-nightly updates_, run the following as your normal user:
+To install Netdata, including all dependencies required to connect to Netdata Cloud, and get _automatic nightly
+updates_, run the following as your normal user:
 
-**Linux**
+<OneLineInstallWget/>
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+Or, if you have cURL but not wget (such as on macOS):
 
-**macOS**
+<OneLineInstallCurl/>
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
-```
+This script will preferentially use native DEB/RPM packages if we provide them for your platform.
 
 To see more information about this installation script, including how to disable automatic updates, get nightly vs.
 stable releases, or disable anonymous statistics, see the [`kickstart.sh` method
-page](/packaging/installer/methods/kickstart.md). 
+page](/packaging/installer/methods/kickstart.md).
 
 Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
 releases](#nightly-vs-stable-releases).
@@ -71,9 +67,8 @@ external databases, and more.
 
 ## Have a different operating system, or want to try another method?
 
-Netdata works on many different operating systems, each with a few possible installation methods. To see the full list
-of approved methods for each operating system/version we support, see our [distribution
-matrix](/packaging/DISTRIBUTIONS.md).
+Netdata works on many different platforms. To see all supported platforms, check out our [platform support
+policy](/packaging/PLATFORM_SUPPORT.md).
 
 Below, you can find a few additional installation methods, followed by separate instructions for a variety of unique
 operating systems.
@@ -87,27 +82,19 @@ operating systems.
     svg="linux" />
   <InstallBox
     to="/docs/agent/packaging/docker"
-    os="Run with Docker" 
+    os="Run with Docker"
     svg="docker" />
   <InstallBox
     to="/docs/agent/packaging/installer/methods/kubernetes"
-    os="Deploy on Kubernetes" 
+    os="Deploy on Kubernetes"
     svg="kubernetes" />
    <InstallBox
     to="/docs/agent/packaging/installer/methods/macos"
-    os="Install on macOS" 
+    os="Install on macOS"
     svg="macos" />
   <InstallBox
-    to="/docs/agent/packaging/installer/methods/packages"
-    os="Linux with .deb/.rpm packages" 
-    svg="linux" />
-  <InstallBox
-    to="/docs/agent/packaging/installer/methods/kickstart-64"
-    os="Linux with static 64-bit binary" 
-    svg="linux" />
-  <InstallBox
     to="/docs/agent/packaging/installer/methods/manual"
-    os="Linux from Git" 
+    os="Linux from Git"
     svg="linux" />
   <InstallBox
     to="/docs/agent/packaging/installer/methods/source"
@@ -128,7 +115,7 @@ option when you install or update Netdata using the [automatic one-line installa
 script](#automatic-one-line-installation-script).
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update
@@ -184,9 +171,6 @@ If you're running an older Linux distribution or one that has reached EOL, such 
 versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
 helps securely encrypt SSL connections.
 
-We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), which uses an
-up-to-date version of OpenSSL with hostname validation enabled.
-
 If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
 with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
 man-in-the-middle attacks.
@@ -230,13 +214,10 @@ We've received reports from the community about issues with running the `kicksta
 a distribution-installed version of OpenSSL and a manually-installed local version. The Agent's installer cannot handle
 both.
 
-We recommend you install Netdata with the [static binary](/packaging/installer/methods/kickstart-64.md) to avoid the
-issue altogether. Or, you can manually remove one version of OpenSSL to remove the conflict.
-
 ### Clang compiler on Linux
 
 Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
 section on `nonrepresentable section on output`
 errors](/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

@@ -7,8 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/READM
 
 Netdata can collect metrics from hundreds of different sources, be they internal data created by the system itself, or
 external data created by services or applications. To see _all_ of the sources Netdata collects from, view our [list of
-supported collectors](/collectors/COLLECTORS.md), and then view our [quickstart guide](/collectors/QUICKSTART.md) to get
-up-and-running.
+supported collectors](/collectors/COLLECTORS.md).
 
 There are two essential points to understand about how collecting metrics works in Netdata:
 
@@ -17,12 +16,10 @@ There are two essential points to understand about how collecting metrics works 
 -   Upon startup, Netdata will **auto-detect** any application or service that has a
     [collector](/collectors/COLLECTORS.md), as long as both the collector and the app/service are configured correctly.
 
-Most users will want to enable a new Netdata collector for their app/service. For those details, see our [quickstart
-guide](/collectors/QUICKSTART.md).
+Most users will want to enable a new Netdata collector for their app/service. For those details, see
+our [collectors' configuration reference](/collectors/REFERENCE.md).
 
 ## Take your next steps with collectors
-
-[Collectors quickstart](/collectors/QUICKSTART.md)
 
 [Supported collectors list](/collectors/COLLECTORS.md)
 
@@ -49,4 +46,4 @@ long-term metrics storage, by archiving metrics to like Graphite, Prometheus, Mo
 **[Exporting](/exporting/README.md)**: An experimental refactoring of our backends system with a modular system and
 support for exporting metrics to multiple systems simultaneously.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

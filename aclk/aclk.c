@@ -222,7 +222,7 @@ static void msg_callback_old_protocol(const char *topic, const void *msg, size_t
         return;
     }
 
-    aclk_handle_cloud_message(cmsg);
+    aclk_handle_cloud_cmd_message(cmsg);
 }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
@@ -320,8 +320,12 @@ static int handle_connection(mqtt_wss_client client)
             return 1;
         }
 
-        if (disconnect_req) {
+        if (disconnect_req || aclk_kill_link) {
+            info("Going to restart connection due to disconnect_req=%s (cloud req), aclk_kill_link=%s (reclaim)",
+                disconnect_req ? "true" : "false",
+                aclk_kill_link ? "true" : "false");
             disconnect_req = 0;
+            aclk_kill_link = 0;
             aclk_graceful_disconnect(client);
             aclk_queue_unlock();
             aclk_shared_state.mqtt_shutdown_msg_id = -1;
@@ -814,6 +818,16 @@ void *aclk_main(void *ptr)
     do {
         if (aclk_attempt_to_connect(mqttwss_client))
             goto exit_full;
+
+#if defined(ENABLE_ACLK) && !defined(ENABLE_NEW_CLOUD_PROTOCOL)
+        error_report("############################  WARNING  ###############################");
+        error_report("#       Your agent is configured to connect to cloud but has         #");
+        error_report("#      no protobuf protocol support (uses legacy JSON protocol)      #");
+        error_report("#  Legacy protocol will be deprecated soon (planned 1st March 2022)  #");
+        error_report("#  Visit following link for more info and instructions how to solve  #");
+        error_report("#   https://www.netdata.cloud/blog/netdata-clouds-new-architecture   #");
+        error_report("######################################################################");
+#endif
 
         // warning this assumes the popcorning is relative short (3s)
         // if that changes call mqtt_wss_service from within

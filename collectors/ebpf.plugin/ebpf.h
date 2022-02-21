@@ -27,6 +27,7 @@
 #include "libnetdata/config/appconfig.h"
 #include "libnetdata/ebpf/ebpf.h"
 #include "libnetdata/procfile/procfile.h"
+#include "collectors/cgroups.plugin/sys_fs_cgroup.h"
 #include "daemon/main.h"
 
 #include "ebpf_apps.h"
@@ -96,7 +97,9 @@ enum ebpf_main_index {
     EBPF_OPTION_VERSION,
     EBPF_OPTION_HELP,
     EBPF_OPTION_GLOBAL_CHART,
-    EBPF_OPTION_RETURN_MODE
+    EBPF_OPTION_RETURN_MODE,
+    EBPF_OPTION_LEGACY,
+    EBPF_OPTION_CORE
 };
 
 typedef struct ebpf_tracepoint {
@@ -126,6 +129,11 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
 #define NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU "swap (eBPF)"
 #define NETDATA_SYSTEM_IPC_SHM_SUBMENU "ipc shared memory"
+#define NETDATA_MONITORING_FAMILY "netdata"
+
+// Statistics charts
+#define NETDATA_EBPF_THREADS "ebpf_threads"
+#define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
@@ -159,7 +167,6 @@ extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern int isrh;
 extern char *ebpf_plugin_dir;
-extern char kernel_string[64];
 
 extern pthread_mutex_t collect_data_mutex;
 extern pthread_cond_t collect_data_cond_var;
@@ -256,6 +263,7 @@ extern sem_t *shm_sem_ebpf_cgroup;
 extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
 extern uint32_t finalized_threads;
+extern ebpf_plugin_stats_t plugin_statistics;
 
 // Socket functions and variables
 // Common functions
@@ -268,6 +276,7 @@ extern void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
 extern void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
                                       char *charttype, char *context, int order, int update_every);
 extern void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
+void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 

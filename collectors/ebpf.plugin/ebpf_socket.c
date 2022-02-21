@@ -1295,11 +1295,10 @@ netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_sock
  *
  * @param values        the values used to calculate the data.
  * @param key           the key to store  data.
- * @param removesock    check if this socket must be removed .
  * @param family        the connection family
  * @param end           the values size.
  */
-static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int *removesock, int family, int end)
+static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int family, int end)
 {
     uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
     uint16_t retransmit = 0;
@@ -1320,8 +1319,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
 
         if (w->ct > ct)
             ct = w->ct;
-
-        *removesock += (int)w->removeme;
     }
 
     values[0].recv_packets += precv;
@@ -1329,7 +1326,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].recv_bytes   += brecv;
     values[0].sent_bytes   += bsent;
     values[0].retransmit   += retransmit;
-    values[0].removeme     += (uint8_t)*removesock;
     values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
     values[0].ct           = ct;
 
@@ -1357,8 +1353,6 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
 
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
-    netdata_socket_idx_t removeme;
-    int removesock = 0;
 
     netdata_socket_t *values = socket_values;
     size_t length = ebpf_nprocs*sizeof(netdata_socket_t);
@@ -1375,22 +1369,12 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
             continue;
         }
 
-        if (removesock)
-            bpf_map_delete_elem(fd, &removeme);
-
         if (network_connection) {
-            removesock = 0;
-            hash_accumulator(values, &key, &removesock, family, end);
+            hash_accumulator(values, &key, family, end);
         }
-
-        if (removesock)
-            removeme = key;
 
         key = next_key;
     }
-
-    if (removesock)
-        bpf_map_delete_elem(fd, &removeme);
 
     test = bpf_map_lookup_elem(fd, &next_key, values);
     if (test < 0) {
@@ -1398,12 +1382,8 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
     }
 
     if (network_connection) {
-        removesock = 0;
-        hash_accumulator(values, &next_key, &removesock, family, end);
+        hash_accumulator(values, &next_key, family, end);
     }
-
-    if (removesock)
-        bpf_map_delete_elem(fd, &next_key);
 }
 
 /**
@@ -1575,6 +1555,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
     curr->retransmit = eb->retransmit;
     curr->call_udp_sent = eb->call_udp_sent;
     curr->call_udp_received = eb->call_udp_received;
+    curr->call_close = eb->close;
 }
 
 /**
@@ -1595,6 +1576,7 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
         total->retransmit += move->retransmit;
         total->call_udp_sent += move->call_udp_sent;
         total->call_udp_received += move->call_udp_received;
+        total->close += move->close;
     }
 }
 
@@ -1652,6 +1634,7 @@ static void ebpf_update_socket_cgroup()
                 publish->retransmit = in->retransmit;
                 publish->call_udp_sent = in->call_udp_sent;
                 publish->call_udp_received = in->call_udp_received;
+                publish->call_close = in->call_close;
             } else {
                 if (!bpf_map_lookup_elem(fd, &pid, eb)) {
                     ebpf_socket_bandwidth_accumulator(eb);
@@ -1665,6 +1648,7 @@ static void ebpf_update_socket_cgroup()
                     publish->retransmit = out->retransmit;
                     publish->call_udp_sent = out->call_udp_sent;
                     publish->call_udp_received = out->call_udp_received;
+                    publish->call_close = out->close;
                 }
             }
         }
@@ -1695,6 +1679,7 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
         accumulator.retransmit += w->retransmit;
         accumulator.call_udp_received += w->call_udp_received;
         accumulator.call_udp_sent += w->call_udp_sent;
+        accumulator.call_close += w->close;
 
         pids = pids->next;
     }
@@ -1706,6 +1691,7 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
     socket->retransmit = (accumulator.retransmit >= socket->retransmit) ? accumulator.retransmit : socket->retransmit;
     socket->call_udp_sent = (accumulator.call_udp_sent >= socket->call_udp_sent) ? accumulator.call_udp_sent : socket->call_udp_sent;
     socket->call_udp_received = (accumulator.call_udp_received >= socket->call_udp_received) ? accumulator.call_udp_received : socket->call_udp_received;
+    socket->call_close = (accumulator.call_close >= socket->call_close) ? accumulator.call_close : socket->call_close;
 }
 
 /**
@@ -3363,6 +3349,7 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         error("Cannot initialize local mutex");
         goto endsocket;
     }
@@ -3374,8 +3361,9 @@ void *ebpf_socket_thread(void *ptr)
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
@@ -3390,12 +3378,17 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_create_global_charts(em);
 
+    ebpf_update_stats(&plugin_statistics, em);
+
     finalized_threads = 0;
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_every * USEC_PER_SEC), em);
 
 endsocket:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

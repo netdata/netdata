@@ -379,6 +379,7 @@ typedef struct ebpf_bandwidth {
     uint64_t retransmit;         // Number of times tcp_retransmit was called
     uint64_t call_udp_sent;      // Number of times udp_sendmsg was called
     uint64_t call_udp_received;  // Number of times udp_recvmsg was called
+    uint64_t close;              // Number of times tcp_close was called
 } ebpf_bandwidth_t;
 
 /**

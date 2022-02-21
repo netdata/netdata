@@ -70,11 +70,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         do_uptime               = config_get_boolean("plugin:macos:sysctl", "system uptime", 1);
     }
 
-    RRDSET *st;
+    RRDSET *st = NULL;
 
-    int system_pagesize = getpagesize(); // wouldn't it be better to get value directly from hw.pagesize?
-    int i, n;
-    int common_error = 0;
+    int i;
     size_t size;
 
     // NEEDED BY: do_loadavg
@@ -96,7 +94,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     // NEEDED BY: do_tcp...
     struct tcpstat tcpstat;
-    uint64_t tcps_states[TCP_NSTATES];
 
     // NEEDED BY: do_udp...
     struct udpstat udpstat;

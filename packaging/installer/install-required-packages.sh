@@ -198,7 +198,7 @@ get_os_release() {
   eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
   for x in "${ID}" ${ID_LIKE}; do
     case "${x,,}" in
-      alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | sabayon | sles | suse | ubuntu)
+      alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
         distribution="${x}"
         version="${VERSION_ID}"
         codename="${VERSION}"
@@ -419,7 +419,7 @@ detect_package_manager_from_distribution() {
       fi
       ;;
 
-    centos* | clearos*)
+    centos* | clearos* | rocky*)
       package_installer=""
       tree="centos"
       [ -n "${dnf}" ] && package_installer="install_dnf"
@@ -695,6 +695,7 @@ declare -A pkg_json_c_dev=(
   ['sabayon']="dev-libs/json-c"
   ['suse']="libjson-c-devel"
   ['freebsd']="json-c"
+  ['macos']="json-c"
   ['default']="json-c-devel"
 )
 
@@ -828,7 +829,7 @@ declare -A pkg_libuuid_dev=(
   ['rhel']="libuuid-devel"
   ['ol']="libuuid-devel"
   ['suse']="libuuid-devel"
-  ['macos']="NOTREQUIRED"
+  ['macos']="ossp-uuid"
   ['freebsd']="e2fsprogs-libuuid"
   ['default']=""
 )
@@ -1171,7 +1172,7 @@ declare -A pkg_openssl=(
   ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
   ['freebsd']="openssl"
-  ['macos']="openssl@1.1"
+  ['macos']="openssl"
   ['default']="openssl-devel"
 )
 
@@ -1613,7 +1614,7 @@ validate_tree_centos() {
 
   if [[ "${version}" =~ ^8(\..*)?$ ]]; then
     echo >&2 " > Checking for config-manager ..."
-    if ! run yum ${sudo} config-manager; then
+    if ! run ${sudo} yum config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
         run ${sudo} yum ${opts} install 'dnf-command(config-manager)'
       fi

@@ -155,6 +155,12 @@ AC_ARG_ENABLE(
     [enable_https="detect"]
 )
 AC_ARG_ENABLE(
+    [compression],
+    [AS_HELP_STRING([--enable-compression], [Enable LZ4 compression support @<:@default autodetect@:>@])],
+    ,
+    [enable_compression="detect"]
+)
+AC_ARG_ENABLE(
     [dbengine],
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
@@ -279,24 +285,21 @@ AC_MSG_CHECKING([operating system])
 case "$host_os" in
 freebsd*)
     build_target=freebsd
-    build_target_id=2
     CFLAGS="${CFLAGS} -I/usr/local/include -L/usr/local/lib"
     ;;
 darwin*)
     build_target=macos
-    build_target_id=3
     LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
     ;;
 *)
     build_target=linux
-    build_target_id=1
     ;;
 esac
 
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
-AC_MSG_RESULT([${build_target} with id ${build_target_id}])
+AC_MSG_RESULT([Host OS: ${build_target}])
 
 
 # -----------------------------------------------------------------------------
@@ -360,10 +363,15 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 AC_CHECK_LIB(
     [lz4],
+    [LZ4_initStream],
+    [LZ4_LIBS_FAST="-llz4"]
+)
+
+AC_CHECK_LIB(
+    [lz4],
     [LZ4_compress_default],
     [LZ4_LIBS="-llz4"]
 )
-
 
 # -----------------------------------------------------------------------------
 # zlib
@@ -519,6 +527,37 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+AC_MSG_CHECKING([if netdata compression should be used])
+if test "${enable_compression}" != "no"; then
+    if test "${LZ4_LIBS_FAST}"; then
+        LIBS_BKP="${LIBS}"
+        LIBS="${LZ4_LIBS_FAST}"
+        AC_TRY_LINK(
+            [ #include <lz4.h> ],
+            [
+                LZ4_stream_t* stream = LZ4_initStream(NULL, 0);
+            ],
+            [ enable_compression="yes"],
+            [ enable_compression="no" ]
+        )
+        LIBS="${LIBS_BKP}"
+        if test "${enable_compression}" == "yes"; then
+            OPTIONAL_LZ4_LIBS="${LZ4_LIBS_FAST}"
+            AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
+        fi
+    else
+        if test "${enable_compression}" == "yes"; then
+            AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable_compression. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
+            enable_compression="no"
+        fi
+        enable_compression="no"
+    fi
+else
+    enable_compression="no"
+fi
+AC_MSG_RESULT([${enable_compression}])
+AM_CONDITIONAL([ENABLE_COMPRESSION], [test "${enable_compression}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
@@ -1250,12 +1289,7 @@ PKG_CHECK_MODULES(
 PKG_CHECK_MODULES(
     [AWS_CPP_SDK_CORE],
     [aws-cpp-sdk-core],
-    [AC_CHECK_LIB(
-        [aws-cpp-sdk-core],
-        [cJSON_free],
-        [have_libaws_cpp_sdk_core=yes],
-        [have_libaws_cpp_sdk_core=no]
-    )],
+    [have_libaws_cpp_sdk_core=yes],
     [have_libaws_cpp_sdk_core=no]
 )
 
@@ -1264,27 +1298,6 @@ PKG_CHECK_MODULES(
     [aws-cpp-sdk-kinesis],
     [have_libaws_cpp_sdk_kinesis=yes],
     [have_libaws_cpp_sdk_kinesis=no]
-)
-
-AC_CHECK_LIB(
-    [aws-checksums],
-    [aws_checksums_crc32],
-    [have_libaws_checksums=yes],
-    [have_libaws_checksums=no]
-)
-
-AC_CHECK_LIB(
-    [aws-c-common],
-    [aws_default_allocator],
-    [have_libaws_c_common=yes],
-    [have_libaws_c_common=no]
-)
-
-AC_CHECK_LIB(
-    [aws-c-event-stream],
-    [aws_event_stream_library_init],
-    [have_libaws_c_event_stream=yes],
-    [have_libaws_c_event_stream=no]
 )
 
 test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_kinesis}" != "yes" && \
@@ -1302,17 +1315,9 @@ test "${enable_backend_kinesis}" = "yes" -a "${have_libssl}" != "yes" && \
 test "${enable_backend_kinesis}" = "yes" -a "${have_libcrypto}" != "yes" && \
     AC_MSG_ERROR([libcrypto required but not found])
 
-test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_checksums}" != "yes" \
-                                         -a "${have_libaws_c_common}" != "yes" \
-                                         -a "${have_libaws_c_event_stream}" != "yes" && \
-    AC_MSG_ERROR([AWS SKD third party dependencies required but not found])
-
 AC_MSG_CHECKING([if kinesis backend should be enabled])
 if test "${enable_backend_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" = "yes" \
                                             -a "${have_libaws_cpp_sdk_core}" = "yes" \
-                                            -a "${have_libaws_checksums}" = "yes" \
-                                            -a "${have_libaws_c_common}" = "yes" \
-                                            -a "${have_libaws_c_event_stream}" = "yes" \
                                             -a "${have_libcurl}" = "yes" \
                                             -a "${have_libssl}" = "yes" \
                                             -a "${have_libcrypto}" = "yes"; then
@@ -1340,12 +1345,14 @@ PKG_CHECK_MODULES(
     [have_libgrpc=no]
 )
 
-PKG_CHECK_MODULES(
-    [PUBSUB],
-    [googleapis_cpp_pubsub_protos],
-    [have_pubsub_protos=yes],
-    [have_pubsub_protos=no]
-)
+if test "${enable_exporting_pubsub}" != "no"; then
+    PKG_CHECK_MODULES(
+        [PUBSUB],
+        [google_cloud_cpp_pubsub_protos],
+        [have_pubsub_protos=yes],
+        [have_pubsub_protos=no]
+    )
+fi
 
 AC_PATH_PROG([CXX_BINARY], [${CXX}], [no])
 AS_IF(
@@ -1570,7 +1577,6 @@ libconfigdir="${libdir}/netdata/conf.d"
 logdir="${localstatedir}/log/netdata"
 pluginsdir="${libexecdir}/netdata/plugins.d"
 
-AC_SUBST([build_target])
 AC_SUBST([varlibdir])
 AC_SUBST([registrydir])
 AC_SUBST([cachedir])
@@ -1592,7 +1598,6 @@ CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
 CPPFLAGS="\
-    -DTARGET_OS=${build_target_id} \
 	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
 	-DCACHE_DIR=\"\\\"${cachedir}\\\"\" \
 	-DCONFIG_DIR=\"\\\"${configdir}\\\"\" \
@@ -1743,6 +1748,7 @@ AC_CONFIG_FILES([
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
     libnetdata/clocks/Makefile
+    libnetdata/completion/Makefile
     libnetdata/config/Makefile
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile

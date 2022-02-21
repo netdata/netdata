@@ -289,14 +289,14 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
             ++failures;
             uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
-            init_completion(&compl);
+            completion_init(&compl);
             cmd.opcode = RRDENG_FLUSH_PAGES;
             cmd.completion = &compl;
             rrdeng_enq_cmd(&ctx->worker_config, &cmd);
             /* wait for some pages to be flushed */
             debug(D_RRDENGINE, "%s: waiting for pages to be written to disk before evicting.", __func__);
-            wait_for_completion(&compl);
-            destroy_completion(&compl);
+            completion_wait_for(&compl);
+            completion_destroy(&compl);
 
             if (unlikely(failures > 1)) {
                 unsigned long slots, usecs_to_sleep;

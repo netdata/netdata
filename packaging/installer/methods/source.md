@@ -38,6 +38,7 @@ Additionally, the following build time features require additional dependencies:
     -   A recent version of CMake
     -   OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
     -   JSON-C (may be provided by the user as shown below, or by the system)
+    -   protobuf (Google Protocol Buffers) and protoc compiler
 
 ## Preparing the source tree
 
@@ -47,61 +48,6 @@ libraries and their header files must be copied into specific locations
 in the source tree to be used.
 
 ### Netdata cloud
-
-Netdata Cloud functionality requires custom builds of libmosquitto and
-libwebsockets.
-
-#### libmosquitto
-
-Netdata maintains a custom fork of libmosquitto at
-https://github.com/netdata/mosquitto with patches to allow for proper
-integration with libwebsockets, which is needed for correct operation of
-Netdata Cloud functionality. To prepare this library for the build system:
-
-1.  Verify the tag that Netdata expects to be used by checking the contents
-    of `packaging/mosquitto.version` in your Netdata sources.
-2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/mosquitto/releases and
-        downloading and unpacking the source code archive for that release.
-    -   Cloning the repository with `git` and checking out the required tag.
-3.  If building on a platform other than Linux, prepare the mosquitto
-    sources by running `cmake -D WITH_STATIC_LIBRARIES:boolean=YES .` in
-    the mosquitto source directory.
-4.  Build mosquitto by running `make -C lib` in the mosquitto source directory.
-5.  In the Netdata source directory, create a directory called `externaldeps/mosquitto`.
-6.  Copy `lib/mosquitto.h` from the mosquitto source directory to
-    `externaldeps/mosquitto/mosquitto.h` in the Netdata source tree.
-7.  Copy `lib/libmosquitto.a` from the mosquitto source directory to
-    `externaldeps/mosquitto/libmosquitto.a` in the Netdata source tree. If
-    building on a platform other than Linux, the file that needs to be
-    copied will instead be named `lib/libmosquitto_static.a`, but it
-    still needs to be copied to `externaldeps/mosquitto/libmosquitto.a`.
-
-#### libwebsockets
-
-Netdata uses the standard upstream version of libwebsockets located at
-https://github.com/warmcat/libwebsockets, but requires a build with SOCKS5
-support, which is not enabled by most pre-built versions. Currently,
-we do not support using a system copy of libwebsockets. To prepare this
-library for the build system:
-
-1.  Verify the tag that Netdata expects to be used by checking the contents
-    of `packaging/libwebsockets.version` in your Netdata sources.
-2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/warmcat/libwebsockets/releases and
-        downloading and unpacking the source code archive for that release.
-    -   Cloning the repository with `git` and checking out the required tag.
-3.  Prepare the libwebsockets sources by running `cmake -D
-    LWS_WITH_SOCKS5:bool=ON .` in the libwebsockets source directory.
-4.  Build libwebsockets by running `make` in the libwebsockets source
-    directory.
-5.  In the Netdata source directory, create a directory called
-    `externaldeps/libwebsockets`.
-6.  Copy `lib/libwebsockets.a` from the libwebsockets source directory to
-    `externaldeps/libwebsockets/libwebsockets.a` in the Netdata source tree.
-7.  Copy the entire contents of `include/` from the libwebsockets source
-    directory to `externaldeps/libwebsockets/include` in the Netdata source tree.
-
 #### JSON-C
 
 Netdata requires the use of JSON-C for JSON parsing when using Netdata
@@ -288,4 +234,4 @@ repository](https://github.com/netdata/kernel-collector/blob/master/README.md),
 which outlines both the required dependencies, as well as multiple
 options for building the code.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fsource&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

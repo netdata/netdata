@@ -25,11 +25,7 @@ aims to document some of those steps for popular cloud providers.
 ## Recommended installation methods for cloud providers
 
 The best installation method depends on the instance's operating system, distribution, and version. For Linux instances,
-we recommend either the [`kickstart.sh` automatic installation script](kickstart.md) or [.deb/.rpm
-packages](packages.md).
-
-To see the full list of approved methods for each operating system/version we support, see our [distribution
-matrix](/packaging/DISTRIBUTIONS.md). That table will guide you to the various supported methods for your cloud instance.
+we recommend the [`kickstart.sh` automatic installation script](kickstart.md).
 
 If you have issues with Netdata after installation, look to the sections below to find the issue you're experiencing,
 followed by the solution for your provider.
@@ -127,4 +123,4 @@ Name: Netdata
 
 Click **Add** to apply your new inbound security rule.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fcloud-providers&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

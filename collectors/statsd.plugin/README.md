@@ -4,8 +4,6 @@ description: "The Netdata Agent is a fully-featured StatsD server that collects 
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md
 -->
 
-# statsd.plugin
-
 StatsD is a system to collect data from any application. Applications send metrics to it, usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.
 
 If you want to learn more about the StatsD protocol, we have written a [blog post](https://www.netdata.cloud/blog/introduction-to-statsd/) about it!
@@ -19,7 +17,7 @@ Since statsd is embedded in Netdata, it means you now have a statsd server embed
 
 Netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
 
-# Available StatsD collectors
+## Available StatsD collectors
 
 Netdata ships with collectors implemented using the StatsD collector. They are configuration files (as you will read below), but they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
 
@@ -613,4 +611,4 @@ The function is smart enough to call `nc` just once and pass all the metrics to 
 
 If you have gotten thus far, make sure to check out our [community forums](https://community.netdata.cloud) to share your experience using Netdata with StatsD.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fstatsd.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

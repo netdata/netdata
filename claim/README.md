@@ -73,7 +73,7 @@ When coming from  [Nodes view page](https://learn.netdata.cloud/docs/cloud/visua
 If you want to connect a node that is running on a Linux environment, the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
@@ -101,7 +101,7 @@ The default user is `netdata`. Yours may be different, so pay attention to the o
 and run the script.
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 ### Connect an agent running in Docker
 
@@ -227,7 +227,7 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/methods/macos.md#install-netdata-with-our-automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
@@ -267,7 +267,7 @@ You can now move on to connecting. When you connect with the [kickstart](/packag
 append the same proxy setting you added to `netdata.conf`.
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy socks5h://203.0.113.0:1080
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy http://[user:pass@]host:ip
 ```
 
 Hit **Enter**. The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if
@@ -308,7 +308,7 @@ If you run the kickstart script and get the following error `Existing install ap
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
-script](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended).
+script](/docs/get-started.mdx#install-on-linux-with-one-line-installer).
 
 #### kickstart: Failed to write new machine GUID
 
@@ -328,7 +328,7 @@ Netdata to `/opt/netdata`, use `/opt/netdata/bin/netdata-claim.sh` to run the cl
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
-script](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended).
+script](/docs/get-started.mdx#install-on-linux-with-one-line-installer).
 
 #### Connecting on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
 
@@ -337,7 +337,7 @@ If you're running an older Linux distribution or one that has reached EOL, such 
 versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
 helps securely encrypt SSL connections.
 
-We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), which uses an
+We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart.md#static-builds), which uses an
 up-to-date version of OpenSSL with hostname validation enabled.
 
 If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
@@ -399,7 +399,7 @@ grep -i ACLK /var/log/netdata/error.log
 ```
 
 If the installer's output does not help you enable Cloud features, contact us by [creating an issue on
-GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality)
+GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality)
 with details about your system and relevant output from `error.log`.
 
 #### agent-claimed is false / Claimed: No
@@ -416,7 +416,7 @@ connecting](#connect-through-a-proxy).
 
 If you are certain firewall and proxy settings are not the issue, you should consult the Agent's `error.log` at
 `/var/log/netdata/error.log` and contact us by [creating an issue on
-GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=ACLK-available-is-false)
+GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=ACLK-available-is-false)
 with details about your system and relevant output from `error.log`.
 
 ### Remove and reconnect a node
@@ -460,8 +460,8 @@ using the [ACLK](/aclk/README.md).
 
 The best way to install Netdata and connect your nodes to Netdata Cloud is with our automatic one-line installation script, [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script). This script will install the Netdata Agent, in case it isn't already installed, and connect your node to Netdata Cloud. 
 
-This  works with:
-* all Linux distributions, see [Netdata distribution support matrix](https://learn.netdata.cloud/docs/agent/packaging/distributions)
+This works with:
+* most Linux distributions, see [Netdata's platform support policy](/packaging/PLATFORM_SUPPORT.md)
 * macOS
 
 For details on how to run this script please check [How to connect a node](#how-to-connect-a-node) and choose your environment.
@@ -474,13 +474,13 @@ Our suggestion is to first run kickstart to upgrade your agent by running the co
 **Linux**
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 **macOS**
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install /usr/local/
 ```
 ### Claiming script
 
@@ -499,7 +499,7 @@ using `sudo`, or as the user running the Agent (typically `netdata`), and passin
 -hostname=HOSTNAME
     where HOSTNAME is the result of the hostname command by default.
 -proxy=PROXY_URL
-    where PROXY_URL is the endpoint of a SOCKS5 proxy.
+    where PROXY_URL is the endpoint of a HTTP or HTTPS proxy.
 ```
 
 For example, the following command connects an Agent and adds it to rooms `room1` and `room2`:
@@ -548,4 +548,4 @@ Rooms you added that node to.
 The user can also put the Cloud endpoint's full certificate chain in `cloud.d/cloud_fullchain.pem` so that the Agent
 can trust the endpoint if necessary.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fclaim%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

@@ -1181,9 +1181,9 @@ int run_test(struct test *test)
         calculated_number v = unpack_storage_number(rd->values[c]);
         calculated_number n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
         int same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-        fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+        fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
             test->name, rd->name, c+1,
-            (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+            (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
@@ -1192,9 +1192,9 @@ int run_test(struct test *test)
             v = unpack_storage_number(rd2->values[c]);
             n = test->results2[c];
             same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-            fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+            fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
                 test->name, rd2->name, c+1,
-                (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+                (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
@@ -1917,7 +1917,7 @@ static void generate_dbengine_chart(void *arg)
 
         thread_info->rd[j] = rd[j] = rrddim_add(st, name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    complete(&thread_info->charts_initialized);
+    completion_mark_complete(&thread_info->charts_initialized);
 
     // feed it with the test data
     time_current = time_present - history_seconds;
@@ -1986,10 +1986,10 @@ void generate_dbengine_dataset(unsigned history_seconds)
         thread_info[i]->time_present = time_present;
         thread_info[i]->time_max = 0;
         thread_info[i]->done = 0;
-        init_completion(&thread_info[i]->charts_initialized);
+        completion_init(&thread_info[i]->charts_initialized);
         assert(0 == uv_thread_create(&thread_info[i]->thread, generate_dbengine_chart, thread_info[i]));
-        wait_for_completion(&thread_info[i]->charts_initialized);
-        destroy_completion(&thread_info[i]->charts_initialized);
+        completion_wait_for(&thread_info[i]->charts_initialized);
+        completion_destroy(&thread_info[i]->charts_initialized);
     }
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         assert(0 == uv_thread_join(&thread_info[i]->thread));
@@ -2177,13 +2177,13 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         chart_threads[i]->time_max = 0;
         chart_threads[i]->done = 0;
         chart_threads[i]->errors = chart_threads[i]->stored_metrics_nr = 0;
-        init_completion(&chart_threads[i]->charts_initialized);
+        completion_init(&chart_threads[i]->charts_initialized);
         assert(0 == uv_thread_create(&chart_threads[i]->thread, generate_dbengine_chart, chart_threads[i]));
     }
     /* barrier so that subsequent queries can access valid chart data */
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
-        wait_for_completion(&chart_threads[i]->charts_initialized);
-        destroy_completion(&chart_threads[i]->charts_initialized);
+        completion_wait_for(&chart_threads[i]->charts_initialized);
+        completion_destroy(&chart_threads[i]->charts_initialized);
     }
     sleep(RAMP_UP_SECONDS);
     /* at this point data have already began being written to the database */

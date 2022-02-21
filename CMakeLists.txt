@@ -57,22 +57,15 @@ SET(MACOS   False)
 
 # Detect the operating system
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    SET(TARGET_OS_NAME "macos")
-    SET(TARGET_OS 3)
     SET(MACOS True)
 ELSEIF(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-    SET(TARGET_OS_NAME "freebsd")
-    SET(TARGET_OS 2)
     SET(FREEBSD True)
 ELSE()
-    SET(TARGET_OS_NAME "linux")
-    SET(TARGET_OS 1)
     SET(LINUX True)
 ENDIF()
 
 # show the operating system on the console
-message(STATUS "operating system: ${TARGET_OS_NAME} (TARGET_OS=${TARGET_OS})")
-
+message(STATUS "system name: ${CMAKE_SYSTEM_NAME}")
 
 # -----------------------------------------------------------------------------
 # Detect libuuid
@@ -288,7 +281,7 @@ pkg_check_modules(GRPC grpc)
 # -----------------------------------------------------------------------------
 # Detect libgoogleapis_cpp_pubsub_protos
 
-pkg_check_modules(PUBSUB googleapis_cpp_pubsub_protos)
+pkg_check_modules(PUBSUB google_cloud_cpp_pubsub_protos)
 # later we use:
 # ${PUBSUB_LIBRARIES}
 # ${PUBSUB_CFLAGS_OTHER}
@@ -317,9 +310,10 @@ pkg_check_modules(SNAPPY snappy)
 # -----------------------------------------------------------------------------
 # Detect libmongoc
 
-find_package(libmongoc-1.0)
+pkg_check_modules(MONGOC libmongoc-1.0)
 # later we use:
 # ${MONGOC_LIBRARIES}
+# ${MONGOC_CFLAGS_OTHER}
 # ${MONGOC_INCLUDE_DIRS}
 
 
@@ -346,6 +340,18 @@ IF(LINUX AND EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
     ENDIF(ELF_LIBRARIES)
 ENDIF()
 
+# -----------------------------------------------------------------------------
+# Detect ml dependencies
+file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_ML REGEX "^#define ENABLE_ML 1$")
+IF(DEFINE_ENABLE_ML MATCHES ".+" AND
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/kmeans/dlib/dlib/all/source.cpp" AND
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/json/single_include/nlohmann/json.hpp")
+    set(ENABLE_ML True)
+    list(APPEND NETDATA_COMMON_CFLAGS "-DDLIB_NO_GUI_SUPPORT")
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS "ml/kmeans/dlib")
+ELSE()
+    set(ENABLE_ML False)
+ENDIF()
 
 # -----------------------------------------------------------------------------
 # netdata files
@@ -361,6 +367,8 @@ set(LIBNETDATA_FILES
         libnetdata/buffer/buffer.h
         libnetdata/clocks/clocks.c
         libnetdata/clocks/clocks.h
+        libnetdata/completion/completion.c
+        libnetdata/completion/completion.h
         libnetdata/dictionary/dictionary.c
         libnetdata/dictionary/dictionary.h
         libnetdata/eval/eval.c
@@ -416,7 +424,6 @@ set(APPS_PLUGIN_FILES
 
 set(CHECKS_PLUGIN_FILES
         collectors/checks.plugin/plugin_checks.c
-        collectors/checks.plugin/plugin_checks.h
         )
 
 set(FREEBSD_PLUGIN_FILES
@@ -441,7 +448,6 @@ set(HEALTH_PLUGIN_FILES
 
 set(IDLEJITTER_PLUGIN_FILES
         collectors/idlejitter.plugin/plugin_idlejitter.c
-        collectors/idlejitter.plugin/plugin_idlejitter.h
         )
 
 set(CGROUPS_PLUGIN_FILES
@@ -454,12 +460,10 @@ set(CGROUP_NETWORK_FILES
         )
 
 set(DISKSPACE_PLUGIN_FILES
-        collectors/diskspace.plugin/plugin_diskspace.h
         collectors/diskspace.plugin/plugin_diskspace.c
         )
 
 set(TIMEX_PLUGIN_FILES
-        collectors/timex.plugin/plugin_timex.h
         collectors/timex.plugin/plugin_timex.c
         )
 
@@ -571,7 +575,6 @@ set(PROC_PLUGIN_FILES
 
 set(TC_PLUGIN_FILES
         collectors/tc.plugin/plugin_tc.c
-        collectors/tc.plugin/plugin_tc.h
         )
 
 set(MACOS_PLUGIN_FILES
@@ -612,7 +615,6 @@ set(REGISTRY_PLUGIN_FILES
 
 set(STATSD_PLUGIN_FILES
         collectors/statsd.plugin/statsd.c
-        collectors/statsd.plugin/statsd.h
         )
 
 set(RRD_PLUGIN_FILES
@@ -738,6 +740,7 @@ set(API_PLUGIN_FILES
 set(STREAMING_PLUGIN_FILES
         streaming/rrdpush.c
         streaming/rrdpush.h
+        streaming/compression.c
         streaming/receiver.c
         streaming/sender.c
         )
@@ -914,7 +917,8 @@ set(DAEMON_FILES
         daemon/signals.c
         daemon/signals.h
         daemon/service.c
-        daemon/service.h
+        daemon/static_threads.c
+        daemon/static_threads.h
         daemon/commands.c
         daemon/commands.h
         daemon/unit_test.c
@@ -922,9 +926,35 @@ set(DAEMON_FILES
         )
 
 set(ML_FILES
-        ml/ml.h
-        ml/ml-dummy.c
+    ml/ml.h
+    ml/ml-dummy.c
 )
+
+IF(ENABLE_ML)
+    list(APPEND ML_FILES
+            ml/BitBufferCounter.h
+            ml/BitBufferCounter.cc
+            ml/BitRateWindow.h
+            ml/BitRateWindow.cc
+            ml/Config.h
+            ml/Config.cc
+            ml/Database.h
+            ml/Database.cc
+            ml/Dimension.cc
+            ml/Dimension.h
+            ml/Host.h
+            ml/Host.cc
+            ml/Query.h
+            ml/kmeans/KMeans.h
+            ml/kmeans/KMeans.cc
+            ml/kmeans/SamplesBuffer.h
+            ml/kmeans/SamplesBuffer.cc
+            ml/kmeans/dlib/dlib/all/source.cpp
+            ml/json/single_include/nlohmann/json.hpp
+            ml/ml.cc
+            ml/ml-private.h
+    )
+ENDIF()
 
 set(NETDATA_FILES
         collectors/all.h
@@ -957,7 +987,6 @@ include_directories(AFTER .)
 
 add_definitions(
         -DHAVE_CONFIG_H
-        -DTARGET_OS=${TARGET_OS}
         -DCACHE_DIR="/var/cache/netdata"
         -DCONFIG_DIR="/etc/netdata"
         -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d"
@@ -1021,7 +1050,38 @@ IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     message(STATUS "prometheus remote write backend: enabled")
 
     find_package(Protobuf REQUIRED)
-    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
+    
+    function(PROTOBUF_REMOTE_WRITE_GENERATE_CPP SRCS HDRS)
+        if(NOT ARGN)
+            message(SEND_ERROR "Error: PROTOBUF_REMOTE_WRITE_GENERATE_CPP() called without any proto files")
+            return()
+        endif()
+
+        set(${SRCS})
+        set(${HDRS})
+        foreach(FIL ${ARGN})
+            get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+            get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+            get_filename_component(FIL_WE ${FIL} NAME_WE)
+            set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+            set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+            list(APPEND ${SRCS} ${GENERATED_PB_CC})
+            list(APPEND ${HDRS} ${GENERATED_PB_H})
+            add_custom_command(
+            OUTPUT ${GENERATED_PB_CC}
+                    ${GENERATED_PB_H}
+            COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+            ARGS -I=${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write --cpp_out=${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write ${ABS_FIL}
+            DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+            COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+            VERBATIM )
+        endforeach()
+        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+        set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+        set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+    endfunction()
+
+    protobuf_remote_write_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
 
     list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
@@ -1034,12 +1094,13 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # mongodb backend
 
-IF(libmongoc-1.0_FOUND)
+IF(MONGOC_LIBRARIES)
     message(STATUS "mongodb backend: enabled")
 
     list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES} ${MONGODB_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES ${MONGOC_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${MONGOC_INCLUDE_DIRS})
+    list(APPEND NETDATA_COMMON_CFLAGS ${MONGOC_CFLAGS_OTHER})
 ELSE()
     message(STATUS "mongodb backend: disabled (requires mongoc library)")
 ENDIF()
@@ -1115,6 +1176,9 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 # netdata
 
 IF(LINUX)
+    list(APPEND NETDATA_FILES daemon/static_threads_linux.c)
+    list(APPEND NETDATA_COMMON_LIBRARIES rt)
+
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
@@ -1132,6 +1196,8 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_SLABINFO True)
 
 ELSEIF(FREEBSD)
+    list(APPEND NETDATA_FILES daemon/static_threads_freebsd.c)
+
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
@@ -1143,6 +1209,8 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_EBPF False)
 
 ELSEIF(MACOS)
+    list(APPEND NETDATA_FILES daemon/static_threads_macos.c)
+
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES} ${IOKIT} ${FOUNDATION})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
@@ -1298,7 +1366,6 @@ IF(ENABLE_PLUGIN_CGROUP_NETWORK)
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
 ENDIF()
-
 
 # -----------------------------------------------------------------------------
 # Unit tests

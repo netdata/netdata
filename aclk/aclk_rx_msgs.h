@@ -8,7 +8,7 @@
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
 
-int aclk_handle_cloud_message(char *payload);
+int aclk_handle_cloud_cmd_message(char *payload);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_init_rx_msg_handlers(void);

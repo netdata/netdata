@@ -115,7 +115,7 @@ guide](/health/QUICKSTART.md).
 
 Now that you're collecting metrics from your CockroachDB databases, let us know how it's working for you! There's always
 room for improvement or refinement based on real-world use cases. Feel free to [file an
-issue](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md) with your
+issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) with your
 thoughts.
 
 Also, be sure to check out these useful resources:
@@ -133,4 +133,4 @@ Also, be sure to check out these useful resources:
 -   [Monitor CockroachDB with
     Prometheus](https://www.cockroachlabs.com/docs/stable/monitor-cockroachdb-with-prometheus.html)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor-cockroachdb&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

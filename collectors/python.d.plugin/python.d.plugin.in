@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 '''':;
-pybinary=$(which python || which python3 || which python2)
+pybinary=$(which python3 || which python || which python2)
 filtered=()
 for arg in "$@"
 do

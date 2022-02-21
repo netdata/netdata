@@ -178,6 +178,46 @@ int pack_and_clear_write_request(void *write_request_p, char *buffer, size_t *si
 }
 
 /**
+ * Writes an unpacked write request into a text buffer
+ *
+ * @param write_request_p the write request
+ * @param buffer a buffer, where text is written
+ * @param size the size of the buffer
+ * @return Returns 0 on success, 1 on failure
+ */
+int convert_write_request_to_string(
+    const char *compressed_write_request,
+    size_t compressed_size,
+    char *buffer,
+    size_t size)
+{
+    size_t uncompressed_size = 0;
+
+    snappy::GetUncompressedLength(compressed_write_request, compressed_size, &uncompressed_size);
+    if (size < uncompressed_size)
+        return 1;
+    char *uncompressed_write_request = (char *)malloc(size);
+
+    if (snappy::RawUncompress(compressed_write_request, compressed_size, uncompressed_write_request) == false) {
+        free(uncompressed_write_request);
+        return 1;
+    }
+
+    WriteRequest *write_request = google::protobuf::Arena::CreateMessage<WriteRequest>(&arena);
+    if (write_request->ParseFromString(std::string(uncompressed_write_request, uncompressed_size)) == false) {
+        free(uncompressed_write_request);
+        return 1;
+    }
+
+    std::string text_write_request(write_request->DebugString());
+    text_write_request.copy(buffer, size);
+
+    free(uncompressed_write_request);
+
+    return 0;
+}
+
+/**
  * Shuts down the Protobuf library
  */
 void protocol_buffers_shutdown()

@@ -8,6 +8,7 @@ SUBDIRS = \
     avl \
     buffer \
     clocks \
+    completion \
     config \
     dictionary \
     ebpf \

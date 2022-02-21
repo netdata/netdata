@@ -65,4 +65,4 @@ But it simplifies everything else. Data collection, metrics database and visuali
 
 Netdata goes a step further, by enriching the dashboard with information that is useful for most people. So, to improve clarity and help users be more effective, Netdata includes right in the dashboard the community knowledge and expertise about the metrics. So, that Netdata users can focus on solving their infrastructure problem, not on the technicalities of data collection and visualization. 
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fwhy-netdata%2Fmeaningful-presentation&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

@@ -35,7 +35,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
     RRDSET *st;
 
-    mach_port_t         master_port;
+    mach_port_t         main_port;
     io_registry_entry_t drive, drive_media;
     io_iterator_t       drive_list;
     CFDictionaryRef     properties, statistics;
@@ -73,19 +73,22 @@ int do_macos_iokit(int update_every, usec_t dt) {
     // NEEDED BY: do_space, do_inodes
     struct statfs *mntbuf;
     int mntsize, i;
-    char mntonname[MNAMELEN + 1];
     char title[4096 + 1];
 
     // NEEDED BY: do_bandwidth
     struct ifaddrs *ifa, *ifap;
 
+#if !__is_identifier(IOMainPort) /* macOS >= 12.0 */
+#define IOMainPort IOMasterPort
+#endif
+
     /* Get ports and services for drive statistics. */
-    if (unlikely(IOMasterPort(bootstrap_port, &master_port))) {
+    if (unlikely(IOMainPort(bootstrap_port, &main_port))) {
         error("MACOS: IOMasterPort() failed");
         do_io = 0;
         error("DISABLED: system.io");
     /* Get the list of all drive objects. */
-    } else if (unlikely(IOServiceGetMatchingServices(master_port, IOServiceMatching("IOBlockStorageDriver"), &drive_list))) {
+    } else if (unlikely(IOServiceGetMatchingServices(main_port, IOServiceMatching("IOBlockStorageDriver"), &drive_list))) {
         error("MACOS: IOServiceGetMatchingServices() failed");
         do_io = 0;
         error("DISABLED: system.io");
@@ -115,7 +118,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
             CFRelease(properties);
             IOObjectRelease(drive_media);
 
-            if(unlikely(!diskstat.name || !*diskstat.name)) {
+            if(unlikely(!*diskstat.name)) {
                 IOObjectRelease(drive);
                 continue;
             }

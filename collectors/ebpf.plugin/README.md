@@ -45,7 +45,7 @@ which allow hooking into arbitrary user-space functions in a similar manner to k
 ## Manually enable the collector on Linux
 
 **The eBPF collector is installed and enabled by default on most new installations of the Agent**. The eBPF collector
-does not currently work with [static build installations](/packaging/installer/methods/kickstart-64.md) for kernels older
+does not currently work with [static build installations](/packaging/installer/methods/kickstart.md#static-builds) for kernels older
 than `4.11`, but improved support is in active development.
 
 eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`,
@@ -899,4 +899,4 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Febpf.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

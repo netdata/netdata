@@ -124,7 +124,7 @@ static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_cloud_req_type", NULL, "aclk", NULL, "Requests received from cloud by their type", "req/s",
+            "netdata", "aclk_processed_query_type", NULL, "aclk", NULL, "Query thread commands processed by their type", "cmd/s",
             "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rd_type_http = rrddim_add(st, "http", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -138,14 +138,14 @@ static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample
     } else
         rrdset_next(st);
 
-    rrddim_set_by_pointer(st, rd_type_http, per_sample->cloud_req_type_http);
-    rrddim_set_by_pointer(st, rd_type_alarm_upd, per_sample->cloud_req_type_alarm_upd);
-    rrddim_set_by_pointer(st, rd_type_metadata_info, per_sample->cloud_req_type_metadata_info);
-    rrddim_set_by_pointer(st, rd_type_metadata_alarms, per_sample->cloud_req_type_metadata_alarms);
-    rrddim_set_by_pointer(st, rd_type_chart_new, per_sample->cloud_req_type_chart_new);
-    rrddim_set_by_pointer(st, rd_type_chart_del, per_sample->cloud_req_type_chart_del);
-    rrddim_set_by_pointer(st, rd_type_register_node, per_sample->cloud_req_type_register_node);
-    rrddim_set_by_pointer(st, rd_type_node_upd, per_sample->cloud_req_type_node_upd);
+    rrddim_set_by_pointer(st, rd_type_http, per_sample->query_type_http);
+    rrddim_set_by_pointer(st, rd_type_alarm_upd, per_sample->query_type_alarm_upd);
+    rrddim_set_by_pointer(st, rd_type_metadata_info, per_sample->query_type_metadata_info);
+    rrddim_set_by_pointer(st, rd_type_metadata_alarms, per_sample->query_type_metadata_alarms);
+    rrddim_set_by_pointer(st, rd_type_chart_new, per_sample->query_type_chart_new);
+    rrddim_set_by_pointer(st, rd_type_chart_del, per_sample->query_type_chart_del);
+    rrddim_set_by_pointer(st, rd_type_register_node, per_sample->query_type_register_node);
+    rrddim_set_by_pointer(st, rd_type_node_upd, per_sample->query_type_node_upd);
 
     rrdset_done(st);
 }

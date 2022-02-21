@@ -151,7 +151,14 @@ NETDATA_USER=$(get_config_value netdata global "run as user")
 gen_id() {
     local id
 
-    id="$(uuidgen)"
+    if command -v uuidgen > /dev/null 2>&1; then
+        id="$(uuidgen)"
+    elif [ -r /proc/sys/kernel/random/uuid ]; then
+        id="$(cat /proc/sys/kernel/random/uuid)"
+    else
+        echo >&2 "Unable to generate machine ID."
+        exit 18
+    fi
 
     if [ "${id}" = "8a795b0c-2311-11e6-8563-000c295076a6" ] || [ "${id}" = "4aed1458-1c3e-11e6-a53f-000c290fc8f5" ]; then
         gen_id
@@ -289,7 +296,7 @@ if [ "${URLTOOL}" = "curl" ] ; then
                 URLCOMMAND="${URLCOMMAND} -x \"${PROXY}\""
         fi
 else
-        URLCOMMAND="wget -T 15 -O -  -q --save-headers --content-on-error=on --method=PUT \
+        URLCOMMAND="wget -T 15 -O -  -q --server-response --content-on-error=on --method=PUT \
         --body-file=\"${CLAIMING_DIR}/tmpin.txt\""
         if [ "${NOPROXY}" = "yes" ] ; then
                 URLCOMMAND="${URLCOMMAND} --no-proxy"
@@ -319,7 +326,11 @@ if [ "${VERBOSE}" == 1 ]; then
 fi
 
 attempt_contact () {
-        eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
+        if [ "${URLTOOL}" = "curl" ] ; then
+                eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
+        else
+                eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt" 2>&1
+        fi
         URLCOMMAND_EXIT_CODE=$?
         if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
         # We consider the server issuing an error response a successful attempt at communicating
@@ -379,7 +390,9 @@ fi
 
 if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
-        echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
+        if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
+                echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
+        fi
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; set -e; exit 2)
 
         # Rewrite the cloud.conf on the disk

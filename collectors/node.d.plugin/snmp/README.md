@@ -183,37 +183,50 @@ The `options` given for each server, are:
 
 To use SNMPv3:
 
--   set `version` to 3
 -   use `user` instead of `community`
+-   set `version` to 3
 
 User syntax:
 
 ```json
 {
-    "user": {
+  "enable_autodetect": false,
+  "update_every": 10,
+  "servers": [
+    {
+      "hostname": "10.11.12.8",
+      "user": {
         "name": "userName",
         "level": 3,
         "authProtocol": "3",
         "authKey": "authKey",
         "privProtocol": "2",
         "privKey": "privKey"
+      },
+      "update_every": 10,
+      "options": {
+        "version": 3
+      },
+      "charts": {
+      }
     }
+  ]
 }
 ```
 
-Security levels:
+Security levels (`level`):
 
 -   1 is `noAuthNoPriv`
 -   2 is `authNoPriv`
 -   3 is `authPriv`
 
-Authentication protocols:
+Authentication protocols (`authProtocol`):
 
 -   "1" is `none`
 -   "2" is `md5`
 -   "3" is `sha`
 
-Privacy protocols:
+Privacy protocols (`privProtocol`):
 
 -   "1" is `none`
 -   "2" is `des`
@@ -429,4 +442,4 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
 }
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fnode.d.plugin%2Fsnmp%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

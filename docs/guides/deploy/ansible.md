@@ -171,4 +171,4 @@ provisioning/infrastructure as code software, such as Chef or Puppet, in our [co
 repo](https://github.com/netdata/community). Anyone is able to fork the repo and submit a PR, either to improve this
 playbook, extend it, or create an entirely new experience for deploying Netdata across entire infrastructure.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fdeploy%2Fansible.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+
