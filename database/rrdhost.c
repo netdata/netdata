@@ -878,7 +878,20 @@ void rrdhost_free(RRDHOST *host) {
 
 
     rrdhost_wrlock(host);   // lock this RRDHOST
-
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    struct aclk_database_worker_config *wc =  host->dbsync_worker;
+    if (wc && !netdata_exit) {
+        struct aclk_database_cmd cmd;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
+        struct aclk_completion compl ;
+        init_aclk_completion(&compl );
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd(wc, &cmd);
+        wait_for_aclk_completion(&compl );
+        destroy_aclk_completion(&compl );
+    }
+#endif
     // ------------------------------------------------------------------------
     // release its children resources
 
@@ -981,7 +994,10 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->node_id);
 
     freez(host);
-
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    if (wc)
+        wc->is_orphan = 0;
+#endif
     rrd_hosts_available--;
 }
 
