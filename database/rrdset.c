@@ -1475,7 +1475,14 @@ void rrdset_done(RRDSET *st) {
     // check if we will re-write the entire page
     if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
                 dt_usec(&st->last_collected_time, &st->last_updated) > (RRDENG_BLOCK_SIZE / sizeof(storage_number)) * update_every_ut)) {
-        info("%s: too old data (last updated at %ld.%ld, last collected at %ld.%ld). Resetting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
+        info(
+            "%s: too old data (last updated at %" PRId64 ".%" PRId64 ", last collected at %" PRId64 ".%" PRId64 "). "
+            "Resetting it. Will not store the next entry.",
+            st->name,
+            (int64_t)st->last_updated.tv_sec,
+            (int64_t)st->last_updated.tv_usec,
+            (int64_t)st->last_collected_time.tv_sec,
+            (int64_t)st->last_collected_time.tv_usec);
         rrdset_reset(st);
         rrdset_init_last_updated_time(st);
 

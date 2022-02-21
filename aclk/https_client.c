@@ -587,7 +587,7 @@ void https_req_response_init(https_req_response_t *res) {
     res->payload_size = 0;
 }
 
-static inline char *min_non_null(char *a, char *b) {
+static inline char *UNUSED_FUNCTION(min_non_null)(char *a, char *b) {
     if (!a)
         return b;
     if (!b)
