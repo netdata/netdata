@@ -116,7 +116,7 @@ For the connection process to work, the contents of `/var/lib/netdata` _must_ be
 restarts using a persistent volume.  See our [recommended `docker run` and Docker Compose
 examples](/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
 
-#### Known issue on systems with enabled seccomp
+#### Known issues on older hosts with seccomp enabled
 
 The nodes running on the following hosts **cannot be claimed**:
 
@@ -133,9 +133,9 @@ CONFIG_SECCOMP=y
 
 To resolve the issue, do one of the following actions:
 
-1. Update to a newer version of Docker and `libseccomp` (recommended).
-2. Create a custom profile and pass it for the container.
-3. Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
+-  Update to a newer version of Docker and `libseccomp` (recommended).
+-  Create a custom profile and pass it for the container.
+-  Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
 
 <details>
 <summary>See how to create a custom profile</summary>
