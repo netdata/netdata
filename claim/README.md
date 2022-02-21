@@ -135,45 +135,47 @@ To resolve the issue, do one of the following actions:
 
 1. Update to a newer version of Docker and `libseccomp` (recommended).
 2. Create a custom profile and pass it for the container.
-3. Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
+3.
+Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (
+unsafe, not recommended).
 
 <details>
 <summary>See how to create a custom profile</summary>
 
 1. Download the moby default seccomp profile and change `defaultAction` to `SCMP_ACT_TRACE` on line 2.
 
-```cmd
-sudo wget https://raw.githubusercontent.com/moby/moby/master/profiles/seccomp/default.json -O /etc/docker/seccomp.json
-sudo sed -i '2s/SCMP_ACT_ERRNO/SCMP_ACT_TRACE/' /etc/docker/seccomp.json
-```
+    ```cmd
+    sudo wget https://raw.githubusercontent.com/moby/moby/master/profiles/seccomp/default.json -O /etc/docker/seccomp.json
+    sudo sed -i '2s/SCMP_ACT_ERRNO/SCMP_ACT_TRACE/' /etc/docker/seccomp.json
+    ```
 
 2. Specify the new policy for the container explicitly.
 
-- When using `docker run`:
+    - When using `docker run`:
 
-```cmd
-docker run -d --name=netdata \
-  --security-opt=seccomp=/etc/docker/seccomp.json \
-  ...
-```
+    ```cmd
+    docker run -d --name=netdata \
+      --security-opt=seccomp=/etc/docker/seccomp.json \
+      ...
+    ```
 
-- When using `docker-compose`:
+    - When using `docker-compose`:
 
-> :warning: The security_opt option is ignored when deploying a stack in swarm mode.
+   > :warning: The security_opt option is ignored when deploying a stack in swarm mode.
 
-```yaml
-version: '3'
-services:
-  netdata:
-    security_opt:
-      - seccomp:/etc/docker/seccomp.json
-    ...
-```
+    ```yaml
+    version: '3'
+    services:
+      netdata:
+        security_opt:
+          - seccomp:/etc/docker/seccomp.json
+        ...
+    ```
 
-- When using `docker stack deploy`:
+    - When using `docker stack deploy`:
 
-Change the default profile globally by adding `--seccomp-profile=/etc/docker/seccomp.json` to the options passed to
-dockerd on startup.
+   Change the default profile globally by adding `--seccomp-profile=/etc/docker/seccomp.json` to the options passed to
+   dockerd on startup.
 
 </details>
 
