@@ -690,6 +690,7 @@ int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
+    bool close_open_fds = true;
     size_t default_stacksize;
     char *user = NULL;
 
@@ -1038,7 +1039,13 @@ int main(int argc, char **argv) {
                             print_build_info_json();
                             return 0;
                         }
-                        else {
+                        else if(strcmp(optarg, "keepopenfds") == 0) {
+                            // Internal dev option to skip closing inherited
+                            // open FDs. Useful, when we want to run the agent
+                            // under profiling tools that open/maintain their
+                            // own FDs.
+                            close_open_fds = false;
+                        } else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
                             return help(1);
                         }
@@ -1053,12 +1060,12 @@ int main(int argc, char **argv) {
     }
 
 #ifdef _SC_OPEN_MAX
-    // close all open file descriptors, except the standard ones
-    // the caller may have left open files (lxc-attach has this issue)
-    {
-        int fd;
-        for(fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
-            if(fd_is_valid(fd)) close(fd);
+    if (close_open_fds == true) {
+        // close all open file descriptors, except the standard ones
+        // the caller may have left open files (lxc-attach has this issue)
+        for(int fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
+            if(fd_is_valid(fd))
+                close(fd);
     }
 #endif
 
