@@ -16,6 +16,10 @@ extern sqlite3 *db_meta;
 #define RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER   (3)
 #endif
 
+#ifndef ACLK_MAX_DIMENSION_CLEANUP
+#define ACLK_MAX_DIMENSION_CLEANUP (500)
+#endif
+
 struct aclk_chart_sync_stats {
     int        updates;
     uint64_t   batch_id;

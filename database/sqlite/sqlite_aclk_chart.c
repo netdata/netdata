@@ -58,18 +58,15 @@ bind_fail:
     return send_status;
 }
 
-static int aclk_add_chart_payload(
-    struct aclk_database_worker_config *wc,
-    uuid_t *uuid,
-    char *claim_id,
-    ACLK_PAYLOAD_TYPE payload_type,
-    void *payload,
-    size_t payload_size)
+static int aclk_add_chart_payload(struct aclk_database_worker_config *wc, uuid_t *uuid, char *claim_id,
+                                 ACLK_PAYLOAD_TYPE payload_type, void *payload, size_t payload_size, int *send_status)
 {
     static __thread sqlite3_stmt *res_chart = NULL;
     int rc;
 
     rc = payload_sent(wc->uuid_str, uuid, payload, payload_size);
+    if (send_status)
+        *send_status = rc;
     if (rc == 1)
         return 0;
 
@@ -162,22 +159,16 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         size_t size;
         char *payload = generate_chart_instance_updated(&size, &chart_payload);
         if (likely(payload))
-            rc = aclk_add_chart_payload(wc, st->chart_uuid, claim_id, ACLK_PAYLOAD_CHART, (void *)payload, size);
+            rc = aclk_add_chart_payload(wc, st->chart_uuid, claim_id, ACLK_PAYLOAD_CHART, (void *) payload, size, NULL);
         freez(payload);
         chart_instance_updated_destroy(&chart_payload);
     }
     return rc;
 }
 
-static inline int aclk_upd_dimension_event(
-    struct aclk_database_worker_config *wc,
-    char *claim_id,
-    uuid_t *dim_uuid,
-    const char *dim_id,
-    const char *dim_name,
-    const char *chart_type_id,
-    time_t first_time,
-    time_t last_time)
+static inline int aclk_upd_dimension_event(struct aclk_database_worker_config *wc, char *claim_id, uuid_t *dim_uuid,
+        const char *dim_id, const char *dim_name, const char *chart_type_id, time_t first_time, time_t last_time,
+        int *send_status)
 {
     int rc = 0;
     size_t size;
@@ -190,13 +181,11 @@ static inline int aclk_upd_dimension_event(
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if (!first_time)
-        info(
-            "Host %s (node %s) deleting dimension id=[%s] name=[%s] chart=[%s]",
-            wc->host_guid,
-            wc->node_id,
-            dim_id,
-            dim_name,
-            chart_type_id);
+        info("Host %s (node %s) deleting dimension id=[%s] name=[%s] chart=[%s]",
+                wc->host_guid, wc->node_id, dim_id, dim_name, chart_type_id);
+    if (last_time)
+        info("Host %s (node %s) stopped collecting dimension id=[%s] name=[%s] chart=[%s] %ld seconds ago at %ld",
+             wc->host_guid, wc->node_id, dim_id, dim_name, chart_type_id, now_realtime_sec() - last_time, last_time);
 #endif
 
     dim_payload.node_id = wc->node_id;
@@ -208,7 +197,7 @@ static inline int aclk_upd_dimension_event(
     dim_payload.last_timestamp.tv_sec = last_time;
     char *payload = generate_chart_dimension_updated(&size, &dim_payload);
     if (likely(payload))
-        rc = aclk_add_chart_payload(wc, dim_uuid, claim_id, ACLK_PAYLOAD_DIMENSION, (void *)payload, size);
+        rc = aclk_add_chart_payload(wc, dim_uuid, claim_id, ACLK_PAYLOAD_DIMENSION, (void *)payload, size, send_status);
     freez(payload);
     return rc;
 }
@@ -252,7 +241,7 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
 
     unsigned count = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
-        (void)aclk_upd_dimension_event(
+        (void) aclk_upd_dimension_event(
             wc,
             claim_id,
             (uuid_t *)sqlite3_column_text(res, 3),
@@ -260,7 +249,8 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
             (const char *)sqlite3_column_text(res, 1),
             (const char *)sqlite3_column_text(res, 2),
             0,
-            0);
+            0,
+            NULL);
         count++;
     }
 
@@ -304,7 +294,8 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
             rd->name,
             rd->rrdset->id,
             first_t,
-            live ? 0 : last_t);
+            live ? 0 : last_t,
+            NULL);
         rd->state->aclk_live_status = live;
 
         freez(claim_id);
@@ -892,6 +883,8 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     time_t first_entry_t;
     time_t last_entry_t;
     uint32_t update_every = 0;
+    uint32_t dimension_update_count = 0;
+    int send_status;
 
     struct retention_updated rotate_data;
 
@@ -947,7 +940,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
             start_time = MIN(start_time, first_entry_t);
         int live = ((now - last_entry_t) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * update_every));
 
-        if (!live || !first_entry_t) {
+        if ((!live || !first_entry_t) && dimension_update_count < ACLK_MAX_DIMENSION_CLEANUP) {
             (void)aclk_upd_dimension_event(
                 wc,
                 claim_id,
@@ -956,7 +949,11 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
                 (const char *)(const char *)sqlite3_column_text(res, 4),
                 (const char *)(const char *)sqlite3_column_text(res, 2),
                 first_entry_t,
-                live ? 0 : last_entry_t);
+                live ? 0 : last_entry_t,
+                &send_status);
+
+            if (!send_status)
+                dimension_update_count++;
         }
     }
     if (update_every) {
@@ -1078,7 +1075,8 @@ void aclk_send_dimension_update(RRDDIM *rd)
             rd->name,
             rd->rrdset->id,
             first_entry_t,
-            live ? 0 : last_entry_t);
+            live ? 0 : last_entry_t,
+            NULL);
 
         if (!first_entry_t)
             debug(
