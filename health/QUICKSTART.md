@@ -52,8 +52,8 @@ Navigate to the health configuration directory to see all the available files an
 cd /usr/lib/netdata/conf.d/health.d/
 ls
 adaptec_raid.conf entropy.conf memory.conf squid.conf
-am2320.conf fping.conf mongodb.conf stiebeleltron.conf
-apache.conf fronius.conf mysql.conf swap.conf
+am2320.conf fping.conf mongodb.conf
+apache.conf mysql.conf swap.conf
 ...
 ```
 

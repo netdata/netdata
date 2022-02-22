@@ -21,9 +21,7 @@ collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
 collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
 collectors/macos.plugin/ @vlvkobal @thiagoftsm
 collectors/node.d.plugin/ @jacekkolasa
-collectors/node.d.plugin/fronius/ @ccremer
 collectors/node.d.plugin/snmp/ @jacekkolasa
-collectors/node.d.plugin/stiebeleltron/ @ccremer
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm

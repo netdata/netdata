@@ -36,11 +36,7 @@ dist_nodeconfig_DATA = \
 dist_node_DATA = \
     $(NULL)
 
-include fronius/Makefile.inc
-include named/Makefile.inc
-include sma_webbox/Makefile.inc
 include snmp/Makefile.inc
-include stiebeleltron/Makefile.inc
 
 nodemodulesdir=$(nodedir)/node_modules
 dist_nodemodules_DATA = \

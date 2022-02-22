@@ -581,7 +581,7 @@ Negative values are rendered counter-clockwise.
 This is a chart that displays the hotwater temperature in the given range of 40
 to 50.
 ```html
-<div data-netdata="stiebeleltron_system.hotwater.hotwatertemp"
+<div data-netdata="acme_system.hotwater.hotwatertemp"
  data-title="Hot Water Temperature"
  data-decimal-digits="1"
  data-chart-library="easypiechart"
