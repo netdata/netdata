@@ -93,6 +93,7 @@ ignored_sections_regex = re.compile(
     re.X
 )
 mirror_group_regex = re.compile(r'^Mirror Group \d+:$')
+disk_partition_regex = re.compile(r'^Disk Partition Information$')
 array_regex = re.compile(r'^Array: (?P<id>[A-Z]+)$')
 drive_regex = re.compile(
     r'''
@@ -242,7 +243,7 @@ class HPSSA(object):
         }
 
         for line in self:
-            if mirror_group_regex.match(line):
+            if HPSSA.match_any(line, mirror_group_regex, disk_partition_regex):
                 self.parse_ignored_section()
                 continue
 
