@@ -143,7 +143,7 @@ dimensions](https://user-images.githubusercontent.com/1153921/102813877-db5e4880
 
 As you can see in the above screenshot, this node is now looking for anomalies in many places. The result is a single
 `anomalies_local.probability` chart with more than twenty dimensions, some of which the dashboard hides at the bottom of
-a scroll-able area. In addition, training and analyzing the anomaly collector on many charts might require more CPU
+a scrollable area. In addition, training and analyzing the anomaly collector on many charts might require more CPU
 utilization that you're willing to give.
 
 First, explicitly declare which `system.` charts to monitor rather than of all of them using regex (`system\..*`).
