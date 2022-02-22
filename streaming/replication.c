@@ -5,6 +5,8 @@
 extern struct config stream_config;
 extern int netdata_use_ssl_on_stream;
 
+size_t replication_parser(struct replication_state *rpt, struct plugind *cd, FILE *fp);
+
 static void replication_receiver_thread_cleanup_callback(void *host);
 static void replication_sender_thread_cleanup_callback(void *ptr);
 static void print_replication_state(REPLICATION_STATE *state);
@@ -326,6 +328,16 @@ static void replication_attempt_to_connect(struct sender_state *state)
 
         // Update the connection state flag
         state->replication->connected = 1;
+
+        // Set file pointer
+        state->replication->fp = fdopen(state->replication->socket, "r");
+        if(!state->replication->fp) {
+            log_stream_connection(state->replication->client_ip, state->replication->client_port, state->host->rrdpush_send_api_key, state->host->machine_guid, state->host->hostname, "SOCKET CONVERSION TO FD FAILED - SOCKET ERROR");
+            error("%s %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", REPLICATION_MSG, state->host->hostname, state->replication->client_ip, state->replication->client_port, state->replication->socket);
+            close(state->replication->socket);
+            fclose(state->replication->fp);
+            return 0;
+        } 
     }
     else {
         // increase the failed connections counter
@@ -454,16 +466,16 @@ void *replication_sender_thread(void *ptr) {
     if(sock_delnonblock(s->replication->socket) < 0)
         error("%s %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", REPLICATION_MSG, s->host->hostname, s->replication->client_ip, s->replication->client_port, s->replication->socket);
 
-    /*
+   /*
     // convert the socket to a FILE *
     FILE *fp = fdopen(s->replication->socket, "r");
     if(!fp) {
-        log_stream_connection(s->replication->client_ip, s->replication->client_port, s->key, s->host->machine_guid, s->host->hostname, "SOCKET CONVERSION TO FD FAILED - SOCKET ERROR");
-        error("%s %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", REPLICATION_MSG, rpt->host->hostname, rpt->replication->client_ip, rpt->replication->client_port, rpt->replication->socket);
-        close(rpt->replication->socket);
+        log_stream_connection(s->replication->client_ip, s->replication->client_port, s->host->rrdpush_send_api_key, s->host->machine_guid, s->host->hostname, "SOCKET CONVERSION TO FD FAILED - SOCKET ERROR");
+        error("%s %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", REPLICATION_MSG, s->host->hostname, s->replication->client_ip, s->replication->client_port, s->replication->socket);
+        close(s->replication->socket);
         return 0;
     }
-    */
+  */
     // attempt to connect to parent
     // Read the config for sending in replication
     // Add here the sender initialization logic of the thread.
@@ -480,6 +492,7 @@ void *replication_sender_thread(void *ptr) {
     //     // if reponse is REP off - exit
     // }
     //Implementation...
+
     for(;rrdpush_replication_enabled && !netdata_exit;)
     {
         // check for outstanding cancellation requests
@@ -493,26 +506,9 @@ void *replication_sender_thread(void *ptr) {
             s->replication->not_connected_loops++;            
         }
         else {
-            //replication_attempt_read(s->replication);
-            //replication_parser(s->replication, NULL, fp);
-
-            replication_start(s->replication);
-
-            buffer_sprintf(
-            s->replication->build
-            , "REP ON\n"
-            );
-
-            replication_commit(s->replication);
-            
-            replication_attempt_to_send(s->replication);
-
-            replication_attempt_read(s->replication);
-
-            s->replication->read_buffer[s->replication->read_len] = '\0';
-            info("Sender Received: %s \n", s->replication->read_buffer);
-            s->replication->read_len = 0;
-            sleep(1);
+            //send_message(s->replication, "REP ON\n");
+            replication_parser(s->replication, NULL, s->replication->fp);
+            //sleep(1);
 
         }
     }
@@ -545,8 +541,6 @@ void send_message(struct replication_state *replication, char* message){
     replication_commit(replication);
     replication_attempt_to_send(replication);
 }
-
-size_t replication_parser(struct replication_state *rpt, struct plugind *cd, FILE *fp);
 
 void *replication_receiver_thread(void *ptr){
     netdata_thread_cleanup_push(replication_receiver_thread_cleanup_callback, ptr);
@@ -637,25 +631,12 @@ void *replication_receiver_thread(void *ptr){
     //     // recv RDATA command from child agent
     // }    
     // Closing thread - clean any resources allocated in this thread function
-    int send_count2 = 1;
-    for(;rrdpush_replication_enabled && !netdata_exit && send_count2 < 10000;)
+    for(;rrdpush_replication_enabled && !netdata_exit;)
     {
         // check for outstanding cancellation requests
         netdata_thread_testcancel();
-
+        info("Parsing...");
         replication_parser(rpt->replication, &cd, fp);
-        /*
-        replication_attempt_read(rpt->replication);
-        
-        while(rpt->replication->read_len <= 0){
-            info("Receiver did NOT receive: %s \n");
-            usleep(250);
-        }
-        
-        rpt->replication->read_buffer[rpt->replication->read_len] = '\0';
-        info("Receiver received: %s \n", rpt->replication->read_buffer);
-        rpt->replication->read_len = 0;
-        */
     }
     // Closing thread - clean up any resources allocated here
     netdata_thread_cleanup_pop(1);
@@ -1038,7 +1019,10 @@ static int receiver_read(struct replication_state *r, FILE *fp) {
 size_t replication_parser(struct replication_state *rpt, struct plugind *cd, FILE *fp) {
     size_t result;
     PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
-    user->enabled = cd->enabled;
+    //TODO cd?
+    if(cd){
+        user->enabled = cd->enabled;
+    }
     user->host = rpt->host;
     user->opaque = rpt;
     user->cd = cd;
@@ -1049,7 +1033,11 @@ size_t replication_parser(struct replication_state *rpt, struct plugind *cd, FIL
 
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
-        cd->serial_failures++;
+        //TODO cd?
+        if(cd){
+            cd->serial_failures++;
+        }
+
         freez(user);
         return 0;
     }
@@ -1090,6 +1078,7 @@ size_t replication_parser(struct replication_state *rpt, struct plugind *cd, FIL
         char *line;
         while ((line = receiver_next_line(rpt, &pos))) {
             info("Parser received: %s \n", line);
+            //TODO shutdown?
             if (unlikely(netdata_exit /*|| rpt->shutdown*/ || parser_action(parser,  line)))
                 goto done;
         }

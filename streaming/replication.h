@@ -2,7 +2,7 @@
 #define REPLICATION_MSG "REPLICATION_STREAM"
 #define REPLICATE_CMD "REPLICATE"
 #define REP_CMD "REP"
-#define REP_ACK_CMD "REP ack"
+#define REP_ACK_CMD "REP ACK"
 // REP command with arguments 
 // on, off, pause/continue, ack
 enum REP_ARG {
@@ -55,6 +55,7 @@ typedef struct replication_state {
     time_t last_msg_t;
     char *client_ip;
     char *client_port;
+    FILE *fp;
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
