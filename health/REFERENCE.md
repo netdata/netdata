@@ -82,6 +82,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
 | [`options`](#alarm-line-options)                    | no              | Add an option to not clear alarms.                                                    |
 | [`host labels`](#alarm-line-host-labels)            | no              | List of labels present on a host.                                                     |
+| [`info`](#alarm-line-info)                          | no              | A brief description of the alarm.                                                           |
 
 The `alarm` or `template` line must be the first line of any entity.
 
@@ -532,6 +533,14 @@ host labels: installed = 201*
 ```
 
 See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for more examples.
+
+#### Alarm line `info`
+
+The info field can contain a small piece of text describing the alarm or template. This will be rendered in notifications and UI elements whenever the specific alarm is in focus. An example for the `ram_available` alarm is:
+
+```yaml
+info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
+```
 
 ## Expressions
 

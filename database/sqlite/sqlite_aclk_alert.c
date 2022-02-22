@@ -242,7 +242,9 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.old_value = (calculated_number) sqlite3_column_double(res, 24);
 
         alarm_log.updated = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
-        alarm_log.rendered_info = strdupz((char *)sqlite3_column_text(res, 18));
+        alarm_log.rendered_info = sqlite3_column_type(res, 18) == SQLITE_NULL ?
+                                      strdupz((char *)"") :
+                                      strdupz((char *)sqlite3_column_text(res, 18));
 
         aclk_send_alarm_log_entry(&alarm_log);
 
@@ -714,7 +716,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->utc_offset = host->utc_offset;
     alarm_log->timezone = strdupz((char *)host->abbrev_timezone);
     alarm_log->exec_path = ae->exec ? strdupz((char *)ae->exec) : strdupz((char *)host->health_default_exec);
-    alarm_log->conf_source = ae->source ? strdupz((char *)ae->source) : "";
+    alarm_log->conf_source = ae->source ? strdupz((char *)ae->source) : strdupz((char *)"");
 
     alarm_log->command = strdupz((char *)edit_command);
 
@@ -738,7 +740,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->old_value = (!isnan(ae->old_value)) ? (calculated_number)ae->old_value : 0;
 
     alarm_log->updated = (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
-    alarm_log->rendered_info = strdupz(ae->info);
+    alarm_log->rendered_info = ae->info ? strdupz(ae->info) : strdupz((char *)"");
 
     freez(edit_command);
 }
