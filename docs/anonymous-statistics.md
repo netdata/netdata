@@ -98,7 +98,7 @@ Each of these opt-out processes does the following:
 
 -   Prevents the daemon from executing the anonymous statistics script.
 -   Forces the anonymous statistics script to exit immediately.
--   Stops the PostHog Javascript snippet, which remains on the dashboard, from firing and sending any data to the Netdata PostHog.
+-   Stops the PostHog JavaScript snippet, which remains on the dashboard, from firing and sending any data to the Netdata PostHog.
 
 ## Migration from Google Analytics and Google Tag Manager.
 
