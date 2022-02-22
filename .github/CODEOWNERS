@@ -5,8 +5,8 @@
 * @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
-.github/ @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
+.travis/ @Ferroin @iigorkarpov @maneamarius @kaskavel
+.github/ @Ferroin @iigorkarpov @maneamarius @kaskavel
 aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
@@ -14,7 +14,7 @@ backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
 build/ @Ferroin @iigorkarpov @maneamarius
-contrib/debian @Ferroin @iigorkarpov @maneamarius @vkalintiris
+contrib/debian @Ferroin @iigorkarpov @maneamarius
 collectors/ @vlvkobal
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
@@ -25,41 +25,41 @@ collectors/node.d.plugin/snmp/ @jacekkolasa
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
-daemon/ @thiagoftsm
+daemon/ @thiagoftsm @vkalintiris
 database/ @thiagoftsm @vkalintiris
 docs/ @DShreve2 @kickoke
 health/ @thiagoftsm @vlvkobal @vkalintiris
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
 ml/ @andrewm4894 @vkalintiris
-libnetdata/ @thiagofsm
-packaging/ @Ferroin @iigorkarpov @maneamarius @vkalintiris
+libnetdata/ @thiagofsm @vkalintiris
+packaging/ @Ferroin @iigorkarpov @maneamarius
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
-system/ @Ferroin @iigorkarpov @maneamarius @vkalintiris
+system/ @Ferroin @iigorkarpov @maneamarius
 tests/ @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
 web/ @thiagoftsm @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin @iigorkarpov @maneamarius @vkalintiris
+*.am @Ferroin @iigorkarpov @maneamarius
 *.md @DShreve2 @kickoke
-Dockerfile* @Ferroin @iigorkarpov @maneamarius @vkalintiris
+Dockerfile* @Ferroin @iigorkarpov @maneamarius
 
 # Ownership of specific files
 .gitignore @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.travis.yml @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
-.lgtm.yml @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.eslintrc @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.eslintignore @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.csslintrc @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.codeclimate.yml @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.codacy.yml @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.yamllint.yml @Ferroin @iigorkarpov @maneamarius @vkalintiris
-netdata.spec.in @Ferroin @iigorkarpov @maneamarius @vkalintiris
-netdata-installer.sh @Ferroin @iigorkarpov @maneamarius @vkalintiris
-package.json @jacekkolasa @Ferroin @iigorkarpov @maneamarius @vkalintiris
-packaging/version @netdatabot @Ferroin @iigorkarpov @maneamarius @vkalintiris
+.travis.yml @Ferroin @iigorkarpov @maneamarius @kaskavel
+.lgtm.yml @Ferroin @iigorkarpov @maneamarius
+.eslintrc @Ferroin @iigorkarpov @maneamarius
+.eslintignore @Ferroin @iigorkarpov @maneamarius
+.csslintrc @Ferroin @iigorkarpov @maneamarius
+.codeclimate.yml @Ferroin @iigorkarpov @maneamarius
+.codacy.yml @Ferroin @iigorkarpov @maneamarius
+.yamllint.yml @Ferroin @iigorkarpov @maneamarius
+netdata.spec.in @Ferroin @iigorkarpov @maneamarius
+netdata-installer.sh @Ferroin @iigorkarpov @maneamarius
+package.json @jacekkolasa @Ferroin @iigorkarpov @maneamarius
+packaging/version @netdatabot @Ferroin @iigorkarpov @maneamarius
 
 LICENSE.md @DShreve2 @Ferroin @vkalintiris
-CHANGELOG.md @netdatabot @Ferroin @iigorkarpov @maneamarius @vkalintiris
+CHANGELOG.md @netdatabot @Ferroin @iigorkarpov @maneamarius
