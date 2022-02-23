@@ -24,6 +24,8 @@
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
+int aclk_rcvd_cloud_msgs = 0;
+int aclk_connection_counter = 0;
 int disconnect_req = 0;
 
 int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
@@ -264,6 +266,7 @@ static void msg_callback_new_protocol(const char *topic, const void *msg, size_t
 }
 
 static inline void msg_callback(const char *topic, const void *msg, size_t msglen, int qos) {
+    aclk_rcvd_cloud_msgs++;
     if (aclk_use_new_cloud_arch)
         msg_callback_new_protocol(topic, msg, msglen, qos);
     else
@@ -400,6 +403,8 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_stats_upd_online(1);
     aclk_connected = 1;
     aclk_pubacks_per_conn = 0;
+    aclk_rcvd_cloud_msgs = 0;
+    aclk_connection_counter++;
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!aclk_use_new_cloud_arch) {
