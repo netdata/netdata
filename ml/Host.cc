@@ -33,15 +33,15 @@ static void updateDimensionsChart(RRDHOST *RH,
     if (!RS) {
         std::string IdPrefix = "dimensions";
         std::string TitlePrefix = "Anomaly detection dimensions for host";
-        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
 
         RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            P.first.c_str(), // id
+            IdTitlePair.first.c_str(), // id
             NULL, // name
             "dimensions", // family
             "anomaly_detection.dimensions", // ctx
-            P.second.c_str(), // title
+            IdTitlePair.second.c_str(), // title
             "dimensions", // units
             "netdata", // plugin
             "ml", // module
@@ -76,15 +76,15 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
     if (!RS) {
         std::string IdPrefix = "anomaly_rate";
         std::string TitlePrefix = "Percentage of anomalous dimensions for host";
-        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
 
         RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            P.first.c_str(), // id
+            IdTitlePair.first.c_str(), // id
             NULL, // name
             "anomaly_rate", // family
             "anomaly_detection.anomaly_rate", // ctx
-            P.second.c_str(), // title
+            IdTitlePair.second.c_str(), // title
             "percentage", // units
             "netdata", // plugin
             "ml", // module
@@ -110,15 +110,15 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
     if (!RS) {
         std::string IdPrefix = "detector_window";
         std::string TitlePrefix = "Anomaly detector window length for host";
-        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
 
         RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            P.first.c_str(), // id
+            IdTitlePair.first.c_str(), // id
             NULL, // name
             "detector_window", // family
             "anomaly_detection.detector_window", // ctx
-            P.second.c_str(), // title
+            IdTitlePair.second.c_str(), // title
             "seconds", // units
             "netdata", // plugin
             "ml", // module
@@ -148,15 +148,15 @@ static void updateEventsChart(RRDHOST *RH,
     if (!RS) {
         std::string IdPrefix = "detector_events";
         std::string TitlePrefix = "Anomaly events triggered for host";
-        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
 
         RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            P.first.c_str(), // id
+            IdTitlePair.first.c_str(), // id
             NULL, // name
             "detector_events", // family
             "anomaly_detection.detector_events", // ctx
-            P.second.c_str(), // title
+            IdTitlePair.second.c_str(), // title
             "boolean", // units
             "netdata", // plugin
             "ml", // module
@@ -191,15 +191,15 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
     if (!RS) {
         std::string IdPrefix = "prediction_stats";
         std::string TitlePrefix = "Time it took to run prediction for host";
-        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
 
         RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            P.first.c_str(), // id
+            IdTitlePair.first.c_str(), // id
             NULL, // name
             "prediction_stats", // family
             "anomaly_detection.prediction_stats", // ctx
-            P.second.c_str(), // title
+            IdTitlePair.second.c_str(), // title
             "milliseconds", // units
             "netdata", // plugin
             "ml", // module
@@ -229,15 +229,15 @@ static void updateTrainingChart(RRDHOST *RH,
     if (!RS) {
         std::string IdPrefix = "training_stats";
         std::string TitlePrefix = "Training step statistics for host";
-        auto P = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
 
         RS = rrdset_create_localhost(
             "anomaly_detection", // type
-            P.first.c_str(), // id
+            IdTitlePair.first.c_str(), // id
             NULL, // name
             "training_stats", // family
             "anomaly_detection.training_stats", // ctx
-            P.second.c_str(), // title
+            IdTitlePair.second.c_str(), // title
             "milliseconds", // units
             "netdata", // plugin
             "ml", // module
