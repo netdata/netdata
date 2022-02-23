@@ -1140,11 +1140,43 @@ char *ng_aclk_state(void)
     if (agent_id == NULL)
         buffer_strcat(wb, "No\n");
     else {
-        buffer_sprintf(wb, "Yes\nClaimed Id: %s\n", agent_id);
+        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\n", agent_id, cloud_base_url ? cloud_base_url : "null");
         freez(agent_id);
     }
 
-    buffer_sprintf(wb, "Online: %s", aclk_connected ? "Yes" : "No");
+    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\n", aclk_connected ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
+
+    if (aclk_connected) {
+        buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d", aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn);
+
+        RRDHOST *host;
+        rrd_rdlock();
+        rrdhost_foreach_read(host) {
+            buffer_sprintf(wb, "\n\n> Node Instance for mGUID: \"%s\" hostname \"%s\"\n", host->machine_guid, host->hostname);
+
+            buffer_strcat(wb, "\tClaimed ID: ");
+            rrdhost_aclk_state_lock(host);
+            if (host->aclk_state.claimed_id)
+                buffer_strcat(wb, host->aclk_state.claimed_id);
+            else
+                buffer_strcat(wb, "null");
+            rrdhost_aclk_state_unlock(host);
+
+
+            if (host->node_id == NULL || uuid_is_null(*host->node_id)) {
+                buffer_strcat(wb, "\n\tNode ID: null\n");
+            } else {
+                char node_id[GUID_LEN + 1];
+                uuid_unparse_lower(*host->node_id, node_id);
+                buffer_sprintf(wb, "\n\tNode ID: %s\n", node_id);
+            }
+
+            buffer_sprintf(wb, "\tStreaming Hops: %d\n\tRelationship: %s", host->system_info->hops, host == localhost ? "self" : "child");
+
+        }
+        rrd_unlock();
+    }
 
     ret = strdupz(buffer_tostring(wb));
     buffer_free(wb);
@@ -1153,7 +1185,7 @@ char *ng_aclk_state(void)
 
 char *ng_aclk_state_json(void)
 {
-    json_object *tmp, *arr, *msg = json_object_new_object();
+    json_object *tmp, *grp, *msg = json_object_new_object();
 
     tmp = json_object_new_boolean(1);
     json_object_object_add(msg, "aclk-available", tmp);
@@ -1162,17 +1194,17 @@ char *ng_aclk_state_json(void)
     json_object_object_add(msg, "aclk-version", tmp);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    arr = json_object_new_array_ext(2);
+    grp = json_object_new_array_ext(2);
     tmp = json_object_new_string("Legacy");
-    json_object_array_add(arr, tmp);
+    json_object_array_add(grp, tmp);
     tmp = json_object_new_string("Protobuf");
-    json_object_array_add(arr, tmp);
+    json_object_array_add(grp, tmp);
 #else
-    arr = json_object_new_array_ext(1);
+    grp = json_object_new_array_ext(1);
     tmp = json_object_new_string("Legacy");
-    json_object_array_add(arr, tmp);
+    json_object_array_add(grp, tmp);
 #endif
-    json_object_object_add(msg, "protocols-supported", arr);
+    json_object_object_add(msg, "protocols-supported", grp);
 
     char *agent_id = is_agent_claimed();
     tmp = json_object_new_boolean(agent_id != NULL);
@@ -1185,11 +1217,65 @@ char *ng_aclk_state_json(void)
         tmp = NULL;
     json_object_object_add(msg, "claimed-id", tmp);
 
+    char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+    tmp = cloud_base_url ? json_object_new_string(cloud_base_url) : NULL;
+    json_object_object_add(msg, "cloud-url", tmp);
+
     tmp = json_object_new_boolean(aclk_connected);
     json_object_object_add(msg, "online", tmp);
 
     tmp = json_object_new_string(aclk_use_new_cloud_arch ? "Protobuf" : "Legacy");
     json_object_object_add(msg, "used-cloud-protocol", tmp);
+
+    tmp = json_object_new_int(aclk_rcvd_cloud_msgs);
+    json_object_object_add(msg, "received-app-layer-msgs", tmp);
+
+    tmp = json_object_new_int(aclk_pubacks_per_conn);
+    json_object_object_add(msg, "received-mqtt-pubacks", tmp);
+
+    tmp = json_object_new_int(aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
+    json_object_object_add(msg, "reconnect-count", tmp);
+
+    grp = json_object_new_array();
+
+    RRDHOST *host;
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        json_object *nodeinstance = json_object_new_object();
+
+        tmp = json_object_new_string(host->hostname);
+        json_object_object_add(nodeinstance, "hostname", tmp);
+
+        tmp = json_object_new_string(host->machine_guid);
+        json_object_object_add(nodeinstance, "mguid", tmp);
+
+        rrdhost_aclk_state_lock(host);
+        if (host->aclk_state.claimed_id) {
+            tmp = json_object_new_string(host->aclk_state.claimed_id);
+            json_object_object_add(nodeinstance, "claimed_id", tmp);
+        } else
+            json_object_object_add(nodeinstance, "claimed_id", NULL);
+        rrdhost_aclk_state_unlock(host);
+
+        if (host->node_id == NULL || uuid_is_null(*host->node_id)) {
+            json_object_object_add(nodeinstance, "node-id", NULL);
+        } else {
+            char node_id[GUID_LEN + 1];
+            uuid_unparse_lower(*host->node_id, node_id);
+            tmp = json_object_new_string(node_id);
+            json_object_object_add(nodeinstance, "node-id", tmp);
+        }
+
+        tmp = json_object_new_int(host->system_info->hops);
+        json_object_object_add(nodeinstance, "streaming-hops", tmp);
+
+        tmp = json_object_new_string(host == localhost ? "self" : "child");
+        json_object_object_add(nodeinstance, "relationship", tmp);
+
+        json_object_array_add(grp, nodeinstance);
+    }
+    rrd_unlock();
+    json_object_object_add(msg, "node-instances", grp);
 
     char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
     json_object_put(msg);
