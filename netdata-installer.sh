@@ -701,7 +701,7 @@ bundle_protobuf() {
     "${PROTOBUF_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_VERRIDE_PROTOBUF}"; then
-    if run tar -xf "${tmp}/${PROTOBUF_PACKAGE_BASENAME}" -C "${tmp}" &&
+    if run tar --no-same-owner -xf "${tmp}/${PROTOBUF_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
       copy_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
@@ -786,7 +786,7 @@ bundle_judy() {
     "${JUDY_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_OVERRIDE_JUDY}"; then
-    if run tar -xf "${tmp}/${JUDY_PACKAGE_BASENAME}" -C "${tmp}" &&
+    if run tar --no-same-owner -xf "${tmp}/${JUDY_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
       copy_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
@@ -870,7 +870,7 @@ bundle_jsonc() {
     "${JSONC_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_OVERRIDE_JSONC}"; then
-    if run tar -xf "${tmp}/${JSONC_PACKAGE_BASENAME}" -C "${tmp}" &&
+    if run tar --no-same-owner -xf "${tmp}/${JSONC_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_jsonc "${tmp}/json-c-json-c-${JSONC_PACKAGE_VERSION}" &&
       copy_jsonc "${tmp}/json-c-json-c-${JSONC_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
@@ -959,7 +959,7 @@ bundle_libbpf() {
     "${LIBBPF_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBBPF}"; then
-    if run tar -xf "${tmp}/${LIBBPF_PACKAGE_BASENAME}" -C "${tmp}" &&
+    if run tar --no-same-owner -xf "${tmp}/${LIBBPF_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
       copy_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
@@ -1539,10 +1539,10 @@ install_go() {
   # Install new files
   run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d"
   run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d.conf"
-  run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
+  run tar --no-same-owner -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
   run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
-  run tar -xf "${tmp}/${GO_PACKAGE_BASENAME}"
+  run tar --no-same-owner -xf "${tmp}/${GO_PACKAGE_BASENAME}"
   run mv "${GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   if [ "$(id -u)" -eq 0 ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
@@ -1671,7 +1671,7 @@ install_ebpf() {
   fi
 
   echo >&2 " Extracting ${EBPF_TARBALL} ..."
-  tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
+  tar --no-same-owner -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
   # chown everything to root:netdata before we start copying out of our package
   run chown -R root:netdata "${tmp}"
