@@ -262,6 +262,10 @@ static void msg_callback_new_protocol(const char *topic, const void *msg, size_t
     close(logfd);
 #endif
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message(msgtype, 1, 0);
+#endif
+
     aclk_handle_new_cloud_msg(msgtype, msg, msglen);
 }
 
@@ -286,6 +290,10 @@ static void puback_callback(uint16_t packet_id)
         info("Shutdown message has been acknowledged by the cloud. Exiting gracefully");
         aclk_shared_state.mqtt_shutdown_msg_rcvd = 1;
     }
+    
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message_upd_puback(packet_id);
+#endif
 }
 
 static int read_query_thread_count()

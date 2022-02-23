@@ -230,4 +230,6 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
 int claimed();
 void aclk_sync_exit_all();
 struct aclk_database_worker_config *find_inactive_wc_by_node_id(char *node_id);
+int sql_log_message(const char *msgtype, int in, uint16_t packet_id);
+int sql_log_message_upd_puback(uint16_t packet_id);
 #endif //NETDATA_SQLITE_ACLK_H

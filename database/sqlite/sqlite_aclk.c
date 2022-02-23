@@ -23,6 +23,12 @@ const char *aclk_sync_config[] = {
 
     "DELETE FROM dimension_delete WHERE host_id NOT IN"
     " (SELECT host_id FROM host) OR strftime('%s') - date_created > 604800;",
+#ifdef NETDATA_INTERNAL_CHECKS
+    "CREATE TABLE IF NOT EXISTS message_log (message_id INTEGER PRIMARY KEY, node_id, message, flow, "
+    "pid, date_created, date_puback);",
+
+    "DELETE FROM message_log;",
+#endif
 
     NULL,
 };
@@ -835,4 +841,132 @@ void aclk_data_rotated(void)
     uv_mutex_unlock(&aclk_async_lock);
 #endif
     return;
+}
+
+int sql_log_message(const char *msgtype, int in, uint16_t packet_id)
+{
+    int rc;
+    /* uuid_t host_uuid; */
+    /* char *host_guid = (char *)cmd.data; */
+
+    /* if (unlikely(!host_guid)) */
+    /*     return; */
+
+    /* rc = uuid_parse(host_guid, host_uuid); */
+    /* freez(host_guid); */
+    /* if (rc) */
+    /*     return; */
+
+    /* uuid_unparse_lower(host_uuid, host_str); */
+    /* uuid_unparse_lower_fix(&host_uuid, uuid_str); */
+
+    /* debug(D_ACLK_SYNC, "Checking if I should delete aclk tables for node %s", host_str); */
+
+    /* if (is_host_available(&host_uuid)) { */
+    /*     debug(D_ACLK_SYNC, "Host %s exists, not deleting aclk sync tables", host_str); */
+    /*     return; */
+    /* } */
+
+    /* debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str); */
+
+    sqlite3_stmt *res = NULL;
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+
+        buffer_sprintf(
+        sql,
+        "INSERT INTO message_log (message, flow, date_created, pid) "
+        "VALUES (@message, @flow, strftime('%%s'), @packet_id); ");
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to store message in message_log");
+        buffer_free(sql);
+        return 1;
+    }
+
+    rc = sqlite3_bind_text(res, 1, msgtype, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (in)
+        rc = sqlite3_bind_text(res, 2, "IN", -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_text(res, 2, "OUT", -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 3, packet_id);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to store message, rc = %d", rc);
+        goto bind_fail;
+    }
+
+bind_fail:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to reset statement to store message, rc = %d", rc);
+
+    buffer_free(sql);
+    return 0;
+}
+
+int sql_log_message_upd_puback(uint16_t packet_id)
+{
+    int rc;
+    /* uuid_t host_uuid; */
+    /* char *host_guid = (char *)cmd.data; */
+
+    /* if (unlikely(!host_guid)) */
+    /*     return; */
+
+    /* rc = uuid_parse(host_guid, host_uuid); */
+    /* freez(host_guid); */
+    /* if (rc) */
+    /*     return; */
+
+    /* uuid_unparse_lower(host_uuid, host_str); */
+    /* uuid_unparse_lower_fix(&host_uuid, uuid_str); */
+
+    /* debug(D_ACLK_SYNC, "Checking if I should delete aclk tables for node %s", host_str); */
+
+    /* if (is_host_available(&host_uuid)) { */
+    /*     debug(D_ACLK_SYNC, "Host %s exists, not deleting aclk sync tables", host_str); */
+    /*     return; */
+    /* } */
+
+    /* debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str); */
+
+    sqlite3_stmt *res = NULL;
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+
+        buffer_sprintf(
+        sql,
+        "UPDATE message_log SET date_puback = strftime('%%s') where pid = @packet_id; ");
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to store message in message_log");
+        buffer_free(sql);
+        return 1;
+    }
+
+    rc = sqlite3_bind_int(res, 1, packet_id);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to store message, rc = %d", rc);
+        goto bind_fail;
+    }
+
+bind_fail:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to reset statement to store message, rc = %d", rc);
+
+    buffer_free(sql);
+    return 0;
 }

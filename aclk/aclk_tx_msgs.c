@@ -64,6 +64,10 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     }
 #endif
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message(msgname, 0, packet_id);
+#endif
+
     return packet_id;
 }
 
