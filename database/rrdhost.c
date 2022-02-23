@@ -642,8 +642,6 @@ RRDHOST *rrdhost_find_or_create(
         rrdhost_unlock(host);
     }
 
-    rrdhost_cleanup_orphan_hosts_nolock(host);
-
     rrd_unlock();
 
     return host;
@@ -652,7 +650,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
     if(host != protected_host
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && host->receiver
+       && !host->receiver
        && host->senders_disconnected_time
        && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
         return 1;
@@ -880,7 +878,20 @@ void rrdhost_free(RRDHOST *host) {
 
 
     rrdhost_wrlock(host);   // lock this RRDHOST
-
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    struct aclk_database_worker_config *wc =  host->dbsync_worker;
+    if (wc && !netdata_exit) {
+        struct aclk_database_cmd cmd;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
+        struct aclk_completion compl ;
+        init_aclk_completion(&compl );
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd(wc, &cmd);
+        wait_for_aclk_completion(&compl );
+        destroy_aclk_completion(&compl );
+    }
+#endif
     // ------------------------------------------------------------------------
     // release its children resources
 
@@ -983,7 +994,10 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->node_id);
 
     freez(host);
-
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    if (wc)
+        wc->is_orphan = 0;
+#endif
     rrd_hosts_available--;
 }
 

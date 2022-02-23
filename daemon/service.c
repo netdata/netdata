@@ -31,6 +31,11 @@ void *service_main(void *ptr)
         heartbeat_next(&hb, step);
 
         rrd_cleanup_obsolete_charts();
+
+        rrd_wrlock();
+        rrdhost_cleanup_orphan_hosts_nolock(localhost);
+        rrd_unlock();
+
     }
 
     netdata_thread_cleanup_pop(1);
