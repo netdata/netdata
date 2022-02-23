@@ -23,8 +23,10 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
       - name: Prepare tools
+        id: prepare
         run: |
           sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
@@ -55,6 +57,25 @@ jobs:
           matrix = json.dumps({'include': entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
           print('::set-output name=matrix::' + matrix)
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Repository Package Build matrix generation failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: >-
+              ${{ github.repository }}: Failed to generate build matrix for repository package build.
+              Checkout: ${{ steps.checkout.outcome }}
+              Prepare Tools: ${{ steps.prepare.outcome }}
+              Read Build Matrix: ${{ steps.set-matrix.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+          }}
 
   build:
     name: Build
@@ -73,9 +94,11 @@ jobs:
       max-parallel: 8
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
         # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Fetch base image
+        id: fetch-images
         uses: nick-invision/retry@v2
         with:
           max_attempts: 3
@@ -83,25 +106,30 @@ jobs:
           timeout_seconds: 900
           command: docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
       - name: Build Packages
+        id: build
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --platform ${{ matrix.platform }} \
-              -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
+              -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: Upload Packages
+        id: publish
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         shell: bash
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
         run: |
-          echo "Packages to upload:\n$(ls artifacts/*.${{ matrix.format }})"
+          printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} ${pkgfile}
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} ${pkgfile}
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} ${pkgfile}
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} \
+                "$(basename "${pkgfile}")" || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} \
+                "$(basename "${pkgfile}")" || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} \
+                "$(basename "${pkgfile}")" || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} "${pkgfile}"
           done
       - name: Failure Notification
         if: ${{ failure() }}
@@ -112,5 +140,10 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Repository Package Build failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: "${{ matrix.pkgclouddistro }} ${{ matrix.version }} repository package build failed."
+          SLACK_MESSAGE: >-
+              ${{ github.repository }}: ${{ matrix.pkgclouddistro }} ${{ matrix.version }} repository package build failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Fetch images: ${{ steps.fetch-images.outcome }}
+              Build: ${{ steps.build.outcome }}
+              Publish: ${{ steps.publish.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
