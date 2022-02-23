@@ -1174,6 +1174,8 @@ char *ng_aclk_state(void)
 
             buffer_sprintf(wb, "\tStreaming Hops: %d\n\tRelationship: %s", host->system_info->hops, host == localhost ? "self" : "child");
 
+            if (host != localhost)
+                buffer_sprintf(wb, "\n\tStreaming Connection Live: %s", host->receiver ? "true" : "false");
         }
         rrd_unlock();
     }
@@ -1271,6 +1273,9 @@ char *ng_aclk_state_json(void)
 
         tmp = json_object_new_string(host == localhost ? "self" : "child");
         json_object_object_add(nodeinstance, "relationship", tmp);
+
+        tmp = json_object_new_boolean((host->receiver || host == localhost));
+        json_object_object_add(nodeinstance, "streaming-online", tmp);
 
         json_object_array_add(grp, nodeinstance);
     }
