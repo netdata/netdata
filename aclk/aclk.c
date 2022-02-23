@@ -43,8 +43,6 @@ struct aclk_shared_state aclk_shared_state = {
     .mqtt_shutdown_msg_rcvd = 0
 };
 
-//ENDTODO
-
 static RSA *aclk_private_key = NULL;
 static int load_private_key()
 {
