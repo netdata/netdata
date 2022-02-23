@@ -277,7 +277,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
         time_t first_t = rd->state->query_ops.oldest_time(rd);
         time_t last_t  = rd->state->query_ops.latest_time(rd);
 
-        int live = ((now - last_t) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
+        int live = ((now - last_t) < MAX(RRDSET_MINIMUM_LIVE_MULTIPLIER * rd->update_every, rrdset_free_obsolete_time));
 
         rc = aclk_upd_dimension_event(
             wc,
