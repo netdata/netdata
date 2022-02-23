@@ -120,4 +120,14 @@ RabbitMQ users with the "monitoring" tag cannot see all queue data, you'll need 
 rabbitmqctl add_user netdata ChangeThisSuperSecretPassword
 rabbitmqctl set_permissions netdata "^$" "^$" ".*"
 ```
-Once the user is set up, add `collect_queues_metrics: yes` to your config.
+Once the user is set up, add `collect_queues_metrics: yes` to your config:
+
+```yaml
+local:
+  name                   : 'local'
+  host                   : '127.0.0.1'
+  port                   :  15672
+  user                   : 'netdata'
+  pass                   : 'ChangeThisSuperSecretPassword'
+  collect_queues_metrics : 'yes'
+```
