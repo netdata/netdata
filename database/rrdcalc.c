@@ -81,35 +81,32 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     if(!rc->units) rc->units = strdupz(st->units);
 
-    if(!rrdcalc_isrepeating(rc)) {
-        time_t now = now_realtime_sec();
-        ALARM_ENTRY *ae = health_create_alarm_entry(
-                host,
-                rc->id,
-                rc->next_event_id++,
-                rc->config_hash_id,
-                now,
-                rc->name,
-                rc->rrdset->id,
-                rc->rrdset->family,
-                rc->classification,
-                rc->component,
-                rc->type,
-                rc->exec,
-                rc->recipient,
-                now - rc->last_status_change,
-                rc->old_value,
-                rc->value,
-                rc->status,
-                RRDCALC_STATUS_UNINITIALIZED,
-                rc->source,
-                rc->units,
-                rc->info,
-                0,
-                0
-        );
-        health_alarm_log(host, ae);
-    }
+    time_t now = now_realtime_sec();
+    ALARM_ENTRY *ae = health_create_alarm_entry(
+        host,
+        rc->id,
+        rc->next_event_id++,
+        rc->config_hash_id,
+        now,
+        rc->name,
+        rc->rrdset->id,
+        rc->rrdset->family,
+        rc->classification,
+        rc->component,
+        rc->type,
+        rc->exec,
+        rc->recipient,
+        now - rc->last_status_change,
+        rc->old_value,
+        rc->value,
+        rc->status,
+        RRDCALC_STATUS_UNINITIALIZED,
+        rc->source,
+        rc->units,
+        rc->info,
+        0,
+        0);
+    health_alarm_log(host, ae);
 }
 
 static inline int rrdcalc_test_additional_restriction(RRDCALC *rc, RRDSET *st){
@@ -159,35 +156,32 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
 
     RRDHOST *host = st->rrdhost;
 
-    if(!rrdcalc_isrepeating(rc)) {
-        time_t now = now_realtime_sec();
-        ALARM_ENTRY *ae = health_create_alarm_entry(
-                host,
-                rc->id,
-                rc->next_event_id++,
-                rc->config_hash_id,
-                now,
-                rc->name,
-                rc->rrdset->id,
-                rc->rrdset->family,
-                rc->classification,
-                rc->component,
-                rc->type,
-                rc->exec,
-                rc->recipient,
-                now - rc->last_status_change,
-                rc->old_value,
-                rc->value,
-                rc->status,
-                RRDCALC_STATUS_REMOVED,
-                rc->source,
-                rc->units,
-                rc->info,
-                0,
-                0
-        );
-        health_alarm_log(host, ae);
-    }
+    time_t now = now_realtime_sec();
+    ALARM_ENTRY *ae = health_create_alarm_entry(
+        host,
+        rc->id,
+        rc->next_event_id++,
+        rc->config_hash_id,
+        now,
+        rc->name,
+        rc->rrdset->id,
+        rc->rrdset->family,
+        rc->classification,
+        rc->component,
+        rc->type,
+        rc->exec,
+        rc->recipient,
+        now - rc->last_status_change,
+        rc->old_value,
+        rc->value,
+        rc->status,
+        RRDCALC_STATUS_REMOVED,
+        rc->source,
+        rc->units,
+        rc->info,
+        0,
+        0);
+    health_alarm_log(host, ae);
 
     debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, host->hostname);
 

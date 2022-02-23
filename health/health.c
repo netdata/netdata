@@ -999,19 +999,19 @@ void *health_main(void *ptr) {
                         rc->delay_last = delay;
                         rc->delay_up_to_timestamp = now + delay;
 
-                        if(likely(!rrdcalc_isrepeating(rc))) {
-                            ALARM_ENTRY *ae = health_create_alarm_entry(
-                                    host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
-                                    rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
-                                    rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
-                                    rc->delay_last,
-                                    (
-                                            ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                            ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
-                                    )
-                            );
-                            health_alarm_log(host, ae);
-                        }
+
+                        ALARM_ENTRY *ae = health_create_alarm_entry(
+                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
+                                rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
+                                rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
+                                rc->delay_last,
+                                (
+                                        ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                        ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                                )
+                        );
+                        health_alarm_log(host, ae);
+
                         rc->last_status_change = now;
                         rc->old_status = rc->status;
                         rc->status = status;
