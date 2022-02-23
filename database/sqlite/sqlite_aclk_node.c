@@ -27,6 +27,13 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     now_realtime_timeval(&node_info.updated_at);
 
     RRDHOST *host = wc->host;
+    char *host_version = NULL;
+    if (host != localhost) {
+        netdata_mutex_lock(&host->receiver_lock);
+        if (host->receiver && host->receiver->program_version)
+            host_version = strdupz(host->receiver->program_version);
+        netdata_mutex_unlock(&host->receiver_lock);
+    }
 
     node_info.data.name = host->hostname;
     node_info.data.os = (char *) host->os;
@@ -61,6 +68,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     netdata_rwlock_unlock(&labels->labels_rwlock);
     rrd_unlock();
     freez(node_info.claim_id);
+    freez(host_version);
 #else
     UNUSED(wc);
 #endif
