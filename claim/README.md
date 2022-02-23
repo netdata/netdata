@@ -276,7 +276,7 @@ Connect a _running Netdata Agent container_, where you don't want to recreate th
 `netdata` with the name of your running container:
 
 ```bash
-docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+docker exec -it netdata netdata-claim.sh -token TOKEN -rooms ROOM1,ROOM2 -url https://app.netdata.cloud
 ```
 The values for `ROOM1,ROOM2` can be found by by going to Netdata Cloud, clicking the **Nodes** tab, clicking **Connect Nodes**, selecting **Docker**, and copying the `rooms=` value in the command provided. 
 
@@ -498,7 +498,7 @@ the claiming script parameters (not yet supported on the kickstart script). Make
 **Claiming script**
 
 ```bash
-sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud -id=$(uuidgen)
+sudo netdata-claim.sh -token TOKEN -rooms ROOM1,ROOM2 -url https://app.netdata.cloud -id $(uuidgen)
 ```
 
 The agent _must be restarted_ after this change.
@@ -549,24 +549,24 @@ A Space's administrator can also connect an Agent by directly calling the `netda
 using `sudo`, or as the user running the Agent (typically `netdata`), and passing the following arguments:
 
 ```sh
--token=TOKEN
+-token TOKEN
     where TOKEN is the Space's claiming token.
--rooms=ROOM1,ROOM2,...
+-rooms ROOM1,ROOM2,...
     where ROOMX is the War Room this node should be added to. This list is optional.
--url=URL_BASE
+-url URL_BASE
     where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://app.netdata.cloud.
--id=AGENT_ID
+-id AGENT_ID
     where AGENT_ID is the unique identifier of the Agent. This is the Agent's MACHINE_GUID by default.
--hostname=HOSTNAME
+-hostname HOSTNAME
     where HOSTNAME is the result of the hostname command by default.
--proxy=PROXY_URL
+-proxy PROXY_URL
     where PROXY_URL is the endpoint of a HTTP or HTTPS proxy.
 ```
 
 For example, the following command connects an Agent and adds it to rooms `room1` and `room2`:
 
 ```sh
-netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2
+netdata-claim.sh -token MYTOKEN1234567 -rooms room1,room2
 ```
 
 You should then update the `netdata` service about the result with `netdatacli`:
@@ -585,13 +585,13 @@ If a Netdata Agent is running, the Space's administrator can connect a node usin
 additional command line parameters:
 
 ```sh
--W "claim -token=TOKEN -rooms=ROOM1,ROOM2"
+-W "claim -token TOKEN -rooms ROOM1,ROOM2"
 ```
 
 For example:
 
 ```sh
-/usr/sbin/netdata -D -W "claim -token=MYTOKEN1234567 -rooms=room1,room2"
+/usr/sbin/netdata -D -W "claim -token MYTOKEN1234567 -rooms room1,room2"
 ```
 
 If need be, the user can override the Agent's defaults by providing additional arguments like those described
