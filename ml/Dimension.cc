@@ -128,6 +128,7 @@ MLResult TrainableDimension::trainModel() {
     SamplesBuffer SB = SamplesBuffer(CNs, N, 1, Cfg.DiffN, Cfg.SmoothN, Cfg.LagN);
     KM.train(SB, Cfg.MaxKMeansIters);
     Trained = true;
+    ConstantModel = true;
 
     delete[] CNs;
     return MLResult::Success;
@@ -146,6 +147,10 @@ void PredictableDimension::addValue(CalculatedNumber Value, bool Exists) {
     }
 
     std::rotate(std::begin(CNs), std::begin(CNs) + 1, std::end(CNs));
+
+    if (CNs[N - 1] != Value)
+        ConstantModel = false;
+
     CNs[N - 1] = Value;
 }
 

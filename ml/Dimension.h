@@ -55,6 +55,9 @@ public:
     }
 
     bool shouldTrain(const TimePoint &TP) const {
+        if (ConstantModel)
+            return false;
+
         return (LastTrainedAt + TrainEvery) < TP;
     }
 
@@ -69,6 +72,9 @@ private:
 
 public:
     TimePoint LastTrainedAt{Seconds{0}};
+
+protected:
+    std::atomic<bool> ConstantModel{false};
 
 private:
     Seconds TrainEvery;
