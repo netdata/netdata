@@ -905,6 +905,49 @@ bind_fail:
     return 1;
 }
 
+/*
+ * Store set option for a dimension
+ */
+int sql_set_dimension_option(uuid_t *dim_uuid, char *option)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    rc = sqlite3_prepare_v2(db_meta, "UPDATE dimension SET options = @options WHERE dim_id = @dim_id", -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to update dimension options");
+        return 0;
+    };
+
+    rc = sqlite3_bind_blob(res, 2, dim_uuid, sizeof(*dim_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (!option || !strcmp(option,"unhide"))
+        rc = sqlite3_bind_null(res, 1);
+    else
+        rc = sqlite3_bind_text(res, 1, option, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to update dimension option, rc = %d", rc);
+
+bind_fail:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement in update dimension options, rc = %d", rc);
+    return 0;
+}
+
 
 //
 // Support for archived charts
