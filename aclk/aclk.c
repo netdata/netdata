@@ -1124,14 +1124,14 @@ char *ng_aclk_state(void)
 
     buffer_strcat(wb,
         "ACLK Available: Yes\n"
-        "ACLK Implementation: Next Generation\n"
+        "ACLK Version: 2\n"
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        "New Cloud Protocol Support: Yes\n"
+        "Protocols Supported: Legacy, Protobuf\n"
 #else
-        "New Cloud Protocol Support: No\n"
+        "Protocols Supported: Legacy\n"
 #endif
-        "Claimed: "
     );
+    buffer_sprintf(wb, "Protocol Used: %s\nClaimed: ", aclk_use_new_cloud_arch ? "Protobuf" : "Legacy");
 
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
@@ -1141,7 +1141,7 @@ char *ng_aclk_state(void)
         freez(agent_id);
     }
 
-    buffer_sprintf(wb, "Online: %s\nUsed Cloud Protocol: %s", aclk_connected ? "Yes" : "No", aclk_use_new_cloud_arch ? "New" : "Legacy");
+    buffer_sprintf(wb, "Online: %s", aclk_connected ? "Yes" : "No");
 
     ret = strdupz(buffer_tostring(wb));
     buffer_free(wb);
@@ -1150,20 +1150,26 @@ char *ng_aclk_state(void)
 
 char *ng_aclk_state_json(void)
 {
-    json_object *tmp, *msg = json_object_new_object();
+    json_object *tmp, *arr, *msg = json_object_new_object();
 
     tmp = json_object_new_boolean(1);
     json_object_object_add(msg, "aclk-available", tmp);
 
-    tmp = json_object_new_string("Next Generation");
-    json_object_object_add(msg, "aclk-implementation", tmp);
+    tmp = json_object_new_int(2);
+    json_object_object_add(msg, "aclk-version", tmp);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    tmp = json_object_new_boolean(1);
+    arr = json_object_new_array_ext(2);
+    tmp = json_object_new_string("Legacy");
+    json_object_array_add(arr, tmp);
+    tmp = json_object_new_string("Protobuf");
+    json_object_array_add(arr, tmp);
 #else
-    tmp = json_object_new_boolean(0);
+    arr = json_object_new_array_ext(1);
+    tmp = json_object_new_string("Legacy");
+    json_object_array_add(arr, tmp);
 #endif
-    json_object_object_add(msg, "new-cloud-protocol-supported", tmp);
+    json_object_object_add(msg, "protocols-supported", arr);
 
     char *agent_id = is_agent_claimed();
     tmp = json_object_new_boolean(agent_id != NULL);
@@ -1179,7 +1185,7 @@ char *ng_aclk_state_json(void)
     tmp = json_object_new_boolean(aclk_connected);
     json_object_object_add(msg, "online", tmp);
 
-    tmp = json_object_new_string(aclk_use_new_cloud_arch ? "New" : "Legacy");
+    tmp = json_object_new_string(aclk_use_new_cloud_arch ? "Protobuf" : "Legacy");
     json_object_object_add(msg, "used-cloud-protocol", tmp);
 
     char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
