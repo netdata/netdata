@@ -425,9 +425,6 @@ void DetectableHost::detectOnce() {
                 DimsOverThreshold.push_back({ AnomalyScore, D->getID() });
 
             D->updateAnomalyBitCounter(AnomalyRateRS, AnomalyRateTimer, IsAnomalous);
-
-            if (NewAnomalyEvent && (AnomalyScore >= Cfg.ADDimensionRateThreshold))
-                DimsOverThreshold.push_back({ AnomalyScore, D->getID() });
         }
 
         if (NumAnomalousDimensions)
