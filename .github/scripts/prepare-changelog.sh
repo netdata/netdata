@@ -145,8 +145,8 @@ git config --global user.name "netdatabot"
 git config --global user.email "bot@netdata.cloud"
 
 if [ "${REPO}" != "netdata/netdata" ]; then
-    echo "::set-output name=run::false"
     echo "::notice::Not running in the netdata/netdata repository, not queueing a release build."
+    echo "::set-output name=run::false"
 elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     echo "::notice::Preparing a nightly release build."
     LAST_TAG=$(git describe --abbrev=0 --tags)
@@ -162,7 +162,7 @@ elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     check_version_format || exit 1
     check_for_existing_tag || exit 1
     branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
-    if [ -z "$(git branch --list "${branch_name}")" ] || [ -z "$(git ls-remote --heads origin "${branch}")" ]; then
+    if [ -z "$(git branch --list "${branch_name}")" ]; then
         echo "::error::Could not find a branch for the ${branch_name}.x release series."
         exit 1
     fi
@@ -183,7 +183,7 @@ elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     check_newer_minor_version || exit 1
     check_for_existing_tag || exit 1
     branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
-    if [ -n "$(git branch --list "${branch_name}")" ] || [ -n "$(git ls-remote --heads origin "${branch}")" ]; then
+    if [ -n "$(git branch --list "${branch_name}")" ]; then
         echo "::error::A branch named ${branch_name} already exists in the repository."
         exit 1
     fi
