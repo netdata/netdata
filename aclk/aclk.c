@@ -1185,6 +1185,31 @@ char *ng_aclk_state(void)
     return ret;
 }
 
+static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
+{
+    struct proto_alert_status status;
+    if (!get_proto_alert_status(host, &status))
+        return;
+
+    json_object *tmp = json_object_new_int(status.alert_updates);
+    json_object_object_add(obj, "updates", tmp);
+
+    tmp = json_object_new_int(status.alerts_batch_id);
+    json_object_object_add(obj, "batch-id", tmp);
+
+    tmp = json_object_new_int(status.last_acked_sequence_id);
+    json_object_object_add(obj, "last-acked-seq-id", tmp);
+
+    tmp = json_object_new_int(status.pending_min_sequence_id);
+    json_object_object_add(obj, "pending-min-seq-id", tmp);
+
+    tmp = json_object_new_int(status.pending_max_sequence_id);
+    json_object_object_add(obj, "pending-max-seq-id", tmp);
+
+    tmp = json_object_new_int(status.last_submitted_sequence_id);
+    json_object_object_add(obj, "last-submitted-seq-id", tmp);
+}
+
 char *ng_aclk_state_json(void)
 {
     json_object *tmp, *grp, *msg = json_object_new_object();
@@ -1276,6 +1301,10 @@ char *ng_aclk_state_json(void)
 
         tmp = json_object_new_boolean((host->receiver || host == localhost));
         json_object_object_add(nodeinstance, "streaming-online", tmp);
+
+        tmp =json_object_new_object();
+        fill_alert_status_for_host_json(tmp, host);
+        json_object_object_add(nodeinstance, "alert-sync-status", tmp);
 
         json_object_array_add(grp, nodeinstance);
     }
