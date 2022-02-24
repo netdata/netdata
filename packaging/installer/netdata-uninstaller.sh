@@ -31,7 +31,6 @@ while :; do
       exit 1
       ;;
     -f | --force)
-      # shellcheck disable=SC2034
       INTERACTIVITY="-f"
       shift
       ;;
@@ -68,29 +67,36 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 user_input() {
-  TEXT="$1 [y/n]"
+  if [ "${INTERACTIVITY}" = "-i" ]; then
+    TEXT="$1 [y/n]"
 
-  while true; do
-    echo "$TEXT"
-    read -r yn
+    while true; do
+      echo "$TEXT"
+      read -r yn
 
-    case "$yn" in
-       [Yy]*) return 0;;
-       [Nn]*) return 1;;
-       *) echo "Please answer yes or no.";;
-     esac
-   done
+      case "$yn" in
+         [Yy]*) return 0;;
+         [Nn]*) return 1;;
+         *) echo "Please answer yes or no.";;
+       esac
+     done
+  fi
 }
 
 if [ -x "$(command -v apt-get)" ]; then
   if dpkg -s netdata > /dev/null; then
     echo "Found netdata native installation"
-	if user_input "Do you want to remove netdata? "; then
+    if user_input "Do you want to remove netdata? "; then
       apt-get remove netdata ${FLAG}
-	fi
+    fi
     if dpkg -s netdata-repo-edge > /dev/null; then
-	  if user_input "Do you want to remove netdata-repo-edge? "; then
+      if user_input "Do you want to remove netdata-repo-edge? "; then
         apt-get remove netdata-repo-edge ${FLAG}
+      fi
+    fi
+    if dpkg -s netdata-repo > /dev/null; then
+      if user_input "Do you want to remove netdata-repo? "; then
+        apt-get remove netdata-repo ${FLAG}
       fi
     fi
     exit 0
@@ -98,13 +104,57 @@ if [ -x "$(command -v apt-get)" ]; then
 elif [ -x "$(command -v dnf)" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
-	if user_input "Do you want to remove netdata? "; then
+    if user_input "Do you want to remove netdata? "; then
       dnf remove netdata ${FLAG}
-	fi
+    fi
     if rpm -q netdata-repo-edge > /dev/null; then
-	  if user_input "Do you want to remove netdata-repo-edge? "; then
+      if user_input "Do you want to remove netdata-repo-edge? "; then
         dnf remove netdata-repo-edge ${FLAG}
-	  fi
+      fi
+    fi
+    if rpm -q netdata-repo > /dev/null; then
+      if user_input "Do you want to remove netdata-repo? "; then
+        dnf remove netdata-repo ${FLAG}
+      fi
+    fi
+    exit 0
+  fi
+elif [ -x "$(command -v yum)" ]; then
+  if rpm -q netdata > /dev/null; then
+    echo "Found netdata native installation."
+    if user_input "Do you want to remove netdata? "; then
+      yum remove netdata ${FLAG}
+    fi
+    if rpm -q netdata-repo-edge > /dev/null; then
+      if user_input "Do you want to remove netdata-repo-edge? "; then
+        yum remove netdata-repo-edge ${FLAG}
+      fi
+    fi
+    if rpm -q netdata-repo > /dev/null; then
+      if user_input "Do you want to remove netdata-repo? "; then
+        yum remove netdata-repo ${FLAG}
+      fi
+    fi
+    exit 0
+  fi
+elif [ -x "$(command -v zypper)" ]; then
+  if [ "${FLAG}" = "-y" ]; then
+    FLAG=-n
+  fi
+  if zypper search -i netdata > /dev/null; then
+    echo "Found netdata native installation."
+    if user_input "Do you want to remove netdata? "; then
+      zypper ${FLAG} remove netdata
+    fi
+    if zypper search -i netdata-repo-edge > /dev/null; then
+      if user_input "Do you want to remove netdata-repo-edge? "; then
+        zypper ${FLAG} remove netdata-repo-edge
+      fi
+    fi
+    if zypper search -i netdata-repo > /dev/null; then
+      if user_input "Do you want to remove netdata-repo? "; then
+        zypper ${FLAG} remove netdata-repo
+      fi
     fi
     exit 0
   fi
@@ -354,7 +404,7 @@ rm_file() {
   if [ -f "${FILE}" ]; then
     if user_input "Do you want to delete this file '$FILE' ? "; then
 	  run rm -v "${FILE}"
-	fi
+    fi
   fi
 }
 
@@ -492,27 +542,7 @@ stop_all_netdata() {
 
 trap quit_msg EXIT
 
-detect_existing_install() {
-  # shellcheck disable=SC2154
-  ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
-
-  if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
-    ndpath="/opt/netdata/bin/netdata"
-  fi
-
-  if [ -n "${ndpath}" ]; then
-    ndprefix="$(dirname "$(dirname "${ndpath}")")"
-  fi
-
-  if echo "${ndprefix}" | grep -Eq '/usr$'; then
-    ndprefix="$(dirname "${ndprefix}")"
-  fi
-
-  INSTALL_PREFIX="${ndprefix}"
-}
-
-#shellcheck source=/dev/null
-detect_existing_install
+# shellcheck source=/dev/null
 # shellcheck disable=SC1090
 . "${INSTALL_PREFIX}${ENVIRONMENT_FILE}" || exit 1
 
