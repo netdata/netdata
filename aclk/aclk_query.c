@@ -295,7 +295,7 @@ aclk_query_handler aclk_query_handlers[] = {
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     { .type = REGISTER_NODE,        .name = "register_node",            .fnc = register_node            },
     { .type = NODE_STATE_UPDATE,    .name = "node_state_update",        .fnc = node_state_update        },
-    { .type = CHART_DIMS_UPDATE,    .name = "chart_and_dim_update_bin", .fnc = send_bin_msg             },
+    { .type = CHART_DIMS_UPDATE,    .name = "chart_and_dim_update",     .fnc = send_bin_msg             },
     { .type = CHART_CONFIG_UPDATED, .name = "chart_config_updated",     .fnc = send_bin_msg             },
     { .type = CHART_RESET,          .name = "reset_chart_messages",     .fnc = send_bin_msg             },
     { .type = RETENTION_UPDATED,    .name = "update_retention_info",    .fnc = send_bin_msg             },
