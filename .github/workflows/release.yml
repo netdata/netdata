@@ -56,7 +56,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to prepare changelog:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to prepare changelog.
               Checkout: ${{ steps.checkout.outcome }}
               Login to DockerHub: ${{ steps.login.outcome }}
@@ -92,7 +92,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to trigger ${{ github.event.inputs.type }} artifact builds:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to trigger ${{ github.event.inputs.type }} artifact builds.
               Checkout: ${{ steps.checkout.outcome }}
               Trigger build: ${{ steps.trigger.outcome }}
@@ -127,7 +127,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to trigger ${{ github.event.inputs.type }} Docker builds:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to trigger ${{ github.event.inputs.type }} Docker builds.
               Checkout: ${{ steps.checkout.outcome }}
               Trigger build: ${{ steps.trigger.outcome }}
@@ -162,7 +162,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to trigger ${{ github.event.inputs.type }} package builds:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to trigger ${{ github.event.inputs.type }} package builds.
               Checkout: ${{ steps.checkout.outcome }}
               Trigger build: ${{ steps.trigger.outcome }}
