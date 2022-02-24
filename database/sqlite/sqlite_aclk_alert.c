@@ -924,8 +924,9 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     sqlite3_stmt *res = NULL;
 
     buffer_sprintf(sql, "SELECT MIN(sequence_id), MAX(sequence_id), " \
-                   "(select MAX(sequence_id) from aclk_alert_%s where date_cloud_ack is not NULL) " \
-                   "FROM aclk_alert_%s where date_submitted is null;", wc->uuid_str, wc->uuid_str);
+                   "(select MAX(sequence_id) from aclk_alert_%s where date_cloud_ack is not NULL), " \
+                   "(select MAX(sequence_id) from aclk_alert_%s where date_submitted is not NULL) " \
+                   "FROM aclk_alert_%s where date_submitted is null;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -938,6 +939,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
         proto_alert_status->pending_min_sequence_id = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0;
         proto_alert_status->pending_max_sequence_id = sqlite3_column_bytes(res, 1) > 0 ? (uint64_t) sqlite3_column_int64(res, 1) : 0;
         proto_alert_status->last_acked_sequence_id = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0;
+        proto_alert_status->last_submitted_sequence_id = sqlite3_column_bytes(res, 3) > 0 ? (uint64_t) sqlite3_column_int64(res, 3) : 0;
     }
 
     rc = sqlite3_finalize(res);
