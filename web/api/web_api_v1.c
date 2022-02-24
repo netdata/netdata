@@ -401,13 +401,14 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     time_t last_timestamp_in_data = 0, google_timestamp = 0;
 
-    char *chart = NULL
-    , *before_str = NULL
-    , *after_str = NULL
-    , *group_time_str = NULL
-    , *points_str = NULL
-    , *context = NULL
-    , *chart_label_key = NULL;
+    char *chart = NULL;
+    char *before_str = NULL;
+    char *after_str = NULL;
+    char *group_time_str = NULL;
+    char *points_str = NULL;
+    char *max_anomaly_rates_str = NULL;
+    char *context = NULL;
+    char *chart_label_key = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t format = DATASOURCE_JSON;
@@ -483,6 +484,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                 else if(!strcmp(tqx_name, "outFileName"))
                     outFileName = tqx_value;
             }
+        }
+        else if(!strcmp(name, "max_anomaly_rates")) {
+            max_anomaly_rates_str = value;
         }
     }
 
@@ -564,6 +568,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
     int       points = (points_str && *points_str)?str2i(points_str):0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
+    int       max_anomaly_rates = (max_anomaly_rates_str && *max_anomaly_rates_str) ? str2i(max_anomaly_rates_str) : 0;
 
     debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
           , w->id
@@ -606,8 +611,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
-                                 , options, &last_timestamp_in_data, context_param_list, chart_label_key);
+    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format,
+                                 points, after, before, group, group_time,
+                                 options, &last_timestamp_in_data, context_param_list,
+                                 chart_label_key, max_anomaly_rates);
 
     free_context_param_list(&context_param_list);
 

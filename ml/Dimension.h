@@ -12,11 +12,7 @@ namespace ml {
 
 class RrdDimension {
 public:
-    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->state->query_ops) {
-        std::stringstream SS;
-        SS << RD->rrdset->id << "|" << RD->name;
-        ID = SS.str();
-    }
+    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->state->query_ops) { }
 
     RRDDIM *getRD() const { return RD; }
 
@@ -26,12 +22,27 @@ public:
 
     unsigned updateEvery() const { return RD->update_every; }
 
-    const std::string getID() const { return ID; }
+    const std::string getID() const {
+        std::stringstream SS;
+        SS << RD->rrdset->id << "|" << RD->name;
+        return SS.str();
+    }
 
-    virtual ~RrdDimension() {}
+    void setAnomalyRateRD(RRDDIM *ARRD) { AnomalyRateRD = ARRD; }
+    RRDDIM *getAnomalyRateRD() const { return AnomalyRateRD; }
+
+    void setAnomalyRateRDName(const char *Name) const {
+        rrddim_set_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
+    }
+
+    virtual ~RrdDimension() {
+        rrddim_free_custom(AnomalyRateRD->rrdset, AnomalyRateRD, 0);
+    }
 
 private:
     RRDDIM *RD;
+    RRDDIM *AnomalyRateRD;
+
     struct rrddim_volatile::rrddim_query_ops *Ops;
 
     std::string ID;
@@ -94,9 +105,20 @@ public:
 
     bool isAnomalous() { return AnomalyBit; }
 
+    void updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous) {
+        AnomalyBitCounter += IsAnomalous;
+
+        if (Elapsed == Cfg.DBEngineAnomalyRateEvery) {
+            double AR = static_cast<double>(AnomalyBitCounter) / Cfg.DBEngineAnomalyRateEvery;
+            rrddim_set_by_pointer(RS, getAnomalyRateRD(), AR * 1000);
+            AnomalyBitCounter = 0;
+        }
+    }
+
 private:
     CalculatedNumber AnomalyScore{0.0};
     std::atomic<bool> AnomalyBit{false};
+    unsigned AnomalyBitCounter{0};
 
     std::vector<CalculatedNumber> CNs;
 };
