@@ -5,6 +5,14 @@
 
 extern sqlite3 *db_meta;
 
+struct proto_alert_status {
+    int alert_updates;
+    uint64_t alerts_batch_id;
+    uint64_t last_acked_sequence_id;
+    uint64_t pending_min_sequence_id;
+    uint64_t pending_max_sequence_id;
+};
+
 int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_send_alarm_health_log(char *node_id);
