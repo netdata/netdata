@@ -46,7 +46,13 @@ commit_changes() {
         git tag "${tag}"
         opts="--tags"
     fi
-    git push -u origin $opts "${branch}"
+
+    if [ -n "${GITHUB_ACTIONS}" ]; then
+        git push -u origin ${opts} "${branch}"
+    else
+        echo "Not pushing changes as we are not running in GitHub Actions."
+        echo "Would have pushed ${branch} to origin, with additional options '${opts}'"
+    fi
 
     echo "::endgroup::"
 }
