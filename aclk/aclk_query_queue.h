@@ -10,7 +10,7 @@
 #include "aclk_util.h"
 
 typedef enum {
-    UNKNOWN,
+    UNKNOWN = 0,
     METADATA_INFO,
     METADATA_ALARMS,
     HTTP_API_V2,
@@ -26,7 +26,8 @@ typedef enum {
     UPDATE_NODE_INFO,
     ALARM_LOG_HEALTH,
     ALARM_PROVIDE_CFG,
-    ALARM_SNAPSHOT
+    ALARM_SNAPSHOT,
+    ACLK_QUERY_TYPE_COUNT // always keep this as last
 } aclk_query_type_t;
 
 struct aclk_query_metadata {

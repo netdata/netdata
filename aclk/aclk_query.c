@@ -2,7 +2,6 @@
 
 #include "aclk_query.h"
 #include "aclk_stats.h"
-#include "aclk_query_queue.h"
 #include "aclk_tx_msgs.h"
 
 #define ACLK_QUERY_THREAD_NAME "ACLK_Query"
@@ -287,27 +286,37 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 #endif
 
 aclk_query_handler aclk_query_handlers[] = {
-    { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
-    { .type = ALARM_STATE_UPDATE,   .name = "alarm state update",       .fnc = alarm_state_update_query },
-    { .type = METADATA_INFO,        .name = "info metadata",            .fnc = info_metadata            },
-    { .type = METADATA_ALARMS,      .name = "alarms metadata",          .fnc = alarms_metadata          },
-    { .type = CHART_NEW,            .name = "chart new",                .fnc = chart_query              },
-    { .type = CHART_DEL,            .name = "chart delete",             .fnc = info_metadata            },
+    { .type = HTTP_API_V2,          .name = "http_api_request_v2",      .fnc = http_api_v2              },
+    { .type = ALARM_STATE_UPDATE,   .name = "alarm_state_update",       .fnc = alarm_state_update_query },
+    { .type = METADATA_INFO,        .name = "info_metadata",            .fnc = info_metadata            },
+    { .type = METADATA_ALARMS,      .name = "alarms_metadata",          .fnc = alarms_metadata          },
+    { .type = CHART_NEW,            .name = "chart_new",                .fnc = chart_query              },
+    { .type = CHART_DEL,            .name = "chart_delete",             .fnc = info_metadata            },
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    { .type = REGISTER_NODE,        .name = "register node",            .fnc = register_node            },
-    { .type = NODE_STATE_UPDATE,    .name = "node state update",        .fnc = node_state_update        },
-    { .type = CHART_DIMS_UPDATE,    .name = "chart and dim update bin", .fnc = send_bin_msg             },
-    { .type = CHART_CONFIG_UPDATED, .name = "chart config updated",     .fnc = send_bin_msg             },
-    { .type = CHART_RESET,          .name = "reset chart messages",     .fnc = send_bin_msg             },
-    { .type = RETENTION_UPDATED,    .name = "update retention info",    .fnc = send_bin_msg             },
-    { .type = UPDATE_NODE_INFO,     .name = "update node info",         .fnc = send_bin_msg             },
-    { .type = ALARM_LOG_HEALTH,     .name = "alarm log health",         .fnc = send_bin_msg             },
-    { .type = ALARM_PROVIDE_CFG,    .name = "provide alarm config",     .fnc = send_bin_msg             },
-    { .type = ALARM_SNAPSHOT,       .name = "alarm snapshot",           .fnc = send_bin_msg             },
+    { .type = REGISTER_NODE,        .name = "register_node",            .fnc = register_node            },
+    { .type = NODE_STATE_UPDATE,    .name = "node_state_update",        .fnc = node_state_update        },
+    { .type = CHART_DIMS_UPDATE,    .name = "chart_and_dim_update",     .fnc = send_bin_msg             },
+    { .type = CHART_CONFIG_UPDATED, .name = "chart_config_updated",     .fnc = send_bin_msg             },
+    { .type = CHART_RESET,          .name = "reset_chart_messages",     .fnc = send_bin_msg             },
+    { .type = RETENTION_UPDATED,    .name = "update_retention_info",    .fnc = send_bin_msg             },
+    { .type = UPDATE_NODE_INFO,     .name = "update_node_info",         .fnc = send_bin_msg             },
+    { .type = ALARM_LOG_HEALTH,     .name = "alarm_log_health",         .fnc = send_bin_msg             },
+    { .type = ALARM_PROVIDE_CFG,    .name = "provide_alarm_config",     .fnc = send_bin_msg             },
+    { .type = ALARM_SNAPSHOT,       .name = "alarm_snapshot",           .fnc = send_bin_msg             },
 #endif
     { .type = UNKNOWN,              .name = NULL,                       .fnc = NULL                     }
 };
 
+const char *aclk_query_get_name(aclk_query_type_t qt)
+{
+    aclk_query_handler *ptr = aclk_query_handlers;
+    while (ptr->type != UNKNOWN) {
+        if (ptr->type == qt)
+            return ptr->name;
+        ptr++;
+    }
+    return "unknown";
+}
 
 static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
@@ -315,13 +324,14 @@ static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_que
         if (aclk_query_handlers[i].type == query->type) {
             debug(D_ACLK, "Processing Queued Message of type: \"%s\"", aclk_query_handlers[i].name);
             aclk_query_handlers[i].fnc(query_thr, query);
-            aclk_query_free(query);
             if (aclk_stats_enabled) {
                 ACLK_STATS_LOCK;
                 aclk_metrics_per_sample.queries_dispatched++;
                 aclk_queries_per_thread[query_thr->idx]++;
+                aclk_metrics_per_sample.queries_per_type[query->type]++;
                 ACLK_STATS_UNLOCK;
             }
+            aclk_query_free(query);
             return;
         }
     }

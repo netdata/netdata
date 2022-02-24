@@ -5,6 +5,7 @@
 
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
+#include "aclk_query_queue.h"
 
 #define ACLK_STATS_THREAD_NAME "ACLK_Stats"
 
@@ -49,14 +50,7 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t cloud_req_err;
 
     // query types.
-    volatile uint32_t query_type_http;
-    volatile uint32_t query_type_alarm_upd;
-    volatile uint32_t query_type_metadata_info;
-    volatile uint32_t query_type_metadata_alarms;
-    volatile uint32_t query_type_chart_new;
-    volatile uint32_t query_type_chart_del;
-    volatile uint32_t query_type_register_node;
-    volatile uint32_t query_type_node_upd;
+    volatile uint32_t queries_per_type[ACLK_QUERY_TYPE_COUNT];
 
     // HTTP-specific request types.
     volatile uint32_t cloud_req_http_by_type[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT];

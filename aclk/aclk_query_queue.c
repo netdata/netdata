@@ -45,49 +45,14 @@ static inline int _aclk_queue_query(aclk_query_t query)
 
 }
 
-// Gets a pointer to the metric associated with a particular query type.
-// NULL if the query type has no associated metric.
-static inline volatile uint32_t *aclk_stats_qmetric_for_qtype(aclk_query_type_t qtype) {
-    switch (qtype) {
-        case HTTP_API_V2:
-            return &aclk_metrics_per_sample.query_type_http;
-        case ALARM_STATE_UPDATE:
-            return &aclk_metrics_per_sample.query_type_alarm_upd;
-        case METADATA_INFO:
-            return &aclk_metrics_per_sample.query_type_metadata_info;
-        case METADATA_ALARMS:
-            return &aclk_metrics_per_sample.query_type_metadata_alarms;
-        case CHART_NEW:
-            return &aclk_metrics_per_sample.query_type_chart_new;
-        case CHART_DEL:
-            return &aclk_metrics_per_sample.query_type_chart_del;
-        case REGISTER_NODE:
-            return &aclk_metrics_per_sample.query_type_register_node;
-        case NODE_STATE_UPDATE:
-            return &aclk_metrics_per_sample.query_type_node_upd;
-        default:
-            return NULL;
-    }
-}
-
 int aclk_queue_query(aclk_query_t query)
 {
     int ret = _aclk_queue_query(query);
     if (!ret) {
-        // local cache of query type before we wake up query thread, which may
-        // free the query in a race.
-        aclk_query_type_t qtype = query->type;
         QUERY_THREAD_WAKEUP;
-
         if (aclk_stats_enabled) {
-            // get target query type metric before lock so we keep lock for
-            // minimal time.
-            volatile uint32_t *metric = aclk_stats_qmetric_for_qtype(qtype);
-
             ACLK_STATS_LOCK;
             aclk_metrics_per_sample.queries_queued++;
-            if (metric)
-                *metric += 1;
             ACLK_STATS_UNLOCK;
         }
     }
