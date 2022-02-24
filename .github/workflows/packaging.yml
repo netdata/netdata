@@ -20,6 +20,7 @@ on:
         required: false
 env:
   DISABLE_TELEMETRY: 1
+  REPO_PREFIX: netdata/netdata
 concurrency:
   group: packages-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
@@ -114,17 +115,17 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             case "${{ github.event.inputs.type }}" in
               "release")
-                echo "::set-output name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}"
+                echo "::set-output name=repo::${REPO_PREFIX}"
                 echo "::set-output name=version::${{ github.event.inputs.version }}"
                 echo "::set-output name=retention::365"
                 ;;
               "nightly")
-                echo "::set-output name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}-edge"
+                echo "::set-output name=repo::${REPO_PREFIX}-edge"
                 echo "::set-output name=version::${{ github.event.inputs.version }}"
                 echo "::set-output name=retention::30"
                 ;;
               *)
-                echo "::set-output name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}-devel"
+                echo "::set-output name=repo::${REPO_PREFIX}-devel"
                 echo "::set-output name=version::0.${GITHUB_SHA}"
                 echo "::set-output name=retention::30"
                 ;;
