@@ -1120,6 +1120,29 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
     aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname);
 }
 
+static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
+{
+    struct proto_alert_status status;
+    if (!get_proto_alert_status(host, &status)) {
+        buffer_strcat(wb, "\nFailed to get alert streaming status for this host");
+        return;
+    }
+    buffer_sprintf(wb,
+        "\n\t\tUpdates: %d"
+        "\n\t\tBatch ID: %"PRIu64
+        "\n\t\tLast Acked Seq ID: %"PRIu64
+        "\n\t\tPending Min Seq ID: %"PRIu64
+        "\n\t\tPending Max Seq ID: %"PRIu64
+        "\n\t\tLast Submitted Seq ID: %"PRIu64,
+        status.alert_updates,
+        status.alerts_batch_id,
+        status.last_acked_sequence_id,
+        status.pending_min_sequence_id,
+        status.pending_max_sequence_id,
+        status.last_submitted_sequence_id
+    );
+}
+
 char *ng_aclk_state(void)
 {
     BUFFER *wb = buffer_create(1024);
@@ -1176,6 +1199,9 @@ char *ng_aclk_state(void)
 
             if (host != localhost)
                 buffer_sprintf(wb, "\n\tStreaming Connection Live: %s", host->receiver ? "true" : "false");
+
+            buffer_strcat(wb, "\n\tAlert Streaming Status:");
+            fill_alert_status_for_host(wb, host);
         }
         rrd_unlock();
     }
