@@ -51,26 +51,6 @@ stages:
   - name: Build process
     if: commit_message =~ /^((?!\[Package (amd64|arm64|i386) (DEB|RPM)( .*)?\]).)*$/
 
-    # Nightly operations
-  - name: Nightly operations
-    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
-
-  - name: Nightly release
-    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
-
-    # Scheduled releases
-  - name: Support activities on main branch
-    if: branch = master AND type != pull_request AND type != cron AND repo = netdata/netdata
-
-    # We don't run on release candidates
-  - name: Publish for release
-    if: >-
-      branch = master
-      AND type != pull_request
-      AND type != cron
-      AND tag !~ /(-rc)/
-      AND commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/
-
 
 # Define stage implementation details
 #
@@ -86,69 +66,3 @@ jobs:
       script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
       env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -fno-common   -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
-
-    - stage: Support activities on main branch
-      name: Generate changelog for release (only on special and tagged commit msg)
-      before_script: post_message "TRAVIS_MESSAGE" "Support activities on main branch initiated" "${NOTIF_CHANNEL}"
-      script:
-        - echo "GIT Branch:" && git branch
-        - echo "Last commit:" && git log -1
-        - echo "GIT Describe:" && git describe
-        - echo "packaging/version:" && cat packaging/version
-        - if [[ -z "${GIT_TAG}" ]]; then  echo "Running set tag for release" && set_tag_for_release; fi;
-        - .travis/generate_changelog_and_tag_release.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Changelog generation and tag of release, failed"
-      git:
-        depth: false
-      if: commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/ OR (env(GIT_TAG) IS present AND NOT env(GIT_TAG) IS blank)
-
-    # We only publish if a TAG has been set during packaging
-    - stage: Publish for release
-      name: Trigger release build and draft release creation
-      script:
-        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version)"
-        - .travis/trigger_artifact_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "release"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger release artifact build during nightly release" "${NOTIF_CHANNEL}"
-
-    - name: Trigger Docker image build and publish
-      script:
-        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
-        - .travis/trigger_docker_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during release" "${NOTIF_CHANNEL}"
-
-    - name: Trigger DEB and RPM package build
-      script:
-        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | sed 's/^v//' | cut -d'-' -f1)"
-        - .travis/trigger_package_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "release"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during release" "${NOTIF_CHANNEL}"
-
-
-    # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
-    - stage: Nightly operations
-      # This is generating the changelog for nightly release and publish it
-      name: Generate nightly changelog
-      script:
-        - ".travis/nightlies.sh"
-        - ".travis/check_changelog_last_modification.sh"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly changelog generation failed"
-      git:
-        depth: false
-
-    # This is the nightly execution step
-    #
-    - stage: Nightly release
-      name: Trigger nightly artifact build and upload
-      script:
-        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version)"
-        - .travis/trigger_artifact_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "nightly"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger release artifact build during nightly release" "${NOTIF_CHANNEL}"
-
-    - name: Trigger Docker image build and publish
-      script: .travis/trigger_docker_build.sh "${GITHUB_TOKEN}" "nightly"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during nightly release" "${NOTIF_CHANNEL}"
-
-    - name: Trigger DEB and RPM package build
-      script:
-        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | sed 's/^v//')"
-        - .travis/trigger_package_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "nightly"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during nightly release" "${NOTIF_CHANNEL}"
