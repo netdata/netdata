@@ -15,6 +15,7 @@ on:
       - .github/workflows/repoconfig-packages.yml
 env:
   DISABLE_TELEMETRY: 1
+  REPO_PREFIX: netdata/netdata
 jobs:
   matrix:
     name: Prepare Build Matrix
@@ -121,15 +122,15 @@ jobs:
         run: |
           printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} \
+            .github/scripts/package_cloud_wrapper.sh yank "${REPO_PREFIX}/${{ matrix.pkgclouddistro }}" \
                 "$(basename "${pkgfile}")" || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} "${pkgfile}"
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} \
+            .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}/${{ matrix.pkgclouddistro }}" "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh yank "${REPO_PREFIX}-edge/${{ matrix.pkgclouddistro }}" \
                 "$(basename "${pkgfile}")" || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} "${pkgfile}"
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} \
+            .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}-edge/${{ matrix.pkgclouddistro }}" "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh yank "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" \
                 "$(basename "${pkgfile}")" || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" "${pkgfile}"
           done
       - name: Failure Notification
         if: ${{ failure() }}
