@@ -31,7 +31,9 @@ public:
             RRDSET_TYPE_LINE
         );
 
-        rrdset_flag_set(AnomalyRateRS, RRDSET_FLAG_HIDDEN);
+        AnomalyRateRS->flags = static_cast<RRDSET_FLAGS>(
+            static_cast<int>(AnomalyRateRS->flags) | RRDSET_FLAG_HIDDEN
+        );
     }
 
     RRDHOST *getRH() { return RH; }
