@@ -962,6 +962,14 @@ bundle_libbpf() {
     return 0
   fi
 
+  # When libc is not detected, we do not have necessity to compile libbpf and we should not do download of eBPF programs
+  libc="${EBPF_LIBC:-"$(detect_libc)"}"
+  if [ -z "$libc" ]; then
+      NETDATA_DISABLE_EBPF=1
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+      return 0
+  fi
+
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
 
   rename_libbpf_packaging
