@@ -907,28 +907,6 @@ bind_fail:
 int sql_log_message_upd_puback(uint16_t packet_id)
 {
     int rc;
-    /* uuid_t host_uuid; */
-    /* char *host_guid = (char *)cmd.data; */
-
-    /* if (unlikely(!host_guid)) */
-    /*     return; */
-
-    /* rc = uuid_parse(host_guid, host_uuid); */
-    /* freez(host_guid); */
-    /* if (rc) */
-    /*     return; */
-
-    /* uuid_unparse_lower(host_uuid, host_str); */
-    /* uuid_unparse_lower_fix(&host_uuid, uuid_str); */
-
-    /* debug(D_ACLK_SYNC, "Checking if I should delete aclk tables for node %s", host_str); */
-
-    /* if (is_host_available(&host_uuid)) { */
-    /*     debug(D_ACLK_SYNC, "Host %s exists, not deleting aclk sync tables", host_str); */
-    /*     return; */
-    /* } */
-
-    /* debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str); */
 
     sqlite3_stmt *res = NULL;
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
