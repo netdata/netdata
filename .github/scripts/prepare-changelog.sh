@@ -141,8 +141,8 @@ check_newer_patch_version() {
 ##############################################################
 # Core logic
 
-git config --global user.name "netdatabot"
-git config --global user.email "bot@netdata.cloud"
+git config user.name "netdatabot"
+git config user.email "bot@netdata.cloud"
 
 if [ "${REPO}" != "netdata/netdata" ]; then
     echo "::notice::Not running in the netdata/netdata repository, not queueing a release build."
