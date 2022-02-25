@@ -904,6 +904,25 @@ get_kernel_version() {
   printf "%03d%03d%03d" "${maj}" "${min}" "${patch}"
 }
 
+detect_libc() {
+  libc=
+  if ldd --version 2>&1 | grep -q -i glibc; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i musl; then
+    echo >&2 " Detected musl"
+    libc="musl"
+  else
+    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
+    return 1
+  fi
+  echo "${libc}"
+  return 0
+}
+
 rename_libbpf_packaging() {
   if [ "$(get_kernel_version)" -ge "004014000" ]; then
     cp packaging/current_libbpf.checksums packaging/libbpf.checksums
@@ -1554,25 +1573,6 @@ install_go() {
 }
 
 install_go
-
-detect_libc() {
-  libc=
-  if ldd --version 2>&1 | grep -q -i glibc; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i musl; then
-    echo >&2 " Detected musl"
-    libc="musl"
-  else
-    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
-    return 1
-  fi
-  echo "${libc}"
-  return 0
-}
 
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
