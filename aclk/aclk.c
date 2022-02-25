@@ -262,10 +262,6 @@ static void msg_callback_new_protocol(const char *topic, const void *msg, size_t
     close(logfd);
 #endif
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    sql_log_message(msgtype, 1, 0);
-#endif
-
     aclk_handle_new_cloud_msg(msgtype, msg, msglen);
 }
 
@@ -1060,6 +1056,8 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
         create_query->data.node_creation.hops = (uint32_t) host->system_info->hops;
         create_query->data.node_creation.hostname = strdupz(host->hostname);
         create_query->data.node_creation.machine_guid = strdupz(host->machine_guid);
+        create_query->node_id = NULL;
+        create_query->context = strdupz(host->machine_guid);
         info("Registering host=%s, hops=%u",host->machine_guid, host->system_info->hops);
         aclk_queue_query(create_query);
         return;
@@ -1075,6 +1073,8 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     uuid_unparse_lower(node_id, (char*)query->data.node_update.node_id);
     query->data.node_update.queryable = 1;
     query->data.node_update.session_id = aclk_session_newarch;
+    query->node_id = strdupz(query->data.node_update.node_id);
+    query->context = strdupz(query->data.node_update.claim_id);
     info("Queuing status update for node=%s, live=%d, hops=%u",(char*)query->data.node_update.node_id, cmd,
          host->system_info->hops);
     aclk_queue_query(query);
@@ -1100,6 +1100,8 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->node_id, (char*)query->data.node_update.node_id);
             query->data.node_update.queryable = 1;
             query->data.node_update.session_id = aclk_session_newarch;
+            query->node_id = strdupz(query->data.node_update.node_id);
+            query->context = strdupz(query->data.node_update.claim_id);
             info("Queuing status update for node=%s, live=%d, hops=%d",(char*)query->data.node_update.node_id,
                  list->live,
                  list->hops);
@@ -1113,6 +1115,8 @@ void aclk_send_node_instances()
             create_query->data.node_creation.hops = list->hops;
             create_query->data.node_creation.hostname = list->hostname;
             create_query->data.node_creation.machine_guid  = mallocz(UUID_STR_LEN);
+            create_query->node_id = NULL;
+            create_query->context = strdupz(list->host_id);
             uuid_unparse_lower(list->host_id, (char*)create_query->data.node_creation.machine_guid);
             info("Queuing registration for host=%s, hops=%d",(char*)create_query->data.node_creation.machine_guid,
                  list->hops);
@@ -1124,9 +1128,9 @@ void aclk_send_node_instances()
     freez(list_head);
 }
 
-void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname, const char *node_id, const char *context)
 {
-    aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname);
+    aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname, node_id, context);
 }
 
 char *ng_aclk_state(void)

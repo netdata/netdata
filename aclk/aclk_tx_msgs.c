@@ -36,7 +36,7 @@ static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg,
 #endif
 }
 
-uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname, const char *node_id, const char *context)
 {
 #ifndef ACLK_LOG_CONVERSATION_DIR
     UNUSED(msgname);
@@ -65,7 +65,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    sql_log_message(msgname, 0, packet_id);
+    sql_log_message(msgname, 0, packet_id, node_id, context);
 #endif
 
     return packet_id;
@@ -441,7 +441,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         return 0;
     }
 
-    pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
+    pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection", NULL, conn.claim_id);
     freez(msg);
     if (localhost->aclk_state.prev_claimed_id) {
         freez(localhost->aclk_state.prev_claimed_id);
@@ -474,7 +474,7 @@ char *aclk_generate_lwt(size_t *size) {
     return msg;
 }
 
-void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creation_t *node_creation) {
+void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creation_t *node_creation, const char *node_id, const char *context) {
     size_t len;
     char *msg = generate_node_instance_creation(&len, node_creation);
     if (!msg) {
@@ -482,19 +482,18 @@ void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creat
         return;
     }
 
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_CREATE_NODE, "CreateNodeInstance");
+    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_CREATE_NODE, "CreateNodeInstance", node_id, context);
     freez(msg);
 }
 
-void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_connection_t *node_connection) {
+void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_connection_t *node_connection, const char *node_id, const char *context) {
     size_t len;
     char *msg = generate_node_instance_connection(&len, node_connection);
     if (!msg) {
         error("Error generating nodeinstance::v1::UpdateNodeInstanceConnection");
         return;
     }
-
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
+    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection", node_id, context);
     freez(msg);
 }
 #endif /* ENABLE_NEW_CLOUD_PROTOCOL */

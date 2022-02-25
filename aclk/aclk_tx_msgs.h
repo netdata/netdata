@@ -9,7 +9,7 @@
 #include "schema-wrappers/schema_wrappers.h"
 #include "aclk_util.h"
 
-uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
+uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname, const char *node_id, const char *context);
 
 void aclk_send_info_metadata(mqtt_wss_client client, int metadata_submitted, RRDHOST *host);
 void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted);
@@ -28,8 +28,8 @@ int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message);
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable);
 char *aclk_generate_lwt(size_t *size);
 
-void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creation_t *node_creation);
-void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_connection_t *node_connection);
+void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creation_t *node_creation, const char *node_id, const char *context);
+void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_connection_t *node_connection, const char *node_id, const char *context);
 #endif
 
 #endif

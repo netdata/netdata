@@ -184,6 +184,8 @@ void aclk_query_free(aclk_query_t query)
     freez(query->dedup_id);
     freez(query->callback_topic);
     freez(query->msg_id);
+    freez(query->node_id);
+    freez(query->context);
     freez(query);
 }
 

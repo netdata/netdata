@@ -266,7 +266,7 @@ static int register_node(struct aclk_query_thread *query_thr, aclk_query_t query
     // TODO create a pending registrations list
     // with some timeouts to detect registration requests that
     // go unanswered from the cloud
-    aclk_generate_node_registration(query_thr->client, &query->data.node_creation);
+    aclk_generate_node_registration(query_thr->client, &query->data.node_creation, query->node_id, query->context);
     return 0;
 }
 
@@ -274,14 +274,14 @@ static int node_state_update(struct aclk_query_thread *query_thr, aclk_query_t q
     // TODO create a pending registrations list
     // with some timeouts to detect registration requests that
     // go unanswered from the cloud
-    aclk_generate_node_state_update(query_thr->client, &query->data.node_update);
+    aclk_generate_node_state_update(query_thr->client, &query->data.node_update, query->node_id, query->context);
     return 0;
 }
 
 static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
     // this will be simplified when legacy support is removed
-    aclk_send_bin_message_subtopic_pid(query_thr->client, query->data.bin_payload.payload, query->data.bin_payload.size, query->data.bin_payload.topic, query->data.bin_payload.msg_name);
+    aclk_send_bin_message_subtopic_pid(query_thr->client, query->data.bin_payload.payload, query->data.bin_payload.size, query->data.bin_payload.topic, query->data.bin_payload.msg_name, query->node_id, query->context);
     return 0;
 }
 #endif

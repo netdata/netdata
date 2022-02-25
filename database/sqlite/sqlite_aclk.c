@@ -24,7 +24,7 @@ const char *aclk_sync_config[] = {
     "DELETE FROM dimension_delete WHERE host_id NOT IN"
     " (SELECT host_id FROM host) OR strftime('%s') - date_created > 604800;",
 #ifdef NETDATA_INTERNAL_CHECKS
-    "CREATE TABLE IF NOT EXISTS message_log (message_id INTEGER PRIMARY KEY, node_id, message, flow, "
+    "CREATE TABLE IF NOT EXISTS message_log (message_id INTEGER PRIMARY KEY, node_id, message, flow, context, "
     "pid, date_created, date_puback);",
 
     "DELETE FROM message_log;",
@@ -843,7 +843,7 @@ void aclk_data_rotated(void)
     return;
 }
 
-int sql_log_message(const char *msgtype, int in, uint16_t packet_id)
+int sql_log_message(const char *msgtype, int in, uint16_t packet_id, const char *node_id, const char *context)
 {
     int rc;
     /* uuid_t host_uuid; */
@@ -874,8 +874,8 @@ int sql_log_message(const char *msgtype, int in, uint16_t packet_id)
 
         buffer_sprintf(
         sql,
-        "INSERT INTO message_log (message, flow, date_created, pid) "
-        "VALUES (@message, @flow, strftime('%%s'), @packet_id); ");
+        "INSERT INTO message_log (message, flow, date_created, pid, node_id, context) "
+        "VALUES (@message, @flow, strftime('%%s'), @packet_id, @node_id, @context); ");
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -898,6 +898,19 @@ int sql_log_message(const char *msgtype, int in, uint16_t packet_id)
     rc = sqlite3_bind_int(res, 3, packet_id);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
+
+    if (node_id) {
+        rc = sqlite3_bind_text(res, 4, node_id, -1, SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+    }
+    //else bind null
+
+    if (context) {
+        rc = sqlite3_bind_text(res, 5, context, -1, SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+    }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {

@@ -81,6 +81,9 @@ struct aclk_query {
         struct aclk_bin_payload bin_payload;
         json_object *alarm_update;
     } data;
+
+    char *node_id;
+    char *context;
 };
 
 aclk_query_t aclk_query_new(aclk_query_type_t type);

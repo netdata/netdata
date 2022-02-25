@@ -125,6 +125,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     UNUSED(cmd);
 #else
     int rc;
+    char context[512];
 
     if (unlikely(!wc->alert_updates)) {
         log_access("AC [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
@@ -246,7 +247,8 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
                                       strdupz((char *)"") :
                                       strdupz((char *)sqlite3_column_text(res, 18));
 
-        aclk_send_alarm_log_entry(&alarm_log);
+        sprintf(context, "%lu", alarm_log.sequence_id);
+        aclk_send_alarm_log_entry(&alarm_log, wc->node_id, context);
 
         if (first_sequence_id == 0)
             first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
@@ -392,7 +394,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 
     wc->alert_sequence_id = last_sequence;
 
-    aclk_send_alarm_log_health(&alarm_log);
+    aclk_send_alarm_log_health(&alarm_log, wc->node_id);
     log_access("OG [%s (%s)]: Alarm health log sent, first sequence id %"PRIu64", last sequence id %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", first_sequence, last_sequence);
 
     rc = sqlite3_finalize(res);
