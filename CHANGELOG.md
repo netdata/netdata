@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix builds where HAVE\_C\_\_\_ATOMIC is not defined. [\#12240](https://github.com/netdata/netdata/pull/12240) ([vkalintiris](https://github.com/vkalintiris))
+- minor - remove dead code [\#12230](https://github.com/netdata/netdata/pull/12230) ([underhood](https://github.com/underhood))
+- Fix node information send to the cloud for older agent versions [\#12223](https://github.com/netdata/netdata/pull/12223) ([stelfrag](https://github.com/stelfrag))
 - Update github's code owners configuration. [\#12213](https://github.com/netdata/netdata/pull/12213) ([vkalintiris](https://github.com/vkalintiris))
 - Skip training of constant metrics. [\#12212](https://github.com/netdata/netdata/pull/12212) ([vkalintiris](https://github.com/vkalintiris))
 - Add -W keepopenfds option. [\#12211](https://github.com/netdata/netdata/pull/12211) ([vkalintiris](https://github.com/vkalintiris))
@@ -40,6 +43,7 @@
 - rename DO\_NOT\_TRACK to DISABLE\_TELEMETRY [\#12126](https://github.com/netdata/netdata/pull/12126) ([ilyam8](https://github.com/ilyam8))
 - Bump follow-redirects from 1.14.7 to 1.14.8 [\#12124](https://github.com/netdata/netdata/pull/12124) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump karma from 6.0.2 to 6.3.14 [\#12116](https://github.com/netdata/netdata/pull/12116) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Track anomaly rates with DBEngine. [\#12083](https://github.com/netdata/netdata/pull/12083) ([vkalintiris](https://github.com/vkalintiris))
 - Fix compilation warnings on macOS [\#12082](https://github.com/netdata/netdata/pull/12082) ([vlvkobal](https://github.com/vlvkobal))
 - feat\(apps.plugin\): group Apple Filing Protocol daemons into `afp` group [\#12078](https://github.com/netdata/netdata/pull/12078) ([ilyam8](https://github.com/ilyam8))
 - Overhaul handling of auto-updates in the installer code. [\#12076](https://github.com/netdata/netdata/pull/12076) ([Ferroin](https://github.com/Ferroin))
@@ -49,6 +53,7 @@
 - Remove unused NETDATA\_NO\_ATOMIC\_INSTRUCTIONS macro [\#12045](https://github.com/netdata/netdata/pull/12045) ([vkalintiris](https://github.com/vkalintiris))
 - Remove NETDATA\_WITH\_UUID def because it's not used anywhere. [\#12044](https://github.com/netdata/netdata/pull/12044) ([vkalintiris](https://github.com/vkalintiris))
 - adds install method to /api/v1/info as label [\#12040](https://github.com/netdata/netdata/pull/12040) ([underhood](https://github.com/underhood))
+- Adds all query types to aclk\_processed\_query\_type [\#12036](https://github.com/netdata/netdata/pull/12036) ([underhood](https://github.com/underhood))
 - Create a removed alert event if chart goes obsolete [\#12021](https://github.com/netdata/netdata/pull/12021) ([MrZammler](https://github.com/MrZammler))
 - minor - remove ACLK\_NEWARCH\_DEVMODE [\#12018](https://github.com/netdata/netdata/pull/12018) ([underhood](https://github.com/underhood))
 - Update AWS SNS README.md [\#11946](https://github.com/netdata/netdata/pull/11946) ([kickoke](https://github.com/kickoke))
@@ -192,7 +197,6 @@
 - Add localhost hostname to the edit\_command [\#11793](https://github.com/netdata/netdata/pull/11793) ([MrZammler](https://github.com/MrZammler))
 - Initial release of new kickstart script. [\#11764](https://github.com/netdata/netdata/pull/11764) ([Ferroin](https://github.com/Ferroin))
 - Add support to updater for updating native DEB/RPM installs with our official packages. [\#11753](https://github.com/netdata/netdata/pull/11753) ([Ferroin](https://github.com/Ferroin))
-- add note with link to guide for using on Pi [\#11605](https://github.com/netdata/netdata/pull/11605) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
@@ -353,11 +357,6 @@
 - Adds new alarm status protocol messages [\#11612](https://github.com/netdata/netdata/pull/11612) ([underhood](https://github.com/underhood))
 - eBPF and cgroup \(process, file descriptor, VFS, directory cache and OOMkill\) [\#11611](https://github.com/netdata/netdata/pull/11611) ([thiagoftsm](https://github.com/thiagoftsm))
 - apps: disable reporting min/avg/max group uptime by default [\#11609](https://github.com/netdata/netdata/pull/11609) ([ilyam8](https://github.com/ilyam8))
-- fix https client  [\#11608](https://github.com/netdata/netdata/pull/11608) ([underhood](https://github.com/underhood))
-- add cgroups.plugin charts descriptions [\#11607](https://github.com/netdata/netdata/pull/11607) ([ilyam8](https://github.com/ilyam8))
-- Add flag to mark containers as created from official images in analytics. [\#11606](https://github.com/netdata/netdata/pull/11606) ([Ferroin](https://github.com/Ferroin))
-- Update optional parameters for upcoming installer. [\#11604](https://github.com/netdata/netdata/pull/11604) ([DShreve2](https://github.com/DShreve2))
-- add apps.plugin charts descriptions [\#11601](https://github.com/netdata/netdata/pull/11601) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
