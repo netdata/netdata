@@ -904,6 +904,37 @@ get_kernel_version() {
   printf "%03d%03d%03d" "${maj}" "${min}" "${patch}"
 }
 
+detect_libc() {
+  libc=
+  if ldd --version 2>&1 | grep -q -i glibc; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i musl; then
+    echo >&2 " Detected musl"
+    libc="musl"
+  else
+    ls_path=$(command -v ls)
+    if [ -n "${ls_path}" ] ; then
+      cmd=$(ldd "$ls_path" | grep -w libc | cut -d" " -f 3)
+      if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
+        echo >&2 " Detected GLIBC"
+        libc="glibc"    
+      fi    
+    fi    
+  fi
+
+  if [ -z "$libc" ]; then
+    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
+    return 1
+  fi
+
+  echo "${libc}"
+  return 0
+}
+
 rename_libbpf_packaging() {
   if [ "$(get_kernel_version)" -ge "004014000" ]; then
     cp packaging/current_libbpf.checksums packaging/libbpf.checksums
@@ -941,6 +972,14 @@ copy_libbpf() {
 bundle_libbpf() {
   if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
+  fi
+
+  # When libc is not detected, we do not have necessity to compile libbpf and we should not do download of eBPF programs
+  libc="${EBPF_LIBC:-"$(detect_libc)"}"
+  if [ -z "$libc" ]; then
+      NETDATA_DISABLE_EBPF=1
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+      return 0
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
@@ -1554,25 +1593,6 @@ install_go() {
 }
 
 install_go
-
-detect_libc() {
-  libc=
-  if ldd --version 2>&1 | grep -q -i glibc; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i musl; then
-    echo >&2 " Detected musl"
-    libc="musl"
-  else
-    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
-    return 1
-  fi
-  echo "${libc}"
-  return 0
-}
 
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
