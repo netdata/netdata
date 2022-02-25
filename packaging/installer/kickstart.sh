@@ -595,7 +595,7 @@ detect_existing_install() {
 
   INSTALL_PREFIX="${ndprefix}"
 
-  export INSTALL_PREFIX=$INSTALL_PREFIX
+  export INSTALL_PREFIX="${INSTALL_PREFIX}"
 }
 
 handle_existing_install() {
