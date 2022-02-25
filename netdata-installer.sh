@@ -916,9 +916,21 @@ detect_libc() {
     echo >&2 " Detected musl"
     libc="musl"
   else
+    ls_path=$(command -v ls)
+    if [ -n "${ls_path}" ] ; then
+      cmd=$(ldd "$ls_path" | grep -w libc | cut -d" " -f 3)
+      if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
+        echo >&2 " Detected GLIBC"
+        libc="glibc"    
+      fi    
+    fi    
+  fi
+
+  if [ -z "$libc" ]; then
     echo >&2 " ERROR: Cannot detect a supported libc on your system!"
     return 1
   fi
+
   echo "${libc}"
   return 0
 }
