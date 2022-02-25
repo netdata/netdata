@@ -2,6 +2,8 @@
 
 #include "sqlite_functions.h"
 
+#define DB_METADATA_VERSION "1"
+
 const char *database_config[] = {
     "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA temp_store=MEMORY;",
     "PRAGMA journal_size_limit=16777216;",
@@ -52,6 +54,7 @@ const char *database_config[] = {
     "INSERT INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id) "
     "on conflict (chart_id, hash_id) do nothing; END; ",
 
+    "PRAGMA user_version="DB_METADATA_VERSION";",
     NULL
 };
 
