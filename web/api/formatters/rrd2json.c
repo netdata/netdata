@@ -229,7 +229,7 @@ int rrdset2anything_api_v1(
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
-    if (st && st->state->is_ar_chart)
+    if (st && st->state && st->state->is_ar_chart)
         ml_process_rrdr(r, max_anomaly_rates);
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
