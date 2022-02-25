@@ -378,6 +378,40 @@ struct rrddim_query_handle {
     };
 };
 
+// ------------------------------------------------------------------------
+// function pointers that handle data collection
+struct rrddim_collect_ops {
+    // an initialization function to run before starting collection
+    void (*init)(RRDDIM *rd);
+
+    // run this to store each metric into the database
+    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, storage_number number);
+
+    // an finalization function to run after collection is over
+    // returns 1 if it's safe to delete the dimension
+    int (*finalize)(RRDDIM *rd);
+};
+
+// function pointers that handle database queries
+struct rrddim_query_ops {
+    // run this before starting a series of next_metric() database queries
+    void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+
+    // run this to load each metric number from the database
+    storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time);
+
+    // run this to test if the series of next_metric() database queries is finished
+    int (*is_finished)(struct rrddim_query_handle *handle);
+
+    // run this after finishing a series of load_metric() database queries
+    void (*finalize)(struct rrddim_query_handle *handle);
+
+    // get the timestamp of the last entry of this metric
+    time_t (*latest_time)(RRDDIM *rd);
+
+    // get the timestamp of the first entry of this metric
+    time_t (*oldest_time)(RRDDIM *rd);
+};
 
 // ----------------------------------------------------------------------------
 // volatile state per RRD dimension
@@ -391,41 +425,8 @@ struct rrddim_volatile {
 #endif
     uuid_t metric_uuid;                 // global UUID for this metric (unique_across hosts)
     union rrddim_collect_handle handle;
-    // ------------------------------------------------------------------------
-    // function pointers that handle data collection
-    struct rrddim_collect_ops {
-        // an initialization function to run before starting collection
-        void (*init)(RRDDIM *rd);
-
-        // run this to store each metric into the database
-        void (*store_metric)(RRDDIM *rd, usec_t point_in_time, storage_number number);
-
-        // an finalization function to run after collection is over
-        // returns 1 if it's safe to delete the dimension
-        int (*finalize)(RRDDIM *rd);
-    } collect_ops;
-
-    // function pointers that handle database queries
-    struct rrddim_query_ops {
-        // run this before starting a series of next_metric() database queries
-        void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
-
-        // run this to load each metric number from the database
-        storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time);
-
-        // run this to test if the series of next_metric() database queries is finished
-        int (*is_finished)(struct rrddim_query_handle *handle);
-
-        // run this after finishing a series of load_metric() database queries
-        void (*finalize)(struct rrddim_query_handle *handle);
-
-        // get the timestamp of the last entry of this metric
-        time_t (*latest_time)(RRDDIM *rd);
-
-        // get the timestamp of the first entry of this metric
-        time_t (*oldest_time)(RRDDIM *rd);
-    } query_ops;
-
+    struct rrddim_collect_ops collect_ops;
+    struct rrddim_query_ops query_ops;
     ml_dimension_t ml_dimension;
 };
 
