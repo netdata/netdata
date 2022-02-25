@@ -16,6 +16,14 @@ extern sqlite3 *db_meta;
 #define RRDSET_MINIMUM_LIVE_MULTIPLIER   (1.5)
 #endif
 
+struct chart_sync_status {
+    int updates;
+    uint64_t batch_id;
+    uint64_t pending_min_sequence_id;
+    uint64_t pending_max_sequence_id;
+    uint64_t last_submitted_sequence_id;
+};
+
 extern int queue_chart_to_aclk(RRDSET *st);
 extern int queue_dimension_to_aclk(RRDDIM *rd);
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
@@ -35,4 +43,5 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
 void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 uint32_t sql_get_pending_count(struct aclk_database_worker_config *wc);
 void aclk_send_dimension_update(RRDDIM *rd);
+int get_chart_sync_status(RRDHOST *host, struct chart_sync_status *status);
 #endif //NETDATA_SQLITE_ACLK_CHART_H
