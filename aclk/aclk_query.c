@@ -64,7 +64,7 @@ static RRDHOST *node_id_2_rrdhost(const char *node_id)
         return NULL;
     }
     if ((res = get_host_id(&node_id_bin, &host_id_bin))) {
-        error("node not found rc=%d", res);
+        //error("node not found rc=%d", res);
         return NULL;
     }
     uuid_unparse_lower(host_id_bin, host_id);
@@ -110,36 +110,52 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
 
         query_host = node_id_2_rrdhost(nodeid);
         if (!query_host) {
-            error("Host with node_id \"%s\" not found! Query Ignored!", node_uuid);
+            //error("Host with node_id \"%s\" not found! Query Ignored!", node_uuid);
             retval = 1;
-            goto cleanup;
+            //goto host_not_found;
+            //goto cleanup;
         }
     }
 
+    size_t size;
+    size_t sent;
     buffer_strcat(log_buffer, query->data.http_api_v2.query);
+    if (query_host) {
+        //buffer_strcat(log_buffer, query->data.http_api_v2.query);
 
-    char *mysep = strchr(query->data.http_api_v2.query, '?');
-    if (mysep) {
-        url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-        *mysep = '\0';
-    } else
-        url_decode_r(w->decoded_query_string, query->data.http_api_v2.query, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+        char *mysep = strchr(query->data.http_api_v2.query, '?');
+        if (mysep) {
+            url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+            *mysep = '\0';
+        } else
+            url_decode_r(w->decoded_query_string, query->data.http_api_v2.query, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
-    mysep = strrchr(query->data.http_api_v2.query, '/');
+        mysep = strrchr(query->data.http_api_v2.query, '/');
 
-    if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        int stat_idx = aclk_cloud_req_http_type_to_idx(mysep ? mysep + 1 : "other");
-        aclk_metrics_per_sample.cloud_req_http_by_type[stat_idx]++;
-        ACLK_STATS_UNLOCK;
+        if (aclk_stats_enabled) {
+            ACLK_STATS_LOCK;
+            int stat_idx = aclk_cloud_req_http_type_to_idx(mysep ? mysep + 1 : "other");
+            aclk_metrics_per_sample.cloud_req_http_by_type[stat_idx]++;
+            ACLK_STATS_UNLOCK;
+        }
+
+        // execute the query
+        w->tv_in = query->created_tv;
+        now_realtime_timeval(&w->tv_ready);
+        t = aclk_web_api_v1_request(query_host, w, mysep ? mysep + 1 : "noop");
+        size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
+        sent = size;
     }
-
-    // execute the query
-    w->tv_in = query->created_tv;
-    now_realtime_timeval(&w->tv_ready);
-    t = aclk_web_api_v1_request(query_host, w, mysep ? mysep + 1 : "noop");
-    size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
-    size_t sent = size;
+    else {
+        w->tv_in = query->created_tv;
+        now_realtime_timeval(&w->tv_ready);
+        buffer_flush(w->response.data);
+        w->response.data->contenttype = CT_APPLICATION_JSON;
+        w->response.data->len = 0;
+        size = 0;
+        sent = 0;
+        w->response.code = 404;
+    }
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
