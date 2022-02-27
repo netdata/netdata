@@ -13,6 +13,7 @@
 - minor - remove dead code [\#12230](https://github.com/netdata/netdata/pull/12230) ([underhood](https://github.com/underhood))
 - Fix node information send to the cloud for older agent versions [\#12223](https://github.com/netdata/netdata/pull/12223) ([stelfrag](https://github.com/stelfrag))
 - Fixed typo in docs/guides/monitor/anomaly-detection-python.md file [\#12220](https://github.com/netdata/netdata/pull/12220) ([MariosMarinos](https://github.com/MariosMarinos))
+- \[makeself\] Fix license URL [\#12219](https://github.com/netdata/netdata/pull/12219) ([Daniel15](https://github.com/Daniel15))
 - Update github's code owners configuration. [\#12213](https://github.com/netdata/netdata/pull/12213) ([vkalintiris](https://github.com/vkalintiris))
 - Skip training of constant metrics. [\#12212](https://github.com/netdata/netdata/pull/12212) ([vkalintiris](https://github.com/vkalintiris))
 - Add -W keepopenfds option. [\#12211](https://github.com/netdata/netdata/pull/12211) ([vkalintiris](https://github.com/vkalintiris))
@@ -355,8 +356,6 @@
 - fix proc nfsd "proc4ops" chart family [\#11623](https://github.com/netdata/netdata/pull/11623) ([ilyam8](https://github.com/ilyam8))
 - Initialize struct with zeroes [\#11621](https://github.com/netdata/netdata/pull/11621) ([MrZammler](https://github.com/MrZammler))
 - add sys\_class\_power\_supply charts info [\#11619](https://github.com/netdata/netdata/pull/11619) ([ilyam8](https://github.com/ilyam8))
-- add cgroups.plugin systemd units charts info [\#11618](https://github.com/netdata/netdata/pull/11618) ([ilyam8](https://github.com/ilyam8))
-- Fix swap size calculation for cgroups [\#11617](https://github.com/netdata/netdata/pull/11617) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
