@@ -562,10 +562,24 @@ detect_existing_install() {
 
   if [ -n "${ndprefix}" ]; then
     typefile="${ndprefix}/etc/netdata/.install-type"
+    envfile="${ndprefix}/etc/netdata/.environment"
     if [ -r "${typefile}" ]; then
       ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
       # shellcheck disable=SC1091
       . "${tmpdir}/install-type"
+    elif [ -r "${envfile}" ]; then
+      ${ROOTCMD} sh -c "cat \"${envfile}\" > \"${tmpdir}/environment\""
+      # shellcheck disable=SC1091
+      . "${tmpdir}/environment"
+      if [ -n "${NETDATA_IS_STATIC_INSTALL}" ]; then
+        if [ "${NETDATA_IS_STATIC_INSTALL}" = "yes" ]; then
+          INSTALL_TYPE="legacy-stati"
+        else
+          INSTALL_TYPE="legacy-build"
+        fi
+      else
+        INSTALL_TYPE="unknown"
+      fi
     else
       INSTALL_TYPE="unknown"
     fi
