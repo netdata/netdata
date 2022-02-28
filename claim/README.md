@@ -585,13 +585,13 @@ If a Netdata Agent is running, the Space's administrator can connect a node usin
 additional command line parameters:
 
 ```sh
--W "claim -token TOKEN -rooms=ROOM1,ROOM2"
+-W "claim -token=TOKEN -rooms=ROOM1,ROOM2"
 ```
 
 For example:
 
 ```sh
-/usr/sbin/netdata -D -W "claim -token MYTOKEN1234567 -rooms=room1,room2"
+/usr/sbin/netdata -D -W "claim -token=MYTOKEN1234567 -rooms=room1,room2"
 ```
 
 If need be, the user can override the Agent's defaults by providing additional arguments like those described
