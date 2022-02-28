@@ -60,7 +60,6 @@ dist_noinst_DATA = \
     mqtt_websockets \
     netdata.cppcheck \
     netdata.spec \
-    package.json \
     packaging/bundle-ebpf.sh \
     packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
