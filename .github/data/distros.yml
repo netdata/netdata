@@ -99,16 +99,21 @@ include:
 
   - &opensuse
     distro: opensuse
-    version: "15.3"
+    version: "15.4"
     base_image: opensuse/leap
     jsonc_removal: |
       zypper rm -y libjson-c-devel
-    packages:
+    packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/15.3
+      repo_distro: opensuse/15.4
       arches:
         - amd64
         - arm64
+  - <<: *opensuse
+    version: "15.3"
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.3
 
   - distro: oraclelinux
     version: "8"
