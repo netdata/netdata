@@ -1076,6 +1076,9 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                         if (url_parse_query_string(w->decoded_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1, ptr_variables, total_variables)) {
                             return HTTP_VALIDATION_MALFORMED_URL;
                         }
+                    } else {
+                        //make sure there's no leftovers from previous request on the same web client
+                        w->decoded_query_string[1]='\0';
                     }
                 }
                 *ue = ' ';
