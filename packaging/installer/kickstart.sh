@@ -573,7 +573,7 @@ detect_existing_install() {
       . "${tmpdir}/environment"
       if [ -n "${NETDATA_IS_STATIC_INSTALL}" ]; then
         if [ "${NETDATA_IS_STATIC_INSTALL}" = "yes" ]; then
-          INSTALL_TYPE="legacy-stati"
+          INSTALL_TYPE="legacy-static"
         else
           INSTALL_TYPE="legacy-build"
         fi
