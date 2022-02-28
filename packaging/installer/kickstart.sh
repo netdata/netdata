@@ -1452,6 +1452,7 @@ confirm_install_prefix
 
 if [ "${ACTION}" = "uninstall" ]; then
   uninstall
+  cleanup
   trap - EXIT
   exit 0
 fi
