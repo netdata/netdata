@@ -58,7 +58,6 @@ Dockerfile* @Ferroin @iigorkarpov @maneamarius
 .yamllint.yml @Ferroin @iigorkarpov @maneamarius
 netdata.spec.in @Ferroin @iigorkarpov @maneamarius
 netdata-installer.sh @Ferroin @iigorkarpov @maneamarius
-package.json @jacekkolasa @Ferroin @iigorkarpov @maneamarius
 packaging/version @netdatabot @Ferroin @iigorkarpov @maneamarius
 
 LICENSE.md @DShreve2 @Ferroin @vkalintiris
