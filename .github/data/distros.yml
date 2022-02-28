@@ -116,18 +116,23 @@ include:
 
   - &ubuntu
     distro: ubuntu
-    version: "21.10"
+    version: "22.04"
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
     jsonc_removal: |
       apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
-      repo_distro: ubuntu/impish
+      repo_distro: ubuntu/jammy
       arches:
         - amd64
         - armhf
         - arm64
+  - <<: *ubuntu
+    version: "21.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/impish
   - <<: *ubuntu
     version: "20.04"
     packages:
