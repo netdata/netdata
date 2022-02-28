@@ -60,9 +60,14 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t cloud_q_process_max;
 } aclk_metrics_per_sample;
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+extern uint32_t *aclk_proto_rx_msgs_sample;
+#endif
+
 extern uint32_t *aclk_queries_per_thread;
 
 void *aclk_stats_main_thread(void *ptr);
+void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt);
 void aclk_stats_thread_cleanup();
 void aclk_stats_upd_online(int online);
 

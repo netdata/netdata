@@ -457,9 +457,15 @@ new_cloud_rx_msg_t *find_rx_handler_by_hash(simple_hash_t hash)
     return NULL;
 }
 
-void aclk_init_rx_msg_handlers(void)
+const char *rx_handler_get_name(size_t i)
 {
-    for (int i = 0; rx_msgs[i].fnc; i++) {
+    return rx_msgs[i].name;
+}
+
+unsigned int aclk_init_rx_msg_handlers(void)
+{
+    int i;
+    for (i = 0; rx_msgs[i].fnc; i++) {
         simple_hash_t hash = simple_hash(rx_msgs[i].name);
         new_cloud_rx_msg_t *hdl = find_rx_handler_by_hash(hash);
         if (unlikely(hdl)) {
@@ -469,6 +475,7 @@ void aclk_init_rx_msg_handlers(void)
         }
         rx_msgs[i].name_hash = hash;
     }
+    return i;
 }
 
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len)
@@ -488,6 +495,11 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             ACLK_STATS_UNLOCK;
         }
         return;
+    }
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_proto_rx_msgs_sample[msg_descriptor-rx_msgs]++;
+        ACLK_STATS_UNLOCK;
     }
     if (msg_descriptor->fnc(msg, msg_len)) {
         error("Error processing message of type '%s'", message_type);

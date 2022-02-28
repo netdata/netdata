@@ -761,8 +761,9 @@ void *aclk_main(void *ptr)
         return NULL;
     }
 
+    unsigned int proto_hdl_cnt;
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    aclk_init_rx_msg_handlers();
+    proto_hdl_cnt = aclk_init_rx_msg_handlers();
 #endif
 
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
@@ -802,6 +803,7 @@ void *aclk_main(void *ptr)
         stats_thread = callocz(1, sizeof(struct aclk_stats_thread));
         stats_thread->thread = mallocz(sizeof(netdata_thread_t));
         stats_thread->query_thread_count = query_threads.count;
+        aclk_stats_thread_prepare(query_threads.count, proto_hdl_cnt);
         netdata_thread_create(
             stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
             stats_thread);

@@ -11,7 +11,8 @@
 int aclk_handle_cloud_cmd_message(char *payload);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-void aclk_init_rx_msg_handlers(void);
+const char *rx_handler_get_name(size_t i);
+unsigned int aclk_init_rx_msg_handlers(void);
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len);
 #endif
 

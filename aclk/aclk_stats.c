@@ -6,7 +6,14 @@
 
 netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
-int query_thread_count;
+struct {
+    int query_thread_count;
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    unsigned int proto_hdl_cnt;
+    uint32_t *aclk_proto_rx_msgs_sample;
+    RRDDIM **rx_msg_dims;
+#endif
+} aclk_stats_cfg; // there is only 1 stats thread at a time
 
 // data ACLK stats need per query thread
 struct aclk_qt_data {
@@ -15,6 +22,7 @@ struct aclk_qt_data {
 
 uint32_t *aclk_queries_per_thread = NULL;
 uint32_t *aclk_queries_per_thread_sample = NULL;
+uint32_t *aclk_proto_rx_msgs_sample = NULL;
 
 struct aclk_metrics aclk_metrics = {
     .online = 0,
@@ -186,7 +194,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
             "netdata", "stats", 200009, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        for (int i = 0; i < query_thread_count; i++) {
+        for (int i = 0; i < aclk_stats_cfg.query_thread_count; i++) {
             if (snprintfz(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
                 error("snprintf encoding error");
             aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -194,7 +202,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
     } else
         rrdset_next(st);
 
-    for (int i = 0; i < query_thread_count; i++) {
+    for (int i = 0; i < aclk_stats_cfg.query_thread_count; i++) {
         rrddim_set_by_pointer(st, aclk_qt_data[i].dim, queries_per_thread[i]);
     }
 
@@ -229,8 +237,57 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+const char *rx_handler_get_name(size_t i);
+static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
+{
+    static RRDSET *st = NULL;
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_protobuf_rx_types", NULL, "aclk", NULL, "Received new cloud architecture messages by their type.", "msg/s",
+            "netdata", "stats", 200010, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++) {
+            aclk_stats_cfg.rx_msg_dims[i] = rrddim_add(st, rx_handler_get_name(i), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        }
+    } else
+        rrdset_next(st);
+
+    for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++)
+        rrddim_set_by_pointer(st, aclk_stats_cfg.rx_msg_dims[i], rx_msgs_sample[i]);
+
+    rrdset_done(st);
+}
+#endif
+
+void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt)
+{
+#ifndef ENABLE_NEW_CLOUD_PROTOCOL
+    UNUSED(proto_hdl_cnt);
+#endif
+
+    aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
+    aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
+    aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
+
+    memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
+
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    aclk_stats_cfg.proto_hdl_cnt = proto_hdl_cnt;
+    aclk_stats_cfg.aclk_proto_rx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_rx_msgs_sample));
+    aclk_proto_rx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_rx_msgs_sample));
+    aclk_stats_cfg.rx_msg_dims = callocz(proto_hdl_cnt, sizeof(RRDDIM*));
+#endif
+}
+
 void aclk_stats_thread_cleanup()
 {
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    freez(aclk_stats_cfg.rx_msg_dims);
+    freez(aclk_proto_rx_msgs_sample);
+    freez(aclk_stats_cfg.aclk_proto_rx_msgs_sample);
+#endif
     freez(aclk_qt_data);
     freez(aclk_queries_per_thread);
     freez(aclk_queries_per_thread_sample);
@@ -240,16 +297,11 @@ void *aclk_stats_main_thread(void *ptr)
 {
     struct aclk_stats_thread *args = ptr;
 
-    query_thread_count = args->query_thread_count;
-    aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
-    aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
-    aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
+    aclk_stats_cfg.query_thread_count = args->query_thread_count;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
-
-    memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
 
     struct aclk_metrics_per_sample per_sample;
     struct aclk_metrics permanent;
@@ -266,11 +318,15 @@ void *aclk_stats_main_thread(void *ptr)
         // to not hold lock longer than necessary, especially not to hold it
         // during database rrd* operations
         memcpy(&per_sample, &aclk_metrics_per_sample, sizeof(struct aclk_metrics_per_sample));
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        memcpy(aclk_stats_cfg.aclk_proto_rx_msgs_sample, aclk_proto_rx_msgs_sample, sizeof(*aclk_proto_rx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
+        memset(aclk_proto_rx_msgs_sample, 0, sizeof(*aclk_proto_rx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
+#endif
         memcpy(&permanent, &aclk_metrics, sizeof(struct aclk_metrics));
         memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
 
-        memcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * query_thread_count);
-        memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * query_thread_count);
+        memcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * aclk_stats_cfg.query_thread_count);
+        memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * aclk_stats_cfg.query_thread_count);
         ACLK_STATS_UNLOCK;
 
         aclk_stats_collect(&per_sample, &permanent);
@@ -286,6 +342,10 @@ void *aclk_stats_main_thread(void *ptr)
         aclk_stats_query_threads(aclk_queries_per_thread_sample);
 
         aclk_stats_query_time(&per_sample);
+
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        aclk_stats_newproto_rx(aclk_stats_cfg.aclk_proto_rx_msgs_sample);
+#endif
     }
 
     return 0;
