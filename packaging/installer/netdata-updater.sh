@@ -173,7 +173,9 @@ enable_netdata_updater() {
       ;;
     "crontab")
       if [ -d "/etc/cron.d" ]; then
-        cat "${NETDATA_SOURCE_DIR}/system/netdata.crontab" > "/etc/cron.d/netdata-updater"
+        cat > "/etc/cron.d/netdata-updater" <<-EOF
+	2 57 * * * root ${NETDATA_PREFIX}/netdata-updater.sh
+	EOF
 
         info "Auto-updating has been ENABLED through cron, using a crontab at /etc/cron.d/netdata-updater\n"
         info "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
@@ -718,6 +720,14 @@ ndtmpdir=
 
 trap cleanup EXIT
 
+# shellcheck source=/dev/null
+. "${ENVIRONMENT_FILE}" || exit 1
+
+if [ -f "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
+  # shellcheck source=/dev/null
+  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || exit 1
+fi
+
 while [ -n "${1}" ]; do
   if [ "${1}" = "--not-running-from-cron" ]; then
     NETDATA_NOT_RUNNING_FROM_CRON=1
@@ -749,14 +759,6 @@ if [ ! -t 1 ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ]; then
               printf("%d\n", 3600 * rand())
       }')"
     sleep $(((rnd % 3600) + 1))
-fi
-
-# shellcheck source=/dev/null
-. "${ENVIRONMENT_FILE}" || exit 1
-
-if [ -f "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
-  # shellcheck source=/dev/null
-  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || exit 1
 fi
 
 # We dont expect to find lib dir variable on older installations, so load this path if none found
