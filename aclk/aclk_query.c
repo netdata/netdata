@@ -98,27 +98,38 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
     w->acl = 0x1f;
 
+    buffer_strcat(log_buffer, query->data.http_api_v2.query);
+
     if (!strncmp(query->data.http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
         char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);
         char nodeid[UUID_STR_LEN];
         if (strlen(node_uuid) < (UUID_STR_LEN - 1)) {
-            error("URL requests node_id but there is not enough chars following");
+            error("URL requests node_id but there is not enough chars following. Returning 404 to Cloud.");
             retval = 1;
             aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, 404, NULL, 0);
+            log_access("%d '[ACLK]:%d' '%s' Error parsing node_id Sending 404",
+                    gettid(),
+                    query_thr->idx,
+                    strip_control_characters((char *)buffer_tostring(log_buffer))
+                );
             goto cleanup;
         }
         strncpyz(nodeid, node_uuid, UUID_STR_LEN - 1);
 
         query_host = node_id_2_rrdhost(nodeid);
         if (!query_host) {
-            error("Host with node_id \"%s\" not found! Query Ignored!", node_uuid);
+            error("Host with node_id \"%s\" not found! Returning 404 to Cloud!", node_uuid);
             retval = 1;
             aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, 404, NULL, 0);
+            log_access("%d '[ACLK]:%d' '%s' Host with node_id \"%s\" not found. Sending 404",
+                    gettid(),
+                    query_thr->idx,
+                    strip_control_characters((char *)buffer_tostring(log_buffer)),
+                    node_uuid
+                );
             goto cleanup;
         }
     }
-
-    buffer_strcat(log_buffer, query->data.http_api_v2.query);
 
     char *mysep = strchr(query->data.http_api_v2.query, '?');
     if (mysep) {
@@ -176,6 +187,11 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
                     error("Unknown error during zlib compression.");
                 retval = 1;
                 aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, 500, NULL, 0);
+                log_access("%d '[ACLK]:%d' '%s' Internal server error during zlib compression. Sending 500",
+                    gettid(),
+                    query_thr->idx,
+                    strip_control_characters((char *)buffer_tostring(log_buffer))
+                  );
                 goto cleanup;
             }
             int bytes_to_cpy = NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE - w->response.zstream.avail_out;
