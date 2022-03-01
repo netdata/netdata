@@ -98,25 +98,33 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
     w->acl = 0x1f;
 
+    buffer_strcat(log_buffer, query->data.http_api_v2.query);
+    size_t size = 0;
+    size_t sent = 0;
+    w->tv_in = query->created_tv;
+    now_realtime_timeval(&w->tv_ready);
+
     if (!strncmp(query->data.http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
         char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);
         char nodeid[UUID_STR_LEN];
         if (strlen(node_uuid) < (UUID_STR_LEN - 1)) {
-            error("URL requests node_id but there is not enough chars following");
+            error("URL requests node_id but there is not enough chars following. Returning 404 to Cloud.");
             retval = 1;
+            w->response.code = 404;
+            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, NULL, 0);
             goto cleanup;
         }
         strncpyz(nodeid, node_uuid, UUID_STR_LEN - 1);
 
         query_host = node_id_2_rrdhost(nodeid);
         if (!query_host) {
-            error("Host with node_id \"%s\" not found! Query Ignored!", node_uuid);
+            error("Host with node_id \"%s\" not found! Returning 404 to Cloud!", node_uuid);
             retval = 1;
+            w->response.code = 404;
+            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, NULL, 0);
             goto cleanup;
         }
     }
-
-    buffer_strcat(log_buffer, query->data.http_api_v2.query);
 
     char *mysep = strchr(query->data.http_api_v2.query, '?');
     if (mysep) {
@@ -135,11 +143,9 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     }
 
     // execute the query
-    w->tv_in = query->created_tv;
-    now_realtime_timeval(&w->tv_ready);
     t = aclk_web_api_v1_request(query_host, w, mysep ? mysep + 1 : "noop");
-    size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
-    size_t sent = size;
+    size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
+    sent = size;
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
@@ -173,6 +179,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
                 else
                     error("Unknown error during zlib compression.");
                 retval = 1;
+                w->response.code = 500;
+                aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, NULL, 0);
                 goto cleanup;
             }
             int bytes_to_cpy = NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE - w->response.zstream.avail_out;
@@ -213,8 +221,9 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     // send msg.
     aclk_http_msg_v2(query_thr->client, query->callback_topic, query->msg_id, t, query->created, w->response.code, local_buffer->buffer, local_buffer->len);
 
-    // log.
     struct timeval tv;
+
+cleanup:
     now_realtime_timeval(&tv);
     log_access("%llu: %d '[ACLK]:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
         w->id
@@ -231,7 +240,6 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         , strip_control_characters((char *)buffer_tostring(log_buffer))
     );
 
-cleanup:
 #ifdef NETDATA_WITH_ZLIB
     if(w->response.zinitialized)
         deflateEnd(&w->response.zstream);
