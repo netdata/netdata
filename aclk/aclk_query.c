@@ -104,6 +104,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         if (strlen(node_uuid) < (UUID_STR_LEN - 1)) {
             error("URL requests node_id but there is not enough chars following");
             retval = 1;
+            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, 404, NULL, 0);
             goto cleanup;
         }
         strncpyz(nodeid, node_uuid, UUID_STR_LEN - 1);
@@ -112,6 +113,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         if (!query_host) {
             error("Host with node_id \"%s\" not found! Query Ignored!", node_uuid);
             retval = 1;
+            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, 404, NULL, 0);
             goto cleanup;
         }
     }
@@ -173,6 +175,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
                 else
                     error("Unknown error during zlib compression.");
                 retval = 1;
+                aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, 500, NULL, 0);
                 goto cleanup;
             }
             int bytes_to_cpy = NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE - w->response.zstream.avail_out;
