@@ -130,11 +130,19 @@ _get_intervaldir() {
 }
 
 enable_netdata_updater() {
-  if [ -n "${1}" ] ; then
-    updater_type="${1}"
-  else
-    updater_type="$(_get_scheduler_type)"
-  fi
+  updater_type="$(echo "${1}" | tr '[:upper:]' '[:lower:]')"
+  case "${updater_type}" in
+    systemd|interval|crontab)
+      updater_type="${1}"
+      ;;
+    "")
+      updater_type="$(_get_scheduler_type)"
+      ;;
+    *)
+      error "Unrecognized updater type ${updater_type} requested. Supported types are 'systemd', 'interval', and 'crontab'."
+      exit 1
+      ;;
+  esac
 
   case "${updater_type}" in
     "systemd")
@@ -721,21 +729,8 @@ while [ -n "${1}" ]; do
     NETDATA_TMPDIR_PATH="${2}"
     shift 2
   elif [ "${1}" = "--enable-auto-updates" ]; then
-    AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
-    case "${AUTO_UPDATE_TYPE}" in
-      systemd|interval|crontab)
-        enable_netdata_updater "${AUTO_UPDATE_TYPE}"
-        exit $?
-        ;;
-      "")
-        enable_netdata_updater ""
-        exit $?
-        ;;
-      *)
-        error "Unrecognized updater type ${2} requested. Supported types are 'systemd', 'interval', and 'crontab'."
-        exit 1
-        ;;
-    esac
+    enable_netdata_updater "${2}"
+    exit $?
   elif [ "${1}" = "--disable-auto-updates" ]; then
     disable_netdata_updater
     exit $?
