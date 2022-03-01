@@ -505,7 +505,8 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 
     // free(rd->annotations);
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-    aclk_send_dimension_update(rd);
+    if (!netdata_exit)
+        aclk_send_dimension_update(rd);
 #endif
 
     RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
