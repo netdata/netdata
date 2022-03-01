@@ -1942,6 +1942,9 @@ after_second_database_work:
                             delete_dimension_uuid(&rd->state->metric_uuid);
                         } else {
                             /* Do not delete this dimension */
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+                            aclk_send_dimension_update(rd);
+#endif
                             last = rd;
                             rd = rd->next;
                             continue;

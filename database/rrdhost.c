@@ -1516,6 +1516,11 @@ restart_after_removal:
                             }
                             continue;
                         }
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+                        else {
+                            aclk_send_dimension_update(rd);
+                        }
+#endif
                     }
                     last = rd;
                     rd = rd->next;

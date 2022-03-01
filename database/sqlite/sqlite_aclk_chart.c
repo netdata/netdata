@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_chart.h"
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
 #include "../../aclk/aclk_charts_api.h"
 #include "../../aclk/aclk.h"
 
@@ -971,6 +971,39 @@ int queue_dimension_to_aclk(RRDDIM *rd)
     int rc = sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker,
                                      rd, ACLK_DATABASE_ADD_DIMENSION);
     return rc;
+}
+
+void aclk_send_dimension_update(RRDDIM *rd)
+{
+    if (!aclk_use_new_cloud_arch)
+        return;
+
+    char *claim_id = is_agent_claimed();
+    if (unlikely(!claim_id))
+        return;
+
+    time_t first_entry_t = rrddim_first_entry_t(rd);
+    time_t last_entry_t = rrddim_last_entry_t(rd);
+
+    time_t now = now_realtime_sec();
+    int live = ((now - rd->last_collected_time.tv_sec) <
+                MAX(RRDSET_MINIMUM_LIVE_MULTIPLIER * rd->update_every, rrdset_free_obsolete_time));
+
+    if (!live || rd->state->aclk_live_status != live || !first_entry_t) {
+        (void)aclk_upd_dimension_event(
+            rd->rrdset->rrdhost->dbsync_worker,
+            claim_id,
+            &rd->state->metric_uuid,
+            rd->id,
+            rd->name,
+            rd->rrdset->id,
+            first_entry_t,
+            live ? 0 : last_entry_t);
+        rd->state->aclk_live_status = live;
+    }
+
+    freez(claim_id);
+    return;
 }
 
 #endif //ENABLE_NEW_CLOUD_PROTOCOL
