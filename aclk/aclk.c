@@ -1116,8 +1116,8 @@ void aclk_send_node_instances()
             create_query->data.node_creation.hostname = list->hostname;
             create_query->data.node_creation.machine_guid  = mallocz(UUID_STR_LEN);
             create_query->node_id = NULL;
-            create_query->context = strdupz(list->host_id);
             uuid_unparse_lower(list->host_id, (char*)create_query->data.node_creation.machine_guid);
+            create_query->context = strdupz((char*)create_query->data.node_creation.machine_guid);
             info("Queuing registration for host=%s, hops=%d",(char*)create_query->data.node_creation.machine_guid,
                  list->hops);
             aclk_queue_query(create_query);

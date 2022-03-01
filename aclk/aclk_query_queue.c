@@ -157,7 +157,7 @@ void aclk_query_free(aclk_query_t query)
 
     case NODE_STATE_UPDATE:
         freez((void*)query->data.node_update.claim_id);
-        freez((void*)query->data.node_update.node_id);
+        //freez((void*)query->data.node_update.node_id);
         break;
 
     case REGISTER_NODE:
