@@ -70,6 +70,11 @@ struct label *add_aclk_host_labels(struct label *label) {
 
     label = add_label_to_list(label, "_aclk_impl", "Next Generation", LABEL_SOURCE_AUTO);
     label = add_label_to_list(label, "_aclk_proxy", proxy_str, LABEL_SOURCE_AUTO);
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    label = add_label_to_list(label, "_aclk_ng_new_cloud_protocol", "true", LABEL_SOURCE_AUTO);
+#else
+    label = add_label_to_list(label, "_aclk_ng_new_cloud_protocol", "false", LABEL_SOURCE_AUTO);
+#endif
 #endif
     return label;
 }
