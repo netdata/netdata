@@ -382,6 +382,10 @@ update_build() {
       install_type="INSTALL_TYPE='legacy-build'"
     fi
 
+    if [ "${INSTALL_TYPE}" = "custom" ] && [ -f "${NETDATA_PREFIX}" ]; then
+      install_type="INSTALL_TYPE='legacy-build'"
+    fi
+
     info "Re-installing netdata..."
     eval "${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
 
