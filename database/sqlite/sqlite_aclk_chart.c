@@ -999,6 +999,14 @@ void aclk_send_dimension_update(RRDDIM *rd)
             rd->rrdset->id,
             first_entry_t,
             live ? 0 : last_entry_t);
+
+        if (!first_entry_t)
+            debug(D_ACLK_SYNC, "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld)",
+              rd->rrdset->rrdhost->hostname, rd->rrdset->name, rd->name, live, first_entry_t, last_entry_t);
+        else
+            debug(D_ACLK_SYNC, "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld) collected %ld seconds ago",
+                  rd->rrdset->rrdhost->hostname, rd->rrdset->name, rd->name, live, first_entry_t,
+                  last_entry_t, now - last_entry_t);
         rd->state->aclk_live_status = live;
     }
 
