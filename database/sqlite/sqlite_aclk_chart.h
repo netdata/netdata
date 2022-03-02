@@ -17,6 +17,8 @@ extern sqlite3 *db_meta;
 #endif
 
 struct aclk_chart_sync_stats {
+    int        updates;
+    uint64_t   batch_id;
     uint64_t   min_seqid;
     uint64_t   max_seqid;
     uint64_t   min_seqid_pend;
@@ -49,5 +51,5 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
 void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 uint32_t sql_get_pending_count(struct aclk_database_worker_config *wc);
 void aclk_send_dimension_update(RRDDIM *rd);
-struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(const char *host_id);
+struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host);
 #endif //NETDATA_SQLITE_ACLK_CHART_H

@@ -1016,15 +1016,23 @@ void aclk_send_dimension_update(RRDDIM *rd)
 
 #define SQL_SEQ_NULL(result, n)  sqlite3_column_type(result, n) == SQLITE_NULL ? 0 : sqlite3_column_int64(result, n)
 
-struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(const char *host_id)
+struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host)
 {
     struct aclk_chart_sync_stats *aclk_statistics = NULL;
 
     aclk_statistics = callocz(1, sizeof(struct aclk_chart_sync_stats));
 
+    struct aclk_database_worker_config *wc  = NULL;
+    wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+    if (!wc)
+        return NULL;
+
+    aclk_statistics->updates = wc->chart_updates;
+    aclk_statistics->batch_id = wc->batch_id;
+
     char host_uuid_fixed[GUID_LEN + 1];
 
-    strncpy(host_uuid_fixed, host_id, GUID_LEN);
+    strncpy(host_uuid_fixed, host->machine_guid, GUID_LEN);
     host_uuid_fixed[GUID_LEN] = 0;
 
     host_uuid_fixed[8] = '_';
@@ -1041,8 +1049,11 @@ struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(const char *host_id)
     buffer_sprintf(sql, "SELECT max(date_created), max(date_submitted), max(date_updated), 0 FROM aclk_chart_%s;", host_uuid_fixed);
 
     int rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK)
-        goto failed;
+    if (rc != SQLITE_OK) {
+        buffer_free(sql);
+        freez(aclk_statistics);
+        return NULL;
+    }
 
     rc = sqlite3_step(res);
     if (rc == SQLITE_ROW) {
@@ -1085,7 +1096,6 @@ struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(const char *host_id)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when fetching aclk sync statistics, rc = %d", rc);
 
-failed:
     buffer_free(sql);
     return aclk_statistics;
 }
