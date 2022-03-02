@@ -1238,24 +1238,41 @@ static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 
 static void fill_chart_status_for_host_json(json_object *obj, RRDHOST *host)
 {
-    struct chart_sync_status status;
-    if (!get_chart_sync_status(host, &status))
+    struct aclk_chart_sync_stats *stats = aclk_get_chart_sync_stats(host);
+    if (!stats)
         return;
 
-    json_object *tmp = json_object_new_int(status.updates);
+    json_object *tmp = json_object_new_int(stats->updates);
     json_object_object_add(obj, "updates", tmp);
 
-    tmp = json_object_new_int(status.batch_id);
+    tmp = json_object_new_int(stats->batch_id);
     json_object_object_add(obj, "batch-id", tmp);
 
-    tmp = json_object_new_int(status.pending_min_sequence_id);
+    tmp = json_object_new_int(stats->min_seqid);
+    json_object_object_add(obj, "min-seq-id", tmp);
+
+    tmp = json_object_new_int(stats->max_seqid);
+    json_object_object_add(obj, "max-seq-id", tmp);
+
+    tmp = json_object_new_int(stats->min_seqid_pend);
     json_object_object_add(obj, "pending-min-seq-id", tmp);
 
-    tmp = json_object_new_int(status.pending_max_sequence_id);
+    tmp = json_object_new_int(stats->max_seqid_pend);
     json_object_object_add(obj, "pending-max-seq-id", tmp);
 
-    tmp = json_object_new_int(status.last_submitted_sequence_id);
-    json_object_object_add(obj, "last-submitted-seq-id", tmp);
+    tmp = json_object_new_int(stats->min_seqid_sent);
+    json_object_object_add(obj, "sent-min-seq-id", tmp);
+
+    tmp = json_object_new_int(stats->max_seqid_sent);
+    json_object_object_add(obj, "sent-max-seq-id", tmp);
+
+    tmp = json_object_new_int(stats->min_seqid_ack);
+    json_object_object_add(obj, "acked-min-seq-id", tmp);
+
+    tmp = json_object_new_int(stats->max_seqid_ack);
+    json_object_object_add(obj, "acked-max-seq-id", tmp);
+
+    freez(stats);
 }
 
 char *ng_aclk_state_json(void)
