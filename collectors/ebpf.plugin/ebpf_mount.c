@@ -39,6 +39,143 @@ netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_T
 
 static struct mount_bpf *bpf_obj = NULL;
 
+/*****************************************************************
+ *
+ *  BTF FUNCTIONS
+ *
+ *****************************************************************/
+
+/*
+ * Disable probe
+ *
+ * Disable all probes to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_mount_disable_probe(struct mount_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_mount_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_umount_probe, false);
+
+    bpf_program__set_autoload(obj->progs.netdata_mount_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_umount_retprobe, false);
+}
+
+/*
+ * Disable tracepoint
+ *
+ * Disable all tracepoints to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_mount_disable_tracepoint(struct mount_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_mount_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_umount_exit, false);
+}
+
+/*
+ * Disable trampoline
+ *
+ * Disable all trampoline to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_mount_disable_trampoline(struct mount_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_mount_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_umount_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_mount_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_umount_fexit, false);
+}
+
+/**
+ * Set trampoline target
+ *
+ * Set the targets we will monitor.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void netdata_set_trampoline_target(struct mount_bpf *obj)
+{
+    char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH + 1];
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            mount_targets[NETDATA_MOUNT_SYSCALL].name, running_on_kernel);
+
+    bpf_program__set_attach_target(obj->progs.netdata_mount_fentry, 0,
+                                   syscall);
+
+    bpf_program__set_attach_target(obj->progs.netdata_mount_fexit, 0,
+                                   syscall);
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            mount_targets[NETDATA_UMOUNT_SYSCALL].name, running_on_kernel);
+
+    bpf_program__set_attach_target(obj->progs.netdata_umount_fentry, 0,
+                                   syscall);
+
+    bpf_program__set_attach_target(obj->progs.netdata_umount_fexit, 0,
+                                   syscall);
+}
+
+/**
+ * Mount Attach Probe
+ *
+ * Attach probes to target
+ *
+ * @param obj is the main structure for bpf objects.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_mount_attach_probe(struct mount_bpf *obj)
+{
+    char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH + 1];
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            mount_targets[NETDATA_MOUNT_SYSCALL].name, running_on_kernel);
+
+    obj->links.netdata_mount_probe = bpf_program__attach_kprobe(obj->progs.netdata_mount_probe,
+                                                                false, syscall);
+    int ret = (int)libbpf_get_error(obj->links.netdata_mount_probe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_mount_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_mount_retprobe,
+                                                                   true, syscall);
+    ret = (int)libbpf_get_error(obj->links.netdata_mount_retprobe);
+    if (ret)
+        return -1;
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            mount_targets[NETDATA_UMOUNT_SYSCALL].name, running_on_kernel);
+
+    obj->links.netdata_umount_probe = bpf_program__attach_kprobe(obj->progs.netdata_umount_probe,
+                                                                 false, syscall);
+    ret = (int)libbpf_get_error(obj->links.netdata_umount_probe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_umount_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_umount_retprobe,
+                                                                    true, syscall);
+    ret = (int)libbpf_get_error(obj->links.netdata_umount_retprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_mount_set_hash_tables(struct mount_bpf *obj)
+{
+    mount_maps[NETDATA_KEY_MOUNT_TABLE].map_fd = bpf_map__fd(obj->maps.tbl_mount);
+}
+
 /**
  * Load and attach
  *
@@ -51,7 +188,36 @@ static struct mount_bpf *bpf_obj = NULL;
  */
 static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_t *em)
 {
-    return 0;
+    netdata_ebpf_targets_t *mt = em->targets;
+    netdata_ebpf_program_loaded_t test = mt[NETDATA_MOUNT_SYSCALL].mode;
+
+    // We are testing only one, because all will have the same behavior
+    if (test == EBPF_LOAD_TRAMPOLINE ) {
+        ebpf_mount_disable_probe(obj);
+        ebpf_mount_disable_tracepoint(obj);
+
+        netdata_set_trampoline_target(obj);
+    } else if (test == EBPF_LOAD_PROBE ||
+    test == EBPF_LOAD_RETPROBE ) {
+        ebpf_mount_disable_tracepoint(obj);
+        ebpf_mount_disable_trampoline(obj);
+    } else {
+        ebpf_mount_disable_probe(obj);
+        ebpf_mount_disable_trampoline(obj);
+    }
+
+    int ret = mount_bpf__load(obj);
+    if (!ret) {
+        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE )
+            ret = mount_bpf__attach(obj);
+        else
+            ret = ebpf_mount_attach_probe(obj);
+
+        if (!ret)
+            ebpf_mount_set_hash_tables(obj);
+    }
+
+    return ret;
 }
 #endif
 /*****************************************************************

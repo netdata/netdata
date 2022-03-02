@@ -63,6 +63,78 @@ netdata_ebpf_targets_t sync_targets[] = { {.name = NETDATA_SYSCALLS_SYNC, .mode 
 
 
 #ifdef LIBBPF_MAJOR_VERSION
+/*****************************************************************
+ *
+ *  BTF FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * Disable probe
+ *
+ * Disable kprobe to use another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_sync_disable_probe(struct sync_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_sync_kprobe, false);
+}
+
+/**
+ * Disable tramppoline
+ *
+ * Disable trampoline to use another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_sync_disable_trampoline(struct sync_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_sync_fentry, false);
+}
+
+/**
+ * Disable tracepoint
+ *
+ * Disable tracepoints according information given.
+ *
+ * @param obj  object loaded
+ * @param idx  Which syscall will not be disabled
+ */
+void ebpf_sync_disable_tracepoints(struct sync_bpf *obj, sync_syscalls_index_t idx)
+{
+    if (idx != NETDATA_SYNC_SYNC_IDX)
+        bpf_program__set_autoload(obj->progs.netdata_sync_entry, false);
+
+    if (idx != NETDATA_SYNC_SYNCFS_IDX)
+        bpf_program__set_autoload(obj->progs.netdata_syncfs_entry, false);
+
+    if (idx != NETDATA_SYNC_MSYNC_IDX)
+        bpf_program__set_autoload(obj->progs.netdata_msync_entry, false);
+
+    if (idx != NETDATA_SYNC_FSYNC_IDX)
+        bpf_program__set_autoload(obj->progs.netdata_fsync_entry, false);
+
+    if (idx != NETDATA_SYNC_FDATASYNC_IDX)
+        bpf_program__set_autoload(obj->progs.netdata_fdatasync_entry, false);
+
+    if (idx != NETDATA_SYNC_SYNC_FILE_RANGE_IDX)
+        bpf_program__set_autoload(obj->progs.netdata_sync_file_range_entry, false);
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param idx    the index for the main structure
+ */
+static void ebpf_sync_set_hash_tables(struct sync_bpf *obj, sync_syscalls_index_t idx)
+{
+    sync_maps[idx].map_fd = bpf_map__fd(obj->maps.tbl_sync);
+}
+
 /**
  * Load and attach
  *
@@ -78,7 +150,41 @@ netdata_ebpf_targets_t sync_targets[] = { {.name = NETDATA_SYSCALLS_SYNC, .mode 
 static inline int ebpf_sync_load_and_attach(struct sync_bpf *obj, ebpf_module_t *em, char *target,
                                             sync_syscalls_index_t idx)
 {
-    return 0;
+    netdata_ebpf_targets_t *synct = em->targets;
+    netdata_ebpf_program_loaded_t test = synct[NETDATA_SYNC_SYNC_IDX].mode;
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ebpf_sync_disable_probe(obj);
+        ebpf_sync_disable_tracepoints(obj, NETDATA_SYNC_IDX_END);
+
+        bpf_program__set_attach_target(obj->progs.netdata_sync_fentry, 0,
+                                       target);
+    } else if (test == EBPF_LOAD_PROBE ||
+    test == EBPF_LOAD_RETPROBE) {
+        ebpf_sync_disable_tracepoints(obj, NETDATA_SYNC_IDX_END);
+        ebpf_sync_disable_trampoline(obj);
+    } else {
+        ebpf_sync_disable_probe(obj);
+        ebpf_sync_disable_trampoline(obj);
+
+        ebpf_sync_disable_tracepoints(obj, idx);
+    }
+
+    int ret = sync_bpf__load(obj);
+    if (!ret) {
+        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE) {
+            ret = sync_bpf__attach(obj);
+        } else {
+            obj->links.netdata_sync_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_sync_kprobe,
+                                                                        false, target);
+            ret = (int)libbpf_get_error(obj->links.netdata_sync_kprobe);
+        }
+
+        if (!ret)
+            ebpf_sync_set_hash_tables(obj, idx);
+    }
+
+    return ret;
 }
 #endif
 

@@ -52,6 +52,149 @@ netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TR
 
 static struct shm_bpf *bpf_obj = NULL;
 
+/*****************************************************************
+ *
+ *  BTF FUNCTIONS
+ *
+ *****************************************************************/
+
+/*
+ * Disable tracepoint
+ *
+ * Disable all tracepoints to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_shm_disable_tracepoint(struct shm_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_syscall_shmget, false);
+    bpf_program__set_autoload(obj->progs.netdata_syscall_shmat, false);
+    bpf_program__set_autoload(obj->progs.netdata_syscall_shmdt, false);
+    bpf_program__set_autoload(obj->progs.netdata_syscall_shmctl, false);
+}
+
+/*
+ * Disable probe
+ *
+ * Disable all probes to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_disable_probe(struct shm_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_shmget_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_shmat_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_shmdt_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_shmctl_probe, false);
+}
+
+/*
+ * Disable trampoline
+ *
+ * Disable all trampoline to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_disable_trampoline(struct shm_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_shmget_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_shmat_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_shmdt_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_shmctl_fentry, false);
+}
+
+/**
+ * Set trampoline target
+ *
+ * Set the targets we will monitor.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_set_trampoline_target(struct shm_bpf *obj)
+{
+    char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH + 1];
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            shm_targets[NETDATA_KEY_SHMGET_CALL].name, running_on_kernel);
+
+    bpf_program__set_attach_target(obj->progs.netdata_shmget_fentry, 0,
+                                   syscall);
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            shm_targets[NETDATA_KEY_SHMAT_CALL].name, running_on_kernel);
+    bpf_program__set_attach_target(obj->progs.netdata_shmat_fentry, 0,
+                                   syscall);
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            shm_targets[NETDATA_KEY_SHMDT_CALL].name, running_on_kernel);
+    bpf_program__set_attach_target(obj->progs.netdata_shmdt_fentry, 0,
+                                   syscall);
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            shm_targets[NETDATA_KEY_SHMCTL_CALL].name, running_on_kernel);
+    bpf_program__set_attach_target(obj->progs.netdata_shmctl_fentry, 0,
+                                   syscall);
+}
+
+/**
+ * SHM Attach Probe
+ *
+ * Attach probes to target
+ *
+ * @param obj is the main structure for bpf objects.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_shm_attach_probe(struct shm_bpf *obj)
+{
+    char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH + 1];
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            shm_targets[NETDATA_KEY_SHMGET_CALL].name, running_on_kernel);
+
+    obj->links.netdata_shmget_probe = bpf_program__attach_kprobe(obj->progs.netdata_shmget_probe,
+                                                                 false, syscall);
+    int ret = (int)libbpf_get_error(obj->links.netdata_shmget_probe);
+    if (ret)
+        return -1;
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            shm_targets[NETDATA_KEY_SHMAT_CALL].name, running_on_kernel);
+    obj->links.netdata_shmat_probe = bpf_program__attach_kprobe(obj->progs.netdata_shmat_probe,
+                                                                false, syscall);
+    ret = (int)libbpf_get_error(obj->links.netdata_shmat_probe);
+    if (ret)
+        return -1;
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            shm_targets[NETDATA_KEY_SHMDT_CALL].name, running_on_kernel);
+    obj->links.netdata_shmdt_probe = bpf_program__attach_kprobe(obj->progs.netdata_shmdt_probe,
+                                                                false, syscall);
+    ret = (int)libbpf_get_error(obj->links.netdata_shmdt_probe);
+    if (ret)
+        return -1;
+
+    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
+                            shm_targets[NETDATA_KEY_SHMCTL_CALL].name, running_on_kernel);
+    obj->links.netdata_shmctl_probe = bpf_program__attach_kprobe(obj->progs.netdata_shmctl_probe,
+                                                                 false, syscall);
+    ret = (int)libbpf_get_error(obj->links.netdata_shmctl_probe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ */
+static void ebpf_shm_set_hash_tables(struct shm_bpf *obj)
+{
+    shm_maps[NETDATA_PID_SHM_TABLE].map_fd = bpf_map__fd(obj->maps.tbl_pid_shm);
+    shm_maps[NETDATA_SHM_CONTROLLER].map_fd = bpf_map__fd(obj->maps.shm_ctrl);
+    shm_maps[NETDATA_SHM_GLOBAL_TABLE].map_fd = bpf_map__fd(obj->maps.tbl_shm);
+}
+
 /**
  * Load and attach
  *
@@ -64,7 +207,35 @@ static struct shm_bpf *bpf_obj = NULL;
  */
 static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *em)
 {
-    return 0;
+    netdata_ebpf_targets_t *shmt = em->targets;
+    netdata_ebpf_program_loaded_t test = shmt[NETDATA_KEY_SHMGET_CALL].mode;
+
+    // We are testing only one, because all will have the same behavior
+    if (test == EBPF_LOAD_TRAMPOLINE ) {
+        ebpf_shm_disable_tracepoint(obj);
+        ebpf_disable_probe(obj);
+
+        ebpf_set_trampoline_target(obj);
+    }  else if (test == EBPF_LOAD_PROBE || test == EBPF_LOAD_RETPROBE ) {
+        ebpf_shm_disable_tracepoint(obj);
+        ebpf_disable_trampoline(obj);
+    } else  {
+        ebpf_disable_probe(obj);
+        ebpf_disable_trampoline(obj);
+    }
+
+    int ret = shm_bpf__load(obj);
+    if (!ret) {
+        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE)
+            shm_bpf__attach(obj);
+        else
+            ret = ebpf_shm_attach_probe(obj);
+
+        if (!ret)
+            ebpf_shm_set_hash_tables(obj);
+    }
+
+    return ret;
 }
 #endif
 /*****************************************************************

@@ -30,6 +30,13 @@ enum mount_tables {
     NETDATA_KEY_MOUNT_TABLE
 };
 
+enum netdata_mount_syscalls {
+    NETDATA_MOUNT_SYSCALL,
+    NETDATA_UMOUNT_SYSCALL,
+
+    NETDATA_MOUNT_SYSCALLS_END
+};
+
 extern struct config mount_config;
 extern void *ebpf_mount_thread(void *ptr);
 extern netdata_ebpf_targets_t mount_targets[];
