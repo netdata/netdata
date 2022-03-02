@@ -215,6 +215,9 @@ else
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
     CPU_INFO_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n kern.smp.cpus)"
+  elif [ "${KERNEL_NAME}" = Darwin ]; then
+    CPU_INFO_SOURCE="sysctl"
+    LCPU_COUNT="$(sysctl -n hw.logicalcpu)"
   elif [ -d /sys/devices/system/cpu ]; then
     CPU_INFO_SOURCE="sysfs"
     # This is potentially more accurate than checking `/proc/cpuinfo`.
@@ -224,8 +227,14 @@ else
     LCPU_COUNT="$(grep -c ^processor /proc/cpuinfo)"
   fi
 
-  # If we have GNU uname, we can use that to get CPU info (probably).
-  if uname --version 2> /dev/null | grep -qF 'GNU coreutils'; then
+  if [ "${KERNEL_NAME}" = Darwin ]; then
+    CPU_MODEL="$(sysctl -n machdep.cpu.brand_string)"
+    if [ "${ARCHITECTURE}" = "x86_64" ]; then
+      CPU_VENDOR="$(sysctl -n machdep.cpu.vendor)"
+    else
+      CPU_VENDOR="Apple"
+    fi
+  elif uname --version 2> /dev/null | grep -qF 'GNU coreutils'; then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} uname"
     CPU_MODEL="$(uname -p)"
     CPU_VENDOR="$(uname -i)"
@@ -245,7 +254,9 @@ else
   fi
 fi
 
-if [ -r /sys/devices/system/cpu/cpu0/cpufreq/base_frequency ]; then
+if [ "${KERNEL_NAME}" = Darwin ] && [ "${ARCHITECTURE}" = "x86_64" ]; then
+  CPU_FREQ="$(sysctl -n hw.cpufrequency)"
+elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/base_frequency ]; then
   if (echo "${CPU_INFO_SOURCE}" | grep -qv sysfs); then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
   fi
