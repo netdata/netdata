@@ -1424,7 +1424,7 @@ while [ -n "${1}" ]; do
       optname="$(echo "${1}" | cut -d '-' -f 4-)"
       case "${optname}" in
         id|proxy|user|hostname)
-          NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname} ${2}"
+          NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=${2}"
           shift 1
           ;;
         verbose|insecure|noproxy|noreload|daemon-not-running)
