@@ -3,10 +3,12 @@
 #ifndef NETDATA_EBPF_H
 #define NETDATA_EBPF_H 1
 
-#include <linux/btf.h>
+#include <bpf/btf.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
-#include <bpf/btf.h>
+#ifdef LIBBPF_MAJOR_VERSION
+#include <linux/btf.h>
+#endif
 #include <stdlib.h> // Necessary for stdtoul
 
 #define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"

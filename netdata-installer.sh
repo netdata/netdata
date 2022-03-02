@@ -1034,6 +1034,13 @@ bundle_ebpf_co_re() {
     return 0
   fi
 
+  LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf.version)"
+  LIBBPF_EXPECTED_VERSION="$(cat packaging/current_libbpf.version)"
+
+  if [ "${LIBBPF_PACKAGE_VERSION}" != "${LIBBPF_EXPECTED_VERSION}" ]; then
+      return 0;
+  fi
+
   progress "eBPF CO-RE"
 
   CORE_PACKAGE_VERSION="$(cat packaging/ebpf-co-re.version)"
