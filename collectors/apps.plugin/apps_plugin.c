@@ -107,6 +107,25 @@ static int
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 
+// some variables for keeping track of processes count by states
+#define NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES 601
+typedef enum {
+    RUNNING = 0,
+    SLEEPING, // interruptible sleep
+    SLEEPING_D, // uninterruptible sleep
+    ZOMBIE,
+    STOPPED,
+} proc_state;
+
+static int proc_state_count[5];
+static const char* proc_states[] = {
+    [RUNNING] = "running",
+    [SLEEPING] = "sleeping(interruptible)",
+    [SLEEPING_D] = "sleeping(uninterruptible)",
+    [ZOMBIE] = "zombie",
+    [STOPPED] = "stopped",
+    };
+
 // ----------------------------------------------------------------------------
 // internal flags
 // handled in code (automatically set)
@@ -286,7 +305,7 @@ struct pid_stat {
 
     uint32_t log_thrown;
 
-    // char state;
+    char state;
     int32_t ppid;
     // int32_t pgrp;
     // int32_t session;
@@ -1234,6 +1253,28 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
 }
 #endif // !__FreeBSD__
 
+static void update_proc_state_count(char proc_state) {
+    switch (proc_state) {
+        case 'S':
+            proc_state_count[SLEEPING] += 1;
+            break;
+        case 'R':
+            proc_state_count[RUNNING] += 1;
+            break;
+        case 'D':
+            proc_state_count[SLEEPING_D] += 1;
+            break;
+        case 'Z':
+            proc_state_count[ZOMBIE] += 1;
+            break;
+        case 'T':
+            proc_state_count[STOPPED] += 1;
+            break;
+        default:
+            break;
+    }
+}
+
 static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->status_vmsize           = 0;
     p->status_vmrss            = 0;
@@ -1267,6 +1308,7 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
         arl_expect_custom(p->status_arl, "RssShmem", arl_callback_status_rssshmem, &arl_ptr);
         arl_expect_custom(p->status_arl, "VmSwap", arl_callback_status_vmswap, &arl_ptr);
     }
+
 
     if(unlikely(!p->status_filename)) {
         char filename[FILENAME_MAX + 1];
@@ -1345,16 +1387,18 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 #ifdef __FreeBSD__
     char *comm          = proc_info->ki_comm;
     p->ppid             = proc_info->ki_ppid;
+    //TODO: get state for FreeBSD??
 #else
     // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
     char *comm          = procfile_lineword(ff, 0, 1);
-    // p->state         = *(procfile_lineword(ff, 0, 2));
+    p->state            = *(procfile_lineword(ff, 0, 2));
     p->ppid             = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
     // p->pgrp          = (int32_t)str2pid_t(procfile_lineword(ff, 0, 4));
     // p->session       = (int32_t)str2pid_t(procfile_lineword(ff, 0, 5));
     // p->tty_nr        = (int32_t)str2pid_t(procfile_lineword(ff, 0, 6));
     // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
+    update_proc_state_count(p->state);
 #endif
 
     if(strcmp(p->comm, comm) != 0) {
@@ -2533,6 +2577,11 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 
 static int collect_data_for_all_processes(void) {
     struct pid_stat *p = NULL;
+    
+    // clear process state counter
+    for (proc_state i = RUNNING; i <= STOPPED; i++) {
+        proc_state_count[i] = 0;
+    }
 
 #ifdef __FreeBSD__
     int i, procnum;
@@ -2608,8 +2657,9 @@ static int collect_data_for_all_processes(void) {
             // we forward read all running processes
             // collect_data_for_pid() is smart enough,
             // not to read the same pid twice per iteration
-            for(slc = 0; slc < all_pids_count; slc++)
+            for(slc = 0; slc < all_pids_count; slc++) {
                 collect_data_for_pid(all_pids_sortlist[slc], NULL);
+            }
         }
 #endif
     }
@@ -2666,7 +2716,6 @@ static int collect_data_for_all_processes(void) {
     // we do this by collecting the ownership of process
     // if we manage to get the ownership, the process still runs
     process_exited_processes();
-
     return 1;
 }
 
@@ -3607,6 +3656,13 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         }
         send_END();
     }
+
+    // send process state count
+    send_BEGIN("system", "process_states", dt);
+    for (proc_state i = RUNNING; i <= STOPPED; i++) {
+      send_SET(proc_states[i], proc_state_count[i]);
+    }
+    send_END();
 }
 
 
@@ -3640,7 +3696,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
                 debug_log_int("%s just added - regenerating charts.", w->name);
         }
     }
- 
+
     // nothing more to show
     if(!newly_added && show_guest_time == show_guest_time_old) return;
 
@@ -3804,8 +3860,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
     }
-}
 
+    // create chart for count of processes in different states
+    fprintf(
+        stdout, "CHART system.process_states '' '%s Process States' 'numbers' processes system.process_states line %d %d\n", title, NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES, update_every);
+    for (proc_state i = RUNNING; i <= STOPPED; i++) {
+        fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", proc_states[i]);
+    }
+}
 
 // ----------------------------------------------------------------------------
 // parse command line arguments

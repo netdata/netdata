@@ -1218,6 +1218,13 @@ netdataDashboard.context = {
         '<b>Blocked</b> - currently blocked, waiting for I/O to complete.</p>'
     },
 
+    'system.process_states': {
+        info: '<p>System processes in different states (chart provided by apps.plugin) </p> '+
+        '<p><b>running</b> - Running processes. <b>zombie</b> - Zombie. <b>stopped</b> - Stopped (on a signal). </p>' +
+        '<p><b>sleeping(interruptible)</b> - Sleeping in an interruptible wait. '+
+        '<b>sleeping(uninterruptible)</b> - Waiting in uninterruptible disk sleep. </p>'
+    },
+
     'system.active_processes': {
         info: 'The total number of processes in the system.'
     },
