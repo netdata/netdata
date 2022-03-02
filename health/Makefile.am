@@ -65,6 +65,7 @@ dist_healthconfig_DATA = \
     health.d/mysql.conf \
     health.d/net.conf \
     health.d/netfilter.conf \
+    health.d/nut.conf \
     health.d/pihole.conf \
     health.d/portcheck.conf \
     health.d/processes.conf \
