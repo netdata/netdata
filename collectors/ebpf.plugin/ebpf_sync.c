@@ -44,14 +44,23 @@ struct config sync_config = { .first_section = NULL,
         .rwlock = AVL_LOCK_INITIALIZER } };
 
 ebpf_sync_syscalls_t local_syscalls[] = {
-    {.syscall = "sync", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = "syncfs", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = "msync", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = "fsync", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = "fdatasync", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = "sync_file_range", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = NETDATA_SYSCALLS_SYNCFS, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = NETDATA_SYSCALLS_MSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = NETDATA_SYSCALLS_FSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = NETDATA_SYSCALLS_FDATASYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
     {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL}
 };
+
+netdata_ebpf_targets_t sync_targets[] = { {.name = NETDATA_SYSCALLS_SYNC, .mode = EBPF_LOAD_TRAMPOLINE},
+                                          {.name = NETDATA_SYSCALLS_SYNCFS, .mode = EBPF_LOAD_TRAMPOLINE},
+                                          {.name = NETDATA_SYSCALLS_MSYNC, .mode = EBPF_LOAD_TRAMPOLINE},
+                                          {.name = NETDATA_SYSCALLS_FSYNC, .mode = EBPF_LOAD_TRAMPOLINE},
+                                          {.name = NETDATA_SYSCALLS_FDATASYNC, .mode = EBPF_LOAD_TRAMPOLINE},
+                                          {.name = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .mode = EBPF_LOAD_TRAMPOLINE},
+                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
 
 #ifdef LIBBPF_MAJOR_VERSION
 /**

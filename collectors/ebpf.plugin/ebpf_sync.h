@@ -17,6 +17,13 @@
 #define NETDATA_EBPF_FILE_SEGMENT_CHART "file_segment"
 #define NETDATA_EBPF_SYNC_SUBMENU "synchronization (eBPF)"
 
+#define NETDATA_SYSCALLS_SYNC   "sync"
+#define NETDATA_SYSCALLS_SYNCFS "syncfs"
+#define NETDATA_SYSCALLS_MSYNC  "msync"
+#define NETDATA_SYSCALLS_FSYNC  "fsync"
+#define NETDATA_SYSCALLS_FDATASYNC  "fdatasync"
+#define NETDATA_SYSCALLS_SYNC_FILE_RANGE  "sync_file_range"
+
 #define NETDATA_EBPF_SYNC_SLEEP_MS 800000ULL
 
 // configuration file
@@ -64,5 +71,6 @@ enum netdata_sync_table {
 
 extern void *ebpf_sync_thread(void *ptr);
 extern struct config sync_config;
+extern netdata_ebpf_targets_t sync_targets[];
 
 #endif /* NETDATA_EBPF_SYNC_H */

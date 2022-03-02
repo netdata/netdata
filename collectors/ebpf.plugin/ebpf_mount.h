@@ -32,5 +32,6 @@ enum mount_tables {
 
 extern struct config mount_config;
 extern void *ebpf_mount_thread(void *ptr);
+extern netdata_ebpf_targets_t mount_targets[];
 
 #endif /* NETDATA_EBPF_MOUNT_H */

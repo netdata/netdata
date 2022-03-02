@@ -41,6 +41,12 @@ static struct bpf_object *objects = NULL;
 struct netdata_static_thread shm_threads = {"SHM KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
 
+netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "shmat", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "shmdt", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "shmctl", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/shm.skel.h"
 

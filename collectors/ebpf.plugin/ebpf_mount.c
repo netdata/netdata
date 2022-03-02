@@ -30,6 +30,10 @@ struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
                                               NULL, NULL, 1, NULL,
                                               NULL,  NULL};
 
+netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
+                                           {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},
+                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/mount.skel.h" // BTF code
 
