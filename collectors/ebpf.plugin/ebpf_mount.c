@@ -219,6 +219,30 @@ static void ebpf_create_mount_charts(int update_every)
  *
  *****************************************************************/
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_mount_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    if (em->load == EBPF_LOAD_LEGACY) {
+        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
+        if (!probe_links) {
+            em->enabled = CONFIG_BOOLEAN_NO;
+            ret = -1;
+        }
+    }
+
+    if (ret)
+        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+
+    return ret;
+}
+
 /**
  * Mount thread
  *
@@ -238,8 +262,10 @@ void *ebpf_mount_thread(void *ptr)
     if (!em->enabled)
         goto endmount;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
+    if (ebpf_mount_load_bpf(em)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endmount;
     }

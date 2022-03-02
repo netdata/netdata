@@ -19,7 +19,7 @@
 #define NETDATA_SYNC_CONFIG_FILE "sync.conf"
 #define NETDATA_SYNC_CONFIG_NAME "syscalls"
 
-enum sync_syscalls_index {
+typedef enum sync_syscalls_index {
     NETDATA_SYNC_SYNC_IDX,
     NETDATA_SYNC_SYNCFS_IDX,
     NETDATA_SYNC_MSYNC_IDX,
@@ -28,7 +28,7 @@ enum sync_syscalls_index {
     NETDATA_SYNC_SYNC_FILE_RANGE_IDX,
 
     NETDATA_SYNC_IDX_END
-};
+} sync_syscalls_index_t;
 
 typedef struct ebpf_sync_syscalls {
     char *syscall;

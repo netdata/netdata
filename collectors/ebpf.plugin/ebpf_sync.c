@@ -59,6 +59,29 @@ ebpf_sync_syscalls_t local_syscalls[] = {
  *
  *****************************************************************/
 
+/**
+ * Load Legacy
+ *
+ * Load legacy code.
+ *
+ * @param w   is the sync output structure with pointers to objects loaded.
+ * @param em  is structure with configuration
+ *
+ * @return 0 on success and -1 otherwise.
+ */
+static int ebpf_sync_load_legacy(ebpf_sync_syscalls_t *w, ebpf_module_t *em)
+{
+    em->thread_name = w->syscall;
+    if (!w->probe_links) {
+        w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
+        if (!w->probe_links) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 /*
  * Initialize Syscalls
  *
@@ -70,9 +93,17 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 {
     int i;
     const char *saved_name = em->thread_name;
+    sync_syscalls_index_t errors = 0;
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
-        if (!w->probe_links && w->enabled) {
+        if (w->enabled) {
+            if (em->load == EBPF_LOAD_LEGACY) {
+                if (ebpf_sync_load_legacy(w, em))
+                    errors++;
+
+                em->thread_name = saved_name;
+            }
+
             em->thread_name = w->syscall;
             w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
             if (!w->probe_links) {
@@ -386,6 +417,9 @@ void *ebpf_sync_thread(void *ptr)
     if (!em->enabled)
         goto endsync;
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
     if (ebpf_sync_initialize_syscall(em)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endsync;
