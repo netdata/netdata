@@ -544,7 +544,7 @@ trap quit_msg EXIT
 
 # shellcheck source=/dev/null
 # shellcheck disable=SC1090
-. "${INSTALL_PREFIX}${ENVIRONMENT_FILE}" || exit 1
+. "${ENVIRONMENT_FILE}" || exit 1
 
 #### STOP NETDATA
 echo >&2 "Stopping a possibly running netdata..."

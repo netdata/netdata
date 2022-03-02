@@ -632,7 +632,7 @@ stop_all_netdata() {
     fi
   fi
 
-  if [ -n "$(netdata_pids)" ] && [ -n "$(type netdatacli)" ]; then
+  if [ -n "$(netdata_pids)" ] && [ -n "$(command -v netdatacli)" ]; then
     netdatacli shutdown-agent
     sleep 20
   fi
