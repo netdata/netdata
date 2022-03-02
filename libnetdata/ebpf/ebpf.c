@@ -1119,6 +1119,26 @@ int ebpf_disable_tracing_values(char *subsys, char *eventname)
 }
 
 /**
+ * Select PC prefix
+ *
+ * Identify the prefix to run on PC architecture.
+ *
+ * @return It returns 32 or 64 according to host arch.
+ */
+static uint32_t ebpf_select_pc_prefix()
+{
+    long counter = 1;
+    uint32_t i;
+    for (i = 0; i < 128; i++) {
+        counter <<= 1;
+        if (counter < 0)
+            break;
+    }
+
+    return counter;
+}
+
+/**
  * Select Host Prefix
  *
  * Select prefix to syscall when host is running a kernel newer than 4.17.0
@@ -1132,6 +1152,10 @@ void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kve
 {
     if (kver < NETDATA_EBPF_KERNEL_4_17)
         snprintfz(output, length, "sys_%s", syscall);
-    else
-        snprintfz(output, length, "__x64_sys_%s", syscall);
+    else {
+        uint32_t arch = ebpf_select_pc_prefix();
+        // Prefix selected according https://www.kernel.org/doc/html/latest/process/adding-syscalls.html
+        char *prefix = (arch == 32) ? "__ia32" : "__x64";
+        snprintfz(output, length, "%s_sys_%s", prefix, syscall);
+    }
 }
