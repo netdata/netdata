@@ -662,7 +662,9 @@ static int health_readfile(const char *filename, void *data) {
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if(rc) {
-                if(ignore_this || !alert_hash_and_store_config(rc->config_hash_id, alert_cfg) || !rrdcalc_add_alarm_from_config(host, rc)) {
+                if (host == localhost)
+                    alert_hash_and_store_config(rc->config_hash_id, alert_cfg);
+                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
                     alert_config_free(alert_cfg);
                 }
@@ -670,7 +672,9 @@ static int health_readfile(const char *filename, void *data) {
             }
 
             if(rt) {
-                if (ignore_this || !alert_hash_and_store_config(rt->config_hash_id, alert_cfg) || !rrdcalctemplate_add_template_from_config(host, rt)) {
+                if (host == localhost)
+                    alert_hash_and_store_config(rt->config_hash_id, alert_cfg);
+                if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
                     rrdcalctemplate_free(rt);
                     alert_config_free(alert_cfg);
                 }
@@ -701,7 +705,9 @@ static int health_readfile(const char *filename, void *data) {
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
 //                health_add_alarms_loop(host, rc, ignore_this) ;
-                if(ignore_this || !alert_hash_and_store_config(rc->config_hash_id, alert_cfg) || !rrdcalc_add_alarm_from_config(host, rc)) {
+                if (host == localhost)
+                    alert_hash_and_store_config(rc->config_hash_id, alert_cfg);
+                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
                     alert_config_free(alert_cfg);
                 }
@@ -710,7 +716,9 @@ static int health_readfile(const char *filename, void *data) {
             }
 
             if(rt) {
-                if(ignore_this || !alert_hash_and_store_config(rt->config_hash_id, alert_cfg) || !rrdcalctemplate_add_template_from_config(host, rt)) {
+                if (host == localhost)
+                    alert_hash_and_store_config(rt->config_hash_id, alert_cfg);
+                if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
                     rrdcalctemplate_free(rt);
                     alert_config_free(alert_cfg);
                 }
@@ -1225,13 +1233,17 @@ static int health_readfile(const char *filename, void *data) {
 
     if(rc) {
         //health_add_alarms_loop(host, rc, ignore_this) ;
-        if(ignore_this || !alert_hash_and_store_config(rc->config_hash_id, alert_cfg) || !rrdcalc_add_alarm_from_config(host, rc)) {
+        if (host == localhost)
+            alert_hash_and_store_config(rc->config_hash_id, alert_cfg);
+        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
             rrdcalc_free(rc);
         }
     }
 
     if(rt) {
-        if(ignore_this || !alert_hash_and_store_config(rt->config_hash_id, alert_cfg) || !rrdcalctemplate_add_template_from_config(host, rt)) {
+        if (host == localhost)
+            alert_hash_and_store_config(rt->config_hash_id, alert_cfg);
+        if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
             rrdcalctemplate_free(rt);
         }
     }
