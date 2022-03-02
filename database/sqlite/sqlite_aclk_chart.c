@@ -1014,6 +1014,81 @@ void aclk_send_dimension_update(RRDDIM *rd)
     return;
 }
 
+#define SQL_SEQ_NULL(result, n)  sqlite3_column_type(result, n) == SQLITE_NULL ? 0 : sqlite3_column_int64(result, n)
+
+struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(const char *host_id)
+{
+    struct aclk_chart_sync_stats *aclk_statistics = NULL;
+
+    aclk_statistics = callocz(1, sizeof(struct aclk_chart_sync_stats));
+
+    char host_uuid_fixed[GUID_LEN + 1];
+
+    strncpy(host_uuid_fixed, host_id, GUID_LEN);
+    host_uuid_fixed[GUID_LEN] = 0;
+
+    host_uuid_fixed[8] = '_';
+    host_uuid_fixed[13] = '_';
+    host_uuid_fixed[18] = '_';
+    host_uuid_fixed[23] = '_';
+
+    sqlite3_stmt *res = NULL;
+    BUFFER *sql = buffer_create(1024);
+    buffer_sprintf(sql, "SELECT min(sequence_id), max(sequence_id), 0 FROM aclk_chart_%s;", host_uuid_fixed);
+    buffer_sprintf(sql, "SELECT min(sequence_id), max(sequence_id), 0 FROM aclk_chart_%s WHERE date_submitted IS NULL;", host_uuid_fixed);
+    buffer_sprintf(sql, "SELECT min(sequence_id), max(sequence_id), 0 FROM aclk_chart_%s WHERE date_submitted IS NOT NULL;", host_uuid_fixed);
+    buffer_sprintf(sql, "SELECT min(sequence_id), max(sequence_id), 0 FROM aclk_chart_%s WHERE date_updated IS NOT NULL;", host_uuid_fixed);
+    buffer_sprintf(sql, "SELECT max(date_created), max(date_submitted), max(date_updated), 0 FROM aclk_chart_%s;", host_uuid_fixed);
+
+    int rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK)
+        goto failed;
+
+    rc = sqlite3_step(res);
+    if (rc == SQLITE_ROW) {
+        aclk_statistics->min_seqid = SQL_SEQ_NULL(res, 0);
+        aclk_statistics->max_seqid = SQL_SEQ_NULL(res, 1);
+    }
+
+    rc = sqlite3_step(res);
+    if (rc == SQLITE_ROW) {
+        aclk_statistics->min_seqid_pend = SQL_SEQ_NULL(res, 0);
+        aclk_statistics->max_seqid_pend = SQL_SEQ_NULL(res, 1);
+    }
+
+    rc = sqlite3_step(res);
+    if (rc == SQLITE_ROW) {
+        aclk_statistics->min_seqid_sent = SQL_SEQ_NULL(res, 0);
+        aclk_statistics->max_seqid_sent = SQL_SEQ_NULL(res, 1);
+    }
+
+    rc = sqlite3_step(res);
+    if (rc == SQLITE_ROW) {
+        aclk_statistics->min_seqid_ack = SQL_SEQ_NULL(res, 0);
+        aclk_statistics->max_seqid_ack = SQL_SEQ_NULL(res, 1);
+    }
+
+    rc = sqlite3_step(res);
+    if (rc == SQLITE_ROW) {
+        aclk_statistics->min_seqid_ack = SQL_SEQ_NULL(res, 0);
+        aclk_statistics->max_seqid_ack = SQL_SEQ_NULL(res, 1);
+    }
+
+    rc = sqlite3_step(res);
+    if (rc == SQLITE_ROW) {
+        aclk_statistics->max_date_created = (time_t) SQL_SEQ_NULL(res, 0);
+        aclk_statistics->max_date_submitted = (time_t) SQL_SEQ_NULL(res, 1);
+        aclk_statistics->max_date_ack = (time_t) SQL_SEQ_NULL(res, 2);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when fetching aclk sync statistics, rc = %d", rc);
+
+failed:
+    buffer_free(sql);
+    return aclk_statistics;
+}
 #endif //ENABLE_NEW_CLOUD_PROTOCOL
 
 // ST is read locked
@@ -1034,43 +1109,4 @@ int queue_chart_to_aclk(RRDSET *st)
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                        st, ACLK_DATABASE_ADD_CHART);
 #endif
-}
-
-int get_chart_sync_status(RRDHOST *host, struct chart_sync_status *status)
-{
-    int rc;
-    struct aclk_database_worker_config *wc  = NULL;
-    wc = (struct aclk_database_worker_config *)host->dbsync_worker;
-    if (!wc)
-        return 0;
-
-    status->updates = wc->chart_updates;
-    status->batch_id = wc->batch_id;
-
-    BUFFER *sql = buffer_create(1024);
-    sqlite3_stmt *res = NULL;
-
-    buffer_sprintf(sql, "SELECT MIN(sequence_id), MAX(sequence_id), " \
-                   "(select MAX(sequence_id) from aclk_alert_%s where date_submitted is not NULL) " \
-                   "FROM aclk_chart_%s where date_submitted is null;", wc->uuid_str, wc->uuid_str);
-
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to get alert log status from the database.");
-        buffer_free(sql);
-        return 0;
-    }
-
-    while (sqlite3_step(res) == SQLITE_ROW) {
-        status->pending_min_sequence_id = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0;
-        status->pending_max_sequence_id = sqlite3_column_bytes(res, 1) > 0 ? (uint64_t) sqlite3_column_int64(res, 1) : 0;
-        status->last_submitted_sequence_id = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0;
-    }
-
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement to get alert log status from the database, rc = %d", rc);
-
-    buffer_free(sql);
-    return 1;
 }
