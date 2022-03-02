@@ -1143,6 +1143,38 @@ static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
     );
 }
 
+static void fill_chart_status_for_host(BUFFER *wb, RRDHOST *host)
+{
+    struct aclk_chart_sync_stats *stats = aclk_get_chart_sync_stats(host);
+    if (!stats) {
+        buffer_strcat(wb, "\n\t\tFailed to get alert streaming status for this host");
+        return;
+    }
+    buffer_sprintf(wb,
+        "\n\t\tUpdates: %d"
+        "\n\t\tBatch ID: %"PRIu64
+        "\n\t\tMin Seq ID: %"PRIu64
+        "\n\t\tMax Seq ID: %"PRIu64
+        "\n\t\tPending Min Seq ID: %"PRIu64
+        "\n\t\tPending Max Seq ID: %"PRIu64
+        "\n\t\tSent Min Seq ID: %"PRIu64
+        "\n\t\tSent Max Seq ID: %"PRIu64
+        "\n\t\tAcked Min Seq ID: %"PRIu64
+        "\n\t\tAcked Max Seq ID: %"PRIu64,
+        stats->updates,
+        stats->batch_id,
+        stats->min_seqid,
+        stats->max_seqid,
+        stats->min_seqid_pend,
+        stats->max_seqid_pend,
+        stats->min_seqid_sent,
+        stats->max_seqid_sent,
+        stats->min_seqid_ack,
+        stats->max_seqid_ack
+    );
+    freez(stats);
+}
+
 char *ng_aclk_state(void)
 {
     BUFFER *wb = buffer_create(1024);
@@ -1202,6 +1234,9 @@ char *ng_aclk_state(void)
 
             buffer_strcat(wb, "\n\tAlert Streaming Status:");
             fill_alert_status_for_host(wb, host);
+
+            buffer_strcat(wb, "\n\tChart Streaming Status:");
+            fill_chart_status_for_host(wb, host);
         }
         rrd_unlock();
     }
