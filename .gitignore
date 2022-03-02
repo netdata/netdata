@@ -72,6 +72,7 @@ cgroup-network
 ebpf.plugin
 collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
+collectors/ebpf.plugin/includes/
 
 # protoc generated files
 *.pb.cc

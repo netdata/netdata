@@ -1025,6 +1025,57 @@ bundle_libbpf() {
 
 bundle_libbpf
 
+copy_co_re() {
+  cp -R "${1}/includes" "collectors/ebpf.plugin/"
+}
+
+bundle_ebpf_co_re() {
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+    return 0
+  fi
+
+  progress "eBPF CO-RE"
+
+  CORE_PACKAGE_VERSION="$(cat packaging/ebpf-co-re.version)"
+
+  tmp="$(mktemp -d -t netdata-ebpf-co-re-XXXXXX)"
+  CORE_PACKAGE_BASENAME="netdata-ebpf-co-re-glibc-${CORE_PACKAGE_VERSION}.tar.xz"
+
+  if fetch_and_verify "ebpf-co-re" \
+    "https://github.com/netdata/ebpf-co-re/releases/download/${CORE_PACKAGE_VERSION}/${CORE_PACKAGE_BASENAME}" \
+    "${CORE_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_CORE}"; then
+    if run tar --no-same-owner -xf "${tmp}/${CORE_PACKAGE_BASENAME}" -C "${tmp}" &&
+      copy_co_re "${tmp}" &&
+      rm -rf "${tmp}"; then
+      run_ok "libbpf built and prepared."
+    else
+      run_failed "Failed to get eBPF CO-RE files."
+      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to get CO-RE. You will not be able to use eBPF plugin."
+        NETDATA_DISABLE_EBPF=1
+        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for libbpf."
+    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for eBPF CO-RE. You will not be able to use eBPF plugin."
+      NETDATA_DISABLE_EBPF=1
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+    fi
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+bundle_ebpf_co_re
+
 # -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
 # dashboard during the install (updates don't work correctly otherwise).
