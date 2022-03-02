@@ -14,7 +14,7 @@ jobs:
           repo: netdata/test-automation
           ref: refs/heads/master
           workflow: regression.yml
-          token: ${{ secrets.TEST_AUTOMATION_TOKEN }}
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN  }}
           inputs: '{ "netdata_branch": "${{ github.event.pull_request.head.ref }}",
                "netdata_repo": "${{ github.event.pull_request.head.repo.full_name }}",
                "netdata_pr_number": "${{ github.event.number }}",
