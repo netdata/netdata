@@ -30,6 +30,26 @@ struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
                                               NULL, NULL, 1, NULL,
                                               NULL,  NULL};
 
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/mount.skel.h" // BTF code
+
+static struct mount_bpf *bpf_obj = NULL;
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_t *em)
+{
+    return 0;
+}
+#endif
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -236,6 +256,15 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
             ret = -1;
         }
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        bpf_obj = mount_bpf__open();
+        if (!bpf_obj)
+            ret = -1;
+        else
+            ret = ebpf_mount_load_and_attach(bpf_obj, em);
+    }
+#endif
 
     if (ret)
         error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);

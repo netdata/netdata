@@ -275,8 +275,11 @@ extern int ebpf_disable_tracing_values(char *subsys, char *eventname);
 #define EBPF_DEFAULT_ERROR_MSG "Cannot open or load BPF file for thread"
 
 // BTF helpers
+#define NETDATA_EBPF_MAX_SYSCALL_LENGTH 255
+
 extern netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(char *str);
 extern netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode_t lmode);
+extern void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kver);
 #ifdef LIBBPF_MAJOR_VERSION
 extern void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
 extern struct btf *ebpf_parse_btf_file(const char *filename);

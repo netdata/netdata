@@ -3,6 +3,10 @@
 #ifndef NETDATA_EBPF_SYNC_H
 #define NETDATA_EBPF_SYNC_H 1
 
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/sync.skel.h"
+#endif
+
 // Module name
 #define NETDATA_EBPF_MODULE_NAME_SYNC "sync"
 
@@ -35,8 +39,16 @@ typedef struct ebpf_sync_syscalls {
     int enabled;
     uint32_t flags;
 
+    // BTF structure
     struct bpf_object *objects;
     struct bpf_link **probe_links;
+
+    // BPF structure
+#ifdef LIBBPF_MAJOR_VERSION
+    struct sync_bpf *sync_obj;
+#else
+    void *sync_obj;
+#endif
 } ebpf_sync_syscalls_t;
 
 enum netdata_sync_charts {

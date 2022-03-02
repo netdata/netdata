@@ -1117,3 +1117,21 @@ int ebpf_disable_tracing_values(char *subsys, char *eventname)
 {
     return ebpf_change_tracing_values(subsys, eventname, "0");
 }
+
+/**
+ * Select Host Prefix
+ *
+ * Select prefix to syscall when host is running a kernel newer than 4.17.0
+ *
+ * @param output the vector to store data.
+ * @param length length of output vector.
+ * @param syscall the syscall that prefix will be attached;
+ * @param kver    the current kernel version in format MAJOR*65536 + MINOR*256 + PATCH
+ */
+void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kver)
+{
+    if (kver < NETDATA_EBPF_KERNEL_4_17)
+        snprintfz(output, length, "sys_%s", syscall);
+    else
+        snprintfz(output, length, "__x64_sys_%s", syscall);
+}

@@ -53,6 +53,26 @@ ebpf_sync_syscalls_t local_syscalls[] = {
     {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL}
 };
 
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj    is the main structure for bpf objects.
+ * @param em     the structure with configuration
+ * @param target the syscall that we are attaching a tracer.
+ * @param idx    the index for the main structure
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_sync_load_and_attach(struct sync_bpf *obj, ebpf_module_t *em, char *target,
+                                            sync_syscalls_index_t idx)
+{
+    return 0;
+}
+#endif
+
 /*****************************************************************
  *
  *  INITIALIZE THREAD
@@ -103,13 +123,23 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 
                 em->thread_name = saved_name;
             }
+#ifdef LIBBPF_MAJOR_VERSION
+            else {
+                char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH];
+                ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH, w->syscall, running_on_kernel);
+                w->sync_obj = sync_bpf__open();
+                if (!w->sync_obj) {
+                    errors++;
+                } else {
+                    if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
+                        if (ebpf_sync_load_legacy(w, em))
+                            errors++;
 
-            em->thread_name = w->syscall;
-            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
-            if (!w->probe_links) {
-                em->thread_name = saved_name;
-                return -1;
+                        em->thread_name = saved_name;
+                    }
+                }
             }
+#endif
         }
     }
     em->thread_name = saved_name;
