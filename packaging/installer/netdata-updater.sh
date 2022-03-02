@@ -73,6 +73,152 @@ if [ "${ENVIRONMENT_FILE}" = "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; th
   fi
 fi
 
+issystemd() {
+  # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
+  if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
+    return 1
+  fi
+
+  # if there is no systemctl command, it is not systemd
+  systemctl=$(command -v systemctl 2> /dev/null)
+  if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ]; then
+    return 1
+  fi
+
+  # if pid 1 is systemd, it is systemd
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0
+
+  # if systemd is not running, it is not systemd
+  pids=$(safe_pidof systemd 2> /dev/null)
+  [ -z "${pids}" ] && return 1
+
+  # check if the running systemd processes are not in our namespace
+  myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
+  for p in ${pids}; do
+    ns="$(readlink "/proc/${p}/ns/pid" 2> /dev/null)"
+
+    # if pid of systemd is in our namespace, it is systemd
+    [ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
+  done
+
+  # else, it is not systemd
+  return 1
+}
+
+_get_scheduler_type() {
+  if _get_intervaldir > /dev/null ; then
+    echo 'interval'
+  elif issystemd ; then
+    echo 'systemd'
+  elif [ -d /etc/cron.d ] ; then
+    echo 'crontab'
+  else
+    echo 'none'
+  fi
+}
+
+_get_intervaldir() {
+  if [ -d /etc/cron.daily ]; then
+    echo /etc/cron.daily
+  elif [ -d /etc/periodic/daily ]; then
+    echo /etc/periodic/daily
+  else
+    return 1
+  fi
+
+  return 0
+}
+
+enable_netdata_updater() {
+  updater_type="$(echo "${1}" | tr '[:upper:]' '[:lower:]')"
+  case "${updater_type}" in
+    systemd|interval|crontab)
+      updater_type="${1}"
+      ;;
+    "")
+      updater_type="$(_get_scheduler_type)"
+      ;;
+    *)
+      error "Unrecognized updater type ${updater_type} requested. Supported types are 'systemd', 'interval', and 'crontab'."
+      exit 1
+      ;;
+  esac
+
+  case "${updater_type}" in
+    "systemd")
+      if issystemd; then
+        systemctl enable netdata-updater.timer
+
+        info "Auto-updating has been ENABLED using a systemd timer unit.\n"
+        info "If the update process fails, the failure will be logged to the systemd journal just like a regular service failure."
+        info "Successful updates should produce empty logs."
+      else
+        error "Systemd-based auto-update scheduling requested, but this does not appear to be a systemd system."
+        error "Auto-updates have NOT been enabled."
+        return 1
+      fi
+      ;;
+    "interval")
+      if _get_intervaldir > /dev/null; then
+        ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "$(_get_intervaldir)/netdata-updater"
+
+        info "Auto-updating has been ENABLED through cron, updater script linked to $(_get_intervaldir)/netdata-updater\n"
+        info "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
+        info "Successful updates will not send an email."
+      else
+        error "Interval-based auto-update scheduling requested, but I could not find an interval scheduling directory."
+        error "Auto-updates have NOT been enabled."
+        return 1
+      fi
+      ;;
+    "crontab")
+      if [ -d "/etc/cron.d" ]; then
+        cat > "/etc/cron.d/netdata-updater" <<-EOF
+	2 57 * * * root ${NETDATA_PREFIX}/netdata-updater.sh
+	EOF
+
+        info "Auto-updating has been ENABLED through cron, using a crontab at /etc/cron.d/netdata-updater\n"
+        info "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
+        info "Successful updates will not send an email."
+      else
+        error "Crontab-based auto-update scheduling requested, but there is no '/etc/cron.d'."
+        error "Auto-updates have NOT been enabled."
+        return 1
+      fi
+      ;;
+    *)
+      error "Unable to determine what type of auto-update scheduling to use."
+      error "Auto-updates have NOT been enabled."
+      return 1
+  esac
+
+  return 0
+}
+
+disable_netdata_updater() {
+  if issystemd && ( systemctl list-units --full -all | grep -Fq "netdata-updater.timer" ) ; then
+    systemctl disable netdata-updater.timer
+  fi
+
+  if [ -d /etc/cron.daily ]; then
+    rm -f /etc/cron.daily/netdata-updater.sh
+    rm -f /etc/cron.daily/netdata-updater
+  fi
+
+  if [ -d /etc/periodic/daily ]; then
+    rm -f /etc/periodic/daily/netdata-updater.sh
+    rm -f /etc/periodic/daily/netdata-updater
+  fi
+
+  if [ -d /etc/cron.d ]; then
+    rm -f /etc/cron.d/netdata-updater
+  fi
+
+  info "Auto-updates have been DISABLED."
+
+  return 0
+}
+
 str_in_list() {
   printf "%s\n" "${2}" | tr ' ' "\n" | grep -qE "^${1}\$"
   return $?
@@ -574,6 +720,14 @@ ndtmpdir=
 
 trap cleanup EXIT
 
+# shellcheck source=/dev/null
+. "${ENVIRONMENT_FILE}" || exit 1
+
+if [ -f "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
+  # shellcheck source=/dev/null
+  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || exit 1
+fi
+
 while [ -n "${1}" ]; do
   if [ "${1}" = "--not-running-from-cron" ]; then
     NETDATA_NOT_RUNNING_FROM_CRON=1
@@ -584,6 +738,12 @@ while [ -n "${1}" ]; do
   elif [ "${1}" = "--tmpdir-path" ]; then
     NETDATA_TMPDIR_PATH="${2}"
     shift 2
+  elif [ "${1}" = "--enable-auto-updates" ]; then
+    enable_netdata_updater "${2}"
+    exit $?
+  elif [ "${1}" = "--disable-auto-updates" ]; then
+    disable_netdata_updater
+    exit $?
   else
     break
   fi
@@ -599,14 +759,6 @@ if [ ! -t 1 ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ]; then
               printf("%d\n", 3600 * rand())
       }')"
     sleep $(((rnd % 3600) + 1))
-fi
-
-# shellcheck source=/dev/null
-. "${ENVIRONMENT_FILE}" || exit 1
-
-if [ -f "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
-  # shellcheck source=/dev/null
-  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || exit 1
 fi
 
 # We dont expect to find lib dir variable on older installations, so load this path if none found
@@ -653,7 +805,7 @@ case "${INSTALL_TYPE}" in
       update_legacy
       ;;
     custom)
-      # At this point, we _should_ have a valid `.environment` file, but it0s best to just check.
+      # At this point, we _should_ have a valid `.environment` file, but it's best to just check.
       # If we do, then behave like the legacy updater.
       if [ -n "${RELEASE_CHANNEL}" ] && [ -n "${NETDATA_PREFIX}" ] && [ -n "${REINSTALL_OPTIONS}" ]; then
         update_legacy
