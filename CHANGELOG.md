@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Timex: make offset rrd independently configurable [\#12281](https://github.com/netdata/netdata/pull/12281) ([d--j](https://github.com/d--j))
+- add host labels \_aclk\_ng\_new\_cloud\_protocol [\#12278](https://github.com/netdata/netdata/pull/12278) ([underhood](https://github.com/underhood))
+- Use the new error mechanism in case host not found [\#12277](https://github.com/netdata/netdata/pull/12277) ([underhood](https://github.com/underhood))
+- Fixed typos in docs/Running-behind-haproxy.md [\#12272](https://github.com/netdata/netdata/pull/12272) ([RatishT](https://github.com/RatishT))
 - Null terminate decoded\_query\_string if there are no url parameters. [\#12266](https://github.com/netdata/netdata/pull/12266) ([MrZammler](https://github.com/MrZammler))
 - delete package.json [\#12265](https://github.com/netdata/netdata/pull/12265) ([ilyam8](https://github.com/ilyam8))
 - Docs: Fix typo in step-10.md [\#12263](https://github.com/netdata/netdata/pull/12263) ([tnagorran](https://github.com/tnagorran))
@@ -27,6 +31,7 @@
 - Fix `hpssa` parse error [\#12206](https://github.com/netdata/netdata/pull/12206) ([wooyey](https://github.com/wooyey))
 - Improve cleaning up of orphan hosts [\#12201](https://github.com/netdata/netdata/pull/12201) ([stelfrag](https://github.com/stelfrag))
 - Store dimension hidden option in the metadata db [\#12196](https://github.com/netdata/netdata/pull/12196) ([stelfrag](https://github.com/stelfrag))
+- make netdata-uninstaller.sh POSIX compatibility and add --uninstall flag… [\#12195](https://github.com/netdata/netdata/pull/12195) ([maneamarius](https://github.com/maneamarius))
 - docs: document the issue with seccomp and claiming [\#12192](https://github.com/netdata/netdata/pull/12192) ([ilyam8](https://github.com/ilyam8))
 - fix\(docs\): unresolved file references [\#12191](https://github.com/netdata/netdata/pull/12191) ([ilyam8](https://github.com/ilyam8))
 - Update libs code [\#12190](https://github.com/netdata/netdata/pull/12190) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -62,6 +67,7 @@
 - Remove SIZEOF\_VOIDP and ENVIRONMENT{32,64} macros. [\#12046](https://github.com/netdata/netdata/pull/12046) ([vkalintiris](https://github.com/vkalintiris))
 - Remove unused NETDATA\_NO\_ATOMIC\_INSTRUCTIONS macro [\#12045](https://github.com/netdata/netdata/pull/12045) ([vkalintiris](https://github.com/vkalintiris))
 - Remove NETDATA\_WITH\_UUID def because it's not used anywhere. [\#12044](https://github.com/netdata/netdata/pull/12044) ([vkalintiris](https://github.com/vkalintiris))
+- inform cloud about inability to satisfy request [\#12041](https://github.com/netdata/netdata/pull/12041) ([underhood](https://github.com/underhood))
 - adds install method to /api/v1/info as label [\#12040](https://github.com/netdata/netdata/pull/12040) ([underhood](https://github.com/underhood))
 - Adds all query types to aclk\_processed\_query\_type [\#12036](https://github.com/netdata/netdata/pull/12036) ([underhood](https://github.com/underhood))
 - Create a removed alert event if chart goes obsolete [\#12021](https://github.com/netdata/netdata/pull/12021) ([MrZammler](https://github.com/MrZammler))
@@ -346,14 +352,6 @@
 - eBPF cgroup integration [\#11642](https://github.com/netdata/netdata/pull/11642) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add Fedora 35 to CI. [\#11641](https://github.com/netdata/netdata/pull/11641) ([Ferroin](https://github.com/Ferroin))
 - various fixes and updates for dashboard info [\#11639](https://github.com/netdata/netdata/pull/11639) ([ilyam8](https://github.com/ilyam8))
-- Fix an overflow when unsigned integer subtracted [\#11638](https://github.com/netdata/netdata/pull/11638) ([vlvkobal](https://github.com/vlvkobal))
-- add note for the new release of charts on the cloud [\#11637](https://github.com/netdata/netdata/pull/11637) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- add timex.plugin charts info [\#11635](https://github.com/netdata/netdata/pull/11635) ([ilyam8](https://github.com/ilyam8))
-- Add protobuf to `-W buildinfo` output. [\#11634](https://github.com/netdata/netdata/pull/11634) ([Ferroin](https://github.com/Ferroin))
-- Revert "Update alarms info" [\#11633](https://github.com/netdata/netdata/pull/11633) ([ilyam8](https://github.com/ilyam8))
-- Fix nfsd RPC metrics and remove unused nfsd charts and metrics [\#11632](https://github.com/netdata/netdata/pull/11632) ([vlvkobal](https://github.com/vlvkobal))
-- add proc zfs charts info [\#11630](https://github.com/netdata/netdata/pull/11630) ([ilyam8](https://github.com/ilyam8))
-- Update dashboard to version v2.20.7. [\#11629](https://github.com/netdata/netdata/pull/11629) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
