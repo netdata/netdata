@@ -1,0 +1,24 @@
+name: Trigger Cloud Regression E2E Tests
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  trigger_cloud_regression_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Cloud Regression
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          repo: netdata/test-automation
+          ref: refs/heads/master
+          workflow: regression.yml
+          token: ${{ secrets.TEST_AUTOMATION_TOKEN }}
+          inputs: '{ "netdata_branch": "${{ github.event.pull_request.head.ref }}",
+               "netdata_repo": "${{ github.event.pull_request.head.repo.full_name }}",
+               "netdata_pr_number": "${{ github.event.number }}",
+               "netdata_branch_commit_hash": "${{ github.event.pull_request.head.sha }}",
+               "custom_netdata_image": "true"
+               }'
+          wait-for-completion: false
