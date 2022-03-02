@@ -153,7 +153,6 @@ if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
 else
   # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
   if [ -e "/host/etc/os-release" ]; then
-    OS_DETECTION="/etc/os-release"
     eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" < /host/etc/os-release | sed 's/^/HOST_/')"
     HOST_OS_DETECTION="/host/etc/os-release"
   fi
