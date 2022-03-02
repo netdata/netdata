@@ -915,7 +915,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     struct aclk_database_worker_config *wc  = NULL;
     wc = (struct aclk_database_worker_config *)host->dbsync_worker;
     if (!wc)
-        return 0;
+        return 1;
 
     proto_alert_status->alert_updates = wc->alert_updates;
     proto_alert_status->alerts_batch_id = wc->alerts_batch_id;
@@ -932,7 +932,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to get alert log status from the database.");
         buffer_free(sql);
-        return 0;
+        return 1;
     }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
@@ -947,5 +947,5 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
         error_report("Failed to finalize statement to get alert log status from the database, rc = %d", rc);
 
     buffer_free(sql);
-    return 1;
+    return 0;
 }

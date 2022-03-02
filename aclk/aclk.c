@@ -1123,7 +1123,7 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
 static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
 {
     struct proto_alert_status status;
-    if (!get_proto_alert_status(host, &status)) {
+    if (get_proto_alert_status(host, &status)) {
         buffer_strcat(wb, "\nFailed to get alert streaming status for this host");
         return;
     }
@@ -1249,7 +1249,7 @@ char *ng_aclk_state(void)
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
     struct proto_alert_status status;
-    if (!get_proto_alert_status(host, &status))
+    if (get_proto_alert_status(host, &status))
         return;
 
     json_object *tmp = json_object_new_int(status.alert_updates);
