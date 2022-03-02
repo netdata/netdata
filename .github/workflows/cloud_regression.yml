@@ -1,9 +1,9 @@
 name: Trigger Cloud Regression E2E Tests
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 jobs:
   trigger_cloud_regression_tests:
     runs-on: ubuntu-latest
