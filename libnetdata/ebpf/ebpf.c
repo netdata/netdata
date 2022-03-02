@@ -789,6 +789,23 @@ void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file)
         mod->load = EBPF_LOAD_CORE;
     }
 }
+
+/**
+ *
+ * @param filename
+ * @return
+ */
+struct btf *ebpf_parse_btf_file(const char *filename)
+{
+    struct btf *bf = btf__parse(filename, NULL);
+    if (libbpf_get_error(bf)) {
+        fprintf(stderr, "Cannot parse btf file");
+        btf__free(bf);
+        return NULL;
+    }
+
+    return bf;
+}
 #endif
 
 /**

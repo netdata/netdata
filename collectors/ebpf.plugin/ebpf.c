@@ -181,6 +181,11 @@ ebpf_network_viewer_options_t network_viewer_opt;
 ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .threads = 0, .tracepoints = 0,
                                          .probes = 0, .retprobes = 0, .trampolines = 0};
 
+#ifdef LIBBPF_MAJOR_VERSION
+struct btf *default_btf = NULL;
+#endif
+char *btf_path = NULL;
+
 /*****************************************************************
  *
  *  FUNCTIONS USED TO CLEAN MEMORY AND OPERATE SYSTEM FILES
@@ -289,6 +294,11 @@ static void ebpf_exit(int sig)
         exit(0);
     }
      */
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (default_btf)
+        btf__free(default_btf);
+#endif
 
     exit(sig);
 }
@@ -1116,6 +1126,47 @@ static void ebpf_update_table_size()
     }
 }
 
+/**
+ * Set Load mode
+ *
+ * @param load  default load mode.
+ */
+static inline void ebpf_set_load_mode(netdata_ebpf_load_mode_t load)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    if (load == EBPF_LOAD_CORE || load == EBPF_LOAD_PLAY_DICE) {
+        char path[PATH_MAX + 1];
+        snprintfz(path, PATH_MAX, "%s/%s", btf_path, EBPF_DEFAULT_BTF_FILE);
+
+        default_btf = ebpf_parse_btf_file(path);
+        if (load == EBPF_LOAD_PLAY_DICE && !default_btf)
+            error("Your environment does not have BTF file %s. The plugin will work with 'legacy' code.",
+                  path);
+
+        load = (!default_btf) ? EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
+    }
+#else
+    load = EBPF_LOAD_LEGACY;
+#endif
+
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        // TO DO: Use `load` variable after we change all threads.
+        ebpf_modules[i].load = EBPF_LOAD_LEGACY; // load ;
+    }
+}
+
+/**
+ *  Update mode
+ *
+ *  @param str value read from configuration file.
+ */
+static inline void epbf_update_load_mode(char *str)
+{
+    netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(str);
+
+    ebpf_set_load_mode(load);
+}
 
 /**
  * Read collector values
@@ -1136,6 +1187,13 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups, int u
                               EBPF_CFG_LOAD_MODE_DEFAULT);
 
     how_to_load(value);
+
+    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, EBPF_CFG_DEFAULT_PROGRAM);
+
+    epbf_update_load_mode(value);
+
+    btf_path = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PROGRAM_PATH,
+                             EBPF_DEFAULT_BTF_FILE);
 
     ebpf_update_interval(update_every);
 
@@ -1369,19 +1427,6 @@ static inline void ebpf_load_thread_config()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_update_module(&ebpf_modules[i]);
-    }
-}
-
-/**
- * Set Load mode
- *
- * @param load  default load mode.
- */
-static inline void ebpf_set_load_mode(netdata_ebpf_load_mode_t load)
-{
-    int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_modules[i].load = load;
     }
 }
 
@@ -1841,6 +1886,10 @@ int main(int argc, char **argv)
     }
 
     ebpf_allocate_common_vectors();
+
+#ifdef LIBBPF_MAJOR_VERSION
+    libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+#endif
 
     read_local_addresses();
     read_local_ports("/proc/net/tcp", IPPROTO_TCP);
