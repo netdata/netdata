@@ -234,6 +234,7 @@ else
     else
       CPU_VENDOR="Apple"
     fi
+    echo "${CPU_INFO_SOURCE}" | grep -qv sysctl && CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
   elif uname --version 2> /dev/null | grep -qF 'GNU coreutils'; then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} uname"
     CPU_MODEL="$(uname -p)"
