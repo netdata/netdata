@@ -3,8 +3,10 @@
 #ifndef NETDATA_EBPF_H
 #define NETDATA_EBPF_H 1
 
+#include <linux/btf.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
+#include <bpf/btf.h>
 #include <stdlib.h> // Necessary for stdtoul
 
 #define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
@@ -16,6 +18,16 @@
 #define EBPF_CFG_LOAD_MODE_DEFAULT "entry"
 #define EBPF_CFG_LOAD_MODE_RETURN "return"
 #define EBPF_MAX_MODE_LENGTH 6
+
+#define EBPF_CFG_TYPE_FORMAT "ebpf type format"
+#define EBPF_CFG_DEFAULT_PROGRAM "auto"
+#define EBPF_CFG_CORE_PROGRAM "CO-RE"
+#define EBPF_CFG_LEGACY_PROGRAM "legacy"
+
+#define EBPF_CFG_CORE_ATTACH "ebpf co-re tracing"
+#define EBPF_CFG_ATTACH_TRAMPOLINE "trampoline"
+#define EBPF_CFG_ATTACH_TRACEPOINT "tracepoint"
+#define EBPF_CFG_ATTACH_PROBE "probe"
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
 #define EBPF_CFG_PID_SIZE "pid table size"
@@ -253,5 +265,10 @@ extern void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
 extern int ebpf_is_tracepoint_enabled(char *subsys, char *eventname);
 extern int ebpf_enable_tracing_values(char *subsys, char *eventname);
 extern int ebpf_disable_tracing_values(char *subsys, char *eventname);
+
+// BTF helpers
+#ifdef LIBBPF_MAJOR_VERSION
+void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
+#endif
 
 #endif /* NETDATA_EBPF_H */
