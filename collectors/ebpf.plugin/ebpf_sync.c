@@ -430,6 +430,10 @@ void ebpf_sync_cleanup_objects()
             }
             bpf_object__close(w->objects);
         }
+#ifdef LIBBPF_MAJOR_VERSION
+        else if (w->sync_obj)
+            sync_bpf__destroy(w->sync_obj);
+#endif
     }
 }
 

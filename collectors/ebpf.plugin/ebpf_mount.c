@@ -249,6 +249,11 @@ static void ebpf_mount_cleanup(void *ptr)
         }
         bpf_object__close(objects);
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else if (bpf_obj)
+        mount_bpf__destroy(bpf_obj);
+#endif
+
 }
 
 /*****************************************************************
