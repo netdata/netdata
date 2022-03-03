@@ -1135,14 +1135,6 @@ static inline void ebpf_set_load_mode(netdata_ebpf_load_mode_t load)
 {
 #ifdef LIBBPF_MAJOR_VERSION
     if (load == EBPF_LOAD_CORE || load == EBPF_LOAD_PLAY_DICE) {
-        char path[PATH_MAX + 1];
-        snprintfz(path, PATH_MAX, "%s/%s", btf_path, EBPF_DEFAULT_BTF_FILE);
-
-        default_btf = ebpf_parse_btf_file(path);
-        if (load == EBPF_LOAD_PLAY_DICE && !default_btf)
-            error("Your environment does not have BTF file %s. The plugin will work with 'legacy' code.",
-                  path);
-
         load = (!default_btf) ? EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
     }
 #else
@@ -1169,6 +1161,23 @@ static inline void epbf_update_load_mode(char *str)
 }
 
 /**
+ * Set default btf file
+ *
+ * Load the default BTF file on environment.
+ */
+static void ebpf_set_default_btf_file()
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    char path[PATH_MAX + 1];
+    snprintfz(path, PATH_MAX, "%s/vmlinux", btf_path);
+    default_btf = ebpf_parse_btf_file(path);
+#endif
+    if (!default_btf)
+        info("Your environment does not have BTF file %s. The plugin will work with 'legacy' code.",
+             path);
+}
+
+/**
  * Read collector values
  *
  * @param disable_apps    variable to store information related to apps.
@@ -1188,12 +1197,14 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups, int u
 
     how_to_load(value);
 
+    btf_path = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PROGRAM_PATH,
+                             EBPF_DEFAULT_BTF_FILE);
+
+    ebpf_set_default_btf_file();
+
     value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, EBPF_CFG_DEFAULT_PROGRAM);
 
     epbf_update_load_mode(value);
-
-    btf_path = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PROGRAM_PATH,
-                             EBPF_DEFAULT_BTF_FILE);
 
     ebpf_update_interval(update_every);
 
