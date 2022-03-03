@@ -886,10 +886,17 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
         rrdhost_aclk_state_lock(host);
         if (host->aclk_state.claimed_id)
-            buffer_sprintf(wb, "\"%s\" }", host->aclk_state.claimed_id);
+            buffer_sprintf(wb, "\"%s\", ", host->aclk_state.claimed_id);
         else
-            buffer_strcat(wb, "null }");
+            buffer_strcat(wb, "null, ");
         rrdhost_aclk_state_unlock(host);
+
+        if (host->node_id) {
+            char node_id_str[GUID_LEN + 1];
+            uuid_unparse_lower(*host->node_id, node_id_str);
+            buffer_sprintf(wb, "\"node_id\": \"%s\" }", node_id_str);
+        } else
+            buffer_strcat(wb, "\"node_id\": null }");
 
         count++;
     }
