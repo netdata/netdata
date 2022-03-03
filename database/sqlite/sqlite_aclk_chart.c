@@ -317,18 +317,19 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     time_t last_timestamp = 0;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
 
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"SELECT ac.sequence_id, acp.payload, ac.date_created, ac.type, ac.uuid  " \
-    "FROM aclk_chart_%s ac, aclk_chart_payload_%s acp " \
-    "WHERE ac.date_submitted IS NULL AND ac.unique_id = acp.unique_id AND ac.update_count > 0 " \
-    "AND acp.claim_id = @claim_id ORDER BY ac.sequence_id ASC LIMIT %d;", wc->uuid_str, wc->uuid_str, limit);
-
-    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to send a chart update via ACLK");
-        freez(claim_id);
-        return;
+    if (unlikely(!res)) {
+        snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"SELECT ac.sequence_id, acp.payload, ac.date_created, ac.type, ac.uuid  " \
+             "FROM aclk_chart_%s ac, aclk_chart_payload_%s acp " \
+             "WHERE ac.date_submitted IS NULL AND ac.unique_id = acp.unique_id AND ac.update_count > 0 " \
+             "AND acp.claim_id = @claim_id ORDER BY ac.sequence_id ASC LIMIT %d;", wc->uuid_str, wc->uuid_str, limit);
+        rc = prepare_statement(db_meta, sql, &res);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement when trying to send a chart update via ACLK");
+            freez(claim_id);
+            return;
+        }
     }
 
     rc = sqlite3_bind_blob(res, 1, claim_uuid , sizeof(claim_uuid), SQLITE_STATIC);
@@ -427,9 +428,9 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     freez(is_dim);
 
 bind_fail:
-    rc = sqlite3_finalize(res);
+    rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when pushing chart events, rc = %d", rc);
+        error_report("Failed to reset statement when pushing chart events, rc = %d", rc);
 
     freez(claim_id);
     return;
