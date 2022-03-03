@@ -556,12 +556,11 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
                    wc->uuid_str, cmd.param1);
     db_execute(buffer_tostring(sql));
     if (cmd.param1 == 1) {
-        db_lock();
         buffer_flush(sql);
         log_access("IN [%s (%s)]: Received chart full resync.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
         buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; " \
                             "DELETE FROM aclk_chart_latest_%s;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
-
+        db_lock();
         db_execute("BEGIN TRANSACTION;");
         db_execute(buffer_tostring(sql));
         db_execute("COMMIT TRANSACTION;");
