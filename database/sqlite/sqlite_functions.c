@@ -1335,7 +1335,7 @@ void add_migrated_file(char *path, uint64_t file_size)
 
 void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -1344,10 +1344,12 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
         return;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_INS_CHART_LABEL, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement store chart labels");
-        return;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_INS_CHART_LABEL, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement store chart labels");
+            return;
+        }
     }
 
     rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
@@ -1379,8 +1381,8 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
         error_report("Failed to store chart label entry, rc = %d", rc);
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when storing chart label information");
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("Failed to reset the prepared statement when storing chart label information");
 
     return;
 }
