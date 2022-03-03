@@ -538,6 +538,7 @@ static inline void alert_config_free(struct alert_config *cfg)
     freez(cfg);
 }
 
+int sql_store_hashes = 1;
 static int health_readfile(const char *filename, void *data) {
     RRDHOST *host = (RRDHOST *)data;
 
@@ -662,9 +663,7 @@ static int health_readfile(const char *filename, void *data) {
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if(rc) {
-                if (host == localhost)
-                    alert_hash_and_store_config(rc->config_hash_id, alert_cfg);
-                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+                if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
                     alert_config_free(alert_cfg);
                 }
@@ -672,9 +671,7 @@ static int health_readfile(const char *filename, void *data) {
             }
 
             if(rt) {
-                if (host == localhost)
-                    alert_hash_and_store_config(rt->config_hash_id, alert_cfg);
-                if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
+                if (!alert_hash_and_store_config(rt->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
                     rrdcalctemplate_free(rt);
                     alert_config_free(alert_cfg);
                 }
@@ -705,9 +702,7 @@ static int health_readfile(const char *filename, void *data) {
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
 //                health_add_alarms_loop(host, rc, ignore_this) ;
-                if (host == localhost)
-                    alert_hash_and_store_config(rc->config_hash_id, alert_cfg);
-                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+                if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
                     alert_config_free(alert_cfg);
                 }
@@ -716,9 +711,7 @@ static int health_readfile(const char *filename, void *data) {
             }
 
             if(rt) {
-                if (host == localhost)
-                    alert_hash_and_store_config(rt->config_hash_id, alert_cfg);
-                if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
+                if(!alert_hash_and_store_config(rt->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
                     rrdcalctemplate_free(rt);
                     alert_config_free(alert_cfg);
                 }
@@ -1233,17 +1226,13 @@ static int health_readfile(const char *filename, void *data) {
 
     if(rc) {
         //health_add_alarms_loop(host, rc, ignore_this) ;
-        if (host == localhost)
-            alert_hash_and_store_config(rc->config_hash_id, alert_cfg);
-        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+        if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
             rrdcalc_free(rc);
         }
     }
 
     if(rt) {
-        if (host == localhost)
-            alert_hash_and_store_config(rt->config_hash_id, alert_cfg);
-        if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
+        if(!alert_hash_and_store_config(rt->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
             rrdcalctemplate_free(rt);
         }
     }
@@ -1253,6 +1242,11 @@ static int health_readfile(const char *filename, void *data) {
 
     fclose(fp);
     return 1;
+}
+
+void sql_refresh_hashes(void)
+{
+    sql_store_hashes = 1;
 }
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
@@ -1270,4 +1264,5 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
     }
 
     recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
+    sql_store_hashes = 0;
 }

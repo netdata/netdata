@@ -223,6 +223,8 @@ void health_reload(void) {
     if (netdata_cloud_setting)
         aclk_single_update_disable();
 #endif
+    sql_refresh_hashes();
+
     rrd_rdlock();
 
     RRDHOST *host;
