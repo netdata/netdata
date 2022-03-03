@@ -1776,8 +1776,9 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
     return;
 }
 
-#define SQL_UPDATE_NODE_ID  "update node_instance set node_id = @node_id where host_id = @host_id;"
-
+#define SQL_UPDATE_NODE_ID "insert or replace into node_instance (node_id, host_id) " \
+    "values ( @node_id, @host_id ) " \
+    "on conflict (host_id) do update set node_id=excluded.node_id; "
 int update_node_id(uuid_t *host_id, uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
