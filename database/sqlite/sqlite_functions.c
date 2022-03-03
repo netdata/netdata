@@ -1883,7 +1883,7 @@ failed:
 
 int get_host_id(uuid_t *node_id, uuid_t *host_id)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -1892,10 +1892,12 @@ int get_host_id(uuid_t *node_id, uuid_t *host_id)
         return 1;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOST_BY_NODE_ID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to select node instance information for a node");
-        return 1;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_SELECT_HOST_BY_NODE_ID, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to select node instance information for a node");
+            return 1;
+        }
     }
 
     rc = sqlite3_bind_blob(res, 1, node_id, sizeof(*node_id), SQLITE_STATIC);
@@ -1909,8 +1911,8 @@ int get_host_id(uuid_t *node_id, uuid_t *host_id)
         uuid_copy(*host_id, *((uuid_t *) sqlite3_column_blob(res, 0)));
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when selecting node instance information");
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("Failed to reset the prepared statement when selecting node instance information");
 
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
