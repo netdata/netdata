@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- chore: remove unused variable in the system-info script [\#12297](https://github.com/netdata/netdata/pull/12297) ([ilyam8](https://github.com/ilyam8))
+- fix\(kickstart\): use correct syntax for claiming extra parameters [\#12289](https://github.com/netdata/netdata/pull/12289) ([ilyam8](https://github.com/ilyam8))
+- feat\(health\): add charts.d/nut alarms [\#12285](https://github.com/netdata/netdata/pull/12285) ([ilyam8](https://github.com/ilyam8))
 - Timex: make offset rrd independently configurable [\#12281](https://github.com/netdata/netdata/pull/12281) ([d--j](https://github.com/d--j))
 - add host labels \_aclk\_ng\_new\_cloud\_protocol [\#12278](https://github.com/netdata/netdata/pull/12278) ([underhood](https://github.com/underhood))
 - Use the new error mechanism in case host not found [\#12277](https://github.com/netdata/netdata/pull/12277) ([underhood](https://github.com/underhood))
@@ -29,7 +32,9 @@
 - Remove chart specific configuration from netdata.conf except enabled [\#12209](https://github.com/netdata/netdata/pull/12209) ([stelfrag](https://github.com/stelfrag))
 - Fix two small typos in documentation [\#12208](https://github.com/netdata/netdata/pull/12208) ([xrgman](https://github.com/xrgman))
 - Fix `hpssa` parse error [\#12206](https://github.com/netdata/netdata/pull/12206) ([wooyey](https://github.com/wooyey))
+- Add support to the updater to toggle auto-updates on and off. [\#12202](https://github.com/netdata/netdata/pull/12202) ([Ferroin](https://github.com/Ferroin))
 - Improve cleaning up of orphan hosts [\#12201](https://github.com/netdata/netdata/pull/12201) ([stelfrag](https://github.com/stelfrag))
+- Fix detection of existing installs. [\#12199](https://github.com/netdata/netdata/pull/12199) ([Ferroin](https://github.com/Ferroin))
 - Store dimension hidden option in the metadata db [\#12196](https://github.com/netdata/netdata/pull/12196) ([stelfrag](https://github.com/stelfrag))
 - make netdata-uninstaller.sh POSIX compatibility and add --uninstall flag… [\#12195](https://github.com/netdata/netdata/pull/12195) ([maneamarius](https://github.com/maneamarius))
 - docs: document the issue with seccomp and claiming [\#12192](https://github.com/netdata/netdata/pull/12192) ([ilyam8](https://github.com/ilyam8))
@@ -245,7 +250,6 @@
 - Bump static builds to use Alpine 3.15 as a base. [\#11836](https://github.com/netdata/netdata/pull/11836) ([Ferroin](https://github.com/Ferroin))
 - Detect whether libatomic should be linked in when using CXX linker. [\#11818](https://github.com/netdata/netdata/pull/11818) ([vkalintiris](https://github.com/vkalintiris))
 - Make netdata-updater.sh POSIX compliant. [\#11755](https://github.com/netdata/netdata/pull/11755) ([Ferroin](https://github.com/Ferroin))
-- Remove Fedora 33 from CI. [\#11640](https://github.com/netdata/netdata/pull/11640) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.32.0](https://github.com/netdata/netdata/tree/v1.32.0) (2021-11-30)
 
@@ -346,12 +350,6 @@
 - minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
 - Fix false poll timeout [\#11650](https://github.com/netdata/netdata/pull/11650) ([underhood](https://github.com/underhood))
 - Use submodules in Clang build checks. [\#11649](https://github.com/netdata/netdata/pull/11649) ([Ferroin](https://github.com/Ferroin))
-- Fix chart config overflow [\#11645](https://github.com/netdata/netdata/pull/11645) ([stelfrag](https://github.com/stelfrag))
-- Explicitly opt out of LTO in RPM builds. [\#11644](https://github.com/netdata/netdata/pull/11644) ([Ferroin](https://github.com/Ferroin))
-- eBPF process \(collector improvements\) [\#11643](https://github.com/netdata/netdata/pull/11643) ([thiagoftsm](https://github.com/thiagoftsm))
-- eBPF cgroup integration [\#11642](https://github.com/netdata/netdata/pull/11642) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add Fedora 35 to CI. [\#11641](https://github.com/netdata/netdata/pull/11641) ([Ferroin](https://github.com/Ferroin))
-- various fixes and updates for dashboard info [\#11639](https://github.com/netdata/netdata/pull/11639) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
