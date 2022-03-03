@@ -263,7 +263,7 @@ _cannot_use_tmpdir() {
 
   if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
     if chmod +x "${testfile}" ; then
-      if [ "$("${testfile}")" = "SUCCESS" ] ; then
+      if [ "$("${testfile}" 2>/dev/null)" = "SUCCESS" ] ; then
         ret=1
       fi
     fi
