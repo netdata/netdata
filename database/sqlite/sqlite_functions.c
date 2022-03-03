@@ -121,7 +121,7 @@ static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t 
 
     // Check if we should need to prepare the statement
     if (!*res) {
-        rc = sqlite3_prepare_v2(db_meta, statement, -1, res, 0);
+        rc = prepare_statement(db_meta, statement, res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store active object, rc = %d", rc);
             return rc;
@@ -142,7 +142,7 @@ static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t 
  */
 void store_active_chart(uuid_t *chart_uuid)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -158,7 +158,7 @@ void store_active_chart(uuid_t *chart_uuid)
     if (rc != SQLITE_DONE)
         error_report("Failed to store active chart, rc = %d", rc);
 
-    rc = sqlite3_finalize(res);
+    rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement in store active chart, rc = %d", rc);
     return;
@@ -170,7 +170,7 @@ void store_active_chart(uuid_t *chart_uuid)
  */
 void store_active_dimension(uuid_t *dimension_uuid)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -186,7 +186,7 @@ void store_active_dimension(uuid_t *dimension_uuid)
     if (rc != SQLITE_DONE)
         error_report("Failed to store active dimension, rc = %d", rc);
 
-    rc = sqlite3_finalize(res);
+    rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement in store active dimension, rc = %d", rc);
     return;
