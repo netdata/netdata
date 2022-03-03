@@ -1322,14 +1322,13 @@ char *ng_aclk_state_json(void)
     tmp = json_object_new_int(2);
     json_object_object_add(msg, "aclk-version", tmp);
 
+    grp = json_object_new_array();
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    grp = json_object_new_array_ext(2);
     tmp = json_object_new_string("Legacy");
     json_object_array_add(grp, tmp);
     tmp = json_object_new_string("Protobuf");
     json_object_array_add(grp, tmp);
 #else
-    grp = json_object_new_array_ext(1);
     tmp = json_object_new_string("Legacy");
     json_object_array_add(grp, tmp);
 #endif
