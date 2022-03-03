@@ -79,7 +79,8 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     chmod 4755 /usr/local/bin/fping && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
+    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}" \
+    # Fix handling of config directory
 
 # Long-term this should leverage BuildKit’s mount option.
 COPY --from=builder /wheels /wheels
@@ -110,7 +111,8 @@ RUN chown -R root:root \
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
     pip --no-cache-dir install /wheels/* && \
-    rm -rf /wheels
+    rm -rf /wheels \
+    cp -va /etc/netdata /etc/netdata.stock
 
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
