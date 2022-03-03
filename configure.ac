@@ -1218,7 +1218,7 @@ if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
     if test "${have_libelf}" = "yes" -a \
             "${have_bpf}" = "yes" -a \
             "${have_libbpf}" = "yes"; then
-        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I \$(abs_top_srcdir)/externaldeps/libbpf/include"
+        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I \$(abs_top_srcdir)/externaldeps/libbpf/include -I \$(abs_top_srcdir)/externaldeps/libbpf/include/uapi"
         OPTIONAL_BPF_LIBS="\$(abs_top_srcdir)/externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
         AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
         enable_ebpf="yes"

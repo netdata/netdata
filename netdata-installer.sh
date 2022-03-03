@@ -967,6 +967,7 @@ copy_libbpf() {
 
   run cp "${1}/usr/${lib_subdir}/libbpf.a" "${target_dir}/libbpf.a" || return 1
   run cp -r "${1}/usr/include" "${target_dir}" || return 1
+  run cp -r "${1}/include/uapi" "${target_dir}/include" || return 1
 }
 
 bundle_libbpf() {
