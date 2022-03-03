@@ -910,21 +910,23 @@ failed:
 uint32_t sql_get_pending_count(struct aclk_database_worker_config *wc)
 {
     BUFFER *sql = buffer_create(1024);
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
 
     buffer_sprintf(sql,"SELECT count(1) FROM aclk_chart_%s ac WHERE ac.date_submitted IS NULL;", wc->uuid_str);
 
     int rc;
     uint32_t chart_payload_count = 0;
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to count pending messages");
-        goto fail;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, (char *) buffer_tostring(sql), &res);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement to count pending messages");
+            goto fail;
+        }
     }
     while (sqlite3_step(res) == SQLITE_ROW)
         chart_payload_count = (uint32_t) sqlite3_column_int(res, 0);
 
-    rc = sqlite3_finalize(res);
+    rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when fetching pending messages, rc = %d", rc);
 
