@@ -23,7 +23,7 @@ library](https://github.com/yzhao062/pyod/tree/master), which periodically runs 
 quantify how anomalous certain charts are.
 
 All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud). If
-you choose to sign up for Netdata Cloud and [coonect your nodes](/claim/README.md), you will have the ability to run
+you choose to sign up for Netdata Cloud and [connect your nodes](/claim/README.md), you will have the ability to run
 tailored anomaly detection on every node in your infrastructure, regardless of its purpose or workload.
 
 In this guide, you'll learn how to set up the anomalies collector to instantly detect anomalies in an Nginx web server
