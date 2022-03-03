@@ -17,7 +17,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     if (!wc->host)
         return;
 
-    rrd_wrlock();
+    rrd_rdlock();
     node_info.node_id = wc->node_id;
     node_info.claim_id = is_agent_claimed();
     node_info.machine_guid = wc->host_guid;
