@@ -16,6 +16,7 @@ START_TIME="$(date +%s)"
 # ======================================================================
 # Defaults for environment variables
 
+DRY_RUN=0
 SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
@@ -62,6 +63,7 @@ USAGE: kickstart.sh [options]
   --non-interactive          Do not prompt for user input. (default: prompt if there is a controlling terminal)
   --interactive              Prompt for user input even if there is no controlling terminal.
   --dont-start-it            Do not start the agent by default (only for static installs or local builds)
+  --dry-run                  Report what we would do with the given options on this system, but don’t actually do anything.
   --stable-channel           Install a stable version instead of a nightly build (default: install a nightly build)
   --nightly-channel          Install a nightly build instead of a stable version
   --no-updates               Do not enable automatic updates (default: enable automatic updates)
@@ -80,7 +82,7 @@ USAGE: kickstart.sh [options]
   --claim-only               If there is an existing install, only try to claim it, not update it.
   --claim-*                  Specify other options for the claiming script.
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
-  --uninstall                Uninstall netdata.
+  --uninstall                Uninstall an existing installation of Netdata.
 
 Additionally, this script may use the following environment variables:
 
@@ -101,7 +103,7 @@ HEREDOC
 # Telemetry functions
 
 telemetry_event() {
-  if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
+  if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ] || [ "${DRY_RUN}" -eq 1 ]; then
     return 0
   fi
 
@@ -297,6 +299,10 @@ run() {
     info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
   fi
 
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    printf >&2 "%s" "Would run command:\n"
+  fi
+
   {
     printf "%s" "${info}"
     escaped_print "${@}"
@@ -307,9 +313,13 @@ run() {
   escaped_print >&2 "${@}"
   printf >&2 "%s\n" "${TPUT_RESET}"
 
-  "${@}"
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    "${@}"
+    ret=$?
+  else
+    ret=0
+  fi
 
-  ret=$?
   if [ ${ret} -ne 0 ]; then
     run_failed
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
@@ -359,6 +369,17 @@ create_tmp_directory() {
   fi
 
   mktemp -d -t netdata-kickstart-XXXXXXXXXX
+}
+
+check_for_remote_file() {
+  url="${1}"
+  if command -v curl > /dev/null 2>&1; then
+    curl --output /dev/null --silent --head --fail "${url}" || return 1
+  elif command -v wget > /dev/null 2>&1; then
+    wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
+  else
+    fatal "I need curl or wget to proceed, but neither of them are available on this system." F0003
+  fi
 }
 
 download() {
@@ -522,6 +543,11 @@ update() {
   updater="${ndprefix}/usr/libexec/netdata/netdata-updater.sh"
 
   if [ -x "${updater}" ]; then
+    if [ "${DRY_RUN}" -eq 1 ]; then
+      progress "Would attempt to update existing installation by running the updater script located at: ${updater}"
+      return 0
+    fi
+
     if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
@@ -529,6 +555,7 @@ update() {
       fatal "Failed to update existing Netdata install at ${ndprefix}" F0100
     fi
   else
+    warning "Could not find a usable copy of the updater script."
     return 1
   fi
 }
@@ -539,24 +566,40 @@ uninstall() {
 
   export INSTALL_PREFIX="${ndprefix}"
 
+  uninstaller="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh"
+  uninstaller_url="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh"
+
   if [ $INTERACTIVE = 0 ]; then
     FLAGS="--yes --force"
   else
     FLAGS="--yes"
   fi
 
-  if [ -f "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" ]; then
-    echo "Found existing netdata-uninstaller. Running it.."
-    ${ROOTCMD} "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" $FLAGS
+  if [ -x "${uninstaller}" ]; then
+    if [ "${DRY_RUN}" -eq 1 ]; then
+      progress "Would attempt to uninstall existing install with uninstaller script found at: ${uninstaller}"
+      return 0
+    else
+      progress "Found existing netdata-uninstaller. Running it.."
+      run ${ROOTCMD} "${uninstaller}" $FLAGS
+    fi
   else
-    echo "Downloading netdata-uninstaller ..."
-    wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh -O "${tmpdir}/netdata-uninstaller.sh"
-    chmod +x "${tmpdir}/netdata-uninstaller.sh"
-    ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS
+    if [ "${DRY_RUN}" -eq 1 ]; then
+      progress "Would download installer script from: ${uninstaller_url}"
+      progress "Would attempt to uninstall existing install with downloaded uninstaller script."
+      return 0
+    else
+      progress "Downloading netdata-uninstaller ..."
+      download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
+      chmod +x "${tmpdir}/netdata-uninstaller.sh"
+      run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS
+    fi
   fi
 }
 
 detect_existing_install() {
+  progress "Checking for existing installations of Netdata..."
+
   if pkg_installed netdata; then
     ndprefix="/"
   else
@@ -584,7 +627,6 @@ detect_existing_install() {
 
   if [ -n "${ndprefix}" ]; then
     typefile="${ndprefix}/etc/netdata/.install-type"
-    envfile="${ndprefix}/etc/netdata/.environment"
     if [ -r "${typefile}" ]; then
       ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
       # shellcheck disable=SC1090,SC1091
@@ -593,6 +635,7 @@ detect_existing_install() {
       INSTALL_TYPE="unknown"
     fi
 
+    envfile="${ndprefix}/etc/netdata/.environment"
     if [ "${INSTALL_TYPE}" = "unknown" ] || [ "${INSTALL_TYPE}" = "custom" ]; then
       if [ -r "${envfile}" ]; then
         ${ROOTCMD} sh -c "cat \"${envfile}\" > \"${tmpdir}/environment\""
@@ -621,7 +664,6 @@ handle_existing_install() {
   case "${INSTALL_TYPE}" in
     kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
-
         warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
         warning "Usually this means you installed Netdata through your distribution’s regular package repositories or some other unsupported method."
       else
@@ -763,7 +805,7 @@ confirm_install_prefix() {
 check_claim_opts() {
 # shellcheck disable=SC2235,SC2030
   if [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
-    fatal "Invalid claiming options, claim rooms may only be specified when a token and URL are specified." F0204
+    fatal "Invalid claiming options, claim rooms may only be specified when a token is specified." F0204
   elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}" ]; then
     fatal "Invalid claiming options, a claiming token must be specified." F0204
   elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ] && [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
@@ -796,7 +838,12 @@ is_netdata_running() {
 }
 
 claim() {
-  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to claim agent to ${NETDATA_CLAIM_URL}"
+  else
+    progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
+  fi
+
   if [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
@@ -805,12 +852,22 @@ claim() {
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
+  claim_opts="-token=${NETDATA_CLAIM_TOKEN} -url=${NETDATA_CLAIM_URL}"
+
+  if [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
+    claim_opts="${claim_opts} -rooms=${NETDATA_CLAIM_ROOMS}"
+  fi
+
   if ! is_netdata_running; then
-    NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+    claim_opts="${claim_opts} -daemon-not-running"
+  fi
+
+  if [ -n "${NETDATA_CLAIM_EXTRA}" ]; then
+    claim_opts="${claim_opts} ${NETDATA_CLAIM_EXTRA}"
   fi
 
   # shellcheck disable=SC2086
-  if ${ROOTCMD} "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}; then
+  if run ${ROOTCMD} "${NETDATA_CLAIM_PATH}" ${claim_opts}; then
     progress "Successfully claimed node"
   else
     warning "Unable to claim node, you must do so manually."
@@ -870,10 +927,10 @@ check_special_native_deps() {
     progress "Checking for libuv availability."
     # shellcheck disable=SC2086
     if ${pm_cmd} search ${interactive_opts} -v libuv | grep -q "No matches found"; then
-      progress "libv not found, checking for EPEL availability."
+      progress "libuv not found, checking for EPEL availability."
       # shellcheck disable=SC2086
       if ${pm_cmd} search ${interactive_opts} -v epel-release | grep -q "No matches found"; then
-        warning "Unable to find a suitable source for libuv, cannot install on this system."
+        warning "Unable to find a suitable source for libuv, cannot install using native packages on this system."
         return 1
       else
         progress "EPEL is available, attempting to install so that required dependencies are available."
@@ -896,7 +953,11 @@ try_package_install() {
     return 1
   fi
 
-  progress "Attempting to install using native packages..."
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to install using native packages..."
+  else
+    progress "Attempting to install using native packages..."
+  fi
 
   if [ "${RELEASE_CHANNEL}" = "nightly" ]; then
     release="-edge"
@@ -1010,14 +1071,17 @@ try_package_install() {
   repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
 
   if ! pkg_installed "${repoconfig_name}"; then
-    progress "Downloading repository configuration package."
-    if ! download "${repoconfig_url}" "${tmpdir}/${repoconfig_file}"; then
-      warning "Failed to download repository configuration package."
+    progress "Checking for availability of repository configuration package."
+    if ! check_for_remote_file "${repoconfig_url}"; then
+      warning "No repository configuration package available for ${DISTRO} ${SYSVERSION}."
       return 2
     fi
 
+    if ! download "${repoconfig_url}" "${tmpdir}/${repoconfig_file}"; then
+      fatal "Failed to download repository configuration package." F0209
+    fi
+
     if [ -n "${needs_early_refresh}" ]; then
-      progress "Updating repository metadata."
       # shellcheck disable=SC2086
       if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
         warning "Failed to refresh repository metadata."
@@ -1025,7 +1089,6 @@ try_package_install() {
       fi
     fi
 
-    progress "Installing repository configuration package."
     # shellcheck disable=SC2086
     if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
@@ -1033,7 +1096,6 @@ try_package_install() {
     fi
 
     if [ -n "${repo_subcmd}" ]; then
-      progress "Updating repository metadata."
       # shellcheck disable=SC2086
       if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
         fatal "Failed to update repository metadata." F0205
@@ -1044,7 +1106,7 @@ try_package_install() {
   fi
 
   if ! check_special_native_deps; then
-    warning "Could not find secondary dependencies ${DISTRO} on ${SYSARCH}."
+    warning "Could not find secondary dependencies for ${DISTRO} on ${SYSARCH}."
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
@@ -1053,7 +1115,6 @@ try_package_install() {
     return 2
   fi
 
-  progress "Checking for usable Netdata package."
   if ! netdata_avail_check "${DISTRO_COMPAT_NAME}"; then
     warning "Could not find a usable native package for ${DISTRO} on ${SYSARCH}."
     if [ -z "${NO_CLEANUP}" ]; then
@@ -1069,7 +1130,6 @@ try_package_install() {
     run ${ROOTCMD} touch "/etc/netdata/.opt-out-from-anonymous-statistics"
   fi
 
-  progress "Installing Netdata package."
   # shellcheck disable=SC2086
   if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} netdata; then
     warning "Failed to install Netdata package."
@@ -1098,19 +1158,32 @@ set_static_archive_urls() {
 
 try_static_install() {
   set_static_archive_urls "${RELEASE_CHANNEL}"
-  progress "Downloading static netdata binary: ${NETDATA_STATIC_ARCHIVE_URL}"
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to install using static build..."
+  else
+    progress "Attempting to install using static build..."
+  fi
+
+  # Check status code first, so that we can provide nicer fallback for dry runs.
+  if ! check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+    warning "No static build available for ${SYSARCH} CPUs."
+    return 2
+  fi
 
   if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${tmpdir}/netdata-${SYSARCH}-latest.gz.run"; then
-    warning "Unable to download static build archive for ${SYSARCH}."
-    return 2
+    fatal "Unable to download static build archive for ${SYSARCH}." F0208
   fi
 
   if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
     fatal "Unable to fetch checksums to verify static build archive." F0206
   fi
 
-  if ! grep "netdata-${SYSARCH}-latest.gz.run" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Static binary checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0207
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would validate SHA256 checksum of downloaded static build archive."
+  else
+    if ! grep "netdata-${SYSARCH}-latest.gz.run" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+      fatal "Static binary checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0207
+    fi
   fi
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
@@ -1125,18 +1198,20 @@ try_static_install() {
     return 2
   fi
 
+  if [ "${DRY_RUN}" -ne 1 ]; then
   install_type_file="/opt/netdata/etc/netdata/.install-type"
-  if [ -f "${install_type_file}" ]; then
-    ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
-    ${ROOTCMD} chown "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
-    # shellcheck disable=SC1090,SC1091
-    . "${tmpdir}/install-type"
-    cat > "${tmpdir}/install-type" <<- EOF
+    if [ -f "${install_type_file}" ]; then
+      ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
+      ${ROOTCMD} chown "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
+      # shellcheck disable=SC1090,SC1091
+      . "${tmpdir}/install-type"
+      cat > "${tmpdir}/install-type" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
 	EOF
-    ${ROOTCMD} chown netdata:netdata "${tmpdir}/install-type"
-    ${ROOTCMD} cp "${tmpdir}/install-type" "${install_type_file}"
+      ${ROOTCMD} chown netdata:netdata "${tmpdir}/install-type"
+      ${ROOTCMD} cp "${tmpdir}/install-type" "${install_type_file}"
+    fi
   fi
 }
 
@@ -1162,13 +1237,16 @@ install_local_build_dependencies() {
     return 1
   fi
 
-  progress "Fetching script to detect required packages..."
   download "${PACKAGES_SCRIPT}" "${tmpdir}/install-required-packages.sh"
 
-  if [ ! -s "${tmpdir}/install-required-packages.sh" ]; then
+  if [ ! -s "${tmpdir}/install-required-packages.sh" ] && [ "${DRY_RUN}" -ne 1 ]; then
     warning "Downloaded dependency installation script is empty."
   else
-    progress "Running downloaded script to detect required packages..."
+    if [ "${DRY_RUN}" -eq 1 ]; then
+      progress "Would run downloaded script to install required build dependencies..."
+    else
+      progress "Running downloaded script to install required build dependencies..."
+    fi
 
     if [ "${INTERACTIVE}" -eq 0 ]; then
       opts="--dont-wait --non-interactive"
@@ -1188,7 +1266,11 @@ install_local_build_dependencies() {
 }
 
 build_and_install() {
-  progress "Building netdata"
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to build netdata..."
+  else
+    progress "Building netdata..."
+  fi
 
   echo "INSTALL_TYPE='kickstart-build'" > system/.install-type
 
@@ -1226,6 +1308,12 @@ build_and_install() {
 }
 
 try_build_install() {
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to install by building locally..."
+  else
+    progress "Attempting to install by building locally..."
+  fi
+
   if ! install_local_build_dependencies; then
     return 1
   fi
@@ -1235,15 +1323,21 @@ try_build_install() {
   download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"
   download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"
 
-  if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0005
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would validate SHA256 checksum of downloaded source archive."
+  else
+    if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+      fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0005
+    fi
   fi
 
   run tar -xf "${tmpdir}/netdata-latest.tar.gz" -C "${tmpdir}"
   rm -rf "${tmpdir}/netdata-latest.tar.gz" > /dev/null 2>&1
-  cd "$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot cd to netdata source tree" F0006
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    cd "$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot cd to netdata source tree" F0006
+  fi
 
-  if [ -x netdata-installer.sh ]; then
+  if [ -x netdata-installer.sh ] || [ "${DRY_RUN}" -eq 1 ]; then
     build_and_install || return 1
   else
     # This case is needed because some platforms produce an extra directory on the source tarball extraction.
@@ -1377,6 +1471,7 @@ while [ -n "${1}" ]; do
     "--no-cleanup") NO_CLEANUP=1 ;;
     "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
     "--interactive") INTERACTIVE=1 ;;
+    "--dry-run") DRY_RUN=1 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
     "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
@@ -1473,7 +1568,7 @@ fi
 
 tmpdir="$(create_tmp_directory)"
 progress "Using ${tmpdir} as a temporary directory."
-cd "${tmpdir}" || exit 1
+cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
 
 handle_existing_install
 

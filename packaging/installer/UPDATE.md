@@ -27,18 +27,6 @@ Starting with netdata v1.33.0, you can use Netdata itself to determine the insta
 netdata -W buildinfo | grep 'Install type:'
 ```
 
-If this produces no output, you have an older install and will have to manually look in the Netdata config directory.
-If you are not sure where your Netdata config directory is, see the [configuration doc](/docs/configure/nodes.md). In
-most installations, this is `/etc/netdata`.
-
-Use `cd` to navigate to the Netdata config directory, then use `ls -a` to look for a file called `.install-type`.
-
--   If the `.install-type` file doex not exist, look for a file in the same directory called `.environment`.
-    -   If the `.environment` file does not exist, then you have a ‘custom’ install.
-    -   If the `.environment` file does exist, then you have either a ‘static’ or ‘build’ install.
--   If the `.install-type` file does exist, check it’s contents with `cat .install-type`.
-    -   The value of the `INSTALL_TYPE` key indicates what type of install you have.
-
 The exact update method to use depends on the install type:
 
 -   Installs with an install type of 'custom' usually indicate installing a third-party package through the system
@@ -50,6 +38,24 @@ The exact update method to use depends on the install type:
     using our [Docker](#docker) update procedure.
 -   macOS users should check [our update instructions for macOS](#macos).
 -   Manually built installs should check [our update instructions for manual builds](#manual-installation-from-git).
+
+If you are using an older version of Netdata, or the above command produces no output, you can run our one-line
+installation script in dry-run mode to attempt to determine what method to use to update by running the following
+command:
+
+```bash
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --dry-run
+```
+
+Note that if you installed Netdata using an installation prefix, you will need to add an `--install` option
+specifying that prefix to make sure it finds the existing install.
+
+If you see a line starting with `--- Would attempt to update existing installation by running the updater script
+located at:, then our [regular update method](#updates-for-most-systems) will work for you.
+
+Otherwise, it should either indicate that the installation type is not supported (which probably means you either
+have a `custom` instal or built Netdata manually) or indicate that it would create a new install (which means that
+you either used a non-standard install path, or that you don’t actually have Netdata installed).
 
 ## Updates for most systems
 
