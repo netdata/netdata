@@ -6,12 +6,19 @@
 
 **Merged pull requests:**
 
+- adds node\_id into mirrored\_hosts list [\#12307](https://github.com/netdata/netdata/pull/12307) ([underhood](https://github.com/underhood))
+- fix: CPU frequency detection for some containers [\#12306](https://github.com/netdata/netdata/pull/12306) ([ilyam8](https://github.com/ilyam8))
+- fix uninstall using kickstart flag [\#12304](https://github.com/netdata/netdata/pull/12304) ([maneamarius](https://github.com/maneamarius))
+- Fixing stderr output when testing tmpdir [\#12298](https://github.com/netdata/netdata/pull/12298) ([godismyjudge95](https://github.com/godismyjudge95))
 - chore: remove unused variable in the system-info script [\#12297](https://github.com/netdata/netdata/pull/12297) ([ilyam8](https://github.com/ilyam8))
+- fix: cpu system info detection on macOS [\#12293](https://github.com/netdata/netdata/pull/12293) ([ilyam8](https://github.com/ilyam8))
 - fix\(kickstart\): use correct syntax for claiming extra parameters [\#12289](https://github.com/netdata/netdata/pull/12289) ([ilyam8](https://github.com/ilyam8))
 - feat\(health\): add charts.d/nut alarms [\#12285](https://github.com/netdata/netdata/pull/12285) ([ilyam8](https://github.com/ilyam8))
+- Fix incorrect install type on some older nightly installs. [\#12282](https://github.com/netdata/netdata/pull/12282) ([Ferroin](https://github.com/Ferroin))
 - Timex: make offset rrd independently configurable [\#12281](https://github.com/netdata/netdata/pull/12281) ([d--j](https://github.com/d--j))
 - add host labels \_aclk\_ng\_new\_cloud\_protocol [\#12278](https://github.com/netdata/netdata/pull/12278) ([underhood](https://github.com/underhood))
 - Use the new error mechanism in case host not found [\#12277](https://github.com/netdata/netdata/pull/12277) ([underhood](https://github.com/underhood))
+- Add proper handling for legacy kickstart install detection. [\#12273](https://github.com/netdata/netdata/pull/12273) ([Ferroin](https://github.com/Ferroin))
 - Fixed typos in docs/Running-behind-haproxy.md [\#12272](https://github.com/netdata/netdata/pull/12272) ([RatishT](https://github.com/RatishT))
 - Null terminate decoded\_query\_string if there are no url parameters. [\#12266](https://github.com/netdata/netdata/pull/12266) ([MrZammler](https://github.com/MrZammler))
 - delete package.json [\#12265](https://github.com/netdata/netdata/pull/12265) ([ilyam8](https://github.com/ilyam8))
@@ -344,12 +351,6 @@
 - Fix interval usage and reduce I/O [\#11662](https://github.com/netdata/netdata/pull/11662) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update dashboard to version v2.20.9. [\#11661](https://github.com/netdata/netdata/pull/11661) ([netdatabot](https://github.com/netdatabot))
 - Optimize static build and update various dependencies. [\#11660](https://github.com/netdata/netdata/pull/11660) ([Ferroin](https://github.com/Ferroin))
-- Sanely handle installing on systems with limited RAM. [\#11658](https://github.com/netdata/netdata/pull/11658) ([Ferroin](https://github.com/Ferroin))
-- Mark unmaintained tests as expected failures. [\#11657](https://github.com/netdata/netdata/pull/11657) ([vkalintiris](https://github.com/vkalintiris))
-- Fix build issue related to legacy aclk and new arch code [\#11655](https://github.com/netdata/netdata/pull/11655) ([MrZammler](https://github.com/MrZammler))
-- minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
-- Fix false poll timeout [\#11650](https://github.com/netdata/netdata/pull/11650) ([underhood](https://github.com/underhood))
-- Use submodules in Clang build checks. [\#11649](https://github.com/netdata/netdata/pull/11649) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
