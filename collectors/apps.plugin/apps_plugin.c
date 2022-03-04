@@ -1495,7 +1495,6 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
         p->cstime           = 0;
         p->cgtime           = 0;
     }
-
     update_proc_state_count(p->state);
     return 1;
 
@@ -3855,14 +3854,18 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
 static void send_proc_states_count(usec_t dt)
 {
+    static bool chart_added = false;
     // create chart for count of processes in different states
-    fprintf(
-        stdout,
-        "CHART system.process_states '' 'Apps Process States' 'numbers' processes system.process_states line %d %d\n",
-        NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES,
-        update_every);
-    for (proc_state i = RUNNING; i < END; i++) {
-        fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", proc_states[i]);
+    if (!chart_added) {
+        fprintf(
+                stdout,
+                "CHART system.process_states '' 'Apps Process States' 'numbers' processes system.process_states line %d %d\n",
+                NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES,
+                update_every);
+        for (proc_state i = RUNNING; i < END; i++) {
+          fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", proc_states[i]);
+        }
+        chart_added = true;
     }
 
     // send process state count
