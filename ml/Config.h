@@ -40,6 +40,8 @@ public:
 
     std::string AnomalyDBPath;
 
+    bool ReuseClusterCenters;
+
     void readMLConfig();
 };
 

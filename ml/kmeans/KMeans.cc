@@ -3,7 +3,7 @@
 #include "KMeans.h"
 #include <dlib/clustering.h>
 
-void KMeans::train(SamplesBuffer &SB, size_t MaxIterations) {
+void KMeans::train(SamplesBuffer &SB, size_t MaxIterations, bool ReuseClusterCenters) {
     std::vector<DSample> Samples = SB.preprocess();
 
     MinDist = std::numeric_limits<CalculatedNumber>::max();
@@ -12,9 +12,11 @@ void KMeans::train(SamplesBuffer &SB, size_t MaxIterations) {
     {
         std::lock_guard<std::mutex> Lock(Mutex);
 
-        ClusterCenters.clear();
+        if (ClusterCenters.size() == 0 || ReuseClusterCenters == false) {
+            ClusterCenters.clear();
+            dlib::pick_initial_centers(NumClusters, ClusterCenters, Samples);
+        }
 
-        dlib::pick_initial_centers(NumClusters, ClusterCenters, Samples);
         dlib::find_clusters_using_kmeans(Samples, ClusterCenters, MaxIterations);
 
         for (const auto &S : Samples) {

@@ -49,6 +49,8 @@ void Config::readMLConfig(void) {
     double ADWindowRateThreshold = config_get_float(ConfigSectionML, "window minimum anomaly rate", 0.25);
     double ADDimensionRateThreshold = config_get_float(ConfigSectionML, "anomaly event min dimension rate threshold", 0.05);
 
+    bool ReuseClusterCenters = config_get_boolean(ConfigSectionML, "reuse cluster centers", false);
+
     std::stringstream SS;
     SS << netdata_configured_cache_dir << "/anomaly-detection.db";
     Cfg.AnomalyDBPath = SS.str();
@@ -122,6 +124,8 @@ void Config::readMLConfig(void) {
     Cfg.ADIdleWindowSize = ADIdleWindowSize;
     Cfg.ADWindowRateThreshold = ADWindowRateThreshold;
     Cfg.ADDimensionRateThreshold = ADDimensionRateThreshold;
+
+    Cfg.ReuseClusterCenters = ReuseClusterCenters;
 
     Cfg.HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     Cfg.SP_HostsToSkip = simple_pattern_create(Cfg.HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);

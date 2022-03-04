@@ -126,7 +126,7 @@ MLResult TrainableDimension::trainModel() {
         return MLResult::MissingData;
 
     SamplesBuffer SB = SamplesBuffer(CNs, N, 1, Cfg.DiffN, Cfg.SmoothN, Cfg.LagN);
-    KM.train(SB, Cfg.MaxKMeansIters);
+    KM.train(SB, Cfg.MaxKMeansIters, Cfg.ReuseClusterCenters);
     Trained = true;
     ConstantModel = true;
 
