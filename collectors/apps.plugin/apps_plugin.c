@@ -115,10 +115,11 @@ typedef enum {
     SLEEPING_D, // uninterruptible sleep
     ZOMBIE,
     STOPPED,
+    END,
 } proc_state;
 
 static int proc_state_count[5];
-static const char* proc_states[] = {
+static const char *proc_states[] = {
     [RUNNING] = "running",
     [SLEEPING] = "sleeping(interruptible)",
     [SLEEPING_D] = "sleeping(uninterruptible)",
@@ -1355,7 +1356,6 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
 #ifdef __FreeBSD__
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
-
     if (unlikely(proc_info->ki_tdflags & TDF_IDLETD))
         goto cleanup;
 #else
@@ -1387,7 +1387,6 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 #ifdef __FreeBSD__
     char *comm          = proc_info->ki_comm;
     p->ppid             = proc_info->ki_ppid;
-    //TODO: get state for FreeBSD??
 #else
     // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
     char *comm          = procfile_lineword(ff, 0, 1);
@@ -1398,9 +1397,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->tty_nr        = (int32_t)str2pid_t(procfile_lineword(ff, 0, 6));
     // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
-    update_proc_state_count(p->state);
 #endif
-
     if(strcmp(p->comm, comm) != 0) {
         if(unlikely(debug_enabled)) {
             if(p->comm[0])
@@ -1499,6 +1496,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
         p->cgtime           = 0;
     }
 
+    update_proc_state_count(p->state);
     return 1;
 
 cleanup:
@@ -2579,7 +2577,7 @@ static int collect_data_for_all_processes(void) {
     struct pid_stat *p = NULL;
     
     // clear process state counter
-    for (proc_state i = RUNNING; i <= STOPPED; i++) {
+    for (proc_state i = RUNNING; i < END; i++) {
         proc_state_count[i] = 0;
     }
 
@@ -3656,13 +3654,6 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         }
         send_END();
     }
-
-    // send process state count
-    send_BEGIN("system", "process_states", dt);
-    for (proc_state i = RUNNING; i <= STOPPED; i++) {
-      send_SET(proc_states[i], proc_state_count[i]);
-    }
-    send_END();
 }
 
 
@@ -3860,13 +3851,26 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
     }
+}
 
+static void send_proc_states_count(usec_t dt)
+{
     // create chart for count of processes in different states
     fprintf(
-        stdout, "CHART system.process_states '' '%s Process States' 'numbers' processes system.process_states line %d %d\n", title, NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES, update_every);
-    for (proc_state i = RUNNING; i <= STOPPED; i++) {
+        stdout,
+        "CHART system.process_states '' 'Apps Process States' 'numbers' processes system.process_states line %d %d\n",
+        NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES,
+        update_every);
+    for (proc_state i = RUNNING; i < END; i++) {
         fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", proc_states[i]);
     }
+
+    // send process state count
+    send_BEGIN("system", "process_states", dt);
+    for (proc_state i = RUNNING; i < END; i++) {
+        send_SET(proc_states[i], proc_state_count[i]);
+    }
+    send_END();
 }
 
 // ----------------------------------------------------------------------------
@@ -4243,10 +4247,10 @@ int main(int argc, char **argv) {
         normalize_utilization(apps_groups_root_target);
 
         send_resource_usage_to_netdata(dt);
+        send_proc_states_count(dt);
 
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
-
         if(likely(enable_users_charts))
             send_charts_updates_to_netdata(users_root_target, "users", "Users");
 
