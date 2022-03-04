@@ -68,10 +68,10 @@ that prefix to this command to make sure it finds Netdata.
 wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
-### For older binpkg installs
+### Issues with older binpkg installs
 
 The above command is known not to work with binpkg type installs for stable releases with a version number of
-v1.33.1 or earlier, and nightly builds with a version number o v1.33.1-93 or earlier. If you have such a system,
+v1.33.1 or earlier, and nightly builds with a version number of v1.33.1-93 or earlier. If you have such a system,
 the above command will report that it found an existing install, and then issue a warning about not being able to
 find the updater script.
 
