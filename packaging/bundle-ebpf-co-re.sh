@@ -1,7 +1,6 @@
 #!/bin/sh
 
 SRCDIR="${1}"
-PLUGINDIR="${2}"
 
 CORE_VERSION="$(cat "${SRCDIR}/packaging/ebpf-co-re.version")"
 CORE_TARBALL="netdata-ebpf-co-re-glibc-${CORE_VERSION}.tar.xz"
