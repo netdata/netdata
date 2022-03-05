@@ -1035,12 +1035,7 @@ bundle_ebpf_co_re() {
     return 0
   fi
 
-  LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf.version)"
-  LIBBPF_EXPECTED_VERSION="$(cat packaging/current_libbpf.version)"
-
-  if [ "${LIBBPF_PACKAGE_VERSION}" != "${LIBBPF_EXPECTED_VERSION}" ]; then
-      return 0;
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
 
   progress "eBPF CO-RE"
 
