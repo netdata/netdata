@@ -174,7 +174,7 @@ ioping_opts="-T 1000000"
 # -----------------------------------------------------------------------------
 # load the configuration files
 
-for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"
+for CONFIG in "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"
 do
     if [ -f "${CONFIG}" ]
         then
