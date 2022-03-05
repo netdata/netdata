@@ -2,4 +2,4 @@
 
 This folder is a home for any documentation supporting machine learning related notebooks.
 
-- [netdata anomaly detection deepdive](netdata%20anomaly%20detection%20deepdive.ipynb): This is a starter notebook to help users understand how anomaly detection works in the netdata agent and go a little deeper if they want.
+- [Netdata anomaly detection deepdive](netdata%20anomaly%20detection%20deepdive.ipynb): This is a starter notebook to help users understand how anomaly detection works in the Netdata agent and go a little deeper if they want.
