@@ -174,16 +174,14 @@ ioping_opts="-T 1000000"
 # -----------------------------------------------------------------------------
 # load the configuration files
 
-for CONFIG in "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"
-do
-    if [ -f "${CONFIG}" ]
-        then
-        info "Loading config file '${CONFIG}'..."
-        source "${CONFIG}"
-        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
-    else
-        warning "Cannot find file '${CONFIG}'."
-    fi
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"; do
+  if [ -f "${CONFIG}" ]; then
+    info "Loading config file '${CONFIG}'..."
+    source "${CONFIG}"
+    [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+  elif [[ $CONFIG =~ ^$NETDATA_USER_CONFIG_DIR ]]; then
+    warning "Cannot find file '${CONFIG}'."
+  fi
 done
 
 if [ -z "${destination}" ]
