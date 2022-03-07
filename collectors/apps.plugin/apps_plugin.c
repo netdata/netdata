@@ -111,20 +111,20 @@ static char *stock_config_dir = LIBCONFIG_DIR;
 // some variables for keeping track of processes count by states
 typedef enum {
     PROC_STATUS_RUNNING = 0,
-    PROC_STATUS_SLEEPING, // interruptible sleep
     PROC_STATUS_SLEEPING_D, // uninterruptible sleep
+    PROC_STATUS_SLEEPING,   // interruptible sleep
     PROC_STATUS_ZOMBIE,
     PROC_STATUS_STOPPED,
-    PROC_STATUS_END,  //place holder for ending enum fields
+    PROC_STATUS_END, //place holder for ending enum fields
 } proc_state;
 
 static proc_state proc_state_count[PROC_STATUS_END];
 static const char *proc_states[] = {
-    [PROC_STATUS_RUNNING] = " running",
-    [PROC_STATUS_SLEEPING] = " sleeping(interruptible)",
-    [PROC_STATUS_SLEEPING_D] = " sleeping(uninterruptible)",
-    [PROC_STATUS_ZOMBIE] = " zombie",
-    [PROC_STATUS_STOPPED] = " stopped",
+    [PROC_STATUS_RUNNING] = "running",
+    [PROC_STATUS_SLEEPING] = "sleeping_interruptible",
+    [PROC_STATUS_SLEEPING_D] = "sleeping_uninterruptible",
+    [PROC_STATUS_ZOMBIE] = "zombie",
+    [PROC_STATUS_STOPPED] = "stopped",
     };
 
 // ----------------------------------------------------------------------------
