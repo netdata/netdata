@@ -30,6 +30,8 @@
 
 set -e
 
+PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
+
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 if [ -x "${script_dir}/netdata-updater" ]; then
@@ -127,6 +129,33 @@ _get_intervaldir() {
   fi
 
   return 0
+}
+
+install_build_dependencies() {
+  bash="$(command -v bash 2> /dev/null)"
+
+  if [ -z "${bash}" ] || [ ! -x "${bash}" ]; then
+    warning "Unable to find a usable version of \`bash\` (required for local build)."
+    return 1
+  fi
+
+  info "Fetching dependency handling script..."
+  download "${PACKAGES_SCRIPT}" "${TMPDIR}/install-required-packages.sh" || true
+
+  if [ ! -s "${TMPDIR}/install-required-packages.sh" ]; then
+    warning "Downloaded dependency installation script is empty."
+  else
+    info "Running dependency handling script..."
+
+    if [ "${INTERACTIVE}" -eq 0 ]; then
+      opts="--dont-wait --non-interactive"
+    fi
+
+    # shellcheck disable=SC2086
+    if ! run "${bash}" "${TMPDIR}/install-required-packages.sh" ${opts} netdata; then
+      warning "Installing build dependencies failed. The update should still work, but you might be missing some features."
+    fi
+  fi
 }
 
 enable_netdata_updater() {
@@ -474,6 +503,8 @@ set_tarball_urls() {
 
 update_build() {
   [ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
+
+  install_build_dependencies
 
   RUN_INSTALLER=0
   ndtmpdir=$(create_tmp_directory)
