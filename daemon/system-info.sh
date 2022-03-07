@@ -21,7 +21,7 @@ if [ -z "${VIRTUALIZATION}" ]; then
   if [ -n "$(command -v systemd-detect-virt 2> /dev/null)" ]; then
     VIRTUALIZATION="$(systemd-detect-virt -v)"
     VIRT_DETECTION="systemd-detect-virt"
-    CONTAINER="$(systemd-detect-virt -c)"
+    CONTAINER=${CONTAINER:-$(systemd-detect-virt -c)}
     CONT_DETECTION="systemd-detect-virt"
   else
     if grep -q "^flags.*hypervisor" /proc/cpuinfo 2> /dev/null; then
