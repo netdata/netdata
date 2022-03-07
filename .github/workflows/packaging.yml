@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Prepare tools
         id: prepare
         run: |
@@ -108,7 +108,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Check Version
         id: check-version
         run: |
@@ -171,7 +171,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0 # We need full history for versioning
           submodules: recursive
