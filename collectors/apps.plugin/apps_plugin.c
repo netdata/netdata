@@ -6,7 +6,7 @@
  * Released under GPL v3+
  */
 
-#include "../all.h"
+#include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
