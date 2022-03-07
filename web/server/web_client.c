@@ -399,18 +399,6 @@ int mysendfile(struct web_client *w, char *filename) {
             return access_to_file_is_not_permitted(w, webfilename);
         }
 
-        // check if the file is owned by expected user
-        if (statbuf.st_uid != web_files_uid()) {
-            error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, statbuf.st_uid, web_files_uid());
-            return access_to_file_is_not_permitted(w, webfilename);
-        }
-
-        // check if the file is owned by expected group
-        if (statbuf.st_gid != web_files_gid()) {
-            error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, statbuf.st_gid, web_files_gid());
-            return access_to_file_is_not_permitted(w, webfilename);
-        }
-
         done = 1;
     }
 
