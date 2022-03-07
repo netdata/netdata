@@ -1220,15 +1220,15 @@ netdataDashboard.context = {
 
     'system.processes_state': {
         info: '<p>The number of processes in different states. </p> '+
-        '<p><b>Running</b> - executing and using the CPU at a particular moment. '+
-        '<b>Sleeping(uninterruptible)</b> - will wake only as a result of a waited-upon resource becoming available or after a time-out occurs during that wait. '+
+        '<p><b>Running</b> - Process using the CPU at a particular moment. '+
+        '<b>Sleeping (uninterruptible)</b> - Process will wake when a waited-upon resource becomes available or after a time-out occurs during that wait. '+
         'Mostly used by device drivers waiting for disk or network I/O. '+
-        '<b>Sleeping(interruptible)</b> - waiting either for a particular time slot or for a particular event to occur. '+
-        '<b>Zombie</b> - have completed their execution, released the system resources, but their entries are not removed from the process table. '+
-        'Usually occur for child processes, as the parent process still needs to read its child’s exit status. '+
-        'Processes that stay zombies for a long time are generally an error and cause the system PID space leak. '+
-        '<b>Stopped</b> - suspended from proceeding further (STOP/TSTP signals). ' +
-        'In this state a process will not do anything until it receives a CONT signal, not even terminate.</p>'
+        '<b>Sleeping (interruptible)</b> - Process is waiting either for a particular time slot or for a particular event to occur. '+
+        '<b>Zombie</b> - Process that has completed its execution, released the system resources, but its entry is not removed from the process table. '+
+        'Usually occurs in child processes when the parent process still needs to read its child’s exit status. '+
+        'A process that stays a zombie for a long time is generally an error and causes system PID space leak. '+
+        '<b>Stopped</b> - Process is suspended from proceeding further due to STOP or TSTP signals. ' +
+        'In this state, a process will not do anything (not even terminate) until it receives a CONT signal.</p>'
     },
 
     'system.active_processes': {
