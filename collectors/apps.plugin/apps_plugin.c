@@ -6,6 +6,7 @@
  * Released under GPL v3+
  */
 
+#include "../all.h"
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
@@ -108,23 +109,22 @@ static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 
 // some variables for keeping track of processes count by states
-#define NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES 601
 typedef enum {
-    RUNNING = 0,
-    SLEEPING, // interruptible sleep
-    SLEEPING_D, // uninterruptible sleep
-    ZOMBIE,
-    STOPPED,
-    END,
+    PROC_STATUS_RUNNING = 0,
+    PROC_STATUS_SLEEPING, // interruptible sleep
+    PROC_STATUS_SLEEPING_D, // uninterruptible sleep
+    PROC_STATUS_ZOMBIE,
+    PROC_STATUS_STOPPED,
+    PROC_STATUS_END,  //place holder for ending enum fields
 } proc_state;
 
-static int proc_state_count[5];
+static proc_state proc_state_count[PROC_STATUS_END];
 static const char *proc_states[] = {
-    [RUNNING] = "running",
-    [SLEEPING] = "sleeping(interruptible)",
-    [SLEEPING_D] = "sleeping(uninterruptible)",
-    [ZOMBIE] = "zombie",
-    [STOPPED] = "stopped",
+    [PROC_STATUS_RUNNING] = " running",
+    [PROC_STATUS_SLEEPING] = " sleeping(interruptible)",
+    [PROC_STATUS_SLEEPING_D] = " sleeping(uninterruptible)",
+    [PROC_STATUS_ZOMBIE] = " zombie",
+    [PROC_STATUS_STOPPED] = " stopped",
     };
 
 // ----------------------------------------------------------------------------
@@ -1257,19 +1257,19 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
 static void update_proc_state_count(char proc_state) {
     switch (proc_state) {
         case 'S':
-            proc_state_count[SLEEPING] += 1;
+            proc_state_count[PROC_STATUS_SLEEPING] += 1;
             break;
         case 'R':
-            proc_state_count[RUNNING] += 1;
+            proc_state_count[PROC_STATUS_RUNNING] += 1;
             break;
         case 'D':
-            proc_state_count[SLEEPING_D] += 1;
+            proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
             break;
         case 'Z':
-            proc_state_count[ZOMBIE] += 1;
+            proc_state_count[PROC_STATUS_ZOMBIE] += 1;
             break;
         case 'T':
-            proc_state_count[STOPPED] += 1;
+            proc_state_count[PROC_STATUS_STOPPED] += 1;
             break;
         default:
             break;
@@ -2574,12 +2574,9 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 
 static int collect_data_for_all_processes(void) {
     struct pid_stat *p = NULL;
-    
-    // clear process state counter
-    for (proc_state i = RUNNING; i < END; i++) {
-        proc_state_count[i] = 0;
-    }
 
+    // clear process state counter
+    memset(proc_state_count, 0, sizeof proc_state_count);
 #ifdef __FreeBSD__
     int i, procnum;
 
@@ -3862,7 +3859,7 @@ static void send_proc_states_count(usec_t dt)
                 "CHART system.process_states '' 'Apps Process States' 'numbers' processes system.process_states line %d %d\n",
                 NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES,
                 update_every);
-        for (proc_state i = RUNNING; i < END; i++) {
+        for (proc_state i = PROC_STATUS_RUNNING; i < PROC_STATUS_END; i++) {
           fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", proc_states[i]);
         }
         chart_added = true;
@@ -3870,7 +3867,7 @@ static void send_proc_states_count(usec_t dt)
 
     // send process state count
     send_BEGIN("system", "process_states", dt);
-    for (proc_state i = RUNNING; i < END; i++) {
+    for (proc_state i = PROC_STATUS_RUNNING; i < PROC_STATUS_END; i++) {
         send_SET(proc_states[i], proc_state_count[i]);
     }
     send_END();
