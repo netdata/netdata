@@ -1218,12 +1218,12 @@ netdataDashboard.context = {
         '<b>Blocked</b> - currently blocked, waiting for I/O to complete.</p>'
     },
 
-    'system.process_states': {
+    'system.processes_state': {
         info: '<p>The number of processes in different states. </p> '+
         '<p><b>Running</b> - executing and using the CPU at a particular moment. '+
-        '<b>Sleeping(interruptible)</b> - waiting either for a particular time slot or for a particular event to occur. '+
         '<b>Sleeping(uninterruptible)</b> - will wake only as a result of a waited-upon resource becoming available or after a time-out occurs during that wait. '+
         'Mostly used by device drivers waiting for disk or network I/O. '+
+        '<b>Sleeping(interruptible)</b> - waiting either for a particular time slot or for a particular event to occur. '+
         '<b>Zombie</b> - have completed their execution, released the system resources, but their entries are not removed from the process table. '+
         'Usually occur for child processes, as the parent process still needs to read its child’s exit status. '+
         'Processes that stay zombies for a long time are generally an error and cause the system PID space leak. '+

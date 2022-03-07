@@ -3856,7 +3856,7 @@ static void send_proc_states_count(usec_t dt)
     if (!chart_added) {
         fprintf(
                 stdout,
-                "CHART system.process_states '' 'Apps Process States' 'processes' processes system.process_states line %d %d\n",
+                "CHART system.processes_state '' 'System Processes State' 'processes' processes system.processes_state line %d %d\n",
                 NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES,
                 update_every);
         for (proc_state i = PROC_STATUS_RUNNING; i < PROC_STATUS_END; i++) {
