@@ -3866,7 +3866,7 @@ static void send_proc_states_count(usec_t dt)
     }
 
     // send process state count
-    send_BEGIN("system", "process_states", dt);
+    send_BEGIN("system", "processes_state", dt);
     for (proc_state i = PROC_STATUS_RUNNING; i < PROC_STATUS_END; i++) {
         send_SET(proc_states[i], proc_state_count[i]);
     }
