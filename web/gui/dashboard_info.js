@@ -1219,10 +1219,16 @@ netdataDashboard.context = {
     },
 
     'system.process_states': {
-        info: '<p>System processes in different states (chart provided by apps.plugin) </p> '+
-        '<p><b>running</b> - Running processes. <b>zombie</b> - Zombie. <b>stopped</b> - Stopped (on a signal). </p>' +
-        '<p><b>sleeping(interruptible)</b> - Sleeping in an interruptible wait. '+
-        '<b>sleeping(uninterruptible)</b> - Waiting in uninterruptible disk sleep. </p>'
+        info: '<p>The number of processes in different states. </p> '+
+        '<p><b>Running</b> - executing and using the CPU at a particular moment. '+
+        '<b>Sleeping(interruptible)</b> - waiting either for a particular time slot or for a particular event to occur. '+
+        '<b>Sleeping(uninterruptible)</b> - will wake only as a result of a waited-upon resource becoming available or after a time-out occurs during that wait. '+
+        'Mostly used by device drivers waiting for disk or network I/O. '+
+        '<b>Zombie</b> - have completed their execution, released the system resources, but their entries are not removed from the process table. '+
+        'Usually occur for child processes, as the parent process still needs to read its child’s exit status. '+
+        'Processes that stay zombies for a long time are generally an error and cause the system PID space leak. '+
+        '<b>Stopped</b> - suspended from proceeding further (STOP/TSTP signals). ' +
+        'In this state a process will not do anything until it receives a CONT signal, not even terminate.</p>'
     },
 
     'system.active_processes': {
