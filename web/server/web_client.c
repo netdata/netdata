@@ -235,37 +235,6 @@ uid_t web_files_uid(void) {
     return(owner_uid);
 }
 
-gid_t web_files_gid(void) {
-    static char *web_group = NULL;
-    static gid_t owner_gid = 0;
-
-    if(unlikely(!web_group)) {
-        // getgrgid() is not thread safe,
-        // but we have called this function once
-        // while single threaded
-        struct group *gr = getgrgid(getegid());
-        web_group = config_get(CONFIG_SECTION_WEB, "web files group", (gr)?(gr->gr_name?gr->gr_name:""):"");
-        if(!web_group || !*web_group)
-            owner_gid = getegid();
-        else {
-            // getgrnam() is not thread safe,
-            // but we have called this function once
-            // while single threaded
-            gr = getgrnam(web_group);
-            if(!gr) {
-                error("Group '%s' is not present. Ignoring option.", web_group);
-                owner_gid = getegid();
-            }
-            else {
-                debug(D_WEB_CLIENT, "Web files group set to %s.", web_group);
-                owner_gid = gr->gr_gid;
-            }
-        }
-    }
-
-    return(owner_gid);
-}
-
 static struct {
     const char *extension;
     uint32_t hash;

@@ -195,7 +195,6 @@ struct web_client {
 };
 
 extern uid_t web_files_uid(void);
-extern uid_t web_files_gid(void);
 
 extern int web_client_permission_denied(struct web_client *w);
 

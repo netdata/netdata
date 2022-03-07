@@ -1212,11 +1212,6 @@ int main(int argc, char **argv) {
 
     info("netdata started on pid %d.", getpid());
 
-    // IMPORTANT: these have to run once, while single threaded
-    // but after we have switched user
-    web_files_uid();
-    web_files_gid();
-
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
     // initialize internal registry
