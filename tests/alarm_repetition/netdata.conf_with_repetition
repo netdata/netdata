@@ -22,8 +22,6 @@
     # listen backlog = 4096
     default port = 19999
     #bind to = *=dashboard|registry|streaming|netdata.conf|badges|management *:20000=dashboard|registry|streaming|netdata.conf|badges|management^SSL=optional *:20001=dashboard|registry|streaming|netdata.conf|badges|management^SSL=force unix:/tmp/netdata/netdata.sock
-    # web files owner = netdata
-    # web files group = netdata
     #accept a streaming request every seconds = 2
 
 [plugins]
