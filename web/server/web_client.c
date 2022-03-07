@@ -204,37 +204,6 @@ void web_client_request_done(struct web_client *w) {
 #endif // NETDATA_WITH_ZLIB
 }
 
-uid_t web_files_uid(void) {
-    static char *web_owner = NULL;
-    static uid_t owner_uid = 0;
-
-    if(unlikely(!web_owner)) {
-        // getpwuid() is not thread safe,
-        // but we have called this function once
-        // while single threaded
-        struct passwd *pw = getpwuid(geteuid());
-        web_owner = config_get(CONFIG_SECTION_WEB, "web files owner", (pw)?(pw->pw_name?pw->pw_name:""):"");
-        if(!web_owner || !*web_owner)
-            owner_uid = geteuid();
-        else {
-            // getpwnam() is not thread safe,
-            // but we have called this function once
-            // while single threaded
-            pw = getpwnam(web_owner);
-            if(!pw) {
-                error("User '%s' is not present. Ignoring option.", web_owner);
-                owner_uid = geteuid();
-            }
-            else {
-                debug(D_WEB_CLIENT, "Web files owner set to %s.", web_owner);
-                owner_uid = pw->pw_uid;
-            }
-        }
-    }
-
-    return(owner_uid);
-}
-
 static struct {
     const char *extension;
     uint32_t hash;
