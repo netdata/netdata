@@ -77,7 +77,7 @@ find the updater script.
 
 On such installs, you can update Netdata using your distribution package manager.
 
-### If that does not work
+### If the kickstart script does not work
 
 If the above command fails, you can [reinstall
 Netdata](/packaging/installer/REINSTALL.md#one-line-installer-script-kickstartsh) to get the latest version. This
