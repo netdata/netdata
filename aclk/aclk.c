@@ -1120,6 +1120,7 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
     aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname);
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
 {
     struct proto_alert_status status;
@@ -1175,6 +1176,7 @@ static void fill_chart_status_for_host(BUFFER *wb, RRDHOST *host)
     );
     freez(stats);
 }
+#endif
 
 char *ng_aclk_state(void)
 {
@@ -1206,6 +1208,7 @@ char *ng_aclk_state(void)
     if (aclk_connected) {
         buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d", aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn);
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         RRDHOST *host;
         rrd_rdlock();
         rrdhost_foreach_read(host) {
@@ -1240,6 +1243,7 @@ char *ng_aclk_state(void)
             fill_chart_status_for_host(wb, host);
         }
         rrd_unlock();
+#endif
     }
 
     ret = strdupz(buffer_tostring(wb));
@@ -1247,6 +1251,7 @@ char *ng_aclk_state(void)
     return ret;
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
     struct proto_alert_status status;
@@ -1311,6 +1316,7 @@ static void fill_chart_status_for_host_json(json_object *obj, RRDHOST *host)
 
     freez(stats);
 }
+#endif
 
 char *ng_aclk_state_json(void)
 {
@@ -1364,6 +1370,7 @@ char *ng_aclk_state_json(void)
     tmp = json_object_new_int(aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
     json_object_object_add(msg, "reconnect-count", tmp);
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     grp = json_object_new_array();
 
     RRDHOST *host;
@@ -1415,6 +1422,7 @@ char *ng_aclk_state_json(void)
     }
     rrd_unlock();
     json_object_object_add(msg, "node-instances", grp);
+#endif
 
     char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
     json_object_put(msg);
