@@ -135,7 +135,7 @@ install_build_dependencies() {
   bash="$(command -v bash 2> /dev/null)"
 
   if [ -z "${bash}" ] || [ ! -x "${bash}" ]; then
-    warning "Unable to find a usable version of \`bash\` (required for local build)."
+    error "Unable to find a usable version of \`bash\` (required for local build)."
     return 1
   fi
 
@@ -143,7 +143,7 @@ install_build_dependencies() {
   download "${PACKAGES_SCRIPT}" "${TMPDIR}/install-required-packages.sh" || true
 
   if [ ! -s "${TMPDIR}/install-required-packages.sh" ]; then
-    warning "Downloaded dependency installation script is empty."
+    error "Downloaded dependency installation script is empty."
   else
     info "Running dependency handling script..."
 
@@ -152,8 +152,8 @@ install_build_dependencies() {
     fi
 
     # shellcheck disable=SC2086
-    if ! run "${bash}" "${TMPDIR}/install-required-packages.sh" ${opts} netdata; then
-      warning "Installing build dependencies failed. The update should still work, but you might be missing some features."
+    if ! "${bash}" "${TMPDIR}/install-required-packages.sh" ${opts} netdata; then
+      error "Installing build dependencies failed. The update should still work, but you might be missing some features."
     fi
   fi
 }
