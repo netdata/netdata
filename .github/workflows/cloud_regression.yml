@@ -8,6 +8,25 @@ jobs:
   trigger_cloud_regression_tests:
     runs-on: ubuntu-latest
     steps:
+      - name: Evaluate workflow dispatch parameters
+        id: output-workflow-dispatch-params
+        run: |
+          if [ ${{ github.event_name }} == 'pull_request' ]; then
+            NETDATA_CUSTOM_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+            NETDATA_CUSTOM_BRANCH="${{ github.event.pull_request.head.ref }}"
+            NETDATA_CUSTOM_PR_NUMBER="${{ github.event.number }}"
+            NETDATA_CUSTOM_COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
+          elif [ ${{ github.event.event_type }} == 'push' ]; then
+            NETDATA_CUSTOM_REPO="netdata/netdata"
+            NETDATA_CUSTOM_BRANCH="master"
+            NETDATA_CUSTOM_PR_NUMBER=""
+            NETDATA_CUSTOM_COMMIT_HASH="${{ github.sha }}"
+          fi
+            echo "::set-output name=netdata_repo::${NETDATA_CUSTOM_REPO}"
+            echo "::set-output name=netdata_branch::${NETDATA_CUSTOM_BRANCH}"
+            echo "::set-output name=netdata_pr_number::${NETDATA_CUSTOM_PR_NUMBER}"
+            echo "::set-output name=netdata_commit_hash::${NETDATA_CUSTOM_COMMIT_HASH}"
+
       - name: Trigger Cloud Regression
         uses: aurelien-baudet/workflow-dispatch@v2
         with:
@@ -15,10 +34,10 @@ jobs:
           ref: refs/heads/master
           workflow: regression.yml
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN  }}
-          inputs: '{ "netdata_branch": "${{ github.event.pull_request.head.ref }}",
-               "netdata_repo": "${{ github.event.pull_request.head.repo.full_name }}",
-               "netdata_pr_number": "${{ github.event.number }}",
-               "netdata_branch_commit_hash": "${{ github.event.pull_request.head.sha }}",
+          inputs: '{ "netdata_branch": "${{ steps.output-workflow-dispatch-params.outputs.netdata_branch }}",
+               "netdata_repo": "${{ steps.output-workflow-dispatch-params.outputs.netdata_repo }}",
+               "netdata_pr_number": "${{ steps.output-workflow-dispatch-params.outputs.netdata_pr_number }}",
+               "netdata_branch_commit_hash": "${{ steps.output-workflow-dispatch-params.outputs.netdata_commit_hash }}",
                "custom_netdata_image": "true"
                }'
           wait-for-completion: false
