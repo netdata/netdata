@@ -1020,12 +1020,12 @@ struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host)
 {
     struct aclk_chart_sync_stats *aclk_statistics = NULL;
 
-    aclk_statistics = callocz(1, sizeof(struct aclk_chart_sync_stats));
-
     struct aclk_database_worker_config *wc  = NULL;
     wc = (struct aclk_database_worker_config *)host->dbsync_worker;
     if (!wc)
         return NULL;
+
+    aclk_statistics = callocz(1, sizeof(struct aclk_chart_sync_stats));
 
     aclk_statistics->updates = wc->chart_updates;
     aclk_statistics->batch_id = wc->batch_id;
