@@ -416,6 +416,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->delay_multiplier = rt->delay_multiplier;
 
     rc->last_repeat = 0;
+    rc->times_repeat = 0;
     rc->warn_repeat_every = rt->warn_repeat_every;
     rc->crit_repeat_every = rt->crit_repeat_every;
 
@@ -528,6 +529,7 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     newrc->delay_multiplier = rc->delay_multiplier;
 
     newrc->last_repeat = 0;
+    newrc->times_repeat = 0;
     newrc->warn_repeat_every = rc->warn_repeat_every;
     newrc->crit_repeat_every = rc->crit_repeat_every;
 
