@@ -264,6 +264,7 @@ extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
 extern uint32_t finalized_threads;
 extern ebpf_plugin_stats_t plugin_statistics;
+extern struct btf *default_btf;
 
 // Socket functions and variables
 // Common functions

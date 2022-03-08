@@ -61,6 +61,7 @@ dist_noinst_DATA = \
     netdata.cppcheck \
     netdata.spec \
     packaging/bundle-ebpf.sh \
+    packaging/bundle-ebpf-co-re.sh \
     packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
     packaging/check-kernel-config.sh \

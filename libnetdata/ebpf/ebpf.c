@@ -718,14 +718,131 @@ static void ebpf_select_mode_string(char *output, size_t len, netdata_run_mode_t
 }
 
 /**
+ * Convert string to load mode
+ *
+ * Convert the string given as argument to value present in enum.
+ *
+ * @param str  value read from configuraion file.
+ *
+ * @return It returns the value to be used.
+ */
+netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(char *str)
+{
+    if (!strcasecmp(str, EBPF_CFG_CORE_PROGRAM))
+        return EBPF_LOAD_CORE;
+    else if (!strcasecmp(str, EBPF_CFG_LEGACY_PROGRAM))
+        return EBPF_LOAD_LEGACY;
+
+    return EBPF_LOAD_PLAY_DICE;
+}
+
+/**
+ * Convert load mode to string
+ *
+ * @param mode value that will select the string
+ *
+ * @return It returns the string associated to mode.
+ */
+static char *ebpf_convert_load_mode_to_string(netdata_ebpf_load_mode_t mode)
+{
+    if (mode == EBPF_LOAD_CORE)
+        return EBPF_CFG_CORE_PROGRAM;
+    else if (mode == EBPF_LOAD_LEGACY)
+        return EBPF_CFG_LEGACY_PROGRAM;
+
+    return EBPF_CFG_DEFAULT_PROGRAM;
+}
+
+/**
+ *  CO-RE type
+ *
+ *  Select the preferential type of CO-RE
+ *
+ *  @param str    value read from configuration file.
+ *  @param lmode  load mode used by collector.
+ */
+netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode_t lmode)
+{
+    if (!strcasecmp(str, EBPF_CFG_ATTACH_TRACEPOINT))
+        return EBPF_LOAD_TRACEPOINT;
+    else if (!strcasecmp(str, EBPF_CFG_ATTACH_PROBE)) {
+        return (lmode == MODE_ENTRY) ? EBPF_LOAD_PROBE : EBPF_LOAD_RETPROBE;
+    }
+
+    return EBPF_LOAD_TRAMPOLINE;
+}
+
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ * Adjust Thread Load
+ *
+ * Adjust thread configuraton according specified load.
+ *
+ * @param mod   the main structure that will be adjusted.
+ * @param file  the btf file used with thread.
+ */
+void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file)
+{
+    if (!file) {
+        mod->load = EBPF_LOAD_LEGACY;
+    } else if (mod->load == EBPF_LOAD_PLAY_DICE && file) {
+        mod->load = EBPF_LOAD_CORE;
+    }
+}
+
+/**
+ *
+ * @param filename
+ * @return
+ */
+struct btf *ebpf_parse_btf_file(const char *filename)
+{
+    struct btf *bf = btf__parse(filename, NULL);
+    if (libbpf_get_error(bf)) {
+        fprintf(stderr, "Cannot parse btf file");
+        btf__free(bf);
+        return NULL;
+    }
+
+    return bf;
+}
+#endif
+
+/**
+ * Update target with configuration
+ *
+ * Update target load mode with value.
+ *
+ * @param em       the module structure
+ * @param value    value used to update.
+ */
+static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program_loaded_t value)
+{
+    netdata_ebpf_targets_t *targets = em->targets;
+    if (!targets) {
+        return;
+    }
+
+    int i = 0;
+    while (targets[i].name) {
+        targets[i].mode = value;
+        i++;
+    }
+}
+
+/**
+ * Update Module using config
+ *
+ * Update configuration for a specific thread.
+ *
  * @param modules   structure that will be updated
  */
 void ebpf_update_module_using_config(ebpf_module_t *modules)
 {
     char default_value[EBPF_MAX_MODE_LENGTH + 1];
     ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
-    char *mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
-    modules->mode = ebpf_select_mode(mode);
+    char *value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
+    modules->mode = ebpf_select_mode(value);
 
     modules->update_every = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
                                                      EBPF_CFG_UPDATE_EVERY, modules->update_every);
@@ -735,8 +852,15 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
 
     modules->pid_map_size = (uint32_t)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
                                                            modules->pid_map_size);
-}
 
+    value = ebpf_convert_load_mode_to_string(modules->load);
+    value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
+    modules->load = epbf_convert_string_to_load_mode(value);
+
+    value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
+    netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(value, modules->mode);
+    ebpf_update_target_with_conf(modules, fill_lm);
+}
 
 /**
  * Update module
@@ -992,4 +1116,46 @@ int ebpf_enable_tracing_values(char *subsys, char *eventname)
 int ebpf_disable_tracing_values(char *subsys, char *eventname)
 {
     return ebpf_change_tracing_values(subsys, eventname, "0");
+}
+
+/**
+ * Select PC prefix
+ *
+ * Identify the prefix to run on PC architecture.
+ *
+ * @return It returns 32 or 64 according to host arch.
+ */
+static uint32_t ebpf_select_pc_prefix()
+{
+    long counter = 1;
+    uint32_t i;
+    for (i = 0; i < 128; i++) {
+        counter <<= 1;
+        if (counter < 0)
+            break;
+    }
+
+    return counter;
+}
+
+/**
+ * Select Host Prefix
+ *
+ * Select prefix to syscall when host is running a kernel newer than 4.17.0
+ *
+ * @param output the vector to store data.
+ * @param length length of output vector.
+ * @param syscall the syscall that prefix will be attached;
+ * @param kver    the current kernel version in format MAJOR*65536 + MINOR*256 + PATCH
+ */
+void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kver)
+{
+    if (kver < NETDATA_EBPF_KERNEL_4_17)
+        snprintfz(output, length, "sys_%s", syscall);
+    else {
+        uint32_t arch = ebpf_select_pc_prefix();
+        // Prefix selected according https://www.kernel.org/doc/html/latest/process/adding-syscalls.html
+        char *prefix = (arch == 32) ? "__ia32" : "__x64";
+        snprintfz(output, length, "%s_sys_%s", prefix, syscall);
+    }
 }
