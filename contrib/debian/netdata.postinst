@@ -50,9 +50,7 @@ case "$1" in
 
     dpkg-statoverride --force --update --add root netdata 0775 /var/lib/netdata/registry > /dev/null 2>&1
 
-    chown -R root:netdata /usr/share/netdata
     chown -R root:netdata /usr/libexec/netdata/plugins.d
-    chown -R root:netdata /var/lib/netdata/www
     setcap cap_dac_read_search,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin
     setcap cap_dac_read_search+ep /usr/libexec/netdata/plugins.d/slabinfo.plugin
     capsh --supports=cap_perfmon 2>/dev/null && setcap cap_perfmon+ep /usr/libexec/netdata/plugins.d/perf.plugin || setcap cap_sys_admin+ep /usr/libexec/netdata/plugins.d/perf.plugin

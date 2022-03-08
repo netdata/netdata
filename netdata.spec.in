@@ -514,7 +514,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
-%defattr(0644,root,netdata,0755)
+%defattr(0644,root,root,0755)
 %{_datadir}/%{name}/web
 
 # Enforce 0660 for files and 0770 for directories

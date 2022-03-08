@@ -1244,15 +1244,6 @@ NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 echo >&2 "Netdata user and group is finally set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
-# the owners of the web files
-NETDATA_WEB_USER="$(config_option "web" "web files owner" "${NETDATA_USER}")"
-NETDATA_WEB_GROUP="${NETDATA_GROUP}"
-if [ "$(id -u)" = "0" ] && [ "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]; then
-  NETDATA_WEB_GROUP="$(id -g -n "${NETDATA_WEB_USER}")"
-  [ -z "${NETDATA_WEB_GROUP}" ] && NETDATA_WEB_GROUP="${NETDATA_WEB_USER}"
-fi
-NETDATA_WEB_GROUP="$(config_option "web" "web files group" "${NETDATA_WEB_GROUP}")"
-
 # port
 defport=19999
 NETDATA_PORT="$(config_option "web" "default port" ${defport})"
@@ -1272,8 +1263,6 @@ cat << OPTIONSEOF
     Permissions
     - netdata user             : ${NETDATA_USER}
     - netdata group            : ${NETDATA_GROUP}
-    - web files user           : ${NETDATA_WEB_USER}
-    - web files group          : ${NETDATA_WEB_GROUP}
     - root user                : ${ROOT_USER}
 
     Directories
@@ -1318,7 +1307,6 @@ if [ ! -d "${NETDATA_WEB_DIR}" ]; then
   echo >&2 "Creating directory '${NETDATA_WEB_DIR}'"
   run mkdir -p "${NETDATA_WEB_DIR}" || exit 1
 fi
-run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
 run find "${NETDATA_WEB_DIR}" -type f -exec chmod 0664 {} \;
 run find "${NETDATA_WEB_DIR}" -type d -exec chmod 0775 {} \;
 
