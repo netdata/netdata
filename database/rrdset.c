@@ -1400,10 +1400,8 @@ void rrdset_done(RRDSET *st) {
 #ifdef ENABLE_ACLK
     if (likely(!st->state->is_ar_chart)) {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-            if (st->counter_done >= RRDSET_MINIMUM_LIVE_COUNT && st->dimensions) {
-                if (likely(!queue_chart_to_aclk(st)))
-                    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
-            }
+            if (likely(st->dimensions && !queue_chart_to_aclk(st)))
+                rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }
     }
 #endif
@@ -1832,7 +1830,8 @@ after_second_database_work:
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
     if (likely(!st->state->is_ar_chart)) {
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) {
-            int live = ((mark - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
+            int live = ((mark - rd->last_collected_time.tv_sec) <
+                 MAX(RRDSET_MINIMUM_LIVE_MULTIPLIER * rd->update_every, rrdset_free_obsolete_time));
             if (unlikely(live != rd->state->aclk_live_status)) {
                 if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
                     if (likely(!queue_dimension_to_aclk(rd))) {
@@ -1943,6 +1942,9 @@ after_second_database_work:
                             delete_dimension_uuid(&rd->state->metric_uuid);
                         } else {
                             /* Do not delete this dimension */
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+                            aclk_send_dimension_update(rd);
+#endif
                             last = rd;
                             rd = rd->next;
                             continue;
