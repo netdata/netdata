@@ -5,13 +5,15 @@
 # ======================================================================
 # Constants
 
+AGENT_BUG_REPORT_URL="https://github.com/netdata/netdata/issues/new/choose"
+CLOUD_BUG_REPORT_URL="https://github.com/netdata/netdata-cloud/issues/new/choose"
 KICKSTART_OPTIONS="${*}"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-1"
-TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
 START_TIME="$(date +%s)"
+TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
 
 # ======================================================================
 # Defaults for environment variables
@@ -779,7 +781,7 @@ claim() {
       return 0
       ;;
     1)
-      warning "Unable to claim node due to invalid claiming options. If you are seeing this message, you’ve probably found a bug."
+      warning "Unable to claim node due to invalid claiming options. If you are seeing this message, you’ve probably found a bug and should open a bug report at ${AGENT_BUG_REPORT_URL}"
       ;;
     2)
       warning "Unable to claim node due to issues creating the claiming directory or preparing the local claiming key. Make sure you have a working openssl command and that ${INSTALL_PREFIX}/var/lib/netdata/cloud.d exists, then try again."
@@ -788,10 +790,10 @@ claim() {
       warning "Unable to claim node due to missing dependencies. Usually this means that the Netdata Agent was built without support for Netdata Cloud."
       ;;
     4)
-      warning "Failed to claim node due to inabiity to connect to ${NETDATA_CLAIM_URL}. Usually this either means that the specified claiming URL is wrong, or that youare having entworking problems."
+      warning "Failed to claim node due to inability to connect to ${NETDATA_CLAIM_URL}. Usually this either means that the specified claiming URL is wrong, or that you are having networking problems."
       ;;
     5)
-      progress "Successfully claimed node, but was not able to notify the Netdata agent. You will need to restart the Netdata service on this node before it will show up in the Cloud."
+      progress "Successfully claimed node, but was not able to notify the Netdata Agent. You will need to restart the Netdata service on this node before it will show up in the Cloud."
       return 0
       ;;
     8)
@@ -807,22 +809,22 @@ claim() {
       warning "Failed to claim node due to an issue with the generated RSA key pair. You can usually resolve this by removing all files in ${INSTALL_PREFIX}/var/lib/netdata/cloud.d and then trying again."
       ;;
     12)
-      warning "Failed to claim node due to an invalid or expired claiming token. Please check that the toekn specified with the --claim-token option ('${NETDATA_CLAIM_TOKEN}') matches what you see in the Cloud and try again."
+      warning "Failed to claim node due to an invalid or expired claiming token. Please check that the token specified with the --claim-token option ('${NETDATA_CLAIM_TOKEN}') matches what you see in the Cloud and try again."
       ;;
     13)
       warning "Failed to claim node because the Cloud thinks it is already claimed. If this node was created by cloning a VM or as a container from a template, please remove the file ${INSTALL_PREFIX}/var/lib/netdata/registry/netdata.public.unique.id and restart the agent, then try to claim it again. Otherwise, if you are certain this node has never been claimed before, you can use the --claim-id option to specify a new node ID to use for claiming, for example by using the uuidgen command like so: --claim-id \"\$(uuidgen)\""
       ;;
     14)
-      warning "Failed to claim node because the node is already in the process of being claimed. You should not need to do anything to resolve this, the node should show up properly in the Cloud soon. If it does not, please report a bug."
+      warning "Failed to claim node because the node is already in the process of being claimed. You should not need to do anything to resolve this, the node should show up properly in the Cloud soon. If it does not, please report a bug at ${AGENT_BUG_REPORT_URL}."
       ;;
     15|16|17)
-      warning "Failed to claim node due to an internal server error in the Cloud. Please retry claiming this node later, and if you still see this message file a bug report."
+      warning "Failed to claim node due to an internal server error in the Cloud. Please retry claiming this node later, and if you still see this message file a bug report at ${CLOUD_BUG_REPORT_URL}."
       ;;
     18)
       warning "Unable to claim node because this Netdata installation does not have a unique ID yet. Make sure the agent is running and started up correctly, and then try again."
       ;;
     *)
-      warning "Failed to claim node for an unknown reason. This usually means either networking problems or a bug. Please retry claiming later, and if you still see this message file a bug report."
+      warning "Failed to claim node for an unknown reason. This usually means either networking problems or a bug. Please retry claiming later, and if you still see this message file a bug report at ${AGENT_BUG_REPORT_URL}"
       ;;
   esac
 
