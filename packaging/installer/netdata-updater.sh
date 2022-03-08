@@ -147,12 +147,10 @@ install_build_dependencies() {
   else
     info "Running dependency handling script..."
 
-    if [ "${INTERACTIVE}" -eq 0 ]; then
-      opts="--dont-wait --non-interactive"
-    fi
+    opts="--dont-wait --non-interactive"
 
     # shellcheck disable=SC2086
-    if ! "${bash}" "${TMPDIR}/install-required-packages.sh" ${opts} netdata; then
+    if ! "${bash}" "${TMPDIR}/install-required-packages.sh" ${opts} netdata >&3 2>&3; then
       error "Installing build dependencies failed. The update should still work, but you might be missing some features."
     fi
   fi
