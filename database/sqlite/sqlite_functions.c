@@ -1879,6 +1879,52 @@ failed:
     return rc - 1;
 }
 
+#define SQL_SELECT_HOSTNAME_BY_NODE_ID  "SELECT h.hostname FROM node_instance ni, " \
+"host h WHERE ni.host_id = h.host_id AND ni.node_id = @node_id;"
+
+char *get_hostname_by_node_id(char *node)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    rrd_rdlock();
+    RRDHOST *host = find_host_by_node_id(node);
+    rrd_unlock();
+    if (host)
+        return strdupz(host->hostname);
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return NULL;
+    }
+
+    uuid_t node_id;
+    uuid_parse(node, node_id);
+    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOSTNAME_BY_NODE_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch hostname by node id");
+        return NULL;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &node_id, sizeof(node_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to select node instance information");
+        goto failed;
+    }
+
+    char  *hostname = NULL;
+    rc = sqlite3_step(res);
+    if (likely(rc == SQLITE_ROW))
+        hostname = strdupz((char *)sqlite3_column_text(res, 0));
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when search for hostname by node id");
+
+    return hostname;
+}
+
 #define SQL_SELECT_HOST_BY_NODE_ID  "select host_id from node_instance where node_id = @node_id;"
 
 int get_host_id(uuid_t *node_id, uuid_t *host_id)

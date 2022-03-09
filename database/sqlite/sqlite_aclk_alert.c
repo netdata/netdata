@@ -274,7 +274,13 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         db_execute(buffer_tostring(sql));
     } else {
         if (log_first_sequence_id)
-            log_access("ACLK RES [%s (%s)]: Sent alert events, first sequence_id %"PRIu64", last sequence_id %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", log_first_sequence_id, log_last_sequence_id);
+            log_access(
+                "ACLK RES [%s (%s)]: ALERTS SENT from %" PRIu64 " to %" PRIu64 " batch=%" PRIu64,
+                wc->node_id,
+                wc->host ? wc->host->hostname : "N/A",
+                log_first_sequence_id,
+                log_last_sequence_id,
+                wc->alerts_batch_id);
         log_first_sequence_id = 0;
         log_last_sequence_id = 0;
     }
@@ -295,7 +301,9 @@ void aclk_send_alarm_health_log(char *node_id)
     if (unlikely(!node_id))
         return;
 
-    log_access("ACLK REQ [%s (N/A)]: Request to send alarm health log.", node_id);
+    char *hostname = get_hostname_by_node_id(node_id);
+    log_access("ACLK REQ [%s (%s)]: HEALTH LOG request received", node_id, hostname);
+    freez(hostname);
 
     struct aclk_database_worker_config *wc  = NULL;
     struct aclk_database_cmd cmd;
@@ -398,7 +406,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     wc->alert_sequence_id = last_sequence;
 
     aclk_send_alarm_log_health(&alarm_log);
-    log_access("ACLK REQ [%s (%s)]: Alarm health log sent, first sequence id %"PRIu64", last sequence id %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", first_sequence, last_sequence);
+    log_access("ACLK RES [%s (%s)]: HEALTH LOG SENT from %"PRIu64" to %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", first_sequence, last_sequence);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
@@ -559,7 +567,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     if (unlikely(!node_id))
         return;
 
-    log_access("ACLK REQ [%s (N/A)]: Start streaming alerts with batch_id %"PRIu64" and start_seq_id %"PRIu64".", node_id, batch_id, start_seq_id);
+    //log_access("ACLK REQ [%s (N/A)]: ALERTS STREAM from %"PRIu64" batch=%"PRIu64".", node_id, start_seq_id, batch_id);
 
     uuid_t node_uuid;
     if (uuid_parse(node_id, node_uuid))
@@ -582,7 +590,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         wc = (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
 
     if (likely(wc)) {
-        log_access("ACLK STA [%s (%s)]: Start streaming alerts enabled with batch_id %"PRIu64" and start_seq_id %"PRIu64".", node_id, wc->host ? wc->host->hostname : "N/A", batch_id, start_seq_id);
+        log_access("ACLK REQ [%s (%s)]: ALERTS STREAM from %"PRIu64" batch=%"PRIu64, node_id, wc->host ? wc->host->hostname : "N/A", start_seq_id, batch_id);
         __sync_synchronize();
         wc->alerts_batch_id = batch_id;
         wc->alerts_start_seq_id = start_seq_id;
