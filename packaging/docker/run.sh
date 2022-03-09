@@ -9,13 +9,17 @@
 # Author  : Austin S. Hemmelgarn <austin@netdata.cloud>
 set -e
 
+if [ ! -w / ] && [ "${EUID}" -eq 0 ]; then
+  echo >&2 "WARNING: This Docker host appears to not properly support newer stat system calls. This is known to cause issues with Netdata (most notably, nodes running on such hosts **cannot be claimed**)."
+  echo >&2 "WARNING: For more information, see https://learn.netdata.cloud/docs/agent/claim#known-issues-on-older-hosts-with-seccomp-enabled"
+fi
+
 if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   [ -n "$DISABLE_TELEMETRY" ] ||
   [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
   [ -n "$DO_NOT_TRACK" ]; then
   touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
-
 
 BALENA_PGID=$(ls -nd /var/run/balena.sock | awk '{print $4}')
 DOCKER_PGID=$(ls -nd /var/run/docker.sock | awk '{print $4}')
