@@ -2,7 +2,7 @@ name: Trigger Cloud Regression E2E Tests
 on:
   push:
     branches: [master]
-  pull_request:
+  pull_request_target:
     branches: [master]
 jobs:
   trigger_cloud_regression_tests:
