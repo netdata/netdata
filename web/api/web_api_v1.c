@@ -1273,22 +1273,14 @@ json_object *generate_info_json(RRDHOST *host)
 
 #ifdef ENABLE_ACLK
     JSON_ADD_BOOL("cloud-available", 1, j)
-#ifdef ACLK_NG
     JSON_ADD_BOOL("aclk-ng-available", 1, j)
-#else
-    JSON_ADD_BOOL("aclk-ng-available", 0, j)
-#endif
-#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     JSON_ADD_BOOL("aclk-ng-new-cloud-protocol", 1, j)
 #else
     JSON_ADD_BOOL("aclk-ng-new-cloud-protocol", 0, j)
 #endif
-#ifdef ACLK_LEGACY
-    JSON_ADD_BOOL("aclk-legacy-available", 1, j)
-#else
     JSON_ADD_BOOL("aclk-legacy-available", 0, j)
-#endif
-    JSON_ADD_STRING("aclk-implementation", aclk_ng ? "Next Generation" : "Legacy", j)
+    JSON_ADD_STRING("aclk-implementation", "Next Generation", j)
 #else /* !ENABLE_ACLK */
     JSON_ADD_BOOL("cloud-available", 0, j)
 #endif /* ENABLE_ALCK */
@@ -1298,9 +1290,14 @@ json_object *generate_info_json(RRDHOST *host)
     freez(agent_id);
 
 #ifdef ENABLE_ACLK
-    if (aclk_connected)
+    if (aclk_connected) {
         JSON_ADD_BOOL("aclk-available", 1, j)
-    else
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        JSON_ADD_STRING("aclk-available-protocol", aclk_use_new_cloud_arch ? "New" : "Legacy", j);
+#else
+        JSON_ADD_STRING("aclk-available-protocol", "Legacy", j);
+#endif
+    } else
 #endif
         JSON_ADD_BOOL("aclk-available", 0, j)
 
