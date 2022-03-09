@@ -47,7 +47,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Docker runtime testing failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Building or testing Docker image for linux/amd64 failed.
               CHeckout: ${{ steps.checkout.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
@@ -102,7 +102,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Docker build testing failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Building Docker image for ${{ matrix.platforms }} failed.
               CHeckout: ${{ steps.checkout.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
@@ -170,7 +170,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Docker Build failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to build or publish Docker images.
               CHeckout: ${{ steps.checkout.outcome }}
               Generate release tags: ${{ steps.release-tags.outcome }}

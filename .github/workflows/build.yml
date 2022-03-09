@@ -68,7 +68,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Distribution tarball creation failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create source tarball for distribution.
               Checkout: ${{ steps.checkout.outcome }}
               Mark stable: ${{ steps.channel.outcome }}
@@ -122,7 +122,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Static build failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create static installer archive for ${{ matrix.arch }}.
               Checkout: ${{ steps.checkout.outcome }}
               Mark stable: ${{ steps.channel.outcome }}
@@ -179,7 +179,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Build matrix preparation failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to prepare build matrix for build checks.
               Checkout: ${{ steps.checkout.outcome }}
               Prepare tools: ${{ steps.prepare.outcome }}
@@ -237,7 +237,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Test environment preparation for ${{ matrix.distro }} failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Test environment preparation for ${{ matrix.distro }} failed.
               Checkout: ${{ steps.checkout.outcome }}
               Set up Buildx: ${{ steps.buildx.outcome }}
@@ -306,7 +306,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Build tests for ${{ matrix.distro }} failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Build tests for ${{ matrix.distro }} failed.
               Checkout: ${{ steps.checkout.outcome }}
               Fetch test environment: ${{ steps.fetch.outcome }}
@@ -384,7 +384,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Updater checks for ${{ matrix.distro }} failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
               Checkout: ${{ steps.checkout.outcome }}
               Fetch dist tarball: ${{ steps.fetch-tarball.outcome }}
@@ -450,7 +450,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to prepare release artifacts for upload:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to prepare release artifacts for upload.
               CHeckout: ${{ steps.checkout.outcome }}
               Prepare environment: ${{ steps.prepare.outcome }}
@@ -501,7 +501,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Artifact verification for source tarball failed.'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Artifact verification for source tarball failed.
               Checkout: ${{ steps.checkout.outcome }}
               Fetch artifacts: ${{ steps.fetch.outcome }}
@@ -549,7 +549,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Artifact verification for static build failed.'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Artifact verification for static build failed.
               Checkout:  ${{ steps.checkout.outcome }}
               Fetch artifacts: ${{ steps.fetch-artifacts.outcome }}
@@ -601,7 +601,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to upload nightly release artifacts:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to upload nightly release artifacts.
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Setup GCloud: ${{ steps.gcloud.outcome }}
@@ -651,7 +651,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to draft release:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create draft release or attach artifacts.
               Checkout: ${{ steps.checkout.outcome }}
               Fetch artifacts: ${{ steps.fetch.outcome }}

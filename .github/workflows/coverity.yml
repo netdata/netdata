@@ -50,7 +50,7 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Coverity run failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: >-
+          SLACK_MESSAGE: |-
               ${{ github.repository }}: Coverity failed to run correctly.
               Checkout: ${{ steps.checkout.outcome }}
               Environment preparation: ${{ steps.prepare.outcome }}
