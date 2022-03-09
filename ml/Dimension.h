@@ -23,8 +23,10 @@ public:
     unsigned updateEvery() const { return RD->update_every; }
 
     const std::string getID() const {
+        RRDSET *RS = RD->rrdset;
+
         std::stringstream SS;
-        SS << RD->rrdset->id << "|" << RD->name;
+        SS << RS->context << "|" << RS->id << "|" << RD->name;
         return SS.str();
     }
 
