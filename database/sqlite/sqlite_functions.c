@@ -121,7 +121,7 @@ static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t 
 
     // Check if we should need to prepare the statement
     if (!*res) {
-        rc = sqlite3_prepare_v2(db_meta, statement, -1, res, 0);
+        rc = prepare_statement(db_meta, statement, res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store active object, rc = %d", rc);
             return rc;
@@ -142,7 +142,7 @@ static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t 
  */
 void store_active_chart(uuid_t *chart_uuid)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -158,7 +158,7 @@ void store_active_chart(uuid_t *chart_uuid)
     if (rc != SQLITE_DONE)
         error_report("Failed to store active chart, rc = %d", rc);
 
-    rc = sqlite3_finalize(res);
+    rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement in store active chart, rc = %d", rc);
     return;
@@ -170,7 +170,7 @@ void store_active_chart(uuid_t *chart_uuid)
  */
 void store_active_dimension(uuid_t *dimension_uuid)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -186,7 +186,7 @@ void store_active_dimension(uuid_t *dimension_uuid)
     if (rc != SQLITE_DONE)
         error_report("Failed to store active dimension, rc = %d", rc);
 
-    rc = sqlite3_finalize(res);
+    rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement in store active dimension, rc = %d", rc);
     return;
@@ -1335,7 +1335,7 @@ void add_migrated_file(char *path, uint64_t file_size)
 
 void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -1344,10 +1344,12 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
         return;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_INS_CHART_LABEL, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement store chart labels");
-        return;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_INS_CHART_LABEL, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement store chart labels");
+            return;
+        }
     }
 
     rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
@@ -1379,8 +1381,8 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
         error_report("Failed to store chart label entry, rc = %d", rc);
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when storing chart label information");
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("Failed to reset the prepared statement when storing chart label information");
 
     return;
 }
@@ -1881,7 +1883,7 @@ failed:
 
 int get_host_id(uuid_t *node_id, uuid_t *host_id)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -1890,10 +1892,12 @@ int get_host_id(uuid_t *node_id, uuid_t *host_id)
         return 1;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOST_BY_NODE_ID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to select node instance information for a node");
-        return 1;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_SELECT_HOST_BY_NODE_ID, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to select node instance information for a node");
+            return 1;
+        }
     }
 
     rc = sqlite3_bind_blob(res, 1, node_id, sizeof(*node_id), SQLITE_STATIC);
@@ -1907,8 +1911,8 @@ int get_host_id(uuid_t *node_id, uuid_t *host_id)
         uuid_copy(*host_id, *((uuid_t *) sqlite3_column_blob(res, 0)));
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when selecting node instance information");
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("Failed to reset the prepared statement when selecting node instance information");
 
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
@@ -2060,7 +2064,7 @@ failed:
 
 void sql_load_node_id(RRDHOST *host)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -2069,11 +2073,13 @@ void sql_load_node_id(RRDHOST *host)
         return;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_GET_HOST_NODE_ID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch node id");
-        return;
-    };
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_GET_HOST_NODE_ID, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to fetch node id");
+            return;
+        };
+    }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
@@ -2090,8 +2096,8 @@ void sql_load_node_id(RRDHOST *host)
     }
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when loading node instance information");
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("Failed to reset the prepared statement when loading node instance information");
 
     return;
 };

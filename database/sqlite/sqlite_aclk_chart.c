@@ -29,12 +29,11 @@ static int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payl
     int send_status = 0;
 
     if (unlikely(!res)) {
-        BUFFER *sql = buffer_create(1024);
-        buffer_sprintf(sql,"SELECT 1 FROM aclk_chart_latest_%s acl, aclk_chart_payload_%s acp "
+        char sql[ACLK_SYNC_QUERY_SIZE];
+        snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "SELECT 1 FROM aclk_chart_latest_%s acl, aclk_chart_payload_%s acp "
                             "WHERE acl.unique_id = acp.unique_id AND acl.uuid = @uuid AND acp.payload = @payload;",
                        uuid_str, uuid_str);
-        rc = prepare_statement(db_meta, (char *) buffer_tostring(sql), &res);
-        buffer_free(sql);
+        rc = prepare_statement(db_meta, sql, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to check payload data");
             return 0;
@@ -70,14 +69,11 @@ static int aclk_add_chart_payload(struct aclk_database_worker_config *wc, uuid_t
         return 0;
 
     if (unlikely(!res_chart)) {
-        BUFFER *sql = buffer_create(1024);
-
-        buffer_sprintf(sql,"INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
-                "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s','now'), @type, @payload);", wc->uuid_str);
-
-        rc = prepare_statement(db_meta, (char *) buffer_tostring(sql), &res_chart);
-        buffer_free(sql);
-
+        char sql[ACLK_SYNC_QUERY_SIZE];
+        snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,
+            "INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
+            "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s','now'), @type, @payload);", wc->uuid_str);
+        rc = prepare_statement(db_meta, sql, &res_chart);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to store chart payload data");
             return 1;
@@ -320,21 +316,20 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     uint64_t last_sequence;
     time_t last_timestamp = 0;
 
-    BUFFER *sql = buffer_create(1024);
+    char sql[ACLK_SYNC_QUERY_SIZE];
+    static __thread sqlite3_stmt *res = NULL;
 
-    sqlite3_stmt *res = NULL;
-
-    buffer_sprintf(sql, "SELECT ac.sequence_id, acp.payload, ac.date_created, ac.type, ac.uuid  " \
-    "FROM aclk_chart_%s ac, aclk_chart_payload_%s acp " \
-    "WHERE ac.date_submitted IS NULL AND ac.unique_id = acp.unique_id AND ac.update_count > 0 " \
-    "AND acp.claim_id = @claim_id ORDER BY ac.sequence_id ASC LIMIT %d;", wc->uuid_str, wc->uuid_str, limit);
-
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to send a chart update via ACLK");
-        buffer_free(sql);
-        freez(claim_id);
-        return;
+    if (unlikely(!res)) {
+        snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"SELECT ac.sequence_id, acp.payload, ac.date_created, ac.type, ac.uuid  " \
+             "FROM aclk_chart_%s ac, aclk_chart_payload_%s acp " \
+             "WHERE ac.date_submitted IS NULL AND ac.unique_id = acp.unique_id AND ac.update_count > 0 " \
+             "AND acp.claim_id = @claim_id ORDER BY ac.sequence_id ASC LIMIT %d;", wc->uuid_str, wc->uuid_str, limit);
+        rc = prepare_statement(db_meta, sql, &res);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement when trying to send a chart update via ACLK");
+            freez(claim_id);
+            return;
+        }
     }
 
     rc = sqlite3_bind_blob(res, 1, claim_uuid , sizeof(claim_uuid), SQLITE_STATIC);
@@ -388,21 +383,18 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             error_report("Failed to reset statement when pushing chart events, rc = %d", rc);
 
         if (likely(first_sequence)) {
-            buffer_flush(sql);
 
             db_lock();
-            buffer_sprintf(sql, "UPDATE aclk_chart_%s SET status = NULL, date_submitted=strftime('%%s','now') "
+            snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "UPDATE aclk_chart_%s SET status = NULL, date_submitted=strftime('%%s','now') "
                                 "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                                 wc->uuid_str, first_sequence, last_sequence);
-            db_execute(buffer_tostring(sql));
-
-            buffer_flush(sql);
-            buffer_sprintf(sql, "INSERT OR REPLACE INTO aclk_chart_latest_%s (uuid, unique_id, date_submitted) "
+            db_execute(sql);
+            snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "INSERT OR REPLACE INTO aclk_chart_latest_%s (uuid, unique_id, date_submitted) "
                                 " SELECT uuid, unique_id, date_submitted FROM aclk_chart_%s s "
                                 " WHERE date_submitted IS NOT NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64
                                 " ;",
                                 wc->uuid_str, wc->uuid_str, first_sequence, last_sequence);
-            db_execute(buffer_tostring(sql));
+            db_execute(sql);
             db_unlock();
 
             aclk_chart_inst_and_dim_update(payload_list, payload_list_size, is_dim, position_list, wc->batch_id);
@@ -436,11 +428,10 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     freez(is_dim);
 
 bind_fail:
-    rc = sqlite3_finalize(res);
+    rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when pushing chart events, rc = %d", rc);
+        error_report("Failed to reset statement when pushing chart events, rc = %d", rc);
 
-    buffer_free(sql);
     freez(claim_id);
     return;
 }
@@ -521,15 +512,15 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
 
     log_access("IN [%s (%s)]: Received ack chart sequence id %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", cmd.param1);
 
-    BUFFER *sql = buffer_create(1024);
+    char sql[ACLK_SYNC_QUERY_SIZE];
 
-    buffer_sprintf(sql, "UPDATE aclk_chart_%s SET date_updated=strftime('%%s','now') WHERE sequence_id <= @sequence_id "
-                        "AND date_submitted IS NOT NULL AND date_updated IS NULL;", wc->uuid_str);
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"UPDATE aclk_chart_%s SET date_updated=strftime('%%s','now') WHERE sequence_id <= @sequence_id "
+            "AND date_submitted IS NOT NULL AND date_updated IS NULL;", wc->uuid_str);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement count sequence ids in the database");
-        goto prepare_fail;
+        error_report("Failed to prepare statement to ack chart sequence ids");
+        return;
     }
 
     rc = sqlite3_bind_int64(res, 1, (uint64_t) cmd.param1);
@@ -540,13 +531,10 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
     if (rc != SQLITE_DONE)
         error_report("Failed to ACK sequence id, rc = %d", rc);
 
-    bind_fail:
-        if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-            error_report("Failed to finalize statement to ACK older sequence ids, rc = %d", rc);
-
-        prepare_fail:
-        buffer_free(sql);
-        return;
+bind_fail:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize statement to ACK older sequence ids, rc = %d", rc);
+    return;
 }
 
 void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
@@ -556,12 +544,11 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
                    wc->uuid_str, cmd.param1);
     db_execute(buffer_tostring(sql));
     if (cmd.param1 == 1) {
-        db_lock();
         buffer_flush(sql);
         log_access("IN [%s (%s)]: Received chart full resync.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
         buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; " \
                             "DELETE FROM aclk_chart_latest_%s;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
-
+        db_lock();
         db_execute("BEGIN TRANSACTION;");
         db_execute(buffer_tostring(sql));
         db_execute("COMMIT TRANSACTION;");
@@ -909,43 +896,43 @@ failed:
 
 uint32_t sql_get_pending_count(struct aclk_database_worker_config *wc)
 {
-    BUFFER *sql = buffer_create(1024);
-    sqlite3_stmt *res = NULL;
+    char sql[ACLK_SYNC_QUERY_SIZE];
+    static __thread sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql,"SELECT count(1) FROM aclk_chart_%s ac WHERE ac.date_submitted IS NULL;", wc->uuid_str);
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "SELECT count(1) FROM aclk_chart_%s ac WHERE ac.date_submitted IS NULL;", wc->uuid_str);
 
     int rc;
     uint32_t chart_payload_count = 0;
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to count pending messages");
-        goto fail;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, sql, &res);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement to count pending messages");
+            return 0;
+        }
     }
     while (sqlite3_step(res) == SQLITE_ROW)
         chart_payload_count = (uint32_t) sqlite3_column_int(res, 0);
 
-    rc = sqlite3_finalize(res);
+    rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when fetching pending messages, rc = %d", rc);
 
-fail:
-    buffer_free(sql);
     return chart_payload_count;
 }
 
 void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc)
 {
-    BUFFER *sql = buffer_create(1024);
+    char sql[ACLK_SYNC_QUERY_SIZE];
 
-    buffer_sprintf(sql,"SELECT ac.sequence_id, ac.date_created FROM aclk_chart_%s ac " \
-                        "WHERE ac.date_submitted IS NOT NULL ORDER BY ac.sequence_id DESC LIMIT 1;", wc->uuid_str);
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "SELECT ac.sequence_id, ac.date_created FROM aclk_chart_%s ac " \
+        "WHERE ac.date_submitted IS NOT NULL ORDER BY ac.sequence_id DESC LIMIT 1;", wc->uuid_str);
 
     int rc;
     sqlite3_stmt *res = NULL;
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to find last chart sequence id");
-        goto fail;
+        return;
     }
 
     wc->chart_sequence_id = 0;
@@ -961,8 +948,6 @@ void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when fetching chart sequence info, rc = %d", rc);
 
-fail:
-    buffer_free(sql);
     return;
 }
 

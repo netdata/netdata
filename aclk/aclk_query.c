@@ -58,6 +58,13 @@ static RRDHOST *node_id_2_rrdhost(const char *node_id)
 {
     int res;
     uuid_t node_id_bin, host_id_bin;
+
+    rrd_rdlock();
+    RRDHOST *host = find_host_by_node_id((char *) node_id);
+    rrd_unlock();
+    if (host)
+        return host;
+
     char host_id[UUID_STR_LEN];
     if (uuid_parse(node_id, node_id_bin)) {
         error("Couldn't parse UUID %s", node_id);
