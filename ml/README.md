@@ -1,3 +1,8 @@
+<!--
+title: "Machine learning (ML) powered anomaly detection"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/ml/README.md
+-->
+
 # Machine learning (ML) powered anomaly detection
 
 ## Overview
