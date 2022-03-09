@@ -34,11 +34,8 @@ typedef enum exporting_options {
     (EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_SOURCE_DATA_SUM)
 #define EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) (exporting_options & EXPORTING_OPTIONS_SOURCE_BITS)
 
-extern int global_exporting_update_every;
 extern EXPORTING_OPTIONS global_exporting_options;
-extern const char *global_exporting_source;
 extern const char *global_exporting_prefix;
-extern const char *global_exporting_send_charts_matching;
 
 #define sending_labels_configured(instance)                                                                            \
     (instance->config.options & (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))

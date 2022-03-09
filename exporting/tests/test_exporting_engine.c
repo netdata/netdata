@@ -15,9 +15,7 @@ char *netdata_configured_hostname = "test_global_host";
 char log_line[MAX_LOG_LINE + 1];
 
 EXPORTING_OPTIONS global_exporting_options = 0;
-const char *global_exporting_source = "average";
 const char *global_exporting_prefix = "netdata";
-const char *global_exporting_send_charts_matching = "*";
 
 void init_connectors_in_tests(struct engine *engine)
 {

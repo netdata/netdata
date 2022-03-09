@@ -451,9 +451,6 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_GLOBAL, "web files group",
                 CONFIG_SECTION_WEB,    "web files group");
-
-    config_move(CONFIG_SECTION_BACKEND, "opentsdb host tags",
-                CONFIG_SECTION_BACKEND, "host tags");
 }
 
 static void get_netdata_configured_variables() {

@@ -2,11 +2,8 @@
 
 #include "exporting_engine.h"
 
-int global_exporting_update_every = 10;
 EXPORTING_OPTIONS global_exporting_options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
-const char *global_exporting_source = NULL;
 const char *global_exporting_prefix = "netdata";
-const char *global_exporting_send_charts_matching = "*";
 
 struct config exporting_config = { .first_section = NULL,
                                    .last_section = NULL,
@@ -244,25 +241,9 @@ struct engine *read_exporting_config()
         prometheus_exporter_instance->config.update_every =
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
-        // ------------------------------------------------------------------------
-        // collect backward compatibility configuration options
-
-        global_exporting_update_every =
-            (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", global_exporting_update_every);
-        global_exporting_source = config_get(CONFIG_SECTION_BACKEND, "data source", "average");
-
-        if(config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", (global_exporting_options & EXPORTING_OPTION_SEND_NAMES)))
-            global_exporting_options |= EXPORTING_OPTION_SEND_NAMES;
-        else
-            global_exporting_options &= ~EXPORTING_OPTION_SEND_NAMES;
-        global_exporting_options = exporting_parse_data_source(global_exporting_source, global_exporting_options);
-
-        global_exporting_prefix = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
-        global_exporting_send_charts_matching = config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*");
-
         prometheus_exporter_instance->config.options |= global_exporting_options & EXPORTING_OPTIONS_SOURCE_BITS;
 
-        char *data_source = prometheus_config_get("data source", global_exporting_source);
+        char *data_source = prometheus_config_get("data source", "average");
         prometheus_exporter_instance->config.options =
             exporting_parse_data_source(data_source, prometheus_exporter_instance->config.options);
 
@@ -283,7 +264,7 @@ struct engine *read_exporting_config()
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
         prometheus_exporter_instance->config.charts_pattern = simple_pattern_create(
-            prometheus_config_get("send charts matching", global_exporting_send_charts_matching),
+            prometheus_config_get("send charts matching", "*"),
             NULL,
             SIMPLE_PATTERN_EXACT);
         prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create(
