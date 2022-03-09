@@ -1,3 +1,9 @@
+<!-- 
+title: Machine learning (ML) powered anomaly detection
+custom_edit_url: https://github.com/netdata/netdata/edit/master/ml/README.md
+description: This is an in-depth look at how Netdata uses ML to detect anomalies.
+keywords: [machine learning, anomaly detection, Netdata ML]
+-->
 # Machine learning (ML) powered anomaly detection
 
 ## Overview
