@@ -1215,6 +1215,8 @@ static inline json_object *host_labels_json(RRDHOST *host)
     return obj;
 }
 
+extern void analytics_build_info(BUFFER *b);
+
 json_object *generate_info_json(RRDHOST *host)
 {
     json_object *j = json_object_new_object();
@@ -1301,14 +1303,17 @@ json_object *generate_info_json(RRDHOST *host)
 #endif
         JSON_ADD_BOOL("aclk-available", 0, j)
 
-    JSON_ADD_STRING("memory-mode", analytics_data.netdata_config_memory_mode, j)
+    JSON_ADD_STRING("memory-mode", rrd_memory_mode_name(default_rrd_memory_mode), j)
     JSON_ADD_STRING("multidb-disk-quota", analytics_data.netdata_config_multidb_disk_quota, j)
     JSON_ADD_STRING("page-cache-size", analytics_data.netdata_config_page_cache_size, j)
     JSON_ADD_STRING("stream-enabled", analytics_data.netdata_config_stream_enabled, j)
     JSON_ADD_STRING("hosts-available", analytics_data.netdata_config_hosts_available, j)
     JSON_ADD_STRING("https-enabled", analytics_data.netdata_config_https_enabled, j)
-    JSON_ADD_STRING("buildinfo", analytics_data.netdata_buildinfo, j)
-    JSON_ADD_STRING("release-channel", analytics_data.netdata_config_release_channel, j)
+    BUFFER *bi = buffer_create(1000);
+    analytics_build_info(bi);
+    JSON_ADD_STRING("buildinfo", buffer_tostring(bi), j);
+    buffer_free(bi);
+    JSON_ADD_STRING("release-channel", get_release_channel(), j)
     JSON_ADD_STRING("web-enabled", analytics_data.netdata_config_web_enabled, j)
     JSON_ADD_STRING("notification-methods", analytics_data.netdata_notification_methods, j)
     JSON_ADD_STRING("exporting-enabled", analytics_data.netdata_config_exporting_enabled, j)
