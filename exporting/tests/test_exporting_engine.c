@@ -14,9 +14,6 @@ char *netdata_configured_hostname = "test_global_host";
 
 char log_line[MAX_LOG_LINE + 1];
 
-EXPORTING_OPTIONS global_exporting_options = 0;
-const char *global_exporting_prefix = "netdata";
-
 void init_connectors_in_tests(struct engine *engine)
 {
     expect_function_call(__wrap_now_realtime_sec);
