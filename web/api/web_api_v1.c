@@ -1314,15 +1314,19 @@ json_object *generate_info_json(RRDHOST *host)
     JSON_ADD_STRING("memory-mode", rrd_memory_mode_name(default_rrd_memory_mode), j)
     JSON_ADD_STRING("multidb-disk-quota", analytics_data.netdata_config_multidb_disk_quota, j)
     JSON_ADD_STRING("page-cache-size", analytics_data.netdata_config_page_cache_size, j)
-    JSON_ADD_STRING("stream-enabled", analytics_data.netdata_config_stream_enabled, j)
-    JSON_ADD_STRING("hosts-available", analytics_data.netdata_config_hosts_available, j)
-    JSON_ADD_STRING("https-enabled", analytics_data.netdata_config_https_enabled, j)
+    JSON_ADD_BOOL("stream-enabled", default_rrdpush_enabled, j)
+    JSON_ADD_INT("hosts-available", rrd_hosts_available, j)
+#ifdef ENABLE_HTTPS
+    JSON_ADD_BOOL("https-enabled", 1, j)
+#else
+    JSON_ADD_BOOL("https-enabled", 0, j)
+#endif
     BUFFER *bi = buffer_create(1000);
     analytics_build_info(bi);
     JSON_ADD_STRING("buildinfo", buffer_tostring(bi), j);
     buffer_free(bi);
     JSON_ADD_STRING("release-channel", get_release_channel(), j)
-    JSON_ADD_STRING("web-enabled", analytics_data.netdata_config_web_enabled, j)
+    JSON_ADD_BOOL("web-enabled", (web_server_mode != WEB_SERVER_MODE_NONE), j)
     JSON_ADD_STRING("notification-methods", analytics_data.netdata_notification_methods, j)
     JSON_ADD_STRING("exporting-enabled", analytics_data.netdata_config_exporting_enabled, j)
     JSON_ADD_STRING("exporting-connectors", analytics_data.netdata_exporting_connectors, j)
