@@ -1193,6 +1193,14 @@ static inline void generate_info_mirrored_hosts(json_object *j)
             json_object_object_add(host_status, "claim_id", NULL);
         rrdhost_aclk_state_unlock(host);
 
+        if (host->node_id) {
+            char node_id_str[GUID_LEN + 1];
+            uuid_unparse_lower(*host->node_id, node_id_str);
+            JSON_ADD_STRING("node_id", node_id_str, host_status);
+        } else
+            json_object_object_add(host_status, "node_id", NULL);
+
+
         json_object_array_add(host_statuses, host_status);
     }
     rrd_unlock();
