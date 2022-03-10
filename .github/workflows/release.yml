@@ -44,7 +44,7 @@ jobs:
               ${{ github.event.inputs.version }}
       - name: Generate Nightly Changleog
         id: nightly-changelog
-        if: steps.target.outputs.run == "true" && steps.target.outputs.type == "nightly"
+        if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly'
         uses: heinrichreimer/github-changelog-generator-action@v2.3
         with:
           bugLabels: IGNOREBUGS
@@ -56,7 +56,7 @@ jobs:
           verbose: true
       - name: Generate Release Changelog
         id: release-changelog
-        if: steps.target.outputs.run == "true" && steps.target.outputs.type != "nightly"
+        if: steps.target.outputs.run == 'true' && steps.target.outputs.type != 'nightly'
         uses: heinrichreimer/github-changelog-generator-action@v2.3
         with:
           bugLabels: IGNOREBUGS
@@ -69,7 +69,7 @@ jobs:
           verbose: true
       - name: Commit Changes
         id: commit
-        if: steps.target.outputs.run == "true"
+        if: steps.target.outputs.run == 'true'
         run: |
           git config user.name "netdatabot"
           git config user.email "bot@netdata.cloud"
@@ -78,7 +78,7 @@ jobs:
           if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
             git tag ${{ github.event.inputs.version }}
           fi
-          git push https://${{ secrets.NETDATABOT_GITHUB_TOKEN }}@github.com/${{ github.repo }} ${{ steps.target.outputs.branch }}
+          git push https://${{ secrets.NETDATABOT_GITHUB_TOKEN }}@github.com/${{ github.repository }} ${{ steps.target.outputs.branch }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
