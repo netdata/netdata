@@ -386,7 +386,7 @@ newer_commit_date() {
   if [ -z "${commit_date}" ] ; then
     commit_date="9999999999"
   elif [ "$(uname)" = "Linux" ]; then
-    commit_date="$(date -d "${commit_date}")"
+    commit_date="$(date -d "${commit_date}" +%s)"
   else # assume BSD-style `date` if we are not on Linux
     commit_date="$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${commit_date}" +%s 2>/dev/null)"
 
