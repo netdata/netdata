@@ -1349,13 +1349,24 @@ json_object *generate_info_json(RRDHOST *host)
     buffer_free(bi);
     JSON_ADD_STRING("release-channel", get_release_channel(), j)
     JSON_ADD_BOOL("web-enabled", (web_server_mode != WEB_SERVER_MODE_NONE), j)
-    JSON_ADD_STRING("notification-methods", analytics_data.netdata_notification_methods, j)
+    if (netdata_anonymous_statistics_enabled == 1)
+        JSON_ADD_STRING("notification-methods", analytics_data.netdata_notification_methods, j)
+    else
+        json_object_object_add(j, "notification-methods", NULL);
     JSON_ADD_BOOL("exporting-enabled", appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO), j)
-    JSON_ADD_STRING("exporting-connectors", analytics_data.netdata_exporting_connectors, j)
-    JSON_ADD_STRING("allmetrics-prometheus-used", analytics_data.netdata_allmetrics_prometheus_used, j)
-    JSON_ADD_STRING("allmetrics-shell-used", analytics_data.netdata_allmetrics_shell_used, j)
-    JSON_ADD_STRING("allmetrics-json-used", analytics_data.netdata_allmetrics_json_used, j)
-    JSON_ADD_STRING("dashboard-used", analytics_data.netdata_dashboard_used, j)
+    if (netdata_anonymous_statistics_enabled == 1) {
+        JSON_ADD_STRING("exporting-connectors", analytics_data.netdata_exporting_connectors, j)
+        JSON_ADD_INT("allmetrics-prometheus-used", analytics_data.prometheus_hits, j)
+        JSON_ADD_INT("allmetrics-shell-used", analytics_data.shell_hits, j)
+        JSON_ADD_INT("allmetrics-json-used", analytics_data.json_hits, j)
+        JSON_ADD_INT("dashboard-used", analytics_data.dashboard_hits, j)
+    } else {
+        json_object_object_add(j, "exporting-connectors", NULL);
+        json_object_object_add(j, "allmetrics-prometheus-used", NULL);
+        json_object_object_add(j, "allmetrics-shell-used", NULL);
+        json_object_object_add(j, "allmetrics-json-used", NULL);
+        json_object_object_add(j, "dashboard-used", NULL);
+    }
 
     long int charts, dims;
     get_charts_dimensions_count(&charts, &dims);
