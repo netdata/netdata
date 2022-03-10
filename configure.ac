@@ -1529,36 +1529,14 @@ if test "${enable_backend_kinesis}" = "yes" -o \
         "${new_cloud_protocol}" = "yes" -o \
         "${build_ml}" = "yes"; then
     enable_cxx_linker="yes"
-
-    # Try to unconditionally link with -latomic. If the compiler can satisfy
-    # all the atomic ops with builtins then, the library will be left unused.
-    # Otherwise, some ops will be covered by the compiler's intrinsics and some
-    # will be picked up by the linker from -latomic. In the later case, if
-    # -latomic is not available there will be a build failure, which would
-    # have happened either way before this change.
-    AC_LANG_PUSH([C++])
-
-    AC_MSG_CHECKING(whether we can use -latomic)
-    OLD_LIBS="${LIBS}"
-    LIBS="-latomic"
-    AC_LINK_IFELSE([AC_LANG_SOURCE([[
-      #include <atomic>
-      #include <cstdint>
-      std::atomic<std::int64_t> v;
-      int main() {
-        return v;
-      }
-    ]])], CAN_USE_LIBATOMIC=yes, CAN_USE_LIBATOMIC=no)
-    LIBS="${OLD_LIBS}"
-    AC_MSG_RESULT($CAN_USE_LIBATOMIC)
-
-    if test "x$CAN_USE_LIBATOMIC" = xyes; then
-        OPTIONAL_ATOMIC_LIBS="-latomic"
-    fi
-    AC_SUBST([OPTIONAL_ATOMIC_LIBS])
-
-    AC_LANG_POP([C++])
 fi
+
+# Unconditionally link with the libatomic since:
+# - if atomics are not needed, the library will be unused
+# - if atomics are needed, either atomics are fulfilled by the compiler builtins
+#   and the library is unused or the library is needed anyway.
+OPTIONAL_ATOMIC_LIBS="-latomic"
+AC_SUBST([OPTIONAL_ATOMIC_LIBS])
 
 AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_cxx_linker}" = "yes"])
 
