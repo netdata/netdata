@@ -209,7 +209,7 @@ struct aclk_database_worker_config *find_inactive_wc_by_node_id(char *node_id)
 
 void aclk_sync_exit_all()
 {
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = localhost;
     while(host) {
         struct aclk_database_worker_config *wc = host->dbsync_worker;
@@ -572,7 +572,7 @@ void aclk_database_worker(void *arg)
 
     freez(loop);
 
-    rrd_wrlock();
+    rrd_rdlock();
     if (likely(wc->host))
         wc->host->dbsync_worker = NULL;
     freez(wc);
@@ -820,7 +820,7 @@ void aclk_data_rotated(void)
         return;
 
     time_t next_rotation_time = now_realtime_sec()+ACLK_DATABASE_ROTATION_DELAY;
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *this_host = localhost;
     while (this_host) {
         struct aclk_database_worker_config *wc = this_host->dbsync_worker;

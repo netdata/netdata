@@ -297,7 +297,7 @@ void aclk_send_alarm_health_log(char *node_id)
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_ALARM_HEALTH_LOG;
 
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
@@ -325,7 +325,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 
     RRDHOST *host = wc->host;
     if (unlikely(!host)) {
-        rrd_wrlock();
+        rrd_rdlock();
         host = find_host_by_node_id(wc->node_id);
         rrd_unlock();
 
@@ -561,7 +561,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         return;
 
     struct aclk_database_worker_config *wc  = NULL;
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
@@ -646,7 +646,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t sn
         return;
 
     struct aclk_database_worker_config *wc = NULL;
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;

@@ -625,7 +625,7 @@ static void aclk_submit_param_command(char *node_id, enum aclk_database_opcode a
     cmd.opcode = aclk_command;
     cmd.param1 = param;
 
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
@@ -664,7 +664,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
         return;
 
     struct aclk_database_worker_config *wc  = NULL;
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = localhost;
     while(host) {
         if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
