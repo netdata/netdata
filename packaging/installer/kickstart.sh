@@ -80,7 +80,8 @@ USAGE: kickstart.sh [options]
   --claim-only               If there is an existing install, only try to claim it, not update it.
   --claim-*                  Specify other options for the claiming script.
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
-  --uninstall                Uninstall netdata.
+  --uninstall                Uninstall Netdata.
+  --reinstall-clean          Clean reinstall Netdata.
 
 Additionally, this script may use the following environment variables:
 
@@ -1406,6 +1407,9 @@ while [ -n "${1}" ]; do
     "--uninstall")
       ACTION="uninstall"
       ;;
+    "--reinstall-clean")
+      ACTION="reinstall-clean"
+      ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1
       NETDATA_ONLY_STATIC=0
@@ -1464,9 +1468,22 @@ confirm_root_support
 get_system_info
 confirm_install_prefix
 
+export INSTALL_TYPE="${INSTALL_TYPE}"
+
 if [ "${ACTION}" = "uninstall" ]; then
   uninstall
   cleanup
+  trap - EXIT
+  exit 0
+fi
+
+if [ "${ACTION}" = "reinstall-clean" ]; then
+  uninstall
+  cleanup
+
+  REINSTALL_OPTIONS="$(echo "${KICKSTART_OPTIONS}" | sed 's/--reinstall-clean//g')"
+  ${ROOTCMD} "/kickstart.sh" $REINSTALL_OPTIONS
+
   trap - EXIT
   exit 0
 fi
