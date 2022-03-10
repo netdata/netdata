@@ -83,7 +83,7 @@ user_input() {
   fi
 }
 
-if [ -x "$(command -v apt-get)" ]; then
+if [ -x "$(command -v apt-get)" ] && [ ${INSTALL_TYPE} = *"binpkg-*"* ]; then
   if dpkg -s netdata > /dev/null; then
     echo "Found netdata native installation"
     if user_input "Do you want to remove netdata? "; then
@@ -101,7 +101,7 @@ if [ -x "$(command -v apt-get)" ]; then
     fi
     exit 0
   fi
-elif [ -x "$(command -v dnf)" ]; then
+elif [ -x "$(command -v dnf)" ] && [ ${INSTALL_TYPE} = *"binpkg-*"* ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
@@ -119,7 +119,7 @@ elif [ -x "$(command -v dnf)" ]; then
     fi
     exit 0
   fi
-elif [ -x "$(command -v yum)" ]; then
+elif [ -x "$(command -v yum)" ] && [ ${INSTALL_TYPE} = *"binpkg-*"* ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
@@ -137,7 +137,7 @@ elif [ -x "$(command -v yum)" ]; then
     fi
     exit 0
   fi
-elif [ -x "$(command -v zypper)" ]; then
+elif [ -x "$(command -v zypper)" ] && [ ${INSTALL_TYPE} = *"binpkg-*"* ]; then
   if [ "${FLAG}" = "-y" ]; then
     FLAG=-n
   fi
