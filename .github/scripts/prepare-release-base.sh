@@ -8,56 +8,6 @@ EVENT_TYPE="${3}"
 EVENT_VERSION="${4}"
 
 ##############################################################
-# Utility functions
-
-generate_changelog() {
-    echo "::group::Generating changelog"
-
-    if [ -n "${1}" ]; then
-        OPTS="--future-release ${1}"
-    fi
-
-    # shellcheck disable=SC2086
-    docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest \
-               --user "netdata" \
-               --project "netdata" \
-               --token "${GITHUB_TOKEN}" \
-               --since-tag "v1.10.0" \
-               --unreleased-label "**Next release**" \
-               --no-issues \
-               --exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
-               --max-issues 500 \
-               --bug-labels IGNOREBUGS ${OPTS}
-
-    echo "::endgroup::"
-}
-
-commit_changes() {
-    branch="${1}"
-    msg="${2}"
-    tag="${3}"
-
-    echo "::group::Committing changelog and version file and pushing changes."
-
-    git checkout "${branch}"
-    git add packaging/version CHANGELOG.md
-    git commit -m "[ci skip] ${msg}"
-    if [ -n "${tag}" ]; then
-        git tag "${tag}"
-        opts="--tags"
-    fi
-
-    if [ -n "${GITHUB_ACTIONS}" ]; then
-        git push ${opts} "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${branch}"
-    else
-        echo "Not pushing changes as we are not running in GitHub Actions."
-        echo "Would have pushed ${branch} to origin, with additional options '${opts}'"
-    fi
-
-    echo "::endgroup::"
-}
-
-##############################################################
 # Version validation functions
 
 check_version_format() {
@@ -152,11 +102,12 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     LAST_TAG=$(git describe --abbrev=0 --tags)
     COMMITS_SINCE_RELEASE=$(git rev-list "${LAST_TAG}"..HEAD --count)
     NEW_VERSION="${LAST_TAG}-$((COMMITS_SINCE_RELEASE + 1))-nightly"
-    generate_changelog "" || exit 1
     echo "${NEW_VERSION}" > packaging/version || exit 1
-    commit_changes master "Update changelog and version for nightly build: ${NEW_VERSION}."
     echo "::set-output name=run::true"
+    echo "::set-output name=message::Update changelog and version for nightly build: ${NEW_VERSION}."
     echo "::set-output name=ref::master"
+    echo "::set-output name=type::nightly"
+    echo "::set-output name=branch::master"
 elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a patch release build."
     check_version_format || exit 1
@@ -170,11 +121,12 @@ elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     minor_matches || exit 1
     major_matches || exit 1
     check_newer_patch_number || exit 1
-    generate_changelog "${EVENT_VERSION}" || exit 1
     echo "${EVENT_VERSION}" > packaging/version || exit 1
-    commit_changes "${branch_name}" "Patch release ${EVENT_VERSION}." "${EVENT_VERSION}" || exit 1
     echo "::set-output name=run::true"
+    echo "::set-output name=message::Patch release ${EVENT_VERSION}."
     echo "::set-output name=ref::${EVENT_VERSION}"
+    echo "::set-output name=type::release"
+    echo "::set-output name=branch::${branch_name}"
 elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a minor release build."
     check_version_format || exit 1
@@ -189,11 +141,12 @@ elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     fi
     git branch "${branch_name}"
     git checkout "${branch_name}"
-    generate_changelog "${EVENT_VERSION}" || exit 1
     echo "${EVENT_VERSION}" > packaging/version || exit 1
-    commit_changes "${branch_name}" "Minor release ${EVENT_VERSION}." "${EVENT_VERSION}" || exit 1
     echo "::set-output name=run::true"
+    echo "::set-output name=message::Minor release ${EVENT_VERSION}."
     echo "::set-output name=ref::${EVENT_VERSION}"
+    echo "::set-output name=type::release"
+    echo "::set-output name=branch::${branch_name}"
 elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a major release build."
     check_version_format || exit 1
@@ -201,11 +154,12 @@ elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     patch_is_zero || exit 1
     check_newer_major_version || exit 1
     check_for_existing_tag || exit 1
-    generate_changelog "${EVENT_VERSION}" || exit 1
     echo "${EVENT_VERSION}" > packaging/version || exit 1
-    commit_changes master "Major release ${EVENT_VERSION}." "${EVENT_VERSION}" || exit 1
     echo "::set-output name=run::true"
+    echo "::set-output name=message::Major release ${EVENT_VERSION}"
     echo "::set-output name=ref::${EVENT_VERSION}"
+    echo "::set-output name=type::release"
+    echo "::set-output name=branch::master"
 else
     echo '::error::Unrecognized release type or invalid version.'
     exit 1
