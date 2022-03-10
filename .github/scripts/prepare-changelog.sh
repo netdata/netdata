@@ -48,7 +48,7 @@ commit_changes() {
     fi
 
     if [ -n "${GITHUB_ACTIONS}" ]; then
-        git push -u origin ${opts} "${branch}"
+        git push ${opts} "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${branch}"
     else
         echo "Not pushing changes as we are not running in GitHub Actions."
         echo "Would have pushed ${branch} to origin, with additional options '${opts}'"
