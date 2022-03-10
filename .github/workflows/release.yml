@@ -32,22 +32,53 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - name: Login to DockerHub # Needed to avoid ratelimits in the script we run in the next step.
-        id: login
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: Prepare base ref
         id: target
         env:
           GITHUB_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
         run: >-
-          .github/scripts/prepare-changelog.sh \
+          .github/scripts/prepare-release-base.sh \
               ${{ github.repository }} \
               ${{ github.event_name }} \
               ${{ github.event.inputs.type }} \
               ${{ github.event.inputs.version }}
+      - name: Generate Nightly Changleog
+        id: nightly-changelog
+        if: steps.target.outputs.run == "true" && steps.target.outputs.type == "nightly"
+        uses: heinrichreimer/github-changelog-generator-action@v2.3
+        with:
+          bugLabels: IGNOREBUGS
+          excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
+          issues: false
+          sinceTag: v1.10.0
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          unreleasedLabel: "**Next release**"
+          verbose: true
+      - name: Generate Release Changelog
+        id: release-changelog
+        if: steps.target.outputs.run == "true" && steps.target.outputs.type != "nightly"
+        uses: heinrichreimer/github-changelog-generator-action@v2.3
+        with:
+          bugLabels: IGNOREBUGS
+          excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
+          futureRelease: ${{ github.event.inputs.version }}
+          issues: false
+          sinceTag: v1.10.0
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          unreleasedLabel: "**Next release**"
+          verbose: true
+      - name: Commit Changes
+        id: commit
+        if: steps.target.outputs.run == "true"
+        run: |
+          git config user.name "netdatabot"
+          git config user.email "bot@netdata.cloud"
+          git add packaging/version CHANGELOG.md
+          git commit -m "[ci skip] ${{ steps.target.outputs.message }}"
+          if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
+            git tag ${{ github.event.inputs.version }}
+          fi
+          git push https://${{ secrets.NETDATABOT_GITHUB_TOKEN }}@github.com/${{ github.repo }} ${{ steps.target.outputs.branch }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -59,8 +90,10 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to prepare changelog.
               Checkout: ${{ steps.checkout.outcome }}
-              Login to DockerHub: ${{ steps.login.outcome }}
               Prepare base ref: ${{ steps.target.outcome }}
+              Generate nightly changelog: ${{ steps.nightly-changelog.outcome }}
+              Generate release changelog: ${{ steps.release-changelog.outcome }}
+              Commit changes: ${{ steps.commit.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: failure()
 
