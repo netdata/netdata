@@ -1223,6 +1223,28 @@ static inline json_object *host_labels_json(RRDHOST *host)
     return obj;
 }
 
+static void get_charts_dimensions_count(long int *charts, long int *dims)
+{
+    RRDSET *st;
+    RRDDIM *rd;
+    *charts = 0;
+    *dims = 0;
+    rrdset_foreach_read(st, localhost)
+    {
+        if (rrdset_is_available_for_viewers(st))
+            (*charts)++;
+
+        rrdset_rdlock(st);
+        rrddim_foreach_read(rd, st)
+        {
+            if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
+                continue;
+            (*dims)++;
+        }
+        rrdset_unlock(st);
+    }
+}
+
 extern void analytics_build_info(BUFFER *b);
 
 json_object *generate_info_json(RRDHOST *host)
@@ -1334,8 +1356,11 @@ json_object *generate_info_json(RRDHOST *host)
     JSON_ADD_STRING("allmetrics-shell-used", analytics_data.netdata_allmetrics_shell_used, j)
     JSON_ADD_STRING("allmetrics-json-used", analytics_data.netdata_allmetrics_json_used, j)
     JSON_ADD_STRING("dashboard-used", analytics_data.netdata_dashboard_used, j)
-    JSON_ADD_STRING("charts-count", analytics_data.netdata_charts_count, j)
-    JSON_ADD_STRING("metrics-count", analytics_data.netdata_metrics_count, j)
+
+    long int charts, dims;
+    get_charts_dimensions_count(&charts, &dims);
+    JSON_ADD_INT("charts-count", charts, j)
+    JSON_ADD_INT("metrics-count", dims, j)
 
     return j;
 }
