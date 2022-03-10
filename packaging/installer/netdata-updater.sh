@@ -373,7 +373,7 @@ newer_commit_date() {
   info "Checking if a newer version of the updater script is available."
 
   commit_check_url="https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1"
-  python_version_check="from __future__ import print_function;import sys,json;data = json.load(sys.stdin);print(data[0]['commit']['committer']['date'] if isinsance(data, list) else '')"
+  python_version_check="from __future__ import print_function;import sys,json;data = json.load(sys.stdin);print(data[0]['commit']['committer']['date'] if isinstance(data, list) else '')"
 
   if command -v jq > /dev/null 2>&1; then
     commit_date="$(_safe_download "${commit_check_url}" /dev/stdout | jq '.[0].commit.committer.date' 2>/dev/null | tr -d '"')"
