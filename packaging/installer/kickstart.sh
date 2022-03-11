@@ -1485,7 +1485,7 @@ if [ "${ACTION}" = "reinstall-clean" ]; then
   chmod +x "${tmpdir}/kickstart.sh"
 
   REINSTALL_OPTIONS="$(echo "${KICKSTART_OPTIONS}" | sed 's/--reinstall-clean//g')"
-  ${ROOTCMD} "${tmpdir}/kickstart.sh" $REINSTALL_OPTIONS
+  ${ROOTCMD} "${tmpdir}/kickstart.sh" "$REINSTALL_OPTIONS"
 
   trap - EXIT
   exit 0
