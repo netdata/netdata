@@ -26,22 +26,16 @@ TimeoutStopSec=150
 Restart=on-failure
 RestartSec=30
 
-# The minimum netdata Out-Of-Memory (OOM) score.
-# netdata (via [global].OOM score in netdata.conf) can only increase the value set here.
-# To decrease it, set the minimum here and set the same or a higher value in netdata.conf.
-# Valid values: -1000 (never kill netdata) to 1000 (always kill netdata).
-OOMScoreAdjust=1000
-
 # Valid policies: other (the system default) | batch | idle | fifo | rr
 # To give netdata the max priority, set CPUSchedulingPolicy=rr and CPUSchedulingPriority=99
-CPUSchedulingPolicy=idle
+CPUSchedulingPolicy=batch
 
 # This sets the scheduling priority (for policies: rr and fifo).
 # Priority gets values 1 (lowest) to 99 (highest).
 #CPUSchedulingPriority=1
 
 # For scheduling policy 'other' and 'batch', this sets the lowest niceness of netdata (-20 highest to 19 lowest).
-#Nice=0
+Nice=0
 
 # Capabilities
 # is required for freeipmi and slabinfo plugins

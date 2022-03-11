@@ -254,57 +254,14 @@ where:
 
 See [debugging](#debugging).
 
-## OOM Score
-
-Netdata runs with `OOMScore = 1000`. This means Netdata will be the first to be killed when your server runs out of
-memory.
-
-You can set Netdata OOMScore in `netdata.conf`, like this:
-
-```conf
-[global]
-    OOM score = 1000
-```
-
-Netdata logs its OOM score when it starts:
-
-```sh
-# grep OOM /var/log/netdata/error.log
-2017-10-15 03:47:31: netdata INFO : Adjusted my Out-Of-Memory (OOM) score from 0 to 1000.
-```
-
-### OOM score and systemd
-
-Netdata will not be able to lower its OOM Score below zero, when it is started as the `netdata` user (systemd case).
-
-To allow Netdata control its OOM Score in such cases, you will need to edit `netdata.service` and set:
-
-```sh
-[Service]
-# The minimum Netdata Out-Of-Memory (OOM) score.
-# Netdata (via [global].OOM score in netdata.conf) can only increase the value set here.
-# To decrease it, set the minimum here and set the same or a higher value in netdata.conf.
-# Valid values: -1000 (never kill netdata) to 1000 (always kill netdata).
-OOMScoreAdjust=-1000
-```
-
-Run `systemctl daemon-reload` to reload these changes.
-
-The above, sets and OOMScore for Netdata to `-1000`, so that Netdata can increase it via `netdata.conf`.
-
-If you want to control it entirely via systemd, you can set in `netdata.conf`:
-
-```conf
-[global]
-    OOM score = keep
-```
-
-Using the above, whatever OOM Score you have set at `netdata.service` will be maintained by netdata.
-
 ## Netdata process scheduling policy
 
-By default Netdata runs with the `idle` process scheduling policy, so that it uses CPU resources, only when there is
-idle CPU to spare. On very busy servers (or weak servers), this can lead to gaps on the charts.
+By default Netdata versions prior to 1.34.0 run with the `idle` process scheduling policy, so that it uses CPU
+resources, only when there is idle CPU to spare. On very busy servers (or weak servers), this can lead to gaps on
+the charts.
+
+Starting with version 1.34.0, Netdata instead uses the `batch` scheduling policy by default. This largely eliminates
+issues with gaps in charts on busy systems while still keeping the impact on the rest of the system low.
 
 You can set Netdata scheduling policy in `netdata.conf`, like this:
 
@@ -315,9 +272,9 @@ You can set Netdata scheduling policy in `netdata.conf`, like this:
 
 You can use the following:
 
-| policy                    | description                                                                                                                                                                                                                                                                                                                                                                                                              |                              
+| policy                    | description                                                                                                                                                                                                                                                                                                                                                                                                              |
 | :-----------------------: | :----------                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `idle`                    | use CPU only when there is spare - this is lower than nice 19 - it is the default for Netdata and it is so low that Netdata will run in "slow motion" under extreme system load, resulting in short (1-2 seconds) gaps at the charts.                                                                                                                                                                                    | 
+| `idle`                    | use CPU only when there is spare - this is lower than nice 19 - it is the default for Netdata and it is so low that Netdata will run in "slow motion" under extreme system load, resulting in short (1-2 seconds) gaps at the charts.                                                                                                                                                                                    |
 | `other`<br/>or<br/>`nice` | this is the default policy for all processes under Linux. It provides dynamic priorities based on the `nice` level of each process. Check below for setting this `nice` level for netdata.                                                                                                                                                                                                                               |
 | `batch`                   | This policy is similar to `other` in that it schedules the thread according to its dynamic priority (based on the `nice` value).  The difference is that this policy will cause the scheduler to always assume that the thread is CPU-intensive.  Consequently, the scheduler will  apply a small scheduling penalty with respect to wake-up behavior, so that this thread is mildly disfavored in scheduling decisions. |
 | `fifo`                    | `fifo` can be used only with static priorities higher than 0, which means that when a `fifo` threads becomes runnable, it will always  immediately  preempt  any  currently running  `other`, `batch`, or `idle` thread.  `fifo` is a simple scheduling algorithm without time slicing.                                                                                                                                  |
