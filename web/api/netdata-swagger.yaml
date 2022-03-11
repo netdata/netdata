@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: Netdata API
   description: Real-time performance and health monitoring.
-  version: 1.11.1_rolling
+  version: 1.33.1_rolling
 paths:
   /info:
     get:
