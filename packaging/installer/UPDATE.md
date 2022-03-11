@@ -17,16 +17,6 @@ or stable version. You can also [enable or disable automatic updates on an exist
 Before you update the Netdata Agent, check to see if your Netdata Agent is already up-to-date by clicking on the update
 icon in the local Agent dashboard's top navigation. This modal informs you whether your Agent needs an update or not.
 
-![Opening the Agent's Update modal](https://user-images.githubusercontent.com/1153921/99738428-add06780-2a87-11eb-8268-0e17b689eb3f.gif)
-
-## Determine which installation method you used
-
-Starting with netdata v1.33.0, you can use Netdata itself to determine the installation type by running:
-
-```bash
-netdata -W buildinfo | grep 'Install type:'
-```
-
 The exact update method to use depends on the install type:
 
 -   Installs with an install type of 'custom' usually indicate installing a third-party package through the system
@@ -38,6 +28,14 @@ The exact update method to use depends on the install type:
     using our [Docker](#docker) update procedure.
 -   macOS users should check [our update instructions for macOS](#macos).
 -   Manually built installs should check [our update instructions for manual builds](#manual-installation-from-git).
+
+## Determine which installation method you used
+
+Starting with netdata v1.33.0, you can use Netdata itself to determine the installation type by running:
+
+```bash
+netdata -W buildinfo | grep 'Install type:'
+```
 
 If you are using an older version of Netdata, or the above command produces no output, you can run our one-line
 installation script in dry-run mode to attempt to determine what method to use to update by running the following
