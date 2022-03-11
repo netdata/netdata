@@ -119,7 +119,7 @@ jobs:
           repo: ${{ github.repository }}
           workflow: Build
           ref: ${{ needs.update-changelogs.outputs.ref }}
-          inputs: '{"agent_version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ github.event.inputs.type }}"}'
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ github.event.inputs.type }}"}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -154,7 +154,7 @@ jobs:
           repo: ${{ github.repository }}
           workflow: Docker
           ref: ${{ needs.update-changelogs.outputs.ref }}
-          inputs: '{"agent_version": "${{ needs.update-changelogs.outputs.version }}"}'
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}"}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -189,7 +189,7 @@ jobs:
           repo: ${{ github.repository }}
           workflow: Packages
           ref: ${{ needs.update-changelogs.outputs.ref }}
-          inputs: '{"agent_version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ github.event.inputs.type }}"}'
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ github.event.inputs.type }}"}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

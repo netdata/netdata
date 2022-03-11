@@ -121,7 +121,7 @@ jobs:
                 ;;
               "nightly")
                 echo "::set-output name=repo::${REPO_PREFIX}-edge"
-                echo "::set-output name=version::${{ github.event.inputs.version }}"
+                echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
                 echo "::set-output name=retention::30"
                 ;;
               *)
@@ -131,7 +131,7 @@ jobs:
                 ;;
             esac
           else
-            echo "::set-output name=version::$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')"
+            echo "::set-output name=version::$(cut -d'-' -f 1 packaging/version | tr -d 'v')"
             echo "::set-output name=retention::0"
           fi
       - name: Failure Notification
