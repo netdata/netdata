@@ -300,6 +300,10 @@ static void ebpf_exit(int sig)
         btf__free(default_btf);
 #endif
 
+    char filename[FILENAME_MAX + 1];
+    ebpf_pid_file(filename, FILENAME_MAX);
+    unlink(filename);
+
     exit(sig);
 }
 
