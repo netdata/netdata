@@ -108,6 +108,7 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     echo "::set-output name=ref::master"
     echo "::set-output name=type::nightly"
     echo "::set-output name=branch::master"
+    echo "::set-output name=version::nightly"
 elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a patch release build."
     check_version_format || exit 1
@@ -127,6 +128,7 @@ elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::set-output name=ref::${EVENT_VERSION}"
     echo "::set-output name=type::release"
     echo "::set-output name=branch::${branch_name}"
+    echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
 elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a minor release build."
     check_version_format || exit 1
@@ -147,6 +149,7 @@ elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::set-output name=ref::${EVENT_VERSION}"
     echo "::set-output name=type::release"
     echo "::set-output name=branch::${branch_name}"
+    echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
 elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a major release build."
     check_version_format || exit 1
@@ -160,10 +163,8 @@ elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::set-output name=ref::${EVENT_VERSION}"
     echo "::set-output name=type::release"
     echo "::set-output name=branch::master"
+    echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
 else
     echo '::error::Unrecognized release type or invalid version.'
     exit 1
 fi
-
-# shellcheck disable=SC2002
-echo "::set-output name=version::$(cat packaging/version | sed 's/^v//' packaging/version)"
