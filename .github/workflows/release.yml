@@ -54,6 +54,7 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           unreleasedLabel: "**Next release**"
           verbose: true
+          maxIssues: 500
       - name: Generate Release Changelog
         id: release-changelog
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type != 'nightly'
@@ -67,6 +68,7 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           unreleasedLabel: "**Next release**"
           verbose: true
+          maxIssues: 500
       - name: Commit Changes
         id: commit
         if: steps.target.outputs.run == 'true'
