@@ -900,7 +900,8 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 #endif
 int alert_hash_and_store_config(
     uuid_t hash_id,
-    struct alert_config *cfg)
+    struct alert_config *cfg,
+    int store_hash)
 {
 #if !defined DISABLE_CLOUD && defined ENABLE_HTTPS
     EVP_MD_CTX *evpctx;
@@ -946,7 +947,8 @@ int alert_hash_and_store_config(
     uuid_copy(hash_id, *((uuid_t *)&hash_value));
 
     /* store everything, so it can be recreated when not in memory or just a subset ? */
-    (void)sql_store_alert_config_hash( (uuid_t *)&hash_value, cfg);
+    if (store_hash)
+        (void)sql_store_alert_config_hash( (uuid_t *)&hash_value, cfg);
 #else
     UNUSED(hash_id);
     UNUSED(cfg);
