@@ -22,7 +22,7 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
 fi
 
 BALENA_PGID=$(stat -c %g /var/run/balena.sock 2>/dev/null)
-DOCKER_PGID=$(stat -c %g -nd /var/run/docker.sock 2>/dev/null)
+DOCKER_PGID=$(stat -c %g /var/run/docker.sock 2>/dev/null)
 
 re='^[0-9]+$'
 if [[ $BALENA_PGID =~ $re ]]; then
@@ -32,7 +32,7 @@ if [[ $BALENA_PGID =~ $re ]]; then
 elif [[ $DOCKER_PGID =~ $re ]]; then
   echo "Netdata detected docker.sock"
   DOCKER_HOST="/var/run/docker.sock"
-  PGID=$(stat -c %g /var/run/docker.sock)
+  PGID="$DOCKER_PGID"
 fi
 export PGID
 export DOCKER_HOST
