@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Fix handling of pushing commits for release process. [\#12359](https://github.com/netdata/netdata/pull/12359) ([Ferroin](https://github.com/Ferroin))
+- Fix chart synchronization with the cloud [\#12356](https://github.com/netdata/netdata/pull/12356) ([stelfrag](https://github.com/stelfrag))
+- minor - fix analytics\_build\_info [\#12354](https://github.com/netdata/netdata/pull/12354) ([underhood](https://github.com/underhood))
+- Docs fix: Add missing frontmatter [\#12353](https://github.com/netdata/netdata/pull/12353) ([kickoke](https://github.com/kickoke))
+- fix\(health\): make ioping\_disk\_latency alarm less sensitive [\#12351](https://github.com/netdata/netdata/pull/12351) ([ilyam8](https://github.com/ilyam8))
+- Improve agent to cloud synchronization performance [\#12348](https://github.com/netdata/netdata/pull/12348) ([stelfrag](https://github.com/stelfrag))
+- Prepend context in anomaly rate dimension id. [\#12342](https://github.com/netdata/netdata/pull/12342) ([vkalintiris](https://github.com/vkalintiris))
 - Redirect dependency handling script output to logfile when running from the updater. [\#12341](https://github.com/netdata/netdata/pull/12341) ([Ferroin](https://github.com/Ferroin))
 - fix: container virtualization detection with systemd-detect-virt [\#12338](https://github.com/netdata/netdata/pull/12338) ([ilyam8](https://github.com/ilyam8))
 - fix: use default "bind to" in native packages [\#12336](https://github.com/netdata/netdata/pull/12336) ([ilyam8](https://github.com/ilyam8))
@@ -16,6 +23,7 @@
 - fix\(health\): adjust 10s\_ipv4\_tcp\_resets\_sent warn trigger [\#12320](https://github.com/netdata/netdata/pull/12320) ([ilyam8](https://github.com/ilyam8))
 - CO-RE and syscalls [\#12318](https://github.com/netdata/netdata/pull/12318) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix 'connect' typo anomaly-detection-python.md [\#12317](https://github.com/netdata/netdata/pull/12317) ([DanTheMediocre](https://github.com/DanTheMediocre))
+- Replace write with read locks [\#12309](https://github.com/netdata/netdata/pull/12309) ([MrZammler](https://github.com/MrZammler))
 - adds node\_id into mirrored\_hosts list [\#12307](https://github.com/netdata/netdata/pull/12307) ([underhood](https://github.com/underhood))
 - fix: CPU frequency detection for some containers [\#12306](https://github.com/netdata/netdata/pull/12306) ([ilyam8](https://github.com/ilyam8))
 - introduce new chart for process states metrics [\#12305](https://github.com/netdata/netdata/pull/12305) ([codeguru1](https://github.com/codeguru1))
@@ -25,6 +33,7 @@
 - chore: remove unused variable in the system-info script [\#12297](https://github.com/netdata/netdata/pull/12297) ([ilyam8](https://github.com/ilyam8))
 - Pull in build dependencies when updating a locally built install. [\#12294](https://github.com/netdata/netdata/pull/12294) ([Ferroin](https://github.com/Ferroin))
 - fix: cpu system info detection on macOS [\#12293](https://github.com/netdata/netdata/pull/12293) ([ilyam8](https://github.com/ilyam8))
+- Only store alert hashes when iterated from localhost [\#12292](https://github.com/netdata/netdata/pull/12292) ([MrZammler](https://github.com/MrZammler))
 - fix\(kickstart\): use correct syntax for claiming extra parameters [\#12289](https://github.com/netdata/netdata/pull/12289) ([ilyam8](https://github.com/ilyam8))
 - feat\(health\): add charts.d/nut alarms [\#12285](https://github.com/netdata/netdata/pull/12285) ([ilyam8](https://github.com/ilyam8))
 - Adjust cloud dimension update frequency  [\#12284](https://github.com/netdata/netdata/pull/12284) ([stelfrag](https://github.com/stelfrag))
@@ -44,6 +53,7 @@
 - eBPF installation fixes [\#12242](https://github.com/netdata/netdata/pull/12242) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add a fix to correctly register child nodes to the cloud via a parent [\#12241](https://github.com/netdata/netdata/pull/12241) ([stelfrag](https://github.com/stelfrag))
 - Fix builds where HAVE\_C\_\_\_ATOMIC is not defined. [\#12240](https://github.com/netdata/netdata/pull/12240) ([vkalintiris](https://github.com/vkalintiris))
+- Adds more info to aclk-state API call [\#12231](https://github.com/netdata/netdata/pull/12231) ([underhood](https://github.com/underhood))
 - minor - remove dead code [\#12230](https://github.com/netdata/netdata/pull/12230) ([underhood](https://github.com/underhood))
 - Fix node information send to the cloud for older agent versions [\#12223](https://github.com/netdata/netdata/pull/12223) ([stelfrag](https://github.com/stelfrag))
 - Fixed typo in docs/guides/monitor/anomaly-detection-python.md file [\#12220](https://github.com/netdata/netdata/pull/12220) ([MariosMarinos](https://github.com/MariosMarinos))
@@ -66,6 +76,7 @@
 - fix\(python.d/nvidia\_smi\): use uid when can't find the username [\#12184](https://github.com/netdata/netdata/pull/12184) ([ilyam8](https://github.com/ilyam8))
 - Fix typos [\#12183](https://github.com/netdata/netdata/pull/12183) ([rex4539](https://github.com/rex4539))
 - Revert "Overhaul handling of auto-updates in the installer code. \(\#12076 [\#12182](https://github.com/netdata/netdata/pull/12182) ([Ferroin](https://github.com/Ferroin))
+- Add warning about broken Docker hosts in container entrypoint. [\#12175](https://github.com/netdata/netdata/pull/12175) ([Ferroin](https://github.com/Ferroin))
 - tidy up the installer script usage message [\#12171](https://github.com/netdata/netdata/pull/12171) ([petecooper](https://github.com/petecooper))
 - Remove check for ACLK\_NG and PROMETHEUS\_WRITE in order to assume PROTOBUF [\#12168](https://github.com/netdata/netdata/pull/12168) ([MrZammler](https://github.com/MrZammler))
 - Bundle protobuf on CentOS 7 and earlier. [\#12167](https://github.com/netdata/netdata/pull/12167) ([Ferroin](https://github.com/Ferroin))
@@ -280,7 +291,7 @@
 
 **Merged pull requests:**
 
-- fix\(health\): `pihole\_blocklist\_gravity\_file` and `pihole\_status` info lines [\#11844](https://github.com/netdata/netdata/pull/11844) ([ilyam8](https://github.com/ilyam8))
+- fix\(health\): `pihole_blocklist_gravity_file` and `pihole_status` info lines [\#11844](https://github.com/netdata/netdata/pull/11844) ([ilyam8](https://github.com/ilyam8))
 - Optional proto support fix [\#11840](https://github.com/netdata/netdata/pull/11840) ([underhood](https://github.com/underhood))
 - feat\(apps.plugin\): add consul to apps\_groups.conf [\#11839](https://github.com/netdata/netdata/pull/11839) ([ilyam8](https://github.com/ilyam8))
 - Add a note about pkg-config file location for freeipmi [\#11831](https://github.com/netdata/netdata/pull/11831) ([vlvkobal](https://github.com/vlvkobal))
@@ -345,14 +356,6 @@
 - add sensors to charts.d.conf and add a note how to enable it [\#11715](https://github.com/netdata/netdata/pull/11715) ([ilyam8](https://github.com/ilyam8))
 - Add Cloud sign-up link to README.md [\#11714](https://github.com/netdata/netdata/pull/11714) ([DShreve2](https://github.com/DShreve2))
 - Updating Docker Node Instructions for Clarity [\#11713](https://github.com/netdata/netdata/pull/11713) ([DShreve2](https://github.com/DShreve2))
-- Update jQuery Dependency [\#11710](https://github.com/netdata/netdata/pull/11710) ([rupokify](https://github.com/rupokify))
-- Bring eBPF to static binaries [\#11709](https://github.com/netdata/netdata/pull/11709) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix kickstart.md Installation Guide Links [\#11708](https://github.com/netdata/netdata/pull/11708) ([DShreve2](https://github.com/DShreve2))
-- Queue removed alerts to cloud for new architecture [\#11704](https://github.com/netdata/netdata/pull/11704) ([MrZammler](https://github.com/MrZammler))
-- Ebpf doc [\#11703](https://github.com/netdata/netdata/pull/11703) ([thiagoftsm](https://github.com/thiagoftsm))
-- Charts 2.0 - fix broken link [\#11701](https://github.com/netdata/netdata/pull/11701) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- postgres collector: Fix crash the wal query if wal-file was removed concurrently [\#11697](https://github.com/netdata/netdata/pull/11697) ([unhandled-exception](https://github.com/unhandled-exception))
-- Fix handling of disabling telemetry in static installs. [\#11689](https://github.com/netdata/netdata/pull/11689) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
