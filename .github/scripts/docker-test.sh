@@ -33,7 +33,7 @@ wait_for() {
   printf "OK\n"
 }
 
-apt-get update && apt-get upgrade -y && apt get install -y netcat
+sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y netcat
 
 docker run -d --name=netdata \
            -p 19999:19999 \
