@@ -1831,6 +1831,19 @@ static void ebpf_kill_previous_process(char *filename, pid_t pid)
 }
 
 /**
+ * PID file
+ *
+ * Write the filename for PID inside the given vector.
+ *
+ * @param filename  vector where we will store the name.
+ * @param length    number of bytes available in filename vector
+ */
+void ebpf_pid_file(char *filename, size_t length)
+{
+    snprintfz(filename, length, "%s%s/ebpf.d/ebpf.pid", netdata_configured_host_prefix, ebpf_plugin_dir);
+}
+
+/**
  * Manage PID
  *
  * This function kills another instance of eBPF whether it is necessary and update the file content.
@@ -1840,7 +1853,7 @@ static void ebpf_kill_previous_process(char *filename, pid_t pid)
 static void ebpf_manage_pid(pid_t pid)
 {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s%s/ebpf.d/ebpf.pid", netdata_configured_host_prefix, ebpf_plugin_dir);
+    ebpf_pid_file(filename, FILENAME_MAX);
 
     ebpf_kill_previous_process(filename, pid);
     ebpf_update_pid_file(filename, pid);
