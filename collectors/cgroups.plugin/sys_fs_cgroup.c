@@ -213,6 +213,14 @@ static enum cgroups_type cgroups_try_detect_version()
     return CGROUPS_V2;
 }
 
+void set_cgroup_base_path(char *filename, char *path) {
+    if (strncmp(netdata_configured_host_prefix, path, strlen(netdata_configured_host_prefix)) == 0) {
+        snprintfz(filename, FILENAME_MAX, "%s", path);
+    } else {
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, path);
+    }
+}
+
 void read_cgroup_plugin_configuration() {
     system_page_size = sysconf(_SC_PAGESIZE);
 
@@ -285,7 +293,7 @@ void read_cgroup_plugin_configuration() {
             s = "/sys/fs/cgroup/cpuacct";
         }
         else s = mi->mount_point;
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        set_cgroup_base_path(filename, s);
         cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
@@ -295,7 +303,7 @@ void read_cgroup_plugin_configuration() {
             s = "/sys/fs/cgroup/cpuset";
         }
         else s = mi->mount_point;
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        set_cgroup_base_path(filename, s);
         cgroup_cpuset_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuset", filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
@@ -305,7 +313,7 @@ void read_cgroup_plugin_configuration() {
             s = "/sys/fs/cgroup/blkio";
         }
         else s = mi->mount_point;
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        set_cgroup_base_path(filename, s);
         cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
@@ -315,7 +323,7 @@ void read_cgroup_plugin_configuration() {
             s = "/sys/fs/cgroup/memory";
         }
         else s = mi->mount_point;
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        set_cgroup_base_path(filename, s);
         cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
@@ -325,7 +333,7 @@ void read_cgroup_plugin_configuration() {
             s = "/sys/fs/cgroup/devices";
         }
         else s = mi->mount_point;
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        set_cgroup_base_path(filename, s);
         cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
     }
     else {
@@ -357,7 +365,7 @@ void read_cgroup_plugin_configuration() {
             s = "/sys/fs/cgroup";
         }
         else s = mi->mount_point;
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        set_cgroup_base_path(filename, s);
         cgroup_unified_base = config_get("plugin:cgroups", "path to unified cgroups", filename);
         debug(D_CGROUP, "using cgroup root: '%s'", cgroup_unified_base);
     }
