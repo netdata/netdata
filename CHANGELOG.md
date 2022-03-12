@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix version handling issues in release workflow. [\#12375](https://github.com/netdata/netdata/pull/12375) ([Ferroin](https://github.com/Ferroin))
 - Fix handling of pushing commits for release process. [\#12359](https://github.com/netdata/netdata/pull/12359) ([Ferroin](https://github.com/Ferroin))
 - Fix chart synchronization with the cloud [\#12356](https://github.com/netdata/netdata/pull/12356) ([stelfrag](https://github.com/stelfrag))
 - minor - fix analytics\_build\_info [\#12354](https://github.com/netdata/netdata/pull/12354) ([underhood](https://github.com/underhood))
@@ -43,6 +44,7 @@
 - Use the new error mechanism in case host not found [\#12277](https://github.com/netdata/netdata/pull/12277) ([underhood](https://github.com/underhood))
 - Add proper handling for legacy kickstart install detection. [\#12273](https://github.com/netdata/netdata/pull/12273) ([Ferroin](https://github.com/Ferroin))
 - Fixed typos in docs/Running-behind-haproxy.md [\#12272](https://github.com/netdata/netdata/pull/12272) ([RatishT](https://github.com/RatishT))
+- Change default OOM score and scheduling policy to behave more sanely. [\#12271](https://github.com/netdata/netdata/pull/12271) ([Ferroin](https://github.com/Ferroin))
 - Add Ubuntu 22.04 to CI and package builds. [\#12269](https://github.com/netdata/netdata/pull/12269) ([Ferroin](https://github.com/Ferroin))
 - Add Fedora 36 to CI and package builds. [\#12268](https://github.com/netdata/netdata/pull/12268) ([Ferroin](https://github.com/Ferroin))
 - Null terminate decoded\_query\_string if there are no url parameters. [\#12266](https://github.com/netdata/netdata/pull/12266) ([MrZammler](https://github.com/MrZammler))
@@ -353,9 +355,6 @@
 - Implements cloud initiated disconnect command [\#11723](https://github.com/netdata/netdata/pull/11723) ([underhood](https://github.com/underhood))
 - Adding \(eBPF\) to submenu [\#11721](https://github.com/netdata/netdata/pull/11721) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix coverity CID \#373610 [\#11719](https://github.com/netdata/netdata/pull/11719) ([MrZammler](https://github.com/MrZammler))
-- add sensors to charts.d.conf and add a note how to enable it [\#11715](https://github.com/netdata/netdata/pull/11715) ([ilyam8](https://github.com/ilyam8))
-- Add Cloud sign-up link to README.md [\#11714](https://github.com/netdata/netdata/pull/11714) ([DShreve2](https://github.com/DShreve2))
-- Updating Docker Node Instructions for Clarity [\#11713](https://github.com/netdata/netdata/pull/11713) ([DShreve2](https://github.com/DShreve2))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
