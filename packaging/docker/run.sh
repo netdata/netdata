@@ -21,8 +21,8 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
 
-BALENA_PGID=$(stat -c %g /var/run/balena.sock 2>/dev/null | awk '{print $1}')
-DOCKER_PGID=$(stat -c %g /var/run/docker.sock 2>/dev/null | awk '{print $1}')
+BALENA_PGID=$(stat -c %g /var/run/balena.sock 2>/dev/null || true)
+DOCKER_PGID=$(stat -c %g /var/run/docker.sock 2>/dev/null || true)
 
 re='^[0-9]+$'
 if [[ $BALENA_PGID =~ $re ]]; then
