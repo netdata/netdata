@@ -60,6 +60,10 @@ area/collectors:
   - collectors/*
   - collectors/**/*
 
+area/ebpf:
+  - collectors/ebpf.plugin/*
+  - collectors/ebpf.plugin/**/*
+
 area/external/python:
   - collectors/python.d.plugin/*
   - collectors/python.d.plugin/**/*
