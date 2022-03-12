@@ -27,6 +27,10 @@ On these charts, we can have alarms as with any metric and chart.
   - **Description:** k6 is a developer-centric, free and open-source load testing tool built for making performance testing a productive and enjoyable experience.
   - [Documentation](/collectors/statsd.plugin/k6.md)
   - [Configuration](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/k6.conf)
+- [Asterisk](https://www.asterisk.org/)
+  - **Description:** Asterisk is an Open Source PBX and telephony toolkit.
+  - [Documentation](/collectors/statsd.plugin/asterisk.md)
+  - [Configuration](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/asterisk.conf)
 
 ## Metrics supported by Netdata
 
