@@ -321,7 +321,7 @@ static int read_local_disks()
 {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_EBPF_PROC_PARTITIONS);
-    procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open_no_log(filename, " \t:", PROCFILE_FLAG_DEFAULT);
     if (!ff)
         return -1;
 
