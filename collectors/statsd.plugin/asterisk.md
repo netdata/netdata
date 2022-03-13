@@ -33,6 +33,8 @@ prefix = asterisk               ; Prefix to prepend to all metrics
 
 ## Metrics
 
+### Mapping
+
 Mapping Asterisk StatsD metrics and Netdata charts.
 
 | Chart                                                | Metrics                                    |
@@ -52,3 +54,8 @@ Mapping Asterisk StatsD metrics and Netdata charts.
 | Distribution of Hangup Causes for CONGESTIONed calls | asterisk.dialhangupcause.CONGESTION.*      |
 | Asterisk Dialplan Events                             | asterisk.stasis.message.ast_channel_*_type |
 | Asterisk PJSIP Peers Qualify                         | asterisk.PJSIP.contacts.*.rtt              |
+
+### Screenshots
+
+![image](https://user-images.githubusercontent.com/2662304/158055351-fcc7a7fb-9b95-4656-bdc6-2e5f5a909215.png)
+![image](https://user-images.githubusercontent.com/2662304/158055367-cfd25cd5-d71a-4bab-8cd1-bfcc47bc7312.png)
