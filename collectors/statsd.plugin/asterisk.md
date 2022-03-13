@@ -19,12 +19,14 @@ Netdata ships
 with [asterisk.conf](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/asterisk.conf) with
 preconfigured charts.
 
-You only need to configure Asterisk to send statistics to Netdata. The following suffices for `statsd.conf`:
+You only need to configure Asterisk to send statistics to Netdata. The following suffices for `/etc/asterisk/statsd.conf`:
 
 ```ini
 [general]
-enabled = true
-server = 127.0.0.1 ; adjust the 'server' value if Netdata is running on a remote machine.
+enabled = yes                   ; When set to yes, statsd support is enabled
+server = 127.0.0.1              ; server[:port] of statsd server to use.
+                                ; If not specified, the port is 8125
+prefix = asterisk               ; Prefix to prepend to all metrics
 ```
 
 > See [statsd.conf.sample](https://github.com/asterisk/asterisk/blob/master/configs/samples/statsd.conf.sample) for all available options.
