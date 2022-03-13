@@ -242,7 +242,7 @@ static ebpf_cgroup_target_t * ebpf_cgroup_find_or_create(netdata_ebpf_cgroup_shm
  */
 static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
 {
-    procfile *ff = procfile_open(path, " \t:", PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open_no_log(path, " \t:", PROCFILE_FLAG_DEFAULT);
     if (!ff)
         return;
 
