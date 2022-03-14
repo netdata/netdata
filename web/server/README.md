@@ -221,8 +221,6 @@ present that may match DNS FQDNs.
 |ses max window|`15`|See [single exponential smoothing](/web/api/queries/des/README.md)|
 |des max window|`15`|See [double exponential smoothing](/web/api/queries/des/README.md)|
 |listen backlog|`4096`|The port backlog. Check `man 2 listen`.|
-|web files owner|`netdata`|The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, Netdata will only serve files owned by user given in `run as user`.|
-|web files group|`netdata`|If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.|
 |disconnect idle clients after seconds|`60`|The time in seconds to disconnect web clients after being totally idle.|
 |timeout for first request|`60`|How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.|
 |accept a streaming request every seconds|`0`|Can be used to set a limit on how often a parent node will accept streaming requests from child nodes in a [streaming and replication setup](/streaming/README.md)|

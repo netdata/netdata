@@ -188,25 +188,20 @@ visit the Agent dashboard at `http://NODE:19999`, you need to update Netdata's p
 system.
 
 Run `ls -la /usr/share/netdata/web/index.html` to find the file's permissions. You may need to change this path based on
-the error you're seeing in your browser. In the below example, the file is owned by the user `netdata` and the group
-`netdata`.
+the error you're seeing in your browser. In the below example, the file is owned by the user `root` and the group
+`root`.
 
 ```bash
 ls -la /usr/share/netdata/web/index.html
--rw-r--r--. 1 netdata netdata 89377 May  5 06:30 /usr/share/netdata/web/index.html
+-rw-r--r--. 1 root root 89377 May  5 06:30 /usr/share/netdata/web/index.html
 ```
 
-Open your `netdata.conf` file and find the `[web]` section, plus the `web files owner`/`web files group` settings. Edit
-the lines to match the output from `ls -la` above and uncomment them if necessary.
+These files need to have the same user and group used to install your netdata. Suppose you installed netdata with user
+`netdata` and group `netdata`, in this scenario you will need to run the following command to fix the error:
 
-```conf
-[web]
-    web files owner = netdata
-    web files group = netdata
+```bash
+# chown -R netdata.netdata /usr/share/netdata/web
 ```
-
-Save the file, restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system, and try accessing the dashboard again.
 
 ### Multiple versions of OpenSSL
 
