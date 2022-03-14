@@ -42,10 +42,6 @@ area/ci:
   - .github/*
   - .github/**/*
 
-area/collectors:
-  - collectors/*
-  - collectors/**/*
-
 area/daemon:
   - daemon/*
   - daemon/**/*
@@ -59,6 +55,14 @@ area/docs:
   - "**/*.mdx"
   - diagrams/*
   - diagrams/**/*
+
+area/collectors:
+  - collectors/*
+  - collectors/**/*
+
+area/ebpf:
+  - collectors/ebpf.plugin/*
+  - collectors/ebpf.plugin/**/*
 
 area/external/python:
   - collectors/python.d.plugin/*
