@@ -59,18 +59,21 @@ error() {
 : "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
 
 if [ "${ENVIRONMENT_FILE}" = "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; then
-  if [ -r "${script_dir}/../../../etc/netdata/.environment" ]; then
+  if [ -r "${script_dir}/../../../etc/netdata/.environment" ] || [ -r "${script_dir}/../../../etc/netdata/.install-type" ]; then
     ENVIRONMENT_FILE="${script_dir}/../../../etc/netdata/.environment"
-  elif [ -r "/etc/netdata/.environment" ]; then
+  elif [ -r "/etc/netdata/.environment" ] || [ -r "/etc/netdata/.install-type" ]; then
     ENVIRONMENT_FILE="/etc/netdata/.environment"
-  elif [ -r "/opt/netdata/etc/netdata/.environment" ]; then
+  elif [ -r "/opt/netdata/etc/netdata/.environment" ] || [ -r "/opt/netdata/etc/netdata/.install-type" ]; then
     ENVIRONMENT_FILE="/opt/netdata/etc/netdata/.environment"
   else
     envpath="$(find / -type d \( -path /sys -o -path /proc -o -path /dev \) -prune -false -o -path '*netdata/.environment' -type f  2> /dev/null | head -n 1)"
+    itpath="$(find / -type d \( -path /sys -o -path /proc -o -path /dev \) -prune -false -o -path '*netdata/.install-type' -type f  2> /dev/null | head -n 1)"
     if [ -r "${envpath}" ]; then
       ENVIRONMENT_FILE="${envpath}"
+    elif [ -r "${itpath}" ]; then
+      ENVIRONMENT_FILE="$(dirname "${itpath}")/.environment"
     else
-      fatal "Cannot find environment file, unable to update."
+      fatal "Cannot find environment file or install type file, unable to update."
     fi
   fi
 fi
@@ -442,6 +445,14 @@ get_latest_version() {
   fi
 }
 
+validate_environment_file() {
+  if [ -n "${RELEASE_CHANNEL}" ] && [ -n "${NETDATA_PREFIX}" ] && [ -n "${REINSTALL_OPTIONS}" ] && [ -n "${IS_NETDATA_STATIC_BINARY}" ]; then
+    return 0
+  else
+    error "Environment file located at ${ENVIRONMENT_FILE} is not valid, unable to update."
+  fi
+}
+
 update_available() {
   basepath="$(dirname "$(dirname "$(dirname "${NETDATA_LIB_DIR}")")")"
   searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
@@ -753,10 +764,12 @@ ndtmpdir=
 
 trap cleanup EXIT
 
-# shellcheck source=/dev/null
-. "${ENVIRONMENT_FILE}" || exit 1
+if [ -r "${ENVIRONMENT_FILE}" ] ; then
+  # shellcheck source=/dev/null
+  . "${ENVIRONMENT_FILE}" || exit 1
+fi
 
-if [ -f "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
+if [ -r "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
   # shellcheck source=/dev/null
   . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || exit 1
 fi
@@ -824,10 +837,12 @@ self_update
 # shellcheck disable=SC2153
 case "${INSTALL_TYPE}" in
     *-build)
+      validate_environment_file || exit 1
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_build && exit 0
       ;;
     *-static*)
+      validate_environment_file || exit 1
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_static && exit 0
       ;;
@@ -835,15 +850,16 @@ case "${INSTALL_TYPE}" in
       update_binpkg && exit 0
       ;;
     "") # Fallback case for no `.install-type` file. This just works like the old install type detection.
+      validate_environment_file || exit 1
       update_legacy
       ;;
     custom)
       # At this point, we _should_ have a valid `.environment` file, but it's best to just check.
       # If we do, then behave like the legacy updater.
-      if [ -n "${RELEASE_CHANNEL}" ] && [ -n "${NETDATA_PREFIX}" ] && [ -n "${REINSTALL_OPTIONS}" ]; then
+      if validate_environment_file; then
         update_legacy
       else
-        fatal "This script does not support updating custom installations."
+        fatal "This script does not support updating custom installations without valid environment files."
       fi
       ;;
     oci)
