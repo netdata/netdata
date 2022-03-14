@@ -33,7 +33,9 @@ wait_for() {
   printf "OK\n"
 }
 
-sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y netcat
+if [ -z "$(command -v nc 2>/dev/null)" ] && [ -z "$(command -v netcat 2>/dev/null)" ]; then
+    sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y netcat
+fi
 
 docker run -d --name=netdata \
            -p 19999:19999 \
