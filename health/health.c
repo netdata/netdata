@@ -747,8 +747,11 @@ void *health_main(void *ptr) {
                 if (update_disabled_silenced(host, rc))
                     continue;
 
+                // create an alert removed event if the chart is obsolete and
+                // has stopped being collected for 60 seconds
                 if (unlikely(rc->rrdset && rc->status != RRDCALC_STATUS_REMOVED &&
-                        rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE))) {
+                             rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE) &&
+                             now > (rc->rrdset->last_collected_time.tv_sec + 60))) {
                     if (!rrdcalc_isrepeating(rc)) {
                         time_t now = now_realtime_sec();
                         ALARM_ENTRY *ae = health_create_alarm_entry(
