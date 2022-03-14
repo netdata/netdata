@@ -400,6 +400,10 @@ static inline void add_string_to_command_reply(char *reply_string, unsigned *rep
     unsigned len;
 
     len = strlen(str);
+
+    if (MAX_COMMAND_LENGTH - 1 < len + *reply_string_size)
+        len = MAX_COMMAND_LENGTH - *reply_string_size - 1;
+
     strncpyz(reply_string + *reply_string_size, str, len);
     *reply_string_size += len;
 }
