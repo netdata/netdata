@@ -400,6 +400,10 @@ static inline void add_string_to_command_reply(char *reply_string, unsigned *rep
     unsigned len;
 
     len = strlen(str);
+
+    if (MAX_COMMAND_LENGTH - 1 < len + *reply_string_size)
+        len = MAX_COMMAND_LENGTH - *reply_string_size - 1;
+
     strncpyz(reply_string + *reply_string_size, str, len);
     *reply_string_size += len;
 }
@@ -418,7 +422,7 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     add_string_to_command_reply(reply_string, &reply_string_size, exit_status_string);
     add_char_to_command_reply(reply_string, &reply_string_size, '\0');
 
-    if (message) {
+    if (message && reply_string_size < MAX_COMMAND_LENGTH - 2) {
         add_char_to_command_reply(reply_string, &reply_string_size, cmd_prefix_by_status[status]);
         add_string_to_command_reply(reply_string, &reply_string_size, message);
     }
