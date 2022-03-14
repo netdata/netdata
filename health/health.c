@@ -748,7 +748,8 @@ void *health_main(void *ptr) {
                     continue;
 
                 if (unlikely(rc->rrdset && rc->status != RRDCALC_STATUS_REMOVED &&
-                        rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE))) {
+                             rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE) &&
+                             (now - rc->rrdset->last_collected_time.tv_sec) > 60)) {
                     if (!rrdcalc_isrepeating(rc)) {
                         time_t now = now_realtime_sec();
                         ALARM_ENTRY *ae = health_create_alarm_entry(
