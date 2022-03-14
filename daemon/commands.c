@@ -422,7 +422,7 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     add_string_to_command_reply(reply_string, &reply_string_size, exit_status_string);
     add_char_to_command_reply(reply_string, &reply_string_size, '\0');
 
-    if (message && reply_string_size < MAX_COMMAND_LENGTH - 2) {
+    if (message) {
         add_char_to_command_reply(reply_string, &reply_string_size, cmd_prefix_by_status[status]);
         add_string_to_command_reply(reply_string, &reply_string_size, message);
     }
