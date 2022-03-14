@@ -563,16 +563,18 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     struct aclk_database_worker_config *wc  = NULL;
     rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
-    if (likely(host))
+    rrd_unlock();
+    if (likely(host)) {
         wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
                  (struct aclk_database_worker_config *)host->dbsync_worker :
                  (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
-    rrd_unlock();
 
-    if (unlikely(!host->health_enabled)) {
-        log_access("AC [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
-        return;
-    }
+        if (unlikely(!host->health_enabled)) {
+            log_access("AC [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
+            return;
+        }
+    } else
+        wc = (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
 
     if (likely(wc)) {
         log_access("AC [%s (%s)]: Start streaming alerts enabled with batch_id %"PRIu64" and start_seq_id %"PRIu64".", node_id, wc->host ? wc->host->hostname : "N/A", batch_id, start_seq_id);
