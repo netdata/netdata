@@ -275,7 +275,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
 
     // ----------------------------------------
 
-    procfile *ff = procfile_open(filename, " :\t", PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open_no_log(filename, " :\t", PROCFILE_FLAG_DEFAULT);
     if (!ff)
         return -1;
 
