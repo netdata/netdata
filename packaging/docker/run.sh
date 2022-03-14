@@ -21,8 +21,8 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
 
-BALENA_PGID=$(ls -nd /var/run/balena.sock | awk '{print $4}')
-DOCKER_PGID=$(ls -nd /var/run/docker.sock | awk '{print $4}')
+BALENA_PGID=$(stat -c %g /var/run/balena.sock 2>/dev/null || true)
+DOCKER_PGID=$(stat -c %g /var/run/docker.sock 2>/dev/null || true)
 
 re='^[0-9]+$'
 if [[ $BALENA_PGID =~ $re ]]; then
@@ -32,7 +32,7 @@ if [[ $BALENA_PGID =~ $re ]]; then
 elif [[ $DOCKER_PGID =~ $re ]]; then
   echo "Netdata detected docker.sock"
   DOCKER_HOST="/var/run/docker.sock"
-  PGID=$(ls -nd /var/run/docker.sock | awk '{print $4}')
+  PGID="$DOCKER_PGID"
 fi
 export PGID
 export DOCKER_HOST
