@@ -238,6 +238,8 @@ extern int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
 extern int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
 extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 
+extern void ebpf_pid_file(char *filename, size_t length);
+
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 
 #define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
