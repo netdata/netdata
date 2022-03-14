@@ -591,7 +591,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
     int line = 0;
     struct section *co = NULL;
     int is_exporter_config = 0;
-    int _backends = 0;              // number of backend sections we have
+    int _connectors = 0;              // number of exporting connector sections we have
     char working_instance[CONFIG_MAX_NAME + 1];
     char working_connector[CONFIG_MAX_NAME + 1];
     struct section *working_connector_section = NULL;
@@ -641,8 +641,8 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                         strncpy(working_connector, s, CONFIG_MAX_NAME);
                         s = s + rc + 1;
                         if (unlikely(!(*s))) {
-                            _backends++;
-                            sprintf(buffer, "instance_%d", _backends);
+                            _connectors++;
+                            sprintf(buffer, "instance_%d", _connectors);
                             s = buffer;
                         }
                         strncpy(working_instance, s, CONFIG_MAX_NAME);

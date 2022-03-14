@@ -268,7 +268,7 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 int rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
 int rrdset_is_exportable(struct instance *instance, RRDSET *st);
 
-extern EXPORTING_OPTIONS exporting_parse_data_source(const char *source, EXPORTING_OPTIONS backend_options);
+extern EXPORTING_OPTIONS exporting_parse_data_source(const char *source, EXPORTING_OPTIONS exporting_options);
 
 calculated_number exporting_calculate_value_from_stored_data(
     struct instance *instance,
