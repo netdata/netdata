@@ -420,7 +420,7 @@ all_enabled_charts() {
 		MODULE_NAME="${chart}"
 		
 		if [ "$MODULE_NAME" == "apcupsd" ] && [ -n "$NETDATA_LISTENER_PORT" ]; then
-		  info "apcupsd is temporary disabled because of the bug (#12413)."
+		  info "apcupsd is temporarily disabled because of bug #12413"
 		  continue
 		fi
 
