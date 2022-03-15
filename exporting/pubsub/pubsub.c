@@ -141,7 +141,7 @@ void pubsub_connector_worker(void *instance_p)
         }
 
         debug(
-            D_BACKEND, "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
+            D_EXPORTING, "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
             connector_specific_config->project_id, connector_specific_config->topic_id, buffer_len);
 
         if (pubsub_publish((void *)connector_specific_data, error_message, stats->buffered_metrics, buffer_len)) {

@@ -51,9 +51,7 @@
 // the registry is actually an API feature
 #include "registry/registry.h"
 
-// backends for archiving the metrics
-#include "backends/backends.h"
-// the new exporting engine for archiving the metrics
+// exporting engine for archiving the metrics
 #include "exporting/exporting_engine.h"
 
 // the netdata API

@@ -327,7 +327,7 @@ void mongodb_connector_worker(void *instance_p)
         }
 
         debug(
-            D_BACKEND,
+            D_EXPORTING,
             "EXPORTING: mongodb_insert(): destination = %s, database = %s, collection = %s, data size = %zu",
             instance->config.destination,
             connector_specific_config->database,

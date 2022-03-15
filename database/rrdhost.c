@@ -718,7 +718,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             , netdata_configured_timezone
             , netdata_configured_abbrev_timezone
             , netdata_configured_utc_offset
-            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , ""
             , program_name
             , program_version
             , default_rrd_update_every
@@ -1233,50 +1233,6 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
     return label_list;
 }
 
-static struct label *rrdhost_load_labels_from_tags(void)
-{
-    if (!localhost->tags)
-        return NULL;
-
-    struct label *label_list = NULL;
-    BACKEND_TYPE type = BACKEND_TYPE_UNKNOWN;
-
-    if (config_exists(CONFIG_SECTION_BACKEND, "enabled")) {
-        if (config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", CONFIG_BOOLEAN_NO) != CONFIG_BOOLEAN_NO) {
-            const char *type_name = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
-            type = backend_select_type(type_name);
-        }
-    }
-
-    switch (type) {
-        case BACKEND_TYPE_GRAPHITE:
-            label_list = parse_simple_tags(
-                label_list, localhost->tags, '=', ';', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
-                DO_NOT_SKIP_ESCAPED_CHARACTERS);
-            break;
-        case BACKEND_TYPE_OPENTSDB_USING_TELNET:
-            label_list = parse_simple_tags(
-                label_list, localhost->tags, '=', ' ', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
-                DO_NOT_SKIP_ESCAPED_CHARACTERS);
-            break;
-        case BACKEND_TYPE_OPENTSDB_USING_HTTP:
-            label_list = parse_simple_tags(
-                label_list, localhost->tags, ':', ',', STRIP_QUOTES, STRIP_QUOTES,
-                DO_NOT_SKIP_ESCAPED_CHARACTERS);
-            break;
-        case BACKEND_TYPE_JSON:
-            label_list = parse_json_tags(label_list, localhost->tags);
-            break;
-        default:
-            label_list = parse_simple_tags(
-                label_list, localhost->tags, '=', ',', DO_NOT_STRIP_QUOTES, STRIP_QUOTES,
-                DO_NOT_SKIP_ESCAPED_CHARACTERS);
-            break;
-    }
-
-    return label_list;
-}
-
 static struct label *rrdhost_load_kubernetes_labels(void)
 {
     struct label *l=NULL;
@@ -1340,10 +1296,8 @@ void reload_host_labels(void)
     struct label *from_auto = rrdhost_load_auto_labels();
     struct label *from_k8s = rrdhost_load_kubernetes_labels();
     struct label *from_config = rrdhost_load_config_labels();
-    struct label *from_tags = rrdhost_load_labels_from_tags();
 
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
-    new_labels = merge_label_lists(new_labels, from_tags);
     new_labels = merge_label_lists(new_labels, from_config);
 
     rrdhost_rdlock(localhost);

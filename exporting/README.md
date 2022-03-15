@@ -20,12 +20,6 @@ the same time. You can have different update intervals and filters configured fo
 When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
 restart its process_, not the entire [database of long-term metrics](/docs/store/change-metrics-storage.md).
 
-The exporting engine has its own configuration file `exporting.conf`. The configuration is almost similar to the
-deprecated [backends](/backends/README.md#configuration) system. The most important difference is that type of a
-connector should be specified in a section name before a colon and an instance name after the colon. Also, you can't use
-`host tags` anymore. Set your labels using the [`[host labels]`](/docs/guides/using-host-labels.md) section in
-`netdata.conf`.
-
 Since Netdata collects thousands of metrics per server per second, which would easily congest any database server when
 several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.
 
@@ -270,12 +264,6 @@ Configure individual connectors and override any global settings with the follow
 
 -   `send automatic labels = yes | no` controls if automatically created labels, like `_os_name` or `_architecture`
     should be sent to the external database
-
-> Starting from Netdata v1.20 the host tags (defined in the `[backend]` section of `netdata.conf`) are parsed in
-> accordance with a configured backend type and stored as host labels so that they can be reused in API responses and
-> exporting connectors. The parsing is supported for graphite, json, opentsdb, and prometheus (default) backend types.
-> You can check how the host tags were parsed using the /api/v1/info API call. But, keep in mind that backends subsystem
-> is deprecated and will be deleted soon. Please move your existing tags to the `[host labels]` section.
 
 ## HTTPS
 

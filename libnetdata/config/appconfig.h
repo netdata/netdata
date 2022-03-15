@@ -89,7 +89,6 @@
 #define CONFIG_SECTION_CLOUD      "cloud"
 #define CONFIG_SECTION_REGISTRY   "registry"
 #define CONFIG_SECTION_HEALTH     "health"
-#define CONFIG_SECTION_BACKEND    "backend"
 #define CONFIG_SECTION_STREAM     "stream"
 #define CONFIG_SECTION_ML         "ml"
 #define CONFIG_SECTION_EXPORTING  "exporting:global"
