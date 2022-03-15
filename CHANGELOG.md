@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Fix crash when netdatacli command output too long [\#12393](https://github.com/netdata/netdata/pull/12393) ([underhood](https://github.com/underhood))
+- Dont check host health enabled if host is null [\#12392](https://github.com/netdata/netdata/pull/12392) ([MrZammler](https://github.com/MrZammler))
+- Delay removed event for 60 seconds after the chart's last collected time [\#12388](https://github.com/netdata/netdata/pull/12388) ([MrZammler](https://github.com/MrZammler))
+- Remove unecessary error report for proc and sys files [\#12385](https://github.com/netdata/netdata/pull/12385) ([thiagoftsm](https://github.com/thiagoftsm))
+- fix: handle double host prefix when Netdata running in a podman container [\#12380](https://github.com/netdata/netdata/pull/12380) ([ilyam8](https://github.com/ilyam8))
+- fix\(ebpf.plugin\): remove pid file on exit [\#12379](https://github.com/netdata/netdata/pull/12379) ([thiagoftsm](https://github.com/thiagoftsm))
+- fix: shellcheck warnings in docker run.sh [\#12377](https://github.com/netdata/netdata/pull/12377) ([ilyam8](https://github.com/ilyam8))
 - Fix version handling issues in release workflow. [\#12375](https://github.com/netdata/netdata/pull/12375) ([Ferroin](https://github.com/Ferroin))
 - Fix handling of pushing commits for release process. [\#12359](https://github.com/netdata/netdata/pull/12359) ([Ferroin](https://github.com/Ferroin))
 - Fix chart synchronization with the cloud [\#12356](https://github.com/netdata/netdata/pull/12356) ([stelfrag](https://github.com/stelfrag))
@@ -15,6 +22,7 @@
 - Improve agent to cloud synchronization performance [\#12348](https://github.com/netdata/netdata/pull/12348) ([stelfrag](https://github.com/stelfrag))
 - Prepend context in anomaly rate dimension id. [\#12342](https://github.com/netdata/netdata/pull/12342) ([vkalintiris](https://github.com/vkalintiris))
 - Redirect dependency handling script output to logfile when running from the updater. [\#12341](https://github.com/netdata/netdata/pull/12341) ([Ferroin](https://github.com/Ferroin))
+- Remove owner check from webserver [\#12339](https://github.com/netdata/netdata/pull/12339) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: container virtualization detection with systemd-detect-virt [\#12338](https://github.com/netdata/netdata/pull/12338) ([ilyam8](https://github.com/ilyam8))
 - fix: use default "bind to" in native packages [\#12336](https://github.com/netdata/netdata/pull/12336) ([ilyam8](https://github.com/ilyam8))
 - Add latency dimension [\#12329](https://github.com/netdata/netdata/pull/12329) ([Steve8291](https://github.com/Steve8291))
@@ -345,16 +353,6 @@
 - Update dashboard to version v2.20.11. [\#11743](https://github.com/netdata/netdata/pull/11743) ([netdatabot](https://github.com/netdatabot))
 - Update eBPF documentation [\#11741](https://github.com/netdata/netdata/pull/11741) ([thiagoftsm](https://github.com/thiagoftsm))
 - Change comma possition in v1/info if ml-info is missing [\#11739](https://github.com/netdata/netdata/pull/11739) ([MrZammler](https://github.com/MrZammler))
-- Disable C++ warnings from dlib library. [\#11738](https://github.com/netdata/netdata/pull/11738) ([vkalintiris](https://github.com/vkalintiris))
-- Fix typo in aclk\_query.c [\#11737](https://github.com/netdata/netdata/pull/11737) ([eltociear](https://github.com/eltociear))
-- Fix online chart in NG not updated properly [\#11734](https://github.com/netdata/netdata/pull/11734) ([underhood](https://github.com/underhood))
-- Add command for new health entity file. [\#11733](https://github.com/netdata/netdata/pull/11733) ([DShreve2](https://github.com/DShreve2))
-- Removing dated contact suggestion. [\#11732](https://github.com/netdata/netdata/pull/11732) ([DShreve2](https://github.com/DShreve2))
-- Fix Link to New Charts [\#11729](https://github.com/netdata/netdata/pull/11729) ([DShreve2](https://github.com/DShreve2))
-- Fix Header Link.md [\#11728](https://github.com/netdata/netdata/pull/11728) ([DShreve2](https://github.com/DShreve2))
-- Implements cloud initiated disconnect command [\#11723](https://github.com/netdata/netdata/pull/11723) ([underhood](https://github.com/underhood))
-- Adding \(eBPF\) to submenu [\#11721](https://github.com/netdata/netdata/pull/11721) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix coverity CID \#373610 [\#11719](https://github.com/netdata/netdata/pull/11719) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
