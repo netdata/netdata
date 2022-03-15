@@ -19,7 +19,7 @@ Netdata ships
 with [asterisk.conf](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/asterisk.conf) with
 preconfigured charts.
 
-You only need to configure Asterisk to send statistics to Netdata. The following suffices for `/etc/asterisk/statsd.conf`:
+To receive Asterisk metrics in Netdata, uncomment the following lines in the `/etc/asterisk/statsd.conf` file:
 
 ```ini
 [general]
