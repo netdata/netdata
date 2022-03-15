@@ -17,6 +17,7 @@ declare -a package_tree=(
   autoconf-archive
   autogen
   automake
+  libatomic1
   libtool
   pkg-config
   cmake

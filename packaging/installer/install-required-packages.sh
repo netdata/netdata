@@ -699,6 +699,19 @@ declare -A pkg_json_c_dev=(
   ['default']="json-c-devel"
 )
 
+declare -A pkg_libatomic=(
+  ['arch']="NOTREQUIRED"
+  ['clearlinux']="NOTREQUIRED"
+  ['debian']="libatomic1"
+  ['freebsd']="NOTREQUIRED"
+  ['gentoo']="NOTREQUIRED"
+  ['macos']="NOTREQUIRED"
+  ['sabayon']="NOTREQUIRED"
+  ['suse']="libatomic1"
+  ['ubuntu']="libatomic1"
+  ['default']="libatomic"
+)
+
 declare -A pkg_bridge_utils=(
   ['gentoo']="net-misc/bridge-utils"
   ['clearlinux']="network-basic"
@@ -1339,6 +1352,7 @@ packages() {
   # basic build environment
 
   suitable_package distro-sdk
+  suitable_package libatomic
 
   require_cmd git || suitable_package git
   require_cmd find || suitable_package find

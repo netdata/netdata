@@ -16,6 +16,7 @@ package_tree="
   autoconf
   cmake
   make
+  libatomic
   libtool
   pkgconfig
   tar
