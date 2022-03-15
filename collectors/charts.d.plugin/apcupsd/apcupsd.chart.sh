@@ -50,7 +50,7 @@ apcupsd_check() {
 
   local host working=0 failed=0
   for host in "${!apcupsd_sources[@]}"; do
-    run apcupsd_get "${apcupsd_sources[${host}]}" > /dev/null
+    apcupsd_get "${apcupsd_sources[${host}]}" > /dev/null
     # shellcheck disable=2181
     if [ $? -ne 0 ]; then
       error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
