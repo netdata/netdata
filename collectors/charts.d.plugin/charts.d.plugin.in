@@ -410,7 +410,6 @@ declare -A obsolete_charts=(
 	['postfix']="python.d.plugin module"
 	['squid']="python.d.plugin module"
 	['tomcat']="python.d.plugin module"
-	['apcupsd']="temporary disabled because of the bug (#12413)"
 )
 
 all_enabled_charts() {
@@ -419,6 +418,11 @@ all_enabled_charts() {
 	# find all enabled charts
 	for chart in $(all_charts); do
 		MODULE_NAME="${chart}"
+		
+		if [ "$MODULE_NAME" == "apcupsd" ] && [ -n "$NETDATA_LISTENER_PORT" ]; then
+		  info "apcupsd is temporary disabled because of the bug (#12413)."
+		  continue
+		fi
 
 		if [ -n "${obsolete_charts["$MODULE_NAME"]}" ]; then
 		  debug "is replaced by ${obsolete_charts["$MODULE_NAME"]}, skipping it."
