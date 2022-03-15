@@ -236,7 +236,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
 
             if (unlikely(rd->last_collected_time.tv_sec < instance->after)) {
                 debug(
-                    D_BACKEND,
+                    D_EXPORTING,
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
                     "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
                     rd->id, rd->rrdset->id,

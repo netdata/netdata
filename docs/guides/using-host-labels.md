@@ -86,7 +86,7 @@ They capture the following:
 -   What virtualization layer the system runs on top of, if any
 -   Whether the system is a streaming parent or child
 
-If you want to organize your systems without manually creating host tags, try the automatic labels in some of the
+If you want to organize your systems without manually creating host labels, try the automatic labels in some of the
 features below.
 
 ## Host labels in streaming

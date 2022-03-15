@@ -67,18 +67,18 @@ Alerts for the child can be triggered by any of the involved hosts that maintain
 You can daisy-chain any number of Netdata, each with or without a database and
 with or without alerts for the child metrics.
 
-### Mix and match with backends
+### Mix and match with exporting engine
 
-All nodes that maintain a database can also send their data to a backend database.
+All nodes that maintain a database can also send their data to an external database.
 This allows quite complex setups.
 
 Example:
 
 1.  Netdata nodes `A` and `B` do not maintain a database and stream metrics to Netdata node `C`(live streaming functionality). 
-2.  Netdata node `C` maintains a database for `A`, `B`, `C` and archives all metrics to `graphite` with 10 second detail (backends functionality).
+2.  Netdata node `C` maintains a database for `A`, `B`, `C` and archives all metrics to `graphite` with 10 second detail (exporting functionality).
 3.  Netdata node `C` also streams data for `A`, `B`, `C` to Netdata `D`, which also collects data from `E`, `F` and `G` from another DMZ (live streaming functionality).
 4.  Netdata node `D` is just a proxy, without a database, that streams all data to a remote site at Netdata `H`.
-5.  Netdata node `H` maintains a database for `A`, `B`, `C`, `D`, `E`, `F`, `G`, `H` and sends all data to `opentsdb` with 5 seconds detail (backends functionality)
+5.  Netdata node `H` maintains a database for `A`, `B`, `C`, `D`, `E`, `F`, `G`, `H` and sends all data to `opentsdb` with 5 seconds detail (exporting functionality)
 6.  Alerts are triggered by `H` for all hosts.
 7.  Users can use all Netdata nodes that maintain a database to view metrics (i.e. at `H` all hosts can be viewed).
 
@@ -107,15 +107,7 @@ This also disables the registry (there cannot be a registry without an API).
 requests from its child nodes. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log
 entries "... too busy to accept new streaming request. Will be allowed in X secs".
 
-```
-[backend]
-    enabled = yes | no
-    type = graphite | opentsdb
-    destination = IP:PORT ...
-    update every = 10
-```
-
-`[backend]` configures data archiving to a backend (it archives all databases maintained on
+You can [use](docs/agent/exporting#configuration) the exporting engine to configure data archiving to an external database (it archives all databases maintained on
 this host).
 
 ### Streaming configuration
@@ -156,7 +148,7 @@ a proxy).
 ```
 This is an overview of how these options can be combined:
 
-| target|memory<br/>mode|web<br/>mode|stream<br/>enabled|backend|alarms|dashboard|
+| target|memory<br/>mode|web<br/>mode|stream<br/>enabled|exporting|alarms|dashboard|
 |------|:-------------:|:----------:|:----------------:|:-----:|:----:|:-------:|
 | headless collector|`none`|`none`|`yes`|only for `data source = as collected`|not possible|no|
 | headless proxy|`none`|not `none`|`yes`|only for `data source = as collected`|not possible|no|

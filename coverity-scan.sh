@@ -175,11 +175,11 @@ OTHER_OPTIONS+=" --enable-jsonc"
 OTHER_OPTIONS+=" --enable-plugin-nfacct"
 OTHER_OPTIONS+=" --enable-plugin-freeipmi"
 OTHER_OPTIONS+=" --enable-plugin-cups"
-OTHER_OPTIONS+=" --enable-backend-prometheus-remote-write"
+OTHER_OPTIONS+=" --enable-exporting-prometheus-remote-write"
 # TODO: enable these plugins too
 #OTHER_OPTIONS+=" --enable-plugin-xenstat"
-#OTHER_OPTIONS+=" --enable-backend-kinesis"
-#OTHER_OPTIONS+=" --enable-backend-mongodb"
+#OTHER_OPTIONS+=" --enable-exporting-kinesis"
+#OTHER_OPTIONS+=" --enable-exporting-mongodb"
 
 FOUND_OPTS="NO"
 while [ -n "${1}" ]; do

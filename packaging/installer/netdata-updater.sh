@@ -372,16 +372,27 @@ get_netdata_latest_tag() {
 newer_commit_date() {
   info "Checking if a newer version of the updater script is available."
 
+  commit_check_url="https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1"
+  python_version_check="from __future__ import print_function;import sys,json;data = json.load(sys.stdin);print(data[0]['commit']['committer']['date'] if isinstance(data, list) else '')"
+
   if command -v jq > /dev/null 2>&1; then
-    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | jq '.[0].commit.committer.date' | tr -d '"')"
+    commit_date="$(_safe_download "${commit_check_url}" /dev/stdout | jq '.[0].commit.committer.date' 2>/dev/null | tr -d '"')"
   elif command -v python > /dev/null 2>&1;then
-    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)[0]["commit"]["committer"]["date"])')"
+    commit_date="$(_safe_download "${commit_check_url}" /dev/stdout | python -c "${python_version_check}")"
   elif command -v python3 > /dev/null 2>&1;then
-    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python3 -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)[0]["commit"]["committer"]["date"])')"
+    commit_date="$(_safe_download "${commit_check_url}" /dev/stdout | python3 -c "${python_version_check}")"
   fi
 
   if [ -z "${commit_date}" ] ; then
-    commit_date="9999-12-31T23:59:59Z"
+    return 0
+  elif [ "$(uname)" = "Linux" ]; then
+    commit_date="$(date -d "${commit_date}" +%s)"
+  else # assume BSD-style `date` if we are not on Linux
+    commit_date="$(/bin/date -j -f "%Y-%m-%dT%H:%M:%SZ" "${commit_date}" +%s 2>/dev/null)"
+
+    if [ -z "${commit_date}" ]; then
+        return 0
+    fi
   fi
 
   if [ -e "${script_source}" ]; then
@@ -390,7 +401,7 @@ newer_commit_date() {
     script_date="$(date +%s)"
   fi
 
-  [ "$(date -d "${commit_date}" +%s)" -ge "${script_date}" ]
+  [ "${commit_date}" -ge "${script_date}" ]
 }
 
 self_update() {

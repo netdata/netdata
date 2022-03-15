@@ -86,15 +86,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = statsd_main
     },
     {
-        .name = "BACKENDS",
-        .config_section = NULL,
-        .config_name = NULL,
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = backends_main
-    },
-    {
         .name = "EXPORTING",
         .config_section = NULL,
         .config_name = NULL,
