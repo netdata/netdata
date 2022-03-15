@@ -410,6 +410,7 @@ declare -A obsolete_charts=(
 	['postfix']="python.d.plugin module"
 	['squid']="python.d.plugin module"
 	['tomcat']="python.d.plugin module"
+	['apcupsd']="temporary disabled because of the bug (#12413)"
 )
 
 all_enabled_charts() {
