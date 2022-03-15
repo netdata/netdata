@@ -75,9 +75,9 @@ void __wrap_finished_web_request_statistics(
 
 char *__wrap_config_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
-    if (!strcmp(section, CONFIG_SECTION_WEB) && !strcmp(name, "web files owner"))
-        return "netdata";
     (void)root;
+    (void)section;
+    (void)name;
     (void)default_value;
     return "UNKNOWN FIX ME";
 }
