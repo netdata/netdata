@@ -56,6 +56,11 @@ error() {
   echo >&3 "$(date) : ERROR: " "${@}"
 }
 
+fatal() {
+  error "FAILED TO UPDATE NETDATA : ${1}"
+  exit 1
+}
+
 : "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
 
 if [ "${ENVIRONMENT_FILE}" = "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; then
@@ -107,18 +112,6 @@ issystemd() {
   return 1
 }
 
-_get_scheduler_type() {
-  if _get_intervaldir > /dev/null ; then
-    echo 'interval'
-  elif issystemd ; then
-    echo 'systemd'
-  elif [ -d /etc/cron.d ] ; then
-    echo 'crontab'
-  else
-    echo 'none'
-  fi
-}
-
 _get_intervaldir() {
   if [ -d /etc/cron.daily ]; then
     echo /etc/cron.daily
@@ -129,6 +122,18 @@ _get_intervaldir() {
   fi
 
   return 0
+}
+
+_get_scheduler_type() {
+  if _get_intervaldir > /dev/null ; then
+    echo 'interval'
+  elif issystemd ; then
+    echo 'systemd'
+  elif [ -d /etc/cron.d ] ; then
+    echo 'crontab'
+  else
+    echo 'none'
+  fi
 }
 
 install_build_dependencies() {
@@ -261,12 +266,6 @@ safe_sha256sum() {
   else
     fatal "I could not find a suitable checksum binary to use"
   fi
-}
-
-# this is what we will do if it fails (head-less only)
-fatal() {
-  error "FAILED TO UPDATE NETDATA : ${1}"
-  exit 1
 }
 
 cleanup() {
