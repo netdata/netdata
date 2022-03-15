@@ -312,7 +312,7 @@ Everything is the same with [badges](/web/api/badges/README.md). In short:
      above too).
 
 -   `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
-     `match-ids`, `match-names`. Check the badges documentation for more info.
+     `match-ids`, `match-names`. Check the [badges](/web/api/badges/README.md) documentation for more info.
 
 -   `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
      by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
