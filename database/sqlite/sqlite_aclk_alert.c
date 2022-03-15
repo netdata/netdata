@@ -8,6 +8,44 @@
 #include "../../aclk/aclk.h"
 #endif
 
+//decide if some events should be sent or not
+int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
+{
+    sqlite3_stmt *res = NULL;
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+    int send = 1, rc = 0;
+
+    BUFFER *sql = buffer_create(1024);
+    
+    //a CLEAR event with previous sent status also CLEAR can be skipped
+    if (ae->new_status == RRDCALC_STATUS_CLEAR) {
+
+        buffer_sprintf(sql, "select hl.new_status from health_log_%s hl, aclk_alert_%s aa \
+                             where hl.unique_id = aa.alert_unique_id \
+                             and hl.alarm_id = %u and hl.unique_id <> %u \
+                             order by alarm_event_id desc LIMIT 1;", uuid_str, uuid_str, ae->alarm_id, ae->unique_id);
+
+        rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement when trying to filter alert events.");
+            buffer_free(sql);
+            return 1;
+        }
+
+        rc = sqlite3_step(res);
+        if (likely(rc == SQLITE_ROW))
+            if ((RRDCALC_STATUS) sqlite3_column_int(res, 0) == RRDCALC_STATUS_CLEAR)
+                send = 0;
+
+        rc = sqlite3_reset(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement when trying to filter alert events, rc = %d", rc);
+    }
+
+    return send;
+}
+
 // will replace call to aclk_update_alarm in health/health_log.c
 // and handle both cases
 int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
@@ -41,6 +79,11 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
 
     if (unlikely(uuid_is_null(ae->config_hash_id)))
         return 0;
+
+    if (!should_send_to_cloud(host, ae)) {
+        log_access ("MC Will skip %u", ae->unique_id);
+        return 0;
+    }
 
     int rc = 0;
 
