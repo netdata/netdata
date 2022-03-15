@@ -1481,11 +1481,9 @@ if [ "${ACTION}" = "reinstall-clean" ]; then
   uninstall
   cleanup
 
-  wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/kickstart.sh -O "${tmpdir}/kickstart.sh"
-  chmod +x "${tmpdir}/kickstart.sh"
-
   REINSTALL_OPTIONS="$(echo "${KICKSTART_OPTIONS}" | sed 's/--reinstall-clean//g')"
-  ${ROOTCMD} "${tmpdir}/kickstart.sh" "$REINSTALL_OPTIONS"
+  # shellcheck disable=SC2086
+  ${ROOTCMD} "$0" $REINSTALL_OPTIONS
 
   trap - EXIT
   exit 0
