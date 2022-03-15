@@ -49,7 +49,7 @@ Note that if you installed Netdata using an installation prefix, you will need t
 specifying that prefix to make sure it finds the existing install.
 
 If you see a line starting with `--- Would attempt to update existing installation by running the updater script
-located at:, then our [regular update method](#updates-for-most-systems) will work for you.
+located at:`, then our [regular update method](#updates-for-most-systems) will work for you.
 
 Otherwise, it should either indicate that the installation type is not supported (which probably means you either
 have a `custom` instal or built Netdata manually) or indicate that it would create a new install (which means that
