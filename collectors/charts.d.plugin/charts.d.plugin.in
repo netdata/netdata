@@ -418,6 +418,11 @@ all_enabled_charts() {
 	# find all enabled charts
 	for chart in $(all_charts); do
 		MODULE_NAME="${chart}"
+		
+		if [ "$MODULE_NAME" == "apcupsd" ] && [ -n "$NETDATA_LISTENER_PORT" ]; then
+		  info "apcupsd is temporarily disabled because of bug #12413"
+		  continue
+		fi
 
 		if [ -n "${obsolete_charts["$MODULE_NAME"]}" ]; then
 		  debug "is replaced by ${obsolete_charts["$MODULE_NAME"]}, skipping it."
