@@ -244,19 +244,29 @@ To collect data related to Linux multi-device (MD) flushing, the following kprob
 
 ### Disk
 
-The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled. This will create the
-chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
+The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled.
+
+#### Disk Latency
+This will create the chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
 
 - [`block/block_rq_issue`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
   IO request operation to a device drive.
 - [`block/block_rq_complete`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
   IO operation completed by device.
 
+Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
+For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),
+depending on the workload it should never reach higher than 1-3 ms. In most cases, workloads will experience less than
+1ms latency numbers. The dimensions refer to time intervals.
+
 ### Filesystem
 
-This group has charts demonstrating how applications interact with the Linux
-kernel to open and close file descriptors. It also brings latency charts for
-several different filesystems.
+This group has charts demonstrating how applications interact with the Linux kernel to open and close file descriptors.
+It also brings latency charts for several different filesystems.
+
+#### Latency Algorithm
+We calculate the difference between the calling and return times, this spans disk I/O, file system operations (lock, I/O),
+run queue latency and all events related to the monitored action.
 
 #### ext4
 
@@ -409,6 +419,11 @@ is accessed, but also in possible errors, so we need to attach a `kretprobe`. Fo
 - [`lookup_fast`](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
 - [`d_lookup`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223):
   Called when the desired file is not inside the directory cache.
+
+##### Directory Cache Interpretation
+When directory cache is showing 100% means that every file that was accessed was present in the directory cache.
+If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not
+accessed before.
 
 ### Mount Points
 
