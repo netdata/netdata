@@ -23,7 +23,7 @@ library](https://github.com/yzhao062/pyod/tree/master), which periodically runs 
 quantify how anomalous certain charts are.
 
 All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud). If
-you choose to sign up for Netdata Cloud and [coonect your nodes](/claim/README.md), you will have the ability to run
+you choose to sign up for Netdata Cloud and [connect your nodes](/claim/README.md), you will have the ability to run
 tailored anomaly detection on every node in your infrastructure, regardless of its purpose or workload.
 
 In this guide, you'll learn how to set up the anomalies collector to instantly detect anomalies in an Nginx web server
@@ -143,7 +143,7 @@ dimensions](https://user-images.githubusercontent.com/1153921/102813877-db5e4880
 
 As you can see in the above screenshot, this node is now looking for anomalies in many places. The result is a single
 `anomalies_local.probability` chart with more than twenty dimensions, some of which the dashboard hides at the bottom of
-a scroll-able area. In addition, training and analyzing the anomaly collector on many charts might require more CPU
+a scrollable area. In addition, training and analyzing the anomaly collector on many charts might require more CPU
 utilization that you're willing to give.
 
 First, explicitly declare which `system.` charts to monitor rather than of all of them using regex (`system\..*`).

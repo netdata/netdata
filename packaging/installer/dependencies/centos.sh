@@ -36,7 +36,7 @@ os_version() {
     # shellcheck disable=SC2002
     cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2 | cut -d'"' -f2
   else
-    echo "Erorr: Cannot determine OS version!"
+    echo "Error: Cannot determine OS version!"
     exit 1
   fi
 }

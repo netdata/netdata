@@ -197,7 +197,7 @@ int rrdset2value_api_v1(
     if(db_before) *db_before = r->before;
 
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
-    *n = rrdr2value(r, i, options, value_is_null);
+    *n = rrdr2value(r, i, options, value_is_null, NULL);
 
     rrdr_free(r);
     return HTTP_RESP_OK;
@@ -217,6 +217,7 @@ int rrdset2anything_api_v1(
         , time_t *latest_timestamp
         , struct context_param *context_param_list
         , char *chart_label_key
+        , int max_anomaly_rates
 ) {
 
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
@@ -227,6 +228,9 @@ int rrdset2anything_api_v1(
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
+
+    if (st && st->state && st->state->is_ar_chart)
+        ml_process_rrdr(r, max_anomaly_rates);
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
@@ -243,12 +247,12 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1, context_param_list, chart_label_key);
-            rrdr2ssv(r, wb, options, "", " ", "");
+            rrdr2ssv(r, wb, options, "", " ", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2ssv(r, wb, options, "", " ", "");
+            rrdr2ssv(r, wb, options, "", " ", "", temp_rd);
         }
         break;
 
@@ -256,12 +260,12 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1, context_param_list, chart_label_key);
-            rrdr2ssv(r, wb, options, "", ",", "");
+            rrdr2ssv(r, wb, options, "", ",", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2ssv(r, wb, options, "", ",", "");
+            rrdr2ssv(r, wb, options, "", ",", "", temp_rd);
         }
         break;
 
@@ -269,12 +273,12 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
-            rrdr2ssv(r, wb, options, "[", ",", "]");
+            rrdr2ssv(r, wb, options, "[", ",", "]", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         }
         else {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr2ssv(r, wb, options, "[", ",", "]");
+            rrdr2ssv(r, wb, options, "[", ",", "]", temp_rd);
         }
         break;
 

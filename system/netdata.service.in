@@ -64,6 +64,8 @@ CapabilityBoundingSet=CAP_NET_RAW
 CapabilityBoundingSet=CAP_SYS_CHROOT
 # is required for nfacct plugin (bandwidth accounting)
 CapabilityBoundingSet=CAP_NET_ADMIN
+# is required for plugins that use sudo
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID
 
 # Sandboxing
 ProtectSystem=full

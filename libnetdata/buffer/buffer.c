@@ -87,14 +87,19 @@ inline char *print_number_llu_r(char *str, unsigned long long uvalue) {
 }
 
 inline char *print_number_llu_r_smart(char *str, unsigned long long uvalue) {
-#ifdef ENVIRONMENT32
-    if(uvalue > (unsigned long long)0xffffffff)
-        str = print_number_llu_r(str, uvalue);
-    else
-        str = print_number_lu_r(str, uvalue);
-#else
-    do *str++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
-#endif
+    switch (sizeof(void *)) {
+    case 4:
+        str = (uvalue > (unsigned long long) 0xffffffff) ? print_number_llu_r(str, uvalue) :
+                                                           print_number_lu_r(str, uvalue);
+        break;
+    case 8:
+        do {
+            *str++ = (char) ('0' + (uvalue % 10));
+        } while (uvalue /= 10);
+        break;
+    default:
+        fatal("Netdata supports only 32-bit & 64-bit systems.");
+    }
 
     return str;
 }
@@ -106,14 +111,19 @@ void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
     char *str = &wb->buffer[wb->len];
     char *wstr = str;
 
-#ifdef ENVIRONMENT32
-    if(uvalue > (unsigned long long)0xffffffff)
-        wstr = print_number_llu_r(wstr, uvalue);
-    else
-        wstr = print_number_lu_r(wstr, uvalue);
-#else
-    do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
-#endif
+    switch (sizeof(void *)) {
+    case 4:
+        wstr = (uvalue > (unsigned long long) 0xffffffff) ? print_number_llu_r(wstr, uvalue) :
+                                                            print_number_lu_r(wstr, uvalue);
+        break;
+    case 8:
+        do {
+            *wstr++ = (char) ('0' + (uvalue % 10));
+        } while (uvalue /= 10);
+        break;
+    default:
+        fatal("Netdata supports only 32-bit & 64-bit systems.");
+    }
 
     // terminate it
     *wstr = '\0';

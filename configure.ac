@@ -262,7 +262,6 @@ AC_FUNC_STRERROR_R
 AC_C__GENERIC
 AC_C___ATOMIC
 # AC_C_STMT_EXPR
-AC_CHECK_SIZEOF([void *])
 AC_CANONICAL_HOST
 AC_HEADER_MAJOR
 AC_HEADER_RESOLV
@@ -405,7 +404,6 @@ PKG_CHECK_MODULES(
     [have_uuid=yes],
     [AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])]
 )
-AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
@@ -1220,7 +1218,7 @@ if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
     if test "${have_libelf}" = "yes" -a \
             "${have_bpf}" = "yes" -a \
             "${have_libbpf}" = "yes"; then
-        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I \$(abs_top_srcdir)/externaldeps/libbpf/include"
+        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I \$(abs_top_srcdir)/externaldeps/libbpf/include -I \$(abs_top_srcdir)/externaldeps/libbpf/include/uapi"
         OPTIONAL_BPF_LIBS="\$(abs_top_srcdir)/externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
         AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
         enable_ebpf="yes"

@@ -12,13 +12,13 @@ You could also use a macOS system as the parent node in a [streaming configurati
 You can install Netdata in one of the three following ways: 
 
 - **[Install Netdata with the our automatic one-line installation script (recommended)](#install-netdata-with-our-automatic-one-line-installation-script)**, 
-- [Install Netdata via Homebrew](#install-netdata-with-the-homebrew-package)
+- [Install Netdata via Homebrew](#install-netdata-via-homebrew)
 - [Install Netdata from source](#install-netdata-from-source)
 
 Each of these installation option requires [Homebrew](https://brew.sh/) for handling dependencies. 
 
 > The Netdata Homebrew package is community-created and -maintained.
-> Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/packaging/platform_support).
+> Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/packaging/PLATFORM_SUPPORT.md).
 
 ## Install Netdata with our automatic one-line installation script
 
@@ -52,7 +52,7 @@ curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/n
 ```
 The Netdata Agent is installed under `/usr/local/netdata` on your machine. Your machine will also show up as a node in your Netdata Cloud.
 
-If you experience issues while claiming your node, follow the steps in our [Troubleshooting](claim/README.md#troubleshooting) documentation.
+If you experience issues while claiming your node, follow the steps in our [Troubleshooting](/claim/README.md#troubleshooting) documentation.
 ## Install Netdata via Homebrew
 
 To install Netdata and all its dependencies, run Homebrew using the following command: 
@@ -108,4 +108,4 @@ When you're finished with installation, check out our [single-node](/docs/quicks
 Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
 
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fmacos&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

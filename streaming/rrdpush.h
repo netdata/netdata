@@ -62,7 +62,7 @@ struct decompressor_state {
     size_t total_compressed;
     size_t total_uncompressed;
     size_t packet_count;
-    struct decompressor_data *data; // Deompression API specific data
+    struct decompressor_data *data; // Decompression API specific data
     void (*reset)(struct decompressor_state *state);
     size_t (*start)(struct decompressor_state *state, const char *header, size_t header_size);
     size_t (*put)(struct decompressor_state *state, const char *data, size_t size);

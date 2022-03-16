@@ -207,7 +207,7 @@ banner_root_notify() {
   Netdata will work, but a few data collection modules that
   require root access will fail.
 
-  If you installing netdata permanently on your system, run
+  If you are installing netdata permanently on your system, run
   the installer like this:
 
      ${TPUT_YELLOW}${TPUT_BOLD}sudo $PROGRAM ${@}${TPUT_RESET}
@@ -223,50 +223,50 @@ usage() {
 USAGE: ${PROGRAM} [options]
        where options include:
 
-  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata
-  --dont-start-it            Do not (re)start netdata after installation
-  --dont-wait                Run installation in non-interactive mode
-  --auto-update or -u        Install netdata-updater in cron to update netdata automatically once per day
+  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata.
+  --dont-start-it            Do not (re)start netdata after installation.
+  --dont-wait                Run installation in non-interactive mode.
+  --auto-update or -u        Install netdata-updater in cron to automatically check for updates once per day.
   --auto-update-type         Override the auto-update scheduling mechanism detection, currently supported types
-                             are: systemd, interval, crontab
-  --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
+                             are: systemd, interval, crontab.
+  --stable-channel           Use packages from GitHub release pages instead of nightly updates.
                              This results in less frequent updates.
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
-  --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
+  --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
-  --disable-plugin-freeipmi
-  --disable-https            Explicitly disable TLS support
-  --disable-dbengine         Explicitly disable DB engine support
+  --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
+  --disable-https            Explicitly disable TLS support.
+  --disable-dbengine         Explicitly disable DB engine support.
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
-  --disable-plugin-nfacct
-  --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available
-  --disable-plugin-xenstat   Disable the xenstat plugin.
-  --enable-backend-kinesis   Enable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries
-                             it depends on are available.
-  --disable-backend-kinesis
+  --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
+  --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
+  --disable-plugin-xenstat   Explicitly disable the xenstat plugin.
+  --enable-backend-kinesis   Enable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and its dependencies
+                             are available.
+  --disable-backend-kinesis  Explicitly disable AWS Kinesis backend.
   --enable-backend-prometheus-remote-write Enable Prometheus remote write backend. Default: enable it when libprotobuf and
                              libsnappy are available.
-  --disable-backend-prometheus-remote-write
+  --disable-backend-prometheus-remote-write Explicitly disable Prometheus remote write backend.
   --enable-backend-mongodb   Enable MongoDB backend. Default: enable it when libmongoc is available.
-  --disable-backend-mongodb
+  --disable-backend-mongodb  Explicitly disable MongoDB backend.
   --enable-exporting-pubsub  Enable Google Cloud PubSub exporting connector. Default: enable it when
                              libgoogle_cloud_cpp_pubsub_protos and its dependencies are available.
-  --disable-exporting-pubsub
-  --enable-lto               Enable Link-Time-Optimization. Default: disabled
-  --disable-lto
-  --enable-ml                Enable anomaly detection with machine learning. (Default: autodetect)
-  --disable-ml
-  --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
-  --use-system-lws           Use a system copy of libwebsockets instead of bundling our own (default is to use the bundled copy).
-  --use-system-protobuf      Use a system copy of libprotobuf instead of bundling our own (default is to use the bundled copy).
-  --zlib-is-really-here or
-  --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
+  --disable-exporting-pubsub Explicitly disable Google Cloud PubSub exporting connector.
+  --enable-lto               Enable link-time optimization. Default: disabled.
+  --disable-lto              Explicitly disable link-time optimization.
+  --enable-ml                Enable anomaly detection with machine learning. Default: autodetect.
+  --disable-ml               Explicitly disable anomaly detection with machine learning.
+  --disable-x86-sse          Disable SSE instructions & optimizations. Default: enabled.
+  --use-system-lws           Use a system copy of libwebsockets instead of bundled copy. Default: bundled.
+  --use-system-protobuf      Use a system copy of libprotobuf instead of bundled copy. Default: bundled.
+  --zlib-is-really-here
+  --libs-are-really-here     If you see errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
-  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)
+  --disable-telemetry        Opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
 
 Netdata will by default be compiled with gcc optimization -O2
@@ -284,7 +284,13 @@ or use the following if both LDFLAGS and CFLAGS need to be overridden:
 
 For the installer to complete successfully, you will need these packages installed:
 
-  gcc make autoconf automake pkg-config zlib1g-dev (or zlib-devel) uuid-dev (or libuuid-devel)
+  gcc
+  make
+  autoconf
+  automake
+  pkg-config
+  zlib1g-dev (or zlib-devel)
+  uuid-dev (or libuuid-devel)
 
 For the plugins, you will at least need:
 
@@ -300,7 +306,7 @@ NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
-RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
+RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
 while [ -n "${1}" ]; do
   case "${1}" in
@@ -411,6 +417,13 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
+if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
+  [ -n "$DISABLE_TELEMETRY" ] ||
+  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
+  [ -n "$DO_NOT_TRACK" ]; then
+  NETDATA_DISABLE_TELEMETRY=1
+fi
+
 make="make"
 # See: https://github.com/netdata/netdata/issues/9163
 if [ "$(uname -s)" = "FreeBSD" ]; then
@@ -515,8 +528,8 @@ if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
   ${TPUT_YELLOW}${TPUT_BOLD}NOTE${TPUT_RESET}:
   Anonymous usage stats will be collected and sent to Netdata.
   To opt-out, pass --disable-telemetry option to the installer or export
-  the environment variable DO_NOT_TRACK to a non-zero or non-empty value
-  (e.g: export DO_NOT_TRACK=1).
+  the environment variable DISABLE_TELEMETRY to a non-zero or non-empty value
+  (e.g: export DISABLE_TELEMETRY=1).
 
 BANNER4
 fi
@@ -688,7 +701,7 @@ bundle_protobuf() {
     "${PROTOBUF_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_VERRIDE_PROTOBUF}"; then
-    if run tar -xf "${tmp}/${PROTOBUF_PACKAGE_BASENAME}" -C "${tmp}" &&
+    if run tar --no-same-owner -xf "${tmp}/${PROTOBUF_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
       copy_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
@@ -773,7 +786,7 @@ bundle_judy() {
     "${JUDY_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_OVERRIDE_JUDY}"; then
-    if run tar -xf "${tmp}/${JUDY_PACKAGE_BASENAME}" -C "${tmp}" &&
+    if run tar --no-same-owner -xf "${tmp}/${JUDY_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
       copy_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
@@ -857,7 +870,7 @@ bundle_jsonc() {
     "${JSONC_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_OVERRIDE_JSONC}"; then
-    if run tar -xf "${tmp}/${JSONC_PACKAGE_BASENAME}" -C "${tmp}" &&
+    if run tar --no-same-owner -xf "${tmp}/${JSONC_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_jsonc "${tmp}/json-c-json-c-${JSONC_PACKAGE_VERSION}" &&
       copy_jsonc "${tmp}/json-c-json-c-${JSONC_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
@@ -889,6 +902,37 @@ get_kernel_version() {
   rm -f "${tmpfile}"
 
   printf "%03d%03d%03d" "${maj}" "${min}" "${patch}"
+}
+
+detect_libc() {
+  libc=
+  if ldd --version 2>&1 | grep -q -i glibc; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i musl; then
+    echo >&2 " Detected musl"
+    libc="musl"
+  else
+    ls_path=$(command -v ls)
+    if [ -n "${ls_path}" ] ; then
+      cmd=$(ldd "$ls_path" | grep -w libc | cut -d" " -f 3)
+      if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
+        echo >&2 " Detected GLIBC"
+        libc="glibc"    
+      fi    
+    fi    
+  fi
+
+  if [ -z "$libc" ]; then
+    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
+    return 1
+  fi
+
+  echo "${libc}"
+  return 0
 }
 
 rename_libbpf_packaging() {
@@ -923,11 +967,20 @@ copy_libbpf() {
 
   run cp "${1}/usr/${lib_subdir}/libbpf.a" "${target_dir}/libbpf.a" || return 1
   run cp -r "${1}/usr/include" "${target_dir}" || return 1
+  run cp -r "${1}/include/uapi" "${target_dir}/include" || return 1
 }
 
 bundle_libbpf() {
   if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
+  fi
+
+  # When libc is not detected, we do not have necessity to compile libbpf and we should not do download of eBPF programs
+  libc="${EBPF_LIBC:-"$(detect_libc)"}"
+  if [ -z "$libc" ]; then
+      NETDATA_DISABLE_EBPF=1
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+      return 0
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
@@ -946,7 +999,7 @@ bundle_libbpf() {
     "${LIBBPF_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBBPF}"; then
-    if run tar -xf "${tmp}/${LIBBPF_PACKAGE_BASENAME}" -C "${tmp}" &&
+    if run tar --no-same-owner -xf "${tmp}/${LIBBPF_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
       copy_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
@@ -972,6 +1025,59 @@ bundle_libbpf() {
 }
 
 bundle_libbpf
+
+copy_co_re() {
+  cp -R "${1}/includes" "collectors/ebpf.plugin/"
+}
+
+bundle_ebpf_co_re() {
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+    return 0
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
+
+  progress "eBPF CO-RE"
+
+  CORE_PACKAGE_VERSION="$(cat packaging/ebpf-co-re.version)"
+
+  tmp="$(mktemp -d -t netdata-ebpf-co-re-XXXXXX)"
+  CORE_PACKAGE_BASENAME="netdata-ebpf-co-re-glibc-${CORE_PACKAGE_VERSION}.tar.xz"
+
+  if fetch_and_verify "ebpf-co-re" \
+    "https://github.com/netdata/ebpf-co-re/releases/download/${CORE_PACKAGE_VERSION}/${CORE_PACKAGE_BASENAME}" \
+    "${CORE_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_CORE}"; then
+    if run tar --no-same-owner -xf "${tmp}/${CORE_PACKAGE_BASENAME}" -C "${tmp}" &&
+      copy_co_re "${tmp}" &&
+      rm -rf "${tmp}"; then
+      run_ok "libbpf built and prepared."
+    else
+      run_failed "Failed to get eBPF CO-RE files."
+      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to get CO-RE. You will not be able to use eBPF plugin."
+        NETDATA_DISABLE_EBPF=1
+        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for libbpf."
+    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for eBPF CO-RE. You will not be able to use eBPF plugin."
+      NETDATA_DISABLE_EBPF=1
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+    fi
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+bundle_ebpf_co_re
 
 # -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
@@ -1062,14 +1168,6 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
     run mkdir "${NETDATA_PREFIX}/etc/netdata/node.d"
   fi
 
-  # move the node.d config files
-  for x in named sma_webbox snmp; do
-    for y in "" ".old" ".orig"; do
-      if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ] && [ ! -f "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}" ]; then
-        run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}"
-      fi
-    done
-  done
 fi
 
 # -----------------------------------------------------------------------------
@@ -1534,10 +1632,10 @@ install_go() {
   # Install new files
   run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d"
   run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d.conf"
-  run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
+  run tar --no-same-owner -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
   run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
-  run tar -xf "${tmp}/${GO_PACKAGE_BASENAME}"
+  run tar --no-same-owner -xf "${tmp}/${GO_PACKAGE_BASENAME}"
   run mv "${GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   if [ "$(id -u)" -eq 0 ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
@@ -1549,25 +1647,6 @@ install_go() {
 }
 
 install_go
-
-detect_libc() {
-  libc=
-  if ldd --version 2>&1 | grep -q -i glibc; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i musl; then
-    echo >&2 " Detected musl"
-    libc="musl"
-  else
-    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
-    return 1
-  fi
-  echo "${libc}"
-  return 0
-}
 
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
@@ -1606,7 +1685,7 @@ remove_old_ebpf() {
     mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.d.conf"
   fi
 
-  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
+  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
     echo >&2 "Removing old eBPF programs with patch."
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
@@ -1666,7 +1745,7 @@ install_ebpf() {
   fi
 
   echo >&2 " Extracting ${EBPF_TARBALL} ..."
-  tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
+  tar --no-same-owner -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
   # chown everything to root:netdata before we start copying out of our package
   run chown -R root:netdata "${tmp}"
@@ -1694,10 +1773,6 @@ install_ebpf
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
-
-if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
-  NETDATA_DISABLE_TELEMETRY=1
-fi
 
 # Opt-out from telemetry program
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then

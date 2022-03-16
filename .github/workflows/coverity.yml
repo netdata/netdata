@@ -9,7 +9,7 @@ on:
       - .github/workflows/coverity.yml
       - coverity-scan.sh
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 concurrency:
   group: coverity-${{ github.ref }}
   cancel-in-progress: true
@@ -19,10 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        id: checkout
         with:
           submodules: recursive
       - name: Prepare environment
+        id: prepare
         env:
           DEBIAN_FRONTEND: 'noninteractive'
         run: |
@@ -33,6 +35,7 @@ jobs:
                                   libprotoc-dev libssl-dev protobuf-compiler \
                                   libnetfilter-acct-dev
       - name: Run coverity-scan
+        id: run
         env:
           REPOSITORY: 'netdata/netdata'
           COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
@@ -47,6 +50,11 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Coverity run failed:'
           SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Coverity failed to run correctly.
+              Checkout: ${{ steps.checkout.outcome }}
+              Environment preparation: ${{ steps.prepare.outcome }}
+              Coverity run: ${{ steps.run.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: ${{
             failure()

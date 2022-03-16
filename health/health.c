@@ -223,6 +223,8 @@ void health_reload(void) {
     if (netdata_cloud_setting)
         aclk_single_update_disable();
 #endif
+    sql_refresh_hashes();
+
     rrd_rdlock();
 
     RRDHOST *host;
@@ -745,6 +747,30 @@ void *health_main(void *ptr) {
                 if (update_disabled_silenced(host, rc))
                     continue;
 
+                if (unlikely(rc->rrdset && rc->status != RRDCALC_STATUS_REMOVED &&
+                        rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE))) {
+                    if (!rrdcalc_isrepeating(rc)) {
+                        time_t now = now_realtime_sec();
+                        ALARM_ENTRY *ae = health_create_alarm_entry(
+                            host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
+                            rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
+                            rc->value, NAN, rc->status, RRDCALC_STATUS_REMOVED, rc->source, rc->units, rc->info, 0, 0);
+                        if (ae) {
+                            health_alarm_log(host, ae);
+                            rc->old_status = rc->status;
+                            rc->status = RRDCALC_STATUS_REMOVED;
+                            rc->last_status_change = now;
+                            rc->last_updated = now;
+                            rc->value = NAN;
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+                            if (netdata_cloud_setting && likely(!aclk_alert_reloaded))
+                                sql_queue_removed_alerts_to_aclk(host);
+#endif
+                        }
+                    }
+                    continue;
+                }
+
                 if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run))) {
                     if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE))
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUNNABLE;
@@ -1004,7 +1030,7 @@ void *health_main(void *ptr) {
                 RRDCALC *rc;
                 for(rc = host->alarms; rc ; rc = rc->next) {
                     int repeat_every = 0;
-                    if(unlikely(rrdcalc_isrepeating(rc))) {
+                    if(unlikely(rrdcalc_isrepeating(rc) && rc->delay_up_to_timestamp <= now)) {
                         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUN_ONCE;
                             repeat_every = rc->warn_repeat_every;

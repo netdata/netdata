@@ -129,6 +129,10 @@ unsigned int remote_clock_resync_iterations = 60;
 
 
 static inline int should_send_chart_matching(RRDSET *st) {
+    // Do not stream anomaly rates charts.
+    if (unlikely(st->state->is_ar_chart))
+        return false;
+
     if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED))) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
         rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);

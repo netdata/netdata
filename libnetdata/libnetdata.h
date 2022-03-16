@@ -168,14 +168,6 @@ extern "C" {
 // ----------------------------------------------------------------------------
 // netdata common definitions
 
-#if (SIZEOF_VOID_P == 8)
-#define ENVIRONMENT64
-#elif (SIZEOF_VOID_P == 4)
-#define ENVIRONMENT32
-#else
-#error "Cannot detect if this is a 32 or 64 bit CPU"
-#endif
-
 #ifdef __GNUC__
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif // __GNUC__
@@ -304,6 +296,13 @@ extern char *find_and_replace(const char *src, const char *find, const char *rep
 /* misc. */
 
 #define UNUSED(x) (void)(x)
+
+#ifdef __GNUC__
+#define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
+#else
+#define UNUSED_FUNCTION(x) UNUSED_##x
+#endif
+
 #define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
 
 // Taken from linux kernel

@@ -116,6 +116,67 @@ For the connection process to work, the contents of `/var/lib/netdata` _must_ be
 restarts using a persistent volume.  See our [recommended `docker run` and Docker Compose
 examples](/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
 
+#### Known issues on older hosts with seccomp enabled
+
+The nodes running on the following hosts **cannot be claimed**:
+
+- `libseccomp` version less than v2.3.3.
+- Docker version less than v18.04.0-ce.
+- The kernel is configured with CONFIG_SECCOMP enabled.
+
+To check if your kernel supports `seccomp`:
+
+```cmd
+# grep CONFIG_SECCOMP= /boot/config-$(uname -r) 2>/dev/null || zgrep CONFIG_SECCOMP  /proc/config.gz 2>/dev/null
+CONFIG_SECCOMP=y
+```
+
+To resolve the issue, do one of the following actions:
+
+-  Update to a newer version of Docker and `libseccomp` (recommended).
+-  Create a custom profile and pass it for the container.
+-  Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
+
+<details>
+<summary>See how to create a custom profile</summary>
+
+1. Download the moby default seccomp profile and change `defaultAction` to `SCMP_ACT_TRACE` on line 2.
+
+    ```cmd
+    sudo wget https://raw.githubusercontent.com/moby/moby/master/profiles/seccomp/default.json -O /etc/docker/seccomp.json
+    sudo sed -i '2s/SCMP_ACT_ERRNO/SCMP_ACT_TRACE/' /etc/docker/seccomp.json
+    ```
+
+2. Specify the new policy for the container explicitly.
+
+    - When using `docker run`:
+
+    ```cmd
+    docker run -d --name=netdata \
+      --security-opt=seccomp=/etc/docker/seccomp.json \
+      ...
+    ```
+
+    - When using `docker-compose`:
+
+   > :warning: The security_opt option is ignored when deploying a stack in swarm mode.
+
+    ```yaml
+    version: '3'
+    services:
+      netdata:
+        security_opt:
+          - seccomp:/etc/docker/seccomp.json
+        ...
+    ```
+
+    - When using `docker stack deploy`:
+
+   Change the default profile globally by adding `--seccomp-profile=/etc/docker/seccomp.json` to the options passed to
+   dockerd on startup.
+
+</details>
+
 #### Using environment variables
 
 The Netdata Docker container looks for the following environment variables on startup:
@@ -308,7 +369,7 @@ If you run the kickstart script and get the following error `Existing install ap
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
-script](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended).
+script](/docs/get-started.mdx#install-on-linux-with-one-line-installer).
 
 #### kickstart: Failed to write new machine GUID
 
@@ -328,7 +389,7 @@ Netdata to `/opt/netdata`, use `/opt/netdata/bin/netdata-claim.sh` to run the cl
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
-script](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended).
+script](/docs/get-started.mdx#install-on-linux-with-one-line-installer).
 
 #### Connecting on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
 
@@ -460,8 +521,8 @@ using the [ACLK](/aclk/README.md).
 
 The best way to install Netdata and connect your nodes to Netdata Cloud is with our automatic one-line installation script, [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script). This script will install the Netdata Agent, in case it isn't already installed, and connect your node to Netdata Cloud. 
 
-This  works with:
-* all Linux distributions, see [Netdata distribution support matrix](https://learn.netdata.cloud/docs/agent/packaging/distributions)
+This works with:
+* most Linux distributions, see [Netdata's platform support policy](/packaging/PLATFORM_SUPPORT.md)
 * macOS
 
 For details on how to run this script please check [How to connect a node](#how-to-connect-a-node) and choose your environment.
@@ -548,4 +609,4 @@ Rooms you added that node to.
 The user can also put the Cloud endpoint's full certificate chain in `cloud.d/cloud_fullchain.pem` so that the Agent
 can trust the endpoint if necessary.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fclaim%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

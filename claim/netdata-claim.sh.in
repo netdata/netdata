@@ -296,7 +296,7 @@ if [ "${URLTOOL}" = "curl" ] ; then
                 URLCOMMAND="${URLCOMMAND} -x \"${PROXY}\""
         fi
 else
-        URLCOMMAND="wget -T 15 -O -  -q --save-headers --content-on-error=on --method=PUT \
+        URLCOMMAND="wget -T 15 -O -  -q --server-response --content-on-error=on --method=PUT \
         --body-file=\"${CLAIMING_DIR}/tmpin.txt\""
         if [ "${NOPROXY}" = "yes" ] ; then
                 URLCOMMAND="${URLCOMMAND} --no-proxy"
@@ -326,7 +326,11 @@ if [ "${VERBOSE}" == 1 ]; then
 fi
 
 attempt_contact () {
-        eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
+        if [ "${URLTOOL}" = "curl" ] ; then
+                eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
+        else
+                eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt" 2>&1
+        fi
         URLCOMMAND_EXIT_CODE=$?
         if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
         # We consider the server issuing an error response a successful attempt at communicating

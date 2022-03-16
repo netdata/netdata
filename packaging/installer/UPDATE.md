@@ -6,8 +6,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Update the Netdata Agent
 
-By default, the Netdata Agent automatically updates with the latest nightly version. If you opted out of automatic
-updates, you need to update your Netdata Agent to the latest nightly or stable version.
+By default, the Netdata Agent automatically updates with the latest nightly or stable version depending on which
+you installed. If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly
+or stable version. You can also [enable or disable automatic updates on an existing install](#control-automatic-updates).
 
 > 💡 Looking to reinstall the Netdata Agent to enable a feature, update an Agent that cannot update automatically, or
 > troubleshoot an error during the installation process? See our [reinstallation doc](/packaging/installer/REINSTALL.md)
@@ -20,28 +21,35 @@ icon in the local Agent dashboard's top navigation. This modal informs you wheth
 
 ## Determine which installation method you used
 
+Starting with netdata v1.33.0, you can use Netdata itself to determine the installation type by running:
+
+```bash
+netdata -W buildinfo | grep 'Install type:'
+```
+
+If this produces no output, you have an older install and will have to manually look in the Netdata config directory.
 If you are not sure where your Netdata config directory is, see the [configuration doc](/docs/configure/nodes.md). In
 most installations, this is `/etc/netdata`.
 
 Use `cd` to navigate to the Netdata config directory, then use `ls -a` to look for a file called `.install-type`.
 
 -   If the `.install-type` file doex not exist, look for a file in the same directory called `.environment`.
-    -   If the `.environment` file does not exist, you probably installed Netdata using your system package manager
-        and should update it the same way you would run updates on the system itself.
-    -   If the `.environment` file does exist, then our [regular update method](#updates-for-most-systems) should
-        work correctly.
+    -   If the `.environment` file does not exist, then you have a ‘custom’ install.
+    -   If the `.environment` file does exist, then you have either a ‘static’ or ‘build’ install.
 -   If the `.install-type` file does exist, check it’s contents with `cat .install-type`.
-    -   If the `INSTALL_TYPE` key has a value of `custom`, you probably installed Netdata using your system
-        package manager and should update it the same way you would run updates on the system itself.
-    -   If the `INSTALL_TYPE` key has a value of `oci`, the install is from a Docker image.
-    -   Otherwise, the install should work with our [regular update method](#updates-for-most-systems).
+    -   The value of the `INSTALL_TYPE` key indicates what type of install you have.
 
-Next, use the appropriate method to update the Netdata Agent:
+The exact update method to use depends on the install type:
 
--   [Updates for most systems](#updates-for-most-systems)
--   [Docker](#docker)
--   [macOS](#macos)
--   [Manual installation from Git](#manual-installation-from-git)
+-   Installs with an install type of 'custom' usually indicate installing a third-party package through the system
+    package manager. To update these installs, you should update the package just like you would any other package
+    on your system.
+-   Installs with an install type starting with `binpkg` or ending with `build` or `static` can be updated using
+    our [regular update method](#updates-for-most-systems).
+-   Installs with an install type of 'oci' were created from our official Docker images, and should be updated
+    using our [Docker](#docker) update procedure.
+-   macOS users should check [our update instructions for macOS](#macos).
+-   Manually built installs should check [our update instructions for manual builds](#manual-installation-from-git).
 
 ## Updates for most systems
 
@@ -95,6 +103,9 @@ Homebrew downloads the latest Netdata via the
 [formulae](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb), ensures all dependencies are met,
 and updates Netdata via reinstallation.
 
+If you instead installed Netdata using our one-line installation script, you can use our [regular update
+instructions](#updates-for-most-systems) to update Netdata.
+
 ## Manual installation from Git
 
 If you installed [Netdata manually from Git](/packaging/installer/methods/manual.md), you can run that installer again
@@ -117,4 +128,31 @@ sudo ./netdata-installer.sh
 > ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
 > want to retain those settings, you need to set them again during this process.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2FUPDATE&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+## Control automatic updates
+
+Starting with Netdata v1.34.0, you can easily enable or disable automatic updates on an existing installation
+using the updater script.
+
+For most installs on Linux, you can enable auto-updates with:
+
+```bash
+/usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
+```
+
+and disable them with:
+
+```bash
+/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+```
+
+For static installs, instead use:
+
+```bash
+/opt/netdata/usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
+```
+
+and:
+
+```bash
+/opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+```

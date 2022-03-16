@@ -5,6 +5,7 @@
 
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
+#include "aclk_query_queue.h"
 
 #define ACLK_STATS_THREAD_NAME "ACLK_Stats"
 
@@ -49,14 +50,7 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t cloud_req_err;
 
     // query types.
-    volatile uint32_t query_type_http;
-    volatile uint32_t query_type_alarm_upd;
-    volatile uint32_t query_type_metadata_info;
-    volatile uint32_t query_type_metadata_alarms;
-    volatile uint32_t query_type_chart_new;
-    volatile uint32_t query_type_chart_del;
-    volatile uint32_t query_type_register_node;
-    volatile uint32_t query_type_node_upd;
+    volatile uint32_t queries_per_type[ACLK_QUERY_TYPE_COUNT];
 
     // HTTP-specific request types.
     volatile uint32_t cloud_req_http_by_type[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT];
@@ -66,9 +60,14 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t cloud_q_process_max;
 } aclk_metrics_per_sample;
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+extern uint32_t *aclk_proto_rx_msgs_sample;
+#endif
+
 extern uint32_t *aclk_queries_per_thread;
 
 void *aclk_stats_main_thread(void *ptr);
+void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt);
 void aclk_stats_thread_cleanup();
 void aclk_stats_upd_online(int online);
 

@@ -80,7 +80,7 @@ void *timex_main(void *ptr)
             rrdset_done(st_sync_state);
         }
 
-        if (do_sync) {
+        if (do_offset) {
             static RRDSET *st_offset = NULL;
             static RRDDIM *rd_offset;
 

@@ -430,12 +430,6 @@ netdataDashboard.menu = {
         info: 'Information extracted from a server log file. <code>web_log</code> plugin incrementally parses the server log file to provide, in real-time, a break down of key server performance metrics. For web servers, an extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/web_log/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
-    'named': {
-        title: 'named',
-        icon: '<i class="fas fa-tag"></i>',
-        info: undefined
-    },
-
     'squid': {
         title: 'squid',
         icon: '<i class="fas fa-exchange-alt"></i>',
@@ -451,24 +445,6 @@ netdataDashboard.menu = {
     'apcupsd': {
         title: 'UPS',
         icon: '<i class="fas fa-battery-half"></i>',
-        info: undefined
-    },
-
-    'smawebbox': {
-        title: 'Solar Power',
-        icon: '<i class="fas fa-sun"></i>',
-        info: undefined
-    },
-
-    'fronius': {
-        title: 'Fronius',
-        icon: '<i class="fas fa-sun"></i>',
-        info: undefined
-    },
-
-    'stiebeleltron': {
-        title: 'Stiebel Eltron',
-        icon: '<i class="fas fa-thermometer-half"></i>',
         info: undefined
     },
 
@@ -1240,6 +1216,19 @@ netdataDashboard.context = {
         info: '<p>System processes.</p>'+
         '<p><b>Running</b> - running or ready to run (runnable). '+
         '<b>Blocked</b> - currently blocked, waiting for I/O to complete.</p>'
+    },
+
+    'system.processes_state': {
+        info: '<p>The number of processes in different states. </p> '+
+        '<p><b>Running</b> - Process using the CPU at a particular moment. '+
+        '<b>Sleeping (uninterruptible)</b> - Process will wake when a waited-upon resource becomes available or after a time-out occurs during that wait. '+
+        'Mostly used by device drivers waiting for disk or network I/O. '+
+        '<b>Sleeping (interruptible)</b> - Process is waiting either for a particular time slot or for a particular event to occur. '+
+        '<b>Zombie</b> - Process that has completed its execution, released the system resources, but its entry is not removed from the process table. '+
+        'Usually occurs in child processes when the parent process still needs to read its child’s exit status. '+
+        'A process that stays a zombie for a long time is generally an error and causes system PID space leak. '+
+        '<b>Stopped</b> - Process is suspended from proceeding further due to STOP or TSTP signals. ' +
+        'In this state, a process will not do anything (not even terminate) until it receives a CONT signal.</p>'
     },
 
     'system.active_processes': {
@@ -3130,7 +3119,7 @@ netdataDashboard.context = {
         '<p><b>Arcsz</b> - actual size. '+
         '<b>Target</b> - target size that the ARC is attempting to maintain (adaptive). '+
         '<b>Min</b> - minimum size limit. When the ARC is asked to shrink, it will stop shrinking at this value. '+
-        '<b>Min</b> - maximum size limit.</p>'
+        '<b>Max</b> - maximum size limit.</p>'
     },
 
     'zfs.l2_size': {
@@ -4834,37 +4823,6 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ]
-    },
-    // ------------------------------------------------------------------------
-    // Fronius Solar Power
-
-    'fronius.power': {
-        info: 'Positive <code>Grid</code> values mean that power is coming from the grid. Negative values are excess power that is going back into the grid, possibly selling it. ' +
-            '<code>Photovoltaics</code> is the power generated from the solar panels. ' +
-            '<code>Accumulator</code> is the stored power in the accumulator, if one is present.'
-    },
-
-    'fronius.autonomy': {
-        commonMin: true,
-        commonMax: true,
-        valueRange: "[0, 100]",
-        info: 'The <code>Autonomy</code> is the percentage of how autonomous the installation is. An autonomy of 100 % means that the installation is producing more energy than it is needed. ' +
-            'The <code>Self consumption</code> indicates the ratio between the current power generated and the current load. When it reaches 100 %, the <code>Autonomy</code> declines, since the solar panels can not produce enough energy and need support from the grid.'
-    },
-
-    'fronius.energy.today': {
-        commonMin: true,
-        commonMax: true,
-        valueRange: "[0, null]"
-    },
-
-    // ------------------------------------------------------------------------
-    // Stiebel Eltron Heat pump installation
-
-    'stiebeleltron.system.roomtemp': {
-        commonMin: true,
-        commonMax: true,
-        valueRange: "[0, null]"
     },
 
     // ------------------------------------------------------------------------

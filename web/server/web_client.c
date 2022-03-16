@@ -439,7 +439,7 @@ int mysendfile(struct web_client *w, char *filename) {
     sock_setnonblock(w->ifd);
 
     w->response.data->contenttype = contenttype_for_filename(webfilename);
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, statbuf.st_size, w->ifd, w->ofd);
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, webfilename, (int64_t)statbuf.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
     web_client_enable_wait_receive(w);
@@ -582,14 +582,14 @@ static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char 
     return func(host, w, url);
 }
 
-static inline int check_host_and_dashboard_acl_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
+static inline int UNUSED_FUNCTION(check_host_and_dashboard_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
     if(!web_client_can_access_dashboard(w))
         return web_client_permission_denied(w);
 
     return check_host_and_call(host, w, url, func);
 }
 
-static inline int check_host_and_mgmt_acl_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
+static inline int UNUSED_FUNCTION(check_host_and_mgmt_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
     if(!web_client_can_access_mgmt(w))
         return web_client_permission_denied(w);
 
@@ -1076,6 +1076,9 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                         if (url_parse_query_string(w->decoded_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1, ptr_variables, total_variables)) {
                             return HTTP_VALIDATION_MALFORMED_URL;
                         }
+                    } else {
+                        //make sure there's no leftovers from previous request on the same web client
+                        w->decoded_query_string[1]='\0';
                     }
                 }
                 *ue = ' ';

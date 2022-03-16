@@ -1628,20 +1628,18 @@ components:
           type: string
           description: Describes whether this agent is capable of connection to the Cloud.
             False means agent has been built without ACLK component either on purpose (user choice) or due to missing dependency.
-        aclk-implementation:
-          type: string
-          description: Describes which ACLK implementation is currently used.
-          enum:
-            - Next Generation
-            - Legacy
-        new-cloud-protocol-supported:
-          type: boolean
-          description: Informs about new protobuf based Cloud/Agent protocol support of this agent.
-            If false agent has to be compiled with protobuf and protoc available.
+        aclk-version:
+          type: integer
+          description: Describes which ACLK version is currently used.
+        protocols-supported:
+          type: array
+          description: List of supported protocols for communication with Cloud.
+          items:
+            type: string
         agent-claimed:
           type: boolean
           description: Informs whether this agent has been added to a space in the cloud (User has to perform claiming).
-            If false (user didnt perform claiming) agent will never attempt any cloud connection.
+            If false (user didn't perform claiming) agent will never attempt any cloud connection.
         claimed_id:
           type: string
           format: uuid

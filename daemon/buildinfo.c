@@ -60,16 +60,11 @@
 // Optional libraries
 
 #ifdef HAVE_PROTOBUF
-#if defined(ACLK_NG) || defined(ENABLE_PROMETHEUS_REMOTE_WRITE)
 #define FEAT_PROTOBUF 1
 #ifdef BUNDLED_PROTOBUF
 #define FEAT_PROTOBUF_BUNDLED " (bundled)"
 #else
 #define FEAT_PROTOBUF_BUNDLED " (system)"
-#endif
-#else
-#define FEAT_PROTOBUF 0
-#define FEAT_PROTOBUF_BUNDLED ""
 #endif
 #else
 #define FEAT_PROTOBUF 0
@@ -222,9 +217,8 @@ char *get_value_from_key(char *buffer, char *key) {
     return s;
 }
 
-struct install_type_info get_install_type() {
+void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt_dist) {
     char *install_type_filename;
-    struct install_type_info ret = {.install_type = NULL, .prebuilt_arch = NULL, .prebuilt_distro = NULL};
 
     int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
     install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
@@ -237,41 +231,42 @@ struct install_type_info get_install_type() {
 
         while ((s = fgets_trim_len(buf, 256, fp, &len))) {
             if (!strncmp(buf, "INSTALL_TYPE='", 14))
-                ret.install_type = strdupz((char *)get_value_from_key(buf, "INSTALL_TYPE"));
+                *install_type = strdupz((char *)get_value_from_key(buf, "INSTALL_TYPE"));
             else if (!strncmp(buf, "PREBUILT_ARCH='", 15))
-                ret.prebuilt_arch = strdupz((char *)get_value_from_key(buf, "PREBUILT_ARCH"));
+                *prebuilt_arch = strdupz((char *)get_value_from_key(buf, "PREBUILT_ARCH"));
             else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
-                ret.prebuilt_distro = strdupz((char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
+                *prebuilt_dist = strdupz((char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
         }
         fclose(fp);
     }
     freez(install_type_filename);
-
-    return ret;
 }
 
 void print_build_info(void) {
-    struct install_type_info t = get_install_type();
+    char *install_type = NULL;
+    char *prebuilt_arch = NULL;
+    char *prebuilt_distro = NULL;
+    get_install_type(&install_type, &prebuilt_arch, &prebuilt_distro);
 
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
 
-    if (t.install_type == NULL) {
+    if (install_type == NULL) {
         printf("Install type: unknown\n");
     } else {
-        printf("Install type: %s\n", t.install_type);
+        printf("Install type: %s\n", install_type);
     }
 
-    if (t.prebuilt_arch != NULL) {
-        printf("    Binary architecture: %s\n", t.prebuilt_arch);
+    if (prebuilt_arch != NULL) {
+        printf("    Binary architecture: %s\n", prebuilt_arch);
     }
 
-    if (t.prebuilt_distro != NULL) {
-        printf("    Packaging distro: %s\n", t.prebuilt_distro);
+    if (prebuilt_distro != NULL) {
+        printf("    Packaging distro: %s\n", prebuilt_distro);
     }
 
-    freez(t.install_type);
-    freez(t.prebuilt_arch);
-    freez(t.prebuilt_distro);
+    freez(install_type);
+    freez(prebuilt_arch);
+    freez(prebuilt_distro);
 
     printf("Features:\n");
     printf("    dbengine:                   %s\n", FEAT_YES_NO(FEAT_DBENGINE));
@@ -372,41 +367,104 @@ void print_build_info_json(void) {
     printf("}\n");
 };
 
-//return a list of enabled features for use in analytics
-//find a way to have proper |
+#define add_to_bi(buffer, str)       \
+    { if(first) {                    \
+        buffer_strcat (b, str);      \
+        first = 0;                   \
+    } else                           \
+        buffer_strcat (b, "|" str); }
+
 void analytics_build_info(BUFFER *b) {
-    if(FEAT_DBENGINE)        buffer_strcat (b, "dbengine");
-    if(FEAT_NATIVE_HTTPS)    buffer_strcat (b, "|Native HTTPS");
-    if(FEAT_CLOUD)           buffer_strcat (b, "|Netdata Cloud");
-    if(FEAT_CLOUD)           buffer_strcat (b, "|ACLK Next Generation");
-    if(NEW_CLOUD_PROTO)      buffer_strcat (b, "|New Cloud Protocol Support");
-    if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
-    if(FEAT_ML)              buffer_strcat (b, "|Machine Learning");
-    if(FEAT_STREAM_COMPRESSION) buffer_strcat (b, "|Stream Compression");
+    int first = 1;
+#ifdef ENABLE_DBENGINE
+    add_to_bi(b, "dbengine");
+#endif
+#ifdef ENABLE_HTTPS
+    add_to_bi(b, "Native HTTPS");
+#endif
+#ifdef ENABLE_ACLK
+    add_to_bi(b, "Netdata Cloud|ACLK Next Generation");
+#endif
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    add_to_bi(b, "New Cloud Protocol Support");
+#endif
+#if (FEAT_TLS_HOST_VERIFY!=0)
+    add_to_bi(b, "TLS Host Verification");
+#endif
+#ifdef ENABLE_ML
+    add_to_bi(b, "Machine Learning");
+#endif
+#ifdef ENABLE_COMPRESSION
+    add_to_bi(b, "Stream Compression");
+#endif
 
-    if(FEAT_PROTOBUF)        buffer_strcat (b, "|protobuf");
-    if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");
-    if(FEAT_JSONC)           buffer_strcat (b, "|JSON-C");
-    if(FEAT_LIBCAP)          buffer_strcat (b, "|libcap");
-    if(FEAT_CRYPTO)          buffer_strcat (b, "|libcrypto");
-    if(FEAT_LIBM)            buffer_strcat (b, "|libm");
+#ifdef HAVE_PROTOBUF
+    add_to_bi(b, "protobuf");
+#endif
+#ifdef ENABLE_JEMALLOC
+    add_to_bi(b, "jemalloc");
+#endif
+#ifdef ENABLE_JSONC
+    add_to_bi(b, "JSON-C");
+#endif
+#ifdef HAVE_CAPABILITY
+    add_to_bi(b, "libcap");
+#endif
+#ifdef HAVE_CRYPTO
+    add_to_bi(b, "libcrypto");
+#endif
+#ifdef STORAGE_WITH_MATH
+    add_to_bi(b, "libm");
+#endif
 
-    if(FEAT_TCMALLOC)       buffer_strcat(b, "|tcalloc");
-    if(FEAT_ZLIB)           buffer_strcat(b, "|zlib");
+#ifdef ENABLE_TCMALLOC
+    add_to_bi(b, "tcalloc");
+#endif
+#ifdef NETDATA_WITH_ZLIB
+    add_to_bi(b, "zlib");
+#endif
 
-    if(FEAT_APPS_PLUGIN)    buffer_strcat(b, "|apps");
-    if(FEAT_CGROUP_NET)     buffer_strcat(b, "|cgroup Network Tracking");
-    if(FEAT_CUPS)           buffer_strcat(b, "|CUPS");
-    if(FEAT_EBPF)           buffer_strcat(b, "|EBPF");
-    if(FEAT_IPMI)           buffer_strcat(b, "|IPMI");
-    if(FEAT_NFACCT)         buffer_strcat(b, "|NFACCT");
-    if(FEAT_PERF)           buffer_strcat(b, "|perf");
-    if(FEAT_SLABINFO)       buffer_strcat(b, "|slabinfo");
-    if(FEAT_XEN)            buffer_strcat(b, "|Xen");
-    if(FEAT_XEN_VBD_ERROR)  buffer_strcat(b, "|Xen VBD Error Tracking");
+#ifdef ENABLE_APPS_PLUGIN
+    add_to_bi(b, "apps");
+#endif
+#ifdef HAVE_SETNS
+    add_to_bi(b, "cgroup Network Tracking");
+#endif
+#ifdef HAVE_CUPS
+    add_to_bi(b, "CUPS");
+#endif
+#ifdef HAVE_LIBBPF
+    add_to_bi(b, "EBPF");
+#endif
+#ifdef HAVE_FREEIPMI
+    add_to_bi(b, "IPMI");
+#endif
+#ifdef HAVE_NFACCT
+    add_to_bi(b, "NFACCT");
+#endif
+#ifdef ENABLE_PERF_PLUGIN
+    add_to_bi(b, "perf");
+#endif
+#ifdef ENABLE_SLABINFO
+    add_to_bi(b, "slabinfo");
+#endif
+#ifdef HAVE_LIBXENSTAT
+    add_to_bi(b, "Xen");
+#endif
+#ifdef HAVE_XENSTAT_VBD_ERROR
+    add_to_bi(b, "Xen VBD Error Tracking");
+#endif
 
-    if(FEAT_KINESIS)        buffer_strcat(b, "|AWS Kinesis");
-    if(FEAT_PUBSUB)         buffer_strcat(b, "|GCP PubSub");
-    if(FEAT_MONGO)          buffer_strcat(b, "|MongoDB");
-    if(FEAT_REMOTE_WRITE)   buffer_strcat(b, "|Prometheus Remote Write");
+#ifdef HAVE_KINESIS
+    add_to_bi(b, "AWS Kinesis");
+#endif
+#ifdef ENABLE_EXPORTING_PUBSUB
+    add_to_bi(b, "GCP PubSub");
+#endif
+#ifdef HAVE_MONGOC
+    add_to_bi(b, "MongoDB");
+#endif
+#ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
+    add_to_bi(b, "Prometheus Remote Write");
+#endif
 }

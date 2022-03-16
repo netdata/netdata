@@ -242,7 +242,9 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.old_value = (calculated_number) sqlite3_column_double(res, 24);
 
         alarm_log.updated = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
-        alarm_log.rendered_info = strdupz((char *)sqlite3_column_text(res, 18));
+        alarm_log.rendered_info = sqlite3_column_type(res, 18) == SQLITE_NULL ?
+                                      strdupz((char *)"") :
+                                      strdupz((char *)sqlite3_column_text(res, 18));
 
         aclk_send_alarm_log_entry(&alarm_log);
 
@@ -295,7 +297,7 @@ void aclk_send_alarm_health_log(char *node_id)
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_ALARM_HEALTH_LOG;
 
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
@@ -323,7 +325,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 
     RRDHOST *host = wc->host;
     if (unlikely(!host)) {
-        rrd_wrlock();
+        rrd_rdlock();
         host = find_host_by_node_id(wc->node_id);
         rrd_unlock();
 
@@ -559,7 +561,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         return;
 
     struct aclk_database_worker_config *wc  = NULL;
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
@@ -644,7 +646,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t sn
         return;
 
     struct aclk_database_worker_config *wc = NULL;
-    rrd_wrlock();
+    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
@@ -714,7 +716,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->utc_offset = host->utc_offset;
     alarm_log->timezone = strdupz((char *)host->abbrev_timezone);
     alarm_log->exec_path = ae->exec ? strdupz((char *)ae->exec) : strdupz((char *)host->health_default_exec);
-    alarm_log->conf_source = ae->source ? strdupz((char *)ae->source) : "";
+    alarm_log->conf_source = ae->source ? strdupz((char *)ae->source) : strdupz((char *)"");
 
     alarm_log->command = strdupz((char *)edit_command);
 
@@ -738,7 +740,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->old_value = (!isnan(ae->old_value)) ? (calculated_number)ae->old_value : 0;
 
     alarm_log->updated = (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
-    alarm_log->rendered_info = strdupz(ae->info);
+    alarm_log->rendered_info = ae->info ? strdupz(ae->info) : strdupz((char *)"");
 
     freez(edit_command);
 }
@@ -905,4 +907,45 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 #else
     UNUSED(host);
 #endif
+}
+
+int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert_status)
+{
+    int rc;
+    struct aclk_database_worker_config *wc  = NULL;
+    wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+    if (!wc)
+        return 1;
+
+    proto_alert_status->alert_updates = wc->alert_updates;
+    proto_alert_status->alerts_batch_id = wc->alerts_batch_id;
+
+    BUFFER *sql = buffer_create(1024);
+    sqlite3_stmt *res = NULL;
+
+    buffer_sprintf(sql, "SELECT MIN(sequence_id), MAX(sequence_id), " \
+                   "(select MAX(sequence_id) from aclk_alert_%s where date_cloud_ack is not NULL), " \
+                   "(select MAX(sequence_id) from aclk_alert_%s where date_submitted is not NULL) " \
+                   "FROM aclk_alert_%s where date_submitted is null;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to get alert log status from the database.");
+        buffer_free(sql);
+        return 1;
+    }
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        proto_alert_status->pending_min_sequence_id = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0;
+        proto_alert_status->pending_max_sequence_id = sqlite3_column_bytes(res, 1) > 0 ? (uint64_t) sqlite3_column_int64(res, 1) : 0;
+        proto_alert_status->last_acked_sequence_id = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0;
+        proto_alert_status->last_submitted_sequence_id = sqlite3_column_bytes(res, 3) > 0 ? (uint64_t) sqlite3_column_int64(res, 3) : 0;
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement to get alert log status from the database, rc = %d", rc);
+
+    buffer_free(sql);
+    return 0;
 }

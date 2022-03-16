@@ -4,7 +4,7 @@ description: "Monitor Pi-hole metrics, plus Raspberry Pi system metrics, in minu
 image: /img/seo/guides/monitor/netdata-pi-hole-raspberry-pi.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/pi-hole-raspberry-pi.md
 -->
-import { OneLineInstallWget } from '../../../src/components/OneLineInstall/'
+import { OneLineInstallWget } from '../../src/components/OneLineInstall/'
 
 # Monitor Pi-hole (and a Raspberry Pi) with Netdata
 
@@ -159,4 +159,4 @@ troubleshooting the health of your systems and services.
 If you have any questions about using Netdata to monitor your Raspberry Pi, Pi-hole, or any other applications, head on
 over to our [community forum](https://community.netdata.cloud/).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fpi-hole-raspberry-pi.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

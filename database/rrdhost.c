@@ -385,16 +385,14 @@ RRDHOST *rrdhost_create(const char *hostname,
     // ------------------------------------------------------------------------
     // init new ML host and update system_info to let upstreams know
     // about ML functionality
+    //
+
+    if (is_localhost && host->system_info) {
+        host->system_info->ml_capable = ml_capable();
+        host->system_info->ml_enabled = ml_enabled(host);
+    }
 
     ml_new_host(host);
-    if (is_localhost && host->system_info) {
-#ifndef ENABLE_ML
-        host->system_info->ml_capable = 0;
-#else
-        host->system_info->ml_capable = 1;
-#endif
-        host->system_info->ml_enabled = host->ml_host != NULL;
-    }
 
     info("Host '%s' (at registry as '%s') with guid '%s' initialized"
                  ", os '%s'"
@@ -642,8 +640,6 @@ RRDHOST *rrdhost_find_or_create(
         rrdhost_unlock(host);
     }
 
-    rrdhost_cleanup_orphan_hosts_nolock(host);
-
     rrd_unlock();
 
     return host;
@@ -652,7 +648,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
     if(host != protected_host
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && host->receiver
+       && !host->receiver
        && host->senders_disconnected_time
        && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
         return 1;
@@ -834,6 +830,9 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->container);
         freez(system_info->container_detection);
         freez(system_info->is_k8s_node);
+        freez(system_info->install_type);
+        freez(system_info->prebuilt_arch);
+        freez(system_info->prebuilt_dist);
         freez(system_info);
     }
 }
@@ -877,7 +876,20 @@ void rrdhost_free(RRDHOST *host) {
 
 
     rrdhost_wrlock(host);   // lock this RRDHOST
-
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    struct aclk_database_worker_config *wc =  host->dbsync_worker;
+    if (wc && !netdata_exit) {
+        struct aclk_database_cmd cmd;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
+        struct aclk_completion compl ;
+        init_aclk_completion(&compl );
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd(wc, &cmd);
+        wait_for_aclk_completion(&compl );
+        destroy_aclk_completion(&compl );
+    }
+#endif
     // ------------------------------------------------------------------------
     // release its children resources
 
@@ -980,7 +992,10 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->node_id);
 
     freez(host);
-
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    if (wc)
+        wc->is_orphan = 0;
+#endif
     rrd_hosts_available--;
 }
 
@@ -1070,6 +1085,18 @@ static struct label *rrdhost_load_auto_labels(void)
     if (localhost->system_info->is_k8s_node)
         label_list =
             add_label_to_list(label_list, "_is_k8s_node", localhost->system_info->is_k8s_node, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->install_type)
+        label_list =
+            add_label_to_list(label_list, "_install_type", localhost->system_info->install_type, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->prebuilt_arch)
+        label_list =
+            add_label_to_list(label_list, "_prebuilt_arch", localhost->system_info->prebuilt_arch, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->prebuilt_dist)
+        label_list =
+            add_label_to_list(label_list, "_prebuilt_dist", localhost->system_info->prebuilt_dist, LABEL_SOURCE_AUTO);
 
     label_list = add_aclk_host_labels(label_list);
 
@@ -1489,6 +1516,11 @@ restart_after_removal:
                             }
                             continue;
                         }
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+                        else {
+                            aclk_send_dimension_update(rd);
+                        }
+#endif
                     }
                     last = rd;
                     rd = rd->next;

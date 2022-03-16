@@ -53,7 +53,6 @@ struct context_param {
     uint8_t flags;
 };
 
-#define RRDSET_MINIMUM_LIVE_COUNT 3
 #define META_CHART_UPDATED 1
 #define META_PLUGIN_UPDATED 2
 #define META_MODULE_UPDATED 4
@@ -436,6 +435,7 @@ struct rrdset_volatile {
     uuid_t hash_id;
     struct label *new_labels;
     struct label_index labels;
+    bool is_ar_chart;
 };
 
 // ----------------------------------------------------------------------------
@@ -756,6 +756,9 @@ struct rrdhost_system_info {
     uint16_t hops;
     bool ml_capable;
     bool ml_enabled;
+    char *install_type;
+    char *prebuilt_arch;
+    char *prebuilt_dist;
 };
 
 struct rrdhost {

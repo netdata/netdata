@@ -29,7 +29,14 @@ NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
 RELEASE_CHANNEL="nightly"
 
-NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK:-0}"
+if [ -n "$DISABLE_TELEMETRY" ]; then
+  NETDATA_DISABLE_TELEMETRY="${DISABLE_TELEMETRY}"
+elif [ -n "$DO_NOT_TRACK" ]; then
+  NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK}"
+else
+  NETDATA_DISABLE_TELEMETRY=0
+fi
+
 NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
 NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:-""}"
 TELEMETRY_API_KEY="${NETDATA_POSTHOG_API_KEY:-mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y}"
@@ -73,6 +80,7 @@ USAGE: kickstart.sh [options]
   --claim-only               If there is an existing install, only try to claim it, not update it.
   --claim-*                  Specify other options for the claiming script.
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
+  --uninstall                Uninstall netdata.
 
 Additionally, this script may use the following environment variables:
 
@@ -83,7 +91,7 @@ Additionally, this script may use the following environment variables:
                              default we try to use sudo, doas, or pkexec (in that order of preference), but if
                              you need special options for one of those to work, or have a different tool to do
                              the same thing on your system, you can specify it here.
-  DO_NOT_TRACK               If set to a value other than 0, behave as if \`--disable-telemetry\` was specified.
+  DISABLE_TELEMETRY          If set to a value other than 0, behave as if \`--disable-telemetry\` was specified.
   NETDATA_INSTALLER_OPTIONS: Specifies extra options to pass to the static installer or local build script.
 
 HEREDOC
@@ -150,6 +158,7 @@ telemetry_event() {
     "error_code": "${3}",
     "error_message": "${2}",
     "install_options": "${KICKSTART_OPTIONS}",
+    "install_interactivity": "${INTERACTIVE}",
     "total_runtime": "${total_duration}",
     "selected_install_method": "${SELECTED_INSTALL_METHOD}",
     "netdata_release_channel": "${RELEASE_CHANNEL:-null}",
@@ -257,14 +266,14 @@ run_failed() {
 
 ESCAPED_PRINT_METHOD=
 # shellcheck disable=SC3050
-if printf "%q " test > /dev/null 2>&1; then
+if printf "%s " test > /dev/null 2>&1; then
   ESCAPED_PRINT_METHOD="printfq"
 fi
 
 escaped_print() {
   if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
     # shellcheck disable=SC3050
-    printf "%q " "${@}"
+    printf "%s " "${@}"
   else
     printf "%s" "${*}"
   fi
@@ -411,7 +420,7 @@ get_system_info() {
         SYSCODENAME="${VERSION_CODENAME}"
         SYSARCH="$(uname -m)"
 
-        supported_compat_names="debian ubuntu centos fedora opensuse"
+        supported_compat_names="debian ubuntu centos fedora opensuse ol"
 
         if str_in_list "${DISTRO}" "${supported_compat_names}"; then
             DISTRO_COMPAT_NAME="${DISTRO}"
@@ -422,13 +431,18 @@ get_system_info() {
                 ;;
             rocky|rhel)
                 DISTRO_COMPAT_NAME="centos"
-                SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
                 ;;
             *)
                 DISTRO_COMPAT_NAME="unknown"
                 ;;
             esac
         fi
+
+        case "${DISTRO_COMPAT_NAME}" in
+          centos|ol)
+            SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
+            ;;
+        esac
       else
         DISTRO="unknown"
         DISTRO_COMPAT_NAME="unknown"
@@ -461,11 +475,19 @@ str_in_list() {
 confirm_root_support() {
   if [ "$(id -u)" -ne "0" ]; then
     if [ -z "${ROOTCMD}" ] && command -v sudo > /dev/null; then
-      ROOTCMD="sudo"
+      if [ "${INTERACTIVE}" -eq 0 ]; then
+        ROOTCMD="sudo -n"
+      else
+        ROOTCMD="sudo"
+      fi
     fi
 
     if [ -z "${ROOTCMD}" ] && command -v doas > /dev/null; then
-      ROOTCMD="doas"
+      if [ "${INTERACTIVE}" -eq 0 ]; then
+        ROOTCMD="doas -n"
+      else
+        ROOTCMD="doas"
+      fi
     fi
 
     if [ -z "${ROOTCMD}" ] && command -v pkexec > /dev/null; then
@@ -511,7 +533,30 @@ update() {
   fi
 }
 
-handle_existing_install() {
+uninstall() {
+  get_system_info
+  detect_existing_install
+
+  export INSTALL_PREFIX="${ndprefix}"
+
+  if [ $INTERACTIVE = 0 ]; then
+    FLAGS="--yes --force"
+  else
+    FLAGS="--yes"
+  fi
+
+  if [ -f "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" ]; then
+    echo "Found existing netdata-uninstaller. Running it.."
+    ${ROOTCMD} "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh" $FLAGS
+  else
+    echo "Downloading netdata-uninstaller ..."
+    wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh -O "${tmpdir}/netdata-uninstaller.sh"
+    chmod +x "${tmpdir}/netdata-uninstaller.sh"
+    ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS
+  fi
+}
+
+detect_existing_install() {
   if pkg_installed netdata; then
     ndprefix="/"
   else
@@ -539,16 +584,36 @@ handle_existing_install() {
 
   if [ -n "${ndprefix}" ]; then
     typefile="${ndprefix}/etc/netdata/.install-type"
+    envfile="${ndprefix}/etc/netdata/.environment"
     if [ -r "${typefile}" ]; then
       ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
-      # shellcheck disable=SC1091
+      # shellcheck disable=SC1090,SC1091
       . "${tmpdir}/install-type"
     else
       INSTALL_TYPE="unknown"
     fi
-  fi
 
-  if [ -z "${ndprefix}" ]; then
+    if [ "${INSTALL_TYPE}" = "unknown" ] || [ "${INSTALL_TYPE}" = "custom" ]; then
+      if [ -r "${envfile}" ]; then
+        ${ROOTCMD} sh -c "cat \"${envfile}\" > \"${tmpdir}/environment\""
+        # shellcheck disable=SC1091
+        . "${tmpdir}/environment"
+        if [ -n "${NETDATA_IS_STATIC_INSTALL}" ]; then
+          if [ "${NETDATA_IS_STATIC_INSTALL}" = "yes" ]; then
+            INSTALL_TYPE="legacy-static"
+          else
+            INSTALL_TYPE="legacy-build"
+          fi
+        fi
+      fi
+    fi
+  fi
+}
+
+handle_existing_install() {
+  detect_existing_install
+
+  if [ -z "${ndprefix}" ] || [ -z "${INSTALL_TYPE}" ]; then
     progress "No existing installations of netdata found, assuming this is a fresh install."
     return 0
   fi
@@ -556,7 +621,9 @@ handle_existing_install() {
   case "${INSTALL_TYPE}" in
     kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
+
         warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
+        warning "Usually this means you installed Netdata through your distribution’s regular package repositories or some other unsupported method."
       else
         progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
       fi
@@ -584,6 +651,8 @@ handle_existing_install() {
         esac
 
         return 0
+      elif [ "${INSTALL_TYPE}" = "unknown" ]; then
+        fatal "We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed." F0106
       fi
 
       ret=0
@@ -763,7 +832,7 @@ pkg_installed() {
       dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
       return $?
       ;;
-    centos|fedora|opensuse)
+    centos|fedora|opensuse|ol)
       rpm -q "${1}" > /dev/null 2>&1
       return $?
       ;;
@@ -780,7 +849,7 @@ netdata_avail_check() {
       env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
       return $?
       ;;
-    centos|fedora)
+    centos|fedora|ol)
       # shellcheck disable=SC2086
       ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
       return $?
@@ -822,7 +891,7 @@ check_special_native_deps() {
 }
 
 try_package_install() {
-  if [ -z "${DISTRO}" ]; then
+  if [ -z "${DISTRO}" ] || [ "${DISTRO}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
     return 1
   fi
@@ -911,6 +980,22 @@ try_package_install() {
       pkg_vsep="-"
       pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
       repo_update_opts=""
+      uninstall_subcmd="remove"
+      INSTALL_TYPE="binpkg-rpm"
+      ;;
+    ol)
+      if command -v dnf > /dev/null; then
+        pm_cmd="dnf"
+        repo_subcmd="makecache"
+      else
+        pm_cmd="yum"
+      fi
+      repo_prefix="ol/${SYSVERSION}"
+      pkg_type="rpm"
+      pkg_suffix=".noarch"
+      pkg_vsep="-"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
       uninstall_subcmd="remove"
       INSTALL_TYPE="binpkg-rpm"
       ;;
@@ -1044,7 +1129,7 @@ try_static_install() {
   if [ -f "${install_type_file}" ]; then
     ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
     ${ROOTCMD} chown "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1090,SC1091
     . "${tmpdir}/install-type"
     cat > "${tmpdir}/install-type" <<- EOF
 	INSTALL_TYPE='kickstart-static'
@@ -1318,6 +1403,9 @@ while [ -n "${1}" ]; do
       INSTALL_PREFIX="${2}"
       shift 1
       ;;
+    "--uninstall")
+      ACTION="uninstall"
+      ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1
       NETDATA_ONLY_STATIC=0
@@ -1348,11 +1436,11 @@ while [ -n "${1}" ]; do
       NETDATA_CLAIM_URL="${2}"
       shift 1
       ;;
-    "--claim-*")
+    "--claim-"*)
       optname="$(echo "${1}" | cut -d '-' -f 4-)"
       case "${optname}" in
         id|proxy|user|hostname)
-          NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname} ${2}"
+          NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=${2}"
           shift 1
           ;;
         verbose|insecure|noproxy|noreload|daemon-not-running)
@@ -1375,6 +1463,13 @@ check_claim_opts
 confirm_root_support
 get_system_info
 confirm_install_prefix
+
+if [ "${ACTION}" = "uninstall" ]; then
+  uninstall
+  cleanup
+  trap - EXIT
+  exit 0
+fi
 
 tmpdir="$(create_tmp_directory)"
 progress "Using ${tmpdir} as a temporary directory."

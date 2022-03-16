@@ -57,6 +57,7 @@ extern netdata_publish_shm_t **shm_pid;
 extern void *ebpf_shm_thread(void *ptr);
 extern void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void clean_shm_pid_structures();
+extern netdata_ebpf_targets_t shm_targets[];
 
 extern struct config shm_config;
 

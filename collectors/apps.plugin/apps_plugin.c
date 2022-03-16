@@ -6,6 +6,7 @@
  * Released under GPL v3+
  */
 
+#include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
@@ -106,6 +107,25 @@ static int
 // will be changed to getenv(NETDATA_USER_CONFIG_DIR) if it exists
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
+
+// some variables for keeping track of processes count by states
+typedef enum {
+    PROC_STATUS_RUNNING = 0,
+    PROC_STATUS_SLEEPING_D, // uninterruptible sleep
+    PROC_STATUS_SLEEPING,   // interruptible sleep
+    PROC_STATUS_ZOMBIE,
+    PROC_STATUS_STOPPED,
+    PROC_STATUS_END, //place holder for ending enum fields
+} proc_state;
+
+static proc_state proc_state_count[PROC_STATUS_END];
+static const char *proc_states[] = {
+    [PROC_STATUS_RUNNING] = "running",
+    [PROC_STATUS_SLEEPING] = "sleeping_interruptible",
+    [PROC_STATUS_SLEEPING_D] = "sleeping_uninterruptible",
+    [PROC_STATUS_ZOMBIE] = "zombie",
+    [PROC_STATUS_STOPPED] = "stopped",
+    };
 
 // ----------------------------------------------------------------------------
 // internal flags
@@ -286,7 +306,7 @@ struct pid_stat {
 
     uint32_t log_thrown;
 
-    // char state;
+    char state;
     int32_t ppid;
     // int32_t pgrp;
     // int32_t session;
@@ -1234,6 +1254,28 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
 }
 #endif // !__FreeBSD__
 
+static void update_proc_state_count(char proc_state) {
+    switch (proc_state) {
+        case 'S':
+            proc_state_count[PROC_STATUS_SLEEPING] += 1;
+            break;
+        case 'R':
+            proc_state_count[PROC_STATUS_RUNNING] += 1;
+            break;
+        case 'D':
+            proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
+            break;
+        case 'Z':
+            proc_state_count[PROC_STATUS_ZOMBIE] += 1;
+            break;
+        case 'T':
+            proc_state_count[PROC_STATUS_STOPPED] += 1;
+            break;
+        default:
+            break;
+    }
+}
+
 static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->status_vmsize           = 0;
     p->status_vmrss            = 0;
@@ -1267,6 +1309,7 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
         arl_expect_custom(p->status_arl, "RssShmem", arl_callback_status_rssshmem, &arl_ptr);
         arl_expect_custom(p->status_arl, "VmSwap", arl_callback_status_vmswap, &arl_ptr);
     }
+
 
     if(unlikely(!p->status_filename)) {
         char filename[FILENAME_MAX + 1];
@@ -1313,7 +1356,6 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
 #ifdef __FreeBSD__
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
-
     if (unlikely(proc_info->ki_tdflags & TDF_IDLETD))
         goto cleanup;
 #else
@@ -1348,7 +1390,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 #else
     // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
     char *comm          = procfile_lineword(ff, 0, 1);
-    // p->state         = *(procfile_lineword(ff, 0, 2));
+    p->state            = *(procfile_lineword(ff, 0, 2));
     p->ppid             = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
     // p->pgrp          = (int32_t)str2pid_t(procfile_lineword(ff, 0, 4));
     // p->session       = (int32_t)str2pid_t(procfile_lineword(ff, 0, 5));
@@ -1356,7 +1398,6 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
 #endif
-
     if(strcmp(p->comm, comm) != 0) {
         if(unlikely(debug_enabled)) {
             if(p->comm[0])
@@ -1454,7 +1495,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
         p->cstime           = 0;
         p->cgtime           = 0;
     }
-
+    update_proc_state_count(p->state);
     return 1;
 
 cleanup:
@@ -2534,6 +2575,8 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 static int collect_data_for_all_processes(void) {
     struct pid_stat *p = NULL;
 
+    // clear process state counter
+    memset(proc_state_count, 0, sizeof proc_state_count);
 #ifdef __FreeBSD__
     int i, procnum;
 
@@ -2608,8 +2651,9 @@ static int collect_data_for_all_processes(void) {
             // we forward read all running processes
             // collect_data_for_pid() is smart enough,
             // not to read the same pid twice per iteration
-            for(slc = 0; slc < all_pids_count; slc++)
+            for(slc = 0; slc < all_pids_count; slc++) {
                 collect_data_for_pid(all_pids_sortlist[slc], NULL);
+            }
         }
 #endif
     }
@@ -2666,7 +2710,6 @@ static int collect_data_for_all_processes(void) {
     // we do this by collecting the ownership of process
     // if we manage to get the ownership, the process still runs
     process_exited_processes();
-
     return 1;
 }
 
@@ -3470,14 +3513,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(unlikely(w->exposed))
             send_SET(w->name, w->num_threads);
     }
     send_END();
 
     send_BEGIN(type, "processes", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(unlikely(w->exposed))
             send_SET(w->name, w->processes);
     }
     send_END();
@@ -3640,7 +3683,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
                 debug_log_int("%s just added - regenerating charts.", w->name);
         }
     }
- 
+
     // nothing more to show
     if(!newly_added && show_guest_time == show_guest_time_old) return;
 
@@ -3806,6 +3849,29 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 }
 
+static void send_proc_states_count(usec_t dt)
+{
+    static bool chart_added = false;
+    // create chart for count of processes in different states
+    if (!chart_added) {
+        fprintf(
+                stdout,
+                "CHART system.processes_state '' 'System Processes State' 'processes' processes system.processes_state line %d %d\n",
+                NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES,
+                update_every);
+        for (proc_state i = PROC_STATUS_RUNNING; i < PROC_STATUS_END; i++) {
+          fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", proc_states[i]);
+        }
+        chart_added = true;
+    }
+
+    // send process state count
+    send_BEGIN("system", "processes_state", dt);
+    for (proc_state i = PROC_STATUS_RUNNING; i < PROC_STATUS_END; i++) {
+        send_SET(proc_states[i], proc_state_count[i]);
+    }
+    send_END();
+}
 
 // ----------------------------------------------------------------------------
 // parse command line arguments
@@ -4181,10 +4247,10 @@ int main(int argc, char **argv) {
         normalize_utilization(apps_groups_root_target);
 
         send_resource_usage_to_netdata(dt);
+        send_proc_states_count(dt);
 
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
-
         if(likely(enable_users_charts))
             send_charts_updates_to_netdata(users_root_target, "users", "Users");
 

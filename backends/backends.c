@@ -193,6 +193,10 @@ inline int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st)
     RRDHOST *host = st->rrdhost;
     (void)host;
 
+    // Do not send anomaly rates charts.
+    if (unlikely(st->state->is_ar_chart))
+        return 0;
+
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
         return 0;
 

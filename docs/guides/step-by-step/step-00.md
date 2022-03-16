@@ -3,7 +3,7 @@ title: "The step-by-step Netdata guide"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-00.md
 -->
-import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
+import { OneLineInstallWget, OneLineInstallCurl } from '../../src/components/OneLineInstall/'
 
 # The step-by-step Netdata guide
 
@@ -117,4 +117,4 @@ MongoDB, TimescaleDB, and others.
 
 Run Netdata behind an Nginx proxy to improve performance, and enable TLS/HTTPS for better security.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-00&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

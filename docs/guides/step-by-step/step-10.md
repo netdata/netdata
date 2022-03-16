@@ -156,7 +156,7 @@ sudo certbot --nginx
 > The requested nginx plugin does not appear to be installed`
 > ```
 >
-> You must install `python-certbox-nginx`. On Ubuntu or Debian systems, you can run `sudo apt-get install
+> You must install `python-certbot-nginx`. On Ubuntu or Debian systems, you can run `sudo apt-get install
 > python-certbot-nginx` to download and install this package.
 
 You'll be prompted with a few questions. At the `Which names would you like to activate HTTPS for?` question, hit
@@ -229,4 +229,4 @@ For some celebratory emoji and a clap on the back, head on over to our final ste
 
 [Next: The end. &rarr;](step-99.md)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-10&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

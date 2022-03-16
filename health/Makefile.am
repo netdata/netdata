@@ -46,7 +46,6 @@ dist_healthconfig_DATA = \
     health.d/fping.conf \
     health.d/geth.conf \
     health.d/ioping.conf \
-    health.d/fronius.conf \
     health.d/gearman.conf \
     health.d/go.d.plugin.conf \
     health.d/haproxy.conf \
@@ -66,6 +65,7 @@ dist_healthconfig_DATA = \
     health.d/mysql.conf \
     health.d/net.conf \
     health.d/netfilter.conf \
+    health.d/nut.conf \
     health.d/pihole.conf \
     health.d/portcheck.conf \
     health.d/processes.conf \
@@ -77,7 +77,6 @@ dist_healthconfig_DATA = \
     health.d/riakkv.conf \
     health.d/scaleio.conf \
     health.d/softnet.conf \
-    health.d/stiebeleltron.conf \
     health.d/synchronization.conf \
     health.d/swap.conf \
     health.d/systemdunits.conf \

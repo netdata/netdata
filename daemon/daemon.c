@@ -102,7 +102,11 @@ int become_user(const char *username, int pid_fd) {
     gid_t *supplementary_groups = NULL;
     if(ngroups > 0) {
         supplementary_groups = mallocz(sizeof(gid_t) * ngroups);
+#ifdef __APPLE__
+        if(getgrouplist(username, gid, (int *)supplementary_groups, &ngroups) == -1) {
+#else
         if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
+#endif /* __APPLE__ */
             if(am_i_root)
                 error("Cannot get supplementary groups of user '%s'.", username);
 
@@ -339,13 +343,7 @@ static void sched_getscheduler_report(void) {
         }
     }
 }
-#else // !HAVE_SCHED_GETSCHEDULER
-static void sched_getscheduler_report(void) {
-#ifdef HAVE_GETPRIORITY
-    info("Running with priority %d", getpriority(PRIO_PROCESS, 0));
-#endif // HAVE_GETPRIORITY
-}
-#endif // !HAVE_SCHED_GETSCHEDULER
+#endif /* HAVE_SCHED_GETSCHEDULER */
 
 #ifdef HAVE_SCHED_SETSCHEDULER
 
@@ -418,11 +416,11 @@ fallback:
 report:
     sched_getscheduler_report();
 }
-#else // !HAVE_SCHED_SETSCHEDULER
+#else /* HAVE_SCHED_SETSCHEDULER */
 static void sched_setscheduler_set(void) {
     process_nice_level();
 }
-#endif // !HAVE_SCHED_SETSCHEDULER
+#endif /* HAVE_SCHED_SETSCHEDULER */
 
 int become_daemon(int dont_fork, const char *user)
 {

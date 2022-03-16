@@ -139,15 +139,23 @@ BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
 %if 0%{?suse_version}
+BuildRequires: protobuf-devel
+BuildRequires: libprotobuf-c-devel
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
 BuildRequires: libjson-c-devel
 %else
 %if 0%{?fedora}
+BuildRequires: protobuf-devel
+BuildRequires: protobuf-c-devel
 BuildRequires: Judy-devel
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
 %else
+%if 0%{?centos_ver} >= 8
+BuildRequires: protobuf-devel
+BuildRequires: protobuf-c-devel
+%endif
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
 %endif
@@ -200,12 +208,6 @@ BuildRequires: cups-devel >= 1.7
 
 # Prometheus remote write dependencies
 BuildRequires: snappy-devel
-BuildRequires: protobuf-devel
-%if 0%{?suse_version}
-BuildRequires: libprotobuf-c-devel
-%else
-BuildRequires: protobuf-c-devel
-%endif
 # end - prometheus remote write dependencies
 
 # #####################################################################
@@ -227,15 +229,24 @@ happened, on your systems and applications.
 %if 0%{!?fedora:1} && 0%{!?suse_version:1}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-judy.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
+# Only bundle protobuf on CentOS 7 or earlier
+%if 0%{?centos_ver:1}
+%if %{centos_ver} < 8
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-protobuf.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%endif
+%endif
 %if 0%{?_have_ebpf}
 %if 0%{?centos_ver:1}
 %if %{centos_ver} < 8
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos7
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %else
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos8
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
 %else
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} other
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
 %endif
 
@@ -248,6 +259,11 @@ autoreconf -ivf
 	%endif
 	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
 	--with-bundled-libJudy \
+	%endif
+	%if 0%{?centos_ver:1}
+	%if %{centos_ver} < 8
+	--with-bundled-protobuf \
+	%endif
 	%endif
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
@@ -269,6 +285,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
 
 install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+
+# ###########################################################
+# Install updater script
+install -m 755 -p packaging/installer/netdata-updater.sh "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/netdata-updater.sh"
 
 # ###########################################################
 # logrotate settings
@@ -544,6 +564,8 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Wed Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
+- Bundle updater script in native packages.
 * Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
 - Remove support code for legacy ACLK implementation.
 * Wed Sep 16 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-14

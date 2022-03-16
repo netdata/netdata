@@ -690,6 +690,7 @@ int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
+    bool close_open_fds = true;
     size_t default_stacksize;
     char *user = NULL;
 
@@ -1038,7 +1039,13 @@ int main(int argc, char **argv) {
                             print_build_info_json();
                             return 0;
                         }
-                        else {
+                        else if(strcmp(optarg, "keepopenfds") == 0) {
+                            // Internal dev option to skip closing inherited
+                            // open FDs. Useful, when we want to run the agent
+                            // under profiling tools that open/maintain their
+                            // own FDs.
+                            close_open_fds = false;
+                        } else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
                             return help(1);
                         }
@@ -1053,12 +1060,12 @@ int main(int argc, char **argv) {
     }
 
 #ifdef _SC_OPEN_MAX
-    // close all open file descriptors, except the standard ones
-    // the caller may have left open files (lxc-attach has this issue)
-    {
-        int fd;
-        for(fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
-            if(fd_is_valid(fd)) close(fd);
+    if (close_open_fds == true) {
+        // close all open file descriptors, except the standard ones
+        // the caller may have left open files (lxc-attach has this issue)
+        for(int fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
+            if(fd_is_valid(fd))
+                close(fd);
     }
 #endif
 
@@ -1232,6 +1239,7 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
     system_info->hops = 0;
+    get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
@@ -1317,12 +1325,6 @@ int main(int argc, char **argv) {
     snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
     if (netdata_anonymous_statistics_enabled > 0 && access(filename, F_OK)) { // -1 -> not initialized
         send_statistics("ACLK_DISABLED", "-", "-");
-#ifdef ACLK_NO_LWS
-        send_statistics("BUILD_FAIL_LWS", "-", "-");
-#endif
-#ifdef ACLK_NO_LIBMOSQ
-        send_statistics("BUILD_FAIL_MOSQ", "-", "-");
-#endif
         int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
         if (fd == -1)
             error("Cannot create file '%s'. Please fix this.", filename);

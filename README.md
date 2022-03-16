@@ -8,7 +8,6 @@
   <a href="https://travis-ci.com/netdata/netdata"><img src="https://travis-ci.com/netdata/netdata.svg?branch=master" alt="Build status"></a>
   <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
-  <a href="<>"><img src="https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3" alt="analytics"></a>
   <br />
   <a href="https://codeclimate.com/github/netdata/netdata"><img src="https://codeclimate.com/github/netdata/netdata/badges/gpa.svg" alt="Code Climate"></a>
   <a href="https://www.codacy.com/app/netdata/netdata?utm_source=github.com&utm_medium=referral&utm_content=netdata/netdata&utm_campaign=Badge_Grade"><img src="https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498" alt="Codacy"></a>
@@ -34,12 +33,6 @@ People get addicted to Netdata. Once you use it on your systems, there's no goin
 
 ![Users who are addicted to
 Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
-
-> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.31.0, May 19, 2021**
->
-> The v1.31.0 release of Netdata comes with re-packaged and redesigned elements of the dashboard to help you focus on
-> your metrics, even more Linux kernel insights via eBPF, on-node machine learning to help you find anomalies, and much
-> more.
 
 ## Menu
 

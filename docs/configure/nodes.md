@@ -19,7 +19,7 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 ## The Netdata config directory
 
 On most Linux systems, using our [recommended one-line
-installation](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended), the **Netdata config
+installation](/docs/get-started.mdx#install-on-linux-with-one-line-installer), the **Netdata config
 directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
 few directories, and a shell script named `edit-config`.
 

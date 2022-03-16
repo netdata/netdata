@@ -82,6 +82,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
 | [`options`](#alarm-line-options)                    | no              | Add an option to not clear alarms.                                                    |
 | [`host labels`](#alarm-line-host-labels)            | no              | List of labels present on a host.                                                     |
+| [`info`](#alarm-line-info)                          | no              | A brief description of the alarm.                                                           |
 
 The `alarm` or `template` line must be the first line of any entity.
 
@@ -533,6 +534,14 @@ host labels: installed = 201*
 
 See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for more examples.
 
+#### Alarm line `info`
+
+The info field can contain a small piece of text describing the alarm or template. This will be rendered in notifications and UI elements whenever the specific alarm is in focus. An example for the `ram_available` alarm is:
+
+```yaml
+info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
+```
+
 ## Expressions
 
 Netdata has an internal [infix expression parser](/libnetdata/eval). This parses expressions and creates an internal
@@ -913,4 +922,4 @@ to temporary disable notifications (for instance when running backups triggers a
 notifications are runtime. The health checks can be controlled at runtime via the [health management
 api](/web/api/health/README.md).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Freference%2F&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

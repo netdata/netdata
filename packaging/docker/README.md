@@ -390,7 +390,7 @@ executed internally by the caddy server.
 
 ```caddyfile
 netdata.example.org {
-  proxy / netdata:19999
+  reverse_proxy netdata:19999
   tls admin@example.org
 }
 ```
@@ -403,19 +403,19 @@ proxy.
 ```yaml
 version: '3'
 volumes:
-  caddy:
+  caddy_data:
+  caddy_config:
 
 services:
   caddy:
-    image: abiosoft/caddy
+    image: caddy:2
     ports:
-      - 80:80
-      - 443:443
+      - "80:80"
+      - "443:443"
     volumes:
-      - /opt/Caddyfile:/etc/Caddyfile
-      - $HOME/.caddy:/root/.caddy
-    environment:
-      ACME_AGREE: 'true'
+      - /opt/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
   netdata:
     restart: always
     hostname: netdata.example.org
@@ -489,4 +489,4 @@ Once you have contacted the Netdata owners to setup you up on Github and Travis,
 Having followed these instructions, your forked repository should be all set up for integration with Travis CI. Happy
 testing!
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fdocker%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+
