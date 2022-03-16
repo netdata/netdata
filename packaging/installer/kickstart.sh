@@ -138,7 +138,7 @@ telemetry_event() {
   if [ -f /etc/machine-id ]; then
     DISTINCT_ID="$(cat /etc/machine-id)"
   elif command -v uuidgen > /dev/null 2>&1; then
-    DISTINCT_ID="$(uuidgen)"
+    DISTINCT_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
   else
     DISTINCT_ID="null"
   fi
