@@ -894,7 +894,7 @@ set_auto_updates() {
 
   if [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
-    if grep -qv '\-\-enable-auto-updates' ${updater}; then
+    if ! grep -q '\-\-enable-auto-updates' ${updater}; then
       echo
     elif ! ${updater} --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
       error "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
