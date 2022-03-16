@@ -571,6 +571,12 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
     rc = execute_insert(res);
     if (rc != SQLITE_DONE)
         error_report("Failed to ACK sequence id, rc = %d", rc);
+    else
+        log_access(
+            "ACLK STA [%s (%s)]: CHARTS ACKNOWLEDGED in the database upto %" PRIu64,
+            wc->node_id,
+            wc->host ? wc->host->hostname : "N/A",
+            cmd.param1);
 
 bind_fail:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
@@ -593,6 +599,17 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
         buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; " \
                             "DELETE FROM aclk_chart_latest_%s;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
         db_lock();
+        buffer_flush(sql);
+        log_access(
+            "ACLK REQ [%s (%s)]: Received chart full resync.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
+        buffer_sprintf(
+            sql,
+            "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; "
+            "DELETE FROM aclk_chart_latest_%s;",
+            wc->uuid_str,
+            wc->uuid_str,
+            wc->uuid_str);
+
         db_execute("BEGIN TRANSACTION;");
         db_execute(buffer_tostring(sql));
         db_execute("COMMIT TRANSACTION;");
@@ -1067,12 +1084,26 @@ void aclk_send_dimension_update(RRDDIM *rd)
             live ? 0 : last_entry_t);
 
         if (!first_entry_t)
-            debug(D_ACLK_SYNC, "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld)",
-              rd->rrdset->rrdhost->hostname, rd->rrdset->name, rd->name, live, first_entry_t, last_entry_t);
+            debug(
+                D_ACLK_SYNC,
+                "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld)",
+                rd->rrdset->rrdhost->hostname,
+                rd->rrdset->name,
+                rd->name,
+                live,
+                first_entry_t,
+                last_entry_t);
         else
-            debug(D_ACLK_SYNC, "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld) collected %ld seconds ago",
-                  rd->rrdset->rrdhost->hostname, rd->rrdset->name, rd->name, live, first_entry_t,
-                  last_entry_t, now - last_entry_t);
+            debug(
+                D_ACLK_SYNC,
+                "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld) collected %ld seconds ago",
+                rd->rrdset->rrdhost->hostname,
+                rd->rrdset->name,
+                rd->name,
+                live,
+                first_entry_t,
+                last_entry_t,
+                now - last_entry_t);
         rd->state->aclk_live_status = live;
     }
 
