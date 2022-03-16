@@ -548,7 +548,7 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
     sqlite3_stmt *res = NULL;
 
     log_access(
-        "ACLK REQ [%s (%s)]: Received ack chart sequence id %" PRIu64,
+        "ACLK REQ [%s (%s)]: CHART RECEIVE ACK upto %" PRIu64,
         wc->node_id,
         wc->host ? wc->host->hostname : "N/A",
         cmd.param1);
@@ -694,7 +694,10 @@ void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id)
     if (unlikely(!node_id))
         return;
 
-    log_access("ACLK STA [%s (N/A)]: Node reports last sequence id received %" PRIu64, node_id, last_sequence_id);
+    char *hostname = get_hostname_by_node_id(node_id);
+    log_access("ACLK REQ [%s (%s)]: CHARTS ACKNOWLEDGED upto %" PRIu64, node_id, hostname ? hostname : "N/A",
+               last_sequence_id);
+    freez(hostname);
     aclk_submit_param_command(node_id, ACLK_DATABASE_CHART_ACK, last_sequence_id);
     return;
 }
