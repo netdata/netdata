@@ -391,7 +391,7 @@ safe_sha256sum() {
   if command -v shasum > /dev/null 2>&1; then
     shasum -a 256 "$@"
   elif command -v sha256sum > /dev/null 2>&1; then
-    shasum -a 256 "$@"
+    sha256sum "$@"
   else
     fatal "I could not find a suitable checksum binary to use" F0004
   fi
