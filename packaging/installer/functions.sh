@@ -667,7 +667,7 @@ restart_netdata() {
     # shellcheck disable=SC2086
     run ${NETDATA_INSTALLER_START_CMD} && started=1
 
-    if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
+    if [ ${started} -eq 1 ] && sleep 5 && [ -z "$(netdata_pids)" ]; then
       echo >&2 "Ooops! it seems netdata is not started."
       started=0
     fi
@@ -677,12 +677,13 @@ restart_netdata() {
       # shellcheck disable=SC2086
       run ${NETDATA_INSTALLER_START_CMD} && started=1
     fi
+
+    if [ ${started} -eq 1 ] && sleep 5 && [ -z "$(netdata_pids)" ]; then
+      echo >&2 "Hm... it seems netdata is still not started."
+      started=0
+    fi
   fi
 
-  if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
-    echo >&2 "Hm... it seems netdata is still not started."
-    started=0
-  fi
 
   if [ ${started} -eq 0 ]; then
     # still not started... another forced attempt, just run the binary
