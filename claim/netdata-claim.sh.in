@@ -152,7 +152,7 @@ gen_id() {
     local id
 
     if command -v uuidgen > /dev/null 2>&1; then
-        id="$(uuidgen)"
+        id="$(uuidgen | tr '[:upper:]' '[:lower:]')"
     elif [ -r /proc/sys/kernel/random/uuid ]; then
         id="$(cat /proc/sys/kernel/random/uuid)"
     else
@@ -199,7 +199,7 @@ do
         case $arg in
                 -token=*) TOKEN=${arg:7} ;;
                 -url=*) [ -n "${arg:5}" ] && URL_BASE=${arg:5} ;;
-                -id=*) ID=${arg:4} ;;
+                -id=*) ID=$(echo "${arg:4}" | tr '[:upper:]' '[:lower:]');;
                 -rooms=*) ROOMS=${arg:7} ;;
                 -hostname=*) HOSTNAME=${arg:10} ;;
                 -verbose) VERBOSE=1 ;;
