@@ -1566,6 +1566,7 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
     else if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
         freez(system_info->host_os_name);
         system_info->host_os_name = strdupz(value);
+        json_fix_string(system_info->host_os_name);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_ID")){
         freez(system_info->host_os_id);
