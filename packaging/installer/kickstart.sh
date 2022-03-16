@@ -897,7 +897,7 @@ set_auto_updates() {
     if ! grep -q '\-\-enable-auto-updates' ${updater}; then
       echo
     elif ! ${updater} --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
-      error "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
+      warning "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
     fi
   else
     ${updater} --disable-auto-updates
