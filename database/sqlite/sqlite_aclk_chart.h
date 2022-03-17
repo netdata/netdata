@@ -12,8 +12,8 @@ typedef enum payload_type {
 
 extern sqlite3 *db_meta;
 
-#ifndef RRDSET_MINIMUM_LIVE_MULTIPLIER
-#define RRDSET_MINIMUM_LIVE_MULTIPLIER   (1.5)
+#ifndef RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER
+#define RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER   (3)
 #endif
 
 struct aclk_chart_sync_stats {
