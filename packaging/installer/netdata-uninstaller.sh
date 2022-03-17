@@ -193,7 +193,7 @@ pkg_installed() {
 
 detect_existing_install
 
-if [ -x "$(command -v apt-get)" ] && echo "${INSTALL_TYPE}" | grep -q "binpkg-*"; then
+if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
   if dpkg -s netdata > /dev/null; then
     echo "Found netdata native installation"
     if user_input "Do you want to remove netdata? "; then
@@ -211,7 +211,7 @@ if [ -x "$(command -v apt-get)" ] && echo "${INSTALL_TYPE}" | grep -q "binpkg-*"
     fi
     exit 0
   fi
-elif [ -x "$(command -v dnf)" ] && echo "${INSTALL_TYPE}" | grep -q "binpkg-*"; then
+elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
@@ -229,7 +229,7 @@ elif [ -x "$(command -v dnf)" ] && echo "${INSTALL_TYPE}" | grep -q "binpkg-*"; 
     fi
     exit 0
   fi
-elif [ -x "$(command -v yum)" ] && echo "${INSTALL_TYPE}" | grep -q "binpkg-*"; then
+elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
@@ -247,7 +247,7 @@ elif [ -x "$(command -v yum)" ] && echo "${INSTALL_TYPE}" | grep -q "binpkg-*"; 
     fi
     exit 0
   fi
-elif [ -x "$(command -v zypper)" ] && echo "${INSTALL_TYPE}" | grep -q "binpkg-*"; then
+elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if [ "${FLAG}" = "-y" ]; then
     FLAG=-n
   fi
