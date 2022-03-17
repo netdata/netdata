@@ -342,6 +342,9 @@ static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
     return (uint32_t *)&page_info->scratch[sizeof(uint32_t)];
 }
 
+
+extern void rrddim_initialize_metadata(RRDDIM *RD);
+
 /**
  * Calculates the regions of different data collection intervals in a netdata chart in the time range
  * [start_time,end_time]. This call takes the netdata chart read lock.
@@ -379,6 +382,11 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
     rrdset_rdlock(st);
     for(rd_iter = temp_rd?temp_rd:st->dimensions, rd = NULL, min_time = (usec_t)-1 ; rd_iter ; rd_iter = rd_iter->next) {
+        // This might be the first time the dimension is accessed since it's
+        // creation and maybe it has not been fully initialized yet. Otherwise,
+        // the following call becomes a nop.
+        rrddim_initialize_metadata(rd);
+
         /*
          * Choose oldest dimension as reference. This is not equivalent to the union of all dimensions
          * but it is a best effort approximation with a bias towards older metrics in a chart. It
@@ -533,6 +541,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     unsigned pages_nr;
 
     ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+    rrdimm_handle->rd = rd;
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
     handle = &rrdimm_handle->rrdeng;

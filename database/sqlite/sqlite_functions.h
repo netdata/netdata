@@ -67,7 +67,7 @@ extern int sql_store_chart(
 extern int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, const char *name, collected_number multiplier,
                                collected_number divisor, int algorithm);
 
-extern int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid);
+extern int find_dimension_uuid(RRDSET *st, RRDDIM *rd);
 extern void store_active_dimension(uuid_t *dimension_uuid);
 
 extern uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name);
@@ -99,4 +99,7 @@ extern struct node_instance_list *get_node_list(void);
 extern void sql_load_node_id(RRDHOST *host);
 extern void compute_chart_hash(RRDSET *st);
 extern int sql_set_dimension_option(uuid_t *dim_uuid, char *option);
+
+extern int find_or_update_uuid_of_each_dimension(RRDSET *rs);
+
 #endif //NETDATA_SQLITE_FUNCTIONS_H

@@ -145,14 +145,14 @@ void store_active_chart(uuid_t *chart_uuid)
     static __thread sqlite3_stmt *res = NULL;
     int rc;
 
+    if (unlikely(!chart_uuid))
+        return;
+
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return;
     }
-
-    if (unlikely(!chart_uuid))
-        return;
 
     rc = store_active_uuid_object(&res, SQL_STORE_ACTIVE_CHART, chart_uuid);
     if (rc != SQLITE_DONE)
@@ -160,7 +160,7 @@ void store_active_chart(uuid_t *chart_uuid)
 
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement in store active chart, rc = %d", rc);
+        error_report("Failed to reset statement in store active chart, rc = %d", rc);
     return;
 }
 
@@ -173,14 +173,14 @@ void store_active_dimension(uuid_t *dimension_uuid)
     static __thread sqlite3_stmt *res = NULL;
     int rc;
 
+    if (unlikely(!dimension_uuid))
+        return;
+
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return;
     }
-
-    if (unlikely(!dimension_uuid))
-        return;
 
     rc = store_active_uuid_object(&res, SQL_STORE_ACTIVE_DIMENSION, dimension_uuid);
     if (rc != SQLITE_DONE)
@@ -188,7 +188,7 @@ void store_active_dimension(uuid_t *dimension_uuid)
 
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement in store active dimension, rc = %d", rc);
+        error_report("Failed to reset statement in store active dimension, rc = %d", rc);
     return;
 }
 
@@ -455,7 +455,7 @@ bind_fail:
     return 0;
 }
 
-int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid)
+int find_dimension_uuid(RRDSET *st, RRDDIM *rd)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc;
@@ -486,14 +486,8 @@ int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid)
 
     rc = sqlite3_step(res);
     if (likely(rc == SQLITE_ROW)) {
-        uuid_copy(*store_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
+        uuid_copy(rd->state->metric_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
         status = 0;
-    }
-    else {
-        uuid_generate(*store_uuid);
-        status = sql_store_dimension(store_uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
-        if (unlikely(status))
-            error_report("Failed to store dimension metadata in the database");
     }
 
     rc = sqlite3_reset(res);
@@ -2100,4 +2094,124 @@ failed:
         error_report("Failed to reset the prepared statement when loading node instance information");
 
     return;
-};
+}
+
+int db_begin_transaction() {
+    static sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, "BEGIN IMMEDIATE TRANSACTION;", &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare begin transaction statement, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    int status = 0;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to begin transaction, rc = %d", rc);
+        status = 1;
+    }
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to reset begin transaction statement, rc = %d", rc);
+        status = 1;
+    }
+
+    return status;
+}
+
+int db_end_transaction() {
+    static sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, "END TRANSACTION;", &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare end transaction statement, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    int status = 0;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to end transaction, rc = %d", rc);
+        status = 1;
+    }
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to reset end transaction statement, rc = %d", rc);
+        status = 1;
+    }
+
+    return status;
+}
+
+int find_or_update_uuid_of_each_dimension(RRDSET *rs)
+{
+    static sqlite3_stmt *res = NULL;
+    int ok = 0;
+    int error = 1;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return ok;
+        error_report("Database has not been initialized");
+        return error;
+    }
+
+    db_lock();
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_STORE_DIMENSION, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store dimension, rc = %d", rc);
+            return error;
+        }
+    }
+
+    // begin transaction
+    if (unlikely(db_begin_transaction()))
+        goto unlock_and_return_error;
+
+    // process each dim
+    for (RRDDIM *rd = rs->dimensions; rd != NULL; rd = rd->next) {
+        if (rrddim_flag_check(rd, RRDDIM_FLAG_OPS_INITIALIZED))
+            continue;
+
+        // create a new uuid if we can't find the dimension
+        if (find_dimension_uuid(rs, rd) != 0) {
+            uuid_generate(rd->state->metric_uuid);
+
+            rc = sql_store_dimension(&rd->state->metric_uuid, rs->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
+            if (unlikely(rc)) {
+                error_report("Failed to store dimension metadata in the database");
+                goto rollback_transaction;
+            }
+        }
+
+        // mark the dim as active
+        store_active_dimension(&rd->state->metric_uuid);
+    }
+
+    // end transaction
+    if (unlikely(db_end_transaction() != 0))
+        goto unlock_and_return_error;
+    db_unlock();
+
+    return ok;
+
+rollback_transaction:
+    db_execute("ROLLBACK TRANSACTION;");
+unlock_and_return_error:
+    db_unlock();
+    return error;
+}

@@ -167,7 +167,9 @@ typedef enum rrddim_flags {
     // No new values have been collected for this dimension since agent start or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
-    RRDDIM_FLAG_ACLK                            = (1 << 4)
+    RRDDIM_FLAG_ACLK                            = (1 << 4),
+
+    RRDDIM_FLAG_OPS_INITIALIZED                 = (1 << 5)
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -1359,6 +1361,22 @@ extern RRDHOST *rrdhost_create(
     int update_every, long entries, RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled,
     char *rrdpush_destination, char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
     int is_localhost); //TODO: Remove , int is_archived);
+
+// RRDDIM legacy collection & query functions
+
+extern void rrddim_collect_init(RRDDIM *rd);
+extern void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number);
+extern int rrddim_collect_finalize(RRDDIM *rd);
+
+void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time);
+int rrddim_query_is_finished(struct rrddim_query_handle *handle);
+void rrddim_query_finalize(struct rrddim_query_handle *handle);
+time_t rrddim_query_latest_time(RRDDIM *rd);
+time_t rrddim_query_oldest_time(RRDDIM *rd);
+
+extern void rrdops_initialize(RRDDIM *rd);
+extern void rrddim_initialize_metadata(RRDDIM *rd);
 
 #endif /* NETDATA_RRD_INTERNALS */
 
