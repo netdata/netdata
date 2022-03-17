@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- fix unclaimed agents [\#12449](https://github.com/netdata/netdata/pull/12449) ([underhood](https://github.com/underhood))
+- apps.plugin: fix for plugin sending unnecessary data in freebsd [\#12446](https://github.com/netdata/netdata/pull/12446) ([codeguru1](https://github.com/codeguru1))
 - fix\(kickstart.sh\): prefer shasum over sha256sum [\#12429](https://github.com/netdata/netdata/pull/12429) ([ilyam8](https://github.com/ilyam8))
 - Docs: Fix broken link [\#12428](https://github.com/netdata/netdata/pull/12428) ([kickoke](https://github.com/kickoke))
 - Fix OS name for older agent versions streaming to a parent [\#12425](https://github.com/netdata/netdata/pull/12425) ([stelfrag](https://github.com/stelfrag))
@@ -21,12 +23,14 @@
 - Reorder functions properly in updater script. [\#12399](https://github.com/netdata/netdata/pull/12399) ([Ferroin](https://github.com/Ferroin))
 - Fix crash when netdatacli command output too long [\#12393](https://github.com/netdata/netdata/pull/12393) ([underhood](https://github.com/underhood))
 - Dont check host health enabled if host is null [\#12392](https://github.com/netdata/netdata/pull/12392) ([MrZammler](https://github.com/MrZammler))
+- Update build/m4/ax\_pthread.m4 [\#12390](https://github.com/netdata/netdata/pull/12390) ([vkalintiris](https://github.com/vkalintiris))
 - Delay removed event for 60 seconds after the chart's last collected time [\#12388](https://github.com/netdata/netdata/pull/12388) ([MrZammler](https://github.com/MrZammler))
 - Remove unecessary error report for proc and sys files [\#12385](https://github.com/netdata/netdata/pull/12385) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: handle double host prefix when Netdata running in a podman container [\#12380](https://github.com/netdata/netdata/pull/12380) ([ilyam8](https://github.com/ilyam8))
 - fix\(ebpf.plugin\): remove pid file on exit [\#12379](https://github.com/netdata/netdata/pull/12379) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: shellcheck warnings in docker run.sh [\#12377](https://github.com/netdata/netdata/pull/12377) ([ilyam8](https://github.com/ilyam8))
 - Fix version handling issues in release workflow. [\#12375](https://github.com/netdata/netdata/pull/12375) ([Ferroin](https://github.com/Ferroin))
+- Update Agent version in the Swagger API [\#12374](https://github.com/netdata/netdata/pull/12374) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix handling of checks for newer updater script on update. [\#12367](https://github.com/netdata/netdata/pull/12367) ([Ferroin](https://github.com/Ferroin))
 - Fix handling of pushing commits for release process. [\#12359](https://github.com/netdata/netdata/pull/12359) ([Ferroin](https://github.com/Ferroin))
 - Fix chart synchronization with the cloud [\#12356](https://github.com/netdata/netdata/pull/12356) ([stelfrag](https://github.com/stelfrag))
@@ -342,14 +346,6 @@
 - Use correct hop count if host is already in memory [\#11785](https://github.com/netdata/netdata/pull/11785) ([stelfrag](https://github.com/stelfrag))
 - Fix proc/interrupts parser [\#11783](https://github.com/netdata/netdata/pull/11783) ([maximethebault](https://github.com/maximethebault))
 - Fix typos [\#11782](https://github.com/netdata/netdata/pull/11782) ([rex4539](https://github.com/rex4539))
-- add nightly release version to readme [\#11780](https://github.com/netdata/netdata/pull/11780) ([andrewm4894](https://github.com/andrewm4894))
-- Delete from aclk alerts table if ack'ed from cloud one day ago [\#11779](https://github.com/netdata/netdata/pull/11779) ([MrZammler](https://github.com/MrZammler))
-- Add Oracle Linux 8 to CI and package builds. [\#11776](https://github.com/netdata/netdata/pull/11776) ([Ferroin](https://github.com/Ferroin))
-- Temporary fix for cgroup renaming [\#11775](https://github.com/netdata/netdata/pull/11775) ([vlvkobal](https://github.com/vlvkobal))
-- Remove feature flag for ACLK new cloud architecture [\#11774](https://github.com/netdata/netdata/pull/11774) ([stelfrag](https://github.com/stelfrag))
-- Fix link to new charts. [\#11773](https://github.com/netdata/netdata/pull/11773) ([DShreve2](https://github.com/DShreve2))
-- Update netdata-security.md [\#11772](https://github.com/netdata/netdata/pull/11772) ([jlbriston](https://github.com/jlbriston))
-- Skip sending hidden dimensions via ACLK [\#11770](https://github.com/netdata/netdata/pull/11770) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
