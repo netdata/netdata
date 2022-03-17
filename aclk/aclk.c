@@ -144,7 +144,7 @@ static int wait_till_agent_claim_ready()
         // TODO make it without malloc/free
         memset(&url, 0, sizeof(url_t));
         if (url_parse(cloud_base_url, &url)) {
-            error("Agent is claimed but the configuration is invalid, please fix");
+            error("Agent is claimed but the URL in configuration key \"cloud base url\" is invalid, please fix");
             url_t_destroy(&url);
             sleep(5);
             continue;
