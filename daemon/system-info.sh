@@ -218,8 +218,7 @@ else
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
     CPU_INFO_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n kern.smp.cpus)"
-    possible_cpu_freq=$(sysctl -n machdep.tsc_freq 2> /dev/null)
-    if [ -z "$possible_cpu_freq" ]; then
+    if ! possible_cpu_freq=$(sysctl -n machdep.tsc_freq 2> /dev/null); then
       possible_cpu_freq=$(sysctl -n hw.model 2> /dev/null | grep -Eo "[0-9\.]+GHz" | grep -o "^[0-9\.]*" | awk '{print int($0*1000)}')
       [ -n "$possible_cpu_freq" ] && possible_cpu_freq="${possible_cpu_freq} MHz"
     fi
