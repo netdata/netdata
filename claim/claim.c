@@ -162,8 +162,10 @@ void load_claiming_state(void)
         claimed_id = NULL;
     }
 
-    localhost->aclk_state.claimed_id = mallocz(UUID_STR_LEN);
-    uuid_unparse_lower(uuid, localhost->aclk_state.claimed_id);
+    if(claimed_id) {
+        localhost->aclk_state.claimed_id = mallocz(UUID_STR_LEN);
+        uuid_unparse_lower(uuid, localhost->aclk_state.claimed_id);
+    }
 
     invalidate_node_instances(&localhost->host_uuid, claimed_id ? &uuid : NULL);
     store_claim_id(&localhost->host_uuid, claimed_id ? &uuid : NULL);
