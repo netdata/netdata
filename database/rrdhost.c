@@ -1504,6 +1504,10 @@ restart_after_removal:
             rrdset_free(st);
             goto restart_after_removal;
         }
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+        else
+            sql_check_chart_liveness(st);
+#endif
     }
 }
 
