@@ -655,6 +655,41 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         return 0;
 }
 
+// Create alarms for dimensions that have been added to charts
+// since the previous iteration.
+static void init_pending_foreach_alarms(RRDHOST *host) {
+    rrdhost_wrlock(host);
+
+    if (host->alarms_with_foreach || host->alarms_template_with_foreach) {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS)) {
+            RRDSET *st;
+
+            rrdset_foreach_read(st, host) {
+                rrdset_wrlock(st);
+
+                if (rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS)) {
+                    RRDDIM *rd;
+
+                    rrddim_foreach_write(rd, st) {
+                        if (rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM)) {
+                            rrdcalc_link_to_rrddim(rd, st, host);
+                            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
+                        }
+                    }
+
+                    rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
+                }
+
+                rrdset_unlock(st);
+            }
+
+            rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
+        }
+    }
+
+    rrdhost_unlock(host);
+}
+
 /**
  * Health Main
  *
@@ -738,6 +773,8 @@ void *health_main(void *ptr) {
 
             if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
                 sql_health_alarm_log_cleanup(host);
+
+            init_pending_foreach_alarms(host);
 
             rrdhost_rdlock(host);
 
