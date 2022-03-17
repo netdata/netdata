@@ -123,7 +123,7 @@ static int wait_till_agent_claimed(void)
  * @param aclk_hostname points to location where string pointer to hostname will be set
  * @param aclk_port port to int where port will be saved
  * 
- * @return If non 0 returned irrecoverable error happened and ACLK should be terminated
+ * @return If non 0 returned irrecoverable error happened (or netdata_exit) and ACLK should be terminated
  */
 static int wait_till_agent_claim_ready()
 {
@@ -151,13 +151,13 @@ static int wait_till_agent_claim_ready()
         }
         url_t_destroy(&url);
 
-        if (!load_private_key()) {
-            sleep(5);
-            break;
-        }
+        if (!load_private_key())
+            return 0;
+
+        sleep(5);
     }
 
-    return 0;
+    return 1;
 }
 
 void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
