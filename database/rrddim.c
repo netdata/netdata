@@ -7,6 +7,10 @@ static inline void calc_link_to_rrddim(RRDDIM *rd)
 {
     RRDHOST *host = rd->rrdset->rrdhost;
     RRDSET  *st = rd->rrdset;
+
+    if (st->state && st->state->is_ar_chart)
+        return;
+
     if (host->alarms_with_foreach || host->alarms_template_with_foreach) {
         int count = 0;
         int hostlocked;
