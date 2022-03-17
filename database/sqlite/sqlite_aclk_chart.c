@@ -305,6 +305,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
             rd->rrdset->id,
             first_t,
             live ? 0 : last_t);
+        rd->state->aclk_live_status = live;
 
         freez(claim_id);
     }
