@@ -1650,4 +1650,4 @@ if [ -z "${ACTION}" ]; then
   handle_existing_install
 fi
 
-main $@
+main "$@"
