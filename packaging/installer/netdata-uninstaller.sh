@@ -83,6 +83,78 @@ user_input() {
   fi
 }
 
+detect_existing_install() {
+  if pkg_installed netdata; then
+    ndprefix="/"
+  else
+    if [ -n "${INSTALL_PREFIX}" ]; then
+      searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+      searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
+    else
+      searchpath="${PATH}"
+    fi
+
+    ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
+    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
+      ndpath="/opt/netdata/bin/netdata"
+    fi
+
+    if [ -n "${ndpath}" ]; then
+      ndprefix="$(dirname "$(dirname "${ndpath}")")"
+    fi
+
+    if echo "${ndprefix}" | grep -Eq '/usr$'; then
+      ndprefix="$(dirname "${ndprefix}")"
+    fi
+  fi
+
+  if [ -n "${ndprefix}" ]; then
+    typefile="${ndprefix}/etc/netdata/.install-type"
+    envfile="${ndprefix}/etc/netdata/.environment"
+    if [ -r "${typefile}" ]; then
+      ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
+      # shellcheck disable=SC1090,SC1091
+      . "${tmpdir}/install-type"
+    else
+      INSTALL_TYPE="unknown"
+    fi
+
+    if [ "${INSTALL_TYPE}" = "unknown" ] || [ "${INSTALL_TYPE}" = "custom" ]; then
+      if [ -r "${envfile}" ]; then
+        ${ROOTCMD} sh -c "cat \"${envfile}\" > \"${tmpdir}/environment\""
+        # shellcheck disable=SC1091
+        . "${tmpdir}/environment"
+        if [ -n "${NETDATA_IS_STATIC_INSTALL}" ]; then
+          if [ "${NETDATA_IS_STATIC_INSTALL}" = "yes" ]; then
+            INSTALL_TYPE="legacy-static"
+          else
+            INSTALL_TYPE="legacy-build"
+          fi
+        fi
+      fi
+    fi
+  fi
+}
+
+pkg_installed() {
+  case "${DISTRO_COMPAT_NAME}" in
+    debian|ubuntu)
+      dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
+      return $?
+      ;;
+    centos|fedora|opensuse|ol)
+      rpm -q "${1}" > /dev/null 2>&1
+      return $?
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+detect_existing_install
+
 if [ -x "$(command -v apt-get)" ] && echo "${INSTALL_TYPE}" | grep -q "binpkg-*"; then
   if dpkg -s netdata > /dev/null; then
     echo "Found netdata native installation"
