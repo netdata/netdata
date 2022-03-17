@@ -1053,8 +1053,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
     time_t last_entry_t = rrddim_last_entry_t(rd);
 
     time_t now = now_realtime_sec();
-    int live = ((now - rd->last_collected_time.tv_sec) <
-                MAX(RRDSET_MINIMUM_LIVE_MULTIPLIER * rd->update_every, rrdset_free_obsolete_time));
+    int live = ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every));
 
     if (!live || rd->state->aclk_live_status != live || !first_entry_t) {
         (void)aclk_upd_dimension_event(
@@ -1180,6 +1179,44 @@ struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host)
     buffer_free(sql);
     return aclk_statistics;
 }
+
+void sql_check_chart_liveness(RRDSET *st) {
+    RRDDIM *rd;
+
+    if (unlikely(st->state->is_ar_chart))
+        return;
+
+    rrdset_rdlock(st);
+    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+        if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
+            debug(D_ACLK_SYNC,"Check chart liveness [%s] submit chart definition", st->name);
+            rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+        }
+    }
+    else
+        debug(D_ACLK_SYNC,"Check chart liveness [%s] chart definition already submitted", st->name);
+    time_t mark = now_realtime_sec();
+
+    debug(D_ACLK_SYNC,"Check chart liveness [%s] scanning dimensions", st->name);
+    rrddim_foreach_read(rd, st) {
+        if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) {
+            int live = (mark - rd->last_collected_time.tv_sec) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every;
+            if (unlikely(live != rd->state->aclk_live_status)) {
+                if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+                    if (likely(!queue_dimension_to_aclk(rd))) {
+                        debug(D_ACLK_SYNC,"Dimension change [%s] on [%s] from live %d --> %d", rd->id, rd->rrdset->name, rd->state->aclk_live_status, live);
+                        rd->state->aclk_live_status = live;
+                        rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
+                    }
+                }
+            }
+            else
+                debug(D_ACLK_SYNC,"Dimension check [%s] on [%s] liveness matches", rd->id, st->name);
+        }
+    }
+    rrdset_unlock(st);
+}
+
 #endif //ENABLE_NEW_CLOUD_PROTOCOL
 
 // ST is read locked
