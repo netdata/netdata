@@ -4247,7 +4247,10 @@ int main(int argc, char **argv) {
         normalize_utilization(apps_groups_root_target);
 
         send_resource_usage_to_netdata(dt);
+
+#ifndef __FreeBSD__
         send_proc_states_count(dt);
+#endif
 
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
