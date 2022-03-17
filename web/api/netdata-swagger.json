@@ -3,7 +3,7 @@
   "info": {
     "title": "Netdata API",
     "description": "Real-time performance and health monitoring.",
-    "version": "1.11.1_rolling"
+    "version": "1.33.1"
   },
   "paths": {
     "/info": {
