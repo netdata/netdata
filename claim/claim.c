@@ -161,9 +161,7 @@ void load_claiming_state(void)
         freez(claimed_id);
         claimed_id = NULL;
     }
-
-    localhost->aclk_state.claimed_id = mallocz(UUID_STR_LEN);
-    uuid_unparse_lower(uuid, localhost->aclk_state.claimed_id);
+    localhost->aclk_state.claimed_id = claimed_id;
 
     invalidate_node_instances(&localhost->host_uuid, claimed_id ? &uuid : NULL);
     store_claim_id(&localhost->host_uuid, claimed_id ? &uuid : NULL);
@@ -173,8 +171,6 @@ void load_claiming_state(void)
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
     }
-
-    freez(claimed_id);
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
     netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
