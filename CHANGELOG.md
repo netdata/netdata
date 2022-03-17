@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- fix\(kickstart.sh\): prefer shasum over sha256sum [\#12429](https://github.com/netdata/netdata/pull/12429) ([ilyam8](https://github.com/ilyam8))
+- Docs: Fix broken link [\#12428](https://github.com/netdata/netdata/pull/12428) ([kickoke](https://github.com/kickoke))
+- Fix OS name for older agent versions streaming to a parent [\#12425](https://github.com/netdata/netdata/pull/12425) ([stelfrag](https://github.com/stelfrag))
+- fix: ensure claim\_id is always sent lowercase as string [\#12423](https://github.com/netdata/netdata/pull/12423) ([underhood](https://github.com/underhood))
+- fix: lowercase uuidgen [\#12422](https://github.com/netdata/netdata/pull/12422) ([ilyam8](https://github.com/ilyam8))
+- fix: add a delay between starting Netdata and checking pids [\#12420](https://github.com/netdata/netdata/pull/12420) ([ilyam8](https://github.com/ilyam8))
 - fix\(charts.d.plugin\): fix recursion in apcupsd\_check and enable it again [\#12418](https://github.com/netdata/netdata/pull/12418) ([ilyam8](https://github.com/ilyam8))
 - fix: temporarily disable charts.d apcupsd collectors [\#12415](https://github.com/netdata/netdata/pull/12415) ([ilyam8](https://github.com/ilyam8))
 - Add additional link to badges doc [\#12412](https://github.com/netdata/netdata/pull/12412) ([Steve8291](https://github.com/Steve8291))
@@ -37,6 +43,7 @@
 - Remove check for config file in stock conf dir [\#12327](https://github.com/netdata/netdata/pull/12327) ([Steve8291](https://github.com/Steve8291))
 - fix underscore in libnetfilter-acct-dev package [\#12326](https://github.com/netdata/netdata/pull/12326) ([Steve8291](https://github.com/Steve8291))
 - fix: returning 0 for CPU frequency when unknown [\#12323](https://github.com/netdata/netdata/pull/12323) ([ilyam8](https://github.com/ilyam8))
+- Add a dry run mode to the kickstart script. [\#12322](https://github.com/netdata/netdata/pull/12322) ([Ferroin](https://github.com/Ferroin))
 - fix\(health\): adjust 10s\_ipv4\_tcp\_resets\_sent warn trigger [\#12320](https://github.com/netdata/netdata/pull/12320) ([ilyam8](https://github.com/ilyam8))
 - CO-RE and syscalls [\#12318](https://github.com/netdata/netdata/pull/12318) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix 'connect' typo anomaly-detection-python.md [\#12317](https://github.com/netdata/netdata/pull/12317) ([DanTheMediocre](https://github.com/DanTheMediocre))
@@ -67,6 +74,7 @@
 - delete package.json [\#12265](https://github.com/netdata/netdata/pull/12265) ([ilyam8](https://github.com/ilyam8))
 - Docs: Fix typo in step-10.md [\#12263](https://github.com/netdata/netdata/pull/12263) ([tnagorran](https://github.com/tnagorran))
 - Set a version number for the metadata database to better handle future data migrations [\#12249](https://github.com/netdata/netdata/pull/12249) ([stelfrag](https://github.com/stelfrag))
+- Revise claiming error message in kickstart script. [\#12248](https://github.com/netdata/netdata/pull/12248) ([Ferroin](https://github.com/Ferroin))
 - Add a check to make sure internal chart state is initialized [\#12244](https://github.com/netdata/netdata/pull/12244) ([stelfrag](https://github.com/stelfrag))
 - eBPF installation fixes [\#12242](https://github.com/netdata/netdata/pull/12242) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add a fix to correctly register child nodes to the cloud via a parent [\#12241](https://github.com/netdata/netdata/pull/12241) ([stelfrag](https://github.com/stelfrag))
@@ -270,7 +278,6 @@
 - Ignore clangd cache directory. [\#11803](https://github.com/netdata/netdata/pull/11803) ([vkalintiris](https://github.com/vkalintiris))
 - fix tps decode, add memory usage chart [\#11797](https://github.com/netdata/netdata/pull/11797) ([neotf](https://github.com/neotf))
 - Add localhost hostname to the edit\_command [\#11793](https://github.com/netdata/netdata/pull/11793) ([MrZammler](https://github.com/MrZammler))
-- Initial release of new kickstart script. [\#11764](https://github.com/netdata/netdata/pull/11764) ([Ferroin](https://github.com/Ferroin))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
@@ -301,7 +308,6 @@
 - Fix token name in release draft workflow. [\#11847](https://github.com/netdata/netdata/pull/11847) ([Ferroin](https://github.com/Ferroin))
 - Bump static builds to use Alpine 3.15 as a base. [\#11836](https://github.com/netdata/netdata/pull/11836) ([Ferroin](https://github.com/Ferroin))
 - Detect whether libatomic should be linked in when using CXX linker. [\#11818](https://github.com/netdata/netdata/pull/11818) ([vkalintiris](https://github.com/vkalintiris))
-- Make netdata-updater.sh POSIX compliant. [\#11755](https://github.com/netdata/netdata/pull/11755) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.32.0](https://github.com/netdata/netdata/tree/v1.32.0) (2021-11-30)
 
@@ -344,13 +350,6 @@
 - Fix link to new charts. [\#11773](https://github.com/netdata/netdata/pull/11773) ([DShreve2](https://github.com/DShreve2))
 - Update netdata-security.md [\#11772](https://github.com/netdata/netdata/pull/11772) ([jlbriston](https://github.com/jlbriston))
 - Skip sending hidden dimensions via ACLK [\#11770](https://github.com/netdata/netdata/pull/11770) ([stelfrag](https://github.com/stelfrag))
-- Insert alert into aclk\_alert directly instead of queuing it [\#11769](https://github.com/netdata/netdata/pull/11769) ([MrZammler](https://github.com/MrZammler))
-- Fix host hop count reported to the cloud [\#11768](https://github.com/netdata/netdata/pull/11768) ([stelfrag](https://github.com/stelfrag))
-- Show stats for protected mount points in diskspace plugin [\#11767](https://github.com/netdata/netdata/pull/11767) ([vlvkobal](https://github.com/vlvkobal))
-- Adding parenthesis [\#11766](https://github.com/netdata/netdata/pull/11766) ([ShimonOhayon](https://github.com/ShimonOhayon))
-- fix log if D\_ACLK is used [\#11763](https://github.com/netdata/netdata/pull/11763) ([underhood](https://github.com/underhood))
-- Don't interrupt popcorn timer for children [\#11758](https://github.com/netdata/netdata/pull/11758) ([underhood](https://github.com/underhood))
-- fix \(cgroups.plugin\): containers name resolution for crio/containerd cri [\#11756](https://github.com/netdata/netdata/pull/11756) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
