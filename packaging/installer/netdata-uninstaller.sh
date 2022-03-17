@@ -83,6 +83,44 @@ user_input() {
   fi
 }
 
+_cannot_use_tmpdir() {
+  testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
+  ret=0
+
+  if [ -z "${testfile}" ]; then
+    return "${ret}"
+  fi
+
+  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}"; then
+    if chmod +x "${testfile}"; then
+      if [ "$("${testfile}")" = "SUCCESS" ]; then
+        ret=1
+      fi
+    fi
+  fi
+
+  rm -f "${testfile}"
+  return "${ret}"
+}
+
+create_tmp_directory() {
+  if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
+    if _cannot_use_tmpdir /tmp; then
+      if _cannot_use_tmpdir "${PWD}"; then
+        fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." F0400
+      else
+        TMPDIR="${PWD}"
+      fi
+    else
+      TMPDIR="/tmp"
+    fi
+  fi
+
+  mktemp -d -t netdata-kickstart-XXXXXXXXXX
+}
+
+tmpdir="$(create_tmp_directory)"
+
 detect_existing_install() {
   if pkg_installed netdata; then
     ndprefix="/"
