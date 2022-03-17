@@ -375,12 +375,12 @@ int main(int argc, char **argv) {
         if (unlikely(!cups_printer_by_option_created))
         {
             cups_printer_by_option_created = 1;
-            printf("CHART cups.dest_state '' 'Destinations by state' dests overview cups.dests stacked 100000 %i\n", netdata_update_every);
+            printf("CHART cups.dest_state '' 'Destinations by state' dests overview cups.dests_state stacked 100000 %i\n", netdata_update_every);
             printf("DIMENSION idle '' absolute 1 1\n");
             printf("DIMENSION printing '' absolute 1 1\n");
             printf("DIMENSION stopped '' absolute 1 1\n");
 
-            printf("CHART cups.dest_option '' 'Destinations by option' dests overview cups.dests line 100001 %i\n", netdata_update_every);
+            printf("CHART cups.dest_option '' 'Destinations by option' dests overview cups.dests_option line 100001 %i\n", netdata_update_every);
             printf("DIMENSION total '' absolute 1 1\n");
             printf("DIMENSION acceptingjobs '' absolute 1 1\n");
             printf("DIMENSION shared '' absolute 1 1\n");
