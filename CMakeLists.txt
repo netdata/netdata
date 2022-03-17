@@ -630,6 +630,7 @@ set(RRD_PLUGIN_FILES
         database/rrdlabels.c
         database/rrd.c
         database/rrd.h
+        database/rrdops.c
         database/rrdset.c
         database/rrdsetvar.c
         database/rrdsetvar.h
