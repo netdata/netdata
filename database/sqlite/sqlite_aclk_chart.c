@@ -906,7 +906,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     rotate_data.claim_id = claim_id;
     rotate_data.node_id = strdupz(wc->node_id);
 
-    //    time_t now = now_realtime_sec();
+    time_t now = now_realtime_sec();
     while (sqlite3_step(res) == SQLITE_ROW) {
         if (!update_every || update_every != (uint32_t)sqlite3_column_int(res, 1)) {
             if (update_every) {
@@ -944,6 +944,19 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
 
         if (likely(!rc && first_entry_t))
             start_time = MIN(start_time, first_entry_t);
+        int live = ((now - last_entry_t) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * update_every));
+
+        if (!live || !first_entry_t) {
+            (void)aclk_upd_dimension_event(
+                wc,
+                claim_id,
+                (uuid_t *)sqlite3_column_blob(res, 0),
+                (const char *)(const char *)sqlite3_column_text(res, 3),
+                (const char *)(const char *)sqlite3_column_text(res, 4),
+                (const char *)(const char *)sqlite3_column_text(res, 2),
+                first_entry_t,
+                live ? 0 : last_entry_t);
+        }
     }
     if (update_every) {
         debug(D_ACLK_SYNC, "Update %s for %u oldest time = %ld", wc->host_guid, update_every, start_time);
