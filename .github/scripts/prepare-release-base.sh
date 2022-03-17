@@ -102,13 +102,20 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     LAST_TAG=$(git describe --abbrev=0 --tags)
     COMMITS_SINCE_RELEASE=$(git rev-list "${LAST_TAG}"..HEAD --count)
     NEW_VERSION="${LAST_TAG}-$((COMMITS_SINCE_RELEASE + 1))-nightly"
-    echo "${NEW_VERSION}" > packaging/version || exit 1
-    echo "::set-output name=run::true"
-    echo "::set-output name=message::Update changelog and version for nightly build: ${NEW_VERSION}."
-    echo "::set-output name=ref::master"
-    echo "::set-output name=type::nightly"
-    echo "::set-output name=branch::master"
-    echo "::set-output name=version::nightly"
+    LAST_VERSION_COMMIT="$(git rev-list -1 HEAD packaging/version)"
+    HEAD_COMMIT="$(git rev-parse HEAD)"
+    if [ "${EVENT_NAME}" = 'schedule' ] && [ "${LAST_VERSION_COMMIT}" = "${HEAD_COMMIT}" ] && grep -qE '.*-nightly$' packaging/version; then
+        echo "::notice::No commits since last nightly build, not publishing a new nightly build."
+        echo "::set-output name=run::false"
+    else
+        echo "${NEW_VERSION}" > packaging/version || exit 1
+        echo "::set-output name=run::true"
+        echo "::set-output name=message::Update changelog and version for nightly build: ${NEW_VERSION}."
+        echo "::set-output name=ref::master"
+        echo "::set-output name=type::nightly"
+        echo "::set-output name=branch::master"
+        echo "::set-output name=version::nightly"
+    fi
 elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a patch release build."
     check_version_format || exit 1
