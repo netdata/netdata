@@ -1380,22 +1380,22 @@ netdataDashboard.context = {
 
     'system.process_thread': {
         title : 'Task creation',
-        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads monitoring tracepoint <code>sched_process_fork</code>. This chart is provided by eBPF plugin.<div id="ebpf_system_process_thread"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process or thread is called. Netdata shows process metrics per <a href="#ebpf_apps_process_create">application</a> and <a href="#ebpf_services_process_create">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_system_process_thread"></div>'
     },
 
     'system.exit': {
         title : 'Exit monitoring',
-        info: 'Calls for the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks. This chart is provided by eBPF plugin.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit target="_blank"">a function</a> responsible to close a process or thread is called. Netdata shows process metrics per <a href="#ebpf_apps_process_exit">application</a> and <a href="#ebpf_services_process_exit">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_system_process_exit"></div>'
     },
 
     'system.task_error': {
         title : 'Task error',
-        info: 'Number of errors to create a new process or thread. This chart is provided by eBPF plugin.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error" target="_blank">a function</a> that starts a process or thread failed. Netdata shows process metrics per <a href="#ebpf_apps_task_error">application</a> and <a href="#ebpf_services_task_error">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_system_task_error"></div>'
     },
 
     'system.process_status': {
         title : 'Task status',
-        info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system. This chart is provided by eBPF plugin.'
+        info: 'Difference between the number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">functions</a> that close a task and release a task. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
     },
 
     // ------------------------------------------------------------------------
@@ -2634,23 +2634,23 @@ netdataDashboard.context = {
     },
 
     'apps.process_create': {
-        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. This chart is provided by eBPF plugin.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_process_create">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_process_create"></div>'
     },
 
     'apps.thread_create': {
-        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads monitoring tracepoint <code>sched_process_fork</code>. This chart is provided by eBPF plugin.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_thread_create">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_thread_create"></div>'
     },
 
     'apps.task_exit': {
-        info: 'Calls to the function responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) tasks. This chart is provided by eBPF plugin.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">a function</a> responsible for closing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_process_exit">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_process_exit"></div>'
     },
 
     'apps.task_close': {
-        info: 'Calls to the function responsible for releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks. This chart is provided by eBPF plugin.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">a function</a> responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_task_releease">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_task_release"></div>'
     },
 
     'apps.task_error': {
-        info: 'Number of errors to create a new process or thread. This chart is provided by eBPF plugin.'
+        info: 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">task</a>. Netdata gives a summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_task_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_task_error"></div>'
     },
 
     'apps.total_bandwidth_sent': {
@@ -3970,25 +3970,24 @@ netdataDashboard.context = {
     },
 
     'cgroup.process_create': {
-        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by counting the number of calls to <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that do not have the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_process_create">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
     },
 
     'cgroup.thread_create': {
-        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <a  href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that have the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_thread_create">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
     },
 
     'cgroup.task_exit': {
-        info: 'Calls to the function responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) tasks.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that responsible for closing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_process_exit">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
     },
 
     'cgroup.task_close': {
-        info: 'Calls to the functions responsible for releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_task_release">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
     },
 
     'cgroup.task_error': {
-        info: 'Number of errors to create a new process or thread. This chart is provided by eBPF plugin.'
+        info: 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">task</a>. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_task_release">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
     },
-
 
     'cgroup.dc_ratio': {
         info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>. Netdata also gives a summary for these charts in <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Filesystem submenu</a>.'
@@ -4240,23 +4239,23 @@ netdataDashboard.context = {
     },
 
     'services.process_create': {
-        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by counting the number of calls to <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that do not have the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_process_create">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_process_create"></div>'
     },
 
     'services.thread_create': {
-        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <a  href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that have the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_thread_create">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_thread_create"></div>'
     },
 
     'services.task_exit': {
-        info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) tasks.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_process_exit">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_process_exit"></div>'
     },
 
     'services.task_close': {
-        info: 'Calls to the functions responsible for releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_task_release">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_task_release"></div>'
     },
 
     'services.task_error': {
-        info: 'Number of errors to create a new process or thread. This chart is provided by eBPF plugin.'
+        info: 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error">task</a>. Netdata gives a summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_task_error">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_task_error"></div>'
     },
 
     'services.dc_ratio': {
