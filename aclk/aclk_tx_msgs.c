@@ -362,8 +362,17 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
     int rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
     json_object_put(msg);
 
-    if (rc)
-        aclk_http_msg_v2_err(client, topic, msg_id, rc, payload, payload_len);
+    switch (rc) {
+    case 403:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, payload, payload_len);
+        break;
+    case 500:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
+        break;
+    case 503:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
+        break;
+    }
 }
 
 void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart)
