@@ -325,12 +325,19 @@ void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted)
     buffer_free(local_buffer);
 }
 
-void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, const char *payload, size_t payload_len)
+void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
     msg = create_hdr("http", msg_id, 0, 0, 2);
     tmp = json_object_new_int(http_code);
     json_object_object_add(msg, "http-code", tmp);
+
+    tmp = json_object_new_int(ec);
+    json_object_object_add(msg, "error-code", tmp);
+
+    tmp = json_object_new_string(emsg);
+    json_object_object_add(msg, "error-description", tmp);
+
     if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
         error("Failed to send cancelation message for http reply");
     }
