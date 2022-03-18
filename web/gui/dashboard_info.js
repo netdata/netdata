@@ -611,6 +611,7 @@ netdataDashboard.menu = {
     'filesystem': {
         title: 'Filesystem',
         icon: '<i class="fas fa-hdd"></i>',
+        info: 'Number of filesystem events for <a href="#menu_filesystem_submenu_vfs">Virtual File System</a>, <a href="#menu_filesystem_submenu_file_access">File Access</a>, <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Directory cache</a>, and file system latency (<a href="#menu_filesystem_submenu_btrfs_latency">BTRFS</a>, <a href="#menu_filesystem_submenu_ext4_latency">EXT4</a>, <a href="#menu_filesystem_submenu_nfs_latency">NFS</a>, <a href="#menu_filesystem_submenu_xfs_latency">XFS</a>, and <a href="#menu_filesystem_submenu_xfs_latency">ZFS</a>) when your disk has the file system. Filesystem charts have relationship with <a href="#menu_system_submenu_swap">SWAP</a>, <a href="#menu_disk">Disk</a>, and <a href="#menu_mount">Mount Points</a>.'
     },
 
     'vernemq': {
