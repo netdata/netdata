@@ -954,22 +954,22 @@ netdataDashboard.submenu = {
 
     'filesystem.xfs_latency': {
         title: 'xfs latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/xfsdist_example.txt" target="_blank">xfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/xfsdist_example.txt" target="_blank">xfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_latency': {
         title: 'nfs latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/nfsdist_example.txt" target="_blank">nfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/nfsdist_example.txt" target="_blank">nfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_latency': {
         title: 'zfs latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/zfsdist_example.txt" target="_blank">zfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/zfsdist_example.txt" target="_blank">zfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_latency': {
         title: 'btrfs latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.file_access': {
@@ -5761,83 +5761,83 @@ netdataDashboard.context = {
     },
 
     'filesystem.ext4_read_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>ext4_file_read_iter</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring ext4 reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_write_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>ext4_file_write_iter</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring ext4 writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_open_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>ext4_file_open</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring ext4 opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_sync_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>ext4_sync_file</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring ext4 syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_read_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>xfs_file_read_iter</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring xfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_write_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>xfs_file_write_iter</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring xfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_open_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>xfs_file_open</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring xfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_sync_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>xfs_file_sync</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring xfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_read_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>nfs_file_read</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring nfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_write_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>nfs_file_write</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring nfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_open_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for functions <code>nfs_file_open</code> and <code>nfs4_file_open</code>'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring nfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_attribute_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for the function <code>nfs_getattr</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each get attribute request monitoring nfs attribute <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_read_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for when the function <code>zpl_iter_read</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring zfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_write_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for when the function <code>zpl_iter_write</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring zfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_open_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for when the function <code>zpl_open</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring zfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_sync_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for when the function <code>zpl_fsync</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring zfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_read_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for when the function <code>btrfs_file_read_iter</code> (kernel newer than 5.9.16) or the function <code>generic_file_read_iter</code> (old kernels).'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring btrfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_write_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for when the function <code>btrfs_file_write_iter</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring btrfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_open_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for when the function <code>btrfs_file_open</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring btrfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_sync_latency': {
-        info: 'Netdata is attaching <code>kprobes</code> for when the function <code>btrfs_sync_file</code>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring btrfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'mount_points.call': {
