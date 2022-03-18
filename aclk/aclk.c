@@ -31,6 +31,8 @@ int disconnect_req = 0;
 time_t last_conn_time_mqtt = 0;
 time_t last_conn_time_appl = 0;
 time_t last_disconnect_time = 0;
+time_t next_connection_attempt = 0;
+float last_backoff_value = 0;
 
 int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
 
@@ -530,6 +532,9 @@ static unsigned long aclk_reconnect_delay() {
 #define NETDATA_EXIT_POLL_MS (MSEC_PER_SEC/4)
 static int aclk_block_till_recon_allowed() {
     unsigned long recon_delay = aclk_reconnect_delay();
+
+    next_connection_attempt = now_realtime_sec() + (recon_delay / MSEC_PER_SEC);
+    last_backoff_value = (float)recon_delay / MSEC_PER_SEC;
 
     info("Wait before attempting to reconnect in %.3f seconds\n", recon_delay / (float)MSEC_PER_SEC);
     // we want to wake up from time to time to check netdata_exit
@@ -1229,6 +1234,11 @@ char *ng_aclk_state(void)
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Disconnect Time: %s\n", timebuf);
     }
+    if (!aclk_connected && next_connection_attempt && (tmptr = localtime_r(&next_connection_attempt, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        buffer_sprintf(wb, "Next Connection Attempt At: %s\nLast Backoff: %.3f", timebuf, last_backoff_value);
+    }
 
     if (aclk_connected) {
         buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d", aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn);
@@ -1413,6 +1423,14 @@ char *ng_aclk_state_json(void)
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         tmp = json_object_new_string(timebuf);
         json_object_object_add(msg, "last-disconnect-time-utc", tmp);
+    }
+    if (!aclk_connected && next_connection_attempt && (tmptr = gmtime_r(&next_connection_attempt, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        tmp = json_object_new_string(timebuf);
+        json_object_object_add(msg, "next-connection-attempt-utc", tmp);
+        tmp = json_object_new_double(last_backoff_value);
+        json_object_object_add(msg, "last-backoff-value", tmp);
     }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
