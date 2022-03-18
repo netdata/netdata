@@ -1353,6 +1353,17 @@ static void fill_chart_status_for_host_json(json_object *obj, RRDHOST *host)
 }
 #endif
 
+static json_object *timestamp_to_json(const time_t *t)
+{
+    struct tm *tmptr, tmbuf;
+    if (*t && (tmptr = gmtime_r(t, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        return json_object_new_string(timebuf);
+    }
+    return NULL;
+}
+
 char *ng_aclk_state_json(void)
 {
     json_object *tmp, *grp, *msg = json_object_new_object();
@@ -1405,33 +1416,14 @@ char *ng_aclk_state_json(void)
     tmp = json_object_new_int(aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
     json_object_object_add(msg, "reconnect-count", tmp);
 
-    struct tm *tmptr, tmbuf;
-    if (last_conn_time_mqtt && (tmptr = gmtime_r(&last_conn_time_mqtt, &tmbuf)) ) {
-        char timebuf[26];
-        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
-        tmp = json_object_new_string(timebuf);
-        json_object_object_add(msg, "last-connect-time-utc", tmp);
-    }
-    if (last_conn_time_appl && (tmptr = gmtime_r(&last_conn_time_appl, &tmbuf)) ) {
-        char timebuf[26];
-        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
-        tmp = json_object_new_string(timebuf);
-        json_object_object_add(msg, "last-connect-time-puback-utc", tmp);
-    }
-    if (last_disconnect_time && (tmptr = gmtime_r(&last_disconnect_time, &tmbuf)) ) {
-        char timebuf[26];
-        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
-        tmp = json_object_new_string(timebuf);
-        json_object_object_add(msg, "last-disconnect-time-utc", tmp);
-    }
-    if (!aclk_connected && next_connection_attempt && (tmptr = gmtime_r(&next_connection_attempt, &tmbuf)) ) {
-        char timebuf[26];
-        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
-        tmp = json_object_new_string(timebuf);
-        json_object_object_add(msg, "next-connection-attempt-utc", tmp);
+    json_object_object_add(msg, "last-connect-time-utc", timestamp_to_json(&last_conn_time_mqtt));
+    json_object_object_add(msg, "last-connect-time-puback-utc", timestamp_to_json(&last_conn_time_appl));
+    json_object_object_add(msg, "last-disconnect-time-utc", timestamp_to_json(&last_disconnect_time));
+    json_object_object_add(msg, "next-connection-attempt-utc", !aclk_connected ? timestamp_to_json(&next_connection_attempt) : NULL);
+    tmp = NULL;
+    if (!aclk_connected && last_backoff_value)
         tmp = json_object_new_double(last_backoff_value);
-        json_object_object_add(msg, "last-backoff-value", tmp);
-    }
+    json_object_object_add(msg, "last-backoff-value", tmp);
 
     tmp = json_object_new_boolean(aclk_disable_runtime);
     json_object_object_add(msg, "banned-by-cloud", tmp);
