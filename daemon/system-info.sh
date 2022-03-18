@@ -393,6 +393,46 @@ elif pgrep "kubelet"; then
   HOST_IS_K8S_NODE="true"
 fi
 
+# ------------------------------------------------------------------------------------------------
+# Detect instance metadata for VMs running on cloud providers
+
+CLOUD_TYPE="unknown"
+CLOUD_INSTANCE_TYPE="unknown"
+CLOUD_INSTANCE_REGION="unknown"
+
+if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
+  # Try AWS IMDSv2
+  if [ "${CLOUD_TYPE}" = "unknown" ]; then
+    AWS_IMDS_TOKEN="$(curl -s -m 5 --noproxy -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+    if [ -n "${AWS_IMDS_TOKEN}" ]; then
+      CLOUD_TYPE="AWS"
+      CLOUD_INSTANCE_TYPE="$(curl -s -m 5 --noproxy -H "X-aws-ec2-metadata-token: $TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type")"
+      CLOUD_INSTANCE_REGION="$(curl -s -m 5 --noproxy -H "X-aws-ec2-metadata-token: $TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region")"
+    fi
+  fi
+
+  # Try GCE computeMetadata v1
+  if [ "${CLOUD_TYPE}" = "unknown" ]; then
+    if [ -n "$(curl -s -m 5 --noproxy -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1")" ]; then
+      CLOUD_TYPE="GCP"
+      CLOUD_INSTANCE_TYPE="$(curl -s -m 5 --noproxy -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/machine-type")"
+    fi
+  fi
+
+  # Try Azure IMDS
+  if [ "${CLOUD_TYPE}" = "unknown" ]; then
+    AZURE_IMDS_DATA="$(curl -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?version=2021-10-01")"
+    if [ -n "${AZURE_IMDS_DATA}" ]; then
+      CLOUD_TYPE="Azure"
+      CLOUD_INSTANCE_TYPE="$(curl -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?version=2021-10-01&format=text")"
+      CLOUD_INSTANCE_REGION="$(curl -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?version=2021-10-01&format=text")"
+    fi
+  fi
+fi
+
+# ------------------------------------------------------------------------------------------------
+# Final output
+
 echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
 echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
 echo "NETDATA_CONTAINER_OS_ID_LIKE=${CONTAINER_ID_LIKE}"
@@ -423,3 +463,6 @@ echo "NETDATA_SYSTEM_TOTAL_RAM=${TOTAL_RAM}"
 echo "NETDATA_SYSTEM_RAM_DETECTION=${RAM_DETECTION}"
 echo "NETDATA_SYSTEM_TOTAL_DISK_SIZE=${DISK_SIZE}"
 echo "NETDATA_SYSTEM_DISK_DETECTION=${DISK_DETECTION}"
+echo "NETDATA_CLOUD_TYPE=${CLOUD_TYPE}"
+echo "NETDATA_CLOUD_INSTANCE_TYPE=${CLOUD_INSTANCE_TYPE}"
+echo "NETDATA_CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION}"
