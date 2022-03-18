@@ -938,22 +938,23 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
 
         if (likely(!rc && first_entry_t))
             start_time = MIN(start_time, first_entry_t);
-        int live = ((now - last_entry_t) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * update_every));
 
-        if ((!live || !first_entry_t) && dimension_update_count < ACLK_MAX_DIMENSION_CLEANUP) {
-            (void)aclk_upd_dimension_event(
-                wc,
-                claim_id,
-                (uuid_t *)sqlite3_column_blob(res, 0),
-                (const char *)(const char *)sqlite3_column_text(res, 3),
-                (const char *)(const char *)sqlite3_column_text(res, 4),
-                (const char *)(const char *)sqlite3_column_text(res, 2),
-                first_entry_t,
-                live ? 0 : last_entry_t,
-                &send_status);
-
-            if (!send_status)
-                dimension_update_count++;
+        if (wc->chart_updates) {
+            int live = ((now - last_entry_t) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * update_every));
+            if ((!live || !first_entry_t) && (dimension_update_count < ACLK_MAX_DIMENSION_CLEANUP)) {
+                (void)aclk_upd_dimension_event(
+                    wc,
+                    claim_id,
+                    (uuid_t *)sqlite3_column_blob(res, 0),
+                    (const char *)(const char *)sqlite3_column_text(res, 3),
+                    (const char *)(const char *)sqlite3_column_text(res, 4),
+                    (const char *)(const char *)sqlite3_column_text(res, 2),
+                    first_entry_t,
+                    live ? 0 : last_entry_t,
+                    &send_status);
+                if (!send_status)
+                    dimension_update_count++;
+            }
         }
     }
     if (update_every) {
