@@ -1143,6 +1143,27 @@ const netSpeedInfo = 'The interface\'s latest or current speed that the network 
 const netMTUInfo = 'The interface\'s currently configured ' +
     '<a href="https://en.wikipedia.org/wiki/Maximum_transmission_unit" target="_blank">Maximum transmission unit</a> (MTU) value. ' +
     'MTU is the size of the largest protocol data unit that can be communicated in a single network layer transaction.'
+// eBPF constants
+const ebpfChartProvides = ' This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfProcessCreate = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
+    'that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration ' +
+    'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per ' +
+    '<a href="#ebpf_apps_process_create">apps</a>.' + ebpfChartProvides
+const ebpfThreadCreate = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
+    'that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration ' +
+    'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per ' +
+    '<a href="#ebpf_apps_thread_create">apps</a>.' + ebpfChartProvides
+const ebpfTaskExit = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
+    'that responsible for closing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration ' +
+    'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per '
+    '<a href="#ebpf_apps_process_exit">apps</a>.' + ebpfChartProvides
+const ebpfTaskClose = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
+    'that responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration ' +
+    'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per ' +
+    '<a href="#ebpf_apps_task_release">apps</a>.' + ebpfChartProvides
+const ebpfTaskError = 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error">task</a>. Netdata gives a ' +
+    'summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    'Netdata shows process per <a href="#ebpf_apps_task_error">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 
 netdataDashboard.context = {
     'system.cpu': {
@@ -3971,23 +3992,23 @@ netdataDashboard.context = {
     },
 
     'cgroup.process_create': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_process_create">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+        info: ebpfProcessCreate
     },
 
     'cgroup.thread_create': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_thread_create">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+        info: ebpfThreadCreate
     },
 
     'cgroup.task_exit': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that responsible for closing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_process_exit">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+        info: ebpfTaskExit
     },
 
     'cgroup.task_close': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_task_release">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+        info: ebpfTaskClose
     },
 
     'cgroup.task_error': {
-        info: 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">task</a>. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_task_release">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+        info: ebpfTaskError
     },
 
     'cgroup.dc_ratio': {
@@ -4240,23 +4261,23 @@ netdataDashboard.context = {
     },
 
     'services.process_create': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_process_create">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_process_create"></div>'
+        info: ebpfProcessCreate + '<div id="ebpf_services_process_create"></div>'
     },
 
     'services.thread_create': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_thread_create">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_thread_create"></div>'
+        info: ebpfThreadCreate + '<div id="ebpf_services_thread_create"></div>'
     },
 
     'services.task_exit': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_process_exit">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_process_exit"></div>'
+        info: ebpfTaskExit + '<div id="ebpf_services_process_exit"></div>'
     },
 
     'services.task_close': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_task_release">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_task_release"></div>'
+        info: ebpfTaskClose + '<div id="ebpf_services_task_release"></div>'
     },
 
     'services.task_error': {
-        info: 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error">task</a>. Netdata gives a summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_apps_task_error">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_services_task_error"></div>'
+        info: ebpfTaskError + '<div id="ebpf_services_task_error"></div>'
     },
 
     'services.dc_ratio': {
