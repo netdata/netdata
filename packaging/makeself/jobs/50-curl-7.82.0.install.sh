@@ -7,8 +7,8 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
 
-fetch "curl-7.78.0" "https://curl.haxx.se/download/curl-7.78.0.tar.gz" \
-    ed936c0b02c06d42cf84b39dd12bb14b62d77c7c4e875ade022280df5dcc81d7
+fetch "curl-7.82.0" "https://curl.haxx.se/download/curl-7.82.0.tar.gz" \
+    910cc5fe279dc36e2cca534172c94364cf3fcf7d6494ba56e6c61a390881ddce
 
 export CFLAGS="-I/openssl-static/include"
 export LDFLAGS="-static -L/openssl-static/lib"

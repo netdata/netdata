@@ -7,8 +7,8 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building bash" || true
 
-fetch "bash-5.1.8" "http://ftp.gnu.org/gnu/bash/bash-5.1.8.tar.gz" \
-    0cfb5c9bb1a29f800a97bd242d19511c997a1013815b805e0fdd32214113d6be
+fetch "bash-5.1.16" "http://ftp.gnu.org/gnu/bash/bash-5.1.16.tar.gz" \
+    5bac17218d3911834520dad13cd1f85ab944e1c09ae1aba55906be1f8192f558
 
 export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 
