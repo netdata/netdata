@@ -1218,7 +1218,7 @@ char *ng_aclk_state(void)
         freez(agent_id);
     }
 
-    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\n", aclk_connected ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
+    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_connected ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
     if (last_conn_time_mqtt && (tmptr = localtime_r(&last_conn_time_mqtt, &tmbuf)) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
@@ -1432,6 +1432,9 @@ char *ng_aclk_state_json(void)
         tmp = json_object_new_double(last_backoff_value);
         json_object_object_add(msg, "last-backoff-value", tmp);
     }
+
+    tmp = json_object_new_boolean(aclk_disable_runtime);
+    json_object_object_add(msg, "banned-by-cloud", tmp);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     grp = json_object_new_array();
