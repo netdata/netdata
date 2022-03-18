@@ -7,7 +7,7 @@
 #
 # Author: Paul Emm. Katsoulakis <paul@netdata.cloud>
 
-apk update ||exit 1
+apk update || exit 1
 apk upgrade || exit 1
 
 # Add required APK packages
