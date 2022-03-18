@@ -28,6 +28,10 @@ int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
 int disconnect_req = 0;
 
+time_t last_conn_time_mqtt = 0;
+time_t last_conn_time_appl = 0;
+time_t last_disconnect_time = 0;
+
 int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
 
 time_t aclk_block_until = 0;
@@ -276,8 +280,10 @@ static inline void msg_callback(const char *topic, const void *msg, size_t msgle
 
 static void puback_callback(uint16_t packet_id)
 {
-    if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE)
+    if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE) {
+        last_conn_time_appl = now_realtime_sec();
         aclk_tbeb_reset();
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_puback(packet_id);
@@ -483,6 +489,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     info("ACLK link is down");
     log_access("ACLK DISCONNECTED");
     aclk_stats_upd_online(0);
+    last_disconnect_time = now_realtime_sec();
     aclk_connected = 0;
 
     info("Attempting to gracefully shutdown the MQTT/WSS connection");
@@ -725,6 +732,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             json_object_put(lwt);
 
         if (!ret) {
+            last_conn_time_mqtt = now_realtime_sec();
             info("ACLK connection successfully established");
             log_access("ACLK CONNECTED");
             mqtt_connected_actions(client);
@@ -842,6 +850,7 @@ void *aclk_main(void *ptr)
 
         if (handle_connection(mqttwss_client)) {
             aclk_stats_upd_online(0);
+            last_disconnect_time = now_realtime_sec();
             aclk_connected = 0;
             log_access("ACLK DISCONNECTED");
         }
@@ -1181,6 +1190,7 @@ static void fill_chart_status_for_host(BUFFER *wb, RRDHOST *host)
 char *ng_aclk_state(void)
 {
     BUFFER *wb = buffer_create(1024);
+    struct tm *tmptr, tmbuf;
     char *ret;
 
     buffer_strcat(wb,
@@ -1204,6 +1214,21 @@ char *ng_aclk_state(void)
     }
 
     buffer_sprintf(wb, "Online: %s\nReconnect count: %d\n", aclk_connected ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
+    if (last_conn_time_mqtt && (tmptr = localtime_r(&last_conn_time_mqtt, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        buffer_sprintf(wb, "Last Connection Time: %s\n", timebuf);
+    }
+    if (last_conn_time_appl && (tmptr = localtime_r(&last_conn_time_appl, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        buffer_sprintf(wb, "Last Connection Time + %d PUBACKs received: %s\n", ACLK_PUBACKS_CONN_STABLE, timebuf);
+    }
+    if (last_disconnect_time && (tmptr = localtime_r(&last_disconnect_time, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        buffer_sprintf(wb, "Last Disconnect Time: %s\n", timebuf);
+    }
 
     if (aclk_connected) {
         buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d", aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn);
@@ -1369,6 +1394,26 @@ char *ng_aclk_state_json(void)
 
     tmp = json_object_new_int(aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
     json_object_object_add(msg, "reconnect-count", tmp);
+
+    struct tm *tmptr, tmbuf;
+    if (last_conn_time_mqtt && (tmptr = gmtime_r(&last_conn_time_mqtt, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        tmp = json_object_new_string(timebuf);
+        json_object_object_add(msg, "last-connect-time-utc", tmp);
+    }
+    if (last_conn_time_appl && (tmptr = gmtime_r(&last_conn_time_appl, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        tmp = json_object_new_string(timebuf);
+        json_object_object_add(msg, "last-connect-time-puback-utc", tmp);
+    }
+    if (last_disconnect_time && (tmptr = gmtime_r(&last_disconnect_time, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        tmp = json_object_new_string(timebuf);
+        json_object_object_add(msg, "last-disconnect-time-utc", tmp);
+    }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     grp = json_object_new_array();
