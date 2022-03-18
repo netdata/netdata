@@ -6,210 +6,88 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Install Netdata on Linux from a Git checkout
 
-To install the latest git version of Netdata, please follow these 2 steps:
+These instructions are for building netdata locally from a checkout of the git repository. They are primary of
+interest to developers and contributors. Normal users are strongly encouraged to instead use [our official install
+script](./kickstart.md).
 
-1.  [Prepare your system](#prepare-your-system)
+## Check out the repository
 
-    Install the required packages on your system.
+To clone the repository, run:
 
-2.  [Install Netdata](#install-netdata)
+```sh
+git clone --recursive https://github.com/netdata/netdata
+```
 
-    Download and install Netdata. You can also update it the same way.
+If your version of `git` does not support the `--recursive` option for the `clone` command, you can instead use:
+
+```sh
+git clone https://github.com/netdata/netdata
+( cd netdata && git submodule update --init --recursive )
+```
 
 ## Prepare your system
 
-Use our automatic requirements installer (_no need to be `root`_), which attempts to find the packages that
-should be installed on your system to build and run Netdata. It supports a large variety of major Linux distributions
-and other operating systems and is regularly tested. You can find this tool [here](https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh) or run it directly with `bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh)`. Otherwise read on for how to get requires packages manually:
+Netdata needs the following tools at build time:
 
--   **Alpine** Linux and its derivatives
-    -   You have to install `bash` yourself, before using the installer.
+-     autoconf
+-     autoconf-archive
+-     autogen
+-     automake
+-     CMake
+-     GCC or a recent version of Clang
+-     git
+-     GNU make
+-     G++ or a recent version of Clang++
+-     gzip
+-     libtool
+-     pkg-config
+-     tar
+-     xz (Linux only)
+-     cURL or wget
 
--   **Gentoo** Linux and its derivatives
+Headers and development files for the following libraries are also required at build time:
 
--   **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
+-     JSON-C
+-     libatomic (Linux only)
+-     libelf (Linux only)
+-     libuuid
+-     libuv 1.0 or newer
+-     LZ4
+-     OpenSSL 1.0.2 or newer or LibreSSL 3.0.0 or newer
+-     zlib
 
--   **Red Hat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
-    -   Please note that for RHEL/CentOS you need
-        [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
-        In addition, RHEL/CentOS version 6 also need
-        [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package libuv version 1.
-    -   CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
+We provide a script for handling required dependencies which is located at
+`packaging/installer/install-required-packages.sh` in our Git repository. This script should work on most common
+Linux distributons, as well as macOS and FreeBSD.  To use the automatic dependency handling script, you will need
+GNU bash version 4.0 or newer.
 
--   **SUSE** Linux and its derivatives (including **openSUSE**)
-
--   **SLE12** Must have your system registered with SUSE Customer Center or have the DVD. See
-    [#1162](https://github.com/netdata/netdata/issues/1162)
-
-Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `named`, hardware sensors and `SNMP`):
-
-```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
-```
-
-Install all the required packages for **monitoring everything Netdata can monitor**:
-
-```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata-all
-```
-
-If the above do not work for you, please [open a github
-issue](https://github.com/netdata/netdata/issues/new?title=packages%20installer%20failed&labels=installation%20help&body=The%20experimental%20packages%20installer%20failed.%0A%0AThis%20is%20what%20it%20says:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20screen%20here%0A%0A%60%60%60)
-with a copy of the message you get on screen. We are trying to make it work everywhere (this is also why the script
-[reports back](https://github.com/netdata/netdata/issues/2054) success or failure for all its runs).
-
----
-
-This is how to do it by hand:
+To use this script from your checkout of the Netdata git repository, run the following from the root of the repository:
 
 ```sh
-# Debian / Ubuntu
-apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libssl-dev libelf-dev libmnl-dev libprotobuf-dev protobuf-compiler gcc g++ make git autoconf autoconf-archive autogen automake pkg-config curl python cmake
-
-# Fedora
-dnf install zlib-devel libuuid-devel libuv-devel lz4-devel openssl-devel elfutils-libelf-devel libmnl-devel protobuf-devel protobuf-compiler gcc gcc-c++ make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
-
-# CentOS / Red Hat Enterprise Linux
-yum install autoconf automake curl gcc gcc-c++ git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel elfutils-libelf-devel protobuf protobuf-devel protobuf-compiler make nc pkgconfig python zlib-devel cmake
-
-# openSUSE
-zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel libopenssl-devel libelf-devel libmnl-devel protobuf-devel gcc gcc-c++ make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
-```
-
-Once Netdata is compiled, to run it the following packages are required (already installed using the above commands):
-
-| package   | description|
-|:-----:|-----------|
-| `libuuid` | part of `util-linux` for GUIDs management|
-| `zlib`    | gzip compression for the internal Netdata web server|
-| `libuv`   | Multi-platform support library with a focus on asynchronous I/O, version 1 or greater|
-
-*Netdata will fail to start without the above.*
-
-Netdata plugins and various aspects of Netdata can be enabled or benefit when these are installed (they are optional):
-
-| package |description|
-|:-----:|-----------|
-| `bash`|for shell plugins and **alarm notifications**|
-| `curl`|for shell plugins and **alarm notifications**|
-| `iproute` or `iproute2`|for monitoring **Linux traffic QoS**<br/>use `iproute2` if `iproute` reports as not available or obsolete|
-| `python`|for most of the external plugins|
-| `python-yaml`|used for monitoring **beanstalkd**|
-| `python-beanstalkc`|used for monitoring **beanstalkd**|
-| `python-dnspython`|used for monitoring DNS query time|
-| `python-ipaddress`|used for monitoring **DHCPd**<br/>this package is required only if the system has python v2. python v3 has this functionality embedded|
-| `python-mysqldb`<br/>or<br/>`python-pymysql`|used for monitoring **mysql** or **mariadb** databases<br/>`python-mysqldb` is a lot faster and thus preferred|
-| `python-pymongo`|used for monitoring **mongodb** databases|
-| `nodejs`|used for `node.js` plugins for monitoring **named** and **SNMP** devices|
-| `lm-sensors`|for monitoring **hardware sensors**|
-| `libelf`|for monitoring kernel-level metrics using eBPF|
-| `libmnl`|for collecting netfilter metrics|
-| `netcat`|for shell plugins to collect metrics from remote systems|
-
-*Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
-
-Netdata DB engine can be enabled when these are installed (they are optional):
-
-| package  | description|
-|:-----:|-----------|
-| `liblz4` | Extremely fast compression algorithm, version r129 or greater|
-| `openssl`| Cryptography and SSL/TLS toolkit|
-
-*Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
-
-Netdata Cloud support may require the following packages to be installed:
-
-|  package  | description                                                                                                                          |
-|:---------:|--------------------------------------------------------------------------------------------------------------------------------------|
-|  `cmake`  | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux |
-| `openssl` | Needed to secure communications with the Netdata Cloud                                                                               |
-| `protobuf`| Used for the new Cloud<->Agent binary protocol
-
-*Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
-
-### CentOS / RHEL 6.x
-
-On CentOS / RHEL 6.x, many of the dependencies for Netdata are only
-available with versions older than what we need, so special setup is
-required if manually installing packages.
-
-CentOS 6.x:
-
-- Enable the EPEL repo
-- Enable the additional repo from [okay.network](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
-
-And install the minimum required dependencies.
-
-### CentOS / RHEL 8.x
-
-For CentOS / RHEL 8.x a lot of development packages have moved out into their
-own separate repositories. Some other dependencies are either missing completely
-or have to be sourced by 3rd-parties.
-
-CentOS 8.x:
-
-- Enable the PowerTools repo
-- Enable the EPEL repo
-- Enable the Extra repo from [OKAY](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
-
-And install the minimum required dependencies:
-
-```sh
-# Enable config-manager
-yum install -y 'dnf-command(config-manager)'
-
-# Enable PowerTools
-yum config-manager --set-enabled powertools
-
-# Enable EPEL
-yum install -y epel-release
-
-# Install Repo for libuv-devl (NEW)
-yum install -y http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-3.el8.noarch.rpm
-
-# Install Devel Packages
-yum install autoconf automake curl gcc git cmake libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
-
+packaging/installer/install-required-packages.sh netdata
 ```
 
 ## Install Netdata
 
-Do this to install and run Netdata:
+We provide a script that encapsulates the entire build and install process as a single command. You can run it
+from the root of your checkout of the Netdata git repository like so:
 
 ```sh
-# download it - the directory 'netdata' will be created
-git clone https://github.com/netdata/netdata.git --depth=100 --recursive
-cd netdata
-
-# run script with root privileges to build, install, start Netdata
 ./netdata-installer.sh
 ```
 
 -   If you don't want to run it straight-away, add `--dont-start-it` option.
-
--   You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
-
--   If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
-
--   If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`. 
+-   If you don't want to install it on the default directories, you can run the installer like this:
+    `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
 
 ## Optional parameters to alter your installation
 
 `netdata-installer.sh` accepts a few parameters to customize your installation:
 
--   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
+-   `--dont-wait`: Run without prompting for any user input.
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
--   `--stable-channel`: Automatically update only on the release of new major versions.
--   `--nightly-channel`: Automatically update on every new nightly build.
 -   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
     Netdata better.
--   `--no-updates`: Prevent automatic updates of any kind.
--   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
-    cannot be used to change installation types.
--   `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
-    tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
-    process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
-    `--stable-channel`, Netdata will use the local files.
 
 ### Connect node to Netdata Cloud during installation
 
@@ -222,7 +100,10 @@ See the [connect to cloud](/claim/README.md) doc for details on connecting a nod
 
 Our current build process unfortunately has some issues when using certain configurations of the `clang` C compiler on Linux.
 
-If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o): relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`, and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully functional install. 
+If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o):
+relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`,
+and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully
+functional install.
 
 In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
 
@@ -236,5 +117,3 @@ Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
-
-
