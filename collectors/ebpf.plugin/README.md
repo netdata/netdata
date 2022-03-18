@@ -422,7 +422,7 @@ is accessed, but also in possible errors, so we need to attach a `kretprobe`. Fo
 
 ##### Directory Cache Interpretation
 When directory cache is showing 100% means, that means that every file that was accessed was present in the directory cache.
-If files are not present in the directory cache they are not present in the file system, or the files were not
+If files are not present in the directory cache, they are either not present in the file system or the files were not
 accessed before.
 
 ### Mount Points
