@@ -256,8 +256,8 @@ This will create the chart `disk_latency_io` for each disk on the host. The foll
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),
-depending on the workload it should never reach higher than 1-3 ms. In most cases, workloads will experience less than
-1ms latency numbers. The dimensions refer to time intervals.
+in most cases, workloads experience less than 1 ms latency numbers, but workloads should never reach higher than 3 ms.
+The dimensions refer to time intervals.
 
 ### Filesystem
 
@@ -265,7 +265,7 @@ This group has charts demonstrating how applications interact with the Linux ker
 It also brings latency charts for several different filesystems.
 
 #### Latency Algorithm
-We calculate the difference between the calling and return times, this spans disk I/O, file system operations (lock, I/O),
+We calculate the difference between the calling and return times, spanning disk I/O, file system operations (lock, I/O),
 run queue latency and all events related to the monitored action.
 
 #### ext4
@@ -422,7 +422,7 @@ is accessed, but also in possible errors, so we need to attach a `kretprobe`. Fo
 
 ##### Directory Cache Interpretation
 When directory cache is showing 100% means that every file that was accessed was present in the directory cache.
-If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not
+If files are not present in the directory cache they are not present in the file system, or the files were not
 accessed before.
 
 ### Mount Points
