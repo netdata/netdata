@@ -2768,6 +2768,7 @@ netdataDashboard.context = {
             },
             function (os, id) {
                 void (os);
+                var iface;
                 try {
                     iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
                 } catch (e) {
