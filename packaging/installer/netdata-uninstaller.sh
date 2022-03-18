@@ -83,7 +83,117 @@ user_input() {
   fi
 }
 
-if [ -x "$(command -v apt-get)" ]; then
+_cannot_use_tmpdir() {
+  testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
+  ret=0
+
+  if [ -z "${testfile}" ]; then
+    return "${ret}"
+  fi
+
+  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}"; then
+    if chmod +x "${testfile}"; then
+      if [ "$("${testfile}")" = "SUCCESS" ]; then
+        ret=1
+      fi
+    fi
+  fi
+
+  rm -f "${testfile}"
+  return "${ret}"
+}
+
+create_tmp_directory() {
+  if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
+    if _cannot_use_tmpdir /tmp; then
+      if _cannot_use_tmpdir "${PWD}"; then
+        fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." F0400
+      else
+        TMPDIR="${PWD}"
+      fi
+    else
+      TMPDIR="/tmp"
+    fi
+  fi
+
+  mktemp -d -t netdata-kickstart-XXXXXXXXXX
+}
+
+tmpdir="$(create_tmp_directory)"
+
+detect_existing_install() {
+  if pkg_installed netdata; then
+    ndprefix="/"
+  else
+    if [ -n "${INSTALL_PREFIX}" ]; then
+      searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+      searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
+    else
+      searchpath="${PATH}"
+    fi
+
+    ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
+    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
+      ndpath="/opt/netdata/bin/netdata"
+    fi
+
+    if [ -n "${ndpath}" ]; then
+      ndprefix="$(dirname "$(dirname "${ndpath}")")"
+    fi
+
+    if echo "${ndprefix}" | grep -Eq '/usr$'; then
+      ndprefix="$(dirname "${ndprefix}")"
+    fi
+  fi
+
+  if [ -n "${ndprefix}" ]; then
+    typefile="${ndprefix}/etc/netdata/.install-type"
+    envfile="${ndprefix}/etc/netdata/.environment"
+    if [ -r "${typefile}" ]; then
+      ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
+      # shellcheck disable=SC1090,SC1091
+      . "${tmpdir}/install-type"
+    else
+      INSTALL_TYPE="unknown"
+    fi
+
+    if [ "${INSTALL_TYPE}" = "unknown" ] || [ "${INSTALL_TYPE}" = "custom" ]; then
+      if [ -r "${envfile}" ]; then
+        ${ROOTCMD} sh -c "cat \"${envfile}\" > \"${tmpdir}/environment\""
+        # shellcheck disable=SC1091
+        . "${tmpdir}/environment"
+        if [ -n "${NETDATA_IS_STATIC_INSTALL}" ]; then
+          if [ "${NETDATA_IS_STATIC_INSTALL}" = "yes" ]; then
+            INSTALL_TYPE="legacy-static"
+          else
+            INSTALL_TYPE="legacy-build"
+          fi
+        fi
+      fi
+    fi
+  fi
+}
+
+pkg_installed() {
+  case "${DISTRO_COMPAT_NAME}" in
+    debian|ubuntu)
+      dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
+      return $?
+      ;;
+    centos|fedora|opensuse|ol)
+      rpm -q "${1}" > /dev/null 2>&1
+      return $?
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+detect_existing_install
+
+if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
   if dpkg -s netdata > /dev/null; then
     echo "Found netdata native installation"
     if user_input "Do you want to remove netdata? "; then
@@ -101,7 +211,7 @@ if [ -x "$(command -v apt-get)" ]; then
     fi
     exit 0
   fi
-elif [ -x "$(command -v dnf)" ]; then
+elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
@@ -119,7 +229,7 @@ elif [ -x "$(command -v dnf)" ]; then
     fi
     exit 0
   fi
-elif [ -x "$(command -v yum)" ]; then
+elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
@@ -137,7 +247,7 @@ elif [ -x "$(command -v yum)" ]; then
     fi
     exit 0
   fi
-elif [ -x "$(command -v zypper)" ]; then
+elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if [ "${FLAG}" = "-y" ]; then
     FLAG=-n
   fi
