@@ -1080,6 +1080,62 @@ netdataDashboard.submenu = {
 var cgroupCPULimitIsSet = 0;
 var cgroupMemLimitIsSet = 0;
 
+const netBytesInfo = 'The amount of traffic transferred by the network interface.'
+const netPacketsInfo = 'The number of packets transferred by the network interface. ' +
+    'Received <a href="https://en.wikipedia.org/wiki/Multicast" target="_blank">multicast</a> counter is ' +
+    'commonly calculated at the device level (unlike <b>received</b>) and therefore may include packets which did not reach the host.'
+const netErrorsInfo = '<p>The number of errors encountered by the network interface.</p>' +
+    '<p><b>Inbound</b> - bad packets received on this interface. ' +
+    'It includes dropped packets due to invalid length, CRC, frame alignment, and other errors. ' +
+    '<b>Outbound</b> - transmit problems. ' +
+    'It includes frames transmission errors due to loss of carrier, FIFO underrun/underflow, heartbeat, ' +
+    'late collisions, and other problems.</p>'
+const netFIFOInfo = '<p>The number of FIFO errors encountered by the network interface.</p>' +
+    '<p><b>Inbound</b> - packets dropped because they did not fit into buffers provided by the host, ' +
+    'e.g. packets larger than MTU or next buffer in the ring was not available for a scatter transfer. ' +
+    '<b>Outbound</b> - frame transmission errors due to device FIFO underrun/underflow. ' +
+    'This condition occurs when the device begins transmission of a frame ' +
+    'but is unable to deliver the entire frame to the transmitter in time for transmission.</p>'
+const netDropsInfo = '<p>The number of packets that have been dropped at the network interface level.</p>' +
+    '<p><b>Inbound</b> - packets received but not processed, e.g. due to ' +
+    '<a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad/unintended VLAN tags, ' +
+    'unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. ' +
+    '<b>Outbound</b> - packets dropped on their way to transmission, e.g. due to lack of resources.</p>'
+const netCompressedInfo = 'The number of correctly transferred compressed packets by the network interface. ' +
+    'These counters are only meaningful for interfaces which support packet compression (e.g. CSLIP, PPP).'
+const netEventsInfo = '<p>The number of errors encountered by the network interface.</p>' +
+    '<p><b>Frames</b> - aggregated counter for dropped packets due to ' +
+    'invalid length, FIFO overflow, CRC, and frame alignment errors. ' +
+    '<b>Collisions</b> - ' +
+    '<a href="https://en.wikipedia.org/wiki/Collision_(telecommunications)" target="blank">collisions</a> during packet transmissions. ' +
+    '<b>Carrier</b> - aggregated counter for frame transmission errors due to ' +
+    'excessive collisions, loss of carrier, device FIFO underrun/underflow, Heartbeat/SQE Test errors, and  late collisions.</p>'
+const netDuplexInfo = '<p>The interface\'s latest or current ' +
+    '<a href="https://en.wikipedia.org/wiki/Duplex_(telecommunications)" target="_blank">duplex</a> that the network adapter ' +
+    '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to.</p>' +
+    '<p><b>Unknown</b> - the duplex mode can not be determined. ' +
+    '<b>Half duplex</b> - the communication is one direction at a time. ' +
+    '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>' +
+    '<p><b>State map</b>: 0 - unknown, 1 - half, 2 - full.</p>'
+const netOperstateInfo = '<p>The current ' +
+    '<a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface.</p>' +
+    '<p><b>Unknown</b> - the state can not be determined. ' +
+    '<b>NotPresent</b> - the interface has missing (typically, hardware) components. ' +
+    '<b>Down</b> - the interface is unable to transfer data on L1, e.g. ethernet is not plugged or interface is administratively down. ' +
+    '<b>LowerLayerDown</b> - the interface is down due to state of lower-layer interface(s). ' +
+    '<b>Testing</b> - the interface is in testing mode, e.g. cable test. It can’t be used for normal traffic until tests complete. ' +
+    '<b>Dormant</b> - the interface is L1 up, but waiting for an external event, e.g. for a protocol to establish. ' +
+    '<b>Up</b> - the interface is ready to pass packets and can be used.</p>' +
+    '<p><b>State map</b>: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up.</p>'
+const netCarrierInfo = '<p>The current physical link state of the interface.</p>' +
+    '<p><b>State map</b>: 0 - down, 1 - up.</p>'
+const netSpeedInfo = 'The interface\'s latest or current speed that the network adapter ' +
+    '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. ' +
+    'This does not give the max supported speed of the NIC.'
+const netMTUInfo = 'The interface\'s currently configured ' +
+    '<a href="https://en.wikipedia.org/wiki/Maximum_transmission_unit" target="_blank">Maximum transmission unit</a> (MTU) value. ' +
+    'MTU is the size of the largest protocol data unit that can be communicated in a single network layer transaction.'
+
 netdataDashboard.context = {
     'system.cpu': {
         info: function (os) {
@@ -2654,127 +2710,107 @@ netdataDashboard.context = {
     // NETWORK INTERFACES
 
     'net.net': {
+        heads: [
+            netdataDashboard.gaugeChart('Received', '12%', 'received'),
+            netdataDashboard.gaugeChart('Sent', '12%', 'sent'),
+        ],
+        info: netBytesInfo
+    },
+    'net.packets': {
+        info: netPacketsInfo
+    },
+    'net.errors': {
+        info: netErrorsInfo
+    },
+    'net.fifo': {
+        info: netFIFOInfo
+    },
+    'net.drops': {
+        info: netDropsInfo
+    },
+    'net.compressed': {
+        info: netCompressedInfo
+    },
+    'net.events': {
+        info: netEventsInfo
+    },
+    'net.duplex': {
+        info: netDuplexInfo
+    },
+    'net.operstate': {
+        info: netOperstateInfo
+    },
+    'net.carrier': {
+        info: netCarrierInfo
+    },
+    'net.speed': {
+        info: netSpeedInfo
+    },
+    'net.mtu': {
+        info: netMTUInfo
+    },
+
+    // ------------------------------------------------------------------------
+    // CGROUP NETWORK INTERFACES
+
+    'cgroup.net_net': {
         mainheads: [
             function (os, id) {
                 void (os);
-                if (id.match(/^cgroup_.*/)) {
-                    var iface;
-                    try {
-                        iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
-                    } catch (e) {
-                        iface = '';
-                    }
-                    return netdataDashboard.gaugeChart('Received' + iface, '12%', 'received');
-                } else
-                    return '';
+                var iface;
+                try {
+                    iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
+                } catch (e) {
+                    iface = '';
+                }
+                return netdataDashboard.gaugeChart('Received' + iface, '12%', 'received');
+
             },
             function (os, id) {
                 void (os);
-                if (id.match(/^cgroup_.*/)) {
-                    var iface;
-                    try {
-                        iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
-                    } catch (e) {
-                        iface = '';
-                    }
-                    return netdataDashboard.gaugeChart('Sent' + iface, '12%', 'sent');
-                } else
-                    return '';
+                var iface;
+                try {
+                    iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
+                } catch (e) {
+                    iface = '';
+                }
+                return netdataDashboard.gaugeChart('Sent' + iface, '12%', 'sent');
             }
         ],
-        heads: [
-            function (os, id) {
-                void (os);
-                if (!id.match(/^cgroup_.*/))
-                    return netdataDashboard.gaugeChart('Received', '12%', 'received');
-                else
-                    return '';
-            },
-            function (os, id) {
-                void (os);
-                if (!id.match(/^cgroup_.*/))
-                    return netdataDashboard.gaugeChart('Sent', '12%', 'sent');
-                else
-                    return '';
-            }
-        ],
-        info: 'The amount of traffic transferred by the network interface.'
+        info: netBytesInfo
     },
-    'net.packets': {
-        info: 'The number of packets transferred by the network interface. '+
-        'Received <a href="https://en.wikipedia.org/wiki/Multicast" target="_blank">multicast</a> counter is '+
-        'commonly calculated at the device level (unlike <b>received</b>) and therefore may include packets which did not reach the host.'
+    'cgroup.net_packets': {
+        info: netPacketsInfo
     },
-    'net.errors': {
-        info: '<p>The number of errors encountered by the network interface.</p>'+
-        '<p><b>Inbound</b> - bad packets received on this interface. '+
-        'It includes dropped packets due to invalid length, CRC, frame alignment, and other errors. '+
-        '<b>Outbound</b> - transmit problems. '+
-        'It includes frames transmission errors due to loss of carrier, FIFO underrun/underflow, heartbeat, '+
-        'late collisions, and other problems.</p>'
+    'cgroup.net_errors': {
+        info: netErrorsInfo
     },
-    'net.fifo': {
-        info: '<p>The number of FIFO errors encountered by the network interface.</p>'+
-        '<p><b>Inbound</b> - packets dropped because they did not fit into buffers provided by the host, '+
-        'e.g. packets larger than MTU or next buffer in the ring was not available for a scatter transfer. '+
-        '<b>Outbound</b> - frame transmission errors due to device FIFO underrun/underflow. '+
-        'This condition occurs when the device begins transmission of a frame '+
-        'but is unable to deliver the entire frame to the transmitter in time for transmission.</p>'
+    'cgroup.net_fifo': {
+        info: netFIFOInfo
     },
-    'net.drops': {
-        info: '<p>The number of packets that have been dropped at the network interface level.</p>'+
-        '<p><b>Inbound</b> - packets received but not processed, e.g. due to '+
-        '<a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad/unintended VLAN tags, '+
-        'unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. '+
-        '<b>Outbound</b> - packets dropped on their way to transmission, e.g. due to lack of resources.</p>'
+    'cgroup.net_drops': {
+        info: netDropsInfo
     },
-    'net.compressed': {
-        info: 'The number of correctly transferred compressed packets by the network interface. '+
-        'These counters are only meaningful for interfaces which support packet compression (e.g. CSLIP, PPP).'
+    'cgroup.net_compressed': {
+        info: netCompressedInfo
     },
-    'net.events': {
-        info: '<p>The number of errors encountered by the network interface.</p>'+
-        '<p><b>Frames</b> - aggregated counter for dropped packets due to '+
-        'invalid length, FIFO overflow, CRC, and frame alignment errors. '+
-        '<b>Collisions</b> - '+
-        '<a href="https://en.wikipedia.org/wiki/Collision_(telecommunications)" target="blank">collisions</a> during packet transmissions. '+
-        '<b>Carrier</b> - aggregated counter for frame transmission errors due to '+
-        'excessive collisions, loss of carrier, device FIFO underrun/underflow, Heartbeat/SQE Test errors, and  late collisions.</p>'
+    'cgroup.net_events': {
+        info: netEventsInfo
     },
-    'net.duplex': {
-        info: '<p>The interface\'s latest or current '+
-        '<a href="https://en.wikipedia.org/wiki/Duplex_(telecommunications)" target="_blank">duplex</a> that the network adapter '+
-        '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to.</p>'+
-        '<p><b>Unknown</b> - the duplex mode can not be determined. '+
-        '<b>Half duplex</b> - the communication is one direction at a time. '+
-        '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>'+
-        '<p><b>State map</b>: 0 - unknown, 1 - half, 2 - full.</p>'
+    'cgroup.net_duplex': {
+        info: netDuplexInfo
     },
-    'net.operstate': {
-        info: '<p>The current '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface.</p>'+
-        '<p><b>Unknown</b> - the state can not be determined. '+
-        '<b>NotPresent</b> - the interface has missing (typically, hardware) components. '+
-        '<b>Down</b> - the interface is unable to transfer data on L1, e.g. ethernet is not plugged or interface is administratively down. '+
-        '<b>LowerLayerDown</b> - the interface is down due to state of lower-layer interface(s). '+
-        '<b>Testing</b> - the interface is in testing mode, e.g. cable test. It can’t be used for normal traffic until tests complete. '+
-        '<b>Dormant</b> - the interface is L1 up, but waiting for an external event, e.g. for a protocol to establish. '+
-        '<b>Up</b> - the interface is ready to pass packets and can be used.</p>'+
-        '<p><b>State map</b>: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up.</p>'
+    'cgroup.net_operstate': {
+        info: netOperstateInfo
     },
-    'net.carrier': {
-        info: '<p>The current physical link state of the interface.</p>'+
-        '<p><b>State map</b>: 0 - down, 1 - up.</p>'
+    'cgroup.net_carrier': {
+        info: netCarrierInfo
     },
-    'net.speed': {
-        info: 'The interface\'s latest or current speed that the network adapter '+
-        '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. '+
-        'This does not give the max supported speed of the NIC.'
+    'cgroup.net_speed': {
+        info: netSpeedInfo
     },
-    'net.mtu': {
-        info: 'The interface\'s currently configured '+
-        '<a href="https://en.wikipedia.org/wiki/Maximum_transmission_unit" target="_blank">Maximum transmission unit</a> (MTU) value. '+
-        'MTU is the size of the largest protocol data unit that can be communicated in a single network layer transaction.'
+    'cgroup.net_mtu': {
+        info: netMTUInfo
     },
 
     // ------------------------------------------------------------------------
