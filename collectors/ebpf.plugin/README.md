@@ -421,7 +421,7 @@ is accessed, but also in possible errors, so we need to attach a `kretprobe`. Fo
   Called when the desired file is not inside the directory cache.
 
 ##### Directory Cache Interpretation
-When directory cache is showing 100% means, that means that every file that was accessed was present in the directory cache.
+When directory cache is showing 100% that means that every accessed file was present in the directory cache.
 If files are not present in the directory cache, they are either not present in the file system or the files were not
 accessed before.
 
