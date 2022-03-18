@@ -974,7 +974,6 @@ netdataDashboard.submenu = {
 
     'filesystem.file_access': {
         title: 'file access (eBPF)',
-        info: 'When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows file access per <a href="#menu_apps_submenu_file_access">application</a>.'
     },
 
     'apps.file_access': {
@@ -1161,9 +1160,25 @@ const ebpfTaskClose = 'Number of times <a href="https://learn.netdata.cloud/docs
     'that responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration ' +
     'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per ' +
     '<a href="#ebpf_apps_task_release">apps</a>.' + ebpfChartProvides
-const ebpfTaskError = 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error">task</a>. Netdata gives a ' +
+const ebpfTaskError = 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error" target="_blank">task</a>. Netdata gives a ' +
     'summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
     'Netdata shows process per <a href="#ebpf_apps_task_error">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfFileOpen = 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is ' +
+    '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_file_open">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfFileOpenError = 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_error">file access</a>, and when the integration is ' +
+    '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_file_open_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfFileClosed = 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is ' +
+    '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_file_closed">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfFileCloseError = 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_error">file access</a>, and when the integration is ' +
+    '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_file_close_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 
 netdataDashboard.context = {
     'system.cpu': {
@@ -2609,22 +2624,27 @@ netdataDashboard.context = {
    // Apps eBPF stuff
 
     'apps.file_open': {
-        info: 'Calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
-            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. '
+        info: 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
+              'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+              'Netdata shows virtual file system per <a href="#ebpf_services_file_open">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_file_open"></div>'
     },
 
     'apps.file_open_error': {
-        info: 'Failed calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ).'
+        info: 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
+              'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+              'Netdata shows virtual file system per <a href="#ebpf_services_file_open_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_file_open_error"></div>'
     },
 
     'apps.file_closed': {
-        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version, which is called from' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
+        info: 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
+              'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+              'Netdata shows virtual file system per <a href="#ebpf_services_file_closed">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_file_closed"></div>'
     },
 
     'apps.file_close_error': {
-        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version.'
+        info: 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
+            'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_file_close_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_file_close_error"></div>'
     },
 
     'apps.file_deleted': {
@@ -3945,18 +3965,15 @@ netdataDashboard.context = {
     },
 
     'cgroup.fd_open': {
-        info: 'Calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
-            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. '
+        info: ebpfFileOpen
     },
 
     'cgroup.fd_open_error': {
-        info: 'Failed calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ).'
+        info: ebpfFileCloseError
     },
 
     'cgroup.fd_close': {
-        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version, which is called from' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
+        info: ebpfFileClosed
     },
 
     'cgroup.fd_close_error': {
@@ -4214,22 +4231,19 @@ netdataDashboard.context = {
     },
 
     'services.fd_open': {
-        info: 'Calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
-            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. '
+        info: ebpfFileOpen + '<div id="ebpf_services_file_open"></div>'
     },
 
     'services.fd_open_error': {
-        info: 'Failed calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ).'
+        info: ebpfFileOpenError + '<div id="ebpf_services_file_open_error"></div>'
     },
 
     'services.fd_close': {
-        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version, which is called from' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
+        info: ebpfFileClosed + '<div id="ebpf_services_file_closed"></div>'
     },
 
     'services.fd_close_error': {
-        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version.'
+        info: ebpfFileCloseError + '<div id="ebpf_services_file_close_error"></div>'
     },
 
     'services.vfs_unlink': {
@@ -5870,21 +5884,16 @@ netdataDashboard.context = {
     },
 
     'filesystem.file_descriptor': {
-        info: 'Calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code> ( For kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from'+
-            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
-            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
-            ' The close dimension is attached to the function <code>__close_fd</code> or <code>close_fd</code> according to your kernel version, which is called from system call' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
+        info: 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open and closing files</a>. ' +
+              'Netdata shows file access per <a href="#ebpf_apps_file_open">application</a> and <a href="#ebpf_services_file_open">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> ' +
+              'or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>'
     },
 
     'filesystem.file_error': {
-        info: 'Failed calls to the kernel internal function <code>do_sys_open</code> ( For kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from'+
-            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
-            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
-            ' The close dimension is attached to the function <code>__close_fd</code> or <code>close_fd</code> according to your kernel version, which is called from system call' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
+        info: 'Number of failed calls to the kernel internal function responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor">to open and closing files</a>. ' +
+              'Netdata shows file error per <a href="#ebpf_apps_file_open_error">application</a> and <a href="#ebpf_services_file_open_error">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> ' +
+              'or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
     },
-
 
     // ------------------------------------------------------------------------
     // eBPF
