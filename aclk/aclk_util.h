@@ -7,8 +7,8 @@
 
 #define CLOUD_EC_MALFORMED_NODE_ID   1
 #define CLOUD_EMSG_MALFORMED_NODE_ID "URL requests node_id but there is not enough chars following (for it to be valid uuid)."
-#define CLOUD_EC_NODE_NOT_FOUD       2
-#define CLOUD_EMSG_NODE_NOT_FOUD     "Node with requested node_id not found"
+#define CLOUD_EC_NODE_NOT_FOUND      2
+#define CLOUD_EMSG_NODE_NOT_FOUND    "Node with requested node_id not found"
 #define CLOUD_EC_ZLIB_ERROR          3
 #define CLOUD_EMSG_ZLIB_ERROR        "Error during zlib compression"
 #define CLOUD_EC_REQ_REPLY_TOO_BIG   4

@@ -128,7 +128,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
             error_report("Host with node_id \"%s\" not found! Returning 404 to Cloud!", node_uuid);
             retval = 1;
             w->response.code = 404;
-            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_NODE_NOT_FOUD, CLOUD_EMSG_NODE_NOT_FOUD, NULL, 0);
+            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_NODE_NOT_FOUND, CLOUD_EMSG_NODE_NOT_FOUND, NULL, 0);
             goto cleanup;
         }
     }
