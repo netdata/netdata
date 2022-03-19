@@ -403,7 +403,7 @@ void read_cgroup_plugin_configuration() {
                     " !*.user "
                     " !/ "
                     " !/docker "
-                    " !/libvirt "
+                    " !*/libvirt "
                     " !/lxc "
                     " !/lxc/*/* "                          //  #1397 #2649
                     " !/lxc.monitor* "
