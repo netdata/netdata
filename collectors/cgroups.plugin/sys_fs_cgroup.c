@@ -1938,8 +1938,7 @@ static inline void update_filenames()
             }
 
             if (unlikely(cgroup_enable_blkio_throttle_io && !cg->throttle_io_service_bytes.filename)) {
-                snprintfz(
-                    filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes_recursive", cgroup_blkio_base, cg->id);
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes_recursive", cgroup_blkio_base, cg->id);
                 if (unlikely(stat(filename, &buf) != -1)) {
                     cg->throttle_io_service_bytes.filename = strdupz(filename);
                     cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
@@ -1959,8 +1958,7 @@ static inline void update_filenames()
             }
 
             if (unlikely(cgroup_enable_blkio_throttle_ops && !cg->throttle_io_serviced.filename)) {
-                snprintfz(
-                    filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced_recursive", cgroup_blkio_base, cg->id);
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced_recursive", cgroup_blkio_base, cg->id);
                 if (unlikely(stat(filename, &buf) != -1)) {
                     cg->throttle_io_serviced.filename = strdupz(filename);
                     cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
