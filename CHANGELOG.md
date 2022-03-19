@@ -6,8 +6,14 @@
 
 **Merged pull requests:**
 
+- Update dashboard to version v2.21.8. [\#12455](https://github.com/netdata/netdata/pull/12455) ([netdatabot](https://github.com/netdatabot))
+- fix\(collectors/cgroups\): use different context for cgroup network charts [\#12454](https://github.com/netdata/netdata/pull/12454) ([ilyam8](https://github.com/ilyam8))
+- Add delay on missing priv\_key [\#12450](https://github.com/netdata/netdata/pull/12450) ([underhood](https://github.com/underhood))
 - fix unclaimed agents [\#12449](https://github.com/netdata/netdata/pull/12449) ([underhood](https://github.com/underhood))
 - apps.plugin: fix for plugin sending unnecessary data in freebsd [\#12446](https://github.com/netdata/netdata/pull/12446) ([codeguru1](https://github.com/codeguru1))
+- fix\(cups.plugin\): add `cups` prefix to chart context [\#12444](https://github.com/netdata/netdata/pull/12444) ([ilyam8](https://github.com/ilyam8))
+- fix: CPU frequency detection of FreeBSD [\#12440](https://github.com/netdata/netdata/pull/12440) ([ilyam8](https://github.com/ilyam8))
+- fix install type in netdata-uninstaller.sh [\#12438](https://github.com/netdata/netdata/pull/12438) ([maneamarius](https://github.com/maneamarius))
 - fix\(kickstart.sh\): prefer shasum over sha256sum [\#12429](https://github.com/netdata/netdata/pull/12429) ([ilyam8](https://github.com/ilyam8))
 - Docs: Fix broken link [\#12428](https://github.com/netdata/netdata/pull/12428) ([kickoke](https://github.com/kickoke))
 - Fix OS name for older agent versions streaming to a parent [\#12425](https://github.com/netdata/netdata/pull/12425) ([stelfrag](https://github.com/stelfrag))
@@ -15,6 +21,7 @@
 - fix: lowercase uuidgen [\#12422](https://github.com/netdata/netdata/pull/12422) ([ilyam8](https://github.com/ilyam8))
 - fix: add a delay between starting Netdata and checking pids [\#12420](https://github.com/netdata/netdata/pull/12420) ([ilyam8](https://github.com/ilyam8))
 - fix\(charts.d.plugin\): fix recursion in apcupsd\_check and enable it again [\#12418](https://github.com/netdata/netdata/pull/12418) ([ilyam8](https://github.com/ilyam8))
+- Add content for eBPF documentation [\#12417](https://github.com/netdata/netdata/pull/12417) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: temporarily disable charts.d apcupsd collectors [\#12415](https://github.com/netdata/netdata/pull/12415) ([ilyam8](https://github.com/ilyam8))
 - Add additional link to badges doc [\#12412](https://github.com/netdata/netdata/pull/12412) ([Steve8291](https://github.com/Steve8291))
 - chore: remove contrib/sles11 [\#12410](https://github.com/netdata/netdata/pull/12410) ([ilyam8](https://github.com/ilyam8))
@@ -26,6 +33,7 @@
 - Update build/m4/ax\_pthread.m4 [\#12390](https://github.com/netdata/netdata/pull/12390) ([vkalintiris](https://github.com/vkalintiris))
 - Delay removed event for 60 seconds after the chart's last collected time [\#12388](https://github.com/netdata/netdata/pull/12388) ([MrZammler](https://github.com/MrZammler))
 - Remove unecessary error report for proc and sys files [\#12385](https://github.com/netdata/netdata/pull/12385) ([thiagoftsm](https://github.com/thiagoftsm))
+- feat\(statsd.plugin\): add Asterisk configuration file with synthetic charts [\#12381](https://github.com/netdata/netdata/pull/12381) ([ilyam8](https://github.com/ilyam8))
 - fix: handle double host prefix when Netdata running in a podman container [\#12380](https://github.com/netdata/netdata/pull/12380) ([ilyam8](https://github.com/ilyam8))
 - fix\(ebpf.plugin\): remove pid file on exit [\#12379](https://github.com/netdata/netdata/pull/12379) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: shellcheck warnings in docker run.sh [\#12377](https://github.com/netdata/netdata/pull/12377) ([ilyam8](https://github.com/ilyam8))
@@ -281,7 +289,6 @@
 - Optimize rx msg name resolution [\#11811](https://github.com/netdata/netdata/pull/11811) ([underhood](https://github.com/underhood))
 - Ignore clangd cache directory. [\#11803](https://github.com/netdata/netdata/pull/11803) ([vkalintiris](https://github.com/vkalintiris))
 - fix tps decode, add memory usage chart [\#11797](https://github.com/netdata/netdata/pull/11797) ([neotf](https://github.com/neotf))
-- Add localhost hostname to the edit\_command [\#11793](https://github.com/netdata/netdata/pull/11793) ([MrZammler](https://github.com/MrZammler))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
@@ -339,13 +346,6 @@
 - Update libbpf [\#11800](https://github.com/netdata/netdata/pull/11800) ([thiagoftsm](https://github.com/thiagoftsm))
 - Assorted cleanups to static builds. [\#11798](https://github.com/netdata/netdata/pull/11798) ([Ferroin](https://github.com/Ferroin))
 - Use the proper format specifier when logging configuration options. [\#11795](https://github.com/netdata/netdata/pull/11795) ([vkalintiris](https://github.com/vkalintiris))
-- Verify checksums of makeself deps. [\#11791](https://github.com/netdata/netdata/pull/11791) ([vkalintiris](https://github.com/vkalintiris))
-- packaging: update go.d.plugin version to v0.31.0 [\#11789](https://github.com/netdata/netdata/pull/11789) ([ilyam8](https://github.com/ilyam8))
-- Add some logging for cloud new architecture to access.log [\#11788](https://github.com/netdata/netdata/pull/11788) ([MrZammler](https://github.com/MrZammler))
-- Simple fix for the data API query [\#11787](https://github.com/netdata/netdata/pull/11787) ([vlvkobal](https://github.com/vlvkobal))
-- Use correct hop count if host is already in memory [\#11785](https://github.com/netdata/netdata/pull/11785) ([stelfrag](https://github.com/stelfrag))
-- Fix proc/interrupts parser [\#11783](https://github.com/netdata/netdata/pull/11783) ([maximethebault](https://github.com/maximethebault))
-- Fix typos [\#11782](https://github.com/netdata/netdata/pull/11782) ([rex4539](https://github.com/rex4539))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
