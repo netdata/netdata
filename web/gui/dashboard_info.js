@@ -939,7 +939,7 @@ netdataDashboard.submenu = {
 
     'filesystem.vfs': {
         title: 'vfs (eBPF)',
-        info: 'Monitor calls to functions used to manipulate <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">File Systems</a>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows Virtual File System per <a href="#menu_apps_submenu_vfs">application</a>.'
+        info: 'Number of calls to Virtual File System <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">functions</a> used to manipulate <a href="#menu_filesystem">File Systems</a>.'
     },
 
     'apps.vfs': {
@@ -1191,6 +1191,45 @@ const ebpfDCNotCache = 'Number of times a file is accessed in the file system, b
 const ebpfDCNotFound = 'Number of times a file was not found on the file system. Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, ' +
     'and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows directory cache per <a href="#ebpf_apps_dc_not_found">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSWrite = 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSRead = 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSWriteError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSReadError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSWriteBytes = 'Total of bytes successfully written using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write_bytes">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSReadBytes = 'Total of bytes successfully read using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read_bytes">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSUnlink = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS unlinker function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_unlink">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_unlink">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSSync = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_sync">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_sync">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSSyncError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_sync_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_sync_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSOpen = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_open">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_open">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSOpenError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_open_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_open_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSCreate = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_create">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+const ebpfVFSCreateError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_vfs_create_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 
 netdataDashboard.context = {
     'system.cpu': {
@@ -2660,31 +2699,81 @@ netdataDashboard.context = {
     },
 
     'apps.file_deleted': {
-        info: 'Calls to the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS unlinker function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_unlink">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_unlink">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_unlink"></div>'
     },
 
     'apps.vfs_write_call': {
-        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
+              '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+              'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_write"></div>'
     },
 
     'apps.vfs_write_error': {
-        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_write_error"></div>'
     },
 
     'apps.vfs_read_call': {
-        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
+              '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+              'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_read"></div>'
     },
 
     'apps.vfs_read_error': {
-        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_read_error"></div>'
     },
 
     'apps.vfs_write_bytes': {
-        info: 'Total of bytes successfully written using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
+        info: 'Total of bytes successfully written using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write_bytes">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_write_bytes"></div>'
     },
 
     'apps.vfs_read_bytes': {
-        info: 'Total of bytes successfully read using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>.'
+        info: 'Total of bytes successfully written using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read_bytes">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_read_bytes"></div>'
+    },
+
+    'apps.vfs_fsync': {
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_sync">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_sync">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_sync"></div>'
+    },
+
+    'apps.vfs_fsync_error': {
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_sync_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_sync_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_sync_error"></div>'
+    },
+
+    'apps.vfs_open': {
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_open">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_open">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_open"></div>'
+    },
+
+    'apps.vfs_open_error': {
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_open_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_open_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_open_error"></div>'
+    },
+
+    'apps.vfs_create': {
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_create">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_create">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_create"></div>'
+    },
+
+    'apps.vfs_create_error': {
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
+            '<a href="#ebpf_global_vfs_create_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_create_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_create_error"></div>'
     },
 
     'apps.process_create': {
@@ -3989,35 +4078,59 @@ netdataDashboard.context = {
     },
 
     'cgroup.fd_close_error': {
-        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version.'
+        info: ebpfFileCloseError
     },
 
     'cgroup.vfs_unlink': {
-        info: 'Calls to the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
+        info: ebpfVFSUnlink
     },
 
     'cgroup.vfs_write': {
-        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: ebpfVFSWrite
     },
 
     'cgroup.vfs_write_error': {
-        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: ebpfVFSWriteError
     },
 
     'cgroup.vfs_read': {
-        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: ebpfVFSRead
     },
 
     'cgroup.vfs_read_error': {
-        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: ebpfVFSReadError
     },
 
     'cgroup.vfs_write_bytes': {
-        info: 'Total of bytes successfully written using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
+        info: ebpfVFSWriteBytes
     },
 
     'cgroup.vfs_read_bytes': {
-        info: 'Total of bytes successfully read using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>.'
+        info: ebpfVFSReadBytes
+    },
+
+    'cgroup.vfs_fsync': {
+        info: ebpfVFSSync
+    },
+
+    'cgroup.vfs_fsync_error': {
+        info: ebpfVFSSyncError
+    },
+
+    'cgroup.vfs_open': {
+        info: ebpfVFSOpen
+    },
+
+    'cgroup.vfs_open_error': {
+        info: ebpfVFSOpenError
+    },
+
+    'cgroup.vfs_create': {
+        info: ebpfVFSCreate
+    },
+
+    'cgroup.vfs_create_error': {
+        info: ebpfVFSCreateError
     },
 
     'cgroup.process_create': {
@@ -4259,31 +4372,55 @@ netdataDashboard.context = {
     },
 
     'services.vfs_unlink': {
-        info: 'Calls to the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
+        info: ebpfVFSUnlink + '<div id="ebpf_services_vfs_unlink"></div>'
     },
 
     'services.vfs_write': {
-        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: ebpfVFSWrite + '<div id="ebpf_services_vfs_write"></div>'
     },
 
     'services.vfs_write_error': {
-        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: ebpfVFSWriteError + '<div id="ebpf_services_vfs_write_error"></div>'
     },
 
     'services.vfs_read': {
-        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: ebpfVFSRead + '<div id="ebpf_services_vfs_read"></div>'
     },
 
     'services.vfs_read_error': {
-        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: ebpfVFSReadError + '<div id="ebpf_services_vfs_read_error"></div>'
     },
 
     'services.vfs_write_bytes': {
-        info: 'Total of bytes successfully written using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
+        info: ebpfVFSWriteBytes + '<div id="ebpf_services_vfs_write_bytes"></div>'
     },
 
     'services.vfs_read_bytes': {
-        info: 'Total of bytes successfully read using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>.'
+        info: ebpfVFSReadBytes + '<div id="ebpf_services_vfs_read_bytes"></div>'
+    },
+
+    'services.vfs_fsync': {
+        info: ebpfVFSSync + '<div id="ebpf_services_vfs_sync"></div>'
+    },
+
+    'services.vfs_fsync_error': {
+        info: ebpfVFSSyncError + '<div id="ebpf_services_vfs_sync_error"></div>'
+    },
+
+    'services.vfs_open': {
+        info: ebpfVFSOpen + '<div id="ebpf_services_vfs_open"></div>'
+    },
+
+    'services.vfs_open_error': {
+        info: ebpfVFSOpenError + '<div id="ebpf_services_vfs_open_error"></div>'
+    },
+
+    'services.vfs_create': {
+        info: ebpfVFSCreate + '<div id="ebpf_services_vfs_create"></div>'
+    },
+
+    'services.vfs_create_error': {
+        info: ebpfVFSCreateError + '<div id="ebpf_services_vfs_create_error"></div>'
     },
 
     'services.process_create': {
@@ -5749,46 +5886,86 @@ netdataDashboard.context = {
 
     'filesystem.vfs_deleted_objects': {
         title : 'VFS remove',
-        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS unlinker function</a>. This chart may not show all file system events if it uses other functions' +
+            'to store data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_unlink">application</a> and <a href="#ebpf_services_vfs_unlink">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_unlink"></div>'
     },
 
     'filesystem.vfs_io': {
         title : 'VFS IO',
-        info: 'Successful or failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS I/O functions</a>. This chart may not show all file system events if it uses other functions' +
+              'to store data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_write">application</a> and <a href="#ebpf_services_vfs_write">cgroup (systemd Services)</a> ' +
+              'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+              '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+              'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io"></div>'
     },
 
     'filesystem.vfs_io_bytes': {
         title : 'VFS bytes written',
-        info: 'Total of bytes read or written with success using the functions <code>vfs_read</code> and <code>vfs_write</code>.'
+        info: 'Total of bytes read or written with success using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS I/O functions</a>. This chart may not show all file system events if it uses other functions' +
+            'to store data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_write_bytes">application</a> and <a href="#ebpf_services_vfs_write_bytes">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io_bytes"></div>'
     },
 
     'filesystem.vfs_io_error': {
         title : 'VFS IO error',
-        info: 'Failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>.'
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS I/O functions</a>. This chart may not show all file system events if it uses other functions' +
+            'to store data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_write_error">application</a> and <a href="#ebpf_services_vfs_write_error">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io_error"></div>'
     },
 
     'filesystem.vfs_fsync': {
-        info: 'Successful or failed calls to functions <code>vfs_fsync</code>.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. This chart may not show all file system events if it uses other functions' +
+            'to sync data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_sync">application</a> and <a href="#ebpf_services_vfs_sync">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_sync"></div>'
     },
 
     'filesystem.vfs_fsync_error': {
-        info: 'Failed calls to functions <code>vfs_fsync</code>.'
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function.</a>. This chart may not show all file system events if it uses other functions' +
+            'to sync data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_sync_error">application</a> and <a href="#ebpf_services_vfs_sync_error">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_sync_error"></div>'
     },
 
     'filesystem.vfs_open': {
-        info: 'Successful or failed calls to functions <code>vfs_open</code>.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. This chart may not show all file system events if it uses other functions' +
+            'to open files. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_open">application</a> and <a href="#ebpf_services_vfs_open">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_open"></div>'
     },
 
     'filesystem.vfs_open_error': {
-        info: 'Failed calls to functions <code>vfs_open</code>.'
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. This chart may not show all file system events if it uses other functions' +
+            'to open files. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_open_error">application</a> and <a href="#ebpf_services_vfs_open_error">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_open_error"></div>'
     },
 
     'filesystem.vfs_create': {
-        info: 'Successful or failed calls to functions <code>vfs_create</code>.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. This chart may not show all file system events if it uses other functions' +
+            'to create files. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_create">application</a> and <a href="#ebpf_services_vfs_create">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_create"></div>'
     },
 
     'filesystem.vfs_create_error': {
-        info: 'Failed calls to functions <code>vfs_create</code>.'
+        info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. This chart may not show all file system events if it uses other functions' +
+            'to create files. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_craete_error">application</a> and <a href="#ebpf_services_vfs_create_error">cgroup (systemd Services)</a> ' +
+            'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
+            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_create_error"></div>'
     },
 
     'filesystem.ext4_read_latency': {
