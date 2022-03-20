@@ -1192,43 +1192,43 @@ const ebpfDCNotFound = 'Number of times a file was not found on the file system.
     'and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows directory cache per <a href="#ebpf_apps_dc_not_found">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSWrite = 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSRead = 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSWriteError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSReadError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSWriteBytes = 'Total of bytes successfully written using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write_bytes">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSReadBytes = 'Total of bytes successfully read using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read_bytes">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSUnlink = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS unlinker function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_unlink">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_unlink">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_unlink">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSSync = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_sync">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_sync">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_sync">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSSyncError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_sync_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_sync_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_sync_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSOpen = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_open">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_open">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_open">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSOpenError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_open_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_open_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_open_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSCreate = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_create">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_create">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfVFSCreateError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
-    '<a href="#ebpf_global_vfs_create_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf">enabled</a>, ' +
+    '<a href="#ebpf_global_vfs_create_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 
 netdataDashboard.context = {
