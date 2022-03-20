@@ -16,7 +16,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 ## Disclaimer
 
-Every module should be compatible with python2 and python3.
 All third party libraries should be installed system-wide or in `python_modules` directory.
 Module configurations are written in YAML and **pyYAML is required**.
 
