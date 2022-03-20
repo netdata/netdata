@@ -169,7 +169,7 @@ int rrdset2value_api_v1(
 
     ONEWAYALLOC *owa = onewayalloc_create(0);
 
-    RRDR *r = rrd2rrdr(owa, st, points, after, before, group_method, group_time, options, dimensions, NULL, timeout);
+    RRDR *r = rrd2rrdr(owa, st, points, after, before, group_method, group_time, options, 0, dimensions, NULL, timeout);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -220,17 +220,18 @@ int rrdset2anything_api_v1(
         , int group_method
         , long group_time
         , uint32_t options
+        , uint64_t stats
         , time_t *latest_timestamp
         , struct context_param *context_param_list
         , char *chart_label_key
         , int max_anomaly_rates
         , int timeout
-)
-{
+) {
+
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
         st->last_accessed_time = now_realtime_sec();
 
-    RRDR *r = rrd2rrdr(owa, st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, context_param_list, timeout);
+    RRDR *r = rrd2rrdr(owa, st, points, after, before, group_method, group_time, options, stats, dimensions?buffer_tostring(dimensions):NULL, context_param_list, timeout);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;

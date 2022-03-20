@@ -44,6 +44,24 @@ static struct {
 static struct {
     const char *name;
     uint32_t hash;
+    RRDR_GROUPING value;
+} api_v1_stats[] = {
+         {"average"             , 0    , RRDR_GROUPING_AVERAGE}
+        , {"min"                , 0    , RRDR_GROUPING_MIN}
+        , {"max"                , 0    , RRDR_GROUPING_MAX}
+        , {"sum"                , 0    , RRDR_GROUPING_SUM}
+        , {"incremental_sum"    , 0    , RRDR_GROUPING_INCREMENTAL_SUM}
+        , {"median"             , 0    , RRDR_GROUPING_MEDIAN}
+        , {"stddev"             , 0    , RRDR_GROUPING_STDDEV}
+        , {"cv"                 , 0    , RRDR_GROUPING_CV}
+        , {"ses"                , 0    , RRDR_GROUPING_SES}
+        , {"des"                , 0    , RRDR_GROUPING_DES}
+        , {"zscore"             , 0    , RRDR_GROUPING_ZSCORE}
+        , {                 NULL, 0, 0}
+};
+static struct {
+    const char *name;
+    uint32_t hash;
     uint32_t value;
 } api_v1_data_formats[] = {
         {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
@@ -87,6 +105,9 @@ void web_client_api_v1_init(void) {
 
     for(i = 0; api_v1_data_google_formats[i].name ; i++)
         api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
+
+    for(i = 0; api_v1_stats[i].name ; i++)
+        api_v1_stats[i].hash = simple_hash(api_v1_stats[i].name);
 
     web_client_api_v1_init_grouping();
 
@@ -160,6 +181,25 @@ temp_key:
 
 void web_client_api_v1_management_init(void) {
 	api_secret = get_mgmt_api_key();
+}
+
+inline uint64_t web_client_api_request_v1_stats(char *o) {
+    uint64_t ret = 0x0000000000000000;
+    char *tok;
+
+    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+        if(!*tok) continue;
+
+        uint32_t hash = simple_hash(tok);
+        int i;
+        for(i = 0; api_v1_stats[i].name ; i++) {
+            if (unlikely(hash == api_v1_stats[i].hash && !strcmp(tok, api_v1_stats[i].name))) {
+                ret |= api_v1_stats[i].value;
+                break;
+            }
+        }
+    }
+    return ret;
 }
 
 inline uint32_t web_client_api_request_v1_data_options(char *o) {
@@ -424,6 +464,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t format = DATASOURCE_JSON;
     uint32_t options = 0x00000000;
+    uint64_t stats = 0x0000000000000000;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -466,6 +507,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         }
         else if(!strcmp(name, "filename")) {
             outFileName = value;
+        }
+        else if(!strcmp(name, "stats")) {
+            stats |= web_client_api_request_v1_stats(value);
         }
         else if(!strcmp(name, "tqx")) {
             // parse Google Visualization API options
@@ -647,7 +691,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     ret = rrdset2anything_api_v1(owa, st, w->response.data, dimensions, format,
                                  points, after, before, group, group_time,
-                                 options, &last_timestamp_in_data, context_param_list,
+                                 options,  stats, &last_timestamp_in_data, context_param_list,
                                  chart_label_key, max_anomaly_rates, timeout);
 
     free_context_param_list(owa, &context_param_list);

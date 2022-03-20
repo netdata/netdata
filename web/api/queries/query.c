@@ -857,6 +857,7 @@ static RRDR *rrd2rrdr_fixedstep(
         , RRDR_GROUPING group_method
         , long resampling_time_requested
         , RRDR_OPTIONS options
+        , uint64_t stats
         , const char *dimensions
         , int update_every
         , time_t first_entry_t
@@ -865,6 +866,7 @@ static RRDR *rrd2rrdr_fixedstep(
         , struct context_param *context_param_list
         , int timeout
 ) {
+    UNUSED(stats);
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
     // the duration of the chart
@@ -1243,6 +1245,7 @@ static RRDR *rrd2rrdr_variablestep(
         , RRDR_GROUPING group_method
         , long resampling_time_requested
         , RRDR_OPTIONS options
+        , uint64_t stats
         , const char *dimensions
         , int update_every
         , time_t first_entry_t
@@ -1252,6 +1255,7 @@ static RRDR *rrd2rrdr_variablestep(
         , struct context_param *context_param_list
         , int timeout
 ) {
+    UNUSED(stats);
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
     // the duration of the chart
@@ -1636,6 +1640,7 @@ RRDR *rrd2rrdr(
         , RRDR_GROUPING group_method
         , long resampling_time_requested
         , RRDR_OPTIONS options
+        , uint64_t stats
         , const char *dimensions
         , struct context_param *context_param_list
         , int timeout
@@ -1691,7 +1696,7 @@ RRDR *rrd2rrdr(
                 freez(region_info_array);
             }
             return rrd2rrdr_fixedstep(owa, st, points_requested, after_requested, before_requested, group_method,
-                                      resampling_time_requested, options, dimensions, rrd_update_every,
+                                      resampling_time_requested, options, stats, dimensions, rrd_update_every,
                                       first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
         } else {
             if (rrd_update_every != (uint16_t)max_interval) {
@@ -1702,12 +1707,12 @@ RRDR *rrd2rrdr(
                                                                                   last_entry_t, options);
             }
             return rrd2rrdr_variablestep(owa, st, points_requested, after_requested, before_requested, group_method,
-                                         resampling_time_requested, options, dimensions, rrd_update_every,
+                                         resampling_time_requested, options, stats, dimensions, rrd_update_every,
                                          first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list, timeout);
         }
     }
 #endif
     return rrd2rrdr_fixedstep(owa, st, points_requested, after_requested, before_requested, group_method,
-                              resampling_time_requested, options, dimensions,
+                              resampling_time_requested, options, stats, dimensions,
                               rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
 }

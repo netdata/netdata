@@ -10,6 +10,7 @@
 
 #define MAX_CHART_LABELS_FILTER (32)
 extern uint32_t web_client_api_request_v1_data_options(char *o);
+extern uint64_t web_client_api_request_v1_stats(char *o);
 extern uint32_t web_client_api_request_v1_data_format(char *name);
 extern uint32_t web_client_api_request_v1_data_google_format(char *name);
 

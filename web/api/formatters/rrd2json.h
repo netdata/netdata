@@ -65,6 +65,7 @@ extern int rrdset2anything_api_v1(
         , int group_method
         , long group_time
         , uint32_t options
+        , uint64_t stats
         , time_t *latest_timestamp
         , struct context_param *context_param_list
         , char *chart_label_key
