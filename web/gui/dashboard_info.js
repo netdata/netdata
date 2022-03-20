@@ -1146,38 +1146,38 @@ const netMTUInfo = 'The interface\'s currently configured ' +
 const ebpfChartProvides = ' This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfProcessCreate = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
     'that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration ' +
-    'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per ' +
+    'is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows process per ' +
     '<a href="#ebpf_apps_process_create">apps</a>.' + ebpfChartProvides
 const ebpfThreadCreate = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
     'that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration ' +
-    'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per ' +
+    'is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows process per ' +
     '<a href="#ebpf_apps_thread_create">apps</a>.' + ebpfChartProvides
 const ebpfTaskExit = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
     'that responsible for closing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration ' +
-    'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per '
+    'is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows process per '
     '<a href="#ebpf_apps_process_exit">apps</a>.' + ebpfChartProvides
 const ebpfTaskClose = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
     'that responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration ' +
-    'is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, Netdata shows process per ' +
+    'is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows process per ' +
     '<a href="#ebpf_apps_task_release">apps</a>.' + ebpfChartProvides
 const ebpfTaskError = 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error" target="_blank">task</a>. Netdata gives a ' +
-    'summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    'summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows process per <a href="#ebpf_apps_task_error">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfFileOpen = 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
     'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is ' +
-    '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_file_open">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfFileOpenError = 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
     'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_error">file access</a>, and when the integration is ' +
-    '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_file_open_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfFileClosed = 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
     'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is ' +
-    '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_file_closed">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfFileCloseError = 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
     'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_error">file access</a>, and when the integration is ' +
-    '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin" target="_blank">enabled</a>, ' +
+    '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_file_close_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
 const ebpfDCHit = 'Percentage of file accesses that were present in the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. ' +
     'Netdata gives a summary for this chart in <a href="#ebpf_dc_hit_ratio">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
