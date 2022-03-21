@@ -949,7 +949,7 @@ netdataDashboard.submenu = {
 
     'filesystem.ext4_latency': {
         title: 'ext4 latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem">Latency</a> is the time it takes for an event to be completed. Based on the <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">eBPF ext4dist</a> from BCC tools.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">eBPF ext4dist</a> from BCC tools.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_latency': {
@@ -3129,7 +3129,7 @@ netdataDashboard.context = {
     },
     'disk.latency_io': {
         height: 0.5,
-        info: 'Disk I/O <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#disk">latency</a> is the time it takes for an I/O request to be completed. Disk chart has a relationship with <a href="#filesystem">Filesystem</a> charts. This chart is based on the <a href="https://github.com/cloudflare/ebpf_exporter/blob/master/examples/bio-tracepoints.yaml" target="_blank">bio_tracepoints</a> tool of the ebpf_exporter.' + ebpfChartProvides
+        info: 'Disk I/O <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#disk" target="_blank">latency</a> is the time it takes for an I/O request to be completed. Disk chart has a relationship with <a href="#filesystem">Filesystem</a> charts. This chart is based on the <a href="https://github.com/cloudflare/ebpf_exporter/blob/master/examples/bio-tracepoints.yaml" target="_blank">bio_tracepoints</a> tool of the ebpf_exporter.' + ebpfChartProvides
     },
     'disk.avgsz': {
         height: 0.5,
@@ -3770,7 +3770,7 @@ netdataDashboard.context = {
     },
 
     'netdata.ebpf_threads': {
-        info: 'Show total number of threads and number of active threads. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs">official documentation</a>.'
+        info: 'Show total number of threads and number of active threads. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs" target="_blank">official documentation</a>.'
     },
 
     'netdata.ebpf_load_methods': {
@@ -5969,83 +5969,83 @@ netdataDashboard.context = {
     },
 
     'filesystem.ext4_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring ext4 reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>.' + ebpfChartProvides + 'to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring ext4 reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4" target="_blank">function</a>.' + ebpfChartProvides + 'to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring ext4 writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring ext4 writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring ext4 opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring ext4 opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_sync_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring ext4 syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring ext4 syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring xfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring xfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring xfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring xfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring xfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring xfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_sync_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring xfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring xfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring nfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring nfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring nfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring nfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring nfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring nfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_attribute_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each get attribute request monitoring nfs attribute <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each get attribute request monitoring nfs attribute <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring zfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring zfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring zfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring zfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring zfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring zfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_sync_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring zfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring zfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring btrfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring btrfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring btrfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring btrfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring btrfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring btrfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_sync_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring btrfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring btrfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs" target="_blank">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'mount_points.call': {
@@ -6063,7 +6063,7 @@ netdataDashboard.context = {
     },
 
     'filesystem.file_error': {
-        info: 'Number of failed calls to the kernel internal function responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor">to open and closing files</a>. ' +
+        info: 'Number of failed calls to the kernel internal function responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open and closing files</a>. ' +
               'Netdata shows file error per <a href="#ebpf_apps_file_open_error">application</a> and <a href="#ebpf_services_file_open_error">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> ' +
               'or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
