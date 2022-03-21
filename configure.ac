@@ -1214,7 +1214,6 @@ if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
         [have_libbpf=no]
     )
 
-    AC_MSG_CHECKING([if ebpf.plugin should be enabled])
     if test "${have_libelf}" = "yes" -a \
             "${have_bpf}" = "yes" -a \
             "${have_libbpf}" = "yes"; then
@@ -1228,6 +1227,7 @@ if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
 else
     enable_ebpf="no"
 fi
+AC_MSG_CHECKING([if ebpf.plugin should be enabled])
 AC_MSG_RESULT([${enable_ebpf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_EBPF], [test "${enable_ebpf}" = "yes"])
 
