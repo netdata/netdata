@@ -325,12 +325,19 @@ void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted)
     buffer_free(local_buffer);
 }
 
-void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, const char *payload, size_t payload_len)
+void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
     msg = create_hdr("http", msg_id, 0, 0, 2);
     tmp = json_object_new_int(http_code);
     json_object_object_add(msg, "http-code", tmp);
+
+    tmp = json_object_new_int(ec);
+    json_object_object_add(msg, "error-code", tmp);
+
+    tmp = json_object_new_string(emsg);
+    json_object_object_add(msg, "error-description", tmp);
+
     if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
         error("Failed to send cancelation message for http reply");
     }
@@ -355,8 +362,17 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
     int rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
     json_object_put(msg);
 
-    if (rc)
-        aclk_http_msg_v2_err(client, topic, msg_id, rc, payload, payload_len);
+    switch (rc) {
+    case 403:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, payload, payload_len);
+        break;
+    case 500:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
+        break;
+    case 503:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
+        break;
+    }
 }
 
 void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart)

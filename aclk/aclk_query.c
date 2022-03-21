@@ -115,20 +115,20 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);
         char nodeid[UUID_STR_LEN];
         if (strlen(node_uuid) < (UUID_STR_LEN - 1)) {
-            error("URL requests node_id but there is not enough chars following. Returning 404 to Cloud.");
+            error_report(CLOUD_EMSG_MALFORMED_NODE_ID);
             retval = 1;
             w->response.code = 404;
-            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, NULL, 0);
+            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_MALFORMED_NODE_ID, CLOUD_EMSG_MALFORMED_NODE_ID, NULL, 0);
             goto cleanup;
         }
         strncpyz(nodeid, node_uuid, UUID_STR_LEN - 1);
 
         query_host = node_id_2_rrdhost(nodeid);
         if (!query_host) {
-            error("Host with node_id \"%s\" not found! Returning 404 to Cloud!", node_uuid);
+            error_report("Host with node_id \"%s\" not found! Returning 404 to Cloud!", nodeid);
             retval = 1;
             w->response.code = 404;
-            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, NULL, 0);
+            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_NODE_NOT_FOUND, CLOUD_EMSG_NODE_NOT_FOUND, NULL, 0);
             goto cleanup;
         }
     }
@@ -187,7 +187,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
                     error("Unknown error during zlib compression.");
                 retval = 1;
                 w->response.code = 500;
-                aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, NULL, 0);
+                aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_ZLIB_ERROR, CLOUD_EMSG_ZLIB_ERROR, NULL, 0);
                 goto cleanup;
             }
             int bytes_to_cpy = NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE - w->response.zstream.avail_out;
