@@ -4070,7 +4070,7 @@ netdataDashboard.context = {
     },
 
     'cgroup.fd_open_error': {
-        info: ebpfFileCloseError
+        info: ebpfFileOpenError
     },
 
     'cgroup.fd_close': {
