@@ -2,8 +2,16 @@ name: Trigger Cloud Regression E2E Tests
 on:
   push:
     branches: [master]
+    paths:
+      - 'CMakeLists.txt'
+      - '**.c'
+      - '**.h'
   pull_request_target:
     branches: [master]
+    paths:
+      - 'CMakeLists.txt'
+      - '**.c'
+      - '**.h'
 jobs:
   trigger_cloud_regression_tests:
     runs-on: ubuntu-latest
