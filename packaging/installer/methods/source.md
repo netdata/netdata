@@ -46,25 +46,25 @@ Additionally, the following build time features require additional dependencies:
 -   eBPF monitoring support on Linux:
     -   libelf 0.0.6 or newer (for legacy eBPF) _or_ libelf 0.5 or newer (for CO-RE)
 
+## If using a git checkout
+### Submodules
+
+Our git repository uses submodules for certain copoments. To obtain a complete build when using a git checkout,
+make sure you either clone the repository with the `--recursive` option, or that you run `git submodule update
+--init --recursivea` in your local copy of the repository before attempting to build Netdata.
+
+### Handling version numbers with git checkouts
+
+When building from a git checkout, our build systems requires the git history at least as far back as the most
+recent tag to ensure that the correct version number is used. In most cases, this means that a shallow clone
+created with `--depth=1` will only work if you are building a stable version and cloned the associated tag directly.
+
 ## Preparing the source tree
 
 Certain features in Netdata require custom versions of specific libraries,
 which the the build system will link statically into Netdata. These
 libraries and their header files must be copied into specific locations
 in the source tree to be used.
-
-### If using a git checkout
-#### Submodules
-
-Our git repository uses submodules for certain copoments. To obtain a complete build when using a git checkout,
-make sure you either clone the repository with the `--recursive` option, or that you run `git submodule update
---init --recursivea` in your local copy of the repository before attempting to build Netdata.
-
-#### Handling version numbers with git checkouts
-
-When building from a git checkout, our build systems requires the git history at least as far back as the most
-recent tag to ensure that the correct version number is used. In most cases, this means that a shallow clone
-created with `--depth=1` will only work if you are building a stable version and cloned the associated tag directly.
 
 ### Netdata cloud support
 #### JSON-C

@@ -96,6 +96,7 @@ not allow you to automatically [connect](/claim/README.md) your node to Netdata 
 
 See the [connect to cloud](/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
 
+## Known Issues
 ### 'nonrepresentable section on output' errors
 
 Our current build process unfortunately has some issues when using certain configurations of the `clang` C compiler on Linux.
