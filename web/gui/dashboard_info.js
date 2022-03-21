@@ -949,27 +949,27 @@ netdataDashboard.submenu = {
 
     'filesystem.ext4_latency': {
         title: 'ext4 latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem">Latency</a> is the time it takes for an event to be completed. Based on the <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">eBPF ext4dist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem">Latency</a> is the time it takes for an event to be completed. Based on the <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">eBPF ext4dist</a> from BCC tools.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_latency': {
         title: 'xfs latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/xfsdist_example.txt" target="_blank">xfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/xfsdist_example.txt" target="_blank">xfsdist</a> from BCC tools.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_latency': {
         title: 'nfs latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/nfsdist_example.txt" target="_blank">nfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/nfsdist_example.txt" target="_blank">nfsdist</a> from BCC tools.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_latency': {
         title: 'zfs latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/zfsdist_example.txt" target="_blank">zfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/zfsdist_example.txt" target="_blank">zfsdist</a> from BCC tools.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_latency': {
         title: 'btrfs latency (eBPF)',
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> is the time it takes for an event to be completed. Based on the <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.file_access': {
@@ -1147,89 +1147,89 @@ const ebpfChartProvides = ' This chart is provided by the <a href="#menu_netdata
 const ebpfProcessCreate = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
     'that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration ' +
     'is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows process per ' +
-    '<a href="#ebpf_apps_process_create">apps</a>.' + ebpfChartProvides
+    '<a href="#ebpf_apps_process_create">application</a>.' + ebpfChartProvides
 const ebpfThreadCreate = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
     'that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration ' +
     'is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows process per ' +
-    '<a href="#ebpf_apps_thread_create">apps</a>.' + ebpfChartProvides
+    '<a href="#ebpf_apps_thread_create">application</a>.' + ebpfChartProvides
 const ebpfTaskExit = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
     'that responsible for closing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration ' +
     'is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows process per '
-    '<a href="#ebpf_apps_process_exit">apps</a>.' + ebpfChartProvides
+    '<a href="#ebpf_apps_process_exit">application</a>.' + ebpfChartProvides
 const ebpfTaskClose = 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> ' +
     'that responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration ' +
     'is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows process per ' +
-    '<a href="#ebpf_apps_task_release">apps</a>.' + ebpfChartProvides
+    '<a href="#ebpf_apps_task_release">application</a>.' + ebpfChartProvides
 const ebpfTaskError = 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error" target="_blank">task</a>. Netdata gives a ' +
     'summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows process per <a href="#ebpf_apps_task_error">apps</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows process per <a href="#ebpf_apps_task_error">application</a>.' + ebpfChartProvides
 const ebpfFileOpen = 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
     'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is ' +
     '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_file_open">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_file_open">application</a>.' + ebpfChartProvides
 const ebpfFileOpenError = 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
     'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_error">file access</a>, and when the integration is ' +
     '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_file_open_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_file_open_error">application</a>.' + ebpfChartProvides
 const ebpfFileClosed = 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
     'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is ' +
     '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_file_closed">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_file_closed">application</a>.' + ebpfChartProvides
 const ebpfFileCloseError = 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
     'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_error">file access</a>, and when the integration is ' +
     '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_file_close_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_file_close_error">application</a>.' + ebpfChartProvides
 const ebpfDCHit = 'Percentage of file accesses that were present in the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. ' +
     'Netdata gives a summary for this chart in <a href="#ebpf_dc_hit_ratio">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows directory cache per <a href="#ebpf_apps_dc_hit">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows directory cache per <a href="#ebpf_apps_dc_hit">application</a>.' + ebpfChartProvides
 const ebpfDCReference = 'Number of times a file is accessed inside <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. ' +
     'Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows directory cache per <a href="#ebpf_apps_dc_reference">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows directory cache per <a href="#ebpf_apps_dc_reference">application</a>.' + ebpfChartProvides
 const ebpfDCNotCache = 'Number of times a file is accessed in the file system, because it is not present inside the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. ' +
     'Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows directory cache per <a href="#ebpf_apps_dc_not_cache">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows directory cache per <a href="#ebpf_apps_dc_not_cache">application</a>.' + ebpfChartProvides
 const ebpfDCNotFound = 'Number of times a file was not found on the file system. Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, ' +
     'and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows directory cache per <a href="#ebpf_apps_dc_not_found">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows directory cache per <a href="#ebpf_apps_dc_not_found">application</a>.' + ebpfChartProvides
 const ebpfVFSWrite = 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write">application</a>.' + ebpfChartProvides
 const ebpfVFSRead = 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read">application</a>.' + ebpfChartProvides
 const ebpfVFSWriteError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write_error">application</a>.' + ebpfChartProvides
 const ebpfVFSReadError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read_error">application</a>.' + ebpfChartProvides
 const ebpfVFSWriteBytes = 'Total of bytes successfully written using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write_bytes">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_write_bytes">application</a>.' + ebpfChartProvides
 const ebpfVFSReadBytes = 'Total of bytes successfully read using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read_bytes">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_read_bytes">application</a>.' + ebpfChartProvides
 const ebpfVFSUnlink = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS unlinker function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_unlink">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_unlink">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_unlink">application</a>.' + ebpfChartProvides
 const ebpfVFSSync = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_sync">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_sync">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_sync">application</a>.' + ebpfChartProvides
 const ebpfVFSSyncError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_sync_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_sync_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_sync_error">application</a>.' + ebpfChartProvides
 const ebpfVFSOpen = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_open">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_open">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_open">application</a>.' + ebpfChartProvides
 const ebpfVFSOpenError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_open_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_open_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_open_error">application</a>.' + ebpfChartProvides
 const ebpfVFSCreate = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_create">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create">application</a>.' + ebpfChartProvides
 const ebpfVFSCreateError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_create_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
-    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create_error">application</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+    'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create_error">application</a>.' + ebpfChartProvides
 
 netdataDashboard.context = {
     'system.cpu': {
@@ -1468,22 +1468,22 @@ netdataDashboard.context = {
 
     'system.process_thread': {
         title : 'Task creation',
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process or thread is called. Netdata shows process metrics per <a href="#ebpf_apps_process_create">application</a> and <a href="#ebpf_services_process_create">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_system_process_thread"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process or thread is called. Netdata shows process metrics per <a href="#ebpf_apps_process_create">application</a> and <a href="#ebpf_services_process_create">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_system_process_thread"></div>'
     },
 
     'system.exit': {
         title : 'Exit monitoring',
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit target="_blank"">a function</a> responsible to close a process or thread is called. Netdata shows process metrics per <a href="#ebpf_apps_process_exit">application</a> and <a href="#ebpf_services_process_exit">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_system_process_exit"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit target="_blank"">a function</a> responsible to close a process or thread is called. Netdata shows process metrics per <a href="#ebpf_apps_process_exit">application</a> and <a href="#ebpf_services_process_exit">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_system_process_exit"></div>'
     },
 
     'system.task_error': {
         title : 'Task error',
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error" target="_blank">a function</a> that starts a process or thread failed. Netdata shows process metrics per <a href="#ebpf_apps_task_error">application</a> and <a href="#ebpf_services_task_error">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_system_task_error"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#task-error" target="_blank">a function</a> that starts a process or thread failed. Netdata shows process metrics per <a href="#ebpf_apps_task_error">application</a> and <a href="#ebpf_services_task_error">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_system_task_error"></div>'
     },
 
     'system.process_status': {
         title : 'Task status',
-        info: 'Difference between the number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">functions</a> that close a task and release a task. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+        info: 'Difference between the number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">functions</a> that close a task and release a task.'+ ebpfChartProvides
     },
 
     // ------------------------------------------------------------------------
@@ -1721,11 +1721,11 @@ netdataDashboard.context = {
     },
 
     'filesystem.dc_hit_ratio': {
-        info: 'Percentage of file accesses that were present in the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata shows directory cache metrics per <a href="#ebpf_apps_dc_hit">application</a> and <a href="#ebpf_services_dc_hit">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_dc_hit_ratio"></div>'
+        info: 'Percentage of file accesses that were present in the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata shows directory cache metrics per <a href="#ebpf_apps_dc_hit">application</a> and <a href="#ebpf_services_dc_hit">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_dc_hit_ratio"></div>'
     },
 
     'filesystem.dc_reference': {
-        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access and the file is not present in the directory cache. <code>Miss</code> is when there is file access and the file is not found in the filesystem. <code>Slow</code> is when there is a file access and the file is present in the filesystem but not in the directory cache. Netdata shows directory cache metrics per <a href="#ebpf_apps_dc_reference">application</a> and <a href="#ebpf_services_dc_reference">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_dc_reference"></div>'
+        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access and the file is not present in the directory cache. <code>Miss</code> is when there is file access and the file is not found in the filesystem. <code>Slow</code> is when there is a file access and the file is present in the filesystem but not in the directory cache. Netdata shows directory cache metrics per <a href="#ebpf_apps_dc_reference">application</a> and <a href="#ebpf_services_dc_reference">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_dc_reference"></div>'
     },
 
     'md.health': {
@@ -2677,123 +2677,123 @@ netdataDashboard.context = {
     'apps.file_open': {
         info: 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
               'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-              'Netdata shows virtual file system per <a href="#ebpf_services_file_open">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_file_open"></div>'
+              'Netdata shows virtual file system per <a href="#ebpf_services_file_open">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_file_open"></div>'
     },
 
     'apps.file_open_error': {
         info: 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open files</a>. ' +
               'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-              'Netdata shows virtual file system per <a href="#ebpf_services_file_open_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_file_open_error"></div>'
+              'Netdata shows virtual file system per <a href="#ebpf_services_file_open_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_file_open_error"></div>'
     },
 
     'apps.file_closed': {
         info: 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
               'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-              'Netdata shows virtual file system per <a href="#ebpf_services_file_closed">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_file_closed"></div>'
+              'Netdata shows virtual file system per <a href="#ebpf_services_file_closed">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_file_closed"></div>'
     },
 
     'apps.file_close_error': {
         info: 'Number of failed calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to close files</a>. ' +
             'Netdata gives a summary for this chart in <a href="#menu_filesystem_submenu_file_access">file access</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_file_close_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_file_close_error"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_file_close_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_file_close_error"></div>'
     },
 
     'apps.file_deleted': {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS unlinker function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_unlink">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_unlink">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_unlink"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_unlink">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_unlink"></div>'
     },
 
     'apps.vfs_write_call': {
         info: 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
               '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-              'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_write"></div>'
+              'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_write"></div>'
     },
 
     'apps.vfs_write_error': {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_write_error"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_write_error"></div>'
     },
 
     'apps.vfs_read_call': {
         info: 'Number of successful calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
               '<a href="#ebpf_global_vfs_io">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-              'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_read"></div>'
+              'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_read"></div>'
     },
 
     'apps.vfs_read_error': {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_io_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_read_error"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_read_error"></div>'
     },
 
     'apps.vfs_write_bytes': {
         info: 'Total of bytes successfully written using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS writer function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write_bytes">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_write_bytes"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_write_bytes">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_write_bytes"></div>'
     },
 
     'apps.vfs_read_bytes': {
         info: 'Total of bytes successfully written using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS reader function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_io_bytes">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read_bytes">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_read_bytes"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_read_bytes">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_read_bytes"></div>'
     },
 
     'apps.vfs_fsync': {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_sync">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_sync">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_sync"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_sync">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_sync"></div>'
     },
 
     'apps.vfs_fsync_error': {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_sync_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_sync_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_sync_error"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_sync_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_sync_error"></div>'
     },
 
     'apps.vfs_open': {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_open">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_open">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_open"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_open">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_open"></div>'
     },
 
     'apps.vfs_open_error': {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_open_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_open_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_open_error"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_open_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_open_error"></div>'
     },
 
     'apps.vfs_create': {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_create">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_create">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_create"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_create">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_create"></div>'
     },
 
     'apps.vfs_create_error': {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
             '<a href="#ebpf_global_vfs_create_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
-            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_create_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_vfs_create_error"></div>'
+            'Netdata shows virtual file system per <a href="#ebpf_services_vfs_create_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_vfs_create_error"></div>'
     },
 
     'apps.process_create': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_process_create">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_process_create"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a process is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_process_create">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_process_create"></div>'
     },
 
     'apps.thread_create': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_thread_create">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_thread_create"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#processes" target="_blank">a function</a> that starts a thread is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_thread">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_thread_create">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_thread_create"></div>'
     },
 
     'apps.task_exit': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">a function</a> responsible for closing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_process_exit">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_process_exit"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">a function</a> responsible for closing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_process_exit">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_process_exit"></div>'
     },
 
     'apps.task_close': {
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">a function</a> responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_task_releease">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_task_release"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">a function</a> responsible for releasing tasks is called. Netdata gives a summary for this chart in <a href="#ebpf_system_process_exit">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_task_releease">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_task_release"></div>'
     },
 
     'apps.task_error': {
-        info: 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">task</a>. Netdata gives a summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_task_error">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_task_error"></div>'
+        info: 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">task</a>. Netdata gives a summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_task_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_task_error"></div>'
     },
 
     'apps.total_bandwidth_sent': {
@@ -2825,19 +2825,19 @@ netdataDashboard.context = {
     },
 
     'apps.dc_hit_ratio': {
-        info: 'Percentage of file accesses that were present in the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_dc_hit_ratio">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_hit">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_dc_hit"></div>'
+        info: 'Percentage of file accesses that were present in the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_dc_hit_ratio">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_hit">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_dc_hit"></div>'
     },
 
     'apps.dc_reference': {
-        info: 'Number of times a file is accessed inside <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_reference">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_dc_reference"></div>'
+        info: 'Number of times a file is accessed inside <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_reference">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_dc_reference"></div>'
     },
 
     'apps.dc_not_cache': {
-        info: 'Number of times a file is accessed in the file system, because it is not present inside the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_not_cache">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_dc_not_cache"></div>'
+        info: 'Number of times a file is accessed in the file system, because it is not present inside the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_not_cache">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_dc_not_cache"></div>'
     },
 
     'apps.dc_not_found': {
-        info: 'Number of times a file was not found on the file system. Netdata gives a summary for this chart in  <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_not_found">cgroup (systemd Services)</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.<div id="ebpf_apps_dc_not_found"></div>'
+        info: 'Number of times a file was not found on the file system. Netdata gives a summary for this chart in  <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_not_found">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_dc_not_found"></div>'
     },
 
     // ------------------------------------------------------------------------
@@ -3129,7 +3129,7 @@ netdataDashboard.context = {
     },
     'disk.latency_io': {
         height: 0.5,
-        info: 'Disk I/O <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#disk">latency</a> is the time it takes for an I/O request to be completed. Disk chart has a relationship with <a href="#filesystem">Filesystem</a> charts. This chart is based on the <a href="https://github.com/cloudflare/ebpf_exporter/blob/master/examples/bio-tracepoints.yaml" target="_blank">bio_tracepoints</a> tool of the ebpf_exporter. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a>.'
+        info: 'Disk I/O <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#disk">latency</a> is the time it takes for an I/O request to be completed. Disk chart has a relationship with <a href="#filesystem">Filesystem</a> charts. This chart is based on the <a href="https://github.com/cloudflare/ebpf_exporter/blob/master/examples/bio-tracepoints.yaml" target="_blank">bio_tracepoints</a> tool of the ebpf_exporter.' + ebpfChartProvides
     },
     'disk.avgsz': {
         height: 0.5,
@@ -5889,8 +5889,8 @@ netdataDashboard.context = {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS unlinker function</a>. This chart may not show all file system events if it uses other functions' +
             'to store data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_unlink">application</a> and <a href="#ebpf_services_vfs_unlink">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_unlink"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_unlink"></div>'
     },
 
     'filesystem.vfs_io': {
@@ -5898,8 +5898,8 @@ netdataDashboard.context = {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS I/O functions</a>. This chart may not show all file system events if it uses other functions' +
               'to store data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_write">application</a> and <a href="#ebpf_services_vfs_write">cgroup (systemd Services)</a> ' +
               'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-              '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-              'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io"></div>'
+              '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+              ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io"></div>'
     },
 
     'filesystem.vfs_io_bytes': {
@@ -5907,8 +5907,8 @@ netdataDashboard.context = {
         info: 'Total of bytes read or written with success using the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS I/O functions</a>. This chart may not show all file system events if it uses other functions' +
             'to store data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_write_bytes">application</a> and <a href="#ebpf_services_vfs_write_bytes">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io_bytes"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io_bytes"></div>'
     },
 
     'filesystem.vfs_io_error': {
@@ -5916,136 +5916,136 @@ netdataDashboard.context = {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS I/O functions</a>. This chart may not show all file system events if it uses other functions' +
             'to store data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_write_error">application</a> and <a href="#ebpf_services_vfs_write_error">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io_error"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_io_error"></div>'
     },
 
     'filesystem.vfs_fsync': {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function</a>. This chart may not show all file system events if it uses other functions' +
             'to sync data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_sync">application</a> and <a href="#ebpf_services_vfs_sync">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_sync"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_sync"></div>'
     },
 
     'filesystem.vfs_fsync_error': {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS syncer function.</a>. This chart may not show all file system events if it uses other functions' +
             'to sync data on disk. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_sync_error">application</a> and <a href="#ebpf_services_vfs_sync_error">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_sync_error"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_sync_error"></div>'
     },
 
     'filesystem.vfs_open': {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. This chart may not show all file system events if it uses other functions' +
             'to open files. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_open">application</a> and <a href="#ebpf_services_vfs_open">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_open"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_open"></div>'
     },
 
     'filesystem.vfs_open_error': {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS opener function</a>. This chart may not show all file system events if it uses other functions' +
             'to open files. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_open_error">application</a> and <a href="#ebpf_services_vfs_open_error">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_open_error"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_open_error"></div>'
     },
 
     'filesystem.vfs_create': {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. This chart may not show all file system events if it uses other functions' +
             'to create files. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_create">application</a> and <a href="#ebpf_services_vfs_create">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_create"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_create"></div>'
     },
 
     'filesystem.vfs_create_error': {
         info: 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. This chart may not show all file system events if it uses other functions' +
             'to create files. Netdata shows virtual file system metrics per <a href="#ebpf_apps_vfs_craete_error">application</a> and <a href="#ebpf_services_vfs_create_error">cgroup (systemd Services)</a> ' +
             'if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
-            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. ' +
-            'This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_create_error"></div>'
+            '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides +
+            ' to monitor <a href="#menu_filesystem">File Systems</a>.<div id="ebpf_global_vfs_create_error"></div>'
     },
 
     'filesystem.ext4_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring ext4 reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring ext4 reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>.' + ebpfChartProvides + 'to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring ext4 writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring ext4 writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring ext4 opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring ext4 opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.ext4_sync_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring ext4 syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring ext4 syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ext4">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring xfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring xfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring xfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring xfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring xfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring xfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.xfs_sync_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring xfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring xfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#xfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring nfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring nfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring nfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring nfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring nfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring nfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.nfs_attribute_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each get attribute request monitoring nfs attribute <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each get attribute request monitoring nfs attribute <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#nfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring zfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring zfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring zfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring zfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring zfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring zfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.zfs_sync_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring zfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring zfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#zfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_read_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring btrfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each read request monitoring btrfs reader <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_write_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring btrfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each write request monitoring btrfs writer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_open_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring btrfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each open request monitoring btrfs opener <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'filesystem.btrfs_sync_latency': {
-        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring btrfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+        info: '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#filesystem" target="_blank">Latency</a> for each sync request monitoring btrfs syncer <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#btrfs">function</a>.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     'mount_points.call': {
@@ -6059,13 +6059,13 @@ netdataDashboard.context = {
     'filesystem.file_descriptor': {
         info: 'Number of calls for internal functions on the Linux kernel responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open and closing files</a>. ' +
               'Netdata shows file access per <a href="#ebpf_apps_file_open">application</a> and <a href="#ebpf_services_file_open">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> ' +
-              'or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>'
+              'or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>'
     },
 
     'filesystem.file_error': {
         info: 'Number of failed calls to the kernel internal function responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor">to open and closing files</a>. ' +
               'Netdata shows file error per <a href="#ebpf_apps_file_open_error">application</a> and <a href="#ebpf_services_file_open_error">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> ' +
-              'or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled. This chart is provided by the <a href="#menu_netdata_submenu_ebpf">eBPF plugin</a> to monitor <a href="#menu_filesystem">File systems</a>.'
+              'or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
     },
 
     // ------------------------------------------------------------------------
