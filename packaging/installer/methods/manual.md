@@ -76,11 +76,11 @@ from the root of your checkout of the Netdata git repository like so:
 ./netdata-installer.sh
 ```
 
--   If you don't want to run it straight-away, add `--dont-start-it` option.
--   If you don't want to install it on the default directories, you can run the installer like this:
-    `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
+-   If you only want to install netdata without starting it straight away, add `--dont-start-it` option.
+-   If you don't want to install netdata on the default directories, you can run the installer like this:
+    `./netdata-installer.sh --install /opt`. This will install Netdata in `/opt/netdata`.
 
-## Optional parameters to alter your installation
+### Optional parameters to alter your installation
 
 `netdata-installer.sh` accepts a few parameters to customize your installation:
 

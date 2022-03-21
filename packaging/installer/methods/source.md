@@ -66,7 +66,7 @@ When building from a git checkout, our build systems requires the git history at
 recent tag to ensure that the correct version number is used. In most cases, this means that a shallow clone
 created with `--depth=1` will only work if you are building a stable version and cloned the associated tag directly.
 
-### Netdata cloud
+### Netdata cloud support
 #### JSON-C
 
 Netdata requires the use of JSON-C for JSON parsing when using Netdata
@@ -101,7 +101,7 @@ build system. You can do the following to prepare a copy for the build system:
 2.  Obtain the sources for that version by either:
     -   Navigating to https://github.com/netdata/libbpf and downloading and unpacking the source code archive for
         that release.
-    -   CLoning the repository with `git` and checking out the required tag.
+    -   Cloning the repository with `git` and checking out the required tag.
 3.  Prepare the libbpf sources by running `make -p src/root src/build` in the libbpf source tree.
 4.  Build libbpf by running `BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install` in the `src/` subdirectory
     of the libbpf source tree.
