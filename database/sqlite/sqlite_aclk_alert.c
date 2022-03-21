@@ -659,6 +659,8 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t sn
             wc->host ? wc->host->hostname : "N/A",
             snapshot_id,
             sequence_id);
+        if (wc->alerts_snapshot_id == snapshot_id)
+            return;
         __sync_synchronize();
         wc->alerts_snapshot_id = snapshot_id;
         wc->alerts_ack_sequence_id = sequence_id;
@@ -780,6 +782,9 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
         error_report("ACLK synchronization thread for %s is not linked to HOST", wc->host_guid);
         return;
     }
+
+    if (unlikely(!wc->alerts_snapshot_id))
+        return;
 
     char *claim_id = is_agent_claimed();
     if (unlikely(!claim_id))
