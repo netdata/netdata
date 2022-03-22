@@ -403,29 +403,32 @@ CLOUD_INSTANCE_REGION="unknown"
 if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
   # Try AWS IMDSv2
   if [ "${CLOUD_TYPE}" = "unknown" ]; then
-    AWS_IMDS_TOKEN="$(curl -s -m 5 --noproxy -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+    AWS_IMDS_TOKEN="$(curl --fail -s -m 5 --noproxy "*" -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
     if [ -n "${AWS_IMDS_TOKEN}" ]; then
       CLOUD_TYPE="AWS"
-      CLOUD_INSTANCE_TYPE="$(curl -s -m 5 --noproxy -H "X-aws-ec2-metadata-token: $TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type")"
-      CLOUD_INSTANCE_REGION="$(curl -s -m 5 --noproxy -H "X-aws-ec2-metadata-token: $TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region")"
+      CLOUD_INSTANCE_TYPE="$(curl --fail -s -m 5 --noproxy "*" -H "X-aws-ec2-metadata-token: $TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type")"
+      CLOUD_INSTANCE_REGION="$(curl --fail -s -m 5 --noproxy "*" -H "X-aws-ec2-metadata-token: $TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region")"
     fi
   fi
 
   # Try GCE computeMetadata v1
   if [ "${CLOUD_TYPE}" = "unknown" ]; then
-    if [ -n "$(curl -s -m 5 --noproxy -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1")" ]; then
+    if [ -n "$(curl --fail -s -m 5 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1")" ]; then
       CLOUD_TYPE="GCP"
-      CLOUD_INSTANCE_TYPE="$(curl -s -m 5 --noproxy -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/machine-type")"
+      CLOUD_INSTANCE_TYPE="$(curl --fail -s -m 5 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/machine-type")"
+      [ -n "$CLOUD_INSTANCE_TYPE" ] && CLOUD_INSTANCE_TYPE=$(basename "$CLOUD_INSTANCE_TYPE")
+      CLOUD_INSTANCE_REGION="$(curl --fail -s -m 5 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/zone")"
+      [ -n "$CLOUD_INSTANCE_REGION" ] && CLOUD_INSTANCE_REGION=$(basename "$CLOUD_INSTANCE_REGION") && CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION%-*}
     fi
   fi
 
   # Try Azure IMDS
   if [ "${CLOUD_TYPE}" = "unknown" ]; then
-    AZURE_IMDS_DATA="$(curl -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?version=2021-10-01")"
+    AZURE_IMDS_DATA="$(curl --fail -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?version=2021-10-01")"
     if [ -n "${AZURE_IMDS_DATA}" ]; then
       CLOUD_TYPE="Azure"
-      CLOUD_INSTANCE_TYPE="$(curl -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?version=2021-10-01&format=text")"
-      CLOUD_INSTANCE_REGION="$(curl -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?version=2021-10-01&format=text")"
+      CLOUD_INSTANCE_TYPE="$(curl --fail -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?version=2021-10-01&format=text")"
+      CLOUD_INSTANCE_REGION="$(curl --fail -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?version=2021-10-01&format=text")"
     fi
   fi
 fi
