@@ -395,6 +395,13 @@ void rrdset_free(RRDSET *st) {
     netdata_rwlock_destroy(&st->state->labels.labels_rwlock);
 
     // free directly allocated members
+    freez((void *)st->name);
+    freez(st->type);
+    freez(st->family);
+    freez(st->title);
+    freez(st->units);
+    freez(st->context);
+    freez(st->cache_dir);
     freez(st->config_section);
     freez(st->plugin_name);
     freez(st->module_name);
