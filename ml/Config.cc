@@ -128,9 +128,6 @@ void Config::readMLConfig(void) {
 
     // Always exclude anomaly_detection charts from training.
     Cfg.ChartsToSkip = "anomaly_detection.* ";
-    Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training",
-            "!system.* !cpu.* !mem.* !disk.* !disk_* "
-            "!ip.* !ipv4.* !ipv6.* !net.* !net_* !netfilter.* "
-            "!services.* !apps.* !groups.* !user.* !ebpf.* !netdata.* *");
+    Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training", "netdata.*");
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 }
