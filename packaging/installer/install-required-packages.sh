@@ -198,7 +198,7 @@ get_os_release() {
   eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
   for x in "${ID}" ${ID_LIKE}; do
     case "${x,,}" in
-      alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
+      almalinux | alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
         distribution="${x}"
         version="${VERSION_ID}"
         codename="${VERSION}"
@@ -419,7 +419,7 @@ detect_package_manager_from_distribution() {
       fi
       ;;
 
-    centos* | clearos* | rocky*)
+    centos* | clearos* | rocky* | almalinux*)
       package_installer=""
       tree="centos"
       [ -n "${dnf}" ] && package_installer="install_dnf"
