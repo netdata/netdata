@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- minor - fix configure output of eBPF [\#12471](https://github.com/netdata/netdata/pull/12471) ([underhood](https://github.com/underhood))
+- docs\(collectors/python.d\): remove mention of compatibility with py2/py3 [\#12465](https://github.com/netdata/netdata/pull/12465) ([ilyam8](https://github.com/ilyam8))
+- feat\(collectors/cgroups\): prefer `blkio.*_recursive` when available [\#12462](https://github.com/netdata/netdata/pull/12462) ([ilyam8](https://github.com/ilyam8))
+- Implement fine-grained errors to cloud queries [\#12460](https://github.com/netdata/netdata/pull/12460) ([underhood](https://github.com/underhood))
 - Update dashboard to version v2.21.8. [\#12455](https://github.com/netdata/netdata/pull/12455) ([netdatabot](https://github.com/netdatabot))
 - fix\(collectors/cgroups\): use different context for cgroup network charts [\#12454](https://github.com/netdata/netdata/pull/12454) ([ilyam8](https://github.com/ilyam8))
 - Add delay on missing priv\_key [\#12450](https://github.com/netdata/netdata/pull/12450) ([underhood](https://github.com/underhood))
@@ -27,6 +31,7 @@
 - chore: remove contrib/sles11 [\#12410](https://github.com/netdata/netdata/pull/12410) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.21.3. [\#12407](https://github.com/netdata/netdata/pull/12407) ([netdatabot](https://github.com/netdatabot))
 - chore: remove "web files" options leftovers [\#12403](https://github.com/netdata/netdata/pull/12403) ([ilyam8](https://github.com/ilyam8))
+- Allow updates without environment files in some cases. [\#12400](https://github.com/netdata/netdata/pull/12400) ([Ferroin](https://github.com/Ferroin))
 - Reorder functions properly in updater script. [\#12399](https://github.com/netdata/netdata/pull/12399) ([Ferroin](https://github.com/Ferroin))
 - Fix crash when netdatacli command output too long [\#12393](https://github.com/netdata/netdata/pull/12393) ([underhood](https://github.com/underhood))
 - Dont check host health enabled if host is null [\#12392](https://github.com/netdata/netdata/pull/12392) ([MrZammler](https://github.com/MrZammler))
@@ -191,7 +196,6 @@
 - update existing OS dependencies scripts and add scripts for fedora an… [\#11963](https://github.com/netdata/netdata/pull/11963) ([maneamarius](https://github.com/maneamarius))
 - Posix [\#11961](https://github.com/netdata/netdata/pull/11961) ([maneamarius](https://github.com/maneamarius))
 - Updated formatting issues and copy [\#11944](https://github.com/netdata/netdata/pull/11944) ([kickoke](https://github.com/kickoke))
-- Replace CentOS 8 with RockyLinux 8 in CI and package builds. [\#11801](https://github.com/netdata/netdata/pull/11801) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.33.0](https://github.com/netdata/netdata/tree/v1.33.0) (2022-01-26)
 
@@ -287,8 +291,6 @@
 - Postgres: mat. views considered as tables in table size/count chart [\#11816](https://github.com/netdata/netdata/pull/11816) ([NikolayS](https://github.com/NikolayS))
 - Postgres: use block\_size instead of 8\*1024 [\#11815](https://github.com/netdata/netdata/pull/11815) ([NikolayS](https://github.com/NikolayS))
 - Optimize rx msg name resolution [\#11811](https://github.com/netdata/netdata/pull/11811) ([underhood](https://github.com/underhood))
-- Ignore clangd cache directory. [\#11803](https://github.com/netdata/netdata/pull/11803) ([vkalintiris](https://github.com/vkalintiris))
-- fix tps decode, add memory usage chart [\#11797](https://github.com/netdata/netdata/pull/11797) ([neotf](https://github.com/neotf))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
@@ -341,11 +343,6 @@
 - Fix coverity issues  [\#11809](https://github.com/netdata/netdata/pull/11809) ([stelfrag](https://github.com/stelfrag))
 - Fix broken link in charts.mdx [\#11808](https://github.com/netdata/netdata/pull/11808) ([DShreve2](https://github.com/DShreve2))
 - Always queue alerts to aclk\_alert [\#11806](https://github.com/netdata/netdata/pull/11806) ([MrZammler](https://github.com/MrZammler))
-- Use two digits after the decimal point for the anomaly rate. [\#11804](https://github.com/netdata/netdata/pull/11804) ([vkalintiris](https://github.com/vkalintiris))
-- Add POWER8+ static builds. [\#11802](https://github.com/netdata/netdata/pull/11802) ([Ferroin](https://github.com/Ferroin))
-- Update libbpf [\#11800](https://github.com/netdata/netdata/pull/11800) ([thiagoftsm](https://github.com/thiagoftsm))
-- Assorted cleanups to static builds. [\#11798](https://github.com/netdata/netdata/pull/11798) ([Ferroin](https://github.com/Ferroin))
-- Use the proper format specifier when logging configuration options. [\#11795](https://github.com/netdata/netdata/pull/11795) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
