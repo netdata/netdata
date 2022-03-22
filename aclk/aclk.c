@@ -28,6 +28,12 @@ int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
 int disconnect_req = 0;
 
+time_t last_conn_time_mqtt = 0;
+time_t last_conn_time_appl = 0;
+time_t last_disconnect_time = 0;
+time_t next_connection_attempt = 0;
+float last_backoff_value = 0;
+
 int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
 
 time_t aclk_block_until = 0;
@@ -276,8 +282,10 @@ static inline void msg_callback(const char *topic, const void *msg, size_t msgle
 
 static void puback_callback(uint16_t packet_id)
 {
-    if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE)
+    if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE) {
+        last_conn_time_appl = now_realtime_sec();
         aclk_tbeb_reset();
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_puback(packet_id);
@@ -483,6 +491,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     info("ACLK link is down");
     log_access("ACLK DISCONNECTED");
     aclk_stats_upd_online(0);
+    last_disconnect_time = now_realtime_sec();
     aclk_connected = 0;
 
     info("Attempting to gracefully shutdown the MQTT/WSS connection");
@@ -523,6 +532,9 @@ static unsigned long aclk_reconnect_delay() {
 #define NETDATA_EXIT_POLL_MS (MSEC_PER_SEC/4)
 static int aclk_block_till_recon_allowed() {
     unsigned long recon_delay = aclk_reconnect_delay();
+
+    next_connection_attempt = now_realtime_sec() + (recon_delay / MSEC_PER_SEC);
+    last_backoff_value = (float)recon_delay / MSEC_PER_SEC;
 
     info("Wait before attempting to reconnect in %.3f seconds\n", recon_delay / (float)MSEC_PER_SEC);
     // we want to wake up from time to time to check netdata_exit
@@ -725,6 +737,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             json_object_put(lwt);
 
         if (!ret) {
+            last_conn_time_mqtt = now_realtime_sec();
             info("ACLK connection successfully established");
             log_access("ACLK CONNECTED");
             mqtt_connected_actions(client);
@@ -842,6 +855,7 @@ void *aclk_main(void *ptr)
 
         if (handle_connection(mqttwss_client)) {
             aclk_stats_upd_online(0);
+            last_disconnect_time = now_realtime_sec();
             aclk_connected = 0;
             log_access("ACLK DISCONNECTED");
         }
@@ -1181,6 +1195,7 @@ static void fill_chart_status_for_host(BUFFER *wb, RRDHOST *host)
 char *ng_aclk_state(void)
 {
     BUFFER *wb = buffer_create(1024);
+    struct tm *tmptr, tmbuf;
     char *ret;
 
     buffer_strcat(wb,
@@ -1203,7 +1218,27 @@ char *ng_aclk_state(void)
         freez(agent_id);
     }
 
-    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\n", aclk_connected ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
+    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_connected ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
+    if (last_conn_time_mqtt && (tmptr = localtime_r(&last_conn_time_mqtt, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        buffer_sprintf(wb, "Last Connection Time: %s\n", timebuf);
+    }
+    if (last_conn_time_appl && (tmptr = localtime_r(&last_conn_time_appl, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        buffer_sprintf(wb, "Last Connection Time + %d PUBACKs received: %s\n", ACLK_PUBACKS_CONN_STABLE, timebuf);
+    }
+    if (last_disconnect_time && (tmptr = localtime_r(&last_disconnect_time, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        buffer_sprintf(wb, "Last Disconnect Time: %s\n", timebuf);
+    }
+    if (!aclk_connected && next_connection_attempt && (tmptr = localtime_r(&next_connection_attempt, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        buffer_sprintf(wb, "Next Connection Attempt At: %s\nLast Backoff: %.3f", timebuf, last_backoff_value);
+    }
 
     if (aclk_connected) {
         buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d", aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn);
@@ -1318,6 +1353,17 @@ static void fill_chart_status_for_host_json(json_object *obj, RRDHOST *host)
 }
 #endif
 
+static json_object *timestamp_to_json(const time_t *t)
+{
+    struct tm *tmptr, tmbuf;
+    if (*t && (tmptr = gmtime_r(t, &tmbuf)) ) {
+        char timebuf[26];
+        strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
+        return json_object_new_string(timebuf);
+    }
+    return NULL;
+}
+
 char *ng_aclk_state_json(void)
 {
     json_object *tmp, *grp, *msg = json_object_new_object();
@@ -1369,6 +1415,18 @@ char *ng_aclk_state_json(void)
 
     tmp = json_object_new_int(aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
     json_object_object_add(msg, "reconnect-count", tmp);
+
+    json_object_object_add(msg, "last-connect-time-utc", timestamp_to_json(&last_conn_time_mqtt));
+    json_object_object_add(msg, "last-connect-time-puback-utc", timestamp_to_json(&last_conn_time_appl));
+    json_object_object_add(msg, "last-disconnect-time-utc", timestamp_to_json(&last_disconnect_time));
+    json_object_object_add(msg, "next-connection-attempt-utc", !aclk_connected ? timestamp_to_json(&next_connection_attempt) : NULL);
+    tmp = NULL;
+    if (!aclk_connected && last_backoff_value)
+        tmp = json_object_new_double(last_backoff_value);
+    json_object_object_add(msg, "last-backoff-value", tmp);
+
+    tmp = json_object_new_boolean(aclk_disable_runtime);
+    json_object_object_add(msg, "banned-by-cloud", tmp);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     grp = json_object_new_array();
