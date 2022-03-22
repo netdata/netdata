@@ -406,8 +406,8 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
     AWS_IMDS_TOKEN="$(curl --fail -s -m 5 --noproxy "*" -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
     if [ -n "${AWS_IMDS_TOKEN}" ]; then
       CLOUD_TYPE="AWS"
-      CLOUD_INSTANCE_TYPE="$(curl --fail -s -m 5 --noproxy "*" -H "X-aws-ec2-metadata-token: $TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type")"
-      CLOUD_INSTANCE_REGION="$(curl --fail -s -m 5 --noproxy "*" -H "X-aws-ec2-metadata-token: $TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region")"
+      CLOUD_INSTANCE_TYPE="$(curl --fail -s -m 5 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type" 2> /dev/null)"
+      CLOUD_INSTANCE_REGION="$(curl --fail -s -m 5 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region" 2> /dev/null)"
     fi
   fi
 
