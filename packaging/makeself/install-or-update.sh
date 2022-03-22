@@ -26,7 +26,6 @@ if [ -d /opt/netdata/etc/netdata.old ]; then
 fi
 
 STARTIT=1
-AUTOUPDATE=0
 REINSTALL_OPTIONS=""
 RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 
@@ -36,10 +35,7 @@ while [ "${1}" ]; do
       STARTIT=0
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
-    "--auto-update" | "-u")
-      AUTOUPDATE=1
-      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
-      ;;
+    "--auto-update" | "-u") ;;
     "--stable-channel")
       RELEASE_CHANNEL="stable"
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
@@ -160,13 +156,6 @@ set_netdata_updater_channel || run_failed "Cannot set netdata updater tool relea
 progress "Install (but not enable) netdata updater tool"
 cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
 install_netdata_updater || run_failed "Cannot install netdata updater tool."
-
-progress "Check if we must enable/disable the netdata updater tool"
-if [ "${AUTOUPDATE}" = "1" ]; then
-  enable_netdata_updater || run_failed "Cannot enable netdata updater tool"
-else
-  disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
-fi
 
 # -----------------------------------------------------------------------------
 progress "creating quick links"

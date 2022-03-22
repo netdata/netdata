@@ -68,9 +68,21 @@ that prefix to this command to make sure it finds Netdata.
 wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
-> ❗ If the above command fails, you can [reinstall
-> Netdata](/packaging/installer/REINSTALL.md#one-line-installer-script-kickstartsh) to get the latest version. This also
-> preserves your [configuration](/docs/configure/nodes.md) in `netdata.conf` or other files.
+### Issues with older binpkg installs
+
+The above command is known not to work with binpkg type installs for stable releases with a version number of
+v1.33.1 or earlier, and nightly builds with a version number of v1.33.1-93 or earlier. If you have such a system,
+the above command will report that it found an existing install, and then issue a warning about not being able to
+find the updater script.
+
+On such installs, you can update Netdata using your distribution package manager.
+
+### If the kickstart script does not work
+
+If the above command fails, you can [reinstall
+Netdata](/packaging/installer/REINSTALL.md#one-line-installer-script-kickstartsh) to get the latest version. This
+also preserves your [configuration](/docs/configure/nodes.md) in `netdata.conf` or other files just like updating
+normally would, though you will need to specify any installation options you used originally again.
 
 ## Docker
 
