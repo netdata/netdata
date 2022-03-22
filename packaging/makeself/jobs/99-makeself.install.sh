@@ -12,10 +12,7 @@ run cd "${NETDATA_SOURCE_PATH}" || exit 1
 # -----------------------------------------------------------------------------
 # find the netdata version
 
-VERSION="$(git describe 2> /dev/null)"
-if [ -z "${VERSION}" ]; then
-  VERSION=$(cat packaging/version)
-fi
+VERSION="$("${NETDATA_INSTALL_PARENT}/netdata/bin/netdata" -v | cut -f 2 -d ' ')"
 
 if [ "${VERSION}" == "" ]; then
   echo >&2 "Cannot find version number. Create makeself executable from source code with git tree structure."
