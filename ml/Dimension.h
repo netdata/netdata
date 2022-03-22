@@ -76,10 +76,6 @@ public:
 
     bool isTrained() const { return Trained; }
 
-    double updateTrainingDuration(double Duration) {
-        return TrainingDuration.exchange(Duration);
-    }
-
 private:
     std::pair<CalculatedNumber *, size_t> getCalculatedNumbers();
 
@@ -94,7 +90,6 @@ private:
     KMeans KM;
 
     std::atomic<bool> Trained{false};
-    std::atomic<double> TrainingDuration{0.0};
 };
 
 class PredictableDimension : public TrainableDimension {
