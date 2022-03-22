@@ -1134,6 +1134,7 @@ list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
 list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
 list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
 list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
+list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
 list(APPEND NETDATA_FILES ${ACLK_COMMON_FILES})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
@@ -1151,7 +1152,6 @@ IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
-            ${TIMEX_PLUGIN_FILES}
             ${PROC_PLUGIN_FILES}
             ${TC_PLUGIN_FILES}
             )
@@ -1167,10 +1167,7 @@ IF(LINUX)
 ELSEIF(FREEBSD)
     list(APPEND NETDATA_FILES daemon/static_threads_freebsd.c)
 
-    add_executable(netdata config.h ${NETDATA_FILES}
-            ${FREEBSD_PLUGIN_FILES}
-            ${TIMEX_PLUGIN_FILES}
-            )
+    add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
@@ -1183,10 +1180,7 @@ ELSEIF(FREEBSD)
 ELSEIF(MACOS)
     list(APPEND NETDATA_FILES daemon/static_threads_macos.c)
 
-    add_executable(netdata config.h ${NETDATA_FILES}
-            ${MACOS_PLUGIN_FILES}
-            ${TIMEX_PLUGIN_FILES}
-            )
+    add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES} ${IOKIT} ${FOUNDATION})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})

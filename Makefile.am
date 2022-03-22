@@ -864,13 +864,13 @@ NETDATA_FILES = \
     $(ACLK_COMMON_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
+    $(TIMEX_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
     NETDATA_FILES += \
         daemon/static_threads_freebsd.c \
         $(FREEBSD_PLUGIN_FILES) \
-        $(TIMEX_PLUGIN_FILES) \
         $(NULL)
 endif
 
@@ -878,7 +878,6 @@ if MACOS
     NETDATA_FILES += \
         daemon/static_threads_macos.c \
         $(MACOS_PLUGIN_FILES) \
-        $(TIMEX_PLUGIN_FILES) \
         $(NULL)
 endif
 
@@ -887,7 +886,6 @@ if LINUX
         daemon/static_threads_linux.c \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
-        $(TIMEX_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)
