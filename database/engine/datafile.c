@@ -159,6 +159,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     if (unlikely(ret)) {
         fatal("posix_memalign:%s", strerror(ret));
     }
+    memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ);
     superblock->tier = 1;
