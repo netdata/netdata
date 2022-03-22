@@ -477,15 +477,18 @@ void DetectableHost::detectOnce() {
 void DetectableHost::detect() {
     std::this_thread::sleep_for(Seconds{10});
 
+    heartbeat_t HB;
+    heartbeat_init(&HB);
+
     while (!netdata_exit) {
+        heartbeat_next(&HB, updateEvery() * USEC_PER_SEC);
+
         TimePoint StartTP = SteadyClock::now();
         detectOnce();
         TimePoint EndTP = SteadyClock::now();
 
         Duration<double> Dur = EndTP - StartTP;
         updateDetectionChart(getRH(), Dur.count() * 1000);
-
-        std::this_thread::sleep_for(Seconds{updateEvery()});
     }
 }
 
