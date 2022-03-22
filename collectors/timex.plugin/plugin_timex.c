@@ -44,7 +44,7 @@ void *timex_main(void *ptr)
 
         struct timex timex_buf = {};
         int sync_state = 0;
-        sync_state = adjtimex(&timex_buf);
+        sync_state = ntp_adjtime  (&timex_buf);
 
         collected_number divisor = USEC_PER_MS;
         if (timex_buf.status & STA_NANO)

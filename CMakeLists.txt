@@ -1167,7 +1167,10 @@ IF(LINUX)
 ELSEIF(FREEBSD)
     list(APPEND NETDATA_FILES daemon/static_threads_freebsd.c)
 
-    add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
+    add_executable(netdata config.h ${NETDATA_FILES}
+            ${FREEBSD_PLUGIN_FILES}
+            ${TIMEX_PLUGIN_FILES}
+            )
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
@@ -1180,7 +1183,10 @@ ELSEIF(FREEBSD)
 ELSEIF(MACOS)
     list(APPEND NETDATA_FILES daemon/static_threads_macos.c)
 
-    add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
+    add_executable(netdata config.h ${NETDATA_FILES}
+            ${MACOS_PLUGIN_FILES}
+            ${TIMEX_PLUGIN_FILES}
+            )
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES} ${IOKIT} ${FOUNDATION})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
