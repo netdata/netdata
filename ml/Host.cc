@@ -184,13 +184,13 @@ static void updateEventsChart(RRDHOST *RH,
     rrdset_done(RS);
 }
 
-static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuration) {
+static void updateDetectionChart(RRDHOST *RH) {
     static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *PredictiobDurationRD = nullptr;
+    static thread_local RRDDIM *UserRD, *SystemRD = nullptr;
 
     if (!RS) {
         std::string IdPrefix = "prediction_stats";
-        std::string TitlePrefix = "Time it took to run prediction for host";
+        std::string TitlePrefix = "Prediction thread CPU usage for host";
         auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
 
         RS = rrdset_create_localhost(
@@ -200,21 +200,24 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
             "prediction_stats", // family
             "anomaly_detection.prediction_stats", // ctx
             IdTitlePair.second.c_str(), // title
-            "milliseconds", // units
+            "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
             39187, // priority
             RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
+            RRDSET_TYPE_STACKED // chart_type
         );
 
-        PredictiobDurationRD  = rrddim_add(RS, "duration", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
+        UserRD = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        SystemRD = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
     } else
         rrdset_next(RS);
 
-    rrddim_set_by_pointer(RS, PredictiobDurationRD, PredictionDuration);
+    struct rusage TRU;
+    getrusage(RUSAGE_THREAD, &TRU);
 
+    rrddim_set_by_pointer(RS, UserRD, TRU.ru_utime.tv_sec * 1000000ULL + TRU.ru_utime.tv_usec);
+    rrddim_set_by_pointer(RS, SystemRD, TRU.ru_stime.tv_sec * 1000000ULL + TRU.ru_stime.tv_usec);
     rrdset_done(RS);
 }
 
@@ -483,12 +486,9 @@ void DetectableHost::detect() {
     while (!netdata_exit) {
         heartbeat_next(&HB, updateEvery() * USEC_PER_SEC);
 
-        TimePoint StartTP = SteadyClock::now();
         detectOnce();
-        TimePoint EndTP = SteadyClock::now();
 
-        Duration<double> Dur = EndTP - StartTP;
-        updateDetectionChart(getRH(), Dur.count() * 1000);
+        updateDetectionChart(getRH());
     }
 }
 
