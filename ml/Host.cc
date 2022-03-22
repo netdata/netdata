@@ -358,7 +358,7 @@ void TrainableHost::trainDimension(Dimension *D, const TimePoint &NowTP) {
 }
 
 void TrainableHost::train() {
-    Duration<double> MaxSleepFor = Seconds{updateEvery()};
+    Duration<double> MaxSleepFor = Seconds{10 * updateEvery()};
 
     while (!netdata_exit) {
         TimePoint NowTP = SteadyClock::now();
