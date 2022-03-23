@@ -1324,7 +1324,7 @@ netdataDashboard.context = {
         '<p><b>UNSYNC</b> - set/cleared by the caller to indicate clock unsynchronized (e.g., when no peers are reachable). '+
         'This flag is usually controlled by an application program, but the operating system may also set it. '+
         '<b>CLOCKERR</b> - set/cleared by the external hardware clock driver to indicate hardware fault.</p>'+
-        '<p><b>State map</b>: 0 - bit unset, 1 - bit set.</p>'
+        '<p><b>Status map</b>: 0 - bit unset, 1 - bit set.</p>'
     },
 
     'system.clock_sync_offset': {
