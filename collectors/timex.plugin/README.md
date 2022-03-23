@@ -13,7 +13,7 @@ This plugin creates two charts:
 -   System clock synchronization state according to the system kernel
 -   Computed time offset between local system and reference clock
 
-This is obtained from the information provided by the ntp_adjtime() system call.
+This is obtained from the information provided by the [ntp_adjtime()](https://man7.org/linux/man-pages/man2/adjtimex.2.html) system call.
 An unsynchronized clock may indicate a hardware clock error, or an issue with UTC synchronization.
 
 ## Configuration
