@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/timex
 
 # timex.plugin
 
-This plugin monitors the system kernel clock synchronization state on Linux nodes.
+This plugin monitors the system kernel clock synchronization state.
 
 This plugin creates two charts:
 
