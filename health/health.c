@@ -767,7 +767,7 @@ void *health_main(void *ptr) {
                             rc->value = NAN;
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
                             if (netdata_cloud_setting && likely(!aclk_alert_reloaded))
-                                sql_queue_removed_alerts_to_aclk(host);
+                                sql_queue_alarm_to_aclk(host, ae, 1);
 #endif
                         }
                     }
