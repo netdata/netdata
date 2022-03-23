@@ -107,15 +107,15 @@ void *timex_main(void *ptr)
             if (unlikely(!st_clock_status)) {
                 st_clock_status = rrdset_create_localhost(
                     "system",
-                    "clock_sync_status",
+                    "clock_status",
                     NULL,
                     "clock synchronization",
                     NULL,
-                    "System Clock Synchronization Status",
+                    "System Clock Status",
                     "status",
                     PLUGIN_TIMEX_NAME,
                     NULL,
-                    NETDATA_CHART_PRIO_CLOCK_SYNC_STATUS,
+                    NETDATA_CHART_PRIO_CLOCK_STATUS,
                     update_every,
                     RRDSET_TYPE_LINE);
 

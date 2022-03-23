@@ -11,7 +11,7 @@ This plugin monitors the system kernel clock synchronization state.
 This plugin creates two charts:
 
 - System clock synchronization state according to the system kernel
-- System clock synchronization status which gives the value of the `time_status` variable in the kernel
+- System clock status which gives the value of the `time_status` variable in the kernel
 - Computed time offset between local system and reference clock
 
 This is obtained from the information provided by the [ntp_adjtime()](https://man7.org/linux/man-pages/man2/adjtimex.2.html) system call.
