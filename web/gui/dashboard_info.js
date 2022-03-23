@@ -1310,7 +1310,7 @@ netdataDashboard.context = {
     },
 
     'system.clock_sync_state': {
-        info:'<p>The system clock synchronization state as provided by the ntp_adjtime() system call. '+
+        info:'<p>The system clock synchronization state as provided by the <a href="https://man7.org/linux/man-pages/man2/adjtimex.2.html" target="_blank">ntp_adjtime()</a> system call. '+
         'This reflects the status of the system kernel regarding clock synchronization. '+ 
         'it leads to unpredictable problems. '+
         'It can take several minutes (usually up to 17) before NTP daemon selects a server to synchronize with. '+
