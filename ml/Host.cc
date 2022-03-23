@@ -305,6 +305,7 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
     Json["smooth-n"] = Cfg.SmoothN;
     Json["lag-n"] = Cfg.LagN;
 
+    Json["random-sampling-ratio"] = Cfg.RandomSamplingRatio;
     Json["max-kmeans-iters"] = Cfg.MaxKMeansIters;
 
     Json["dimension-anomaly-score-threshold"] = Cfg.DimensionAnomalyScoreThreshold;

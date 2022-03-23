@@ -38,6 +38,7 @@ void Config::readMLConfig(void) {
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
     unsigned LagN = config_get_number(ConfigSectionML, "num samples to lag", 5);
 
+    double RandomSamplingRatio = config_get_float(ConfigSectionML, "random sampling ratio", 1.0 / LagN);
     unsigned MaxKMeansIters = config_get_number(ConfigSectionML, "maximum number of k-means iterations", 1000);
 
     double DimensionAnomalyScoreThreshold = config_get_float(ConfigSectionML, "dimension anomaly score threshold", 0.99);
@@ -67,6 +68,7 @@ void Config::readMLConfig(void) {
     SmoothN = clamp(SmoothN, 0u, 5u);
     LagN = clamp(LagN, 0u, 5u);
 
+    RandomSamplingRatio = clamp(RandomSamplingRatio, 0.2, 1.0);
     MaxKMeansIters = clamp(MaxKMeansIters, 500u, 1000u);
 
     DimensionAnomalyScoreThreshold = clamp(DimensionAnomalyScoreThreshold, 0.01, 5.00);
@@ -112,6 +114,7 @@ void Config::readMLConfig(void) {
     Cfg.SmoothN = SmoothN;
     Cfg.LagN = LagN;
 
+    Cfg.RandomSamplingRatio = RandomSamplingRatio;
     Cfg.MaxKMeansIters = MaxKMeansIters;
 
     Cfg.DimensionAnomalyScoreThreshold = DimensionAnomalyScoreThreshold;

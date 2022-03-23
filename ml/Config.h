@@ -21,6 +21,7 @@ public:
     unsigned SmoothN;
     unsigned LagN;
 
+    double RandomSamplingRatio;
     unsigned MaxKMeansIters;
 
     double DimensionAnomalyScoreThreshold;
@@ -39,6 +40,7 @@ public:
     SIMPLE_PATTERN *SP_ChartsToSkip;
 
     std::string AnomalyDBPath;
+    std::vector<uint32_t> RandomNums;
 
     void readMLConfig();
 };
