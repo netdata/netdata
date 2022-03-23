@@ -464,6 +464,10 @@ validate_environment_file() {
 }
 
 update_available() {
+  if [ "$NETDATA_UPDATER_FORCE_UPDATE" = "1" ]; then
+     info "Force update requested"
+     return 0
+  fi
   basepath="$(dirname "$(dirname "$(dirname "${NETDATA_LIB_DIR}")")")"
   searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
   searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
@@ -790,6 +794,9 @@ while [ -n "${1}" ]; do
     shift 1
   elif [ "${1}" = "--no-updater-self-update" ]; then
     NETDATA_NO_UPDATER_SELF_UPDATE=1
+    shift 1
+  elif [ "${1}" = "--force-update" ]; then
+    NETDATA_UPDATER_FORCE_UPDATE=1
     shift 1
   elif [ "${1}" = "--tmpdir-path" ]; then
     NETDATA_TMPDIR_PATH="${2}"
