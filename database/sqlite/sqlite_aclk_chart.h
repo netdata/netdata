@@ -35,7 +35,6 @@ struct aclk_chart_sync_stats {
 extern int queue_chart_to_aclk(RRDSET *st);
 extern int queue_dimension_to_aclk(RRDDIM *rd);
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
-extern int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
 int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

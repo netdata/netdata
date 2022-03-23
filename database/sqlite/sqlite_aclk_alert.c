@@ -16,39 +16,71 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
     int send = 1, rc = 0;
 
-    BUFFER *sql = buffer_create(1024);
-    
-    //a CLEAR event with previous sent status also CLEAR can be skipped
-    if (ae->new_status == RRDCALC_STATUS_CLEAR) {
-
-        buffer_sprintf(sql, "select hl.new_status from health_log_%s hl, aclk_alert_%s aa \
-                             where hl.unique_id = aa.alert_unique_id \
-                             and hl.alarm_id = %u and hl.unique_id <> %u \
-                             order by alarm_event_id desc LIMIT 1;", uuid_str, uuid_str, ae->alarm_id, ae->unique_id);
-
-        rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to prepare statement when trying to filter alert events.");
-            buffer_free(sql);
-            return 1;
-        }
-
-        rc = sqlite3_step(res);
-        if (likely(rc == SQLITE_ROW))
-            if ((RRDCALC_STATUS) sqlite3_column_int(res, 0) == RRDCALC_STATUS_CLEAR)
-                send = 0;
-
-        rc = sqlite3_reset(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement when trying to filter alert events, rc = %d", rc);
+    if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED) {
+        log_access("IS queued");
+        return 0;
     }
 
+    if (ae->new_status == RRDCALC_STATUS_REMOVED || ae->new_status == RRDCALC_STATUS_UNINITIALIZED) {
+        log_access("IS removed or uniti");
+        return 0;
+    }
+
+    if (unlikely(uuid_is_null(ae->config_hash_id))) 
+        return 0;
+
+    BUFFER *sql = buffer_create(1024);
+    uuid_t config_hash_id;
+    RRDCALC_STATUS status;
+    time_t when;
+    
+    //get the previous sent event of this alarm_id
+    buffer_sprintf(sql, "select hl.new_status, hl.config_hash_id, hl.when from health_log_%s hl, aclk_alert_%s aa \
+                         where hl.unique_id = aa.alert_unique_id        \
+                         and hl.alarm_id = %u and hl.unique_id <> %u \
+                         order by alarm_event_id desc LIMIT 1;", uuid_str, uuid_str, ae->alarm_id, ae->unique_id);
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to filter alert events.");
+        send = 1;
+        goto done;
+    }
+
+    rc = sqlite3_step(res);
+    if (likely(rc == SQLITE_ROW)) {
+        status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
+        when = (time_t) sqlite3_column_int64(res, 1);
+        if (sqlite3_column_type(res, 2) != SQLITE_NULL)
+            uuid_copy(config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 2)));
+    } else {
+        send = 1;
+        goto done;
+    }
+
+    if (ae->new_status != (RRDCALC_STATUS)status) {
+        send = 1;
+        goto done;
+    }
+
+    if (uuid_compare(ae->config_hash_id, config_hash_id)) {
+        send = 1;
+        goto done;
+    }
+        
+
+done:
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when trying to filter alert events, rc = %d", rc);
+
+    buffer_free(sql);
     return send;
 }
 
 // will replace call to aclk_update_alarm in health/health_log.c
 // and handle both cases
-int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
+int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
 {
     //check aclk architecture and handle old json alarm update to cloud
     //include also the valid statuses for this case
@@ -68,21 +100,14 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     if (!claimed())
         return 0;
 
-    if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)
-        return 0;
-
-    if (ae->new_status == RRDCALC_STATUS_REMOVED || ae->new_status == RRDCALC_STATUS_UNINITIALIZED)
-        return 0;
-
     if (unlikely(!host->dbsync_worker))
         return 1;
 
-    if (unlikely(uuid_is_null(ae->config_hash_id)))
-        return 0;
-
-    if (!should_send_to_cloud(host, ae)) {
-        log_access ("MC Will skip %u", ae->unique_id);
-        return 0;
+    if (!skip_filter) {
+        if (!should_send_to_cloud(host, ae)) {
+            log_access ("MC Will skip %u (%s) %d", ae->unique_id, ae->name, ae->new_status);
+            return 0;
+        }
     }
 
     int rc = 0;
@@ -119,6 +144,7 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
+    log_access("queued %u", ae->unique_id);
 
 bind_fail:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
