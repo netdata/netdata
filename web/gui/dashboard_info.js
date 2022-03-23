@@ -1310,9 +1310,8 @@ netdataDashboard.context = {
     },
 
     'system.clock_sync_state': {
-        info:'<p>The system clock synchronization state. '+
-        'It is strongly recommended having the clock in sync with reliable NTP servers. Otherwise, '+
-        'it leads to unpredictable problems. '+
+        info:'<p>The system clock synchronization state as provided by the <a href="https://man7.org/linux/man-pages/man2/adjtimex.2.html" target="_blank">ntp_adjtime()</a> system call. '+
+        'An unsynchronized clock may be the result of synchronization issues by the NTP daemon or a hardware clock fault. '+
         'It can take several minutes (usually up to 17) before NTP daemon selects a server to synchronize with. '+
         '<p><b>State map</b>: 0 - not synchronized, 1 - synchronized.</p>'
     },
