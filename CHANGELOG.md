@@ -7,9 +7,11 @@
 **Merged pull requests:**
 
 - minor - fix configure output of eBPF [\#12471](https://github.com/netdata/netdata/pull/12471) ([underhood](https://github.com/underhood))
+- Update ebpf dashboard [\#12467](https://github.com/netdata/netdata/pull/12467) ([thiagoftsm](https://github.com/thiagoftsm))
 - docs\(collectors/python.d\): remove mention of compatibility with py2/py3 [\#12465](https://github.com/netdata/netdata/pull/12465) ([ilyam8](https://github.com/ilyam8))
 - feat\(collectors/cgroups\): prefer `blkio.*_recursive` when available [\#12462](https://github.com/netdata/netdata/pull/12462) ([ilyam8](https://github.com/ilyam8))
 - Implement fine-grained errors to cloud queries [\#12460](https://github.com/netdata/netdata/pull/12460) ([underhood](https://github.com/underhood))
+- Extend aclk-state [\#12458](https://github.com/netdata/netdata/pull/12458) ([underhood](https://github.com/underhood))
 - Update dashboard to version v2.21.8. [\#12455](https://github.com/netdata/netdata/pull/12455) ([netdatabot](https://github.com/netdatabot))
 - fix\(collectors/cgroups\): use different context for cgroup network charts [\#12454](https://github.com/netdata/netdata/pull/12454) ([ilyam8](https://github.com/ilyam8))
 - Add delay on missing priv\_key [\#12450](https://github.com/netdata/netdata/pull/12450) ([underhood](https://github.com/underhood))
@@ -56,6 +58,7 @@
 - Remove owner check from webserver [\#12339](https://github.com/netdata/netdata/pull/12339) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: container virtualization detection with systemd-detect-virt [\#12338](https://github.com/netdata/netdata/pull/12338) ([ilyam8](https://github.com/ilyam8))
 - fix: use default "bind to" in native packages [\#12336](https://github.com/netdata/netdata/pull/12336) ([ilyam8](https://github.com/ilyam8))
+- Use the built agent version for Netdata static build archive name. [\#12335](https://github.com/netdata/netdata/pull/12335) ([Ferroin](https://github.com/Ferroin))
 - Add latency dimension [\#12329](https://github.com/netdata/netdata/pull/12329) ([Steve8291](https://github.com/Steve8291))
 - Remove check for config file in stock conf dir [\#12327](https://github.com/netdata/netdata/pull/12327) ([Steve8291](https://github.com/Steve8291))
 - fix underscore in libnetfilter-acct-dev package [\#12326](https://github.com/netdata/netdata/pull/12326) ([Steve8291](https://github.com/Steve8291))
@@ -72,6 +75,7 @@
 - Workflow to trigger cloud regression e2e tests [\#12299](https://github.com/netdata/netdata/pull/12299) ([dimko](https://github.com/dimko))
 - Fixing stderr output when testing tmpdir [\#12298](https://github.com/netdata/netdata/pull/12298) ([godismyjudge95](https://github.com/godismyjudge95))
 - chore: remove unused variable in the system-info script [\#12297](https://github.com/netdata/netdata/pull/12297) ([ilyam8](https://github.com/ilyam8))
+- Switch to using netdata-updater.sh to toggle auto updates on and off when installing. [\#12296](https://github.com/netdata/netdata/pull/12296) ([Ferroin](https://github.com/Ferroin))
 - Pull in build dependencies when updating a locally built install. [\#12294](https://github.com/netdata/netdata/pull/12294) ([Ferroin](https://github.com/Ferroin))
 - fix: cpu system info detection on macOS [\#12293](https://github.com/netdata/netdata/pull/12293) ([ilyam8](https://github.com/ilyam8))
 - Only store alert hashes when iterated from localhost [\#12292](https://github.com/netdata/netdata/pull/12292) ([MrZammler](https://github.com/MrZammler))
@@ -339,10 +343,6 @@
 - Updating ansible steps for clarity [\#11823](https://github.com/netdata/netdata/pull/11823) ([kickoke](https://github.com/kickoke))
 - Don't use wc struct if it might not exist [\#11820](https://github.com/netdata/netdata/pull/11820) ([MrZammler](https://github.com/MrZammler))
 - specify pip3 when installing git-semver package [\#11817](https://github.com/netdata/netdata/pull/11817) ([maneamarius](https://github.com/maneamarius))
-- Cleanup compilation warnings [\#11810](https://github.com/netdata/netdata/pull/11810) ([stelfrag](https://github.com/stelfrag))
-- Fix coverity issues  [\#11809](https://github.com/netdata/netdata/pull/11809) ([stelfrag](https://github.com/stelfrag))
-- Fix broken link in charts.mdx [\#11808](https://github.com/netdata/netdata/pull/11808) ([DShreve2](https://github.com/DShreve2))
-- Always queue alerts to aclk\_alert [\#11806](https://github.com/netdata/netdata/pull/11806) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
