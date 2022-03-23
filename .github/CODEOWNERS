@@ -10,11 +10,11 @@
 aclk/ @stelfrag @underhood
 build/ @Ferroin @iigorkarpov @maneamarius
 contrib/debian @Ferroin @iigorkarpov @maneamarius
-collectors/ @vlvkobal
-collectors/charts.d.plugin/ @ilyam8 @Ferroin
-collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
+collectors/ @vlvkobal @surajnpn
 collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
-collectors/macos.plugin/ @vlvkobal @thiagoftsm
+collectors/charts.d.plugin/ @ilyam8 @surajnpn @Ferroin
+collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @surajnpn
+collectors/macos.plugin/ @vlvkobal @thiagoftsm  @surajnpn
 collectors/node.d.plugin/ @jacekkolasa
 collectors/node.d.plugin/snmp/ @jacekkolasa
 collectors/python.d.plugin/ @ilyam8
