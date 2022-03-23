@@ -1316,6 +1316,17 @@ netdataDashboard.context = {
         '<p><b>State map</b>: 0 - not synchronized, 1 - synchronized.</p>'
     },
 
+    'system.clock_status': {
+        info:'<p>The kernel code can operate in various modes and with various features enabled or disabled, as selected by the '+
+        '<a href="https://man7.org/linux/man-pages/man2/adjtimex.2.html" target="_blank">ntp_adjtime()</a> system call. '+
+        'The system clock status shows the value of the <b>time_status</b> variable in the kernel. '+
+        'The bits of the variable are used to control these functions and record error conditions as they exist.</p>'+
+        '<p><b>UNSYNC</b> - set/cleared by the caller to indicate clock unsynchronized (e.g., when no peers are reachable). '+
+        'This flag is usually controlled by an application program, but the operating system may also set it. '+
+        '<b>CLOCKERR</b> - set/cleared by the external hardware clock driver to indicate hardware fault.</p>'+
+        '<p><b>State map</b>: 0 - bit unset, 1 - bit set.</p>'
+    },
+
     'system.clock_sync_offset': {
         info: 'A typical NTP client regularly polls one or more NTP servers. '+
         'The client must compute its '+
