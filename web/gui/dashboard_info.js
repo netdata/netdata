@@ -1310,8 +1310,8 @@ netdataDashboard.context = {
     },
 
     'system.clock_sync_state': {
-        info:'<p>The system clock synchronization state. '+
-        'It is strongly recommended having the clock in sync with reliable NTP servers. Otherwise, '+
+        info:'<p>The system clock synchronization state as provided by the ntp_adjtime() system call. '+
+        'This reflects the status of the system kernel regarding clock synchronization.'+ 
         'it leads to unpredictable problems. '+
         'It can take several minutes (usually up to 17) before NTP daemon selects a server to synchronize with. '+
         '<p><b>State map</b>: 0 - not synchronized, 1 - synchronized.</p>'
