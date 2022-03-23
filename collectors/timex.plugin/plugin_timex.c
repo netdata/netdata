@@ -7,6 +7,29 @@
 
 #define CONFIG_SECTION_TIMEX "plugin:timex"
 
+struct status_codes {
+    char *name;
+    int code;
+    RRDDIM *rd;
+} sta_codes[] = {
+    // {"pll", STA_PLL, NULL},
+    // {"ppsfreq", STA_PPSFREQ, NULL},
+    // {"ppstime", STA_PPSTIME, NULL},
+    // {"fll", STA_FLL, NULL},
+    // {"ins", STA_INS, NULL},
+    // {"del", STA_DEL, NULL},
+    {"unsync", STA_UNSYNC, NULL},
+    // {"freqhold", STA_FREQHOLD, NULL},
+    // {"ppssignal", STA_PPSSIGNAL, NULL},
+    // {"ppsjitter", STA_PPSJITTER, NULL},
+    // {"ppswander", STA_PPSWANDER, NULL},
+    // {"ppserror", STA_PPSERROR, NULL},
+    {"clockerr", STA_CLOCKERR, NULL},
+    // {"nano", STA_NANO, NULL},
+    // {"clk", STA_CLK, NULL},
+    {NULL, 0, NULL},
+};
+
 static void timex_main_cleanup(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -80,8 +103,6 @@ void *timex_main(void *ptr)
             rrdset_done(st_sync_state);
 
             static RRDSET *st_clock_status = NULL;
-            static RRDDIM *rd_clock_status_unsync;
-            static RRDDIM *rd_clock_status_clockerr;
 
             if (unlikely(!st_clock_status)) {
                 st_clock_status = rrdset_create_localhost(
@@ -98,14 +119,17 @@ void *timex_main(void *ptr)
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                rd_clock_status_unsync = rrddim_add(st_clock_status, "unsync", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_clock_status_clockerr = rrddim_add(st_clock_status, "clockerr", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                for (int i = 0; sta_codes[i].name != NULL; i++) {
+                    sta_codes[i].rd =
+                        rrddim_add(st_clock_status, sta_codes[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                }
             } else {
                 rrdset_next(st_clock_status);
             }
 
-            rrddim_set_by_pointer(st_clock_status, rd_clock_status_unsync, timex_buf.status & STA_UNSYNC ? 1 : 0);
-            rrddim_set_by_pointer(st_clock_status, rd_clock_status_clockerr, timex_buf.status & STA_CLOCKERR ? 1 : 0);
+            for (int i = 0; sta_codes[i].name != NULL; i++) {
+                rrddim_set_by_pointer(st_clock_status, sta_codes[i].rd, timex_buf.status & sta_codes[i].code ? 1 : 0);
+            }
             rrdset_done(st_clock_status);
         }
 
@@ -161,13 +185,14 @@ void *timex_main(void *ptr)
                     update_every,
                     RRDSET_TYPE_STACKED);
 
-                rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
+                rd_user = rrddim_add(stcpu_thread, "user", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
                 rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
             } else {
                 rrdset_next(stcpu_thread);
             }
 
-            rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * USEC_PER_SEC + thread.ru_utime.tv_usec);
+            rrddim_set_by_pointer(
+                stcpu_thread, rd_user, thread.ru_utime.tv_sec * USEC_PER_SEC + thread.ru_utime.tv_usec);
             rrddim_set_by_pointer(
                 stcpu_thread, rd_system, thread.ru_stime.tv_sec * USEC_PER_SEC + thread.ru_stime.tv_usec);
             rrdset_done(stcpu_thread);
