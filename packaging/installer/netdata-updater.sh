@@ -536,7 +536,9 @@ update_build() {
   if update_available; then
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
     download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.tar.gz"
-    if [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
+    if [ -n "${NETDATA_TARBALL_CHECKSUM}" ] &&
+      grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3 &&
+      [ "$NETDATA_FORCE_UPDATE" != "1" ]; then
       info "Newest version is already installed"
     else
       if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
