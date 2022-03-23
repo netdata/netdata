@@ -46,6 +46,7 @@ static void lz4_compressor_destroy(struct compressor_state **state)
             if (s->data->stream)
                 LZ4_freeStream(s->data->stream);
             freez(s->data->stream_buffer);
+            freez(s->data);
         }
         freez(s->buffer);
         freez(s);
@@ -154,6 +155,7 @@ static void lz4_decompressor_destroy(struct decompressor_state **state)
             if (s->data->stream)
                 LZ4_freeStreamDecode(s->data->stream);
             freez(s->data->stream_buffer);
+            freez(s->data);
         }
         freez(s->buffer);
         freez(s);
