@@ -78,6 +78,35 @@ void *timex_main(void *ptr)
 
             rrddim_set_by_pointer(st_sync_state, rd_sync_state, sync_state != TIME_ERROR ? 1 : 0);
             rrdset_done(st_sync_state);
+
+            static RRDSET *st_clock_status = NULL;
+            static RRDDIM *rd_clock_status_unsync;
+            static RRDDIM *rd_clock_status_clockerr;
+
+            if (unlikely(!st_clock_status)) {
+                st_clock_status = rrdset_create_localhost(
+                    "system",
+                    "clock_sync_status",
+                    NULL,
+                    "clock synchronization",
+                    NULL,
+                    "System Clock Synchronization Status",
+                    "status",
+                    PLUGIN_TIMEX_NAME,
+                    NULL,
+                    NETDATA_CHART_PRIO_CLOCK_SYNC_STATUS,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                rd_clock_status_unsync = rrddim_add(st_clock_status, "unsync", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_clock_status_clockerr = rrddim_add(st_clock_status, "clockerr", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            } else {
+                rrdset_next(st_clock_status);
+            }
+
+            rrddim_set_by_pointer(st_clock_status, rd_clock_status_unsync, timex_buf.status & STA_UNSYNC ? 1 : 0);
+            rrddim_set_by_pointer(st_clock_status, rd_clock_status_clockerr, timex_buf.status & STA_CLOCKERR ? 1 : 0);
+            rrdset_done(st_clock_status);
         }
 
         if (do_offset) {
