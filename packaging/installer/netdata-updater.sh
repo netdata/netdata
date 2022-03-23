@@ -464,7 +464,7 @@ validate_environment_file() {
 }
 
 update_available() {
-  if [ "$NETDATA_UPDATER_FORCE_UPDATE" = "1" ]; then
+  if [ "$NETDATA_FORCE_UPDATE" = "1" ]; then
      info "Force update requested"
      return 0
   fi
@@ -796,7 +796,7 @@ while [ -n "${1}" ]; do
     NETDATA_NO_UPDATER_SELF_UPDATE=1
     shift 1
   elif [ "${1}" = "--force-update" ]; then
-    NETDATA_UPDATER_FORCE_UPDATE=1
+    NETDATA_FORCE_UPDATE=1
     shift 1
   elif [ "${1}" = "--tmpdir-path" ]; then
     NETDATA_TMPDIR_PATH="${2}"
