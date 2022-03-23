@@ -61,28 +61,6 @@ fatal() {
   exit 1
 }
 
-: "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
-
-if [ "${ENVIRONMENT_FILE}" = "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; then
-  if [ -r "${script_dir}/../../../etc/netdata/.environment" ] || [ -r "${script_dir}/../../../etc/netdata/.install-type" ]; then
-    ENVIRONMENT_FILE="${script_dir}/../../../etc/netdata/.environment"
-  elif [ -r "/etc/netdata/.environment" ] || [ -r "/etc/netdata/.install-type" ]; then
-    ENVIRONMENT_FILE="/etc/netdata/.environment"
-  elif [ -r "/opt/netdata/etc/netdata/.environment" ] || [ -r "/opt/netdata/etc/netdata/.install-type" ]; then
-    ENVIRONMENT_FILE="/opt/netdata/etc/netdata/.environment"
-  else
-    envpath="$(find / -type d \( -path /sys -o -path /proc -o -path /dev \) -prune -false -o -path '*netdata/.environment' -type f  2> /dev/null | head -n 1)"
-    itpath="$(find / -type d \( -path /sys -o -path /proc -o -path /dev \) -prune -false -o -path '*netdata/.install-type' -type f  2> /dev/null | head -n 1)"
-    if [ -r "${envpath}" ]; then
-      ENVIRONMENT_FILE="${envpath}"
-    elif [ -r "${itpath}" ]; then
-      ENVIRONMENT_FILE="$(dirname "${itpath}")/.environment"
-    else
-      fatal "Cannot find environment file or install type file, unable to update."
-    fi
-  fi
-fi
-
 issystemd() {
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
@@ -774,6 +752,40 @@ ndtmpdir=
 
 trap cleanup EXIT
 
+if [ -t 2 ]; then
+  # we are running on a terminal
+  # open fd 3 and send it to stderr
+  exec 3>&2
+else
+  # we are headless
+  # create a temporary file for the log
+  logfile="$(mktemp -t netdata-updater.log.XXXXXX)"
+  # open fd 3 and send it to logfile
+  exec 3> "${logfile}"
+fi
+
+: "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
+
+if [ "${ENVIRONMENT_FILE}" = "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; then
+  if [ -r "${script_dir}/../../../etc/netdata/.environment" ] || [ -r "${script_dir}/../../../etc/netdata/.install-type" ]; then
+    ENVIRONMENT_FILE="${script_dir}/../../../etc/netdata/.environment"
+  elif [ -r "/etc/netdata/.environment" ] || [ -r "/etc/netdata/.install-type" ]; then
+    ENVIRONMENT_FILE="/etc/netdata/.environment"
+  elif [ -r "/opt/netdata/etc/netdata/.environment" ] || [ -r "/opt/netdata/etc/netdata/.install-type" ]; then
+    ENVIRONMENT_FILE="/opt/netdata/etc/netdata/.environment"
+  else
+    envpath="$(find / -type d \( -path /sys -o -path /proc -o -path /dev \) -prune -false -o -path '*netdata/.environment' -type f  2> /dev/null | head -n 1)"
+    itpath="$(find / -type d \( -path /sys -o -path /proc -o -path /dev \) -prune -false -o -path '*netdata/.install-type' -type f  2> /dev/null | head -n 1)"
+    if [ -r "${envpath}" ]; then
+      ENVIRONMENT_FILE="${envpath}"
+    elif [ -r "${itpath}" ]; then
+      ENVIRONMENT_FILE="$(dirname "${itpath}")/.environment"
+    else
+      fatal "Cannot find environment file or install type file, unable to update."
+    fi
+  fi
+fi
+
 if [ -r "${ENVIRONMENT_FILE}" ] ; then
   # shellcheck source=/dev/null
   . "${ENVIRONMENT_FILE}" || exit 1
@@ -828,18 +840,6 @@ export NETDATA_NIGHTLIES_BASEURL="${NETDATA_NIGHTLIES_BASEURL:-https://storage.g
 
 if [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
-fi
-
-if [ -t 2 ]; then
-  # we are running on a terminal
-  # open fd 3 and send it to stderr
-  exec 3>&2
-else
-  # we are headless
-  # create a temporary file for the log
-  logfile="$(mktemp -t netdata-updater.log.XXXXXX)"
-  # open fd 3 and send it to logfile
-  exec 3> "${logfile}"
 fi
 
 self_update

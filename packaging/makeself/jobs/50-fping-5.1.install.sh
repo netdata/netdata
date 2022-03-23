@@ -7,8 +7,8 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building fping" || true
 
-fetch "fping-5.0" "https://fping.org/dist/fping-5.0.tar.gz" \
-    ed38c0b9b64686a05d1b3bc1d66066114a492e04e44eef1821d43b1263cd57b8
+fetch "fping-5.1" "https://fping.org/dist/fping-5.1.tar.gz" \
+    1ee5268c063d76646af2b4426052e7d81a42b657e6a77d8e7d3d2e60fd7409fe
 
 export CFLAGS="-static -I/openssl-static/include"
 export LDFLAGS="-static -L/openssl-static/lib"
