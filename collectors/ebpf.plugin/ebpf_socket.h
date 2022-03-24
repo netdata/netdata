@@ -360,5 +360,6 @@ extern void clean_socket_apps_structures();
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
 extern struct config socket_config;
+extern netdata_ebpf_targets_t socket_targets[];
 
 #endif

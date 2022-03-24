@@ -51,7 +51,7 @@ ebpf_module_t ebpf_modules[] = {
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &socket_config,
       .config_file = NETDATA_NETWORK_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = socket_targets},
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
       .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,

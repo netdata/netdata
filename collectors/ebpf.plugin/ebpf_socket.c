@@ -79,6 +79,17 @@ struct config socket_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
+netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_retransmit_skb", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_cleanup_rbuf", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_close", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "udp_recvmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_sendmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "udp_sendmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_v4_connect", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
