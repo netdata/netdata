@@ -150,7 +150,7 @@ hardware interrupt request (hard IRQ).
 
 #### IPC shared memory
 
-To monitor shared memory system call counts, the following `kprobes` are used:
+To monitor shared memory system call counts, Netdata attaches tracing in the following functions:
 
 - `shmget`: Runs when [`shmget`](https://man7.org/linux/man-pages/man2/shmget.2.html) is called.
 - `shmat`: Runs when [`shmat`](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
