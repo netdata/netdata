@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/timex
 
 This plugin monitors the system kernel clock synchronization state.
 
-This plugin creates three charts:
+This plugin creates the following charts:
 
 - System clock synchronization state according to the system kernel
 - System clock status which gives the value of the `time_status` variable in the kernel
