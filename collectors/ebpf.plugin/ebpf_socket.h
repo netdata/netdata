@@ -43,9 +43,23 @@ enum ebpf_socket_publish_index {
     NETDATA_IDX_UDP_RECVBUF,
     NETDATA_IDX_UDP_SENDMSG,
     NETDATA_IDX_TCP_RETRANSMIT,
+    NETDATA_IDX_TCP_CONNECTION_V4,
+    NETDATA_IDX_TCP_CONNECTION_V6,
 
     // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_MAX_SOCKET_VECTOR
+};
+
+enum socket_functions {
+    NETDATA_FCNT_INET_CSK_ACCEPT,
+    NETDATA_FCNT_TCP_RETRANSMIT,
+    NETDATA_FCNT_CLEANUP_RBUF,
+    NETDATA_FCNT_TCP_CLOSE,
+    NETDATA_FCNT_UDP_RECEVMSG,
+    NETDATA_FCNT_TCP_SENDMSG,
+    NETDATA_FCNT_UDP_SENDMSG,
+    NETDATA_FCNT_TCP_V4_CONNECT,
+    NETDATA_FCNT_TCP_V6_CONNECT
 };
 
 typedef enum ebpf_socket_idx {
@@ -68,6 +82,12 @@ typedef enum ebpf_socket_idx {
     NETDATA_KEY_BYTES_UDP_SENDMSG,
 
     NETDATA_KEY_TCP_RETRANSMIT,
+
+    NETDATA_KEY_CALLS_TCP_CONNECT_IPV4,
+    NETDATA_KEY_ERROR_TCP_CONNECT_IPV4,
+
+    NETDATA_KEY_CALLS_TCP_CONNECT_IPV6,
+    NETDATA_KEY_ERROR_TCP_CONNECT_IPV6,
 
     // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_SOCKET_COUNTER
@@ -132,14 +152,16 @@ typedef enum ebpf_socket_idx {
 
 typedef struct ebpf_socket_publish_apps {
     // Data read
-    uint64_t bytes_sent;         // Bytes sent
-    uint64_t bytes_received;     // Bytes received
-    uint64_t call_tcp_sent;      // Number of times tcp_sendmsg was called
-    uint64_t call_tcp_received;  // Number of times tcp_cleanup_rbuf was called
-    uint64_t retransmit;         // Number of times tcp_retransmit was called
-    uint64_t call_udp_sent;      // Number of times udp_sendmsg was called
-    uint64_t call_udp_received;  // Number of times udp_recvmsg was called
-    uint64_t call_close;         // Number of times tcp_close was called
+    uint64_t bytes_sent;            // Bytes sent
+    uint64_t bytes_received;        // Bytes received
+    uint64_t call_tcp_sent;         // Number of times tcp_sendmsg was called
+    uint64_t call_tcp_received;     // Number of times tcp_cleanup_rbuf was called
+    uint64_t retransmit;            // Number of times tcp_retransmit was called
+    uint64_t call_udp_sent;         // Number of times udp_sendmsg was called
+    uint64_t call_udp_received;     // Number of times udp_recvmsg was called
+    uint64_t call_close;            // Number of times tcp_close was called
+    uint64_t call_tcp_v4_connection;// Number of times tcp_v4_connect was called
+    uint64_t call_tcp_v6_connection;// Number of times tcp_v6_connect was called
 } ebpf_socket_publish_apps_t;
 
 typedef struct ebpf_network_viewer_dimension_names {
@@ -164,6 +186,17 @@ typedef struct ebpf_network_viewer_port_list {
     uint8_t protocol;
     struct ebpf_network_viewer_port_list *next;
 } ebpf_network_viewer_port_list_t;
+
+typedef struct netdata_passive_connection {
+    uint32_t tgid;
+    uint32_t pid;
+    uint64_t counter;
+} netdata_passive_connection_t;
+
+typedef struct netdata_passive_connection_idx {
+    uint16_t protocol;
+    uint16_t port;
+} netdata_passive_connection_idx_t;
 
 /**
  * Union used to store ip addresses
@@ -235,14 +268,13 @@ typedef struct netdata_socket {
     uint16_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
 
-
 typedef struct netdata_plot_values {
     // Values used in the previous iteration
     uint64_t recv_packets;
     uint64_t sent_packets;
     uint64_t recv_bytes;
     uint64_t sent_bytes;
-    uint16_t retransmit;
+    uint32_t retransmit;
 
     uint64_t last_time;
 
