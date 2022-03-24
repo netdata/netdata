@@ -6,7 +6,7 @@ wait_for() {
   host="${1}"
   port="${2}"
   name="${3}"
-  timeout="30"
+  timeout="60"
 
   if command -v nc > /dev/null ; then
     netcat="nc"
@@ -19,7 +19,7 @@ wait_for() {
 
   printf "Waiting for %s on %s:%s ... " "${name}" "${host}" "${port}"
 
-  sleep 30
+  sleep 60
 
   i=0
   while ! ${netcat} -z "${host}" "${port}"; do
