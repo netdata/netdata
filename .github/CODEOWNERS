@@ -5,8 +5,8 @@
 * @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @iigorkarpov @maneamarius @kaskavel
-.github/ @Ferroin @iigorkarpov @maneamarius @kaskavel
+.travis/ @Ferroin @iigorkarpov @maneamarius
+.github/ @Ferroin @iigorkarpov @maneamarius
 aclk/ @stelfrag @underhood
 build/ @Ferroin @iigorkarpov @maneamarius
 contrib/debian @Ferroin @iigorkarpov @maneamarius
@@ -32,7 +32,7 @@ packaging/ @Ferroin @iigorkarpov @maneamarius
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
 system/ @Ferroin @iigorkarpov @maneamarius
-tests/ @Ferroin @iigorkarpov @maneamarius @kaskavel @vkalintiris
+tests/ @Ferroin @iigorkarpov @maneamarius @vkalintiris
 web/ @thiagoftsm @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
@@ -43,7 +43,7 @@ Dockerfile* @Ferroin @iigorkarpov @maneamarius
 
 # Ownership of specific files
 .gitignore @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.travis.yml @Ferroin @iigorkarpov @maneamarius @kaskavel
+.travis.yml @Ferroin @iigorkarpov @maneamarius
 .lgtm.yml @Ferroin @iigorkarpov @maneamarius
 .eslintrc @Ferroin @iigorkarpov @maneamarius
 .eslintignore @Ferroin @iigorkarpov @maneamarius
