@@ -38,6 +38,8 @@
 #define EBPF_CFG_APPLICATION "apps"
 #define EBPF_CFG_CGROUP "cgroups"
 
+#define EBPF_COMMON_FNCT_CLEAN_UP "release_task"
+
 /**
  * The RedHat magic number was got doing:
  *

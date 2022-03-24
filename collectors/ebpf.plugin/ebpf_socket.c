@@ -90,6 +90,338 @@ netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = 
                                             {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
                                             {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/socket.skel.h" // BTF code
+
+static struct socket_bpf *bpf_obj = NULL;
+
+/**
+ * Disable Probe
+ *
+ * Disable probes to use trampoline.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_socket_disable_probes(struct socket_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_inet_csk_accept_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_retransmit_skb_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_cleanup_rbuf_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_close_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_recvmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_recvmsg_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_socket_release_task_kprobe, false);
+}
+
+/**
+ * Disable Trampoline
+ *
+ * Disable trampoline to use probes.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_socket_disable_trampoline(struct socket_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_inet_csk_accept_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_retransmit_skb_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_cleanup_rbuf_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_close_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_recvmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_recvmsg_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_socket_release_task_fentry, false);
+}
+
+/**
+ *  Set trampoline target.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_set_trampoline_target(struct socket_bpf *obj)
+{
+    bpf_program__set_attach_target(obj->progs.netdata_inet_csk_accept_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_v4_connect_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_v6_connect_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_retransmit_skb_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_RETRANSMIT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_cleanup_rbuf_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_CLEANUP_RBUF].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_close_fentry, 0, socket_targets[NETDATA_FCNT_TCP_CLOSE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_udp_recvmsg_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_udp_recvmsg_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_sendmsg_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_sendmsg_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_udp_sendmsg_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_udp_sendmsg_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_socket_release_task_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
+}
+
+
+/**
+ * Disable specific trampoline
+ *
+ * Disable specific trampoline to match user selection.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param sel option selected by user.
+ */
+static inline void ebpf_socket_disable_specific_trampoline(struct socket_bpf *obj, netdata_run_mode_t sel)
+{
+    if (sel == MODE_RETURN) {
+        bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fentry, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fexit, false);
+        bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fexit, false);
+    }
+}
+
+/**
+ * Disable specific trampoline
+ *
+ * Disable specific trampoline to match user selection.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param sel option selected by user.
+ */
+static inline void ebpf_socket_disable_specific_probe(struct socket_bpf *obj, netdata_run_mode_t sel)
+{
+    if (sel == MODE_RETURN) {
+        bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kprobe, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kretprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kretprobe, false);
+    }
+}
+
+/**
+ * Attach probes
+ *
+ * Attach probes to targets.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param sel option selected by user.
+ */
+static int ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t sel)
+{
+    obj->links.netdata_inet_csk_accept_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_inet_csk_accept_kretprobe,
+                                                                              true,
+                                                                              socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
+    int ret = libbpf_get_error(obj->links.netdata_inet_csk_accept_kretprobe);
+    if (ret)
+            return -1;
+
+    obj->links.netdata_tcp_v4_connect_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v4_connect_kretprobe,
+                                                                             true,
+                                                                             socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_v4_connect_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_tcp_v6_connect_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v6_connect_kretprobe,
+                                                                             true,
+                                                                             socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_tcp_retransmit_skb_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_retransmit_skb_kprobe,
+                                                                              false,
+                                                                              socket_targets[NETDATA_FCNT_TCP_RETRANSMIT].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_retransmit_skb_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_tcp_cleanup_rbuf_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_cleanup_rbuf_kprobe,
+                                                                            false,
+                                                                            socket_targets[NETDATA_FCNT_CLEANUP_RBUF].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_cleanup_rbuf_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_tcp_close_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_close_kprobe,
+                                                                     false,
+                                                                     socket_targets[NETDATA_FCNT_TCP_CLOSE].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_close_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_udp_recvmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_udp_recvmsg_kprobe,
+                                                                       false,
+                                                                       socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+    ret = libbpf_get_error(obj->links.netdata_udp_recvmsg_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_udp_recvmsg_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_udp_recvmsg_kretprobe,
+                                                                          true,
+                                                                          socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+    ret = libbpf_get_error(obj->links.netdata_udp_recvmsg_kretprobe);
+    if (ret)
+        return -1;
+
+    if (sel == MODE_RETURN) {
+        obj->links.netdata_tcp_sendmsg_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_sendmsg_kretprobe,
+                                                                              true,
+                                                                              socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
+        ret = libbpf_get_error(obj->links.netdata_tcp_sendmsg_kretprobe);
+        if (ret)
+            return -1;
+
+        obj->links.netdata_udp_sendmsg_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_udp_sendmsg_kretprobe,
+                                                                              true,
+                                                                              socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
+        ret = libbpf_get_error(obj->links.netdata_udp_sendmsg_kretprobe);
+        if (ret)
+            return -1;
+    } else {
+        obj->links.netdata_tcp_sendmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_sendmsg_kprobe,
+                                                                           false,
+                                                                           socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
+        ret = libbpf_get_error(obj->links.netdata_tcp_sendmsg_kprobe);
+        if (ret)
+            return -1;
+
+        obj->links.netdata_udp_sendmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_udp_sendmsg_kprobe,
+                                                                           false,
+                                                                           socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
+        ret = libbpf_get_error(obj->links.netdata_udp_sendmsg_kprobe);
+        if (ret)
+            return -1;
+    }
+
+    obj->links.netdata_socket_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_socket_release_task_kprobe,
+                                                                               false,  EBPF_COMMON_FNCT_CLEAN_UP);
+    ret = libbpf_get_error(obj->links.netdata_socket_release_task_kprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_socket_set_hash_tables(struct socket_bpf *obj)
+{
+    socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd = bpf_map__fd(obj->maps.tbl_bandwidth);
+    socket_maps[NETDATA_SOCKET_GLOBAL].map_fd = bpf_map__fd(obj->maps.tbl_global_sock);
+    socket_maps[NETDATA_SOCKET_LPORTS].map_fd = bpf_map__fd(obj->maps.tbl_lports);
+    socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd = bpf_map__fd(obj->maps.tbl_conn_ipv4);
+    socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd = bpf_map__fd(obj->maps.tbl_conn_ipv6);
+    socket_maps[NETDATA_SOCKET_TABLE_UDP].map_fd = bpf_map__fd(obj->maps.tbl_nv_udp);
+    socket_maps[NETDATA_SOCKET_TABLE_CTRL].map_fd = bpf_map__fd(obj->maps.socket_ctrl);
+}
+
+/**
+ * Adjust Map Size
+ *
+ * Resize maps according input from users.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ */
+static void ebpf_socket_adjust_map_size(struct socket_bpf *obj, ebpf_module_t *em)
+{
+    ebpf_update_map_size(obj->maps.tbl_bandwidth, &socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH],
+                         em, bpf_map__name(obj->maps.tbl_bandwidth));
+
+    ebpf_update_map_size(obj->maps.tbl_conn_ipv4, &socket_maps[NETDATA_SOCKET_TABLE_IPV4],
+                         em, bpf_map__name(obj->maps.tbl_conn_ipv4));
+
+    ebpf_update_map_size(obj->maps.tbl_conn_ipv6, &socket_maps[NETDATA_SOCKET_TABLE_IPV6],
+                         em, bpf_map__name(obj->maps.tbl_conn_ipv6));
+
+    ebpf_update_map_size(obj->maps.tbl_nv_udp, &socket_maps[NETDATA_SOCKET_TABLE_UDP],
+                         em, bpf_map__name(obj->maps.tbl_nv_udp));
+}
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_module_t *em)
+{
+    netdata_ebpf_targets_t *mt = em->targets;
+    netdata_ebpf_program_loaded_t test = mt[NETDATA_FCNT_INET_CSK_ACCEPT].mode;
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ebpf_socket_disable_probes(obj);
+
+        ebpf_set_trampoline_target(obj);
+        ebpf_socket_disable_specific_trampoline(obj, em->mode);
+    } else { // We are not using tracepoints for this thread.
+        ebpf_socket_disable_trampoline(obj);
+
+        ebpf_socket_disable_specific_probe(obj, em->mode);
+    }
+
+    int ret = socket_bpf__load(obj);
+    if (ret) {
+        fprintf(stderr, "failed to load BPF object: %d\n", ret);
+        return ret;
+    }
+
+    ebpf_socket_adjust_map_size(obj, em);
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ret = socket_bpf__attach(obj);
+    } else {
+        ret = ebpf_socket_attach_probes(obj, em->mode);
+    }
+
+    if (!ret) {
+        ebpf_socket_set_hash_tables(obj);
+
+        ebpf_update_controller(socket_maps[NETDATA_SOCKET_TABLE_CTRL].map_fd, em);
+    }
+
+    return ret;
+}
+#endif
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -3503,6 +3835,15 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
             ret = -1;
         }
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        bpf_obj = socket_bpf__open();
+        if (!bpf_obj)
+            ret = -1;
+        else
+            ret = ebpf_socket_load_and_attach(bpf_obj, em);
+    }
+#endif
 
     if (ret) {
         error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
