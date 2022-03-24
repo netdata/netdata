@@ -3475,6 +3475,31 @@ void parse_table_size_options(struct config *cfg)
                                                                                       EBPF_CONFIG_UDP_SIZE, NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED);
 }
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_socket_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+
+    if (em->load == EBPF_LOAD_LEGACY) {
+        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
+        if (!probe_links) {
+            ret = -1;
+        }
+    }
+
+    if (ret) {
+        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+    }
+
+    return ret;
+}
+
 /**
  * Socket thread
  *
@@ -3516,8 +3541,7 @@ void *ebpf_socket_thread(void *ptr)
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    if (ebpf_socket_load_bpf(em)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endsocket;
