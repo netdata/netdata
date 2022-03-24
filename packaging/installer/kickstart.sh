@@ -990,11 +990,9 @@ netdata_avail_check() {
 check_special_native_deps() {
   if [ "${DISTRO_COMPAT_NAME}" = "centos" ] && [ "${SYSVERSION}" = "7" ]; then
     progress "Checking for libuv availability."
-    # shellcheck disable=SC2086
-    if ${pm_cmd} search ${interactive_opts} -v libuv | grep -q "No matches found"; then
+    if ${pm_cmd} search --nogpgcheck -v libuv | grep -q "No matches found"; then
       progress "libuv not found, checking for EPEL availability."
-      # shellcheck disable=SC2086
-      if ${pm_cmd} search ${interactive_opts} -v epel-release | grep -q "No matches found"; then
+      if ${pm_cmd} search --nogpgcheck -v epel-release | grep -q "No matches found"; then
         warning "Unable to find a suitable source for libuv, cannot install using native packages on this system."
         return 1
       else
