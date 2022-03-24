@@ -137,6 +137,8 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_MAXIMUM_IPV4_CIDR 32
 
 // Contexts
+#define NETDATA_CGROUP_TCP_V4_CONN_CONTEXT "cgroup.net_conn_ipv4"
+#define NETDATA_CGROUP_TCP_V6_CONN_CONTEXT "cgroup.net_conn_ipv6"
 #define NETDATA_CGROUP_SOCKET_BYTES_RECV_CONTEXT "cgroup.net_bytes_recv"
 #define NETDATA_CGROUP_SOCKET_BYTES_SEND_CONTEXT "cgroup.net_bytes_send"
 #define NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT "cgroup.net_tcp_recv"
@@ -145,6 +147,8 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT "cgroup.net_udp_recv"
 #define NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT "cgroup.net_udp_send"
 
+#define NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT "services.net_conn_ipv4"
+#define NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT "services.net_conn_ipv6"
 #define NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT "services.net_bytes_recv"
 #define NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT "services.net_bytes_send"
 #define NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT "services.net_tcp_recv"
