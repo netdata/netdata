@@ -120,6 +120,9 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt->name);
     freez(rt->exec);
     freez(rt->recipient);
+    freez(rt->classification);
+    freez(rt->component);
+    freez(rt->type);
     freez(rt->context);
     freez(rt->source);
     freez(rt->units);
