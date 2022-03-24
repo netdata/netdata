@@ -1,1 +1,6 @@
 .gitignore
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints
+# Jupyter notebooks
+.ipynb
