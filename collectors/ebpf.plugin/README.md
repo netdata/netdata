@@ -448,17 +448,28 @@ The following `kprobes` are used to collect `mount` & `unmount` call counts:
 
 ### Networking Stack
 
-Netdata monitors socket bandwidth attaching `kprobes` for internal functions.
+Netdata monitors socket bandwidth attaching `tracing` for internal functions.
 
-#### TCP functions
+#### TCP outbound connections
+This chart demonstrates calls to `tcp_v4_connection` and `tcp_v6_connection` that start connections for IPV4 and IPV6, respectively.
+
+#### TCP inbound connections
+This chart demonstrates TCP and UDP connections that the host receives.
+To collect this information, netdata attaches a tracing to `inet_csk_accept`.
+
+#### TCP bandwidth functions
 
 This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, and `tcp_close`; these functions are used
 to send & receive data and to close connections when `TCP` protocol is used.
 
 #### TCP bandwidth
 
-Like the previous chart, this one also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`, but instead of showing the number
-of calls, it demonstrates the number of bytes sent and received.
+This chart demonstrates calls to functions:
+
+- `tcp_sendmsg`: Function responsible to send data for a specified destination.
+- `tcp_cleanup_rbuf`: We use this function instead of `tcp_recvmsg`, because the last one misses `tcp_read_sock` traffic
+   and we would also need to add more `tracing` to get the socket and package size.
+- `tcp_close`: Function responsible to close connection.
 
 #### TCP retransmit
 
