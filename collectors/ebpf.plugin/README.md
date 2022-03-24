@@ -227,7 +227,7 @@ changes to a file that was mapped into memory using [`mmap(2)`](https://man7.org
 
 #### File system sync
 
-This chart monitors calls demonstrating commits from filesystem caches to disk. Netdata attaches `kprobes` for
+This chart monitors calls demonstrating commits from filesystem caches to disk. Netdata attaches `tracing` for
 [`sync(2)`](https://man7.org/linux/man-pages/man2/sync.2.html), and [`syncfs(2)`](https://man7.org/linux/man-pages/man2/sync.2.html).
 
 #### File range sync
