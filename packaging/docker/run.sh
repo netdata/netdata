@@ -44,6 +44,11 @@ if [ -n "${PGID}" ]; then
   usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
+if mountpoint -q /etc/netdata && [ -z "$(ls -A /etc/netdata)" ]; then
+  echo "Copying stock configuration to /etc/netdata"
+  cp -a /etc/netdata.stock/. /etc/netdata
+fi
+
 if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /var/lib/netdata/cloud.d/claimed_id ]; then
   /usr/sbin/netdata-claim.sh -token="${NETDATA_CLAIM_TOKEN}" \
                              -url="${NETDATA_CLAIM_URL}" \
