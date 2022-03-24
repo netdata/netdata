@@ -372,6 +372,26 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     struct target *w;
     collected_number value;
 
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          call_tcp_v4_connection));
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          call_tcp_v6_connection));
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
@@ -569,12 +589,29 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  */
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;;
+    struct target *root = ptr;
+    int order = 20080;
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_CONNECTION_TCP_V4,
+                               "Calls to tcp_v4_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               order++,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_CONNECTION_TCP_V6,
+                               "Calls to tcp_v6_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               order++,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
                                "Bytes sent", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20080,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -582,7 +619,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "bytes received", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20081,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -591,7 +628,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20082,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -600,7 +637,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20083,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -609,7 +646,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20084,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -618,7 +655,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20085,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -627,7 +664,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20086,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -1581,6 +1618,8 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
     curr->call_udp_sent = eb->call_udp_sent;
     curr->call_udp_received = eb->call_udp_received;
     curr->call_close = eb->close;
+    curr->call_tcp_v4_connection = eb->tcp_v4_connection;
+    curr->call_tcp_v6_connection = eb->tcp_v6_connection;
 }
 
 /**
@@ -1602,6 +1641,8 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
         total->call_udp_sent += move->call_udp_sent;
         total->call_udp_received += move->call_udp_received;
         total->close += move->close;
+        total->tcp_v4_connection += move->tcp_v4_connection;
+        total->tcp_v6_connection += move->tcp_v6_connection;
     }
 }
 
