@@ -98,6 +98,7 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_CGROUP_NET_GROUP "network (eBPF)"
 
 // Global chart name
+#define NETDATA_TCP_OUTBOUND_CONNECTIONS "tcp_outbound_conn"
 #define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
 #define NETDATA_TCP_FUNCTION_BITS "total_tcp_bandwidth"
 #define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
