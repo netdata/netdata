@@ -632,6 +632,8 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
     db_execute(buffer_tostring(sql));
     buffer_flush(sql);
 
+    log_access("This runs");
+    
     buffer_sprintf(sql, INDEX_ACLK_ALERT, uuid_str, uuid_str);
     db_execute(buffer_tostring(sql));
 
