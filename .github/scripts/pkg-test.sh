@@ -67,7 +67,8 @@ wait_for() {
   host="${1}"
   port="${2}"
   name="${3}"
-  timeout="60"
+  timeout_count="18"
+  timeout_interval="5"
 
   if command -v nc > /dev/null ; then
     netcat="nc"
@@ -84,8 +85,8 @@ wait_for() {
 
   i=0
   while ! ${netcat} -z "${host}" "${port}"; do
-    sleep 1
-    if [ "$i" -gt "$timeout" ]; then
+    sleep "${timeout_interval}"
+    if [ "$i" -gt "${timeout_count}" ]; then
       printf "Timed out!\n"
       return 1
     fi
