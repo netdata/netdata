@@ -864,6 +864,7 @@ NETDATA_FILES = \
     $(ACLK_COMMON_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
+    $(TIMEX_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
@@ -885,7 +886,6 @@ if LINUX
         daemon/static_threads_linux.c \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
-        $(TIMEX_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)

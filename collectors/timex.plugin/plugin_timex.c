@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon/common.h"
-#include "sys/timex.h"
+#include "libnetdata/os.h"
 
 #define PLUGIN_TIMEX_NAME "timex.plugin"
 
@@ -44,7 +44,8 @@ void *timex_main(void *ptr)
 
         struct timex timex_buf = {};
         int sync_state = 0;
-        sync_state = adjtimex(&timex_buf);
+
+        sync_state = ADJUST_TIMEX(&timex_buf);
 
         collected_number divisor = USEC_PER_MS;
         if (timex_buf.status & STA_NANO)
