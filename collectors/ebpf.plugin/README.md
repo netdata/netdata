@@ -441,7 +441,7 @@ accessed before.
 
 ### Mount Points
 
-The following `kprobes` are used to collect `mount` & `unmount` call counts:
+The following `tracing` are used to collect `mount` & `unmount` call counts:
 
 - [`mount`](https://man7.org/linux/man-pages/man2/mount.2.html): mount filesystem on host.
 - [`umount`](https://man7.org/linux/man-pages/man2/umount.2.html): umount filesystem on host.
