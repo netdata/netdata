@@ -442,6 +442,10 @@ validate_environment_file() {
 }
 
 update_available() {
+  if [ "$NETDATA_FORCE_UPDATE" = "1" ]; then
+     info "Force update requested"
+     return 0
+  fi
   basepath="$(dirname "$(dirname "$(dirname "${NETDATA_LIB_DIR}")")")"
   searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
   searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
@@ -510,7 +514,9 @@ update_build() {
   if update_available; then
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
     download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.tar.gz"
-    if [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
+    if [ -n "${NETDATA_TARBALL_CHECKSUM}" ] &&
+      grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3 &&
+      [ "$NETDATA_FORCE_UPDATE" != "1" ]; then
       info "Newest version is already installed"
     else
       if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
@@ -802,6 +808,9 @@ while [ -n "${1}" ]; do
     shift 1
   elif [ "${1}" = "--no-updater-self-update" ]; then
     NETDATA_NO_UPDATER_SELF_UPDATE=1
+    shift 1
+  elif [ "${1}" = "--force-update" ]; then
+    NETDATA_FORCE_UPDATE=1
     shift 1
   elif [ "${1}" = "--tmpdir-path" ]; then
     NETDATA_TMPDIR_PATH="${2}"
