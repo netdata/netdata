@@ -805,9 +805,13 @@ static int rrdr_convert_before_after_to_absolute(
                                                         before_requested % update_every;
             else before_requested = before_requested + update_every - before_requested % update_every;
         }
+        // If the "before_requested" is less than zero then we set it
+        // relatively to the "now_realtime_sec() - 1" NOT "last_entry_t".
+        // Likely DB stores the last metric one second behind the "now_realtime_sec()"
+        // Not to get last metric as a NULL value during request,
+        // "before_requested" is set to "1" second less than "now_realtime_sec()".
         if(before_requested > 0) before_requested = first_entry_t + before_requested;
-        else                     before_requested = last_entry_t  + before_requested; //last_entry_t is not really now_t
-        //TODO: fix before_requested to be relative to now_t
+        else                     before_requested = now_realtime_sec() - 1 + before_requested;
         absolute_period_requested = 0;
     }
 
@@ -826,12 +830,16 @@ static int rrdr_convert_before_after_to_absolute(
     if(absolute_period_requested == -1)
         absolute_period_requested = 1;
 
-    // make sure they are within our timeframe
-    if(before_requested > last_entry_t)  before_requested = last_entry_t;
+    // Make sure they are within our timeframe
+    // Timeframe can be forward than the "last_entry_t",
+    // due to invalid charts like removed USB disk or stopped application services.
+    // Therefore "last_entry_t" checks/conditions are commented.
+
+    //if(before_requested > last_entry_t)  before_requested = last_entry_t;
     if(before_requested < first_entry_t && !(options & RRDR_OPTION_ALLOW_PAST))
         before_requested = first_entry_t;
 
-    if(after_requested > last_entry_t)  after_requested = last_entry_t;
+    //if(after_requested > last_entry_t)  after_requested = last_entry_t;
     if(after_requested < first_entry_t && !(options & RRDR_OPTION_ALLOW_PAST))
         after_requested = first_entry_t;
 
@@ -865,6 +873,7 @@ static RRDR *rrd2rrdr_fixedstep(
         , struct context_param *context_param_list
         , int timeout
 ) {
+    UNUSED(last_entry_t);
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
     // the duration of the chart
@@ -945,6 +954,10 @@ static RRDR *rrd2rrdr_fixedstep(
 
     // we align the request on requested_before
     time_t before_wanted = before_requested;
+    // Timeframe can be forward than the "last_entry_t",
+    // due to invalid charts like removed USB disk or stopped application services.
+    // Therefore "last_entry_t" checks/conditions are commented.
+    /*
     if(likely(before_wanted > last_entry_t)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL ERROR: rrd2rrdr() on %s, before_wanted is after db max", st->name);
@@ -952,6 +965,7 @@ static RRDR *rrd2rrdr_fixedstep(
 
         before_wanted = last_entry_t - (last_entry_t % ( ((aligned)?group:1) * update_every ));
     }
+    */
     //size_t before_slot = rrdset_time2slot(st, before_wanted);
 
     // we need to estimate the number of points, for having
@@ -1000,15 +1014,17 @@ static RRDR *rrd2rrdr_fixedstep(
 
     if(after_wanted < first_entry_t)
         error("INTERNAL CHECK: after_wanted %u is too small, minimum %u", (uint32_t)after_wanted, (uint32_t)first_entry_t);
-
-    if(after_wanted > last_entry_t)
-        error("INTERNAL CHECK: after_wanted %u is too big, maximum %u", (uint32_t)after_wanted, (uint32_t)last_entry_t);
+    // Timeframe can be forward than the "last_entry_t",
+    // due to invalid charts like removed USB disk or stopped application services.
+    // Therefore "last_entry_t" checks/conditions are commented.
+    //if(after_wanted > last_entry_t)
+    //    error("INTERNAL CHECK: after_wanted %u is too big, maximum %u", (uint32_t)after_wanted, (uint32_t)last_entry_t);
 
     if(before_wanted < first_entry_t)
         error("INTERNAL CHECK: before_wanted %u is too small, minimum %u", (uint32_t)before_wanted, (uint32_t)first_entry_t);
 
-    if(before_wanted > last_entry_t)
-        error("INTERNAL CHECK: before_wanted %u is too big, maximum %u", (uint32_t)before_wanted, (uint32_t)last_entry_t);
+    //if(before_wanted > last_entry_t)
+    //    error("INTERNAL CHECK: before_wanted %u is too big, maximum %u", (uint32_t)before_wanted, (uint32_t)last_entry_t);
 
 /*
     if(before_slot >= (size_t)st->entries)
@@ -1252,6 +1268,7 @@ static RRDR *rrd2rrdr_variablestep(
         , struct context_param *context_param_list
         , int timeout
 ) {
+    UNUSED(last_entry_t);
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
     // the duration of the chart
@@ -1334,6 +1351,11 @@ static RRDR *rrd2rrdr_variablestep(
 
     // we align the request on requested_before
     time_t before_wanted = before_requested;
+
+    // Timeframe can be forward than the "last_entry_t",
+    // due to invalid charts like removed USB disk or stopped application services.
+    // Therefore "last_entry_t" checks/conditions are commented.
+    /*
     if(likely(before_wanted > last_entry_t)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL ERROR: rrd2rrdr() on %s, before_wanted is after db max", st->name);
@@ -1341,6 +1363,8 @@ static RRDR *rrd2rrdr_variablestep(
 
         before_wanted = last_entry_t - (last_entry_t % ( ((aligned)?group:1) * update_every ));
     }
+    */
+
     //size_t before_slot = rrdset_time2slot(st, before_wanted);
 
     // we need to estimate the number of points, for having
@@ -1389,15 +1413,17 @@ static RRDR *rrd2rrdr_variablestep(
 
     if(after_wanted < first_entry_t)
         error("INTERNAL CHECK: after_wanted %u is too small, minimum %u", (uint32_t)after_wanted, (uint32_t)first_entry_t);
-
-    if(after_wanted > last_entry_t)
-        error("INTERNAL CHECK: after_wanted %u is too big, maximum %u", (uint32_t)after_wanted, (uint32_t)last_entry_t);
+    // Timeframe can be forward than the "last_entry_t",
+    // due to invalid charts like removed USB disk or stopped application services.
+    // Therefore "last_entry_t" checks/conditions are commented.
+    //if(after_wanted > last_entry_t)
+    //    error("INTERNAL CHECK: after_wanted %u is too big, maximum %u", (uint32_t)after_wanted, (uint32_t)last_entry_t);
 
     if(before_wanted < first_entry_t)
         error("INTERNAL CHECK: before_wanted %u is too small, minimum %u", (uint32_t)before_wanted, (uint32_t)first_entry_t);
 
-    if(before_wanted > last_entry_t)
-        error("INTERNAL CHECK: before_wanted %u is too big, maximum %u", (uint32_t)before_wanted, (uint32_t)last_entry_t);
+    //if(before_wanted > last_entry_t)
+    //    error("INTERNAL CHECK: before_wanted %u is too big, maximum %u", (uint32_t)before_wanted, (uint32_t)last_entry_t);
 
 /*
     if(before_slot >= (size_t)st->entries)
