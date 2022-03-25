@@ -52,6 +52,55 @@ else
   INTERACTIVE=1
 fi
 
+main() {
+  check_claim_opts
+  confirm_root_support
+  get_system_info
+  confirm_install_prefix
+
+  if [ "${ACTION}" = "uninstall" ]; then
+    uninstall
+    cleanup
+    trap - EXIT
+    exit 0
+  fi
+
+  if [ "${ACTION}" = "reinstall-clean" ]; then
+    uninstall
+    cleanup
+
+    ACTION=
+    INSTALL_PREFIX=
+    # shellcheck disable=SC2086
+    main
+
+    trap - EXIT
+    exit 0
+  fi
+
+  tmpdir="$(create_tmp_directory)"
+  progress "Using ${tmpdir} as a temporary directory."
+  cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
+
+  case "${SYSTYPE}" in
+    Linux) install_on_linux ;;
+    Darwin) install_on_macos ;;
+    FreeBSD) install_on_freebsd ;;
+  esac
+
+  if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+    claim
+  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
+    soft_disable_cloud
+  fi
+
+  set_auto_updates
+
+  telemetry_event INSTALL_SUCCESS "" ""
+  cleanup
+  trap - EXIT
+}
+
 # ======================================================================
 # Usage info
 
@@ -84,6 +133,7 @@ USAGE: kickstart.sh [options]
   --claim-*                  Specify other options for the claiming script.
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
   --uninstall                Uninstall an existing installation of Netdata.
+  --reinstall-clean          Clean reinstall Netdata.
 
 Additionally, this script may use the following environment variables:
 
@@ -1577,6 +1627,9 @@ while [ -n "${1}" ]; do
     "--uninstall")
       ACTION="uninstall"
       ;;
+    "--reinstall-clean")
+      ACTION="reinstall-clean"
+      ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1
       NETDATA_ONLY_STATIC=0
@@ -1630,38 +1683,8 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
-check_claim_opts
-confirm_root_support
-get_system_info
-confirm_install_prefix
-
-if [ "${ACTION}" = "uninstall" ]; then
-  uninstall
-  cleanup
-  trap - EXIT
-  exit 0
+if [ -z "${ACTION}" ]; then
+  handle_existing_install
 fi
 
-tmpdir="$(create_tmp_directory)"
-progress "Using ${tmpdir} as a temporary directory."
-cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
-
-handle_existing_install
-
-case "${SYSTYPE}" in
-  Linux) install_on_linux ;;
-  Darwin) install_on_macos ;;
-  FreeBSD) install_on_freebsd ;;
-esac
-
-if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-  claim
-elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
-  soft_disable_cloud
-fi
-
-set_auto_updates
-
-telemetry_event INSTALL_SUCCESS "" ""
-cleanup
-trap - EXIT
+main
