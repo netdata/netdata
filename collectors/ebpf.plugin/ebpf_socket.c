@@ -3893,6 +3893,9 @@ void *ebpf_socket_thread(void *ptr)
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
     if (ebpf_socket_load_bpf(em)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
