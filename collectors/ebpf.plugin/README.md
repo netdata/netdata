@@ -173,13 +173,34 @@ organization:
     * File system sync
     * File range sync
 
-#### Page cache ratio
+#### Page cache hits
 
 When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache.
-If the entry is there, a page cache hit has occurred, and the read is from the cache. If the entry is not there,
-a page cache miss has occurred, and the kernel allocates a new entry and copies in data from the disk. Netdata calculates
- the percentage of accessed files that are cached on memory. The ratio is calculated counting the accessed cached pages
- (without counting dirty pages and pages added because of read misses) divided by total access without dirty pages.
+ If the entry is there, a page cache hit has occurred and the read is from the cache.
+
+A page cache hit is when the page cache is successfully accessed with a read operation. We do not count pages that were
+added relatively recently.
+
+#### Dirty pages
+
+A "dirty page" is a pages in the page cache that was modified after being created. Since non-dirty pages in the page cache
+ have identical copies in secondary storage (e.g. hard disk drive or solid-state drive), discarding and reusing their space
+ is much quicker than paging out application memory, and is often preferred over flushing the dirty pages into secondary storage
+ and reusing their space.
+
+On `cachestat_dirties` Netdata demonstrates the number of pages that were modified. This chart shows the number of calls
+to the function `mark_buffer_dirty`.
+
+#### Page cache ratio
+
+When the processor needs to read or write in a specific memory address, it checks for a corresponding entry in the page cache.
+If the processor hits a page cache (`page cache hit`), it reads the entry from the cache. If there is no entry (`page cache miss`),
+ the kernel allocates a new entry and copies data from the disk. Netdata calculates the percentage of accessed files that are cached on
+ memory. The ratio is calculated counting the accessed cached pages
+ (without counting [dirty pages](#dirty-pages) and pages added because of read misses) divided by total access without dirty pages.
+
+\_\_________<ins>Number of accessed cached pages</ins>__________
+Number of total accessed pages - dirty pages - missed pages
 
 The chart `cachestat_ratio` shows how processes are accessing page cache. In a normal scenario, we expect values around
 100%, which means that the majority of the work on the machine is processed in memory. To calculate the ratio, Netdata
@@ -189,24 +210,6 @@ attaches `kprobes` for kernel functions:
 - `mark_page_accessed`: Access to cache.
 - `account_page_dirtied`: Dirty (modified) pages.
 - `mark_buffer_dirty`: Writes to page cache.
-
-#### Dirty pages
-
-Pages in the page cache modified after being brought in are called “dirty pages.” Since non-dirty pages in the page cache
- have identical copies in secondary storage (e.g. hard disk drive or solid-state drive), discarding and reusing their space
- is much quicker than paging out application memory, and is often preferred over flushing the dirty pages into secondary storage
- and reusing their space.
-
-On `cachestat_dirties` Netdata demonstrates the number of pages that were modified. This chart shows the number of calls
-to the function `mark_buffer_dirty`.
-
-#### Page cache hits
-
-When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache.
- If the entry is there, a page cache hit has occurred and the read is from the cache.
-
-A page cache hit is when the page cache is successfully accessed with a read operation. We do not count pages that were
-added relatively recently.
 
 #### Page cache misses
 
