@@ -6,11 +6,16 @@
 
 **Merged pull requests:**
 
+- fix: Netdata segfault because of 2 timex.plugin threads [\#12512](https://github.com/netdata/netdata/pull/12512) ([ilyam8](https://github.com/ilyam8))
+- fix centos7 gpg key issue [\#12506](https://github.com/netdata/netdata/pull/12506) ([maneamarius](https://github.com/maneamarius))
+- feat\(collectors/timex.plugin\): add clock status chart [\#12501](https://github.com/netdata/netdata/pull/12501) ([ilyam8](https://github.com/ilyam8))
 - PR template: Include user information section [\#12499](https://github.com/netdata/netdata/pull/12499) ([kickoke](https://github.com/kickoke))
 - Adjust timex.plugin information to be less cryptic [\#12495](https://github.com/netdata/netdata/pull/12495) ([DanTheMediocre](https://github.com/DanTheMediocre))
 - fix: open fd 3 before first use in the netdata-updater.sh script [\#12491](https://github.com/netdata/netdata/pull/12491) ([ilyam8](https://github.com/ilyam8))
+- timex: this plugin enables timex plugin for non-linux systems [\#12489](https://github.com/netdata/netdata/pull/12489) ([surajnpn](https://github.com/surajnpn))
 - Bump the debhelper compat level to 10 in our DEB packaging code. [\#12488](https://github.com/netdata/netdata/pull/12488) ([Ferroin](https://github.com/Ferroin))
 - minor - fix configure output of eBPF [\#12471](https://github.com/netdata/netdata/pull/12471) ([underhood](https://github.com/underhood))
+- Don't send an alert snapshot with snapshot\_id 0 [\#12469](https://github.com/netdata/netdata/pull/12469) ([MrZammler](https://github.com/MrZammler))
 - Update ebpf dashboard [\#12467](https://github.com/netdata/netdata/pull/12467) ([thiagoftsm](https://github.com/thiagoftsm))
 - docs\(collectors/python.d\): remove mention of compatibility with py2/py3 [\#12465](https://github.com/netdata/netdata/pull/12465) ([ilyam8](https://github.com/ilyam8))
 - feat\(collectors/cgroups\): prefer `blkio.*_recursive` when available [\#12462](https://github.com/netdata/netdata/pull/12462) ([ilyam8](https://github.com/ilyam8))
@@ -72,6 +77,8 @@
 - fix\(health\): adjust 10s\_ipv4\_tcp\_resets\_sent warn trigger [\#12320](https://github.com/netdata/netdata/pull/12320) ([ilyam8](https://github.com/ilyam8))
 - CO-RE and syscalls [\#12318](https://github.com/netdata/netdata/pull/12318) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix 'connect' typo anomaly-detection-python.md [\#12317](https://github.com/netdata/netdata/pull/12317) ([DanTheMediocre](https://github.com/DanTheMediocre))
+- Add ml notebooks [\#12313](https://github.com/netdata/netdata/pull/12313) ([andrewm4894](https://github.com/andrewm4894))
+- Provide better handling of config files in Docker containers. [\#12310](https://github.com/netdata/netdata/pull/12310) ([Ferroin](https://github.com/Ferroin))
 - Replace write with read locks [\#12309](https://github.com/netdata/netdata/pull/12309) ([MrZammler](https://github.com/MrZammler))
 - adds node\_id into mirrored\_hosts list [\#12307](https://github.com/netdata/netdata/pull/12307) ([underhood](https://github.com/underhood))
 - fix: CPU frequency detection for some containers [\#12306](https://github.com/netdata/netdata/pull/12306) ([ilyam8](https://github.com/ilyam8))
@@ -161,13 +168,13 @@
 - Remove NETDATA\_WITH\_UUID def because it's not used anywhere. [\#12044](https://github.com/netdata/netdata/pull/12044) ([vkalintiris](https://github.com/vkalintiris))
 - inform cloud about inability to satisfy request [\#12041](https://github.com/netdata/netdata/pull/12041) ([underhood](https://github.com/underhood))
 - adds install method to /api/v1/info as label [\#12040](https://github.com/netdata/netdata/pull/12040) ([underhood](https://github.com/underhood))
+- Stream compression - Deactivate compression at runtime in case of a compressor buffer overflow [\#12037](https://github.com/netdata/netdata/pull/12037) ([odynik](https://github.com/odynik))
 - Adds all query types to aclk\_processed\_query\_type [\#12036](https://github.com/netdata/netdata/pull/12036) ([underhood](https://github.com/underhood))
 - Create a removed alert event if chart goes obsolete [\#12021](https://github.com/netdata/netdata/pull/12021) ([MrZammler](https://github.com/MrZammler))
 - minor - remove ACLK\_NEWARCH\_DEVMODE [\#12018](https://github.com/netdata/netdata/pull/12018) ([underhood](https://github.com/underhood))
 - Adds chart for incoming proto msgs in new cloud protocol [\#11969](https://github.com/netdata/netdata/pull/11969) ([underhood](https://github.com/underhood))
 - Update AWS SNS README.md [\#11946](https://github.com/netdata/netdata/pull/11946) ([kickoke](https://github.com/kickoke))
 - Add `--no-same-owner` to `tar xf` in installer [\#11940](https://github.com/netdata/netdata/pull/11940) ([cimnine](https://github.com/cimnine))
-- Show the number of processes/threads for empty apps groups [\#11834](https://github.com/netdata/netdata/pull/11834) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
@@ -294,8 +301,6 @@
 - Fix compilation warnings [\#11846](https://github.com/netdata/netdata/pull/11846) ([vlvkobal](https://github.com/vlvkobal))
 - Send the cloud protocol used to posthog [\#11842](https://github.com/netdata/netdata/pull/11842) ([MrZammler](https://github.com/MrZammler))
 - Removes ACLK Legacy [\#11841](https://github.com/netdata/netdata/pull/11841) ([underhood](https://github.com/underhood))
-- Fix cachestat on kernel 5.15.x \(eBPF\) [\#11833](https://github.com/netdata/netdata/pull/11833) ([thiagoftsm](https://github.com/thiagoftsm))
-- feat\(python.d/fail2ban\): add "Failed attempts" chart, cleanup [\#11825](https://github.com/netdata/netdata/pull/11825) ([ilyam8](https://github.com/ilyam8))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
@@ -324,7 +329,6 @@
 - fix static build, curl will be staict binary; extra args can be transfer [\#11852](https://github.com/netdata/netdata/pull/11852) ([boxjan](https://github.com/boxjan))
 - Create ML README.md [\#11848](https://github.com/netdata/netdata/pull/11848) ([andrewm4894](https://github.com/andrewm4894))
 - Fix token name in release draft workflow. [\#11847](https://github.com/netdata/netdata/pull/11847) ([Ferroin](https://github.com/Ferroin))
-- Bump static builds to use Alpine 3.15 as a base. [\#11836](https://github.com/netdata/netdata/pull/11836) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.32.0](https://github.com/netdata/netdata/tree/v1.32.0) (2021-11-30)
 
@@ -334,13 +338,6 @@
 
 - fix\(health\): `pihole_blocklist_gravity_file` and `pihole_status` info lines [\#11844](https://github.com/netdata/netdata/pull/11844) ([ilyam8](https://github.com/ilyam8))
 - Optional proto support fix [\#11840](https://github.com/netdata/netdata/pull/11840) ([underhood](https://github.com/underhood))
-- feat\(apps.plugin\): add consul to apps\_groups.conf [\#11839](https://github.com/netdata/netdata/pull/11839) ([ilyam8](https://github.com/ilyam8))
-- Add a note about pkg-config file location for freeipmi [\#11831](https://github.com/netdata/netdata/pull/11831) ([vlvkobal](https://github.com/vlvkobal))
-- Remove pihole\_blocked\_queries alert [\#11829](https://github.com/netdata/netdata/pull/11829) ([Ancairon](https://github.com/Ancairon))
-- Add commands to check and fix database corruption [\#11828](https://github.com/netdata/netdata/pull/11828) ([stelfrag](https://github.com/stelfrag))
-- Set NETDATA\_CONTAINER\_OS\_DETECTION properly [\#11827](https://github.com/netdata/netdata/pull/11827) ([MrZammler](https://github.com/MrZammler))
-- feat\(apps.plugin\): add aws to apps\_groups.conf [\#11826](https://github.com/netdata/netdata/pull/11826) ([ilyam8](https://github.com/ilyam8))
-- Updating ansible steps for clarity [\#11823](https://github.com/netdata/netdata/pull/11823) ([kickoke](https://github.com/kickoke))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
