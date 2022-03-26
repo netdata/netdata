@@ -1785,37 +1785,58 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
 }
 
 /**
+ * Fill Network Viewer Port list
+ *
+ * Fill the strcture with values read from /proc or hash table.
+ *
+ * @param out   the structure where we will store data.
+ * @param value the ports we are listen to.
+ * @param proto the protocol used for this connection.
+ * @param in    the strcuture with values read form different sources.
+ */
+static inline void fill_nv_port_list(ebpf_network_viewer_port_list_t *out, uint16_t value, uint16_t proto,
+                                     netdata_passive_connection_t *in)
+{
+    out->first = value;
+    out->protocol = proto;
+    out->pid = in->pid;
+    out->tgid = in->tgid;
+    out->connections = in->counter;
+}
+
+/**
  * Update listen table
  *
  * Update link list when it is necessary.
  *
  * @param value the ports we are listen to.
  * @param proto the protocol used with port connection.
+ * @param in    the strcuture with values read form different sources.
  */
-void update_listen_table(uint16_t value, uint16_t proto)
+void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *in)
 {
     ebpf_network_viewer_port_list_t *w;
     if (likely(listen_ports)) {
         ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;
         while (move) {
-            if (move->protocol == proto && move->first == value)
+            if (move->protocol == proto && move->first == value) {
+                move->pid = in->pid;
+                move->tgid = in->tgid;
                 return;
+            }
 
             store = move;
             move = move->next;
         }
 
         w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-        w->first = value;
-        w->protocol = proto;
         store->next = w;
     } else {
         w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-        w->first = value;
-        w->protocol = proto;
 
         listen_ports = w;
     }
+    fill_nv_port_list(w, value, proto, in);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     info("The network viewer is monitoring inbound connections for port %u", ntohs(value));
@@ -1833,7 +1854,7 @@ static void read_listen_table()
     netdata_passive_connection_idx_t next_key = {};
 
     int fd = socket_maps[NETDATA_SOCKET_LPORTS].map_fd;
-    netdata_passive_connection_t value;
+    netdata_passive_connection_t value = {};
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(fd, &key, &value);
         if (test < 0) {
@@ -1842,14 +1863,15 @@ static void read_listen_table()
         }
 
         // The correct protocol must come from kernel
-        update_listen_table(key.port, key.protocol);
+        update_listen_table(key.port, key.protocol, &value);
 
         key = next_key;
+        memset(&value, 0, sizeof(value));
     }
 
-    if (next_key.port) {
+    if (next_key.port && value.pid) {
         // The correct protocol must come from kernel
-        update_listen_table(next_key.port, next_key.protocol);
+        update_listen_table(next_key.port, next_key.protocol, &value);
     }
 }
 

@@ -972,6 +972,7 @@ static void read_local_ports(char *filename, uint8_t proto)
         return;
 
     size_t lines = procfile_lines(ff), l;
+    netdata_passive_connection_t values = {.counter = 0, .tgid = 0, .pid = 0};
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         // This is header or end of file
@@ -985,7 +986,7 @@ static void read_local_ports(char *filename, uint8_t proto)
 
         // Read local port
         uint16_t port = (uint16_t)strtol(procfile_lineword(ff, l, 2), NULL, 16);
-        update_listen_table(htons(port), proto);
+        update_listen_table(htons(port), proto, &values);
     }
 
     procfile_close(ff);
