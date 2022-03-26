@@ -45,6 +45,8 @@ enum ebpf_socket_publish_index {
     NETDATA_IDX_TCP_RETRANSMIT,
     NETDATA_IDX_TCP_CONNECTION_V4,
     NETDATA_IDX_TCP_CONNECTION_V6,
+    NETDATA_IDX_INCOMING_CONNECTION_TCP,
+    NETDATA_IDX_INCOMING_CONNECTION_UDP,
 
     // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_MAX_SOCKET_VECTOR
@@ -99,6 +101,7 @@ typedef enum ebpf_socket_idx {
 
 // Global chart name
 #define NETDATA_TCP_OUTBOUND_CONNECTIONS "tcp_outbound_conn"
+#define NETDATA_INBOUND_CONNECTIONS "inbound_conn"
 #define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
 #define NETDATA_TCP_FUNCTION_BITS "total_tcp_bandwidth"
 #define NETDATA_TCP_FUNCTION_ERROR "tcp_error"

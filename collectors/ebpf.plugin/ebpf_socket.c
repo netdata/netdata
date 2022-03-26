@@ -13,10 +13,12 @@
 
 static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "received", "sent", "close",
                                                                    "received", "sent", "retransmitted",
-                                                                   "connected_V4", "connected_V6"};
+                                                                   "connected_V4", "connected_V6", "connected_tcp",
+                                                                   "connected_udp"};
 static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_cleanup_rbuf", "tcp_sendmsg",  "tcp_close",
                                                             "udp_recvmsg", "udp_sendmsg", "tcp_retransmit_skb",
-                                                            "tcp_connect_v4", "tcp_connect_v6"};
+                                                            "tcp_connect_v4", "tcp_connect_v6", "inet_csk_accept_tcp",
+                                                            "inet_csk_accept_udp" };
 
 static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_bandwidth",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
@@ -639,6 +641,31 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 }
 
 /**
+ * Send Global Inbound connection
+ *
+ * Send number of connections read per protocol.
+ */
+static void ebpf_socket_send_global_inbound_conn()
+{
+    uint64_t udp_conn = 0;
+    uint64_t tcp_conn = 0;
+    ebpf_network_viewer_port_list_t *move = listen_ports;
+    while (move) {
+        if (move->protocol == IPPROTO_TCP)
+            tcp_conn += move->connections;
+        else
+            udp_conn += move->connections;
+
+        move = move->next;
+    }
+
+    write_begin_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_INBOUND_CONNECTIONS);
+    write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_INCOMING_CONNECTION_TCP].name, (long long) tcp_conn);
+    write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_INCOMING_CONNECTION_UDP].name, (long long) udp_conn);
+    write_end_chart();
+}
+
+/**
  * Send data to Netdata calling auxiliary functions.
  *
  * @param em the structure with thread information
@@ -649,6 +676,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     netdata_publish_vfs_common_t common_udp;
     ebpf_update_global_publish(socket_publish_aggregated, &common_tcp, &common_udp, socket_aggregated_data);
 
+    ebpf_socket_send_global_inbound_conn();
     write_count_chart(NETDATA_TCP_OUTBOUND_CONNECTIONS, NETDATA_EBPF_IP_FAMILY,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4], 2);
 
@@ -826,6 +854,18 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
 {
     int order = 21070;
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
+                      NETDATA_INBOUND_CONNECTIONS,
+                      "Inbound connections.",
+                      EBPF_COMMON_DIMENSION_CONNECTIONS,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      order++,
+                      ebpf_create_global_dimension,
+                      &socket_publish_aggregated[NETDATA_IDX_INCOMING_CONNECTION_TCP],
+                      2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_TCP_OUTBOUND_CONNECTIONS,
                       "TCP outbound connections.",
                       EBPF_COMMON_DIMENSION_CONNECTIONS,
@@ -836,6 +876,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4],
                       2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
 
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_TCP_FUNCTION_COUNT,
