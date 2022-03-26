@@ -1792,7 +1792,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
  * @param value the ports we are listen to.
  * @param proto the protocol used with port connection.
  */
-void update_listen_table(uint16_t value, uint8_t proto)
+void update_listen_table(uint16_t value, uint16_t proto)
 {
     ebpf_network_viewer_port_list_t *w;
     if (likely(listen_ports)) {

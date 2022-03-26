@@ -190,7 +190,9 @@ typedef struct ebpf_network_viewer_port_list {
     uint16_t cmp_first;
     uint16_t cmp_last;
 
-    uint8_t protocol;
+    uint16_t protocol;
+    uint32_t pid;
+    uint32_t tgid;
     struct ebpf_network_viewer_port_list *next;
 } ebpf_network_viewer_port_list_t;
 
@@ -352,7 +354,7 @@ typedef struct netdata_vector_plot {
 
 extern void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
-extern void update_listen_table(uint16_t value, uint8_t proto);
+extern void update_listen_table(uint16_t value, uint16_t proto);
 extern void parse_network_viewer_section(struct config *cfg);
 extern void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 extern void parse_service_name_section(struct config *cfg);
