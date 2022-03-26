@@ -299,8 +299,6 @@
 - Remove Ubuntu 21.04 from CI and packaging. [\#11851](https://github.com/netdata/netdata/pull/11851) ([Ferroin](https://github.com/Ferroin))
 - Allow PushBullet notifications to be sent to PushBullet channels [\#11850](https://github.com/netdata/netdata/pull/11850) ([sourcecodes2](https://github.com/sourcecodes2))
 - Fix compilation warnings [\#11846](https://github.com/netdata/netdata/pull/11846) ([vlvkobal](https://github.com/vlvkobal))
-- Send the cloud protocol used to posthog [\#11842](https://github.com/netdata/netdata/pull/11842) ([MrZammler](https://github.com/MrZammler))
-- Removes ACLK Legacy [\#11841](https://github.com/netdata/netdata/pull/11841) ([underhood](https://github.com/underhood))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
@@ -337,7 +335,6 @@
 **Merged pull requests:**
 
 - fix\(health\): `pihole_blocklist_gravity_file` and `pihole_status` info lines [\#11844](https://github.com/netdata/netdata/pull/11844) ([ilyam8](https://github.com/ilyam8))
-- Optional proto support fix [\#11840](https://github.com/netdata/netdata/pull/11840) ([underhood](https://github.com/underhood))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
