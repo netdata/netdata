@@ -393,7 +393,11 @@ static inline void do_dimension_variablestep(
         , uint32_t options
 ){
 //  RRDSET *st = r->st;
-
+    int no_db_one_time = 1;
+    if (rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+        after_wanted--;
+        before_wanted--;
+    }
     time_t
         now = after_wanted,
         dt = r->update_every,
@@ -440,6 +444,12 @@ static inline void do_dimension_variablestep(
                 // use the previously read database value
                 n_curr = n_prev;
             } else {
+                if (no_db_one_time == 1 && rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+                {
+                    no_db_one_time = 0;
+                    rd->state->query_ops.next_metric(&handle, &db_now);
+
+                }
                 // read the value from the database
                 n_curr = rd->state->query_ops.next_metric(&handle, &db_now);
             }
@@ -542,6 +552,11 @@ static inline void do_dimension_fixedstep(
     RRDSET *st = r->st;
 #endif
 
+    if (rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+        after_wanted--;
+        before_wanted--;
+    }
+    int no_db_one_time = 1;
     time_t
             now = after_wanted,
             dt = r->update_every / r->group, /* usually is st->update_every */
@@ -603,8 +618,15 @@ static inline void do_dimension_fixedstep(
         if (unlikely(rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && now <= first_time_t))
             n = SN_EMPTY_SLOT;
         else
-            n = next_metric(&handle, &db_now);
+        {
+            if (no_db_one_time == 1 && rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            {
+                no_db_one_time = 0;
+                rd->state->query_ops.next_metric(&handle, &db_now);
 
+            }
+            n = next_metric(&handle, &db_now);
+        }
         if(unlikely(db_now > before_wanted)) {
 #ifdef NETDATA_INTERNAL_CHECKS
             r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
@@ -811,7 +833,16 @@ static int rrdr_convert_before_after_to_absolute(
         // Not to get last metric as a NULL value during request,
         // "before_requested" is set to "1" second less than "now_realtime_sec()".
         if(before_requested > 0) before_requested = first_entry_t + before_requested;
-        else                     before_requested = now_realtime_sec() - 1 + before_requested;
+        else{
+            time_t temp = now_realtime_sec();
+            if (last_entry_t == temp)
+            {
+                before_requested =  temp + before_requested;
+            } else{
+                before_requested =  temp - 1 + before_requested;
+            }
+        }
+
         absolute_period_requested = 0;
     }
 
