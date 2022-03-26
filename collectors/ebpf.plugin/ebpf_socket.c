@@ -1834,7 +1834,6 @@ static void read_listen_table()
 
     int fd = socket_maps[NETDATA_SOCKET_LPORTS].map_fd;
     netdata_passive_connection_t value;
-    uint16_t local_port;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(fd, &key, &value);
         if (test < 0) {
@@ -1843,16 +1842,14 @@ static void read_listen_table()
         }
 
         // The correct protocol must come from kernel
-        local_port = htons(key.port);
-        update_listen_table(local_port, (local_port == 53)?IPPROTO_UDP:IPPROTO_TCP);
+        update_listen_table(key.port, key.protocol);
 
         key = next_key;
     }
 
     if (next_key.port) {
         // The correct protocol must come from kernel
-        local_port = htons(next_key.port);
-        update_listen_table(local_port, (local_port == 53)?IPPROTO_UDP:IPPROTO_TCP);
+        update_listen_table(next_key.port, next_key.protocol);
     }
 }
 
