@@ -1822,6 +1822,7 @@ void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connect
             if (move->protocol == proto && move->first == value) {
                 move->pid = in->pid;
                 move->tgid = in->tgid;
+                move->connections = in->counter;
                 return;
             }
 
