@@ -685,7 +685,7 @@ netdataDashboard.menu = {
         title: 'Fail2ban',
         icon: '<i class="fas fa-shield-alt"></i>',
         info: 'Netdata keeps track of the current jail status by reading the Fail2ban log file.'
-    },
+    }
 };
 
 
@@ -973,7 +973,7 @@ netdataDashboard.submenu = {
     },
 
     'filesystem.file_access': {
-        title: 'file access (eBPF)',
+        title: 'file access (eBPF)'
     },
 
     'apps.file_access': {
@@ -1056,11 +1056,11 @@ netdataDashboard.submenu = {
     },
 
     'services.net': {
-        title: 'network (eBPF)',
+        title: 'network (eBPF)'
     },
 
     'services.page_cache': {
-        title: 'pache cache (eBPF)',
+        title: 'pache cache (eBPF)'
     },
 
     'netdata.ebpf': {
@@ -1068,7 +1068,7 @@ netdataDashboard.submenu = {
         info: 'eBPF (extended Berkeley Packet Filter) is used to collect metrics from inside Linux kernel giving a zoom inside your <a href="#ebpf_system_process_thread">Process</a>, '+
               '<a href="#menu_disk">Hard Disk</a>, <a href="#menu_filesystem">Filesystems</a> (<a href="#menu_filesystem_submenu_file_access">File Access</a>, and ' +
               '<a href="#menu_filesystem_submenu_directory_cache__eBPF_">Directory Cache</a>).'
-    },
+    }
 };
 
 // ----------------------------------------------------------------------------
@@ -2872,7 +2872,7 @@ netdataDashboard.context = {
     'net.net': {
         heads: [
             netdataDashboard.gaugeChart('Received', '12%', 'received'),
-            netdataDashboard.gaugeChart('Sent', '12%', 'sent'),
+            netdataDashboard.gaugeChart('Sent', '12%', 'sent')
         ],
         info: netBytesInfo
     },
@@ -6196,7 +6196,7 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[1] + '"'
                     + ' data-decimal-digits="2"'
                     + ' role="application"></div>';
-            },
+            }
         ]
     },
     'vernemq.average_scheduler_utilization': {
@@ -6256,7 +6256,7 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[1] + '"'
                     + ' data-decimal-digits="2"'
                     + ' role="application"></div>';
-            },
+            }
         ]
     },
     'pulsar.subscription_msg_rate_redeliver': {
@@ -6356,7 +6356,7 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[1] + '"'
                     + ' data-decimal-digits="2"'
                     + ' role="application"></div>';
-            },
+            }
         ]
     },
     'pulsar.namespace_subscription_msg_rate_redeliver': {
@@ -6419,8 +6419,8 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[2] + '"'
                     + ' data-decimal-digits="2"'
                     + ' role="application"></div>';
-            },
-        ],
+            }
+        ]
     },
 
     // ------------------------------------------------------------------------
@@ -6618,6 +6618,6 @@ netdataDashboard.context = {
 
     'fail2ban.banned_ips': {
         info: '<p>The number of banned IP addresses.</p>'
-    },
+    }
 
 };
