@@ -49,7 +49,7 @@ Please note that your data history will be lost if you have modified `history` p
 | setting|default|info|||
 |:-----:|:-----:|:---|---|---|
 | process scheduling policy|`keep`|See [Netdata process scheduling policy](/daemon/README.md#netdata-process-scheduling-policy)|||
-| OOM score|`1000`|See [OOM score](/daemon/README.md#oom-score)|||
+| OOM score|`0`||||
 | glibc malloc arena max for plugins|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|||
 | glibc malloc arena max for Netdata|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|||
 | hostname|auto-detected|The hostname of the computer running Netdata.|||

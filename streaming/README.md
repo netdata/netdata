@@ -107,7 +107,7 @@ This also disables the registry (there cannot be a registry without an API).
 requests from its child nodes. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log
 entries "... too busy to accept new streaming request. Will be allowed in X secs".
 
-You can [use](docs/agent/exporting/README.md#configuration) the exporting engine to configure data archiving to an external database (it archives all databases maintained on
+You can [use](/exporting/README.md#configuration) the exporting engine to configure data archiving to an external database (it archives all databases maintained on
 this host).
 
 ### Streaming configuration
