@@ -67,7 +67,7 @@ Please note that your data history will be lost if you have modified `history` p
 | page cache size     | 32         | Determines the amount of RAM in MiB that is dedicated to caching Netdata metric values. |
 | dbengine disk space | 256        | Determines the amount of disk space in MiB that is dedicated to storing Netdata metric values and all related metadata describing them. |
 | dbengine multihost disk space | 256        | Same functionality as `dbengine disk space`, but includes support for storing metrics streamed to a parent node by its children. Can be used in single-node environments as well. |
-| host access prefix||This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43).|
+| host access prefix| |This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43).|
 | memory deduplication (ksm)|`yes`|When set to `yes`, Netdata will offer its in-memory round robin database to kernel same page merging (KSM) for deduplication. For more information check [Memory Deduplication - Kernel Same Page Merging - KSM](/database/README.md#ksm)|
 | TZ environment variable|`:/etc/localtime`|Where to find the timezone|
 | timezone|auto-detected|The timezone retrieved from the environment variable|
