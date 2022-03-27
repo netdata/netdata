@@ -672,7 +672,7 @@ update_binpkg() {
       upgrade_cmd="upgrade"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
-      pkg_installed_check="dpkg -l"
+      pkg_installed_check="dpkg -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
     ubuntu)
@@ -681,7 +681,7 @@ update_binpkg() {
       upgrade_cmd="upgrade"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
-      pkg_installed_check="dpkg -l"
+      pkg_installed_check="dpkg -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
     centos)
