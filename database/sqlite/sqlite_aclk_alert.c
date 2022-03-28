@@ -301,9 +301,7 @@ void aclk_send_alarm_health_log(char *node_id)
     if (unlikely(!node_id))
         return;
 
-    char *hostname = get_hostname_by_node_id(node_id);
-    log_access("ACLK REQ [%s (%s)]: HEALTH LOG request received", node_id, hostname);
-    freez(hostname);
+    char *hostname= NULL;
 
     struct aclk_database_worker_config *wc  = NULL;
     struct aclk_database_cmd cmd;
@@ -312,9 +310,18 @@ void aclk_send_alarm_health_log(char *node_id)
 
     rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
-    if (likely(host))
+    if (likely(host)) {
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+        hostname = host->hostname;
+    }
+    else
+        hostname = get_hostname_by_node_id(node_id);
     rrd_unlock();
+
+    log_access("ACLK REQ [%s (%s)]: HEALTH LOG request received", node_id, hostname ? hostname : "N/A");
+    if (unlikely(!host))
+        freez(hostname);
+
     if (wc)
         aclk_database_enq_cmd(wc, &cmd);
     else {
