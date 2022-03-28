@@ -3,8 +3,9 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 #include <sched.h>
+#include "storage_engine.h"
 #ifdef ENABLE_DBENGINE
-#include "database/engine/rrddiskprotocol.h"
+#include "engine/rrdengineapi.h"
 #endif
 
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
@@ -325,11 +326,6 @@ static inline void last_collected_time_align(RRDSET *st) {
         st->last_collected_time.tv_usec = 500000;
 }
 
-static inline void last_updated_time_align(RRDSET *st) {
-    st->last_updated.tv_sec -= st->last_updated.tv_sec % st->update_every;
-    st->last_updated.tv_usec = 0;
-}
-
 // ----------------------------------------------------------------------------
 // RRDSET - free a chart
 
@@ -414,21 +410,10 @@ void rrdset_free(RRDSET *st) {
     freez(st->state);
     freez(st->chart_uuid);
 
-    switch(st->rrd_memory_mode) {
-        case RRD_MEMORY_MODE_SAVE:
-        case RRD_MEMORY_MODE_MAP:
-        case RRD_MEMORY_MODE_RAM:
-            debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
-            munmap(st, st->memsize);
-            break;
-
-        case RRD_MEMORY_MODE_ALLOC:
-        case RRD_MEMORY_MODE_NONE:
-        case RRD_MEMORY_MODE_DBENGINE:
-            freez(st);
-            break;
-    }
-
+    STORAGE_ENGINE* engine = (host->rrdeng_ctx && st->rrd_memory_mode == host->rrdeng_ctx->engine->id)
+        ? host->rrdeng_ctx->engine
+        : engine_get(st->rrd_memory_mode);
+    engine->api.set_ops.destroy(st);
 }
 
 void rrdset_save(RRDSET *st) {
@@ -737,101 +722,18 @@ RRDSET *rrdset_create_custom(
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
 
-    time_t now = now_realtime_sec();
-
     // ------------------------------------------------------------------------
     // load it or allocate it
 
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
-       memory_mode == RRD_MEMORY_MODE_RAM) {
-        st = (RRDSET *) mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename
-                , size
-                , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
-                , 0
-        );
-
-        if(st) {
-            memset(&st->avl, 0, sizeof(avl_t));
-            memset(&st->avlname, 0, sizeof(avl_t));
-            memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
-            memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
-            memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
-
-            st->name = NULL;
-            st->config_section = NULL;
-            st->type = NULL;
-            st->family = NULL;
-            st->title = NULL;
-            st->units = NULL;
-            st->context = NULL;
-            st->cache_dir = NULL;
-            st->plugin_name = NULL;
-            st->module_name = NULL;
-            st->dimensions = NULL;
-            st->rrdfamily = NULL;
-            st->rrdhost = NULL;
-            st->next = NULL;
-            st->variables = NULL;
-            st->alarms = NULL;
-            st->flags = 0x00000000;
-            st->exporting_flags = NULL;
-
-            if(memory_mode == RRD_MEMORY_MODE_RAM) {
-                memset(st, 0, size);
-            }
-            else {
-                if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
-                    info("Initializing file %s.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(strcmp(st->id, fullid) != 0) {
-                    error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
-                    // munmap(st, size);
-                    // st = NULL;
-                    memset(st, 0, size);
-                }
-                else if(st->memsize != size || st->entries != entries) {
-                    error("File %s does not have the desired size. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(st->update_every != update_every) {
-                    error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if((now - st->last_updated.tv_sec) > update_every * entries) {
-                    info("File %s is too old. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(st->last_updated.tv_sec > now + update_every) {
-                    error("File %s refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st->last_updated.tv_sec - now));
-                    st->last_updated.tv_sec = now;
-                }
-
-                // make sure the database is aligned
-                if(st->last_updated.tv_sec) {
-                    st->update_every = update_every;
-                    last_updated_time_align(st);
-                }
-            }
-
-            // make sure we have the right memory mode
-            // even if we cleared the memory
-            st->rrd_memory_mode = memory_mode;
-        }
+    STORAGE_ENGINE* engine = engine_get(memory_mode);
+    if (unlikely(!engine)) {
+        fatal("Can't find memory mode %s", rrd_memory_mode_name(memory_mode));
+        return NULL;
     }
-
-    if(unlikely(!st)) {
-        st = callocz(1, size);
-        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            st->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        else
-            st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
-    }
-
+    st = engine->api.set_ops.create(id, fullid, fullfilename, entries, update_every);
     st->plugin_name = plugin?strdupz(plugin):NULL;
     st->module_name = module?strdupz(module):NULL;
 
