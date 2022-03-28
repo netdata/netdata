@@ -404,6 +404,42 @@ int unit_test_buffer() {
     return 0;
 }
 
+int unit_test_static_threads() {
+    struct netdata_static_thread *static_threads = static_threads_get();
+
+    /*
+     * make sure enough static threads have been registered
+     */
+    if (!static_threads) {
+        fprintf(stderr, "empty static_threads array\n");
+        return 1;
+    }
+
+    int n;
+    for (n = 0; static_threads[n].start_routine != NULL; n++) {}
+
+    if (n < 2) {
+        fprintf(stderr, "only %d static threads registered", n);
+        return 1;
+    }
+
+    /*
+     * verify that each thread's start routine is unique.
+     */
+    for (int i = 0; i != n - 1; i++) {
+        for (int j = i + 1; j != n; j++) {
+            if (static_threads[i].start_routine != static_threads[j].start_routine)
+                continue;
+
+            fprintf(stderr, "Found duplicate threads with name: %s\n", static_threads[i].name);
+            return 1;
+        }
+    }
+
+    free(static_threads);
+    return 0;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 struct feed_values {
