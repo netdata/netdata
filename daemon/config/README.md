@@ -46,45 +46,45 @@ Please note that your data history will be lost if you have modified `history` p
 
 ### [global] section options
 
-| setting|default|info|||
-|:-----:|:-----:|:---|---|---|
-| process scheduling policy|`keep`|See [Netdata process scheduling policy](/daemon/README.md#netdata-process-scheduling-policy)|||
-| OOM score|`1000`|See [OOM score](/daemon/README.md#oom-score)|||
-| glibc malloc arena max for plugins|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|||
-| glibc malloc arena max for Netdata|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|||
-| hostname|auto-detected|The hostname of the computer running Netdata.|||
-| history|`3996`| Used with `memory mode = save/map/ram/alloc`, not the default `memory mode = dbengine`. This number reflects the number of entries the `netdata` daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](/database/README.md) for more information. |||
-| update every|`1`|The frequency in seconds, for data collection. For more information see the [performance guide](/docs/guides/configure/performance.md).|||
-| config directory|`/etc/netdata`|The directory configuration files are kept.|||
-| stock config directory|`/usr/lib/netdata/conf.d`||||
-| log directory|`/var/log/netdata`|The directory in which the [log files](/daemon/README.md#log-files) are kept.|||
-| web files directory|`/usr/share/netdata/web`|The directory the web static files are kept.|||
-| cache directory|`/var/cache/netdata`|The directory the memory database will be stored if and when Netdata exits. Netdata will re-read the database when it will start again, to continue from the same point.|||
-| lib directory|`/var/lib/netdata`|Contains the alarm log and the Netdata instance guid.|||
-| home directory|`/var/cache/netdata`|Contains the db files for the collected metrics|||
-| plugins directory|`"/usr/libexec/netdata/plugins.d" "/etc/netdata/custom-plugins.d"`|The directory plugin programs are kept. This setting supports multiple directories, space separated. If any directory path contains spaces, enclose it in single or double quotes.|||
+| setting|default|info|
+|:-----:|:-----:|:---|
+| process scheduling policy|`keep`|See [Netdata process scheduling policy](/daemon/README.md#netdata-process-scheduling-policy)|
+| OOM score|`0`||
+| glibc malloc arena max for plugins|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|
+| glibc malloc arena max for Netdata|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|
+| hostname|auto-detected|The hostname of the computer running Netdata.|
+| history|`3996`| Used with `memory mode = save/map/ram/alloc`, not the default `memory mode = dbengine`. This number reflects the number of entries the `netdata` daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](/database/README.md) for more information. |
+| update every|`1`|The frequency in seconds, for data collection. For more information see the [performance guide](/docs/guides/configure/performance.md).|
+| config directory|`/etc/netdata`|The directory configuration files are kept.|
+| stock config directory|`/usr/lib/netdata/conf.d`||
+| log directory|`/var/log/netdata`|The directory in which the [log files](/daemon/README.md#log-files) are kept.|
+| web files directory|`/usr/share/netdata/web`|The directory the web static files are kept.|
+| cache directory|`/var/cache/netdata`|The directory the memory database will be stored if and when Netdata exits. Netdata will re-read the database when it will start again, to continue from the same point.|
+| lib directory|`/var/lib/netdata`|Contains the alarm log and the Netdata instance guid.|
+| home directory|`/var/cache/netdata`|Contains the db files for the collected metrics|
+| plugins directory|`"/usr/libexec/netdata/plugins.d" "/etc/netdata/custom-plugins.d"`|The directory plugin programs are kept. This setting supports multiple directories, space separated. If any directory path contains spaces, enclose it in single or double quotes.|
 | memory mode         | `dbengine` | `dbengine`: The default for long-term metrics storage with efficient RAM and disk usage. Can be extended with `page cache size` and `dbengine disk space`. <br />`save`: Netdata will save its round robin database on exit and load it on startup. <br />`map`: Cache files will be updated in real-time. Not ideal for systems with high load or slow disks (check `man mmap`). <br />`ram`: The round-robin database will be temporary and it will be lost when Netdata exits. <br />`none`: Disables the database at this host, and disables health monitoring entirely, as that requires a database of metrics. |
-| page cache size     | 32         | Determines the amount of RAM in MiB that is dedicated to caching Netdata metric values. |||
-| dbengine disk space | 256        | Determines the amount of disk space in MiB that is dedicated to storing Netdata metric values and all related metadata describing them. |||
-| dbengine multihost disk space | 256        | Same functionality as `dbengine disk space`, but includes support for storing metrics streamed to a parent node by its children. Can be used in single-node environments as well. |||
-| host access prefix||This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43).|
-| memory deduplication (ksm)|`yes`|When set to `yes`, Netdata will offer its in-memory round robin database to kernel same page merging (KSM) for deduplication. For more information check [Memory Deduplication - Kernel Same Page Merging - KSM](/database/README.md#ksm)|||
-| TZ environment variable|`:/etc/localtime`|Where to find the timezone|||
-| timezone|auto-detected|The timezone retrieved from the environment variable|||
-| debug flags|`0x0000000000000000`|Bitmap of debug options to enable. For more information check [Tracing Options](/daemon/README.md#debugging).|||
-| debug log|`/var/log/netdata/debug.log`|The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](/daemon/README.md#debugging).|||
-| error log|`/var/log/netdata/error.log`|The filename to save error messages for Netdata daemon and all plugins (`stderr` is sent here for all Netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.|||
-| access log|`/var/log/netdata/access.log`|The filename to save the log of web clients accessing Netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.|||
-| errors flood protection period|`1200`|Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.|||
-| errors to trigger flood protection|`200`|Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.|||
-| run as user|`netdata`|The user Netdata will run as.|||
-| pthread stack size|auto-detected||||
-| cleanup obsolete charts after seconds|`3600`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also sets the timeout for cleaning up obsolete dimensions|||
-| gap when lost iterations above|`1`||||
-| cleanup orphan hosts after seconds|`3600`|How long to wait until automatically removing from the DB a remote Netdata host (child) that is no longer sending data.|||
-| delete obsolete charts files|`yes`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also affects the deletion of files for obsolete dimensions|||
-| delete orphan hosts files|`yes`|Set to `no` to disable non-responsive host removal.|||
-| enable zero metrics|`no`|Set to `yes` to show charts when all their metrics are zero.|||
+| page cache size     | 32         | Determines the amount of RAM in MiB that is dedicated to caching Netdata metric values. |
+| dbengine disk space | 256        | Determines the amount of disk space in MiB that is dedicated to storing Netdata metric values and all related metadata describing them. |
+| dbengine multihost disk space | 256        | Same functionality as `dbengine disk space`, but includes support for storing metrics streamed to a parent node by its children. Can be used in single-node environments as well. |
+| host access prefix| |This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43).|
+| memory deduplication (ksm)|`yes`|When set to `yes`, Netdata will offer its in-memory round robin database to kernel same page merging (KSM) for deduplication. For more information check [Memory Deduplication - Kernel Same Page Merging - KSM](/database/README.md#ksm)|
+| TZ environment variable|`:/etc/localtime`|Where to find the timezone|
+| timezone|auto-detected|The timezone retrieved from the environment variable|
+| debug flags|`0x0000000000000000`|Bitmap of debug options to enable. For more information check [Tracing Options](/daemon/README.md#debugging).|
+| debug log|`/var/log/netdata/debug.log`|The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](/daemon/README.md#debugging).|
+| error log|`/var/log/netdata/error.log`|The filename to save error messages for Netdata daemon and all plugins (`stderr` is sent here for all Netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.|
+| access log|`/var/log/netdata/access.log`|The filename to save the log of web clients accessing Netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.|
+| errors flood protection period|`1200`|Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.|
+| errors to trigger flood protection|`200`|Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.|
+| run as user|`netdata`|The user Netdata will run as.|
+| pthread stack size|auto-detected||
+| cleanup obsolete charts after seconds|`3600`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also sets the timeout for cleaning up obsolete dimensions|
+| gap when lost iterations above|`1`||
+| cleanup orphan hosts after seconds|`3600`|How long to wait until automatically removing from the DB a remote Netdata host (child) that is no longer sending data.|
+| delete obsolete charts files|`yes`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also affects the deletion of files for obsolete dimensions|
+| delete orphan hosts files|`yes`|Set to `no` to disable non-responsive host removal.|
+| enable zero metrics|`no`|Set to `yes` to show charts when all their metrics are zero.|
 
 ### [web] section options
 
