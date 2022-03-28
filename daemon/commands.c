@@ -412,7 +412,7 @@ static inline void add_string_to_command_reply(char *reply_string, unsigned *rep
 static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t status, char *message)
 {
     int ret;
-    char *reply_string = mallocz(message ? (strlen(message) + MAX_EXIT_STATUS_LENGTH + 2) : MAX_COMMAND_LENGTH);
+    char *reply_string = mallocz(MAX_COMMAND_LENGTH);
     char exit_status_string[MAX_EXIT_STATUS_LENGTH + 1] = {'\0', };
     unsigned reply_string_size = 0;
     uv_buf_t write_buf;
