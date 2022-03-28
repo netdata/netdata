@@ -410,8 +410,6 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
     db_execute(buffer_tostring(sql));
 
-    log_access("Sent existing");
-    
     buffer_free(sql);
 }
 
