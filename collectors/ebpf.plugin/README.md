@@ -159,6 +159,8 @@ Linux metrics:
     - Number of calls to `swap_readpage`. (`swap_read_call`)
     - Number of calls to `swap_writepage`. (`swap_write_call`)
 - network
+    - Number of outbound connections using TCP/IPv4. (`outbound_conn_ipv4`)
+    - Number of outbound connections using TCP/IPv6. (`outbound_conn_ipv6`)
     - Number of bytes sent. (`total_bandwidth_sent`)
     - Number of bytes received. (`total_bandwidth_recv`)
     - Number of calls to `tcp_sendmsg`. (`bandwidth_tcp_send`)
