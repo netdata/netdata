@@ -84,7 +84,7 @@ NETDATA.chartLibraries = {
         },
         options: function (state) {
             void(state);
-            return 'flip' + '%7C' + 'abs';
+            return 'flip%7Cabs';
         },
         legend: function (state) {
             void(state);
@@ -128,7 +128,7 @@ NETDATA.chartLibraries = {
         },
         options: function (state) {
             void(state);
-            return 'null2zero' + '%7C' + 'flip' + '%7C' + 'abs';
+            return 'null2zero%7Cflip%7Cabs';
         },
         legend: function (state) {
             void(state);
@@ -276,7 +276,7 @@ NETDATA.chartLibraries = {
         },
         options: function (state) {
             void(state);
-            return 'objectrows' + '%7C' + 'ms';
+            return 'objectrows%7Cms';
         },
         legend: function (state) {
             void(state);
@@ -477,7 +477,7 @@ NETDATA.chartLibraries = {
             return false;
         },
         update: NETDATA.textOnlyUpdate,
-        xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
+        xssRegexIgnore: new RegExp('^/api/v1/data\.result$')
     }
 };
 
