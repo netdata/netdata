@@ -175,95 +175,13 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
-    unsigned long size = sizeof(RRDDIM) + (st->entries * sizeof(storage_number));
-
     debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
 
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
-       memory_mode == RRD_MEMORY_MODE_RAM) {
-        rd = (RRDDIM *)mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename
-                , size
-                , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
-                , 1
-        );
-
-        if(likely(rd)) {
-            // we have a file mapped for rd
-
-            memset(&rd->avl, 0, sizeof(avl_t));
-            rd->id = NULL;
-            rd->name = NULL;
-            rd->cache_filename = NULL;
-            rd->variables = NULL;
-            rd->next = NULL;
-            rd->rrdset = NULL;
-            rd->exposed = 0;
-
-            struct timeval now;
-            now_realtime_timeval(&now);
-
-            if(memory_mode == RRD_MEMORY_MODE_RAM) {
-                memset(rd, 0, size);
-            }
-            else {
-                int reset = 0;
-
-                if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
-                    info("Initializing file %s.", fullfilename);
-                    memset(rd, 0, size);
-                    reset = 1;
-                }
-                else if(rd->memsize != size) {
-                    error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, rd->memsize);
-                    memset(rd, 0, size);
-                    reset = 1;
-                }
-                else if(rd->update_every != st->update_every) {
-                    error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", fullfilename, st->update_every, rd->update_every);
-                    memset(rd, 0, size);
-                    reset = 1;
-                }
-                else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
-                    info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd->last_collected_time) / USEC_PER_SEC, rd->entries * rd->update_every);
-                    memset(rd, 0, size);
-                    reset = 1;
-                }
-
-                if(!reset) {
-                    if(rd->algorithm != algorithm) {
-                        info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
-                              fullfilename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm, rrd_algorithm_name(rd->algorithm));
-                    }
-
-                    if(rd->multiplier != multiplier) {
-                        info("File %s does not have the expected multiplier (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT "). Previous values may be wrong.", fullfilename, multiplier, rd->multiplier);
-                    }
-
-                    if(rd->divisor != divisor) {
-                        info("File %s does not have the expected divisor (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT "). Previous values may be wrong.", fullfilename, divisor, rd->divisor);
-                    }
-                }
-            }
-
-            // make sure we have the right memory mode
-            // even if we cleared the memory
-            rd->rrd_memory_mode = memory_mode;
-        }
-    }
-
-    if(unlikely(!rd)) {
-        // if we didn't manage to get a mmap'd dimension, just create one
-        rd = callocz(1, size);
-        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        else
-            rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
-    }
-    rd->memsize = size;
+    STORAGE_ENGINE* eng = engine_get(memory_mode);
+    rd = eng->api.dim_ops.create(st, id, fullfilename, multiplier, divisor, algorithm);
 
     strcpy(rd->magic, RRDDIMENSION_MAGIC);
 
@@ -309,29 +227,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state->aclk_live_status = -1;
 #endif
     (void) find_dimension_uuid(st, rd, &(rd->state->metric_uuid));
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-#ifdef ENABLE_DBENGINE
-        rrdeng_metric_init(rd);
-        rd->state->collect_ops.init = rrdeng_store_metric_init;
-        rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-        rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
-        rd->state->query_ops.init = rrdeng_load_metric_init;
-        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-#endif
-    } else {
-        rd->state->collect_ops.init         = rrddim_collect_init;
-        rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
-        rd->state->collect_ops.finalize     = rrddim_collect_finalize;
-        rd->state->query_ops.init           = rrddim_query_init;
-        rd->state->query_ops.next_metric    = rrddim_query_next_metric;
-        rd->state->query_ops.is_finished    = rrddim_query_is_finished;
-        rd->state->query_ops.finalize       = rrddim_query_finalize;
-        rd->state->query_ops.latest_time    = rrddim_query_latest_time;
-        rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
+
+    rd->state->collect_ops = eng->api.collect_ops;
+    rd->state->query_ops = eng->api.query_ops;
+
+    if(eng->api.dim_ops.init) {
+        eng->api.dim_ops.init(rd);
     }
     store_active_dimension(&rd->state->metric_uuid);
     rd->state->collect_ops.init(rd);
