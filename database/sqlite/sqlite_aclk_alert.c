@@ -507,35 +507,6 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
         }
     }
 
-    /* if (unlikely(!first_sequence)) { */
-    /*     sql_queue_existing_alerts_to_aclk(host); */
-    /*     rc = sqlite3_finalize(res); */
-    /*     if (unlikely(rc != SQLITE_OK)) */
-    /*         error_report("Failed to reset statement to get health log statistics from the database, rc = %d", rc); */
-
-    /*     //re-read */
-    /*     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0); */
-    /*     if (rc != SQLITE_OK) { */
-    /*         error_report("Failed to prepare statement to get health log statistics from the database"); */
-    /*         buffer_free(sql); */
-    /*         freez(claim_id); */
-    /*         return; */
-    /*     } */
-
-    /*     while (sqlite3_step(res) == SQLITE_ROW) { */
-    /*         first_sequence = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0; */
-    /*         if (sqlite3_column_bytes(res, 1) > 0) { */
-    /*             first_timestamp.tv_sec = sqlite3_column_int64(res, 1); */
-    /*         } */
-
-    /*         last_sequence = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0; */
-    /*         if (sqlite3_column_bytes(res, 3) > 0) { */
-    /*             last_timestamp.tv_sec = sqlite3_column_int64(res, 3); */
-    /*         } */
-    /*     } */
-        
-    /* } */
-
     struct alarm_log_entries log_entries;
     log_entries.first_seq_id = first_sequence;
     log_entries.first_when = first_timestamp;
