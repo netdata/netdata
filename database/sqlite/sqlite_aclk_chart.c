@@ -547,12 +547,6 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
     int rc;
     sqlite3_stmt *res = NULL;
 
-    log_access(
-        "ACLK REQ [%s (%s)]: CHART RECEIVE ACK upto %" PRIu64,
-        wc->node_id,
-        wc->host ? wc->host->hostname : "N/A",
-        cmd.param1);
-
     char sql[ACLK_SYNC_QUERY_SIZE];
 
     snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"UPDATE aclk_chart_%s SET date_updated=strftime('%%s','now') WHERE sequence_id <= @sequence_id "
