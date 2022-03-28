@@ -23,21 +23,14 @@ HAVE_EBPF = 1
 endif
 
 %:
-	# For jessie and beyond
-	#
-	dh $@ --with autoreconf,systemd
-
-	# For wheezy or other non-systemd distributions use the following. You
-	# should also see contrib/README.md which gives details of updates to
-	# make to debian/control.
-	#
-	#dh $@ --with autoreconf
+	dh $@
 
 override_dh_installinit:
 	echo "SystemD Version: $(SYSTEMD_VERSION)"
 	echo "Using SystemD Unit: $(SYSTEMD_UNIT)"
 	cp -v $(SYSTEMD_UNIT) debian/netdata.service
 
+	dh_systemd_enable
 	dh_installinit
 
 override_dh_auto_configure:
