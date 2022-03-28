@@ -61,7 +61,7 @@ void Config::readMLConfig(void) {
     MinTrainSamples = clamp(MinTrainSamples, 1 * 3600u, 6 * 3600u);
     TrainEvery = clamp(TrainEvery, 1 * 3600u, 6 * 3600u);
 
-    DBEngineAnomalyRateEvery = clamp(DBEngineAnomalyRateEvery, 1 * 60u, 15 * 60u);
+    DBEngineAnomalyRateEvery = clamp(DBEngineAnomalyRateEvery, 1 * 30u, 15 * 60u);
 
     DiffN = clamp(DiffN, 0u, 1u);
     SmoothN = clamp(SmoothN, 0u, 5u);
