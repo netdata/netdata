@@ -672,7 +672,7 @@ update_binpkg() {
       upgrade_cmd="upgrade"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
-      pkg_installed_check="dpkg -l"
+      pkg_installed_check="dpkg -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
     ubuntu)
@@ -681,7 +681,7 @@ update_binpkg() {
       upgrade_cmd="upgrade"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
-      pkg_installed_check="dpkg -l"
+      pkg_installed_check="dpkg -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
     centos)
@@ -847,7 +847,7 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 # Grab the nightlies baseurl (defaulting to our Google Storage bucket)
 export NETDATA_NIGHTLIES_BASEURL="${NETDATA_NIGHTLIES_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
 
-if [ "${INSTALL_UID}" != "$(id -u)" ]; then
+if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
 fi
 
