@@ -88,14 +88,12 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     if (uuid_compare(ae->config_hash_id, config_hash_id)) {
-        log_access("Checking %u, diff uuid", ae->unique_id);
         send = 1;
         goto done;
     }
 
     //same status, same config
     if (ae->new_status == RRDCALC_STATUS_CLEAR) {
-        log_access("Checking %u same status clear", ae->unique_id);
         send = 0;
         goto done;
     }
@@ -105,11 +103,9 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         time_t when = removed_when(ae->alarm_id, ae->unique_id, unique_id, uuid_str);
 
         if (when && (when + (time_t)MAX_REMOVED_PERIOD) < ae->when) {
-            log_access("Checking %u over max period when [%ld] ae when [%ld], add [%ld]", ae->unique_id, when, ae->when, when+MAX_REMOVED_PERIOD);
             send = 1;
             goto done;
         } else {
-            log_access("Checking %u under max period or no removed when", ae->unique_id);
             send = 0;
             goto done;
         }
@@ -149,14 +145,11 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
         return 1;
 
     if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED) {
-        //log_access("IS queued");
-        log_access ("MC Will skip %u (%s) %d already queued", ae->unique_id, ae->name, ae->new_status);
         return 0;
     }
 
     if (!skip_filter) {
         if (!should_send_to_cloud(host, ae)) {
-            log_access ("MC Will skip %u (%s) %d from filter", ae->unique_id, ae->name, ae->new_status);
             return 0;
         }
     }
@@ -195,7 +188,6 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     }
 
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
-    log_access("queued %u", ae->unique_id);
 
 bind_fail:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
