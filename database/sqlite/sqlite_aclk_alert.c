@@ -8,6 +8,35 @@
 #include "../../aclk/aclk.h"
 #endif
 
+time_t removed_when(uint32_t alarm_id, uint32_t before_unique_id, uint32_t after_unique_id, char *uuid_str) {
+    sqlite3_stmt *res = NULL;
+    int rc = 0;
+    time_t when = 0;
+    char sql[ACLK_SYNC_QUERY_SIZE];
+
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "select when_key from health_log_%s where alarm_id = %u " \
+                                          "and unique_id > %u and unique_id < %u " \
+                                          "and new_status = -2;", uuid_str, alarm_id, after_unique_id, before_unique_id);
+
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to find removed gap.");
+        return 0;
+    }
+
+    rc = sqlite3_step(res);
+    if (likely(rc == SQLITE_ROW)) {
+        when = (time_t) sqlite3_column_int64(res, 0);
+    }
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when trying to find removed gap, rc = %d", rc);
+
+    return when;
+}
+
+#define MAX_REMOVED_PERIOD 900
 //decide if some events should be sent or not
 int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
@@ -17,25 +46,24 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     int send = 1, rc = 0;
 
     if (ae->new_status == RRDCALC_STATUS_REMOVED || ae->new_status == RRDCALC_STATUS_UNINITIALIZED) {
-        log_access("IS removed or uniti");
         return 0;
     }
 
     if (unlikely(uuid_is_null(ae->config_hash_id))) 
         return 0;
 
-    BUFFER *sql = buffer_create(1024);
+    char sql[ACLK_SYNC_QUERY_SIZE];
     uuid_t config_hash_id;
     RRDCALC_STATUS status;
-    time_t when;
+    uint32_t unique_id;
     
     //get the previous sent event of this alarm_id
-    buffer_sprintf(sql, "select hl.new_status, hl.config_hash_id, hl.when from health_log_%s hl, aclk_alert_%s aa \
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "select hl.new_status, hl.config_hash_id, hl.unique_id from health_log_%s hl, aclk_alert_%s aa \
                          where hl.unique_id = aa.alert_unique_id        \
                          and hl.alarm_id = %u and hl.unique_id <> %u \
                          order by alarm_event_id desc LIMIT 1;", uuid_str, uuid_str, ae->alarm_id, ae->unique_id);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to filter alert events.");
         send = 1;
@@ -45,9 +73,10 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     rc = sqlite3_step(res);
     if (likely(rc == SQLITE_ROW)) {
         status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
-        when = (time_t) sqlite3_column_int64(res, 1);
-        if (sqlite3_column_type(res, 2) != SQLITE_NULL)
-            uuid_copy(config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 2)));
+        if (sqlite3_column_type(res, 1) != SQLITE_NULL)
+            uuid_copy(config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 1)));
+        unique_id = (uint32_t) sqlite3_column_int64(res, 2);
+        
     } else {
         send = 1;
         goto done;
@@ -59,15 +88,31 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     if (uuid_compare(ae->config_hash_id, config_hash_id)) {
+        log_access("Checking %u, diff uuid", ae->unique_id);
         send = 1;
         goto done;
     }
 
     //same status, same config
-    log_access("Same");
     if (ae->new_status == RRDCALC_STATUS_CLEAR) {
+        log_access("Checking %u same status clear", ae->unique_id);
         send = 0;
         goto done;
+    }
+
+    //detect a long off period of the agent, TODO make global
+    if (ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) {
+        time_t when = removed_when(ae->alarm_id, ae->unique_id, unique_id, uuid_str);
+
+        if (when && (when + (time_t)MAX_REMOVED_PERIOD) < ae->when) {
+            log_access("Checking %u over max period when [%ld] ae when [%ld], add [%ld]", ae->unique_id, when, ae->when, when+MAX_REMOVED_PERIOD);
+            send = 1;
+            goto done;
+        } else {
+            log_access("Checking %u under max period or no removed when", ae->unique_id);
+            send = 0;
+            goto done;
+        }
     }
      
 done:
@@ -75,7 +120,6 @@ done:
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when trying to filter alert events, rc = %d", rc);
 
-    buffer_free(sql);
     return send;
 }
 
@@ -105,14 +149,14 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
         return 1;
 
     if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED) {
-        log_access("IS queued");
-        log_access ("MC Will skip %u (%s) %d", ae->unique_id, ae->name, ae->new_status);
+        //log_access("IS queued");
+        log_access ("MC Will skip %u (%s) %d already queued", ae->unique_id, ae->name, ae->new_status);
         return 0;
     }
 
     if (!skip_filter) {
         if (!should_send_to_cloud(host, ae)) {
-            log_access ("MC Will skip %u (%s) %d", ae->unique_id, ae->name, ae->new_status);
+            log_access ("MC Will skip %u (%s) %d from filter", ae->unique_id, ae->name, ae->new_status);
             return 0;
         }
     }
@@ -374,6 +418,8 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
     db_execute(buffer_tostring(sql));
 
+    log_access("Sent existing");
+    
     buffer_free(sql);
 }
 
@@ -469,34 +515,34 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
         }
     }
 
-    if (unlikely(!first_sequence)) {
-        sql_queue_existing_alerts_to_aclk(host);
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to get health log statistics from the database, rc = %d", rc);
+    /* if (unlikely(!first_sequence)) { */
+    /*     sql_queue_existing_alerts_to_aclk(host); */
+    /*     rc = sqlite3_finalize(res); */
+    /*     if (unlikely(rc != SQLITE_OK)) */
+    /*         error_report("Failed to reset statement to get health log statistics from the database, rc = %d", rc); */
 
-        //re-read
-        rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to prepare statement to get health log statistics from the database");
-            buffer_free(sql);
-            freez(claim_id);
-            return;
-        }
+    /*     //re-read */
+    /*     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0); */
+    /*     if (rc != SQLITE_OK) { */
+    /*         error_report("Failed to prepare statement to get health log statistics from the database"); */
+    /*         buffer_free(sql); */
+    /*         freez(claim_id); */
+    /*         return; */
+    /*     } */
 
-        while (sqlite3_step(res) == SQLITE_ROW) {
-            first_sequence = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0;
-            if (sqlite3_column_bytes(res, 1) > 0) {
-                first_timestamp.tv_sec = sqlite3_column_int64(res, 1);
-            }
+    /*     while (sqlite3_step(res) == SQLITE_ROW) { */
+    /*         first_sequence = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0; */
+    /*         if (sqlite3_column_bytes(res, 1) > 0) { */
+    /*             first_timestamp.tv_sec = sqlite3_column_int64(res, 1); */
+    /*         } */
 
-            last_sequence = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0;
-            if (sqlite3_column_bytes(res, 3) > 0) {
-                last_timestamp.tv_sec = sqlite3_column_int64(res, 3);
-            }
-        }
+    /*         last_sequence = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0; */
+    /*         if (sqlite3_column_bytes(res, 3) > 0) { */
+    /*             last_timestamp.tv_sec = sqlite3_column_int64(res, 3); */
+    /*         } */
+    /*     } */
         
-    }
+    /* } */
 
     struct alarm_log_entries log_entries;
     log_entries.first_seq_id = first_sequence;
@@ -694,6 +740,9 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
             log_access("AC [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
             return;
         }
+
+        if (unlikely(batch_id == 1) && unlikely(start_seq_id == 1))
+            sql_queue_existing_alerts_to_aclk(host);
     } else
         wc = (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
 
