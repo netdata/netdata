@@ -132,7 +132,9 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
 
     if (ret == -1) {
         error("Failed to get the output of \"%s\"", exec);
-    } else if (ret) {
+    } else if (ret == 0) {
+        info("Cannot get the output of \"%s\" within %"PRId64" seconds", exec, (int64_t)timeout.tv_sec);
+    } else {
         while (fgets(buf, MAXSIZE_PROC_CMDLINE, f) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
                 end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
@@ -150,8 +152,6 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
                 break;
             }
         }
-    } else {
-        info("Cannot get the output of \"%s\" within %"PRId64" seconds", exec, (int64_t)timeout.tv_sec);
     }
 
     if (mypclose(f, command_pid))
