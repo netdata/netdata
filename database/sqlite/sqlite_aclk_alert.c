@@ -135,6 +135,9 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     if (unlikely(!claim_id))
         return;
 
+    if (unlikely(!wc->host))
+        return;
+
     BUFFER *sql = buffer_create(1024);
 
     if (wc->alerts_start_seq_id != 0) {
