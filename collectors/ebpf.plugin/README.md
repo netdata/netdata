@@ -8,9 +8,9 @@ sidebar_label: "eBPF"
 
 # eBPF monitoring with Netdata
 
-The Netdata Agent provides many [eBPF](https://ebpf.io/what-is-ebpf/) programs to help you troubleshoot and debug how applications that interact with the Linux kernel. The `ebpf.plugin` uses [tracepoints or kprobes](#data-collection) to collect a wide array of high value data about the host that would otherwise be impossible to capture. 
+The Netdata Agent provides many [eBPF](https://ebpf.io/what-is-ebpf/) programs to help you troubleshoot and debug how applications that interact with the Linux kernel. The `ebpf.plugin` uses [tracepoints, trampoline, and2 kprobes](#data-collection) to collect a wide array of high value data about the host that would otherwise be impossible to capture. 
 
->❗ eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels on CentOS 7.6 or later. For kernels older than `4.11.0`, improved support is in active development.
+> ❗ eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels on CentOS 7.6 or later. For kernels older than `4.11.0`, improved support is in active development.
 
 This document provides all details about the `ebpf.plugin`.
 For hands-on configuration and troubleshooting tips see our [tutorial on troubleshooting apps with eBPF metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md).
@@ -21,20 +21,17 @@ For hands-on configuration and troubleshooting tips see our [tutorial on trouble
 </figure>
 
 <a id="data-collection"> </a>
+
 ## How Netdata collects data using probes and tracepoints
 
-Netdata uses the following two features from the Linux kernel to run eBPF programs:
+Netdata uses the following features from the Linux kernel to run eBPF programs:
 
-- Kprobes and return probes (`kretprobe`): Probes can insert virtually into any kernel instruction. When eBPF runs in
-  `entry` mode, it attaches only `kprobes` for internal functions monitoring calls and some arguments every time a
-  function is called. The user can also change configuration to use [`return`](#global) mode, and this will allow users
-  to monitor return from these functions and detect possible failures.
-- Tracepoints are hooks to call specific functions. Tracepoints are more stable than `kprobes` and are preferred when
-  both options are available.
-- Trampolines are bridges between kernel functions, and BPF programs. When available `netdata` used it by default.
+-   Tracepoints are hooks to call specific functions. Tracepoints are more stable than `kprobes` and are preferred when
+    both options are available.
+-   Trampolines are bridges between kernel functions, and BPF programs. Netdata uses them by default whenever available.
+-   Kprobes and return probes (`kretprobe`): Probes can insert virtually into any kernel instruction. When eBPF runs in `entry` mode, it attaches only `kprobes` for internal functions monitoring calls and some arguments every time a function is called. The user can also change configuration to use [`return`](#global) mode, and this will allow users to monitor return from these functions and detect possible failures.
 
-In each case, wherever a normal kprobe, kretprobe, or tracepoint would have run its hook function, an eBPF program is
-run instead, performing various collection logic before letting the kernel continue its normal control flow.
+In each case, wherever a normal kprobe, kretprobe, or tracepoint would have run its hook function, an eBPF program is run instead, performing various collection logic before letting the kernel continue its normal control flow.
 
 There are more methods to trigger eBPF programs, such as uprobes, but currently are not supported.
 
@@ -47,40 +44,42 @@ If your Agent is v1.22 or older, you may to enable the collector yourself.
 
 To enable or disable the entire eBPF collector: 
 
-1. Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
+1.  Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
     ```bash
     cd /etc/netdata
     ```
-2. Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit `netdata.conf`.
 
-   ```bash
-   ./edit-config netdata.conf
-   ```
+2.  Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit `netdata.conf`.
 
-3. Enable the collector by scrolling down to the `[plugins]` section. Uncomment the line `ebpf` (not
-`ebpf_process`) and set it to `yes`.
+    ```bash
+    ./edit-config netdata.conf
+    ```
 
-   ```conf
-   [plugins]
-      ebpf = yes
-   ```
+3.  Enable the collector by scrolling down to the `[plugins]` section. Uncomment the line `ebpf` (not
+    `ebpf_process`) and set it to `yes`.
+
+    ```conf
+    [plugins]
+       ebpf = yes
+    ```
 
 ### Configure the eBPF collector
 
-You can configure the eBPF collector's behavior to fine-tune which metrics you receive and [optimize performance](#performance opimization).
+You can configure the eBPF collector's behavior to fine-tune which metrics you receive and [optimize performance]\(#performance opimization).
 
 To edit the `ebpf.d.conf`:
 
-1. Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
+1.  Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
     ```bash
     cd /etc/netdata
     ```
-2. Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit [`ebpf.d.conf`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/ebpf.d.conf).
+2.  Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit [`ebpf.d.conf`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/ebpf.d.conf).
 
-   ```bash
-   ./edit-config ebpf.d.conf
-   ```
-   You can now edit the behavior of the eBPF collector. The following sections describe each configuration option in detail.
+    ```bash
+    ./edit-config ebpf.d.conf
+    ```
+
+    You can now edit the behavior of the eBPF collector. The following sections describe each configuration option in detail.
 
 ### `[global]` configuration options
 
@@ -95,13 +94,13 @@ By default, this plugin uses the `entry` mode. Changing this mode can create sig
 system, but also offer valuable information if you are developing or debugging software. The `ebpf load mode` option
 accepts the following values:
 
-- `entry`: This is the default mode. In this mode, the eBPF collector only monitors calls for the functions described in
-  the sections above, and does not show charts related to errors.
-- `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates new
-  charts for the return of these functions, such as errors. Monitoring function returns can help in debugging software,
-  such as failing to close file descriptors or creating zombie processes.
-- `update every`:  Number of seconds used for eBPF to send data for Netdata.
-- `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
+-   `entry`: This is the default mode. In this mode, the eBPF collector only monitors calls for the functions described in
+    the sections above, and does not show charts related to errors.
+-   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates new
+    charts for the return of these functions, such as errors. Monitoring function returns can help in debugging software,
+    such as failing to close file descriptors or creating zombie processes.
+-   `update every`:  Number of seconds used for eBPF to send data for Netdata.
+-   `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
 
 #### Integration with `apps.plugin`
 
@@ -147,97 +146,97 @@ Linux metrics:
 
 > Note: The parenthetical accompanying each bulleted item provides the chart name.
 
-- mem
-    - Number of processes killed due out of memory. (`oomkills`)
-- process
-    - Number of processes created with `do_fork`. (`process_create`)
-    - Number of threads created with `do_fork` or `clone (2)`, depending on your system's kernel
-      version. (`thread_create`)
-    - Number of times that a process called `do_exit`. (`task_exit`)
-    - Number of times that a process called `release_task`. (`task_close`)
-    - Number of times that an error happened to create thread or process. (`task_error`)
-- swap
-    - Number of calls to `swap_readpage`. (`swap_read_call`)
-    - Number of calls to `swap_writepage`. (`swap_write_call`)
-- network
-    - Number of outbound connections using TCP/IPv4. (`outbound_conn_ipv4`)
-    - Number of outbound connections using TCP/IPv6. (`outbound_conn_ipv6`)
-    - Number of bytes sent. (`total_bandwidth_sent`)
-    - Number of bytes received. (`total_bandwidth_recv`)
-    - Number of calls to `tcp_sendmsg`. (`bandwidth_tcp_send`)
-    - Number of calls to `tcp_cleanup_rbuf`. (`bandwidth_tcp_recv`)
-    - Number of calls to `tcp_retransmit_skb`. (`bandwidth_tcp_retransmit`)
-    - Number of calls to `udp_sendmsg`. (`bandwidth_udp_send`)
-    - Number of calls to `udp_recvmsg`. (`bandwidth_udp_recv`)
-- file access
-    - Number of calls to open files. (`file_open`)
-    - Number of calls to open files that returned errors. (`open_error`)
-    - Number of files closed. (`file_closed`)
-    - Number of calls to close files that returned errors. (`file_error_closed`)
-- vfs
-    - Number of calls to `vfs_unlink`. (`file_deleted`)
-    - Number of calls to `vfs_write`. (`vfs_write_call`)
-    - Number of calls to write a file that returned errors. (`vfs_write_error`)
-    - Number of calls to `vfs_read`. (`vfs_read_call`)
-    - Number of bytes written with `vfs_write`. (`vfs_write_bytes`)
-    - Number of bytes read with `vfs_read`. (`vfs_read_bytes`)
-    - Number of calls to read a file that returned errors. (`vfs_read_error`)
-    - Number of calls to `vfs_fsync`. (`vfs_fsync`)
-    - Number of calls to sync file that returned errors. (`vfs_fsync_error`)
-    - Number of calls to `vfs_open`. (`vfs_open`)
-    - Number of calls to open file that returned errors. (`vfs_open_error`)
-    - Number of calls to `vfs_create`. (`vfs_create`)
-    - Number of calls to open file that returned errors. (`vfs_create_error`)
-- page cache
-    - Ratio of pages accessed. (`cachestat_ratio`)
-    - Number of modified pages ("dirty"). (`cachestat_dirties`)
-    - Number of accessed pages. (`cachestat_hits`)
-    - Number of pages brought from disk. (`cachestat_misses`)
-- directory cache
-    - Ratio of files available in directory cache. (`dc_hit_ratio`)
-    - Number of files accessed. (`dc_reference`)
-    - Number of files accessed that were not in cache. (`dc_not_cache`)
-    - Number of files not found. (`dc_not_found`)
-- ipc shm
-    - Number of calls to `shm_get`. (`shmget_call`)
-    - Number of calls to `shm_at`. (`shmat_call`)
-    - Number of calls to `shm_dt`. (`shmdt_call`)
-    - Number of calls to `shm_ctl`. (`shmctl_call`)
+-   mem
+    -   Number of processes killed due out of memory. (`oomkills`)
+-   process
+    -   Number of processes created with `do_fork`. (`process_create`)
+    -   Number of threads created with `do_fork` or `clone (2)`, depending on your system's kernel
+        version. (`thread_create`)
+    -   Number of times that a process called `do_exit`. (`task_exit`)
+    -   Number of times that a process called `release_task`. (`task_close`)
+    -   Number of times that an error happened to create thread or process. (`task_error`)
+-   swap
+    -   Number of calls to `swap_readpage`. (`swap_read_call`)
+    -   Number of calls to `swap_writepage`. (`swap_write_call`)
+-   network
+    -   Number of outbound connections using TCP/IPv4. (`outbound_conn_ipv4`)
+    -   Number of outbound connections using TCP/IPv6. (`outbound_conn_ipv6`)
+    -   Number of bytes sent. (`total_bandwidth_sent`)
+    -   Number of bytes received. (`total_bandwidth_recv`)
+    -   Number of calls to `tcp_sendmsg`. (`bandwidth_tcp_send`)
+    -   Number of calls to `tcp_cleanup_rbuf`. (`bandwidth_tcp_recv`)
+    -   Number of calls to `tcp_retransmit_skb`. (`bandwidth_tcp_retransmit`)
+    -   Number of calls to `udp_sendmsg`. (`bandwidth_udp_send`)
+    -   Number of calls to `udp_recvmsg`. (`bandwidth_udp_recv`)
+-   file access
+    -   Number of calls to open files. (`file_open`)
+    -   Number of calls to open files that returned errors. (`open_error`)
+    -   Number of files closed. (`file_closed`)
+    -   Number of calls to close files that returned errors. (`file_error_closed`)
+-   vfs
+    -   Number of calls to `vfs_unlink`. (`file_deleted`)
+    -   Number of calls to `vfs_write`. (`vfs_write_call`)
+    -   Number of calls to write a file that returned errors. (`vfs_write_error`)
+    -   Number of calls to `vfs_read`. (`vfs_read_call`)
+    -   -   Number of calls to read a file that returned errors. (`vfs_read_error`)
+    -   Number of bytes written with `vfs_write`. (`vfs_write_bytes`)
+    -   Number of bytes read with `vfs_read`. (`vfs_read_bytes`)
+    -   Number of calls to `vfs_fsync`. (`vfs_fsync`)
+    -   Number of calls to sync file that returned errors. (`vfs_fsync_error`)
+    -   Number of calls to `vfs_open`. (`vfs_open`)
+    -   Number of calls to open file that returned errors. (`vfs_open_error`)
+    -   Number of calls to `vfs_create`. (`vfs_create`)
+    -   Number of calls to open file that returned errors. (`vfs_create_error`)
+-   page cache
+    -   Ratio of pages accessed. (`cachestat_ratio`)
+    -   Number of modified pages ("dirty"). (`cachestat_dirties`)
+    -   Number of accessed pages. (`cachestat_hits`)
+    -   Number of pages brought from disk. (`cachestat_misses`)
+-   directory cache
+    -   Ratio of files available in directory cache. (`dc_hit_ratio`)
+    -   Number of files accessed. (`dc_reference`)
+    -   Number of files accessed that were not in cache. (`dc_not_cache`)
+    -   Number of files not found. (`dc_not_found`)
+-   ipc shm
+    -   Number of calls to `shm_get`. (`shmget_call`)
+    -   Number of calls to `shm_at`. (`shmat_call`)
+    -   Number of calls to `shm_dt`. (`shmdt_call`)
+    -   Number of calls to `shm_ctl`. (`shmctl_call`)
 
 ### `[ebpf programs]` configuration options
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
-- `fd` :  This eBPF program creates charts that show information about calls to open files.
-- `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
-- `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
-- `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
-- `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
-  bandwidth consumed by each.
-- `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
-- `process`: This eBPF program creates charts that show information about process life. When in `return` mode, it also
-  creates charts showing errors when these operations are executed.
-- `hardirq`: This eBPF program creates charts that show information about time spent servicing individual hardware
-  interrupt requests (hard IRQs).
-- `softirq`: This eBPF program creates charts that show information about time spent servicing individual software
-  interrupt requests (soft IRQs).
-- `oomkill`: This eBPF program creates a chart that shows OOM kills for all applications recognized via
-  the `apps.plugin` integration. Note that this program will show application charts regardless of whether apps
-  integration is turned on or off.
+-   `fd` :  This eBPF program creates charts that show information about calls to open files.
+-   `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
+-   `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
+-   `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
+-   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+    bandwidth consumed by each.
+-   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
+-   `process`: This eBPF program creates charts that show information about process life. When in `return` mode, it also
+    creates charts showing errors when these operations are executed.
+-   `hardirq`: This eBPF program creates charts that show information about time spent servicing individual hardware
+    interrupt requests (hard IRQs).
+-   `softirq`: This eBPF program creates charts that show information about time spent servicing individual software
+    interrupt requests (soft IRQs).
+-   `oomkill`: This eBPF program creates a chart that shows OOM kills for all applications recognized via
+    the `apps.plugin` integration. Note that this program will show application charts regardless of whether apps
+    integration is turned on or off.
 
 You can also enable the following eBPF programs:
 
-- `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
-  [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
-  for each application.
-- `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
-  `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and files are
-  not found.
-- `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
-- `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
-- `swap` : This eBPF program creates charts that show information about swap access.
-- `mdflush`: This eBPF program creates charts that show information about
-  multi-device software flushes.
+-   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
+    [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
+    for each application.
+-   `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
+    `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and files are
+    not found.
+-   `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
+-   `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
+-   `swap` : This eBPF program creates charts that show information about swap access.
+-   `mdflush`: This eBPF program creates charts that show information about
+    multi-device software flushes.
 
 ### Configuring eBPF threads
 
@@ -245,28 +244,28 @@ You can configure each thread of the eBPF data collector. @thiagoftsm Can you gi
 
 To configure an eBPF thread:
 
-1. Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
+1.  Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
     ```bash
     cd /etc/netdata
     ```
-2. Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
+2.  Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
-   - `network.conf`: Configuration for the [`network viewer` thread](#network-configuration). This config file overwrites the global options and also
-  lets you specify which network the eBPF collector monitors.
-   - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
-   - `cachestat.conf`: Configuration for the `cachestat` thread(#filesystem-configuration).
-   - `dcstat.conf`: Configuration for the `dcstat` thread.
-   - `disk.conf`: Configuration for the `disk` thread.
-   - `fd.conf`: Configuration for the `file descriptor` thread.
-   - `filesystem.conf`: Configuration for the `filesystem` thread.
-   - `hardirq.conf`: Configuration for the `hardirq` thread.
-   - `softirq.conf`: Configuration for the `softirq` thread.
-   - `sync.conf`: Configuration for the `sync` thread.
-   - `vfs.conf`: Configuration for the `vfs` thread.
+    -   `network.conf`: Configuration for the [`network` thread](#network-configuration). This config file overwrites the global options and also
+        lets you specify which network the eBPF collector monitors.
+    -   `process.conf`: Configuration for the [`process` thread](#sync-configuration).
+    -   `cachestat.conf`: Configuration for the `cachestat` thread(#filesystem-configuration).
+    -   `dcstat.conf`: Configuration for the `dcstat` thread.
+    -   `disk.conf`: Configuration for the `disk` thread.
+    -   `fd.conf`: Configuration for the `file descriptor` thread.
+    -   `filesystem.conf`: Configuration for the `filesystem` thread.
+    -   `hardirq.conf`: Configuration for the `hardirq` thread.
+    -   `softirq.conf`: Configuration for the `softirq` thread.
+    -   `sync.conf`: Configuration for the `sync` thread.
+    -   `vfs.conf`: Configuration for the `vfs` thread.
 
-   ```bash
-   ./edit-config FILE.conf
-   ```
+        ```bash
+        ./edit-config FILE.conf
+        ```
 
 ### Network configuration
 
@@ -296,11 +295,11 @@ and 145.
 
 The following options are available:
 
-- `ports`: Define the destination ports for Netdata to monitor.
-- `hostnames`: The list of hostnames that can be resolved to an IP address.
-- `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-  range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresses, but this can
-  be changed with the `ips` setting.
+-   `ports`: Define the destination ports for Netdata to monitor.
+-   `hostnames`: The list of hostnames that can be resolved to an IP address.
+-   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
+    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresses, but this can
+    be changed with the `ips` setting.
 
 By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions,
 they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing
@@ -391,12 +390,12 @@ to support this configuration. The process of recompiling Linux kernels varies b
 Read the documentation for your system's distribution to learn more about the specific workflow for recompiling the
 kernel, ensuring that you set all the necessary
 
-- [Ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
-- [Debian](https://kernel-team.pages.debian.net/kernel-handbook/ch-common-tasks.html#s-common-official)
-- [Fedora](https://fedoraproject.org/wiki/Building_a_custom_kernel)
-- [CentOS](https://wiki.centos.org/HowTos/Custom_Kernel)
-- [Arch Linux](https://wiki.archlinux.org/index.php/Kernel/Traditional_compilation)
-- [Slackware](https://docs.slackware.com/howtos:slackware_admin:kernelbuilding)
+-   [Ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
+-   [Debian](https://kernel-team.pages.debian.net/kernel-handbook/ch-common-tasks.html#s-common-official)
+-   [Fedora](https://fedoraproject.org/wiki/Building_a_custom_kernel)
+-   [CentOS](https://wiki.centos.org/HowTos/Custom_Kernel)
+-   [Arch Linux](https://wiki.archlinux.org/index.php/Kernel/Traditional_compilation)
+-   [Slackware](https://docs.slackware.com/howtos:slackware_admin:kernelbuilding)
 
 ### Mount `debugfs` and `tracefs`
 
@@ -422,8 +421,7 @@ collected in the previous and current seconds.
 
 ### System overview
 
-Not all charts within the System Overview menu are enabled by default, because they add around 100ns overhead for each
-function call, this number is small for a human perspective, but the functions are called many times creating an impact
+Not all charts within the System Overview menu are enabled by default. Charts that rely on `kprobes` are disabled by default because they add around 100ns overhead for each function call. This is a small number from a human's perspective, but the functions are called many times and create an impact
 on host. See the [configuration](#configuration) section for details about how to enable them.
 
 #### Processes
@@ -432,12 +430,12 @@ Internally, the Linux kernel treats both processes and threads as `tasks`. To cr
 system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. To generate this chart, the eBPF
 collector uses the following `tracepoints` and `kprobe`:
 
-- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`.
-- `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
-- `kprobe/kernel_clone`: This is the main [`fork()`](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
-   routine since kernel `5.10.0` was released.
-- `kprobe/_do_fork`: Like `kernel_clone`, but this was the main function between kernels `4.2.0` and `5.9.16`
-- `kprobe/do_fork`: This was the main function before kernel `4.2.0`.
+-   `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`.
+-   `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
+-   `kprobe/kernel_clone`: This is the main [`fork()`](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
+     routine since kernel `5.10.0` was released.
+-   `kprobe/_do_fork`: Like `kernel_clone`, but this was the main function between kernels `4.2.0` and `5.9.16`
+-   `kprobe/do_fork`: This was the main function before kernel `4.2.0`.
 
 #### Process Exit
 
@@ -446,9 +444,9 @@ system that the task is finishing its work. The second step is to release the ke
 function `release_task`. The difference between the two dimensions can help you discover
 [zombie processes](https://en.wikipedia.org/wiki/Zombie_process). To get the metrics, the collector uses:
 
-- `sched/sched_process_exit`: Tracepoint called after a task exits.
-- `kprobe/release_task`: This function is called when a process exits, as the kernel still needs to remove the process
-  descriptor.
+-   `sched/sched_process_exit`: Tracepoint called after a task exits.
+-   `kprobe/release_task`: This function is called when a process exits, as the kernel still needs to remove the process
+    descriptor.
 
 #### Task error
 
@@ -458,7 +456,7 @@ process and thread creation only.
 #### Swap
 
 Inside the swap submenu the eBPF plugin creates the chart `swapcalls`; this chart is displaying when processes are
-calling functions [`swap_readpage` and `swap_writepage`](https://hzliu123.github.io/linux-kernel/Page%20Cache%20in%20Linux%202.6.pdf ),
+calling functions [`swap_readpage` and `swap_writepage`](https://hzliu123.github.io/linux-kernel/Page%20Cache%20in%20Linux%202.6.pdf),
 which are functions responsible for doing IO in swap memory. To collect the exact moment that an access to swap happens,
 the collector attaches `kprobes` for cited functions.
 
@@ -466,70 +464,70 @@ the collector attaches `kprobes` for cited functions.
 
 The following `tracepoints` are used to measure time usage for soft IRQs:
 
-- [`irq/softirq_entry`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_entry): Called
-   before softirq handler
-- [`irq/softirq_exit`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_exit): Called when
-   softirq handler returns.
+-   [`irq/softirq_entry`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_entry): Called
+     before softirq handler
+-   [`irq/softirq_exit`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_exit): Called when
+     softirq handler returns.
 
 #### Hard IRQ
 
 The following tracepoints are used to measure the latency of servicing a
 hardware interrupt request (hard IRQ).
 
-- [`irq/irq_handler_entry`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_irq_handler_entry):
-  Called immediately before the IRQ action handler.
-- [`irq/irq_handler_exit`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_irq_handler_exit):
-  Called immediately after the IRQ action handler returns.
-- `irq_vectors`: These are traces from `irq_handler_entry` and
-  `irq_handler_exit` when an IRQ is handled. The following elements from vector
-  are triggered:
-    - `irq_vectors/local_timer_entry`
-    - `irq_vectors/local_timer_exit`
-    - `irq_vectors/reschedule_entry`
-    - `irq_vectors/reschedule_exit`
-    - `irq_vectors/call_function_entry`
-    - `irq_vectors/call_function_exit`
-    - `irq_vectors/call_function_single_entry`
-    - `irq_vectors/call_function_single_xit`
-    - `irq_vectors/irq_work_entry`
-    - `irq_vectors/irq_work_exit`
-    - `irq_vectors/error_apic_entry`
-    - `irq_vectors/error_apic_exit`
-    - `irq_vectors/thermal_apic_entry`
-    - `irq_vectors/thermal_apic_exit`
-    - `irq_vectors/threshold_apic_entry`
-    - `irq_vectors/threshold_apic_exit`
-    - `irq_vectors/deferred_error_entry`
-    - `irq_vectors/deferred_error_exit`
-    - `irq_vectors/spurious_apic_entry`
-    - `irq_vectors/spurious_apic_exit`
-    - `irq_vectors/x86_platform_ipi_entry`
-    - `irq_vectors/x86_platform_ipi_exit`
+-   [`irq/irq_handler_entry`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_irq_handler_entry):
+    Called immediately before the IRQ action handler.
+-   [`irq/irq_handler_exit`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_irq_handler_exit):
+    Called immediately after the IRQ action handler returns.
+-   `irq_vectors`: These are traces from `irq_handler_entry` and
+    `irq_handler_exit` when an IRQ is handled. The following elements from vector
+    are triggered:
+    -   `irq_vectors/local_timer_entry`
+    -   `irq_vectors/local_timer_exit`
+    -   `irq_vectors/reschedule_entry`
+    -   `irq_vectors/reschedule_exit`
+    -   `irq_vectors/call_function_entry`
+    -   `irq_vectors/call_function_exit`
+    -   `irq_vectors/call_function_single_entry`
+    -   `irq_vectors/call_function_single_xit`
+    -   `irq_vectors/irq_work_entry`
+    -   `irq_vectors/irq_work_exit`
+    -   `irq_vectors/error_apic_entry`
+    -   `irq_vectors/error_apic_exit`
+    -   `irq_vectors/thermal_apic_entry`
+    -   `irq_vectors/thermal_apic_exit`
+    -   `irq_vectors/threshold_apic_entry`
+    -   `irq_vectors/threshold_apic_exit`
+    -   `irq_vectors/deferred_error_entry`
+    -   `irq_vectors/deferred_error_exit`
+    -   `irq_vectors/spurious_apic_entry`
+    -   `irq_vectors/spurious_apic_exit`
+    -   `irq_vectors/x86_platform_ipi_entry`
+    -   `irq_vectors/x86_platform_ipi_exit`
 
 #### IPC shared memory
 
 To monitor shared memory system call counts, Netdata attaches tracing in the following functions:
 
-- `shmget`: Runs when [`shmget`](https://man7.org/linux/man-pages/man2/shmget.2.html) is called.
-- `shmat`: Runs when [`shmat`](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
-- `shmdt`: Runs when [`shmdt`](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
-- `shmctl`: Runs when [`shmctl`](https://man7.org/linux/man-pages/man2/shmctl.2.html) is called.
+-   `shmget`: Runs when [`shmget`](https://man7.org/linux/man-pages/man2/shmget.2.html) is called.
+-   `shmat`: Runs when [`shmat`](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
+-   `shmdt`: Runs when [`shmdt`](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
+-   `shmctl`: Runs when [`shmctl`](https://man7.org/linux/man-pages/man2/shmctl.2.html) is called.
 
 ### Memory
 
 In the memory submenu the eBPF plugin creates two submenus **page cache** and **synchronization** with the following
 organization:
 
-* Page Cache
-    * Page cache ratio
-    * Dirty pages
-    * Page cache hits
-    * Page cache misses
-* Synchronization
-    * File sync
-    * Memory map sync
-    * File system sync
-    * File range sync
+-   Page Cache
+    -   Page cache ratio
+    -   Dirty pages
+    -   Page cache hits
+    -   Page cache misses
+-   Synchronization
+    -   File sync
+    -   Memory map sync
+    -   File system sync
+    -   File range sync
 
 #### Page cache hits
 
@@ -557,18 +555,17 @@ If the processor hits a page cache (`page cache hit`), it reads the entry from t
  memory. The ratio is calculated counting the accessed cached pages
  (without counting [dirty pages](#dirty-pages) and pages added because of read misses) divided by total access without dirty pages.
 
-\_\_________<ins>Number of accessed cached pages</ins>__________
-
-Number of total accessed pages - dirty pages - missed pages
+> \_\_**\_\_\_\_**<ins>Number of accessed cached pages</ins>\***\*\_\_\*\***<br/>
+> Number of total accessed pages - dirty pages - missed pages
 
 The chart `cachestat_ratio` shows how processes are accessing page cache. In a normal scenario, we expect values around
 100%, which means that the majority of the work on the machine is processed in memory. To calculate the ratio, Netdata
 attaches `kprobes` for kernel functions:
 
-- `add_to_page_cache_lru`: Page addition.
-- `mark_page_accessed`: Access to cache.
-- `account_page_dirtied`: Dirty (modified) pages.
-- `mark_buffer_dirty`: Writes to page cache.
+-   `add_to_page_cache_lru`: Page addition.
+-   `mark_page_accessed`: Access to cache.
+-   `account_page_dirtied`: Dirty (modified) pages.
+-   `mark_buffer_dirty`: Writes to page cache.
 
 #### Page cache misses
 
@@ -616,19 +613,20 @@ By default, MD flush is disabled. To enable it, configure your
 
 To collect data related to Linux multi-device (MD) flushing, the following kprobe is used:
 
--  `kprobe/md_flush_request`: called whenever a request for flushing multi-device data is made.
+-   `kprobe/md_flush_request`: called whenever a request for flushing multi-device data is made.
 
 ### Disk
 
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled.
 
 #### Disk Latency
+
 This will create the chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
 
-- [`block/block_rq_issue`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
-  IO request operation to a device drive.
-- [`block/block_rq_complete`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
-  IO operation completed by device.
+-   [`block/block_rq_issue`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
+    IO request operation to a device drive.
+-   [`block/block_rq_complete`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
+    IO operation completed by device.
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),
@@ -641,6 +639,7 @@ This group has charts demonstrating how applications interact with the Linux ker
 It also brings latency charts for several different filesystems.
 
 #### Latency Algorithm
+
 We calculate the difference between the calling and return times, spanning disk I/O, file system operations (lock, I/O),
 run queue latency and all events related to the monitored action.
 
@@ -651,10 +650,10 @@ To measure the latency of executing some actions in an
 collector needs to attach `kprobes` and `kretprobes` for each of the following
 functions:
 
-- `ext4_file_read_iter`: Function used to measure read latency.
-- `ext4_file_write_iter`: Function used to measure write latency.
-- `ext4_file_open`: Function used to measure open latency.
-- `ext4_sync_file`: Function used to measure sync latency.
+-   `ext4_file_read_iter`: Function used to measure read latency.
+-   `ext4_file_write_iter`: Function used to measure write latency.
+-   `ext4_file_open`: Function used to measure open latency.
+-   `ext4_sync_file`: Function used to measure sync latency.
 
 #### ZFS
 
@@ -662,10 +661,10 @@ To measure the latency of executing some actions in a zfs filesystem, the
 collector needs to attach `kprobes` and `kretprobes` for each of the following
 functions:
 
-- `zpl_iter_read`: Function used to measure read latency.
-- `zpl_iter_write`: Function used to measure write latency.
-- `zpl_open`: Function used to measure open latency.
-- `zpl_fsync`: Function used to measure sync latency.
+-   `zpl_iter_read`: Function used to measure read latency.
+-   `zpl_iter_write`: Function used to measure write latency.
+-   `zpl_open`: Function used to measure open latency.
+-   `zpl_fsync`: Function used to measure sync latency.
 
 #### XFS
 
@@ -674,10 +673,10 @@ To measure the latency of executing some actions in an
 collector needs to attach `kprobes` and `kretprobes` for each of the following
 functions:
 
-- `xfs_file_read_iter`: Function used to measure read latency.
-- `xfs_file_write_iter`: Function used to measure write latency.
-- `xfs_file_open`: Function used to measure open latency.
-- `xfs_file_fsync`: Function used to measure sync latency.
+-   `xfs_file_read_iter`: Function used to measure read latency.
+-   `xfs_file_write_iter`: Function used to measure write latency.
+-   `xfs_file_open`: Function used to measure open latency.
+-   `xfs_file_fsync`: Function used to measure sync latency.
 
 #### NFS
 
@@ -686,11 +685,11 @@ To measure the latency of executing some actions in an
 collector needs to attach `kprobes` and `kretprobes` for each of the following
 functions:
 
-- `nfs_file_read`: Function used to measure read latency.
-- `nfs_file_write`: Function used to measure write latency.
-- `nfs_file_open`: Functions used to measure open latency.
-- `nfs4_file_open`: Functions used to measure open latency for NFS v4.
-- `nfs_getattr`: Function used to measure sync latency.
+-   `nfs_file_read`: Function used to measure read latency.
+-   `nfs_file_write`: Function used to measure write latency.
+-   `nfs_file_open`: Functions used to measure open latency.
+-   `nfs4_file_open`: Functions used to measure open latency for NFS v4.
+-   `nfs_getattr`: Function used to measure sync latency.
 
 #### btrfs
 
@@ -698,26 +697,26 @@ To measure the latency of executing some actions in a [btrfs](https://elixir.boo
 filesystem, the collector needs to attach `kprobes` and `kretprobes` for each of the following functions:
 
 > Note: We are listing two functions used to measure `read` latency, but we use either `btrfs_file_read_iter` or
-`generic_file_read_iter`, depending on kernel version.
+> `generic_file_read_iter`, depending on kernel version.
 
-- `btrfs_file_read_iter`: Function used to measure read latency since kernel `5.10.0`.
-- `generic_file_read_iter`: Like `btrfs_file_read_iter`, but this function was used before kernel `5.10.0`.
-- `btrfs_file_write_iter`: Function used to write data.
-- `btrfs_file_open`: Function used to open files.
-- `btrfs_sync_file`: Function used to synchronize data to filesystem.
+-   `btrfs_file_read_iter`: Function used to measure read latency since kernel `5.10.0`.
+-   `generic_file_read_iter`: Like `btrfs_file_read_iter`, but this function was used before kernel `5.10.0`.
+-   `btrfs_file_write_iter`: Function used to write data.
+-   `btrfs_file_open`: Function used to open files.
+-   `btrfs_sync_file`: Function used to synchronize data to filesystem.
 
 #### File descriptor
 
 To give metrics related to `open` and `close` events, instead of attaching kprobes for each syscall used to do these
 events, the collector attaches `kprobes` for the common function used for syscalls:
 
-- [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html ): Internal function used to
-   open files.
-- [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162):
-  Function called from `do_sys_open` since version `5.6.0`.
-- [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
-  descriptor since kernel `5.11.0`.
-- `__close_fd`: Function used to close files before version `5.11.0`.
+-   [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html): Internal function used to
+     open files.
+-   [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162):
+    Function called from `do_sys_open` since version `5.6.0`.
+-   [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
+    descriptor since kernel `5.11.0`.
+-   `__close_fd`: Function used to close files before version `5.11.0`.
 
 #### File error
 
@@ -737,22 +736,22 @@ To measure the latency and total quantity of executing some VFS-level
 functions, ebpf.plugin needs to attach kprobes and kretprobes for each of the
 following functions:
 
-- `vfs_write`: Function used monitoring the number of successful & failed
-  filesystem write calls, as well as the total number of written bytes.
-- `vfs_writev`: Same function as `vfs_write` but for vector writes (i.e. a
-  single write operation using a group of buffers rather than 1).
-- `vfs_read`: Function used for monitoring the number of successful & failed
-  filesystem read calls, as well as the total number of read bytes.
-- `vfs_readv` Same function as `vfs_read` but for vector reads (i.e. a single
-  read operation using a group of buffers rather than 1).
-- `vfs_unlink`: Function used for monitoring the number of successful & failed
-  filesystem unlink calls.
-- `vfs_fsync`: Function used for monitoring the number of successful & failed
-  filesystem fsync calls.
-- `vfs_open`: Function used for monitoring the number of successful & failed
-  filesystem open calls.
-- `vfs_create`: Function used for monitoring the number of successful & failed
-  filesystem create calls.
+-   `vfs_write`: Function used monitoring the number of successful & failed
+    filesystem write calls, as well as the total number of written bytes.
+-   `vfs_writev`: Same function as `vfs_write` but for vector writes (i.e. a
+    single write operation using a group of buffers rather than 1).
+-   `vfs_read`: Function used for monitoring the number of successful & failed
+    filesystem read calls, as well as the total number of read bytes.
+-   `vfs_readv` Same function as `vfs_read` but for vector reads (i.e. a single
+    read operation using a group of buffers rather than 1).
+-   `vfs_unlink`: Function used for monitoring the number of successful & failed
+    filesystem unlink calls.
+-   `vfs_fsync`: Function used for monitoring the number of successful & failed
+    filesystem fsync calls.
+-   `vfs_open`: Function used for monitoring the number of successful & failed
+    filesystem open calls.
+-   `vfs_create`: Function used for monitoring the number of successful & failed
+    filesystem create calls.
 
 ##### VFS Deleted objects
 
@@ -792,11 +791,12 @@ Metrics for directory cache are collected using kprobe for `lookup_fast`, becaus
 times this function is accessed. On the other hand, for `d_lookup` we are not only interested in the number of times it
 is accessed, but also in possible errors, so we need to attach a `kretprobe`. For this reason, the following is used:
 
-- [`lookup_fast`](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
-- [`d_lookup`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223):
-  Called when the desired file is not inside the directory cache.
+-   [`lookup_fast`](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
+-   [`d_lookup`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223):
+    Called when the desired file is not inside the directory cache.
 
 ##### Directory Cache Interpretation
+
 When directory cache is showing 100% that means that every accessed file was present in the directory cache.
 If files are not present in the directory cache, they are either not present in the file system or the files were not
 accessed before.
@@ -805,17 +805,19 @@ accessed before.
 
 The following `tracing` are used to collect `mount` & `unmount` call counts:
 
-- [`mount`](https://man7.org/linux/man-pages/man2/mount.2.html): mount filesystem on host.
-- [`umount`](https://man7.org/linux/man-pages/man2/umount.2.html): umount filesystem on host.
+-   [`mount`](https://man7.org/linux/man-pages/man2/mount.2.html): mount filesystem on host.
+-   [`umount`](https://man7.org/linux/man-pages/man2/umount.2.html): umount filesystem on host.
 
 ### Networking Stack
 
 Netdata monitors socket bandwidth attaching `tracing` for internal functions.
 
 #### TCP outbound connections
+
 This chart demonstrates calls to `tcp_v4_connection` and `tcp_v6_connection` that start connections for IPV4 and IPV6, respectively.
 
 #### TCP inbound connections
+
 This chart demonstrates TCP and UDP connections that the host receives.
 To collect this information, netdata attaches a tracing to `inet_csk_accept`.
 
@@ -828,10 +830,10 @@ to send & receive data and to close connections when `TCP` protocol is used.
 
 This chart demonstrates calls to functions:
 
-- `tcp_sendmsg`: Function responsible to send data for a specified destination.
-- `tcp_cleanup_rbuf`: We use this function instead of `tcp_recvmsg`, because the last one misses `tcp_read_sock` traffic
-   and we would also need to add more `tracing` to get the socket and package size.
-- `tcp_close`: Function responsible to close connection.
+-   `tcp_sendmsg`: Function responsible to send data for a specified destination.
+-   `tcp_cleanup_rbuf`: We use this function instead of `tcp_recvmsg`, because the last one misses `tcp_read_sock` traffic
+     and we would also need to add more `tracing` to get the socket and package size.
+-   `tcp_close`: Function responsible to close connection.
 
 #### TCP retransmit
 
@@ -854,9 +856,10 @@ calls, it monitors the number of bytes sent and received.
 
 These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memory) killing processes.
 
--  `oom/mark_victim`: Monitors when an oomkill event happens.
+-   `oom/mark_victim`: Monitors when an oomkill event happens.
 
-## Known issues 
+## Known issues
+
 ### Performance opimization
 
 eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin
@@ -943,7 +946,7 @@ a feature called "lockdown," which may affect `ebpf.plugin` depending how the ke
 shows how the lockdown module impacts `ebpf.plugin` based on the selected options:
 
 | Enforcing kernel lockdown | Enable lockdown LSM early in init | Default lockdown mode | Can `ebpf.plugin` run with this? |
-|:------------------------- |:--------------------------------- |:--------------------- |:-------------------------------- |
+| :------------------------ | :-------------------------------- | :-------------------- | :------------------------------- |
 | YES                       | NO                                | NO                    | YES                              |
 | YES                       | Yes                               | None                  | YES                              |
 | YES                       | Yes                               | Integrity             | YES                              |
@@ -951,5 +954,3 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
-
-
