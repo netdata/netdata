@@ -284,7 +284,7 @@ elif [ -r /proc/cpuinfo ]; then
   if (echo "${CPU_INFO_SOURCE}" | grep -qv procfs); then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} procfs"
   fi
-  value=$(grep "cpu MHz" /proc/cpuinfo 2>/dev/null | grep -o "[0-9\.]*" | awk '{print int($0*1000000)}')
+  value=$(grep "cpu MHz" /proc/cpuinfo 2>/dev/null | grep -o "[0-9]*" | head -n 1 | awk '{print int($0*1000000)}')
   [ -n "$value" ] && CPU_FREQ="$value"
 fi
 
