@@ -286,7 +286,7 @@ NETDATA.unitsConversion = {
                     return seconds.toString() + '.'
                         + NETDATA.zeropad(nanoseconds);
                 }
-            },
+            }
         }
     },
 
@@ -387,7 +387,7 @@ NETDATA.unitsConversion = {
                 //     }
                 // }
                 const sunit = this.scalableUnits[units];
-                for (var x of Object.keys(sunit)) {
+                for (let x of Object.keys(sunit)) {
                     let m = sunit[x];
                     if (m <= max && m > tdivider) {
                         tunits = x;
@@ -423,7 +423,7 @@ NETDATA.unitsConversion = {
 
                     // find the max divider of all charts
                     let common_units = t[uuid];
-                    for (var x in t) {
+                    for (let x in t) {
                         if (t.hasOwnProperty(x) && t[x].divider > common_units.divider) {
                             common_units = t[x];
                         }
@@ -490,7 +490,7 @@ NETDATA.unitsConversion = {
         } else if (typeof this.convertibleUnits[units] !== 'undefined') {
             // units that can be converted
             if (desired_units === 'auto') {
-                for (var x in this.convertibleUnits[units]) {
+                for (let x in this.convertibleUnits[units]) {
                     if (this.convertibleUnits[units].hasOwnProperty(x)) {
                         if (this.convertibleUnits[units][x].check(max)) {
                             //console.log('DEBUG: ' + uuid.toString() + ' converting ' + units.toString() + ' to: ' + x.toString());
