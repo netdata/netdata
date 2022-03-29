@@ -20,14 +20,14 @@ NETDATA.xss = {
         }
 
         switch (typeof(obj)) {
-            case 'string':
+            case 'string': {
                 const ret = this.string(obj);
                 if (ret !== obj) {
                     console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
                 }
                 return ret;
-
-            case 'object':
+            }
+            case 'object': {
                 if (obj === null) {
                     return obj;
                 }
@@ -55,9 +55,10 @@ NETDATA.xss = {
                     }
                 }
                 return obj;
-
-            default:
+            }
+            default: {
                 return obj;
+            }
         }
     },
 
