@@ -256,20 +256,18 @@ static void enable_supported_stream_features(struct sender_state *s) {
     }
     else {
         //parent does not support compression or has compression disabled
-        debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
         infoerr("Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
     }        
-#endif  //ENABLE_COMPRESSION
+#endif
 
 #ifdef  ENABLE_REPLICATION
     if(s->host->replication->tx_replication){
         s->host->replication->tx_replication->enabled = (s->host->replication->tx_replication->enabled && default_rrdpush_replication_enabled);
         if(!s->host->replication->tx_replication->enabled) {
-            debug(D_REPLICATION, "Stream Replication is not supported in this communication! One of the agents (%s <-> %s) does not support replication.", s->connected_to, s->host->hostname);
             infoerr("Stream Replication is not supported in this communication! One of the agents (%s <-> %s) does not support replication.", s->connected_to, s->host->hostname);
         }
     }
-#endif  //ENABLE_REPLICATION
+#endif
 }
 
 static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
@@ -538,13 +536,12 @@ static void attempt_to_connect(struct sender_state *state)
 
         // let the data collection threads know we are ready
         state->host->rrdpush_sender_connected = 1;
-
+        
 #ifdef  ENABLE_REPLICATION
         // Start replication sender thread (Tx).
-        info("%s Replication is %s", REPLICATION_MSG, (state->host->replication->tx_replication->enabled ? "enabled" : "disabled"));
         if(state->host->replication->tx_replication->enabled && !state->host->replication->tx_replication->spawned)
             replication_sender_thread_spawn(state->host);
-#endif  //ENABLE_REPLICATION
+#endif
 
     }
     else {

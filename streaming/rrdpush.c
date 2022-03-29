@@ -45,7 +45,7 @@ unsigned int default_compression_enabled = 1;
 #endif
 #ifdef  ENABLE_REPLICATION
 unsigned int default_rrdpush_replication_enabled = 0;
-#endif  //ENABLE_REPLICATION
+#endif
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
@@ -475,7 +475,7 @@ void log_stream_connection(const char *client_ip, const char *client_port, const
 void log_replication_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg) {
     log_access("REPLICATE: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
 }
-#endif //ENABLE_REPLICATION
+#endif
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     netdata_mutex_lock(&host->sender->mutex);
@@ -575,7 +575,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver")) {
-            // stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
             stream_version = negotiating_stream_version(STREAMING_PROTOCOL_CURRENT_VERSION, (uint32_t) strtoul(value, NULL, 0));
         }
             

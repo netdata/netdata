@@ -60,7 +60,7 @@
 #define  FEAT_STREAM_REPLICATION 1
 #else
 #define  FEAT_STREAM_REPLICATION 0
-#endif  //ENABLE_REPLICATION
+#endif
 
 
 // Optional libraries

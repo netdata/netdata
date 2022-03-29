@@ -54,10 +54,9 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     }
 }
 
-// Remove this ugly include from here
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-// this function should be moved to replication
+// If this function is not used remove it.
 PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {
     UNUSED(plugins_action);
@@ -357,7 +356,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         freez(user);
         return 0;
     }
-    
+
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
@@ -454,7 +453,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #endif  //ENABLE_COMPRESSION
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
-      
+
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
         error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the parent/proxy machine GUID to a child?", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->machine_guid);
@@ -596,11 +595,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
         close(rpt->fd);
         return 0;
     }
-    
+
 #ifdef ENABLE_REPLICATION
     // Guard it with rx_replication->enabled
     evaluate_gap_onconnection(rpt);
 #endif
+
     // remove the non-blocking flag from the socket
     if(sock_delnonblock(rpt->fd) < 0)
         error("STREAM %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
@@ -619,18 +619,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
         close(rpt->fd);
         return 0;
     }
-    
-    rrdhost_wrlock(rpt->host);
-/* if(rpt->host->connected_senders > 0) {
-        rrdhost_unlock(rpt->host);
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "REJECTED - ALREADY CONNECTED");
-        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
-        fclose(fp);
-        return 0;
-    }
-*/
 
-//    rpt->host->connected_senders++;
+    rrdhost_wrlock(rpt->host);
     rpt->host->labels.labels_flag = (rpt->stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
 
     if(health_enabled != CONFIG_BOOLEAN_NO) {
@@ -682,7 +672,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         rrd_rdlock();
         rrdhost_wrlock(rpt->host);
         netdata_mutex_lock(&rpt->host->receiver_lock);
-        if (rpt->host->receiver == rpt) {            
+        if (rpt->host->receiver == rpt) {
             rpt->host->senders_disconnected_time = now_realtime_sec();
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_ORPHAN);
             if(health_enabled == CONFIG_BOOLEAN_AUTO)
@@ -698,8 +688,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
         rrd_unlock();
     }
 
-    // REPLICATION TO BE REMOVED
-    info("Cleaning up the receiver thread after disconnection!");
     // cleanup
     fclose(fp);
     return (int)count;

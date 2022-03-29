@@ -49,7 +49,7 @@ void debug_sockets() {
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_STREAMING)?"streaming ":"");
 #ifdef  ENABLE_REPLICATION
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_REPLICATION)?"replication":"");        
-#endif  //ENABLE_REPLICATION
+#endif
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_NETDATACONF)?"netdata.conf ":"");
 		debug(D_WEB_CLIENT, "Socket fd %d name '%s' acl_flags: %s",
 			  i,
@@ -90,8 +90,10 @@ SIMPLE_PATTERN *web_allow_mgmt_from = NULL;
 int             web_allow_mgmt_dns;
 SIMPLE_PATTERN *web_allow_streaming_from = NULL;
 int             web_allow_streaming_dns;
+#ifdef  ENABLE_REPLICATION
 SIMPLE_PATTERN *web_allow_replication_from = NULL;
 int             web_allow_replication_dns;
+#endif
 SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 int             web_allow_netdataconf_dns;
 
@@ -128,7 +130,7 @@ void web_client_update_acl_matches(struct web_client *w) {
         connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
                            web_allow_replication_from, "replication", web_allow_replication_dns))
         w->acl |= WEB_CLIENT_ACL_REPLICATION;
-#endif  //ENABLE_REPLICATION
+#endif
 
     if (!web_allow_netdataconf_from ||
        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),

@@ -23,7 +23,7 @@ typedef enum web_client_acl {
     WEB_CLIENT_ACL_SSL_DEFAULT = 1 << 8,
 #ifdef  ENABLE_REPLICATION
     WEB_CLIENT_ACL_REPLICATION   = 1 << 9
-#endif  //ENABLE_REPLICATION
+#endif
 } WEB_CLIENT_ACL;
 
 #define web_client_can_access_dashboard(w) ((w)->acl & WEB_CLIENT_ACL_DASHBOARD)
@@ -37,7 +37,7 @@ typedef enum web_client_acl {
 #define web_client_is_using_ssl_default(w) ((w)->port_acl & WEB_CLIENT_ACL_SSL_DEFAULT)
 #ifdef  ENABLE_REPLICATION
 #define web_client_can_access_replication(w) ((w)->acl & WEB_CLIENT_ACL_REPLICATION)
-#endif  //ENABLE_REPLICATION
+#endif
 
 typedef struct listen_sockets {
     struct config *config;              // the config file to use

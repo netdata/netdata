@@ -134,6 +134,8 @@ struct receiver_state {
     time_t last_msg_t;
     char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
     int read_len;
+    unsigned int shutdown:1;    // Tell the thread to exit
+    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
@@ -141,15 +143,13 @@ struct receiver_state {
     unsigned int rrdpush_compression;
     struct decompressor_state *decompressor;
 #endif
-    unsigned int shutdown:1;    // Tell the thread to exit
-    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
 };
 
 
 extern unsigned int default_rrdpush_enabled;
 #ifdef  ENABLE_REPLICATION
 extern unsigned int default_rrdpush_replication_enabled;
-#endif  //ENABLE_REPLICATION
+#endif
 #ifdef ENABLE_COMPRESSION
 extern unsigned int default_compression_enabled;
 #endif
@@ -168,25 +168,26 @@ extern void rrdset_push_chart_definition_now(RRDSET *st);
 extern void *rrdpush_sender_thread(void *ptr);
 extern void rrdpush_send_labels(RRDHOST *host);
 extern void rrdpush_claimed_id(RRDHOST *host);
+int rrdpush_receiver_too_busy_now(struct web_client *w);
+int rrdpush_receiver_permission_denied(struct web_client *w);
+int should_send_chart_matching(RRDSET *st);
+int need_to_send_chart_definition(RRDSET *st);
 
 extern int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
 extern void rrdpush_sender_thread_stop(RRDHOST *host);
 
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
-#ifdef  ENABLE_REPLICATION
-void log_replication_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
-extern void evaluate_gap_onconnection(struct receiver_state *stream_recv);
-extern void evaluate_gap_ondisconnection(struct receiver_state *stream_recv);
-#endif  //ENABLE_REPLICATION
-
-extern int should_send_chart_matching(RRDSET *st);
-extern int need_to_send_chart_definition(RRDSET *st);
-
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
 size_t is_compressed_data(const char *data, size_t data_size);
+#endif
+
+#ifdef  ENABLE_REPLICATION
+void log_replication_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
+extern void evaluate_gap_onconnection(struct receiver_state *stream_recv);
+extern void evaluate_gap_ondisconnection(struct receiver_state *stream_recv);
 #endif
 
 #endif //NETDATA_RRDPUSH_H

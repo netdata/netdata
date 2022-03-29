@@ -39,7 +39,6 @@ extern PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, struct
 extern PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, LABEL_SOURCE source);
 
 #ifdef ENABLE_REPLICATION
-//Replication action functions
 extern PARSER_RC pluginsd_suspend_this_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations);
 extern PARSER_RC pluginsd_rep_action(void *user, REP_ARG command);
 extern PARSER_RC pluginsd_gap_action(void *user, GAP rx_gap);

@@ -115,7 +115,7 @@ void web_client_request_done(struct web_client *w) {
             case WEB_CLIENT_MODE_REPLICATE:
                 mode = "REPLICATE";
                 break;    
-#endif  //ENABLE_REPLICATION                        
+#endif                        
 
             case WEB_CLIENT_MODE_NORMAL:
                 mode = "DATA";
@@ -1063,7 +1063,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                          (w->mode != WEB_CLIENT_MODE_STREAM 
 #ifdef  ENABLE_REPLICATION
                         || w->mode != WEB_CLIENT_MODE_REPLICATE
-#endif  //ENABLE_REPLICATION                         
+#endif
                          ))) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
@@ -1090,7 +1090,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 (w->mode == WEB_CLIENT_MODE_STREAM
 #ifdef  ENABLE_REPLICATION
                 || w->mode == WEB_CLIENT_MODE_REPLICATE
-#endif  //ENABLE_REPLICATION                
+#endif
                 ) // parse user agent
             );
         }
@@ -1523,7 +1523,7 @@ void web_client_process_request(struct web_client *w) {
                     // add here the receiver thread spawn
                     w->response.code = replication_receiver_thread_spawn(w, w->decoded_url);
                     return;                
-#endif  //ENABLE_REPLICATION               
+#endif
                 case WEB_CLIENT_MODE_STREAM:
                     if(unlikely(!web_client_can_access_stream(w))) {
                         web_client_permission_denied(w);
@@ -1637,8 +1637,7 @@ void web_client_process_request(struct web_client *w) {
         case WEB_CLIENT_MODE_REPLICATE:
             debug(D_WEB_CLIENT, "%llu: REPLICATE done.", w->id);
             break;
-#endif  //ENABLE_REPLICATION
-
+#endif
         case WEB_CLIENT_MODE_STREAM:
             debug(D_WEB_CLIENT, "%llu: STREAM done.", w->id);
             break;
