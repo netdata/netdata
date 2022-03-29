@@ -189,17 +189,19 @@ static void updateDetectionChart(RRDHOST *RH) {
     static thread_local RRDDIM *UserRD, *SystemRD = nullptr;
 
     if (!RS) {
-        std::string IdPrefix = "prediction_stats";
-        std::string TitlePrefix = "Prediction thread CPU usage for host";
-        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        std::stringstream IdSS, NameSS, TitleSS;
+
+        IdSS << "prediction_stats_" << RH->machine_guid;
+        NameSS << "prediction_stats_for_" << RH->hostname;
+        TitleSS << "Prediction thread CPU usage for host " << RH->hostname;
 
         RS = rrdset_create_localhost(
-            "anomaly_detection", // type
-            IdTitlePair.first.c_str(), // id
-            NULL, // name
-            "prediction_stats", // family
-            "anomaly_detection.prediction_stats", // ctx
-            IdTitlePair.second.c_str(), // title
+            "netdata", // type
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
+            "ml", // family
+            "prediction_stats", // ctx
+            TitleSS.str().c_str(), // title
             "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
@@ -228,17 +230,19 @@ static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
     static thread_local RRDDIM *SystemRD = nullptr;
 
     if (!RS) {
-        std::string IdPrefix = "training_stats";
-        std::string TitlePrefix = "Training thread CPU usage for host";
-        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        std::stringstream IdSS, NameSS, TitleSS;
+
+        IdSS << "training_stats_" << RH->machine_guid;
+        NameSS << "training_stats_for_" << RH->hostname;
+        TitleSS << "Training thread CPU usage for host " << RH->hostname;
 
         RS = rrdset_create_localhost(
-            "anomaly_detection", // type
-            IdTitlePair.first.c_str(), // id
-            NULL, // name
-            "training_stats", // family
-            "anomaly_detection.training_stats", // ctx
-            IdTitlePair.second.c_str(), // title
+            "netdata", // type
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
+            "ml", // family
+            "training_stats", // ctx
+            TitleSS.str().c_str(), // title
             "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
