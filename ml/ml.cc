@@ -32,6 +32,9 @@ void ml_init(void) {
     // Read config values
     Cfg.readMLConfig();
 
+    if (!Cfg.EnableAnomalyDetection)
+        return;
+
     // Generate random numbers to efficiently sample the features we need
     // for KMeans clustering.
     std::random_device RD;
@@ -39,7 +42,7 @@ void ml_init(void) {
 
     Cfg.RandomNums.reserve(Cfg.MaxTrainSamples);
     for (size_t Idx = 0; Idx != Cfg.MaxTrainSamples; Idx++)
-        Cfg.RandomNums[Idx] = Gen();
+        Cfg.RandomNums.push_back(Gen());
 }
 
 void ml_new_host(RRDHOST *RH) {
