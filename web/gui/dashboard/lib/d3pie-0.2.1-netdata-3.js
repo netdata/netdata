@@ -1243,7 +1243,7 @@ var segments = {
     create: function(pie) {
         var pieCenter = pie.pieCenter;
         var colors = pie.options.colors;
-        var loadEffects = pie.options.effects.load;
+        //var loadEffects = pie.options.effects.load;
         var segmentStroke = pie.options.misc.colors.segmentStroke;
 
         // we insert the pie chart BEFORE the title, to ensure the title overlaps the pie
