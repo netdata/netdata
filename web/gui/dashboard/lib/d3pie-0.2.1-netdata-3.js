@@ -1817,7 +1817,7 @@ var tt = {
                 }
             };
         };
-        return str.replace(/\{(\w+)\}/g, replacer(replacements));
+        return str.replace(/\{(\w+)\}/g, replacer());
     }
 };
 
