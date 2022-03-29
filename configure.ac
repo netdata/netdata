@@ -284,7 +284,7 @@ AC_MSG_CHECKING([operating system])
 case "$host_os" in
 freebsd*)
     build_target=freebsd
-    OPTIONAL_OS_DEP_CFLAGS="${CFLAGS} -I/usr/local/include -L/usr/local/lib"
+    OPTIONAL_OS_DEP_CFLAGS="-I/usr/local/include -L/usr/local/lib"
     ;;
 darwin*)
     build_target=macos
