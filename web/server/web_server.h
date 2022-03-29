@@ -46,6 +46,7 @@ extern void api_listen_sockets_setup(void);
 extern int web_client_timeout;
 extern int web_client_first_request_timeout;
 extern long web_client_streaming_rate_t;
+extern long web_client_replication_rate_t;
 
 #ifdef WEB_SERVER_INTERNALS
 extern LISTEN_SOCKETS api_sockets;

@@ -200,6 +200,10 @@ test-driver
 **/tests/*_testdriver
 **/tests/*_testdriver.trs
 python.d/python-modules-installer.sh
+**/tests/build
+**/tests/tmp
+**/tests
+build_external/scenarios/gaps_hi
 
 # documentation generated files
 docs/generator/src

@@ -43,6 +43,9 @@ unsigned int default_rrdpush_enabled = 0;
 #ifdef ENABLE_COMPRESSION
 unsigned int default_compression_enabled = 1;
 #endif
+#ifdef  ENABLE_REPLICATION
+unsigned int default_rrdpush_replication_enabled = 0;
+#endif  //ENABLE_REPLICATION
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
@@ -76,6 +79,7 @@ int rrdpush_init() {
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
+
 #ifdef ENABLE_COMPRESSION
     default_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
         "enable compression", default_compression_enabled);
@@ -110,6 +114,15 @@ int rrdpush_init() {
     netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/certs.pem");
 #endif
 
+#ifdef ENABLE_REPLICATION
+    default_rrdpush_replication_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable replication", default_rrdpush_replication_enabled);
+    
+    if (!default_rrdpush_replication_enabled || !default_rrdpush_enabled) {
+        error("%s [send]: Stream Replication is disabled. Check replication and streaming settings in stream.conf.", REPLICATION_MSG);
+        default_rrdpush_replication_enabled = 0;
+    }
+#endif  //ENABLE_REPLICATION
+
     return default_rrdpush_enabled;
 }
 
@@ -128,7 +141,7 @@ int rrdpush_init() {
 unsigned int remote_clock_resync_iterations = 60;
 
 
-static inline int should_send_chart_matching(RRDSET *st) {
+int should_send_chart_matching(RRDSET *st) {
     // Do not stream anomaly rates charts.
     if (unlikely(st->state->is_ar_chart))
         return false;
@@ -173,7 +186,7 @@ int configured_as_parent() {
 }
 
 // checks if the current chart definition has been sent
-static inline int need_to_send_chart_definition(RRDSET *st) {
+int need_to_send_chart_definition(RRDSET *st) {
     rrdset_check_rdlock(st);
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))))
@@ -295,7 +308,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
     RRDHOST *host = st->rrdhost;
     buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
-    if (s->version >= VERSION_GAP_FILLING)
+    if (s->version >= STREAM_VERSION_GAP_FILLING)
         buffer_sprintf(host->sender->build, " %"PRId64"\n", (int64_t)st->last_collected_time.tv_sec);
     else
         buffer_strcat(host->sender->build, "\n");
@@ -458,7 +471,11 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
 void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg) {
     log_access("STREAM: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
 }
-
+#ifdef ENABLE_REPLICATION
+void log_replication_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg) {
+    log_access("REPLICATE: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
+}
+#endif //ENABLE_REPLICATION
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     netdata_mutex_lock(&host->sender->mutex);
@@ -473,6 +490,26 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
             host->rrdpush_sender_spawn = 1;
     }
     netdata_mutex_unlock(&host->sender->mutex);
+}
+
+static uint32_t negotiating_stream_version(uint32_t host, uint32_t incoming)
+{  
+#if !defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
+    return MIN(host, incoming);
+#elif defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
+    // compression supported and replication not supported
+    return MIN(host, incoming);
+#elif !defined(ENABLE_COMPRESSION) && defined(ENABLE_REPLICATION)
+    // compression not supported and replication supported
+    if(incoming == STREAM_VERSION_COMPRESSION) {
+        default_rrdpush_replication_enabled = 1;
+        return STREAM_VERSION_CLABELS;
+    }
+    else
+        return MIN(incoming, host);
+#else
+    return MIN(host, incoming);
+#endif
 }
 
 int rrdpush_receiver_permission_denied(struct web_client *w) {
@@ -537,8 +574,11 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             system_info->ml_enabled = strtoul(value, NULL, 0);
         else if(!strcmp(name, "tags"))
             tags = value;
-        else if(!strcmp(name, "ver"))
-            stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
+        else if(!strcmp(name, "ver")) {
+            // stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
+            stream_version = negotiating_stream_version(STREAMING_PROTOCOL_CURRENT_VERSION, (uint32_t) strtoul(value, NULL, 0));
+        }
+            
         else {
             // An old Netdata child does not have a compatible streaming protocol, map to something sane.
             if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
@@ -724,7 +764,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     }
     rrd_unlock();
 
-    rpt->last_msg_t = now_realtime_sec();
+    rpt->last_msg_t = now_realtime_sec(); // receiver spawn creation and a timestamp close to connection.
 
     rpt->host              = host;
     rpt->fd                = w->ifd;

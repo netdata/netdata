@@ -47,6 +47,17 @@ typedef enum db_check_action_type {
 #define SQL_STORE_ACTIVE_DIMENSION \
     "insert or replace into dimension_active (dim_id, date_created) values (@id, strftime('%s'));"
 
+#ifdef  ENABLE_REPLICATION
+#define SQL_STORE_GAP "INSERT OR REPLACE into gaps (gap_id, host_mguid, " \
+    "t_delta_start, t_delta_first, t_delta_end, status) values " \
+    "(?1,?2,?3,?4,?5,?6);"
+
+#define SQL_GET_HOST_GAPS "select g.gap_id, g.host_mguid, g.t_delta_start, g.t_delta_first, g.t_delta_end, g.status from gaps g " \
+"where g.host_mguid = @host_mguid ORDER BY g.t_delta_start DESC;"
+#define DELETE_GAP_BY_UUID "delete from gaps where gap_id = @uuid;"
+#define DELETE_ALL_GAPS "delete from gaps;"
+#endif  //ENABLE_REPLICATION
+
 #define CHECK_SQLITE_CONNECTION(db_meta)                                                                               \
     if (unlikely(!db_meta)) {                                                                                          \
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {                                                     \
@@ -101,4 +112,15 @@ extern void compute_chart_hash(RRDSET *st);
 extern int sql_set_dimension_option(uuid_t *dim_uuid, char *option);
 char *get_hostname_by_node_id(char *node_id);
 void free_temporary_host(RRDHOST *host);
+extern int sql_store_gap(
+    uuid_t *gap_uuid,
+    char *host_mguid,
+    int t_delta_start,
+    int t_delta_first,
+    int t_delta_end,
+    char *status);
+extern int sql_load_host_gap(RRDHOST *host);
+extern int sql_delete_gap(uuid_t *gap_uuid);
+extern int sql_delete_all_gaps(void);
+extern void set_host_gap(RRDHOST *host, sqlite3_stmt *res);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

@@ -1019,4 +1019,333 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
 
     //metalog_prepare_exit(ctx->metalog_ctx);
 }
+#ifdef  ENABLE_REPLICATION
+int rrdeng_store_past_metrics_page_init(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
 
+    RRDSET *st = rrdset_find_byname(rep_state->host, dim_past_data->rrdset_id);
+    if(unlikely(!st)) {
+        error("%s: Abort Replication - Cannot find chart with name_id '%s' on host '%s'.", REPLICATION_MSG, dim_past_data->rrdset_id, rep_state->host->hostname);
+        return 1;
+    }
+    dim_past_data->rd = rrddim_find(st, dim_past_data->rrddim_id);
+    if(unlikely(!dim_past_data->rd)) {
+        error("%s: Abort Replication - Cannot find dimension with id '%s' in chart '%s' on host '%s'.", REPLICATION_MSG, dim_past_data->rrddim_id, dim_past_data->rrdset_id, rep_state->host->hostname);
+        return 1;
+    }
+
+    /* Create a page */
+    info("%s REP: Creating a page....", REPLICATION_MSG);
+    // rep_handle is probably redundant
+    struct rrdeng_collect_handle *rep_handle;
+    struct pg_cache_page_index *page_index;
+    struct rrdengine_instance *ctx;
+    RRDDIM *rd = dim_past_data->rd;
+
+    rep_handle = &rd->state->handle.rrdeng;
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+    dim_past_data->ctx = ctx;
+    page_index = rd->state->page_index;
+
+    rep_handle->prev_descr = NULL;
+    rep_handle->unaligned_page = 0;
+    uv_rwlock_wrlock(&page_index->lock);
+    ++page_index->writers;
+    uv_rwlock_wrunlock(&page_index->lock);
+
+    // create a dbengine page
+    void *page = rrdeng_create_page(ctx, &page_index->id, &dim_past_data->descr);
+    fatal_assert(page);
+    info("%s REP: Page Created....", REPLICATION_MSG);
+    return 0;
+}
+
+void rrdeng_store_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state) {
+    struct page_cache *pg_cache;
+    struct rrdengine_instance *ctx;
+    struct rrdeng_page_descr *descr;
+    UNUSED(rep_state);
+
+    descr = dim_past_data->descr;
+    ctx = dim_past_data->ctx;
+    pg_cache = &ctx->pg_cache;
+
+    // copy the values in this page
+    rrdeng_page_descr_mutex_lock(ctx, descr);
+    memcpy(descr->pg_cache_descr->page, dim_past_data->page, (size_t)dim_past_data->page_length);
+    descr->page_length  = dim_past_data->page_length;
+    descr->end_time = dim_past_data->end_time;
+    descr->start_time = dim_past_data->start_time;
+    // page alignment can be handled with zero values.
+    // Every flushed page can reach the aligment with zeros if the values are not enough.
+    // for (page_length - rd->rrdset->rrddim_page_alignment) fill with zeros OR 
+    // simply increase the length since zeros are already there
+    print_page_cache_descr(descr);
+    rrdeng_page_descr_mutex_unlock(ctx, descr);
+    print_page_descr(descr);    
+
+    // TO BE REMOVED: Testing code
+    // rrdeng_page_descr_mutex_lock(ctx, descr);
+    // // Set page values, page length and reflect end_time, start_time in the past
+    // set_page_values(descr, rd, 50);
+    // rrdeng_page_descr_mutex_unlock(ctx, descr);    
+    
+    info("%s REP: Page correlation ID and page info updates....", REPLICATION_MSG);
+    // prepare the pg descr to insert and commit the dbengine page
+    dim_past_data->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
+    pg_cache_atomic_set_pg_info(descr, descr->end_time, descr->page_length);
+    info("%s REP: Page correlation ID and page info updates....END", REPLICATION_MSG);
+}
+
+void rrdeng_flush_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){    
+    struct rrdengine_instance *ctx;
+    struct rrdeng_page_descr *descr;
+    struct pg_cache_page_index *page_index;
+    UNUSED(rep_state);
+    RRDDIM *rd;
+
+    descr = dim_past_data->descr;
+    ctx = dim_past_data->ctx;
+    page_index = dim_past_data->rd->state->page_index;
+    rd = dim_past_data->rd;
+
+    info("%s REP: Inserting page in dbengine....", REPLICATION_MSG);
+    unsigned long new_metric_API_producers, old_metric_API_max_producers, ret_metric_API_max_producers;
+    new_metric_API_producers = rrd_atomic_add_fetch(&ctx->stats.metric_API_producers, 1);
+    while (unlikely(new_metric_API_producers > (old_metric_API_max_producers = ctx->metric_API_max_producers))) {
+        /* Increase ctx->metric_API_max_producers */
+        ret_metric_API_max_producers = ulong_compare_and_swap(&ctx->metric_API_max_producers,
+                                                                old_metric_API_max_producers,
+                                                                new_metric_API_producers);
+        if (old_metric_API_max_producers == ret_metric_API_max_producers) {
+            /* success */
+            break;
+        }
+    }
+    // insert it in memory
+    // page flags check. Need to enable the pg_cache_descr_state flags
+    pg_cache_insert(ctx, page_index, descr);
+    // Try to update the time start and end of the metric.
+    pg_cache_add_new_metric_time(page_index, descr);
+    info("%s REP: Inserting page in dbengine....END", REPLICATION_MSG);
+
+    info("%s REP: Commit page in dbengine....", REPLICATION_MSG);
+    // commit_the_page
+    if (likely(descr->page_length)) {
+        int page_is_empty;
+
+        rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
+
+        // if (rep_handle->prev_descr) {
+        //     /* unpin old second page */
+        //     pg_cache_put(ctx, rep_handle->prev_descr);
+        // }
+        page_is_empty = page_has_only_empty_metrics(descr);
+        if (page_is_empty) {
+            info("%s REP: Page has empty metrics only, deleting:", REPLICATION_MSG);
+            pg_cache_put(ctx, descr);
+            pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
+        } else {
+            rrdeng_commit_page(ctx, descr, dim_past_data->page_correlation_id);
+        }
+    } else {
+        freez(descr->pg_cache_descr->page);
+        rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
+        freez(descr);
+    }
+    info("%s REP: Commit page in dbengine....END", REPLICATION_MSG);
+    info("%s REP: OBSERVE dimension (%s.%s) in time_interval[%ld, %ld] #samples(%lu)....END", REPLICATION_MSG, rd->rrdset->id, rd->id, (time_t)(descr->start_time/USEC_PER_SEC), (time_t)(descr->end_time/USEC_PER_SEC), (descr->page_length/sizeof(storage_number)));
+}
+
+void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
+    UNUSED(dim_past_data);
+    UNUSED(rep_state);
+    struct pg_cache_page_index* page_index;
+    page_index = dim_past_data->rd->state->page_index;
+
+    info("%s REP: Destroy and free....", REPLICATION_MSG);
+    // destroy staff - finalize
+    // rrdeng_store_metric_flush_current_page(rd);
+    // if (handle->prev_descr) {
+    //     /* unpin old second page */
+    //     pg_cache_put(ctx, handle->prev_descr);
+    // }
+    // unsigned int can_delete_metric = 0;
+    // uv_rwlock_wrlock(&page_index->lock);
+    // if (!--page_index->writers && !page_index->page_count) {
+    //     can_delete_metric = 1;
+    // }
+    // uv_rwlock_wrunlock(&page_index->lock);    
+    uv_rwlock_wrlock(&page_index->lock);
+    --page_index->writers;
+    uv_rwlock_wrunlock(&page_index->lock);    
+    info("%s REP: Destroy and free....END", REPLICATION_MSG);
+
+    info("%s REP: Exiting....", REPLICATION_MSG);
+    // destroy the past data structs
+    // cleanup the handles + pages
+    // exit
+    info("%s REP: Exiting....END", REPLICATION_MSG);    
+}
+
+static inline void set_page_values(struct rrdeng_page_descr *descr, RRDDIM *rd, calculated_number value){
+    info("%s TEST: Setting page...", REPLICATION_MSG);
+    // handle the page
+    descr->page_length = (RRDENG_BLOCK_SIZE / sizeof(storage_number));
+    uint32_t len = descr->page_length;
+    storage_number *page = descr->pg_cache_descr->page;
+    // create a time interval in the past
+    usec_t offset = (len * (USEC_PER_SEC * rd->update_every)); //1024secs if ue = 1sec.
+    descr->start_time = now_realtime_usec() - (2*offset);
+    descr->end_time = now_realtime_usec() - offset;
+    time_t ts = descr->start_time  / USEC_PER_SEC;
+    time_t te = descr->end_time  / USEC_PER_SEC;
+    // Take the uuid    
+    char rrddim_id[UUID_STR_LEN];
+    uuid_unparse(*descr->id, rrddim_id);
+
+    info("%s TEST: Page Past Samples(%u) [%ld, %ld] for RRDDIM[%s] - %s\n", REPLICATION_MSG, len, ts, te, rd->id, rrddim_id);
+    time_t t = ts;
+    for(uint32_t i=0; i < len ; i++){
+        page[i] = pack_storage_number(value, SN_DEFAULT_FLAGS);
+        info("T: %ld, V: "CALCULATED_NUMBER_FORMAT_AUTO", S: "STORAGE_NUMBER_FORMAT" \n", t, value, page[i]);
+        t += rd->update_every;
+    }
+    info("%s TEST: Setting page and descriptor completed!", REPLICATION_MSG);
+}
+
+void test_rrdeng_store_past_metric_page(RRDHOST *host, char *rrdset_id, char *rrddim_id){
+    /* find the dimension */
+    /* ie. chart name: system.cpu dim name: user
+    	"guest_nice": { "name": "guest_nice" },
+				"guest": { "name": "guest" },
+				"steal": { "name": "steal" },
+				"softirq": { "name": "softirq" },
+				"irq": { "name": "irq" },
+				"user": { "name": "user" },
+				"system": { "name": "system" },
+				"nice": { "name": "nice" },
+				"iowait": { "name": "iowait" }
+    system.load.load1 system.load.load5 system.load.load15
+    */
+    RRDSET *st;
+    RRDDIM *rd;
+    st = rrdset_find_byname(host, rrdset_id);
+    if(unlikely(!st)) {
+        error("%s TEST: Abort Replication - Cannot find chart with name_id '%s' on host '%s'.", REPLICATION_MSG, rrdset_id, host->hostname);
+        return;
+    }
+    rd = rrddim_find(st, rrddim_id);
+    if(unlikely(!rd)) {
+        error("%s TEST: Abort Replication - Cannot find dimension with id '%s' in chart '%s' on host '%s'.", REPLICATION_MSG, rrddim_id, rrdset_id, host->hostname);
+        return;
+    }
+
+    info("\n%s TEST: OBSERVE Dimension \"%s\".\"%s\" on host [%s]\n", REPLICATION_MSG, rrddim_id, rrdset_id, host->hostname);
+    
+    /* Create a page */
+    info("%s TEST: Creating a page....", REPLICATION_MSG);
+    struct rrdeng_collect_handle *rep_handle;
+    struct page_cache *pg_cache;
+    struct pg_cache_page_index *page_index;
+    struct rrdengine_instance *ctx;
+    struct rrdeng_page_descr *descr;
+
+    rep_handle = &rd->state->handle.rrdeng;
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+    pg_cache = &ctx->pg_cache;
+    page_index = rd->state->page_index;
+
+    rep_handle->prev_descr = NULL;
+    rep_handle->unaligned_page = 0;
+    uv_rwlock_wrlock(&page_index->lock);
+    ++page_index->writers;
+    uv_rwlock_wrunlock(&page_index->lock);
+
+    // create a dbengine page
+    void *page = rrdeng_create_page(ctx, &page_index->id, &descr);
+    fatal_assert(page);
+    info("%s TEST: Page Created....", REPLICATION_MSG);    
+
+    // Fill it with a value
+    // pack and store the values in this page
+    rrdeng_page_descr_mutex_lock(ctx, descr);
+    // Set page values, page length and reflect end_time, start_time in the past
+    set_page_values(descr, rd, 50);
+    print_page_cache_descr(descr);
+    print_page_descr(descr);
+    rrdeng_page_descr_mutex_unlock(ctx, descr);    
+    
+    info("%s TEST: Page correlation ID and page info updates....", REPLICATION_MSG);
+    // prepare the descr, handles and everything
+    rep_handle->descr = descr;
+    // rep_handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
+    Word_t page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
+    pg_cache_atomic_set_pg_info(descr, descr->end_time, descr->page_length);
+    info("%s TEST: Page correlation ID and page info updates....END", REPLICATION_MSG);
+    
+    info("%s TEST: Inserting page in dbengine....", REPLICATION_MSG);
+    unsigned long new_metric_API_producers, old_metric_API_max_producers, ret_metric_API_max_producers;
+    new_metric_API_producers = rrd_atomic_add_fetch(&ctx->stats.metric_API_producers, 1);
+    while (unlikely(new_metric_API_producers > (old_metric_API_max_producers = ctx->metric_API_max_producers))) {
+        /* Increase ctx->metric_API_max_producers */
+        ret_metric_API_max_producers = ulong_compare_and_swap(&ctx->metric_API_max_producers,
+                                                                old_metric_API_max_producers,
+                                                                new_metric_API_producers);
+        if (old_metric_API_max_producers == ret_metric_API_max_producers) {
+            /* success */
+            break;
+        }
+    }
+    // insert it in memory
+    // page flags check. Need to enable the pg_cache_descr_state flags
+    pg_cache_insert(ctx, page_index, descr);
+    pg_cache_add_new_metric_time(page_index, descr);
+    info("%s TEST: Inserting page in dbengine....END", REPLICATION_MSG);
+
+    info("%s TEST: Commit page in dbengine....", REPLICATION_MSG);
+    // commit_the_page
+    if (likely(descr->page_length)) {
+        int page_is_empty;
+
+        rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
+
+        if (rep_handle->prev_descr) {
+            /* unpin old second page */
+            pg_cache_put(ctx, rep_handle->prev_descr);
+        }
+        page_is_empty = page_has_only_empty_metrics(descr);
+        if (page_is_empty) {
+            info("%s TEST: Page has empty metrics only, deleting:", REPLICATION_MSG);
+            pg_cache_put(ctx, descr);
+            pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
+            rep_handle->prev_descr = NULL;
+        } else {
+            rrdeng_commit_page(ctx, descr, page_correlation_id);
+        }
+    } else {
+        freez(descr->pg_cache_descr->page);
+        rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
+        freez(descr);
+    }
+    info("%s TEST: Commit page in dbengine....END", REPLICATION_MSG);
+
+    info("%s TEST: Destroy and free....", REPLICATION_MSG);
+    // destroy staff - finalize
+    // rrdeng_store_metric_flush_current_page(rd);
+    // if (handle->prev_descr) {
+    //     /* unpin old second page */
+    //     pg_cache_put(ctx, handle->prev_descr);
+    // }
+    // unsigned int can_delete_metric = 0;
+    // uv_rwlock_wrlock(&page_index->lock);
+    // if (!--page_index->writers && !page_index->page_count) {
+    //     can_delete_metric = 1;
+    // }
+    // uv_rwlock_wrunlock(&page_index->lock);    
+    info("%s TEST: Destroy and free....END", REPLICATION_MSG);
+
+    info("%s TEST: Exiting....", REPLICATION_MSG);
+    // exit
+    info("%s TEST: Exiting....END", REPLICATION_MSG);
+}
+#endif  //ENABLE_REPLICATION
