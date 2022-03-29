@@ -7,6 +7,7 @@
 #define REPLICATE_CMD "REPLICATE"
 #define REP_ACK_CMD "REP ACK"
 #define REPLICATION_RX_CMD_Q_MAX_SIZE (64)
+#define REPLICATION_GAP_TIME_MARGIN 3
 
 typedef struct gap GAP;
 typedef struct time_window TIME_WINDOW;
