@@ -37,7 +37,7 @@ typedef enum web_client_mode {
     WEB_CLIENT_MODE_STREAM = 3,
 #ifdef  ENABLE_REPLICATION
     WEB_CLIENT_MODE_REPLICATE = 4
-#endif  //ENABLE_REPLICATION
+#endif
 } WEB_CLIENT_MODE;
 
 typedef enum {

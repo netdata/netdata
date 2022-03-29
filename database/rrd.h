@@ -18,15 +18,6 @@ typedef struct context_param CONTEXT_PARAM;
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;
 
-// #ifdef  ENABLE_REPLICATION
-// // GAP structs
-// typedef struct time_window TIME_WINDOW;
-// typedef struct gap GAP;
-// typedef struct gaps_queue GAPS;
-// // REPlication struct
-// typedef struct replication REPLICATION;
-// #endif  //ENABLE_REPLICATION
-
 // forward declarations
 struct rrddim_volatile;
 struct rrdset_volatile;
@@ -50,7 +41,7 @@ struct pg_cache_page_index;
 #include "sqlite/sqlite_health.h"
 #ifdef  ENABLE_REPLICATION
 #include "streaming/replication.h"
-#endif  //ENABLE_REPLICATION
+#endif
 
 enum {
     CONTEXT_FLAGS_ARCHIVE = 0x01,
@@ -818,7 +809,7 @@ struct rrdhost {
     int trigger_chart_obsoletion_check;             // set when child connects, will instruct parent to
                                                     // trigger a check for obsoleted charts since previous connect
 #ifdef  ENABLE_REPLICATION
-    GAPS *gaps_timeline;                             // disconnection gaps of a host
+    GAPS *gaps_timeline;                       // disconnection gaps of a host
     REPLICATION *replication;                  // replication struct of a host
 #endif  //ENABLE_REPLICATION    
 

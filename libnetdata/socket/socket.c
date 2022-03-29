@@ -341,7 +341,7 @@ WEB_CLIENT_ACL read_acl(char *st) {
     if (!strcmp(st,"streaming")) ret |= WEB_CLIENT_ACL_STREAMING;
 #ifdef  ENABLE_REPLICATION
     if (!strcmp(st,"replication")) ret |= WEB_CLIENT_ACL_REPLICATION;
-#endif  //ENABLE_REPLICATION
+#endif
     if (!strcmp(st,"netdata.conf")) ret |= WEB_CLIENT_ACL_NETDATACONF;
 
     return ret;
@@ -390,7 +390,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
                         WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING |
 #ifdef ENABLE_REPLICATION
                         WEB_CLIENT_ACL_REPLICATION |                        
-#endif   //ENABLE_REPLICATION
+#endif
                         WEB_CLIENT_ACL_SSL_DEFAULT);
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
@@ -445,7 +445,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
                     WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | 
 #ifdef  ENABLE_REPLICATION
                     WEB_CLIENT_ACL_REPLICATION |
-#endif  //ENABLE_REPLICATION
+#endif
                     WEB_CLIENT_ACL_SSL_DEFAULT;
     }
 

@@ -56,7 +56,7 @@ const char *database_config[] = {
 #ifdef  ENABLE_REPLICATION
     "CREATE TABLE IF NOT EXISTS gaps(gap_id blob PRIMARY KEY, host_mguid text, "
     "t_delta_start int, t_delta_first int, t_delta_end int, status text);",
-#endif  //ENABLE_REPLICATION
+#endif
     
     NULL
 };
@@ -2318,23 +2318,21 @@ int sql_load_host_gap(RRDHOST *host)
         goto failed;
     }
 
-    // Load here the gaps to the host->gaps_timeline
-    // TODO: Need to handle the stpes correctly. Here is will return the last element as empty
     do {
         rc = sqlite3_step(res);
         switch (rc) {
             case SQLITE_ROW:
                 if (likely(sqlite3_column_bytes(res, 0) == sizeof(uuid_t))) {
                     set_host_gap(host, res);
-                    info("%s: Setting host latest gap completed!", REPLICATION_MSG);
+                    debug(D_REPLICATION, "%s: Setting host latest gap completed!", REPLICATION_MSG);
                 }
                 break;
             case SQLITE_DONE:
                 set_host_gap(host, NULL);
-                info("%s: SQLite completed with NO ROWs!", REPLICATION_MSG);
+                debug(D_REPLICATION, "%s: SQLite completed with NO ROWs!", REPLICATION_MSG);
                 break;
             default:
-                error("%s: SQLite returned unexpected error code!", REPLICATION_MSG);
+                debug(D_REPLICATION, "%s: SQLite returned unexpected error code!", REPLICATION_MSG);
                 break;
         }
     } while (rc == SQLITE_ROW);
@@ -2413,23 +2411,19 @@ bind_fail:
  */
 void set_host_gap(RRDHOST *host, sqlite3_stmt *res) {
     int count = host->gaps_timeline->gaps->count;
-    info("%s: SET HOST SQLITE %d GAPs:", REPLICATION_MSG, count);
 
     if(!res)
     {
         if(count > 0) {
-            info(":%s: Exiting loading... with count(%d) \ng_b: %p, \ng_rear: %p, \ng_count: %p", REPLICATION_MSG, count, host->gaps_timeline->gap_buffer, host->gaps_timeline->gaps->front->item, &host->gaps_timeline->gap_data[count]);
+            debug(D_REPLICATION, ":%s: Exiting loading... with count(%d) \ng_b: %p, \ng_rear: %p, \ng_count: %p", REPLICATION_MSG, count, host->gaps_timeline->gap_buffer, host->gaps_timeline->gaps->front->item, &host->gaps_timeline->gap_data[count]);
             copy_gap(host->gaps_timeline->gap_buffer, host->gaps_timeline->gaps->front->item);
             reset_gap(host->gaps_timeline->gaps->front->item);
             queue_pop(host->gaps_timeline->gaps);
             return;
         }
-        // host->gaps_timeline->gap_buffer->status = "empty";
-        infoerr("%s: The GAPs table in the metdata DB seems to be empty for the host %s.", REPLICATION_MSG, host->hostname);
+        debug(D_REPLICATION, "%s: The GAPs table in the metdata DB seems to be empty for the host %s.", REPLICATION_MSG, host->hostname);
         return;
     }
-
-    info("%s: SETTING HOST SQLITE from query return:", REPLICATION_MSG);
     uuid_copy(host->gaps_timeline->gap_data[count].gap_uuid, sqlite3_column_blob(res, 0));
     host->gaps_timeline->gap_data[count].host_mguid = strdupz((char *) sqlite3_column_text(res, 1));
     host->gaps_timeline->gap_data[count].t_window.t_start = (time_t) sqlite3_column_int(res, 2);

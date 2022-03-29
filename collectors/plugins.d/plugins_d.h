@@ -34,7 +34,7 @@
 #define PLUGINSD_KEYWORD_FILL "FILL"
 #define PLUGINSD_KEYWORD_FILLEND "FILLEND"
 // REP command with arguments 
-// on, off, pause/continue, ack
+// on, off, ack
 typedef enum rep_arg {
     REP_ARG_ERROR = 0,
     REP_OFF = 1,
