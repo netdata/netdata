@@ -6,8 +6,16 @@
 
 **Merged pull requests:**
 
+- reduce min `dbengine anomaly rate every` 60s-\>30s [\#12543](https://github.com/netdata/netdata/pull/12543) ([andrewm4894](https://github.com/andrewm4894))
+- Allocate buffer and release on callback when executing agent CLI commands [\#12540](https://github.com/netdata/netdata/pull/12540) ([stelfrag](https://github.com/stelfrag))
+- feat\(collectors\): update go.d.plugin version to v0.32.0 [\#12536](https://github.com/netdata/netdata/pull/12536) ([ilyam8](https://github.com/ilyam8))
+- fix: use internal defaults for sched policy/oom score in native packages [\#12529](https://github.com/netdata/netdata/pull/12529) ([ilyam8](https://github.com/ilyam8))
+- docs: fix unresolved file references [\#12528](https://github.com/netdata/netdata/pull/12528) ([ilyam8](https://github.com/ilyam8))
+- fix\(kickstart.sh\): use `$ROOTCMD` when setting auto updates [\#12526](https://github.com/netdata/netdata/pull/12526) ([ilyam8](https://github.com/ilyam8))
+- fix\(netdata-updater\): properly handle update for debian packages [\#12524](https://github.com/netdata/netdata/pull/12524) ([ilyam8](https://github.com/ilyam8))
 - fix: Netdata segfault because of 2 timex.plugin threads [\#12512](https://github.com/netdata/netdata/pull/12512) ([ilyam8](https://github.com/ilyam8))
 - fix centos7 gpg key issue [\#12506](https://github.com/netdata/netdata/pull/12506) ([maneamarius](https://github.com/maneamarius))
+- Use live charts to count the total number of dimensions. [\#12504](https://github.com/netdata/netdata/pull/12504) ([vkalintiris](https://github.com/vkalintiris))
 - feat\(collectors/timex.plugin\): add clock status chart [\#12501](https://github.com/netdata/netdata/pull/12501) ([ilyam8](https://github.com/ilyam8))
 - PR template: Include user information section [\#12499](https://github.com/netdata/netdata/pull/12499) ([kickoke](https://github.com/kickoke))
 - Adjust timex.plugin information to be less cryptic [\#12495](https://github.com/netdata/netdata/pull/12495) ([DanTheMediocre](https://github.com/DanTheMediocre))
@@ -28,6 +36,7 @@
 - fix unclaimed agents [\#12449](https://github.com/netdata/netdata/pull/12449) ([underhood](https://github.com/underhood))
 - apps.plugin: fix for plugin sending unnecessary data in freebsd [\#12446](https://github.com/netdata/netdata/pull/12446) ([surajnpn](https://github.com/surajnpn))
 - fix\(cups.plugin\): add `cups` prefix to chart context [\#12444](https://github.com/netdata/netdata/pull/12444) ([ilyam8](https://github.com/ilyam8))
+- Skip `foreach` alarms for dimensions of anomaly rate chart. [\#12441](https://github.com/netdata/netdata/pull/12441) ([vkalintiris](https://github.com/vkalintiris))
 - fix: CPU frequency detection of FreeBSD [\#12440](https://github.com/netdata/netdata/pull/12440) ([ilyam8](https://github.com/ilyam8))
 - fix install type in netdata-uninstaller.sh [\#12438](https://github.com/netdata/netdata/pull/12438) ([maneamarius](https://github.com/maneamarius))
 - fix\(kickstart.sh\): prefer shasum over sha256sum [\#12429](https://github.com/netdata/netdata/pull/12429) ([ilyam8](https://github.com/ilyam8))
@@ -295,10 +304,6 @@
 - Update libbpf [\#11865](https://github.com/netdata/netdata/pull/11865) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix cmake build [\#11862](https://github.com/netdata/netdata/pull/11862) ([vlvkobal](https://github.com/vlvkobal))
 - chore: update community link of alert notifications [\#11860](https://github.com/netdata/netdata/pull/11860) ([burbuli8ra](https://github.com/burbuli8ra))
-- nvidia\_smi\_chart.py : fixed username for not-local users [\#11858](https://github.com/netdata/netdata/pull/11858) ([scatenag](https://github.com/scatenag))
-- Remove Ubuntu 21.04 from CI and packaging. [\#11851](https://github.com/netdata/netdata/pull/11851) ([Ferroin](https://github.com/Ferroin))
-- Allow PushBullet notifications to be sent to PushBullet channels [\#11850](https://github.com/netdata/netdata/pull/11850) ([sourcecodes2](https://github.com/sourcecodes2))
-- Fix compilation warnings [\#11846](https://github.com/netdata/netdata/pull/11846) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
@@ -321,20 +326,10 @@
 - fix\(updater\): fix exit code when updating static install && updater script [\#11873](https://github.com/netdata/netdata/pull/11873) ([ilyam8](https://github.com/ilyam8))
 - add z score alarm example [\#11871](https://github.com/netdata/netdata/pull/11871) ([andrewm4894](https://github.com/andrewm4894))
 - fix\(health\): used\_swap alarm calc [\#11868](https://github.com/netdata/netdata/pull/11868) ([ilyam8](https://github.com/ilyam8))
-- Initialize enabled parameter to 1 in AlarmLogHealth message [\#11856](https://github.com/netdata/netdata/pull/11856) ([MrZammler](https://github.com/MrZammler))
-- Explicitly conflict with distro netdata DEB packages. [\#11855](https://github.com/netdata/netdata/pull/11855) ([Ferroin](https://github.com/Ferroin))
-- fixed username for not-local users [\#11854](https://github.com/netdata/netdata/pull/11854) ([scatenag](https://github.com/scatenag))
-- fix static build, curl will be staict binary; extra args can be transfer [\#11852](https://github.com/netdata/netdata/pull/11852) ([boxjan](https://github.com/boxjan))
-- Create ML README.md [\#11848](https://github.com/netdata/netdata/pull/11848) ([andrewm4894](https://github.com/andrewm4894))
-- Fix token name in release draft workflow. [\#11847](https://github.com/netdata/netdata/pull/11847) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.32.0](https://github.com/netdata/netdata/tree/v1.32.0) (2021-11-30)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.31.0...v1.32.0)
-
-**Merged pull requests:**
-
-- fix\(health\): `pihole_blocklist_gravity_file` and `pihole_status` info lines [\#11844](https://github.com/netdata/netdata/pull/11844) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
