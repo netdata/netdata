@@ -279,6 +279,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
     RRDDIM *rd = cmd.data;
 
     if (likely(claim_id)) {
+        int send_status = 0;
         time_t now = now_realtime_sec();
 
         time_t first_t = rd->state->query_ops.oldest_time(rd);
@@ -295,8 +296,10 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
             rd->rrdset->id,
             first_t,
             live ? 0 : last_t,
-            NULL);
-        rd->state->aclk_live_status = live;
+            &send_status);
+
+        if (!send_status)
+            rd->state->aclk_live_status = live;
 
         freez(claim_id);
     }

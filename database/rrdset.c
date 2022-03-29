@@ -1831,8 +1831,7 @@ after_second_database_work:
             if (unlikely(live != rd->state->aclk_live_status)) {
                 if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
                     if (likely(!queue_dimension_to_aclk(rd))) {
-                        if (rd->state->aclk_live_status == -1)
-                            rd->state->aclk_live_status = live;
+                        rd->state->aclk_live_status = live;
                         rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
                     }
                 }
