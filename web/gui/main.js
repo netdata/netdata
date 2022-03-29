@@ -499,14 +499,14 @@ function toggleAgentItem(e, guid) {
 // When you stream metrics from netdata to netdata, the receiving netdata now
 // has multiple host databases. It's own, and multiple mirrored. Mirrored databases
 // can be accessed with <http://localhost:19999/host/NAME/>
-const OLD_DASHBOARD_SUFFIX = "old"
-let isOldSuffix = true
+const OLD_DASHBOARD_SUFFIX = "old";
+let isOldSuffix = true;
 try {
     const currentScriptMainJs = document.currentScript;
-    const mainJsSrc = currentScriptMainJs.getAttribute("src")
-    isOldSuffix = mainJsSrc.startsWith("../main.js")
+    const mainJsSrc = currentScriptMainJs.getAttribute("src");
+    isOldSuffix = mainJsSrc.startsWith("../main.js");
 } catch {
-    console.warn("current script not detecting, assuming the dashboard is running with /old suffix")
+    console.warn("current script not detecting, assuming the dashboard is running with /old suffix");
 }
 
 function transformWithOldSuffix(url) {
