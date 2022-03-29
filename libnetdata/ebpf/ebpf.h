@@ -38,6 +38,8 @@
 #define EBPF_CFG_APPLICATION "apps"
 #define EBPF_CFG_CGROUP "cgroups"
 
+#define EBPF_COMMON_FNCT_CLEAN_UP "release_task"
+
 /**
  * The RedHat magic number was got doing:
  *
@@ -249,6 +251,8 @@ extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
 extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
 extern char **ebpf_fill_histogram_dimension(size_t maximum);
 extern void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em);
+extern void ebpf_update_controller(int fd, ebpf_module_t *em);
+extern void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name);
 
 // Histogram
 #define NETDATA_EBPF_HIST_MAX_BINS 24UL

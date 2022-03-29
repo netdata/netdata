@@ -244,6 +244,7 @@ extern void ebpf_pid_file(char *filename, size_t length);
 
 #define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
 #define EBPF_COMMON_DIMENSION_CALL "calls/s"
+#define EBPF_COMMON_DIMENSION_CONNECTIONS "connections/s"
 #define EBPF_COMMON_DIMENSION_BITS "kilobits/s"
 #define EBPF_COMMON_DIMENSION_BYTES "bytes/s"
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
