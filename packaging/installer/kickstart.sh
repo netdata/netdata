@@ -5,6 +5,12 @@
 # ======================================================================
 # Constants
 
+AGENT_BUG_REPORT_URL="https://github.com/netdata/netdata/issues/new/choose"
+CLOUD_BUG_REPORT_URL="https://github.com/netdata/netdata-cloud/issues/new/choose"
+DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
+DISCORD_INVITE="https://discord.gg/5ygS846fR6"
+DOCS_URL="https://learn.netdata.cloud/docs/"
+FORUM_URL="https://community.netdata.cloud/"
 KICKSTART_OPTIONS="${*}"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
