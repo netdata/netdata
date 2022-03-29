@@ -56,6 +56,12 @@
 #define  FEAT_STREAM_COMPRESSION 0
 #endif  //ENABLE_COMPRESSION
 
+#ifdef  ENABLE_REPLICATION
+#define  FEAT_STREAM_REPLICATION 1
+#else
+#define  FEAT_STREAM_REPLICATION 0
+#endif  //ENABLE_REPLICATION
+
 
 // Optional libraries
 
@@ -278,6 +284,7 @@ void print_build_info(void) {
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
     printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
+    printf("    Stream Replication:         %s\n", FEAT_YES_NO(FEAT_STREAM_REPLICATION));
 
     printf("Libraries:\n");
     printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
@@ -331,6 +338,7 @@ void print_build_info_json(void) {
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
     printf("    \"stream-compression\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
+    printf("    \"stream-replication\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_REPLICATION));
     printf("  },\n");
 
     printf("  \"libs\": {\n");
@@ -397,7 +405,9 @@ void analytics_build_info(BUFFER *b) {
 #ifdef ENABLE_COMPRESSION
     add_to_bi(b, "Stream Compression");
 #endif
-
+#ifdef ENABLE_REPLICATION
+    add_to_bi(b, "Stream Replication");
+#endif
 #ifdef HAVE_PROTOBUF
     add_to_bi(b, "protobuf");
 #endif

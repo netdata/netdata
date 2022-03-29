@@ -413,7 +413,9 @@ set(LIBNETDATA_FILES
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
         libnetdata/circular_buffer/circular_buffer.c
-        libnetdata/circular_buffer/circular_buffer.h)
+        libnetdata/circular_buffer/circular_buffer.h
+        libnetdata/queue/queue.c
+        libnetdata/queue/queue.h)
 
 IF(ENABLE_PLUGIN_EBPF)
     list(APPEND LIBNETDATA_FILES
@@ -753,8 +755,10 @@ set(STREAMING_PLUGIN_FILES
         streaming/rrdpush.c
         streaming/rrdpush.h
         streaming/compression.c
+        streaming/replication.h
         streaming/receiver.c
         streaming/sender.c
+        streaming/replication.c
         )
 
 set(CLAIM_PLUGIN_FILES

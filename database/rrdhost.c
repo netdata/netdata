@@ -190,7 +190,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdpush_sender_pipe[1] = -1;
     host->rrdpush_sender_socket  = -1;
 
-    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 #ifdef ENABLE_HTTPS
     host->ssl.conn = NULL;
     host->ssl.flags = NETDATA_SSL_START;
@@ -435,6 +434,17 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->health_default_exec
          , host->health_default_recipient
     );
+    
+#ifdef  ENABLE_REPLICATION
+    // ------------------------------------------------------------------------
+    //GAPs struct initialization only for child hosts
+    if(strcmp(host->machine_guid, localhost->machine_guid))
+        gaps_init(&host);
+    //Initialization of the Replication thread pointers.
+    host->replication = (REPLICATION *)callocz(1, sizeof(REPLICATION));
+    // Initialize the Tx Replication thread
+    replication_sender_init(host);
+#endif  //ENABLE_REPLICATION    
 
     rrd_hosts_available++;
 
@@ -856,7 +866,10 @@ void rrdhost_free(RRDHOST *host) {
     rrdhost_unlock(host);
 
     // ------------------------------------------------------------------------
-    // clean up streaming
+    // clean up streaming & replication
+#ifdef  ENABLE_REPLICATION
+    replication_sender_thread_stop(host); // stop a possibly running Tx replication thread and clean-up the state of the REP Tx thread.
+#endif  //ENABLE_REPLICATION
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
     buffer_free(host->sender->build);
@@ -869,22 +882,29 @@ void rrdhost_free(RRDHOST *host) {
     if (netdata_exit) {
         netdata_mutex_lock(&host->receiver_lock);
         if (host->receiver) {
-            if (!host->receiver->exited)
+            // if(!host->receiver->replication->exited)
+            //     netdata_thread_cancel(host->receiver->replication->thread);
+            if(!host->receiver->exited)
                 netdata_thread_cancel(host->receiver->thread);
             netdata_mutex_unlock(&host->receiver_lock);
             struct receiver_state *rpt = host->receiver;
+            // REPLICATION_STATE *rep_state = host->receiver->replication;
             while (host->receiver && !rpt->exited)
                 sleep_usec(50 * USEC_PER_MS);
             // If the receiver detached from the host then its thread will destroy the state
             if (host->receiver == rpt)
                 destroy_receiver_state(host->receiver);
+            // if(host->receiver->replication == rep_state)
+            //     replication_state_destroy(&host->receiver->replication);
         }
         else
             netdata_mutex_unlock(&host->receiver_lock);
     }
-
-
-
+#ifdef  ENABLE_REPLICATION
+    if(strcmp(host->machine_guid, localhost->machine_guid))
+        gaps_destroy(&host);
+#endif  //ENABLE_REPLICATION 
+    
     rrdhost_wrlock(host);   // lock this RRDHOST
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
     struct aclk_database_worker_config *wc =  host->dbsync_worker;
@@ -1765,4 +1785,17 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
     }
     rrdhost_unlock(h);
     return result;
+}
+
+time_t rrdhost_first_entry_t(RRDHOST *h) {
+    rrdhost_rdlock(h);
+    RRDSET *st;
+    time_t result = LONG_MAX;
+    rrdset_foreach_read(st, h) {
+        time_t st_first = rrdset_first_entry_t(st);
+        if (st_first < result)
+            result = st_first;
+    }
+    rrdhost_unlock(h);
+    return result;    
 }

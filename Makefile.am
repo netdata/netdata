@@ -164,6 +164,8 @@ LIBNETDATA_FILES = \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
     libnetdata/procfile/procfile.h \
+    libnetdata/queue/queue.c \
+    libnetdata/queue/queue.h \
     libnetdata/os.c \
     libnetdata/os.h \
     libnetdata/simple_pattern/simple_pattern.c \
@@ -558,6 +560,8 @@ STREAMING_PLUGIN_FILES = \
     streaming/compression.c \
     streaming/sender.c \
     streaming/receiver.c \
+    streaming/replication.c \
+    streaming/replication.h \
     streaming/rrdpush.h \
     $(NULL)
 

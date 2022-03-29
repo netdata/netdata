@@ -20,6 +20,7 @@ SUBDIRS = \
     onewayalloc \
     popen \
     procfile \
+    queue \
     simple_pattern \
     socket \
     statistical \

@@ -741,6 +741,273 @@ static void pluginsd_process_thread_cleanup(void *ptr) {
 }
 
 // New plugins.d parser
+#ifdef  ENABLE_REPLICATION
+// Pluginsd_action for the replication commands
+PARSER_RC pluginsd_rep_action(void *user, REP_ARG command)
+{
+    info("%s: REP command - pluginsd_rep_action\n", REPLICATION_MSG);
+    if(!user || !((PARSER_USER_OBJECT *)user)->host || !((PARSER_USER_OBJECT *)user)->opaque) {
+        infoerr("%s: Parser user object was not set properly - user, host or opaque is NULL - Exiting Parser!", REPLICATION_MSG);
+        return PARSER_RC_ERROR;
+    }
+    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
+    REPLICATION_STATE *rep_state = ((PARSER_USER_OBJECT *)user)->opaque;
+
+    switch (command)
+    {
+      case REP_OFF:
+        info("%s: REP OFF command is received!\n", REPLICATION_MSG);
+        // Shutdown the replication thread.
+        rep_state->shutdown = 1;
+        // For now simply return an error to exit
+        ((PARSER_USER_OBJECT *)user)->enabled = 0;
+        return PARSER_RC_ERROR;
+      case REP_ON:
+        info("%s: REP ON command is received!\n", REPLICATION_MSG);
+        if (finish_gap_replication(host, rep_state)) {
+            // Exit the Rx parser
+            ((PARSER_USER_OBJECT *)user)->enabled = 0;
+            return PARSER_RC_ERROR;
+        }
+        send_gap_for_replication(host, rep_state);
+        return PARSER_RC_OK;
+      case REP_ACK:
+        info("%s: REP ACK command is received!\n", REPLICATION_MSG);
+        // REP ACK - A full REP transmission of all the charts
+        // Clear the replicated GAP
+        cleanup_after_gap_replication(host->gaps_timeline);
+        if (finish_gap_replication(host, rep_state)) {
+            // Exit the Rx parser
+            ((PARSER_USER_OBJECT *)user)->enabled = 0;
+            return PARSER_RC_ERROR;
+        }
+        send_gap_for_replication(host, rep_state);
+        return PARSER_RC_OK;       
+      default:
+        info("%s: REP %u command is unknown!\n", REPLICATION_MSG, command);
+    }
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_gap_action(void *user, GAP rx_gap)
+{
+    info("%s: GAP command - pluginsd_gap_action\n", REPLICATION_MSG);
+    if(!user || !((PARSER_USER_OBJECT *)user)->opaque) {
+        infoerr("%s: Parser user object was not set properly - user, host or opaque is NULL - Exiting Parser!", REPLICATION_MSG);
+        return PARSER_RC_ERROR;
+    }
+    REPLICATION_STATE *rep_state = ((PARSER_USER_OBJECT *)user)->opaque;
+    //Check if there is GAP and send GAP command, otherwise send REP OFF command
+    sender_gap_filling(rep_state, rx_gap);
+    info("%s: COMPLETE GAP - Send REP ACK\n", REPLICATION_MSG);
+    send_message(rep_state, "REP 3\n");
+    info("%s: EXITING GAP command - All charts sent\n", REPLICATION_MSG);
+
+    // return PARSER_RC_OK;
+    // ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_rdata_action(void *user, GAP meta_rx_rdata, int block_id, char *chart_id, char *dim_id)
+{
+    if(!user || !((PARSER_USER_OBJECT *)user)->opaque) {
+        infoerr("%s: Parser user object was not set properly - user, or opaque is NULL - Exiting Parser!", REPLICATION_MSG);
+        return PARSER_RC_ERROR;
+    }
+    REPLICATION_STATE *rep_state = ((PARSER_USER_OBJECT *)user)->opaque;
+
+    // info("%s: RDATA command - pluginsd_rdata_action\n", REPLICATION_MSG);
+    char gap_uuid_str[UUID_STR_LEN];
+    uuid_unparse(meta_rx_rdata.gap_uuid, gap_uuid_str);
+    info("%s: Receiving RDATA block id#%d for gap(%s): %s\n", REPLICATION_MSG, block_id, meta_rx_rdata.status,gap_uuid_str);
+    replication_collect_past_metric_init(rep_state, chart_id, dim_id);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_fill_action(void *user, time_t timestamp, storage_number value)
+{
+    if(!user || !((PARSER_USER_OBJECT *)user)->opaque) {
+        infoerr("%s: Parser user object was not set properly - user, or opaque is NULL - Exiting Parser!", REPLICATION_MSG);
+        return PARSER_RC_ERROR;
+    }    
+    REPLICATION_STATE *rep_state = ((PARSER_USER_OBJECT *)user)->opaque;
+    // info("%s: FILL command - pluginsd_fill_action\n", REPLICATION_MSG);
+    //rrddim_find
+    //call a similar void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number)
+    //function to save the fill value in the page
+    //collect_replication_gap_data(rd, timestamp, value);
+    replication_collect_past_metric(rep_state, timestamp, value);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_fill_end_action(void *user, int block_id)
+{
+    UNUSED(block_id);
+    REPLICATION_STATE *rep_state = (REPLICATION_STATE *)((PARSER_USER_OBJECT *)user)->opaque;
+    info("%s: FILLEND command - pluginsd_fill_end_action\n", REPLICATION_MSG);
+    replication_collect_past_metric_done(rep_state);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_rep(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{
+    char *arg_str = words[1];
+    REP_ARG command = strtoul(arg_str, NULL, 10);
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    // info("Pluginsd_rep received! %s %s(%d)\n", PLUGINSD_KEYWORD_REP, words[1], command);
+
+    if (unlikely((!arg_str || command == REP_ARG_ERROR || errno == ERANGE))) {
+        error("REP command either is missing or is wrong for host '%s'. Disabling it.", host->hostname);
+        goto disable;
+    }
+
+    if (plugins_action->rep_action) {
+        return plugins_action->rep_action((PARSER_USER_OBJECT *) user, command);
+    }
+    return PARSER_RC_OK;
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC pluginsd_gap(char **words, void *user, PLUGINSD_ACTION  *plugins_action){
+
+    info("%s: GAP command - pluginsd_gap\n", REPLICATION_MSG);
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    
+    // This needs to enable the LOCALHOST->gaps_timeline->gap_data struct in order to work
+    // GAP rx_gap = host->gaps_timeline->gap_data;
+    GAP rx_gap;
+    int rc = uuid_parse(words[1], rx_gap.gap_uuid);
+    rx_gap.t_window.t_start = (time_t) strtol(words[2], NULL, 10);
+    rx_gap.t_window.t_first = (time_t) strtol(words[3], NULL, 10);
+    rx_gap.t_window.t_end = (time_t) strtol(words[4], NULL, 10);
+    rx_gap.status = "onrequest";
+
+    if (unlikely((rc == -1) || ((!rx_gap.t_window.t_start || !rx_gap.t_window.t_first  || !rx_gap.t_window.t_end ) || errno == ERANGE))) {
+        error("requested a GAP with wrong parameters for host '%s'. Disabling it.",
+        host->hostname);
+        goto disable;
+    }
+
+    if (plugins_action->gap_action) {
+        return plugins_action->gap_action((PARSER_USER_OBJECT *) user, rx_gap);
+    }
+
+    return PARSER_RC_OK;
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC pluginsd_rdata(char **words, void *user, PLUGINSD_ACTION  *plugins_action){
+    
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    GAP meta_rx_rdata;
+    int rc = uuid_parse(words[1], meta_rx_rdata.gap_uuid);
+    char *chart_id = strdupz(words[2]);
+    char *dim_id = strdupz(words[3]);
+    meta_rx_rdata.t_window.t_start = (time_t) strtol(words[4], NULL, 10);
+    meta_rx_rdata.t_window.t_end = (time_t) strtol(words[5], NULL, 10);
+    int block_id = strtol(words[6], NULL, 10);
+    meta_rx_rdata.status = "onreceive";
+
+    if (unlikely((rc == -1) || !chart_id || !dim_id || ((!meta_rx_rdata.t_window.t_start || !meta_rx_rdata.t_window.t_end ) || errno == ERANGE))) {
+        error("requested a RDATA without parameters for host '%s'. Disabling it.", host->hostname);
+        goto disable;
+    }
+
+    if(block_id == 9)
+        meta_rx_rdata.status = "rx_complete";
+
+    //Call RDATA function with parameters    
+    if (plugins_action->rdata_action) {
+        return plugins_action->rdata_action((PARSER_USER_OBJECT *) user, meta_rx_rdata, block_id, chart_id, dim_id);
+    }    
+
+    return PARSER_RC_OK;
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC pluginsd_fill(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{    
+    REPLICATION_STATE *rep_state = (REPLICATION_STATE *)((PARSER_USER_OBJECT *)user)->opaque;
+    char *chart_id = strdupz(words[1]);
+    char *dim_id = strdupz(words[2]);
+    time_t timestamp = (time_t) strtol(words[3], NULL, 10);
+    storage_number value = str2uint32_t(words[4]);
+
+    if (unlikely( !chart_id || !dim_id || !timestamp || errno == ERANGE)) {
+        error("Parsing FILL command parameters has failed for host '%s'. Disabling it.", rep_state->host->hostname);
+        goto disable;
+    }
+
+    // info("%s: FILL %s.%s %ld %d", REPLICATION_MSG, chart_id, dim_id, timestamp, value);
+    //Call the replication function to save the parameters.
+    if (plugins_action->fill_action) {
+        return plugins_action->fill_action((PARSER_USER_OBJECT *) user, timestamp, value);
+    }
+
+    return PARSER_RC_OK;
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC pluginsd_fill_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{    
+    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
+    int numofpoints = strtol(words[1], NULL, 10);
+    int block_id = strtol(words[2], NULL, 10);
+
+    if (unlikely(errno == ERANGE)) {
+        error("%s: FILLEND parameters parsing failed for host '%s'. Disabling it.", REPLICATION_MSG, host->hostname);
+        goto disable;
+    }
+
+    if(unlikely(!numofpoints)) {
+        infoerr("%s: FILLEND Zero #samples - Continue to the next dimension - host '%s'.", REPLICATION_MSG, host->hostname);
+        return PARSER_RC_OK;
+    }
+
+    //Call the replication function to save the parameters.
+    if (plugins_action->fill_end_action) {
+        return plugins_action->fill_end_action((PARSER_USER_OBJECT *) user, block_id);
+    }    
+
+    return PARSER_RC_OK;
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+// Add an incative plugins_action for security reasons. All the parser instances should not be able to use all the available actions.
+PARSER_RC pluginsd_suspend_this_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations)
+{
+    UNUSED(st);
+    UNUSED(user);    
+    UNUSED(microseconds);
+    UNUSED(trust_durations);
+    error("This keyword is not supported from this parser!");
+    //Parser continues?
+    return PARSER_RC_OK;
+    //Parser stops?
+    // return PARSER_RC_ERROR;
+}
+#endif  //ENABLE_REPLICATION
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
 {

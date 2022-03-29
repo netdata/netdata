@@ -13,13 +13,18 @@
 #define STREAM_VERSION_CLAIM 3
 #define STREAM_VERSION_CLABELS 4
 #define STREAM_VERSION_COMPRESSION 5
-#define VERSION_GAP_FILLING 6
+#define STREAM_VERSION_GAP_FILLING 6
+#define STREAM_VERSION_GAP_FILL_N_COMPRESSION 7
 
-#ifdef  ENABLE_COMPRESSION
+#if defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
 #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_COMPRESSION)
-#else
+#elif !defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
 #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_CLABELS)
-#endif  //ENABLE_COMPRESSION
+#elif !defined(ENABLE_COMPRESSION) && defined(ENABLE_REPLICATION)
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_GAP_FILLING)
+#else
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_GAP_FILL_N_COMPRESSION)
+#endif  //ENABLE_COMPRESSION || ENABLE_REPLICATION 
 
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
@@ -93,6 +98,7 @@ struct sender_state {
     size_t sent_bytes_on_this_connection;
     size_t send_attempts;
     time_t last_sent_t;
+    time_t t_newest_connection;
     size_t not_connected_loops;
     // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
@@ -112,6 +118,7 @@ struct receiver_state {
     RRDHOST *host;
     netdata_thread_t thread;
     int fd;
+    int timeout;
     char *key;
     char *hostname;
     char *registry_hostname;
@@ -131,8 +138,6 @@ struct receiver_state {
     time_t last_msg_t;
     char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
     int read_len;
-    unsigned int shutdown:1;    // Tell the thread to exit
-    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
@@ -140,6 +145,8 @@ struct receiver_state {
     unsigned int rrdpush_compression;
     struct decompressor_state *decompressor;
 #endif
+    unsigned int shutdown:1;    // Tell the thread to exit
+    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
 };
 
 struct rrdpush_destinations {
@@ -152,6 +159,9 @@ struct rrdpush_destinations {
 };
 
 extern unsigned int default_rrdpush_enabled;
+#ifdef  ENABLE_REPLICATION
+extern unsigned int default_rrdpush_replication_enabled;
+#endif  //ENABLE_REPLICATION
 #ifdef ENABLE_COMPRESSION
 extern unsigned int default_compression_enabled;
 #endif
@@ -185,6 +195,13 @@ extern int connect_to_one_of_destinations(
     char *connected_to,
     size_t connected_to_size,
     struct rrdpush_destinations **destination);
+
+void log_replication_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
+extern void evaluate_gap_onconnection(struct receiver_state *stream_recv);
+extern void evaluate_gap_ondisconnection(struct receiver_state *stream_recv);
+
+extern int should_send_chart_matching(RRDSET *st);
+extern int need_to_send_chart_definition(RRDSET *st);
 
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();

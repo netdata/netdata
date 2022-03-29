@@ -46,7 +46,6 @@ static inline void deactivate_compression(struct sender_state *s) {
     error("STREAM_COMPRESSION: Deactivating compression to avoid stream corruption");
     default_compression_enabled = 0;
     s->rrdpush_compression = 0;
-    s->version = STREAM_VERSION_CLABELS;
     error("STREAM_COMPRESSION %s [send to %s]: Restarting connection without compression", s->host->hostname, s->connected_to);
     rrdpush_sender_thread_close_socket(s->host);
 }
@@ -247,6 +246,67 @@ static inline long int parse_stream_version(RRDHOST *host, char *http)
     return stream_version;
 }
 
+static void enable_supported_stream_features(struct sender_state *s) {
+#if defined(ENABLE_COMPRESSION) && defined(ENABLE_REPLICATION)
+    switch (s->version)
+    {
+        case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
+            default_compression_enabled = 1;
+            default_rrdpush_replication_enabled = 1;
+            break;
+        case STREAM_VERSION_GAP_FILLING:
+            default_compression_enabled = 0;
+            default_rrdpush_replication_enabled = 1;
+            break;
+        case STREAM_VERSION_COMPRESSION:
+            default_compression_enabled = 1;
+            default_rrdpush_replication_enabled = 0;
+            break;
+        default:
+            default_compression_enabled = 0;
+            default_rrdpush_replication_enabled = 0;
+            break;
+    }
+#elif defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
+    if(s->version < STREAM_VERSION_COMPRESSION)
+        default_compression_enabled = 0;
+    else
+        default_compression_enabled = 1;
+#elif !defined(ENABLE_COMPRESSION) && defined(ENABLE_REPLICATION)
+    if(s->version < STREAM_VERSION_GAP_FILLING)
+        default_rrdpush_replication_enabled = 0;
+    else
+        default_rrdpush_replication_enabled = 1;
+#else
+    UNUSED(s);
+#endif
+
+#ifdef ENABLE_COMPRESSION
+    s->rrdpush_compression = (s->rrdpush_compression && default_compression_enabled);
+    if(s->rrdpush_compression)
+    {
+        // parent supports compression
+        if(s->compressor)
+            s->compressor->reset(s->compressor);
+    }
+    else {
+        //parent does not support compression or has compression disabled
+        debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
+        infoerr("Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
+    }        
+#endif  //ENABLE_COMPRESSION
+
+#ifdef  ENABLE_REPLICATION
+    if(s->host->replication->tx_replication){
+        s->host->replication->tx_replication->enabled = (s->host->replication->tx_replication->enabled && default_rrdpush_replication_enabled);
+        if(!s->host->replication->tx_replication->enabled) {
+            debug(D_REPLICATION, "Stream Replication is not supported in this communication! One of the agents (%s <-> %s) does not support replication.", s->connected_to, s->host->hostname);
+            infoerr("Stream Replication is not supported in this communication! One of the agents (%s <-> %s) does not support replication.", s->connected_to, s->host->hostname);
+        }
+    }
+#endif  //ENABLE_REPLICATION
+}
+
 static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
     struct sender_state *s) {
 
@@ -308,10 +368,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 #endif
 
 #ifdef  ENABLE_COMPRESSION
-// Negotiate stream VERSION_CLABELS if stream compression is not supported
 s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_VERSION_COMPRESSION));
-if(!s->rrdpush_compression)
-    s->version = STREAM_VERSION_CLABELS;
 #endif  //ENABLE_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
@@ -509,23 +566,8 @@ if(!s->rrdpush_compression)
         return 0;
     }
     s->version = version;
-
-#ifdef ENABLE_COMPRESSION
-    s->rrdpush_compression = (s->rrdpush_compression && (s->version >= STREAM_VERSION_COMPRESSION));
-    if(s->rrdpush_compression)
-    {
-        // parent supports compression
-        if(s->compressor)
-            s->compressor->reset(s->compressor);
-    }
-    else {
-        //parent does not support compression or has compression disabled
-        debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
-        infoerr("Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
-        s->version = STREAM_VERSION_CLABELS;
-    }        
-#endif  //ENABLE_COMPRESSION
-
+    // Manage stream features based on strema versioning
+    enable_supported_stream_features(s);
 
     info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
          , host->hostname
@@ -549,6 +591,7 @@ static void attempt_to_connect(struct sender_state *state)
 
     if(rrdpush_sender_thread_connect_to_parent(state->host, state->default_port, state->timeout, state)) {
         state->last_sent_t = now_monotonic_sec();
+        state->t_newest_connection = now_monotonic_sec();
 
         // reset the buffer, to properly send charts and metrics
         rrdpush_sender_thread_data_flush(state->host);
@@ -564,6 +607,14 @@ static void attempt_to_connect(struct sender_state *state)
 
         // let the data collection threads know we are ready
         state->host->rrdpush_sender_connected = 1;
+
+#ifdef  ENABLE_REPLICATION
+        // Start replication sender thread (Tx).
+        info("%s Replication is %s", REPLICATION_MSG, (state->host->replication->tx_replication->enabled ? "enabled" : "disabled"));
+        if(state->host->replication->tx_replication->enabled && !state->host->replication->tx_replication->spawned)
+            replication_sender_thread_spawn(state->host);
+#endif  //ENABLE_REPLICATION
+
     }
     else {
         // increase the failed connections counter
@@ -767,7 +818,7 @@ void *rrdpush_sender_thread(void *ptr) {
     remote_clock_resync_iterations = (unsigned int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM,
         "initial clock resync iterations",
-        remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
+        remote_clock_resync_iterations);
 
     // initialize rrdpush globals
     s->host->rrdpush_sender_connected = 0;
@@ -817,12 +868,13 @@ void *rrdpush_sender_thread(void *ptr) {
             s->buffer->read = 0;
             s->buffer->write = 0;
             attempt_to_connect(s);
-            if (s->version >= VERSION_GAP_FILLING) {
-                time_t now = now_realtime_sec();
-                sender_start(s);
-                buffer_sprintf(s->build, "TIMESTAMP %"PRId64"", (int64_t)now);
-                sender_commit(s);
-            }
+            // if (s->version >= STREAM_VERSION_GAP_FILLING) {
+            //     time_t now = now_realtime_sec();
+            //     sender_start(s);
+            //     buffer_sprintf(s->build, "TIMESTAMP %ld", now);
+            //     sender_commit(s);
+            //     // Send here the REP on command to the parent
+            // }
             rrdpush_claimed_id(s->host);
             continue;
         }
@@ -886,13 +938,13 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // Read as much as possible to fill the buffer, split into full lines for execution.
-        if (fds[Socket].revents & POLLIN) {
-            worker_is_busy(WORKER_SENDER_JOB_SOCKET_RECEIVE);
-            attempt_read(s);
-        }
+        // if (fds[Socket].revents & POLLIN) {
+        //     worker_is_busy(WORKER_SENDER_JOB_SOCKET_RECEIVE);
+        //     attempt_read(s);
+        // }
 
-        worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-        execute_commands(s);
+        // worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
+        // execute_commands(s);
 
         // If we have data and have seen the TCP window open then try to close it by a transmission.
         if (outstanding && fds[Socket].revents & POLLOUT) {

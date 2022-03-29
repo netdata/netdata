@@ -57,6 +57,12 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
         parser_add_keyword(parser, "CLABEL", pluginsd_clabel);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
         parser_add_keyword(parser, "SET", pluginsd_set);
+        
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REP, pluginsd_rep);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_GAP, pluginsd_gap);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_RDATA, pluginsd_rdata);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FILL, pluginsd_fill);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FILLEND, pluginsd_fill_end);
     }
 
     return parser;
