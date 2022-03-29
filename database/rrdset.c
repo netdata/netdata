@@ -855,6 +855,7 @@ RRDSET *rrdset_create_custom(
     st->state->is_ar_chart = strcmp(st->id, ML_ANOMALY_RATES_CHART_ID) == 0;
 
     st->units = units ? strdupz(units) : strdupz("");
+    st->state->old_units = strdupz(st->units);
     json_fix_string(st->units);
 
     st->context = context ? strdupz(context) : strdupz(st->id);
