@@ -116,22 +116,42 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     if (!f)
         return retval;
 
-    while (fgets(buf, MAXSIZE_PROC_CMDLINE, f) != NULL) {
-        if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
-            end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
-            if (!*begin)
-                break;
-            while (isalpha(*end))
-                end++;
-            *end = 0;
-            for (int i = 0; cgroups_systemd_options[i].name; i++) {
-                if (!strcmp(begin, cgroups_systemd_options[i].name)) {
-                    retval = cgroups_systemd_options[i].setting;
+    fd_set rfds;
+    struct timeval timeout;
+    int fd = fileno(f);
+    int ret = -1;
+
+    FD_ZERO(&rfds);
+    FD_SET(fd, &rfds);
+    timeout.tv_sec = 3;
+    timeout.tv_usec = 0;
+
+    if (fd != -1) {
+        ret = select(fd + 1, &rfds, NULL, NULL, &timeout);
+    }
+
+    if (ret == -1) {
+        error("Failed to get the output of \"%s\"", exec);
+    } else if (ret) {
+        while (fgets(buf, MAXSIZE_PROC_CMDLINE, f) != NULL) {
+            if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
+                end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
+                if (!*begin)
                     break;
+                while (isalpha(*end))
+                    end++;
+                *end = 0;
+                for (int i = 0; cgroups_systemd_options[i].name; i++) {
+                    if (!strcmp(begin, cgroups_systemd_options[i].name)) {
+                        retval = cgroups_systemd_options[i].setting;
+                        break;
+                    }
                 }
+                break;
             }
-            break;
         }
+    } else {
+        info("Cannot get the output of \"%s\" within %"PRId64" seconds", exec, (int64_t)timeout.tv_sec);
     }
 
     if (mypclose(f, command_pid))
