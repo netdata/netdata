@@ -1365,8 +1365,8 @@ void generate_new_gap(struct receiver_state *stream_recv) {
     GAP *newgap = stream_recv->host->gaps_timeline->gap_buffer;
     uuid_generate(newgap->gap_uuid);
     newgap->host_mguid = strdupz(stream_recv->machine_guid);
-    newgap->t_window.t_start = stream_recv->last_msg_t;
-    newgap->t_window.t_first = now_realtime_sec();
+    newgap->t_window.t_start = now_realtime_sec() - REPLICATION_GAP_TIME_MARGIN;
+    newgap->t_window.t_first = stream_recv->last_msg_t;
     newgap->t_window.t_end = 0;
     newgap->status = "oncreate";
     return;
@@ -1377,7 +1377,7 @@ int complete_new_gap(GAP *potential_gap){
         error("%s: This GAP cannot be completed. Need to create it first.", REPLICATION_MSG);
         return 1;
     }
-    potential_gap->t_window.t_end = now_realtime_sec();
+    potential_gap->t_window.t_end = now_realtime_sec() + REPLICATION_GAP_TIME_MARGIN;
     potential_gap->status = "oncompletion";
     return 0;
 }
