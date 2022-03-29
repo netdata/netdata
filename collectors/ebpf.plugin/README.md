@@ -31,6 +31,7 @@ Netdata uses the following two features from the Linux kernel to run eBPF progra
   to monitor return from these functions and detect possible failures.
 - Tracepoints are hooks to call specific functions. Tracepoints are more stable than `kprobes` and are preferred when
   both options are available.
+- Trampolines are bridges between kernel functions, and BPF programs. When available `netdata` used it by default.
 
 In each case, wherever a normal kprobe, kretprobe, or tracepoint would have run its hook function, an eBPF program is
 run instead, performing various collection logic before letting the kernel continue its normal control flow.
