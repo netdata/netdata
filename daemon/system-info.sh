@@ -280,6 +280,12 @@ elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ]; then
 
   value="$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
   CPU_FREQ="$((value * 1000))"
+elif [ -r /proc/cpuinfo ]; then
+  if (echo "${CPU_INFO_SOURCE}" | grep -qv procfs); then
+    CPU_INFO_SOURCE="${CPU_INFO_SOURCE} procfs"
+  fi
+  value=$(grep "cpu MHz" /proc/cpuinfo 2>/dev/null | grep -o "[0-9]*" | head -n 1 | awk '{print int($0*1000000)}')
+  [ -n "$value" ] && CPU_FREQ="$value"
 fi
 
 freq_units="$(echo "${CPU_FREQ}" | cut -f 2 -d ' ')"
