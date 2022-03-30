@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- fix: use `/proc/cpuinfo` for CPU freq detection as a last resort [\#12550](https://github.com/netdata/netdata/pull/12550) ([ilyam8](https://github.com/ilyam8))
 - reduce min `dbengine anomaly rate every` 60s-\>30s [\#12543](https://github.com/netdata/netdata/pull/12543) ([andrewm4894](https://github.com/andrewm4894))
 - Allocate buffer and release on callback when executing agent CLI commands [\#12540](https://github.com/netdata/netdata/pull/12540) ([stelfrag](https://github.com/stelfrag))
+- packaging: upgrage protocol buffer version to 3.19.4 [\#12537](https://github.com/netdata/netdata/pull/12537) ([surajnpn](https://github.com/surajnpn))
 - feat\(collectors\): update go.d.plugin version to v0.32.0 [\#12536](https://github.com/netdata/netdata/pull/12536) ([ilyam8](https://github.com/ilyam8))
+- Socket connections \(eBPF\) and bug fix [\#12532](https://github.com/netdata/netdata/pull/12532) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: use internal defaults for sched policy/oom score in native packages [\#12529](https://github.com/netdata/netdata/pull/12529) ([ilyam8](https://github.com/ilyam8))
 - docs: fix unresolved file references [\#12528](https://github.com/netdata/netdata/pull/12528) ([ilyam8](https://github.com/ilyam8))
 - fix\(kickstart.sh\): use `$ROOTCMD` when setting auto updates [\#12526](https://github.com/netdata/netdata/pull/12526) ([ilyam8](https://github.com/ilyam8))
@@ -302,8 +305,6 @@
 - Don't check for symbols in libaws-cpp-sdk-core [\#11867](https://github.com/netdata/netdata/pull/11867) ([vlvkobal](https://github.com/vlvkobal))
 - ACLK-NG remove 'cmd' switch by message type [\#11866](https://github.com/netdata/netdata/pull/11866) ([underhood](https://github.com/underhood))
 - Update libbpf [\#11865](https://github.com/netdata/netdata/pull/11865) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix cmake build [\#11862](https://github.com/netdata/netdata/pull/11862) ([vlvkobal](https://github.com/vlvkobal))
-- chore: update community link of alert notifications [\#11860](https://github.com/netdata/netdata/pull/11860) ([burbuli8ra](https://github.com/burbuli8ra))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
