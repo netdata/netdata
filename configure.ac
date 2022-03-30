@@ -303,7 +303,7 @@ darwin*)
         HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@1.1)
       fi
       if test -n "${HOMEBREW_OPENSSL_PREFIX}"; then
-        OPTIONAL_OS_DEP_CFLAGS="${CFLAGS} -I${HOMEBREW_OPENSSL_PREFIX}/include"
+        OPTIONAL_OS_DEP_CFLAGS="-I${HOMEBREW_OPENSSL_PREFIX}/include"
         CFLAGS="${CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
         LDFLAGS="${LDFLAGS} -L${HOMEBREW_OPENSSL_PREFIX}/lib"
       fi
