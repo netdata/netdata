@@ -70,9 +70,22 @@ public:
 
     void train();
 
+    void updateResourceUsage() {
+        std::lock_guard<std::mutex> Lock(ResourceUsageMutex);
+        getrusage(RUSAGE_THREAD, &ResourceUsage);
+    }
+
+    void getResourceUsage(struct rusage *RU) {
+        std::lock_guard<std::mutex> Lock(ResourceUsageMutex);
+        memcpy(RU, &ResourceUsage, sizeof(struct rusage));
+    }
+
 private:
     std::pair<Dimension *, Duration<double>> findDimensionToTrain(const TimePoint &NowTP);
     void trainDimension(Dimension *D, const TimePoint &NowTP);
+
+    std::mutex ResourceUsageMutex;
+    struct rusage ResourceUsage;
 };
 
 class DetectableHost : public TrainableHost {
