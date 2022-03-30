@@ -1050,9 +1050,11 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_strcat(wb, ",\n");
 
 #ifdef  ENABLE_COMPRESSION
-    buffer_strcat(wb, "\t\"stream-compression\": ");
-    buffer_strcat(wb, (host->sender->rrdpush_compression ? "\"enabled\"" : "\"disabled\""));
-    buffer_strcat(wb, ",\n");
+    if(host->sender){
+        buffer_strcat(wb, "\t\"stream-compression\": ");
+        buffer_strcat(wb, (host->sender->rrdpush_compression ? "\"enabled\"" : "\"disabled\""));
+        buffer_strcat(wb, ",\n");
+    }
 #else
     buffer_strcat(wb, "\t\"stream-compression\": \"N/A\",\n");
 #endif  //ENABLE_COMPRESSION   
