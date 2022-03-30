@@ -159,11 +159,11 @@ installit() {
     fatal "Failed to install coverity."
   fi
 
-  # Clean temp directory
-  [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
-
   progress "Coverity scan tools are installed."
   cd "$ORIGINAL_DIR"
+
+  # Clean temp directory
+  [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
   return 0
 }
 
