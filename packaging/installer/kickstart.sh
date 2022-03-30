@@ -588,7 +588,9 @@ uninstall() {
       return 0
     else
       progress "Found existing netdata-uninstaller. Running it.."
-      run ${ROOTCMD} "${uninstaller}" $FLAGS
+      if ! run ${ROOTCMD} "${uninstaller}" $FLAGS; then
+        warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
+      fi
     fi
   else
     if [ "${DRY_RUN}" -eq 1 ]; then
@@ -599,7 +601,9 @@ uninstall() {
       progress "Downloading netdata-uninstaller ..."
       download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
       chmod +x "${tmpdir}/netdata-uninstaller.sh"
-      run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS
+      if ! run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS; then
+        warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
+      fi
     fi
   fi
 }
@@ -708,7 +712,7 @@ handle_existing_install() {
 
       if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
         if ! update; then
-          warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
+          warning "Failed to update existing Netdata install at ${ndprefix}."
         fi
       else
         warning "Not updating existing install at ${ndprefix}."
@@ -730,7 +734,7 @@ handle_existing_install() {
       exit $ret
       ;;
     oci)
-      fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it." F0203
+      fatal "This is an OCI container, use the regular container lifecycle management commands for your container tools instead of this script for managing it." F0203
       ;;
     *)
       if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
