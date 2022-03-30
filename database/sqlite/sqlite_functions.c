@@ -1161,7 +1161,8 @@ failed:
 }
 
 #define SELECT_HOST "select host_id, registry_hostname, update_every, os, timezone, tags from host where hostname = @hostname order by rowid desc;"
-#define SELECT_HOST_BY_UUID "select host_id, registry_hostname, update_every, os, timezone, tags from host where host_id = @host_id ;"
+#define SELECT_HOST_BY_UUID "select h.host_id, h.registry_hostname, h.update_every, h.os, h.timezone, h.tags from host h, node_instance ni " \
+    "where (ni.host_id = @host_id or ni.node_id = @host_id) AND ni.host_id = h.host_id;"
 
 RRDHOST *sql_create_host_by_uuid(char *hostname)
 {
