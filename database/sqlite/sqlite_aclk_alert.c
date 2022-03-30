@@ -135,6 +135,11 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     if (unlikely(!claim_id))
         return;
 
+    if (unlikely(!wc->host)) {
+        freez(claim_id);
+        return;
+    }
+
     BUFFER *sql = buffer_create(1024);
 
     if (wc->alerts_start_seq_id != 0) {
@@ -269,7 +274,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         db_execute(buffer_tostring(sql));
     } else {
         if (log_first_sequence_id)
-            log_access("OG [%s (%s)]: Sent alert events, first sequence_id %"PRIu64", last sequence_id %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", log_first_sequence_id, log_last_sequence_id);
+            log_access("OG [%s (%s)]: Sent alert events, first sequence_id %"PRIu64", last sequence_id %"PRIu64, wc->node_id, wc->host->hostname, log_first_sequence_id, log_last_sequence_id);
         log_first_sequence_id = 0;
         log_last_sequence_id = 0;
     }
