@@ -593,14 +593,6 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
         buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; " \
                             "DELETE FROM aclk_chart_latest_%s;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
         db_lock();
-        buffer_flush(sql);
-        buffer_sprintf(
-            sql,
-            "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; "
-            "DELETE FROM aclk_chart_latest_%s;",
-            wc->uuid_str,
-            wc->uuid_str,
-            wc->uuid_str);
 
         db_execute("BEGIN TRANSACTION;");
         db_execute(buffer_tostring(sql));
