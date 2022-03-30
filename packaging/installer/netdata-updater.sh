@@ -48,16 +48,22 @@ else
   INTERACTIVE=1
 fi
 
+if [ -n "${script_source}" ]; then
+  script_name="$(basename "${script_source}")"
+else
+  script_name="netdata-updater.sh"
+fi
+
 info() {
-  echo >&3 "$(date) : INFO: " "${@}"
+  echo >&3 "$(date) : INFO: ${script_name}: " "${@}"
 }
 
 error() {
-  echo >&3 "$(date) : ERROR: " "${@}"
+  echo >&3 "$(date) : ERROR: ${script_name}: " "${@}"
 }
 
 fatal() {
-  error "FAILED TO UPDATE NETDATA : ${1}"
+  echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${@}"
   exit 1
 }
 
