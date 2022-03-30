@@ -1453,12 +1453,14 @@ static RRDDIM *create_rrdim_entry(RRDSET *st, char *id, char *name, uuid_t *metr
 }
 #endif
 
-#define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every, c.chart_id from chart c, " \
+#define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every, c.chart_id, " \
+    "c.context, CASE WHEN d.options = 'hidden' THEN 1 else 0 END from chart c, " \
     "dimension d, host h " \
     "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.context = @context " \
     "order by c.chart_id asc, c.type||c.id desc;"
 
-#define SELECT_CHART_SINGLE  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every, c.chart_id, c.context from chart c, " \
+#define SELECT_CHART_SINGLE  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every, c.chart_id, " \
+    "c.context, CASE WHEN d.options = 'hidden' THEN 1 else 0 END from chart c, " \
     "dimension d, host h " \
     "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.type||'.'||c.id = @chart " \
     "order by c.chart_id asc, c.type||'.'||c.id desc;"
@@ -1552,6 +1554,8 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         st->last_entry_t = MAX(st->last_entry_t, (*param_list)->last_entry_t);
 
         RRDDIM *rd = create_rrdim_entry(st, (char *)sqlite3_column_text(res, 1), (char *)sqlite3_column_text(res, 2), &rrdeng_uuid);
+        if (sqlite3_column_int(res, 9) == 1)
+            rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }
