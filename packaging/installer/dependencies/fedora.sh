@@ -32,6 +32,7 @@ declare -a package_tree=(
   autoconf-archive
   autogen
   automake
+  libatomic
   libtool
   cmake
   nmap-ncat

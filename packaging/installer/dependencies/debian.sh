@@ -17,6 +17,7 @@ package_tree="
   autoconf
   autoconf-archive
   autogen
+  libatomic1
   libtool
   pkg-config
   tar
