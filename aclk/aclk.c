@@ -1105,6 +1105,7 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->node_id, (char*)query->data.node_update.node_id);
             query->data.node_update.queryable = 1;
             query->data.node_update.session_id = aclk_session_newarch;
+            freez(list->hostname);
             info("Queuing status update for node=%s, live=%d, hops=%d",(char*)query->data.node_update.node_id,
                  list->live,
                  list->hops);
