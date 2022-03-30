@@ -613,8 +613,14 @@ detect_existing_install() {
 
     ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
 
-    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
-      ndpath="/opt/netdata/bin/netdata"
+    if [ -z "$ndpath" ]; then
+      # static build
+      if [ -x /opt/netdata/bin/netdata ]; then
+            ndpath="/opt/netdata/bin/netdata"
+      # build from source with /opt install-prefix (fairly common case)
+      elif [ -x /opt/netdata/usr/sbin/netdata ]; then
+            ndpath="/opt/netdata/usr/sbin/netdata"
+      fi
     fi
 
     if [ -n "${ndpath}" ]; then
