@@ -48,16 +48,18 @@ else
   INTERACTIVE=1
 fi
 
+script_name=$(basename "$0")
+
 info() {
-  echo >&3 "$(date) : INFO: $(basename "$0"): " "${@}"
+  echo >&3 "$(date) : INFO: ${script_name}: " "${@}"
 }
 
 error() {
-  echo >&3 "$(date) : ERROR: $(basename "$0"): " "${@}"
+  echo >&3 "$(date) : ERROR: ${script_name}: " "${@}"
 }
 
 fatal() {
-  echo >&3 "$(date) : FATAL: $(basename "$0"): FAILED TO UPDATE NETDATA: " "${@}"
+  echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${@}"
   exit 1
 }
 
