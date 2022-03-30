@@ -14,6 +14,7 @@ paths:
         * list of hosts mirrored (includes itself)
         * Operating System, Virtualization, K8s nodes and Container technology information
         * List of active collector plugins and modules
+        * Streaming information
         * number of alarms in the host
           * number of alarms in normal state
           * number of alarms in warning state
@@ -984,6 +985,10 @@ components:
           type: string
           description: Container technology detection method.
           example: dockerenv
+        stream_compression:
+          type: boolean
+          description: Stream transmission compression method.
+          example: true
         labels:
           type: object
           description: List of host labels.
