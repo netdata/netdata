@@ -49,15 +49,15 @@ else
 fi
 
 info() {
-  echo >&3 "$(date) : INFO: " "${@}"
+  echo >&3 "$(date) : INFO: $(basename "$0"): " "${@}"
 }
 
 error() {
-  echo >&3 "$(date) : ERROR: " "${@}"
+  echo >&3 "$(date) : ERROR: $(basename "$0"): " "${@}"
 }
 
 fatal() {
-  error "FAILED TO UPDATE NETDATA : ${1}"
+  echo >&3 "$(date) : FATAL: $(basename "$0"): FAILED TO UPDATE NETDATA: " "${@}"
   exit 1
 }
 
