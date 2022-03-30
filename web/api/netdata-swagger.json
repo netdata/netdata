@@ -9,7 +9,7 @@
     "/info": {
       "get": {
         "summary": "Get netdata basic information",
-        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* Operating System, Virtualization, K8s nodes and Container technology information\n* List of active collector plugins and modules\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
+        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* Operating System, Virtualization, K8s nodes and Container technology information\n* List of active collector plugins and modules\n* Streaming information\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
         "responses": {
           "200": {
             "description": "netdata basic information.",
@@ -1219,6 +1219,11 @@
             "type": "string",
             "description": "Container technology detection method.",
             "example": "dockerenv"
+          },
+          "stream_compression": {
+            "type": "boolean",
+            "description": "Stream transmission compression method.",
+            "example": "true"
           },
           "labels": {
             "type": "object",
