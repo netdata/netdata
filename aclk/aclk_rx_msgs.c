@@ -254,6 +254,9 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     }
 
     debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message("CreateNodeInstanceResult", 1, 0, res.node_id, res.machine_guid);
+#endif
 
     uuid_t host_id, node_id;
     if (uuid_parse(res.machine_guid, host_id)) {
@@ -296,6 +299,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     query->data.node_update.node_id = res.node_id; // aclk_query_free will free it
     query->data.node_update.queryable = 1;
     query->data.node_update.session_id = aclk_session_newarch;
+    query->node_id = res.node_id;
     aclk_queue_query(query);
     freez(res.machine_guid);
     return 0;
@@ -306,6 +310,9 @@ int send_node_instances(const char *msg, size_t msg_len)
     UNUSED(msg);
     UNUSED(msg_len);
     aclk_send_node_instances();
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message("SendNodeInstances", 1, 0, NULL, NULL);
+#endif
     return 0;
 }
 
@@ -320,6 +327,11 @@ int stream_charts_and_dimensions(const char *msg, size_t msg_len)
     }
     chart_batch_id = res.batch_id;
     aclk_start_streaming(res.node_id, res.seq_id, res.seq_id_created_at.tv_sec, res.batch_id);
+#ifdef NETDATA_INTERNAL_CHECKS
+    char context[512];
+    sprintf(context, "%lu - %lu", res.batch_id, res.seq_id);
+    sql_log_message("StreamChartsAndDimensions", 1, 0, res.node_id, context);
+#endif
     freez(res.claim_id);
     freez(res.node_id);
     return 0;
@@ -329,12 +341,15 @@ int charts_and_dimensions_ack(const char *msg, size_t msg_len)
 {
     chart_and_dim_ack_t res = parse_chart_and_dimensions_ack(msg, msg_len);
     if (!res.claim_id || !res.node_id) {
-        error("Error parsing StreamChartsAndDimensions msg");
+        error("Error parsing ChartsAnddimensionsAck msg");
         freez(res.claim_id);
         freez(res.node_id);
         return 1;
     }
     aclk_ack_chart_sequence_id(res.node_id, res.last_seq_id);
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message("ChartsAnddimensionsAck", 1, 0, res.node_id, NULL);
+#endif
     freez(res.claim_id);
     freez(res.node_id);
     return 0;
@@ -347,6 +362,9 @@ int update_chart_configs(const char *msg, size_t msg_len)
         error("Error parsing UpdateChartConfigs msg");
     else
         aclk_get_chart_config(res.hashes);
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message("UpdateChartConfigs", 1, 0, res.node_id, NULL);
+#endif
     destroy_update_chart_config(&res);
     return 0;
 }
@@ -360,6 +378,11 @@ int start_alarm_streaming(const char *msg, size_t msg_len)
         return 1;
     }
     aclk_start_alert_streaming(res.node_id, res.batch_id, res.start_seq_id);
+#ifdef NETDATA_INTERNAL_CHECKS
+    char context[512];
+    sprintf(context, "%lu - %lu", res.batch_id, res.start_seq_id);
+    sql_log_message("StartAlarmStreaming", 1, 0, res.node_id, context);
+#endif
     freez(res.node_id);
     return 0;
 }
@@ -372,6 +395,10 @@ int send_alarm_log_health(const char *msg, size_t msg_len)
         return 1;
     }
     aclk_send_alarm_health_log(node_id);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message("SendAlarmLogHealth", 1, 0, node_id, NULL);
+#endif
     freez(node_id);
     return 0;
 }
@@ -385,6 +412,9 @@ int send_alarm_configuration(const char *msg, size_t msg_len)
         return 1;
     }
     aclk_send_alarm_configuration(config_hash);
+#ifdef NETDATA_INTERNAL_CHECKS
+    sql_log_message("SendAlarmConfiguration", 1, 0, NULL, config_hash);
+#endif
     freez(config_hash);
     return 0;
 }
@@ -398,6 +428,11 @@ int send_alarm_snapshot(const char *msg, size_t msg_len)
         return 1;
     }
     aclk_process_send_alarm_snapshot(sas->node_id, sas->claim_id, sas->snapshot_id, sas->sequence_id);
+#ifdef NETDATA_INTERNAL_CHECKS
+    char context[512];
+    sprintf(context, "%lu - %lu", sas->snapshot_id, sas->sequence_id);
+    sql_log_message("SendAlarmSnapshot", 1, 0, sas->node_id, context);
+#endif
     destroy_send_alarm_snapshot(sas);
     return 0;
 }

@@ -8,21 +8,23 @@
 
 #include "aclk.h"
 
-void aclk_send_alarm_log_health(struct alarm_log_health *log_health)
+void aclk_send_alarm_log_health(struct alarm_log_health *log_health, char *node_id)
 {
     aclk_query_t query = aclk_query_new(ALARM_LOG_HEALTH);
     query->data.bin_payload.payload = generate_alarm_log_health(&query->data.bin_payload.size, log_health);
     query->data.bin_payload.topic = ACLK_TOPICID_ALARM_HEALTH;
     query->data.bin_payload.msg_name = "AlarmLogHealth";
+    query->node_id = strdupz(node_id);
+    query->context = NULL;
     QUEUE_IF_PAYLOAD_PRESENT(query);
 }
 
-void aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry)
+void aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry, const char *node_id, const char *context)
 {
     size_t payload_size;
     char *payload = generate_alarm_log_entry(&payload_size, log_entry);
 
-    aclk_send_bin_msg(payload, payload_size, ACLK_TOPICID_ALARM_LOG, "AlarmLogEntry");
+    aclk_send_bin_msg(payload, payload_size, ACLK_TOPICID_ALARM_LOG, "AlarmLogEntry", node_id, context);
 }
 
 void aclk_send_provide_alarm_cfg(struct provide_alarm_configuration *cfg)
