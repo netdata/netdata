@@ -48,7 +48,11 @@ else
   INTERACTIVE=1
 fi
 
-script_name=$(basename "$0")
+if [ -n "${script_source}" ]; then
+  script_name="$(basename "${script_source}")"
+else
+  script_name="netdata-updater.sh"
+fi
 
 info() {
   echo >&3 "$(date) : INFO: ${script_name}: " "${@}"
