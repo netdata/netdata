@@ -594,8 +594,6 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
                             "DELETE FROM aclk_chart_latest_%s;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
         db_lock();
         buffer_flush(sql);
-        log_access(
-            "ACLK REQ [%s (%s)]: Received chart full resync.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
         buffer_sprintf(
             sql,
             "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; "
