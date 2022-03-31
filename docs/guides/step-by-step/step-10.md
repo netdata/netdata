@@ -33,7 +33,7 @@ Let's dive in!
 
 ## Wait. What's a proxy?
 
-A proxy is a middleman between the internet and a service you're running on your system. Traffic from the internet at
+A proxy is a intermediary between the internet and a service you're running on your system. Traffic from the internet at
 large enters your system through the proxy, which then routes it to the service.
 
 A proxy is often used to enable encrypted HTTPS connections with your browser, but they're also useful for load

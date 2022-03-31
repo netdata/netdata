@@ -179,7 +179,7 @@ netdata (1.6.0) - 2017-03-20
 -   new plugins
 
     @l2isbad builds python data collection plugins for netdata at an wonderful
-    rate! He rocks!
+    rate! They rocks!
 
     -   **web_log** for monitoring in real-time all kinds of web server log files @l2isbad
     -   **freeipmi** for monitoring IPMI (server hardware)

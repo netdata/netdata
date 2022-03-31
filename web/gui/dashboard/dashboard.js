@@ -5242,7 +5242,7 @@ NETDATA.onscrollUpdater = function () {
         NETDATA.abortAllRefreshes();
     }
 
-    // when the user scrolls he sees that we have
+    // when the user scrolls they sees that we have
     // hidden all the not-visible charts
     // using this little function we try to switch
     // the charts back to visible quickly
@@ -6666,7 +6666,7 @@ let chartState = function (element) {
 
                 // de-allocate data
                 // This works, but I not sure there are no corner cases somewhere
-                // so it is commented - if the user has memory issues he can
+                // so it is commented - if the user has memory issues they can
                 // set Destroy on Hide for all charts
                 // this.data = null;
             }

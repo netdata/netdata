@@ -496,7 +496,7 @@ filter_recipient_by_criticality() {
 
   case "${status}" in
   CRITICAL)
-    # make sure he will get future notifications for this alarm too
+    # make sure they will get future notifications for this alarm too
     touch "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
     debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: the alarm is CRITICAL (will now receive next status change)"
     return 0
@@ -504,7 +504,7 @@ filter_recipient_by_criticality() {
 
   WARNING)
     if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]; then
-      # we do not remove the file, so that he will get future notifications of this alarm
+      # we do not remove the file, so that they will get future notifications of this alarm
       debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (will still receive next status change)"
       return 0
     fi
@@ -512,7 +512,7 @@ filter_recipient_by_criticality() {
 
   *)
     if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]; then
-      # remove the file, so that he will only receive notifications for CRITICAL states for this alarm
+      # remove the file, so that they will only receive notifications for CRITICAL states for this alarm
       rm "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
       debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm (will only receive CRITICAL notifications from now on)"
       return 0

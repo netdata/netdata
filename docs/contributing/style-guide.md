@@ -86,8 +86,8 @@ mechanics](#language-grammar-and-mechanics) section below.
 - Avoid disability-related idioms like "lame" or "falling on deaf ears." Don't refer to a person's disability unless
   it’s directly relevant to what you're writing.
 - Don't call groups of people "guys." Don't call women "girls."
-- Avoid gendered terms in favor of neutral alternatives, like "server" instead of "waitress" and "businessperson"
-  instead of "businessman."
+- Avoid gendered terms in favor of neutral alternatives, like "server" instead of "waiter" and "businessperson"
+  instead of "businessperson."
 - When writing about a person, use their communicated pronouns. When in doubt, just ask or use their name. It's OK to
   use "they" as a singular pronoun.
 

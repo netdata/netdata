@@ -46,7 +46,7 @@ perfect for testing and experimentation.
 Aside from creating incredible contributions to Netdata, Mahlon works at [LAIKA](https://www.laika.com/), an
 Oregon-based animation studio that's helped create acclaimed films like _Coraline_ and _Kubo and the Two Strings_.
 
-As part of his work to maintain the company's infrastructure of render farms, workstations, and virtual machines, he's
+As part of their work to maintain the company's infrastructure of render farms, workstations, and virtual machines, they's
 using Netdata, `netdata-timescale-relay`, and TimescaleDB to store Netdata metrics alongside other data from other
 sources.
 

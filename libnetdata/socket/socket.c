@@ -436,7 +436,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
     }
 
-    //Case the user does not set the option SSL in the "bind to", but he has
+    //Case the user does not set the option SSL in the "bind to", but they has
     //the certificates, I must redirect, so I am assuming here the default option
     if(!(acl_flags & WEB_CLIENT_ACL_SSL_OPTIONAL) && !(acl_flags & WEB_CLIENT_ACL_SSL_FORCE)) {
         acl_flags |= WEB_CLIENT_ACL_SSL_DEFAULT;

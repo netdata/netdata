@@ -12,7 +12,7 @@
 #
 # It supports several method for this detection:
 #
-# 1. cgroup-network (the binary father of this script) detects veth network interfaces,
+# 1. cgroup-network (the binary parent of this script) detects veth network interfaces,
 #    by examining iflink and ifindex IDs and switching namespaces
 #    (it also detects the interface name as it is used by the container).
 #

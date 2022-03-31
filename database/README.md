@@ -190,7 +190,7 @@ The files that `CONFIG_KSM=y` offers include:
     ksmd will evaluate on each run.
 
 So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources
-he/she is willing `ksmd` to use.
+they/they is willing `ksmd` to use.
 
 ### Run `ksmd` kernel daemon
 

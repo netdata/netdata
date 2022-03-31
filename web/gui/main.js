@@ -4814,7 +4814,7 @@ function signInDidClick(e) {
     e.stopPropagation();
 
     if (!NETDATA.registry.isUsingGlobalRegistry()) {
-        // If user is using a private registry, request his consent for
+        // If user is using a private registry, request their consent for
         // synchronizing with cloud.
         showSignInModal();
         return;

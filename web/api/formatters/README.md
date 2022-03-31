@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatte
 # Query formatting
 
 API data queries need to be formatted before returned to the caller.
-Using API parameters, the caller may define the format he/she wishes to get back.
+Using API parameters, the caller may define the format they/they wishes to get back.
 
 The following formats are supported:
 
