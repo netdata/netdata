@@ -325,8 +325,6 @@ static void replication_attempt_to_connect(RRDHOST *host)
             log_replication_connection(rep_state->client_ip, rep_state->client_port, host->rrdpush_send_api_key, host->machine_guid, host->hostname, "SOCKET CONVERSION TO FD FAILED - SOCKET ERROR");
             error("%s %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", REPLICATION_MSG, host->hostname, rep_state->client_ip, rep_state->client_port, rep_state->socket);
             close(rep_state->socket);
-            fclose(rep_state->fp);
-            // return 0;
         } 
     }
     else {
@@ -1093,7 +1091,7 @@ int save_gap(GAP *a_gap)
 
     if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
         return 0;
-    if ((*a_gap->status == '\0'))
+    if (!a_gap || (*a_gap->status == '\0'))
         return 0;
     
     rc = sql_store_gap(
@@ -1657,8 +1655,10 @@ void sender_gap_filling(REPLICATION_STATE *rep_state, GAP a_gap)
 void sender_chart_gap_filling(RRDSET *st, GAP a_gap) {
     REPLICATION_STATE *rep_state = st->rrdhost->replication->tx_replication;
     rrdset_rdlock(st);    
-    if(unlikely(!should_send_chart_matching(st)))
+    if(unlikely(!should_send_chart_matching(st))){
+        rrdset_unlock(st);    
         return;
+    }
 
     replication_start(rep_state);         // Locks the sender buffer
     if(need_to_send_chart_definition(st))
