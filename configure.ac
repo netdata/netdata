@@ -292,6 +292,26 @@ freebsd*)
 darwin*)
     build_target=macos
     LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
+    # -----------------------------------------------------------------------------
+    # Pull in OpenSSL properly if on macOS
+    if brew --prefix > /dev/null 2>&1; then
+      if brew --prefix --installed openssl > /dev/null 2>&1; then
+        HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl)
+      elif brew --prefix --installed openssl@3 > /dev/null 2>&1; then
+        HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@3)
+      elif brew --prefix --installed openssl@1.1 > /dev/null 2>&1; then
+        HOMEBREW_OPENSSL_PREFIX=$(brew --prefix --installed openssl@1.1)
+      fi
+      if test -n "${HOMEBREW_OPENSSL_PREFIX}"; then
+        OPTIONAL_OS_DEP_CFLAGS="-I${HOMEBREW_OPENSSL_PREFIX}/include"
+        CFLAGS="${CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
+        LDFLAGS="${LDFLAGS} -L${HOMEBREW_OPENSSL_PREFIX}/lib"
+      fi
+      HOMEBREW_PREFIX=$(brew --prefix)
+      OPTIONAL_OS_DEP_CFLAGS="${OPTIONAL_OS_DEP_CFLAGS} -I${HOMEBREW_PREFIX}/include"
+      CFLAGS="${CFLAGS} -I${HOMEBREW_PREFIX}/include"
+      LDFLAGS="${LDFLAGS} -L${HOMEBREW_PREFIX}/lib"
+    fi
     ;;
 *)
     build_target=linux

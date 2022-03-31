@@ -7,6 +7,7 @@ gpgkey=https://packagecloud.io/netdata/netdata/gpgkey
 enabled=1
 sslverify=1
 sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+priority=50
 
 [netdata-repoconfig]
 name=Netdata Repository Config
@@ -17,3 +18,4 @@ gpgkey=https://packagecloud.io/netdata/netdata-repoconfig/gpgkey
 enabled=1
 sslverify=1
 sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+priority=50

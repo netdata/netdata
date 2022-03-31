@@ -132,9 +132,9 @@ install_build_dependencies() {
   fi
 
   info "Fetching dependency handling script..."
-  download "${PACKAGES_SCRIPT}" "${TMPDIR}/install-required-packages.sh" || true
+  download "${PACKAGES_SCRIPT}" "./install-required-packages.sh" || true
 
-  if [ ! -s "${TMPDIR}/install-required-packages.sh" ]; then
+  if [ ! -s "./install-required-packages.sh" ]; then
     error "Downloaded dependency installation script is empty."
   else
     info "Running dependency handling script..."
@@ -142,7 +142,7 @@ install_build_dependencies() {
     opts="--dont-wait --non-interactive"
 
     # shellcheck disable=SC2086
-    if ! "${bash}" "${TMPDIR}/install-required-packages.sh" ${opts} netdata >&3 2>&3; then
+    if ! "${bash}" "./install-required-packages.sh" ${opts} netdata >&3 2>&3; then
       error "Installing build dependencies failed. The update should still work, but you might be missing some features."
     fi
   fi
@@ -511,11 +511,11 @@ set_tarball_urls() {
 update_build() {
   [ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
-  install_build_dependencies
-
   RUN_INSTALLER=0
   ndtmpdir=$(create_tmp_directory)
   cd "$ndtmpdir" || exit 1
+
+  install_build_dependencies
 
   if update_available; then
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
