@@ -8,11 +8,11 @@ sidebar_label: "eBPF"
 
 # eBPF monitoring with Netdata
 
-The Netdata Agent provides many [eBPF](https://ebpf.io/what-is-ebpf/) programs to help you troubleshoot and debug how applications that interact with the Linux kernel. The `ebpf.plugin` uses [tracepoints, trampoline, and2 kprobes](#data-collection) to collect a wide array of high value data about the host that would otherwise be impossible to capture. 
+The Netdata Agent provides many [eBPF](https://ebpf.io/what-is-ebpf/) programs to help you troubleshoot and debug how applications interact with the Linux kernel. The `ebpf.plugin` uses [tracepoints, trampoline, and2 kprobes](#data-collection) to collect a wide array of high value data about the host that would otherwise be impossible to capture. 
 
 > ❗ eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels on CentOS 7.6 or later. For kernels older than `4.11.0`, improved support is in active development.
 
-This document provides all details about the `ebpf.plugin`.
+This document provides comprehensive details about the `ebpf.plugin`.
 For hands-on configuration and troubleshooting tips see our [tutorial on troubleshooting apps with eBPF metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md).
 
 <figure>
@@ -298,7 +298,7 @@ The following options are available:
 -   `ports`: Define the destination ports for Netdata to monitor.
 -   `hostnames`: The list of hostnames that can be resolved to an IP address.
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresses, but this can
+    range of IPs, or use CIDR values. By default, only data for private IP addresses is collected, but this can
     be changed with the `ips` setting.
 
 By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions,
@@ -325,8 +325,7 @@ service in network connection charts, and thus see the name of the service inste
 
 ### Sync configuration
 
-The sync configuration has specific options to disable monitoring for syscalls, as default option all syscalls are
-monitored.
+The sync configuration has specific options to disable monitoring for syscalls.  All syscalls are monitored by default.
 
 ```conf
 [syscalls]
@@ -340,7 +339,7 @@ monitored.
 
 ### Filesystem configuration
 
-The filesystem configuration has specific options to disable monitoring for filesystems, by default all filesystems are
+The filesystem configuration has specific options to disable monitoring for filesystems; by default, all filesystems are
 monitored.
 
 ```conf
@@ -538,7 +537,7 @@ added relatively recently.
 
 #### Dirty pages
 
-A "dirty page" is a pages in the page cache that was modified after being created. Since non-dirty pages in the page cache
+A "dirty page" is a page in the page cache that was modified after being created. Since non-dirty pages in the page cache
  have identical copies in secondary storage (e.g. hard disk drive or solid-state drive), discarding and reusing their space
  is much quicker than paging out application memory, and is often preferred over flushing the dirty pages into secondary storage
  and reusing their space.
