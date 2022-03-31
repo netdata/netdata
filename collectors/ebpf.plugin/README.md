@@ -240,7 +240,7 @@ You can also enable the following eBPF programs:
 
 ### Configuring eBPF threads
 
-You can configure each thread of the eBPF data collector. @thiagoftsm Can you give some details why/ when you should configure a thread? 
+You can configure each thread of the eBPF data collector. This allows you to overwrite global options defined in `/etc/netdata/ebpf.d.conf` and configure specific options for each thread.
 
 To configure an eBPF thread:
 
