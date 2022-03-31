@@ -1299,6 +1299,50 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     return HTTP_RESP_OK;
 }
 
+int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    long long baseline_after = 0, baseline_before = 0, highlight_after = 0, highlight_before = 0, max_points = 0;
+ 
+    while (url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name)
+            continue;
+        if (!value || !*value)
+            continue;
+
+        if (!strcmp(name, "baseline_after"))
+            baseline_after = (long long) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "baseline_before"))
+            baseline_before = (long long) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "highlight_after"))
+            highlight_after = (long long) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "highlight_before"))
+            highlight_before = (long long) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "max_points"))
+            max_points = (long long) strtoul(value, NULL, 0);
+        
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
+
+    if (!highlight_after || !highlight_before)
+        buffer_strcat(wb, "{\"error\": \"Missing or invalid required highlight after and before parameters.\" }");
+    else {
+        metric_correlations(host, wb, baseline_after, baseline_before, highlight_after, highlight_before, max_points);
+    }
+
+    return HTTP_RESP_OK;
+}
+
 static struct api_command {
     const char *command;
     uint32_t hash;
@@ -1330,8 +1374,9 @@ static struct api_command {
         { "ml_info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_info            },
 #endif
 
-        { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
-        { "aclk",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_state      },
+        { "manage/health",       0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health         },
+        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_state          },
+        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_metric_correlations },
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };

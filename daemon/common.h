@@ -84,6 +84,9 @@
 #include "commands.h"
 #include "analytics.h"
 
+// metric correlations
+#include "database/metric_correlations.h"
+
 // global netdata daemon variables
 extern char *netdata_configured_hostname;
 extern char *netdata_configured_user_config_dir;
