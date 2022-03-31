@@ -5,7 +5,7 @@
 /*
  * @Input:
  *      q / The queue instance that the item will be pushed into
- * 		i / The item which will be pushed into the queue
+ * 	    i / The item which will be pushed into the queue
  * @Return
  *      If the node is pushed the queue, it returns with 1, otherwise 0 
  */
@@ -19,6 +19,7 @@ int queue_push(queue_t q, void* i)
 	pthread_mutex_lock(&q->lock);
 	while(q->count == q->max){
 		if(q->blocked == 0){
+			free(temp);
 			pthread_mutex_unlock(&q->lock);
 			return 0;
 		}
