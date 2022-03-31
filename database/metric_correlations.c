@@ -106,9 +106,9 @@ void run_diffs_and_rev (struct per_dim *d, long long hp, long long bp)
 {
     int k, j;
 
-    for (k = 0, j = bp; k < bp; k++, j--)
+    for (k = 0, j = bp; k < bp - 1; k++, j--)
         d->baseline_diffs[k] = (double)d->baseline[j - 2] - (double)d->baseline[j - 1];
-    for (k = 0, j = hp; k < hp; k++, j--) {
+    for (k = 0, j = hp; k < hp - 1; k++, j--) {
         d->highlight_diffs[k] = (double)d->highlight[j - 2] - (double)d->highlight[j - 1];
     }
 }
