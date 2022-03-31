@@ -1901,7 +1901,9 @@ char *get_hostname_by_node_id(char *node)
     }
 
     uuid_t node_id;
-    uuid_parse(node, node_id);
+    if (uuid_parse(node, node_id))
+        return NULL;
+
     rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOSTNAME_BY_NODE_ID, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch hostname by node id");
