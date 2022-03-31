@@ -380,7 +380,6 @@ You can run our helper script to determine whether your system can support eBPF 
 curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh | sudo bash
 ```
 
-If this script returns no output, your system is ready to compile and run the eBPF collector.
 
 If you see a warning about a missing kernel
 configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL BPF_JIT`), you will need to recompile your kernel
