@@ -167,7 +167,9 @@ typedef enum rrddim_flags {
     // No new values have been collected for this dimension since agent start or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
-    RRDDIM_FLAG_ACLK                            = (1 << 4)
+    RRDDIM_FLAG_ACLK                            = (1 << 4),
+
+    RRDDIM_FLAG_PENDING_FOREACH_ALARM           = (1 << 5), // set when foreach alarm has not been initialized yet
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -476,6 +478,8 @@ typedef enum rrdset_flags {
     // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED            = 1 << 15,
     RRDSET_FLAG_ACLK                = 1 << 16,
+
+    RRDSET_FLAG_PENDING_FOREACH_ALARMS = 1 << 17, // contains dims with uninitialized foreach alarms
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -634,6 +638,7 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_EXPORTING_DONT_SEND      = 1 << 4, // don't send it to external databases
     RRDHOST_FLAG_ARCHIVED               = 1 << 5, // The host is archived, no collected charts yet
     RRDHOST_FLAG_MULTIHOST              = 1 << 6, // Host belongs to localhost/megadb
+    RRDHOST_FLAG_PENDING_FOREACH_ALARMS  = 1 << 7, // contains dims with uninitialized foreach alarms
 } RRDHOST_FLAGS;
 
 #ifdef HAVE_C___ATOMIC

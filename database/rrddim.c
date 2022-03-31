@@ -3,36 +3,6 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
-static inline void calc_link_to_rrddim(RRDDIM *rd)
-{
-    RRDHOST *host = rd->rrdset->rrdhost;
-    RRDSET  *st = rd->rrdset;
-
-    if (st->state && st->state->is_ar_chart)
-        return;
-
-    if (host->alarms_with_foreach || host->alarms_template_with_foreach) {
-        int count = 0;
-        int hostlocked;
-        for (count = 0; count < 5; count++) {
-            hostlocked = netdata_rwlock_trywrlock(&host->rrdhost_rwlock);
-            if (!hostlocked) {
-                rrdcalc_link_to_rrddim(rd, st, host);
-                rrdhost_unlock(host);
-                break;
-            } else if (hostlocked != EBUSY) {
-                error("Cannot lock host to create an alarm for the dimension.");
-            }
-            sleep_usec(USEC_PER_MS * 200);
-        }
-
-        if (count == 5) {
-            error(
-                "Failed to create an alarm for dimension %s of chart %s 5 times. Skipping alarm.", rd->name, st->name);
-        }
-    }
-}
-
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
@@ -248,7 +218,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
             rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
             rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-            calc_link_to_rrddim(rd);
+
+            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
+            rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
+            rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
         }
         if (unlikely(rc)) {
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
@@ -457,7 +430,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
-    calc_link_to_rrddim(rd);
+    rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
+    rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
 
     ml_new_dimension(rd);
 
