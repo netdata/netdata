@@ -19,6 +19,10 @@ Source7:        netdata-edge.repo.ol
 
 BuildArch:      noarch
 
+%if 0%{?centos_ver} < 8
+Requires:       yum-plugin-priorities
+%endif
+
 # Overlapping file installs
 Conflicts:      netdata-repo-edge
 
