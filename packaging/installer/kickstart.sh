@@ -204,6 +204,17 @@ trap_handler() {
 
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ERROR ${TPUT_RESET} Installer exited unexpectedly (${code}-${lineno})"
 
+  case "${code}" in
+    0)
+      printf >&2 "%s\n" "This is almost certainly the result of a bug. If you have time, please report it at ${AGENT_BUG_REPORT_URL}."
+      ;;
+    *)
+      printf >&2 "%s\n" "This is probably a result of a transient issue on your system. Things should work correctly if you try again."
+      printf >&2 "%s\n" "If you continue to experience this issue, you can reacn out to us for support on:"
+      support_list
+      ;;
+  esac
+
   telemetry_event INSTALL_CRASH "Installer exited unexpectedly (${code}-${lineno})" "E${code}-${lineno}"
 
   trap - EXIT
