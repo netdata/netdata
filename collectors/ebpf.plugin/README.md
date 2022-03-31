@@ -374,7 +374,7 @@ grep -i ebpf /var/log/netdata/error.log
 The eBPF collector only works on Linux systems and with specific Linux kernels. We support all kernels more recent than
 `4.11.0`, and all kernels on CentOS 7.6 or later.
 
-You can run our helper script to determine whether your system can support eBPF monitoring.
+You can run our helper script to determine whether your system can support eBPF monitoring. If it returns no output, your system is ready to compile and run the eBPF collector.
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh | sudo bash
