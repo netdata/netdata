@@ -361,8 +361,7 @@ output.
 
 ```bash
 cd /usr/libexec/netdata/plugins.d/
-sudo su -s /bin/bash netdata
-./ebpf.plugin
+sudo su -s /bin/bash ./ebpf.plugin
 ```
 
 You can also use `grep` to search the Agent's `error.log` for messages related to eBPF monitoring.
