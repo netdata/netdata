@@ -251,6 +251,18 @@ setup_terminal() {
   return 0
 }
 
+support_list() {
+  printf >&2 "%s\n" "  - GitHub: ${DISCUSSIONS_URL}"
+  printf >&2 "%s\n" "  - Discord: ${DISCORD_INVITE}"
+  printf >&2 "%s\n" "  - Our community forums: ${FORUM_URL}"
+}
+
+success_banner() {
+  printf >&2 "%s\n\n" "Official documentation can be found online at ${DOCS_URL}."
+  printf >&2 "%s\n" "Join our community and connect with us on:"
+  support_list
+}
+
 cleanup() {
   if [ -z "${NO_CLEANUP}" ]; then
     ${ROOTCMD} rm -rf "${tmpdir}"
@@ -259,6 +271,8 @@ cleanup() {
 
 fatal() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%s\n" "For community support, you can connect with us on:"
+  support_list
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
   cleanup
   trap - EXIT
@@ -713,6 +727,8 @@ handle_existing_install() {
       if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
         if ! update; then
           warning "Failed to update existing Netdata install at ${ndprefix}."
+        else
+          progress "Successfully updated existing netdata install at ${ndprefix}."
         fi
       else
         warning "Not updating existing install at ${ndprefix}."
@@ -729,6 +745,7 @@ handle_existing_install() {
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
 
+      success_banner
       cleanup
       trap - EXIT
       exit $ret
@@ -924,6 +941,8 @@ claim() {
   esac
 
   if [ -z "${NETDATA_NEW_INSTALL}" ]; then
+    printf >&2 "%s\n" "For community support, you can connect with us on:"
+    support_list
     cleanup
     trap - EXIT
     exit 1
@@ -1654,6 +1673,7 @@ cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}
 
 if [ "${ACTION}" = "uninstall" ]; then
   uninstall
+  printf >&2 "Finished uninstalling the Netdata Agent."
   cleanup
   trap - EXIT
   exit 0
@@ -1675,6 +1695,8 @@ fi
 
 set_auto_updates
 
+print >&2 "%s\n\n" "Successfully installed the Netdata Agent."
+success_banner
 telemetry_event INSTALL_SUCCESS "" ""
 cleanup
 trap - EXIT
