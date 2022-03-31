@@ -422,9 +422,9 @@ detect_package_manager_from_distribution() {
     centos* | clearos* | rocky* | almalinux*)
       package_installer=""
       tree="centos"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
-      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ]; then
+      [ -n "${dnf}" ] && package_installer="install_dnf"
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -433,8 +433,8 @@ detect_package_manager_from_distribution() {
     fedora* | redhat* | red\ hat* | rhel*)
       package_installer=
       tree="rhel"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
@@ -444,8 +444,8 @@ detect_package_manager_from_distribution() {
     ol*)
       package_installer=
       tree="ol"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
