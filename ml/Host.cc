@@ -210,7 +210,7 @@ static void updateDetectionChart(RRDHOST *RH) {
             "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
-            39187, // priority
+            136000, // priority
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_STACKED // chart_type
         );
@@ -251,7 +251,7 @@ static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
             "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
-            39188, // priority
+            136001, // priority
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_STACKED // chart_type
         );
