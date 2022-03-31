@@ -133,6 +133,9 @@ static inline int should_send_chart_matching(RRDSET *st) {
     if (unlikely(st->state->is_ar_chart))
         return false;
 
+    if (rrdset_flag_check(st, RRDSET_FLAG_ANOMALY_DETECTION))
+        return ml_streaming_enabled();
+
     if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED))) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
         rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);

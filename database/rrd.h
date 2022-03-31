@@ -476,6 +476,7 @@ typedef enum rrdset_flags {
     // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED            = 1 << 15,
     RRDSET_FLAG_ACLK                = 1 << 16,
+    RRDSET_FLAG_ANOMALY_DETECTION   = 1 << 17, // flag to identify anomaly detection charts.
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC

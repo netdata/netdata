@@ -214,6 +214,10 @@ void ml_dimension_update_name(RRDSET *RS, RRDDIM *RD, const char *Name) {
     D->setAnomalyRateRDName(Name);
 }
 
+bool ml_streaming_enabled() {
+    return Cfg.StreamADCharts;
+}
+
 #if defined(ENABLE_ML_TESTS)
 
 #include "gtest/gtest.h"

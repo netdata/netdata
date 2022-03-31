@@ -58,4 +58,8 @@ void ml_dimension_update_name(RRDSET *RS, RRDDIM *RD, const char *name) {
     (void) name;
 }
 
+bool ml_streaming_enabled() {
+    return false;
+}
+
 #endif

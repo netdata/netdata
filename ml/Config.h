@@ -33,6 +33,8 @@ public:
     double ADWindowRateThreshold;
     double ADDimensionRateThreshold;
 
+    bool StreamADCharts;
+
     std::string HostsToSkip;
     SIMPLE_PATTERN *SP_HostsToSkip;
 

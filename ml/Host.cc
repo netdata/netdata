@@ -41,6 +41,7 @@ static void updateDimensionsChart(RRDHOST *RH,
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
+        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
 
         NumTotalDimensionsRD = rrddim_add(RS, "total", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -87,6 +88,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
+        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
 
         AnomalyRateRD = rrddim_add(RS, "anomaly_rate", NULL,
                 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -124,6 +126,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
+        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
 
         WindowLengthRD = rrddim_add(RS, "duration", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -165,6 +168,7 @@ static void updateEventsChart(RRDHOST *RH,
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
+        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
 
         AboveThresholdRD = rrddim_add(RS, "above_threshold", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
