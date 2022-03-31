@@ -451,7 +451,7 @@ get_system_info() {
             opensuse-leap)
                 DISTRO_COMPAT_NAME="opensuse"
                 ;;
-            rocky|rhel)
+            almalinux|rocky|rhel)
                 DISTRO_COMPAT_NAME="centos"
                 ;;
             *)

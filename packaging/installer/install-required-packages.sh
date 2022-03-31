@@ -198,7 +198,7 @@ get_os_release() {
   eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
   for x in "${ID}" ${ID_LIKE}; do
     case "${x,,}" in
-      alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
+      almalinux | alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
         distribution="${x}"
         version="${VERSION_ID}"
         codename="${VERSION}"
@@ -419,12 +419,12 @@ detect_package_manager_from_distribution() {
       fi
       ;;
 
-    centos* | clearos* | rocky*)
+    centos* | clearos* | rocky* | almalinux*)
       package_installer=""
       tree="centos"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
-      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ]; then
+      [ -n "${dnf}" ] && package_installer="install_dnf"
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -433,8 +433,8 @@ detect_package_manager_from_distribution() {
     fedora* | redhat* | red\ hat* | rhel*)
       package_installer=
       tree="rhel"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
@@ -444,8 +444,8 @@ detect_package_manager_from_distribution() {
     ol*)
       package_installer=
       tree="ol"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
