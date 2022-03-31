@@ -1885,6 +1885,7 @@ failed:
 char *get_hostname_by_node_id(char *node)
 {
     sqlite3_stmt *res = NULL;
+    char  *hostname = NULL;
     int rc;
 
     rrd_rdlock();
@@ -1913,7 +1914,6 @@ char *get_hostname_by_node_id(char *node)
         goto failed;
     }
 
-    char  *hostname = NULL;
     rc = sqlite3_step(res);
     if (likely(rc == SQLITE_ROW))
         hostname = strdupz((char *)sqlite3_column_text(res, 0));
