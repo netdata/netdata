@@ -160,9 +160,11 @@ Below is a list of all the available configuration params and their default valu
 	# maximum num samples to train = 14400
 	# minimum num samples to train = 3600
 	# train every = 3600
+	# dbengine anomaly rate every = 60
 	# num samples to diff = 1
 	# num samples to smooth = 3
 	# num samples to lag = 5
+	# random sampling ratio = 0.2
 	# maximum number of k-means iterations = 1000
 	# dimension anomaly score threshold = 0.99
 	# host anomaly rate threshold = 0.01000
@@ -172,7 +174,7 @@ Below is a list of all the available configuration params and their default valu
 	# window minimum anomaly rate = 0.25000
 	# anomaly event min dimension rate threshold = 0.05000
 	# hosts to skip from training = !*
-	# charts to skip from training = !system.* !cpu.* !mem.* !disk.* !disk_* !ip.* !ipv4.* !ipv6.* !net.* !net_* !netfilter.* !services.* !apps.* !groups.* !user.* !ebpf.* !netdata.* *
+	# charts to skip from training = netdata.*
 ```
 
 ### Descriptions (min/max)
@@ -181,9 +183,11 @@ Below is a list of all the available configuration params and their default valu
 - `maximum num samples to train`: (`3600`/`21600`) This is the maximum amount of time you would like to train each model on. For example, the default of `14400` trains on the preceding 4 hours of data, assuming an `update every` of 1 second.
 - `minimum num samples to train`: (`900`/`21600`) This is the minimum amount of data required to be able to train a model. For example, the default of `3600` implies that once at least 1 hour of data is available for training, a model is trained, otherwise it is skipped and checked again at the next training run.
 - `train every`: (`1800`/`21600`) This is how often each model will be retrained. For example, the default of `3600` means that each model is retrained every hour. Note: The training of all models is spread out across the `train every` period for efficiency, so in reality, it means that each model will be trained in a staggered manner within each `train every` period.
+- `dbengine anomaly rate every`: (`30`/`900`) This is how often netdata will aggregate all the anomaly bits into a single chart (`anomaly_detection.anomaly_rates`) that is used internally to quickly enable anomaly rate ranking over _all_ metrics with one api call as opposed to a call per chart.
 - `num samples to diff`: (`0`/`1`) This is a `0` or `1` to determine if you want the model to operate on differences of the raw data or just the raw data. For example, the default of `1` means that we take differences of the raw values. Using differences is more general and works on dimensions that might naturally tend to have some trends or cycles in them that is normal behavior to which we don't want to be too sensitive.
 - `num samples to smooth`: (`0`/`5`) This is a small integer that controls the amount of smoothing applied as part of the feature processing used by the model. For example, the default of `3` means that the rolling average of the last 3 values is used. Smoothing like this helps the model be a little more robust to spiky types of dimensions that naturally "jump" up or down as part of their normal behavior.
 - `num samples to lag`: (`0`/`5`) This is a small integer that determines how many lagged values of the dimension to include in the feature vector. For example, the default of `5` means that in addition to the most recent (by default, differenced and smoothed) value of the dimension, the feature vector will also include the 5 previous values too. Using lagged values in our feature representation allows the model to work over strange patterns over recent values of a dimension as opposed to just focusing on if the most recent value itself is big or small enough to be anomalous.
+- `random sampling ratio`: (`0.2`/`1.0`) This is an efficiency paramater that tells the ML to just randomly sample `random sampling ratio` of training data when training models. The default of `0.2` means that Netdata will train on a random 20% of training data. This can be useful for minimizing any system over head costs of training while still typically giving useful models even if they were only trained on a random 20% sample of the training data.
 - `maximum number of k-means iterations`: This is a parameter that can be passed to the model to limit the number of iterations in training the k-means model. Vast majority of cases can ignore and leave as default.
 - `dimension anomaly score threshold`: (`0.01`/`5.00`) This is the threshold at which an individual dimension at a specific timestep is considered anomalous or not. For example, the default of `0.99` means that a dimension with an anomaly score of 99% or higher is flagged as anomalous. This is a normalized probability based on the training data, so the default of 99% means that anything that is as strange (based on distance measure) or more strange as the most strange 1% of data observed during training will be flagged as anomalous. If you wanted to make the anomaly detection on individual dimensions more sensitive you could try a value like `0.90` (90%) or to make it less sensitive you could try `1.5` (150%).
 - `host anomaly rate threshold`: (`0.0`/`1.0`) This is the percentage of dimensions (based on all those enabled for anomaly detection) that need to be considered anomalous at specific timestep for the host itself to be considered anomalous. For example, the default value of `0.01` means that if more than 1% of dimensions are anomalous at the same time then the host itself is considered in an anomalous state.
