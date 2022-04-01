@@ -236,9 +236,9 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
                 buffer_strcat(wb, "\n\t\t\"");
                 buffer_strcat(wb, st->id);
                 buffer_strcat(wb, "\": {\n");
-                buffer_strcat(wb, "\t\t\t\"");
+                buffer_strcat(wb, "\t\t\t\"context\": \"");
                 buffer_strcat(wb, st->context);
-                buffer_strcat(wb, "\": {\n");
+                buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
                 buffer_sprintf(wb, "%s", buffer_tostring(wdims));
                 buffer_strcat(wb, "\t\t\t}\n");
                 total_dims += dims;
