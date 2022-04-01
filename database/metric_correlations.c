@@ -6,12 +6,12 @@
 #define MAX_POINTS 10000
 
 struct per_dim {
-    const char *dimension;
-    calculated_number *baseline;
-    calculated_number *highlight;
+    char *dimension;
+    calculated_number baseline[MAX_POINTS];
+    calculated_number highlight[MAX_POINTS];
 
-    double *baseline_diffs;
-    double *highlight_diffs;
+    double baseline_diffs[MAX_POINTS];
+    double highlight_diffs[MAX_POINTS];
 };
 
 int find_index(double arr[], long long n, double K, long long start)
@@ -89,13 +89,13 @@ void fill_nan (struct per_dim *d, long long hp, long long bp)
     int k;
 
     for (k = 0; k < bp; k++) {
-        if (d && isnan(d->baseline[k])) {
+        if (isnan(d->baseline[k])) {
             d->baseline[k] = 0.0;
         }
     }
 
     for (k = 0; k < hp; k++) {
-        if (d && isnan(d->highlight[k])) {
+        if (isnan(d->highlight[k])) {
             d->highlight[k] = 0.0;
         }
     }
@@ -120,31 +120,26 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
     long c;
-    int i=0, j;
+    int i=0, j=0;
+    int b_dims = 0;
 
     struct per_dim *pd = NULL;
 
     //TODO get everything in one go, when baseline is right before highlight
     //get baseline
-    RRDR *r = rrd2rrdr(st, max_points, baseline_after, baseline_before, group_method, group_time, options, NULL, context_param_list);
-    if(!r) {
+    RRDR *rb = rrd2rrdr(st, max_points, baseline_after, baseline_before, group_method, group_time, options, NULL, context_param_list);
+    if(!rb) {
         info("Cannot generate metric correlations output with these parameters on this chart.");
         return 0;
     } else {
-        for (c = 0; c != rrdr_rows(r) ; ++c) {
+        pd = mallocz(sizeof(struct per_dim) * rb->d);
+        b_dims = rb->d;
+        for (c = 0; c != rrdr_rows(rb) ; ++c) {
             RRDDIM *d;
-             // for each dimension
-            for (j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
-                calculated_number *cn = &r->v[ c * r->d ];
-                //i++;
+            for (j = 0, d = rb->st->dimensions ; d && j < rb->d ; ++j, d = d->next) {
+                calculated_number *cn = &rb->v[ c * rb->d ];
                 if (!c) {
-                    //TODO handle highlight while in highlight query
                     //TODO use points from query
-                    pd = reallocz(pd, sizeof(struct per_dim) * (j+1));
-                    pd[j].highlight = callocz(highlight_points + 1, sizeof(calculated_number));
-                    pd[j].baseline = callocz(baseline_points + 1, sizeof(calculated_number));
-                    pd[j].highlight_diffs = callocz(highlight_points + 1, sizeof(double));
-                    pd[j].baseline_diffs = callocz(baseline_points + 1, sizeof(double));
                     pd[j].dimension = strdupz (d->name);
                     pd[j].baseline[c] = cn[j];
                 } else {
@@ -153,35 +148,38 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
             }
         }
     }
-    rrdr_free(r);
-    
+    rrdr_free(rb);
     if (!pd)
         return 0;
 
     //get highlight
-    r = rrd2rrdr(st, max_points, highlight_after, highlight_before, group_method, group_time, options, NULL, context_param_list);
-    if(!r) {
+    RRDR *rh = rrd2rrdr(st, max_points, highlight_after, highlight_before, group_method, group_time, options, NULL, context_param_list);
+    if(!rh) {
         info("Cannot generate metric correlations output with these parameters on this chart.");
         freez(pd);
         return 0;
     } else {
-        for (c = 0; c != rrdr_rows(r) ; ++c) {
+        if (rh->d != b_dims) {
+            //TODO handle different dims
+            rrdr_free(rh);
+            freez(pd);
+            return 0;
+        }
+        for (c = 0; c != rrdr_rows(rh) ; ++c) {
             RRDDIM *d;
-            // for each dimension
-            for (j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
-                calculated_number *cn = &r->v[ c * r->d ];
-                //value = cn[j];
-                //i++;
-                pd[j].highlight[c] = cn[j];
+            for (j = 0, d = rh->st->dimensions ; d && j < rh->d ; ++j, d = d->next) {
+                calculated_number *cn = &rh->v[ c * rh->d ];
+                    pd[j].highlight[c] = cn[j];
             }
         }
     }
+    rrdr_free(rh);
 
-    for (i = 0; i < j; i++) {
+    for (i = 0; i < b_dims; i++) {
         fill_nan(&pd[i], highlight_points, baseline_points);
     }
 
-    for (i = 0; i < j; i++) {
+    for (i = 0; i < b_dims; i++) {
         run_diffs_and_rev(&pd[i], highlight_points, baseline_points);
     }
 
@@ -198,7 +196,6 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
     }
 
     freez(pd);
-    rrdr_free(r);
     return j;
 }
 
