@@ -6,12 +6,16 @@ on:
       - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
+      - 'mqtt_websockets/**'
+      - 'aclk/aclk-schemas/**'
   pull_request_target:
     branches: [master]
     paths:
       - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
+      - 'mqtt_websockets/**'
+      - 'aclk/aclk-schemas/**'
 jobs:
   trigger_cloud_regression_tests:
     runs-on: ubuntu-latest
