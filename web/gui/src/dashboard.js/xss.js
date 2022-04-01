@@ -20,42 +20,46 @@ NETDATA.xss = {
         }
 
         switch (typeof(obj)) {
-            case 'string':
+            case 'string': {
                 const ret = this.string(obj);
                 if (ret !== obj) {
                     console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
                 }
                 return ret;
-
-            case 'object':
+            }
+            case 'object': {
                 if (obj === null) {
                     return obj;
                 }
 
                 if (Array.isArray(obj)) {
                     // console.log('checking array "' + name + '"');
-
                     let len = obj.length;
                     while (len--) {
                         obj[len] = this.object(name + '[' + len + ']', obj[len], ignore_regex);
                     }
-                } else {
-                    // console.log('checking object "' + name + '"');
 
-                    for (var i in obj) {
-                        if (obj.hasOwnProperty(i) === false) {
-                            continue;
-                        }
-                        if (this.string(i) !== i) {
-                            console.log('XSS protection removed invalid object member "' + name + '.' + i + '"');
-                            delete obj[i];
-                        } else {
-                            obj[i] = this.object(name + '.' + i, obj[i], ignore_regex);
-                        }
+                    return obj;
+                } 
+                // console.log('checking object "' + name + '"');
+
+                for (var i in obj) {
+                    if (obj.hasOwnProperty(i) === false) {
+                        continue;
                     }
-                }
-                return obj;
 
+                    if (this.string(i) !== i) {
+                        console.log('XSS protection removed invalid object member "' + name + '.' + i + '"');
+                        delete obj[i];
+
+                        continue;
+                    } 
+                    
+                    obj[i] = this.object(name + '.' + i, obj[i], ignore_regex);
+                }
+                
+                return obj;
+            }
             default:
                 return obj;
         }
