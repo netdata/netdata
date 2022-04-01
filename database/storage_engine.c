@@ -71,14 +71,11 @@ STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_NONE,
         .name = RRD_MEMORY_MODE_NONE_NAME,
         .api = {
-            .engine_ops = {
-                .create = NULL,
-                .exit = NULL,
-                .destroy = NULL
-            },
+            .engine_ops = {NULL, NULL, NULL},
             .set_ops = {
                 .create = rrdset_init_NONE,
                 .destroy = set_destroy_freez,
+                .query = NULL,
             },
             .dim_ops = {
                 .create = rrddim_init_NONE,
@@ -95,14 +92,11 @@ STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_RAM,
         .name = RRD_MEMORY_MODE_RAM_NAME,
         .api = {
-            .engine_ops = {
-                .create = NULL,
-                .exit = NULL,
-                .destroy = NULL
-            },
+            .engine_ops = {NULL, NULL, NULL},
             .set_ops = {
                 .create = rrdset_init_ram,
                 .destroy = set_destroy_unmap,
+                .query = NULL,
             },
             .dim_ops = {
                 .create = rrddim_init_ram,
@@ -119,14 +113,11 @@ STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_MAP,
         .name = RRD_MEMORY_MODE_MAP_NAME,
         .api = {
-            .engine_ops = {
-                .create = NULL,
-                .exit = NULL,
-                .destroy = NULL
-            },
+            .engine_ops = {NULL, NULL, NULL},
             .set_ops = {
                 .create = rrdset_init_map,
                 .destroy = set_destroy_unmap,
+                .query = NULL,
             },
             .dim_ops = {
                 .create = rrddim_init_map,
@@ -143,14 +134,11 @@ STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_SAVE,
         .name = RRD_MEMORY_MODE_SAVE_NAME,
         .api = {
-            .engine_ops = {
-                .create = NULL,
-                .exit = NULL,
-                .destroy = NULL
-            },
+            .engine_ops = {NULL, NULL, NULL},
             .set_ops = {
                 .create = rrdset_init_save,
                 .destroy = set_destroy_unmap,
+                .query = NULL,
             },
             .dim_ops = {
                 .create = rrddim_init_save,
@@ -167,14 +155,11 @@ STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_ALLOC,
         .name = RRD_MEMORY_MODE_ALLOC_NAME,
         .api = {
-            .engine_ops = {
-                .create = NULL,
-                .exit = NULL,
-                .destroy = NULL
-            },
+            .engine_ops = {NULL, NULL, NULL},
             .set_ops = {
                 .create = rrdset_init_ALLOC,
                 .destroy = set_destroy_unmap,
+                .query = NULL,
             },
             .dim_ops = {
                 .create = rrddim_init_ALLOC,
@@ -200,6 +185,7 @@ STORAGE_ENGINE engines[] = {
             .set_ops = {
                 .create = rrdset_init_DBENGINE,
                 .destroy = set_destroy_freez,
+                .query = rrdeng_query,
             },
             .dim_ops = {
                 .create = rrddim_init_DBENGINE,

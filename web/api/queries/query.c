@@ -764,7 +764,7 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 #endif // NETDATA_INTERNAL_CHECKS
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-static int rrdr_convert_before_after_to_absolute(
+int rrdr_convert_before_after_to_absolute(
         long long *after_requestedp
         , long long *before_requestedp
         , int update_every
@@ -836,7 +836,7 @@ static int rrdr_convert_before_after_to_absolute(
     return absolute_period_requested;
 }
 
-static RRDR *rrd2rrdr_fixedstep(
+RRDR *rrd2rrdr_fixedstep(
         RRDSET *st
         , long points_requested
         , long long after_requested
@@ -1207,8 +1207,7 @@ static RRDR *rrd2rrdr_fixedstep(
     return r;
 }
 
-#ifdef ENABLE_DBENGINE
-static RRDR *rrd2rrdr_variablestep(
+RRDR *rrd2rrdr_variablestep(
         RRDSET *st
         , long points_requested
         , long long after_requested
@@ -1221,7 +1220,7 @@ static RRDR *rrd2rrdr_variablestep(
         , time_t first_entry_t
         , time_t last_entry_t
         , int absolute_period_requested
-        , struct rrdeng_region_info *region_info_array
+        , struct rrdr_region_info *region_info_array
         , struct context_param *context_param_list
 ) {
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
@@ -1585,7 +1584,6 @@ static RRDR *rrd2rrdr_variablestep(
     freez(region_info_array);
     return r;
 }
-#endif //#ifdef ENABLE_DBENGINE
 
 RRDR *rrd2rrdr(
         RRDSET *st
@@ -1629,42 +1627,13 @@ RRDR *rrd2rrdr(
             return NULL;
     }
 
-#ifdef ENABLE_DBENGINE
-    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        struct rrdeng_region_info *region_info_array;
-        unsigned regions, max_interval;
-
-        /* This call takes the chart read-lock */
-        regions = rrdeng_variable_step_boundaries(st, after_requested, before_requested,
-                                                  &region_info_array, &max_interval, context_param_list);
-        if (1 == regions) {
-            if (region_info_array) {
-                if (rrd_update_every != region_info_array[0].update_every) {
-                    rrd_update_every = region_info_array[0].update_every;
-                    /* recalculate query alignment */
-                    absolute_period_requested =
-                            rrdr_convert_before_after_to_absolute(&after_requested, &before_requested, rrd_update_every,
-                                                                  first_entry_t, last_entry_t, options);
-                }
-                freez(region_info_array);
-            }
-            return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
-                                      resampling_time_requested, options, dimensions, rrd_update_every,
-                                      first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
-        } else {
-            if (rrd_update_every != (uint16_t)max_interval) {
-                rrd_update_every = (uint16_t) max_interval;
-                /* recalculate query alignment */
-                absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
-                                                                                  rrd_update_every, first_entry_t,
-                                                                                  last_entry_t, options);
-            }
-            return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
-                                         resampling_time_requested, options, dimensions, rrd_update_every,
-                                         first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list);
-        }
+    STORAGE_ENGINE* engine = engine_get(st->rrd_memory_mode);
+    if (engine->api.set_ops.query) {
+        return engine->api.set_ops.query(st, points_requested, after_requested, before_requested, group_method,
+                              resampling_time_requested, options, dimensions,
+                              rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
     }
-#endif
+
     return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                               resampling_time_requested, options, dimensions,
                               rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list);

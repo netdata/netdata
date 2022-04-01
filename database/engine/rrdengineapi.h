@@ -17,12 +17,6 @@ extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
 extern uint8_t rrdeng_drop_metrics_under_page_cache_pressure;
 
-struct rrdeng_region_info {
-    time_t start_time;
-    int update_every;
-    unsigned points;
-};
-
 extern void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrdeng_page_descr **ret_descr);
 extern void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
                                Word_t page_correlation_id);
@@ -42,7 +36,7 @@ extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_n
 extern int rrdeng_store_metric_finalize(RRDDIM *rd);
 extern unsigned
     rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
-                                    struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
+                                    struct rrdr_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
 extern void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle,
                                     time_t start_time, time_t end_time);
 extern storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time);
@@ -58,5 +52,20 @@ extern STORAGE_ENGINE_INSTANCE* rrdeng_init(STORAGE_ENGINE* eng, RRDHOST *host);
 extern int rrdeng_exit(struct rrdengine_instance *ctx);
 extern void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
 extern int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
+
+extern RRDR* rrdeng_query(
+        RRDSET *st
+        , long points_requested
+        , long long after_requested
+        , long long before_requested
+        , RRDR_GROUPING group_method
+        , long resampling_time_requested
+        , RRDR_OPTIONS options
+        , const char *dimensions
+        , int update_every
+        , time_t first_entry_t
+        , time_t last_entry_t
+        , int absolute_period_requested
+        , struct context_param *context_param_list);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

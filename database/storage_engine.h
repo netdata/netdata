@@ -21,6 +21,22 @@ struct storage_engine_ops {
 struct rrdset_ops {
     RRDSET*(*create)(const char *id, const char *fullid, const char *filename, long entries, int update_every);
     void(*destroy)(RRDSET *rd);
+
+    //
+    RRDR*(*query)(
+        RRDSET *st
+        , long points_requested
+        , long long after_requested
+        , long long before_requested
+        , RRDR_GROUPING group_method
+        , long resampling_time_requested
+        , RRDR_OPTIONS options
+        , const char *dimensions
+        , int update_every
+        , time_t first_entry_t
+        , time_t last_entry_t
+        , int absolute_period_requested
+        , struct context_param *context_param_list);
 };
 
 // ------------------------------------------------------------------------

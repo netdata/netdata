@@ -351,7 +351,7 @@ static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
  * @return number of regions with different data collection intervals.
  */
 unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
-                                         struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list)
+                                         struct rrdr_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list)
 {
     struct pg_cache_page_index *page_index;
     struct rrdengine_instance *ctx;
@@ -361,7 +361,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     unsigned i, j, page_entries, region_points, page_points, regions, max_interval;
     time_t now;
     usec_t dt, current_position_time, max_time = 0, min_time, curr_time, first_valid_time_in_page;
-    struct rrdeng_region_info *region_info_array;
+    struct rrdr_region_info *region_info_array;
     uint8_t is_first_region_initialized;
 
     ctx = get_rrdeng_ctx_from_host(st->rrdhost);
@@ -1007,3 +1007,52 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
     //metalog_prepare_exit(ctx->metalog_ctx);
 }
 
+
+RRDR* rrdeng_query(
+        RRDSET *st
+        , long points_requested
+        , long long after_requested
+        , long long before_requested
+        , RRDR_GROUPING group_method
+        , long resampling_time_requested
+        , RRDR_OPTIONS options
+        , const char *dimensions
+        , int update_every
+        , time_t first_entry_t
+        , time_t last_entry_t
+        , int absolute_period_requested
+        , struct context_param *context_param_list)
+{
+        struct rrdr_region_info *region_info_array;
+        unsigned regions, max_interval;
+
+        /* This call takes the chart read-lock */
+        regions = rrdeng_variable_step_boundaries(st, after_requested, before_requested,
+                                                  &region_info_array, &max_interval, context_param_list);
+        if (1 == regions) {
+            if (region_info_array) {
+                if (update_every != region_info_array[0].update_every) {
+                    update_every = region_info_array[0].update_every;
+                    /* recalculate query alignment */
+                    absolute_period_requested =
+                            rrdr_convert_before_after_to_absolute(&after_requested, &before_requested, update_every,
+                                                                  first_entry_t, last_entry_t, options);
+                }
+                freez(region_info_array);
+            }
+            return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
+                                      resampling_time_requested, options, dimensions, update_every,
+                                      first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
+        } else {
+            if (update_every != (uint16_t)max_interval) {
+                update_every = (uint16_t) max_interval;
+                /* recalculate query alignment */
+                absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
+                                                                                  update_every, first_entry_t,
+                                                                                  last_entry_t, options);
+            }
+            return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
+                                         resampling_time_requested, options, dimensions, update_every,
+                                         first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list);
+        }
+}

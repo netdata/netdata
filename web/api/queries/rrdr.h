@@ -49,6 +49,13 @@ typedef enum rrdr_result_flags {
     RRDR_RESULT_OPTION_VARIABLE_STEP = 0x00000004, // the query uses variable-step time-frames
 } RRDR_RESULT_FLAGS;
 
+// RRDR region info
+typedef struct rrdr_region_info {
+    time_t start_time;
+    int update_every;
+    unsigned points;
+} RRDR_REGION_INFO;
+
 typedef struct rrdresult {
     struct rrdset *st;         // the chart this result refers to
 
@@ -111,6 +118,48 @@ extern RRDR *rrd2rrdr(
     RRDSET *st, long points_requested, long long after_requested, long long before_requested,
     RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
     struct context_param *context_param_list);
+
+extern RRDR *rrd2rrdr_fixedstep(
+        RRDSET *st
+        , long points_requested
+        , long long after_requested
+        , long long before_requested
+        , RRDR_GROUPING group_method
+        , long resampling_time_requested
+        , RRDR_OPTIONS options
+        , const char *dimensions
+        , int update_every
+        , time_t first_entry_t
+        , time_t last_entry_t
+        , int absolute_period_requested
+        , struct context_param *context_param_list
+);
+
+extern RRDR *rrd2rrdr_variablestep(
+        RRDSET *st
+        , long points_requested
+        , long long after_requested
+        , long long before_requested
+        , RRDR_GROUPING group_method
+        , long resampling_time_requested
+        , RRDR_OPTIONS options
+        , const char *dimensions
+        , int update_every
+        , time_t first_entry_t
+        , time_t last_entry_t
+        , int absolute_period_requested
+        , struct rrdr_region_info *region_info_array
+        , struct context_param *context_param_list
+);
+
+extern int rrdr_convert_before_after_to_absolute(
+        long long *after_requestedp
+        , long long *before_requestedp
+        , int update_every
+        , time_t first_entry_t
+        , time_t last_entry_t
+        , RRDR_OPTIONS options
+);
 
 #include "query.h"
 
