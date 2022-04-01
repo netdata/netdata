@@ -3139,7 +3139,7 @@ netdataDashboard.context = {
     },
     'disk.latency_io': {
         height: 0.5,
-        info: 'Disk I/O <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#disk" target="_blank">latency</a> is the time it takes for an I/O request to be completed. Disk chart has a relationship with <a href="#filesystem">Filesystem</a> charts. This chart is based on the <a href="https://github.com/cloudflare/ebpf_exporter/blob/master/examples/bio-tracepoints.yaml" target="_blank">bio_tracepoints</a> tool of the ebpf_exporter.' + ebpfChartProvides
+        info: 'Disk I/O <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#disk-latency" target="_blank">latency</a> is the time it takes for an I/O request to be completed. Disk chart has a relationship with <a href="#filesystem">Filesystem</a> charts. This chart is based on the <a href="https://github.com/cloudflare/ebpf_exporter/blob/master/examples/bio-tracepoints.yaml" target="_blank">bio_tracepoints</a> tool of the ebpf_exporter.' + ebpfChartProvides
     },
     'disk.avgsz': {
         height: 0.5,
