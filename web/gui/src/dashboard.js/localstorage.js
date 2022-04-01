@@ -162,10 +162,8 @@ NETDATA.resetOptions = function () {
             }
 
             NETDATA.setOption(a[1], NETDATA.localStorage.default[i]);
-        } else if (a[0] === 'chart_heights') {
-            if (typeof NETDATA.localStorage.callback[i] === 'function' && typeof NETDATA.localStorage.default[i] !== 'undefined') {
-                NETDATA.localStorage.callback[i](NETDATA.localStorage.default[i]);
-            }
+        } else if (a[0] === 'chart_heights' && typeof NETDATA.localStorage.callback[i] === 'function' && typeof NETDATA.localStorage.default[i] !== 'undefined') {
+            NETDATA.localStorage.callback[i](NETDATA.localStorage.default[i]); 
         }
     }
 
