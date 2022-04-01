@@ -304,12 +304,6 @@ body {
     border-top-color: inherit;
 }
 
-.netdata-legend-name-tr {
-}
-
-.netdata-legend-name-td {
-}
-
 .netdata-legend-name {
     text-align: left;
     font-size: 11px; /* legend: dimension name size */
@@ -398,29 +392,6 @@ body {
     flex-grow: 1;
 }
 
-.netdata-peity-chart {
-
-}
-
-.netdata-sparkline-chart {
-
-}
-
-.netdata-dygraph-chart {
-
-}
-
-.netdata-morris-chart {
-
-}
-
-.netdata-google-chart {
-
-}
-
-.dygraph-ylabel {
-}
-
 .dygraph-axis-label-x {
     overflow-x: hidden;
 }
@@ -478,7 +449,6 @@ body {
 }
 
 .easyPieChartLabel {
-    display: inline-block;
     position: absolute;
     float: left;
     left: 0;
@@ -491,7 +461,6 @@ body {
 }
 
 .easyPieChartTitle {
-    display: inline-block;
     position: absolute;
     float: left;
     left: 0;
@@ -503,7 +472,6 @@ body {
 }
 
 .easyPieChartUnits {
-    display: inline-block;
     position: absolute;
     float: left;
     left: 0;
@@ -529,7 +497,6 @@ body {
 }
 
 .gaugeChartLabel {
-    display: inline-block;
     position: absolute;
     float: left;
     left: 0;
@@ -545,7 +512,6 @@ body {
 }
 
 .gaugeChartTitle {
-    display: inline-block;
     position: absolute;
     float: left;
     left: 0;
@@ -556,7 +522,6 @@ body {
 }
 
 .gaugeChartUnits {
-    display: inline-block;
     position: absolute;
     float: left;
     left: 0;
@@ -569,7 +534,6 @@ body {
 }
 
 .gaugeChartMin {
-    display: inline-block;
     position: absolute;
     float: left;
     left: 0;
@@ -582,7 +546,6 @@ body {
 }
 
 .gaugeChartMax {
-    display: inline-block;
     position: absolute;
     float: left;
     left: 0;
