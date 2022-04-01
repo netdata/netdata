@@ -257,11 +257,10 @@ NETDATA.easypiechartChartCreate = function (state, data) {
     }
 
     state.tmp.easyPieChart_instance = chart.data('easyPieChart');
+    state.tmp.easyPieChart_instance.update(pcent);
+    
     if (animate === false) {
         state.tmp.easyPieChart_instance.disableAnimation();
-    }
-    state.tmp.easyPieChart_instance.update(pcent);
-    if (animate === false) {
         state.tmp.easyPieChart_instance.enableAnimation();
     }
 

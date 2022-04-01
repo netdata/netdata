@@ -286,7 +286,7 @@ NETDATA.dygraphChartCreate = function (state, data) {
         // Draw a border around graph lines to make crossing lines more easily
         // distinguishable. Useful for graphs with many lines.
         strokeBorderColor: NETDATA.dataAttribute(state.element, 'dygraph-strokebordercolor', NETDATA.themes.current.background),
-        strokeBorderWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (state.tmp.dygraph_chart_type === 'stacked') ? 0.0 : 0.0),
+        strokeBorderWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', 0.0),
         fillGraph: NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (state.tmp.dygraph_chart_type === 'area' || state.tmp.dygraph_chart_type === 'stacked')),
         fillAlpha: NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
             ((state.tmp.dygraph_chart_type === 'stacked')

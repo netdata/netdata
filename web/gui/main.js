@@ -123,10 +123,8 @@ var urlOptions = {
                 if (urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined') {
                     urlOptions[p[0]] = decodeURIComponent(p[1]);
                 }
-            } else {
-                if (variables[len].length > 0) {
-                    urlOptions.hash = variables[len];
-                }
+            } else if(variables[len].length > 0) {
+                urlOptions.hash = variables[len];
             }
         }
 
@@ -209,7 +207,6 @@ var urlOptions = {
                 this_is_demo = false;
                 break;
 
-            case 'live':
             default:
                 urlOptions.mode = 'live';
                 break;
@@ -543,10 +540,8 @@ function renderStreamedHosts(options) {
         let url, icon;
         const hostname = s.hostname;
 
-        if (myNetdataMenuFilterValue !== "") {
-            if (!hostname.includes(myNetdataMenuFilterValue)) {
-                continue;
-            }
+        if (myNetdataMenuFilterValue !== "" && !hostname.includes(myNetdataMenuFilterValue)) {
+            continue;
         }
 
         displayedDatabases = true;
@@ -610,10 +605,8 @@ function renderMachines(machinesArray) {
         for (var machine of machines) {
             found = true;
 
-            if (myNetdataMenuFilterValue !== "") {
-                if (!machine.name.includes(myNetdataMenuFilterValue)) {
-                    continue;
-                }
+            if (myNetdataMenuFilterValue !== "" && !machine.name.includes(myNetdataMenuFilterValue)) {
+                continue;
             }
 
             displayedAgents = true;
@@ -1074,17 +1067,20 @@ function notifyForDeleteRegistry() {
                         NETDATA.registry.init();
                     });
                 });
-        } else {
-            NETDATA.registry.delete(deleteRegistryUrl, function (result) {
-                if (result !== null) {
-                    deleteRegistryUrl = null;
-                    $('#deleteRegistryModal').modal('hide');
-                    NETDATA.registry.init();
-                } else {
-                    responseEl.innerHTML = "<b>Sorry, this command was rejected by the registry server!</b>";
-                }
-            });
-        }
+
+                return;
+        } 
+
+        NETDATA.registry.delete(deleteRegistryUrl, function (result) {
+            if (result !== null) {
+                deleteRegistryUrl = null;
+                $('#deleteRegistryModal').modal('hide');
+                NETDATA.registry.init();
+                return;
+            } 
+
+            responseEl.innerHTML = "<b>Sorry, this command was rejected by the registry server!</b>";
+        });
     }
 }
 
@@ -2388,17 +2384,14 @@ function alarmsUpdateModal() {
                     switch (row.status) {
                         case 'CRITICAL':
                             return { classes: 'danger' };
-                            break;
                         case 'WARNING':
                             return { classes: 'warning' };
-                            break;
                         case 'UNDEFINED':
                             return { classes: 'info' };
-                            break;
                         case 'CLEAR':
                             return { classes: 'success' };
-                            break;
                     }
+
                     return {};
                 },
                 showFooter: false,
@@ -2959,8 +2952,8 @@ function versionsMatch(v1, v2) {
 
         n1 = (s1.length > 1) ? parseInt(s1[1], 10) : 0;
         n2 = (s2.length > 1) ? parseInt(s2[1], 10) : 0;
-        if (n1 < n2) return false;
-        else return true;
+        
+        return n1 >= n2
     }
 }
 
@@ -3381,7 +3374,7 @@ function loadSnapshot() {
             initializeDynamicDashboard();
         });
     });
-};
+}
 
 function loadSnapshotPreflightFile(file) {
     var filename = NETDATA.xss.string(file.name);
@@ -3434,7 +3427,7 @@ function loadSnapshotPreflightFile(file) {
 
     //console.log(file);
     fr.readAsText(file);
-};
+}
 
 function loadSnapshotPreflightEmpty() {
     document.getElementById('loadSnapshotFilename').innerHTML = '';
@@ -3446,7 +3439,7 @@ function loadSnapshotPreflightEmpty() {
     document.getElementById('loadSnapshotComments').innerHTML = '';
     loadSnapshotModalLog('success', 'Browse for a snapshot file (or drag it and drop it here), then click <b>Import</b> to render it.');
     $('#loadSnapshotImport').addClass('disabled');
-};
+}
 
 var loadSnapshotDragAndDropInitialized = false;
 
@@ -3467,7 +3460,7 @@ function loadSnapshotDragAndDropSetup() {
                 }
             });
     }
-};
+}
 
 function loadSnapshotPreflight() {
     var files = document.getElementById('loadSnapshotSelectFiles').files;
@@ -3504,7 +3497,7 @@ function saveSnapshotModalSetup() {
                 document.getElementById('saveSnapshotComments').focus();
             });
     }
-};
+}
 
 function saveSnapshotModalLog(priority, msg) {
     document.getElementById('saveSnapshotStatus').className = "alert alert-" + priority;
@@ -4476,9 +4469,10 @@ function finalizePage() {
                 i['GoogleAnalyticsObject'] = r;
                 i[r] = i[r] || function () {
                     (i[r].q = i[r].q || []).push(arguments)
-                }, i[r].l = 1 * new Date();
-                a = s.createElement(o),
-                    m = s.getElementsByTagName(o)[0];
+                };
+                i[r].l = 1 * new Date();
+                a = s.createElement(o);
+                m = s.getElementsByTagName(o)[0];
                 a.async = 1;
                 a.src = g;
                 m.parentNode.insertBefore(a, m)
@@ -4584,10 +4578,8 @@ var selected_server_timezone = function (timezone, status) {
 
             document.getElementById('timezone_error_message').innerHTML = 'Ooops! That timezone was not accepted by your browser. Please open a github issue to help us fix it.';
             NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
-        } else {
-            if ($('#local_timezone').prop('checked')) {
-                $('#local_timezone').bootstrapToggle('off');
-            }
+        } else if($('#local_timezone').prop('checked')) {
+            $('#local_timezone').bootstrapToggle('off');
         }
     } else if (status === true) {
         // the user wants the browser default timezone to be activated
@@ -4679,20 +4671,7 @@ function getCloudAccountAgents() {
         }
         return response.json();
     }).then((payload) => {
-        const agents = payload.result ? payload.result.agents : null;
-
-        if (!agents) {
-            return [];
-        }
-
-        return agents.filter((a) => isValidAgent(a)).map((a) => {
-            return {
-                "guid": a.id,
-                "name": a.name,
-                "url": a.urls[0],
-                "alternate_urls": a.urls
-            }
-        })
+        return handleCloudAgentPayload(payload);
     }).catch(function (error) {
         console.log(error);
         return null;
@@ -4721,8 +4700,6 @@ function touchAgent() {
             throw Error("Cannot touch agent" + JSON.stringify(response));
         }
         return response.json();
-    }).then((payload) => {
-
     }).catch(function (error) {
         console.log(error);
         return null;
@@ -4766,22 +4743,26 @@ function postCloudAccountAgents(agentsToSync) {
         }
     ).then((response) => {
         return response.json();
-    }).then((payload) => {
-        const agents = payload.result ? payload.result.agents : null;
-
-        if (!agents) {
-            return [];
-        }
-
-        return agents.filter((a) => isValidAgent(a)).map((a) => {
-            return {
-                "guid": a.id,
-                "name": a.name,
-                "url": a.urls[0],
-                "alternate_urls": a.urls
-            }
-        })
+    }).then((pload) => {
+        return handleCloudAgentPayload(pload);
     });
+}
+
+function handleCloudAgentPayload(payload) {
+    const agents = payload.result ? payload.result.agents : null;
+
+    if (!agents) {
+        return [];
+    }
+
+    return agents.filter((a) => isValidAgent(a)).map((a) => {
+        return {
+            "guid": a.id,
+            "name": a.name,
+            "url": a.urls[0],
+            "alternate_urls": a.urls
+        }
+    })
 }
 
 function deleteCloudAgentURL(agentID, url) {
@@ -4802,8 +4783,7 @@ function deleteCloudAgentURL(agentID, url) {
     ).then((response) => {
         return response.json();
     }).then((payload) => {
-        const count = payload.result ? payload.result.count : 0;
-        return count;
+        return payload.result ? payload.result.count : 0;
     });
 }
 
@@ -5128,7 +5108,7 @@ function netdataRegistryCallback(machinesArray) {
     } else {
         renderMyNetdataMenu(machinesArray)
     }
-};
+}
 
 // If we know the cloudBaseURL and agentID from local storage render (eagerly)
 // the account ui before receiving the definitive response from the web server.
