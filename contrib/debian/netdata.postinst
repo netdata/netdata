@@ -63,6 +63,7 @@ case "$1" in
 
     # Workaround for other plugins not installed directly by this package
     chmod -f 4750 /usr/libexec/netdata/plugins.d/freeipmi.plugin || true
+    chmod -f 4750 /usr/libexec/netdata/plugins.d/ioping || true
 
     ;;
 esac
