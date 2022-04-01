@@ -211,9 +211,9 @@ static inline void ebpf_socket_disable_specific_trampoline(struct socket_bpf *ob
 }
 
 /**
- * Disable specific trampoline
+ * Disable specific probe
  *
- * Disable specific trampoline to match user selection.
+ * Disable specific probe to match user selection.
  *
  * @param obj is the main structure for bpf objects.
  * @param sel option selected by user.
