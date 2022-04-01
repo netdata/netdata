@@ -1483,7 +1483,7 @@ netdataDashboard.context = {
 
     'system.exit': {
         title : 'Exit monitoring',
-        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit target="_blank"">a function</a> responsible to close a process or thread is called. Netdata shows process metrics per <a href="#ebpf_apps_process_exit">application</a> and <a href="#ebpf_services_process_exit">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_system_process_exit"></div>'
+        info: 'Number of times <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">a function</a> responsible to close a process or thread is called. Netdata shows process metrics per <a href="#ebpf_apps_process_exit">application</a> and <a href="#ebpf_services_process_exit">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_system_process_exit"></div>'
     },
 
     'system.task_error': {
