@@ -1531,12 +1531,14 @@ if test "${enable_exporting_kinesis}" = "yes" -o \
     enable_cxx_linker="yes"
 fi
 
-# Unconditionally link with the libatomic since:
+# Unconditionally link with the libatomic except on macos since:
 # - if atomics are not needed, the library will be unused
 # - if atomics are needed, either atomics are fulfilled by the compiler builtins
 #   and the library is unused or the library is needed anyway.
-OPTIONAL_ATOMIC_LIBS="-latomic"
-AC_SUBST([OPTIONAL_ATOMIC_LIBS])
+if test "${build_target}" != "macos"; then
+    OPTIONAL_ATOMIC_LIBS="-latomic"
+    AC_SUBST([OPTIONAL_ATOMIC_LIBS])
+fi
 
 AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_cxx_linker}" = "yes"])
 
