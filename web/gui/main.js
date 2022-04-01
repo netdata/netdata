@@ -414,7 +414,7 @@ function naturalSortChunkify(t) {
     var tz = [];
     var x = 0, y = -1, n = 0, i, j;
 
-    while (i = (j = t.charAt(x++)).charCodeAt(0)) {
+    while (i = t.charAt(x++).charCodeAt(0)) {
         var m = (i >= 48 && i <= 57);
         if (m !== n) {
             tz[++y] = "";

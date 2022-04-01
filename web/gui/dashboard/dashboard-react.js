@@ -218,10 +218,7 @@ NETDATA.options = {
     async_on_scroll: false,                 // sync/async onscroll handler
     onscroll_worker_duration_threshold: 30, // time in ms, for async scroll handler
 
-    retries_on_data_failures: 3, // how many retries to make if we can't fetch chart data from the server
-
-    setOptionCallback: function () {
-    }
+    retries_on_data_failures: 3 // how many retries to make if we can't fetch chart data from the server
   },
 
   debug: {
@@ -551,13 +548,8 @@ NETDATA.chartRegistry = {
 
 
 NETDATA.fixHost = function (host) {
-  while (host.slice(-1) === '/') {
-    host = host.substring(0, host.length - 1);
-  }
-
-  return host;
+  return fixHost(host);
 };
-
 
 NETDATA.registryHello = function (host, callback) {
   host = NETDATA.fixHost(host);
