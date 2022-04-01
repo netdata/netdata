@@ -12,8 +12,12 @@ typedef enum payload_type {
 
 extern sqlite3 *db_meta;
 
-#ifndef RRDSET_MINIMUM_LIVE_MULTIPLIER
-#define RRDSET_MINIMUM_LIVE_MULTIPLIER   (1.5)
+#ifndef RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER
+#define RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER   (3)
+#endif
+
+#ifndef ACLK_MAX_DIMENSION_CLEANUP
+#define ACLK_MAX_DIMENSION_CLEANUP (500)
 #endif
 
 struct aclk_chart_sync_stats {
@@ -52,4 +56,5 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
 uint32_t sql_get_pending_count(struct aclk_database_worker_config *wc);
 void aclk_send_dimension_update(RRDDIM *rd);
 struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host);
+void sql_check_chart_liveness(RRDSET *st);
 #endif //NETDATA_SQLITE_ACLK_CHART_H
