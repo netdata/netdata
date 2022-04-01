@@ -978,7 +978,7 @@ netdataDashboard.submenu = {
 
     'apps.file_access': {
         title: 'file access (eBPF)',
-        info: 'Netdata also gives a summary for this chart on <a href="#menu_filesystem_submenu_file_access">Filesystem submenu</a> (more details on <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file" target="_blank">eBPF plugin file chart section</a>).'
+        info: 'Netdata also gives a summary for this chart on <a href="#menu_filesystem_submenu_file_access">Filesystem submenu</a> (more details on <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">eBPF plugin file chart section</a>).'
     },
 
     'ip.kernel': {
