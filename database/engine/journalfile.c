@@ -210,6 +210,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
     if (unlikely(ret)) {
         fatal("posix_memalign:%s", strerror(ret));
     }
+    memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ);
 

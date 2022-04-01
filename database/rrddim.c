@@ -495,6 +495,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
         case RRD_MEMORY_MODE_RAM:
             debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
             freez((void *)rd->id);
+            freez((void *)rd->name);
             freez(rd->cache_filename);
             freez(rd->state);
             munmap(rd, rd->memsize);
@@ -505,6 +506,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
         case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);
+            freez((void *)rd->name);
             freez(rd->cache_filename);
             freez(rd->state);
             freez(rd);

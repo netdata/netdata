@@ -250,6 +250,8 @@ void cancel_main_threads() {
     else
         info("All threads finished.");
 
+    for (i = 0; static_threads[i].name != NULL ; i++)
+        freez(static_threads[i].thread);
     free(static_threads);
 }
 

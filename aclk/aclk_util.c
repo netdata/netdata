@@ -41,6 +41,7 @@ void aclk_env_t_destroy(aclk_env_t *env) {
         for (size_t i = 0; i < env->transport_count; i++) {
             if(env->transports[i]) {
                 aclk_transport_desc_t_destroy(env->transports[i]);
+                freez(env->transports[i]);
                 env->transports[i] = NULL;
             }
         }

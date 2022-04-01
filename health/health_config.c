@@ -665,7 +665,6 @@ static int health_readfile(const char *filename, void *data) {
             if(rc) {
                 if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
-                    alert_config_free(alert_cfg);
                 }
                // health_add_alarms_loop(host, rc, ignore_this) ;
             }
@@ -673,7 +672,6 @@ static int health_readfile(const char *filename, void *data) {
             if(rt) {
                 if (!alert_hash_and_store_config(rt->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
                     rrdcalctemplate_free(rt);
-                    alert_config_free(alert_cfg);
                 }
                 rt = NULL;
             }
@@ -691,6 +689,8 @@ static int health_readfile(const char *filename, void *data) {
             rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
             rc->warn_repeat_every = host->health_default_warn_repeat_every;
             rc->crit_repeat_every = host->health_default_crit_repeat_every;
+            if (alert_cfg)
+                alert_config_free(alert_cfg);
             alert_cfg = callocz(1, sizeof(struct alert_config));
 
             if(rrdvar_fix_name(rc->name))
@@ -704,7 +704,6 @@ static int health_readfile(const char *filename, void *data) {
 //                health_add_alarms_loop(host, rc, ignore_this) ;
                 if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
-                    alert_config_free(alert_cfg);
                 }
 
                 rc = NULL;
@@ -713,7 +712,6 @@ static int health_readfile(const char *filename, void *data) {
             if(rt) {
                 if(!alert_hash_and_store_config(rt->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)) {
                     rrdcalctemplate_free(rt);
-                    alert_config_free(alert_cfg);
                 }
             }
 
@@ -726,6 +724,8 @@ static int health_readfile(const char *filename, void *data) {
             rt->delay_multiplier = 1.0;
             rt->warn_repeat_every = host->health_default_warn_repeat_every;
             rt->crit_repeat_every = host->health_default_crit_repeat_every;
+            if (alert_cfg)
+                alert_config_free(alert_cfg);
             alert_cfg = callocz(1, sizeof(struct alert_config));
 
             if(rrdvar_fix_name(rt->name))
