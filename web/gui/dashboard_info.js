@@ -3780,7 +3780,7 @@ netdataDashboard.context = {
     },
 
     'netdata.ebpf_threads': {
-        info: 'Show total number of threads and number of active threads. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs" target="_blank">official documentation</a>.'
+        info: 'Show total number of threads and number of active threads. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs-configuration-options" target="_blank">official documentation</a>.'
     },
 
     'netdata.ebpf_load_methods': {
