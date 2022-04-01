@@ -2167,7 +2167,7 @@ NETDATA.dygraphChartCreate = function (state, data) {
 
         // The width of the lines connecting data points.
         // This can be used to increase the contrast or some graphs.
-        strokeWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((state.tmp.dygraph_chart_type === 'stacked') ? 0.1 : ((smooth === true) ? 1.5 : 0.7))),
+        strokeWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((state.tmp.dygraph_chart_type === 'stacked') ? 0.1 : (smooth === true) ? 1.5 : 0.7)),
         strokePattern: NETDATA.dataAttribute(state.element, 'dygraph-strokepattern', undefined),
 
         // The size of the dot to draw on each point in pixels (see drawPoints).
@@ -2188,7 +2188,7 @@ NETDATA.dygraphChartCreate = function (state, data) {
         // Draw a border around graph lines to make crossing lines more easily
         // distinguishable. Useful for graphs with many lines.
         strokeBorderColor: NETDATA.dataAttribute(state.element, 'dygraph-strokebordercolor', NETDATA.themes.current.background),
-        strokeBorderWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (state.tmp.dygraph_chart_type === 'stacked') ? 0.0 : 0.0),
+        strokeBorderWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', 0.0),
         fillGraph: NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (state.tmp.dygraph_chart_type === 'area' || state.tmp.dygraph_chart_type === 'stacked')),
         fillAlpha: NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
             ((state.tmp.dygraph_chart_type === 'stacked')
@@ -3190,7 +3190,6 @@ NETDATA.googleChartCreate = function (state, data) {
             break;
 
         default:
-        case "line":
             state.google_options.lineWidth = 2;
             state.google_instance = new google.visualization.LineChart(state.element_chart);
             break;
@@ -4258,13 +4257,6 @@ NETDATA.d3Initialize = function(callback) {
 };
 
 NETDATA.d3ChartUpdate = function(state, data) {
-    void(state);
-    void(data);
-
-    return false;
-};
-
-NETDATA.d3ChartCreate = function(state, data) {
     void(state);
     void(data);
 
@@ -8314,7 +8306,6 @@ let chartState = function (element) {
                 this.view_before = before * 1000;
 
                 this.requested_padding = null;
-                points_multiplier = 1;
             }
         } else {
             this.tm.pan_and_zoom_seq = 0;
@@ -8325,7 +8316,6 @@ let chartState = function (element) {
             this.view_before = before * 1000;
 
             this.requested_padding = null;
-            points_multiplier = 1;
         }
 
         this.requested_after = after * 1000;
