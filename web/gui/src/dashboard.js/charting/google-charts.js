@@ -121,7 +121,6 @@ NETDATA.googleChartCreate = function (state, data) {
             break;
 
         default:
-        case "line":
             state.google_options.lineWidth = 2;
             state.google_instance = new google.visualization.LineChart(state.element_chart);
             break;
