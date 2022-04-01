@@ -3128,7 +3128,6 @@ let chartState = function (element) {
                 this.view_before = before * 1000;
 
                 this.requested_padding = null;
-                points_multiplier = 1;
             }
         } else {
             this.tm.pan_and_zoom_seq = 0;
@@ -3139,7 +3138,6 @@ let chartState = function (element) {
             this.view_before = before * 1000;
 
             this.requested_padding = null;
-            points_multiplier = 1;
         }
 
         this.requested_after = after * 1000;
@@ -4229,12 +4227,10 @@ NETDATA.start = function () {
         }
     });
 
-    if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
-        if (NETDATA.options.current.stop_updates_when_focus_is_lost) {
-            NETDATA.options.page_is_visible = false;
-            if (NETDATA.options.debug.focus) {
-                console.log('Document has no focus!');
-            }
+    if (typeof document.hasFocus === 'function' && !document.hasFocus() && NETDATA.options.current.stop_updates_when_focus_is_lost) {
+        NETDATA.options.page_is_visible = false;
+        if (NETDATA.options.debug.focus) {
+            console.log('Document has no focus!');
         }
     }
 
