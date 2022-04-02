@@ -296,8 +296,10 @@ static void ebpf_exit(int sig)
      */
 
 #ifdef LIBBPF_MAJOR_VERSION
-    if (default_btf)
+    if (default_btf) {
         btf__free(default_btf);
+        default_btf = NULL;
+    }
 #endif
 
     char filename[FILENAME_MAX + 1];
