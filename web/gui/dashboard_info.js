@@ -3889,6 +3889,16 @@ netdataDashboard.context = {
         '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and kernel</a> modes.'
     },
 
+    'cgroup.throttled': {
+        info: 'The number of times tasks in a cgroup have been throttled. '+ 
+        'The tasks have not been allowed to run because they have exhausted all of the available time as specified by their quota.'
+    },
+
+    'cgroup.throttled_duration': {
+        info: 'The total time duration for which tasks in a cgroup have been throttled. '+
+        'When an application has used its allotted CPU quota for a given period, it gets throttled until the next period.'
+    },
+
     'cgroup.cpu_per_core': {
         info: 'Total CPU utilization per core within the system-wide CPU resources.'
     },
