@@ -212,6 +212,7 @@ void clean_loaded_events()
 static void ebpf_exit(int sig)
 {
     close_ebpf_plugin = 1;
+    static int remove_pid = 0;
 
     // When both threads were not finished case I try to go in front this address, the collector will crash
     if (!thread_finished) {
@@ -302,9 +303,13 @@ static void ebpf_exit(int sig)
     }
 #endif
 
-    char filename[FILENAME_MAX + 1];
-    ebpf_pid_file(filename, FILENAME_MAX);
-    unlink(filename);
+    if (!remove_pid) {
+        remove_pid = 1;
+        char filename[FILENAME_MAX + 1];
+        ebpf_pid_file(filename, FILENAME_MAX);
+        if (unlink(filename))
+            error("Cannot remove PID file %s", filename);
+    }
 
     exit(sig);
 }
