@@ -2013,7 +2013,6 @@ static inline void update_filenames()
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->cpuacct_cpu_stat.filename = strdupz(filename);
                     cg->cpuacct_cpu_stat.enabled = cgroup_enable_cpuacct_cpu_throttling;
-                    info("CGRPUP: THROTTLE filename: %s", filename);
                     debug(D_CGROUP, "cpu.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_stat.filename);
                 }
                 else
