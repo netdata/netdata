@@ -682,6 +682,8 @@ struct cpuacct_stat {
     unsigned long long nr_periods;     // v2 only
     unsigned long long nr_throttled;   // v2 only
     unsigned long long throttled_time; // v2 only (throttled_usec)
+    unsigned long long nr_periods_delta;
+    unsigned long long nr_throttled_delta;
 };
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
@@ -705,6 +707,8 @@ struct cpuacct_cpu_stat {
     unsigned long long nr_periods;
     unsigned long long nr_throttled;
     unsigned long long throttled_time;
+    unsigned long long nr_periods_delta;
+    unsigned long long nr_throttled_delta;
 };
 
 struct cgroup_network_interface {
@@ -929,6 +933,9 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_stat *cp){
         return;
     }
 
+    unsigned long long nr_periods_last = cp->nr_periods; 
+    unsigned long long nr_throttled_last = cp->nr_throttled; 
+
     for (unsigned long i = 0; i < lines; i++) {
         char *s = procfile_lineword(ff, i, 0);
         uint32_t hash = simple_hash(s);
@@ -941,6 +948,8 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_stat *cp){
             cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
         }
     }
+    cp->nr_periods_delta = (cp->nr_periods - nr_periods_last) >= 0 ? cp->nr_periods - nr_periods_last : 0;
+    cp->nr_throttled_delta = (cp->nr_throttled - nr_throttled_last) >= 0 ? cp->nr_throttled - nr_throttled_last : 0;
 
     cp->updated = 1;
 
@@ -981,6 +990,9 @@ static inline void cgroup2_read_cpuacct_stat(struct cpuacct_stat *cp) {
         return;
     }
 
+    unsigned long long nr_periods_last = cp->nr_periods; 
+    unsigned long long nr_throttled_last = cp->nr_throttled; 
+
     for (unsigned long i = 0; i < lines; i++) {
         char *s = procfile_lineword(ff, i, 0);
         uint32_t hash = simple_hash(s);
@@ -997,6 +1009,8 @@ static inline void cgroup2_read_cpuacct_stat(struct cpuacct_stat *cp) {
             cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
         }
     }
+    cp->nr_periods_delta = (cp->nr_periods - nr_periods_last) >= 0 ? cp->nr_periods - nr_periods_last : 0;
+    cp->nr_throttled_delta = (cp->nr_throttled - nr_throttled_last) >= 0 ? cp->nr_throttled - nr_throttled_last : 0;
 
     cp->updated = 1;
 
@@ -3611,12 +3625,12 @@ void update_cgroup_charts(int update_every) {
 
                 cg->st_cpu_nr_throttled = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
-                        , "throttled_periods"
+                        , "throttled"
                         , NULL
                         , "cpu"
                         , "cgroup.throttled"
                         , title
-                        , "periods"
+                        , "percentage"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , cgroup_containers_chart_priority + 10
@@ -3625,14 +3639,20 @@ void update_cgroup_charts(int update_every) {
                 );
 
                 rrdset_update_labels(cg->st_cpu_nr_throttled, cg->chart_labels);
-                rrddim_add(cg->st_cpu_nr_throttled, "throttled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_cpu_nr_throttled, "throttled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(cg->st_cpu_nr_throttled);
-                if (is_cgroup_v1(cg)) {
-                    rrddim_set(cg->st_cpu_nr_throttled, "throttled", cg->cpuacct_cpu_stat.nr_throttled);
-                } else {
-                    rrddim_set(cg->st_cpu_nr_throttled, "throttled", cg->cpuacct_stat.nr_throttled);
+
+                calculated_number cpu_throttling_perc = 0;
+                if (is_cgroup_v1(cg) && cg->cpuacct_cpu_stat.nr_periods_delta > 0) {
+                    cpu_throttling_perc = (calculated_number)cg->cpuacct_cpu_stat.nr_throttled_delta /
+                                          (calculated_number)cg->cpuacct_cpu_stat.nr_periods_delta * 100;
+                } else if (cg->cpuacct_stat.nr_periods_delta > 0) {
+                    cpu_throttling_perc = (calculated_number)cg->cpuacct_stat.nr_throttled_delta /
+                                          (calculated_number)cg->cpuacct_stat.nr_periods_delta * 100;
                 }
+
+                rrddim_set(cg->st_cpu_nr_throttled, "throttled", cpu_throttling_perc);
                 rrdset_done(cg->st_cpu_nr_throttled);
             }
 
