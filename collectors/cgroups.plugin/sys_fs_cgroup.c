@@ -948,8 +948,8 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_stat *cp){
             cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
         }
     }
-    cp->nr_periods_delta = (cp->nr_periods - nr_periods_last) >= 0 ? cp->nr_periods - nr_periods_last : 0;
-    cp->nr_throttled_delta = (cp->nr_throttled - nr_throttled_last) >= 0 ? cp->nr_throttled - nr_throttled_last : 0;
+    cp->nr_periods_delta = cp->nr_periods >= nr_periods_last ? cp->nr_periods - nr_periods_last : 0;
+    cp->nr_throttled_delta = cp->nr_throttled >= nr_throttled_last ? cp->nr_throttled - nr_throttled_last : 0;
 
     cp->updated = 1;
 
@@ -1009,8 +1009,8 @@ static inline void cgroup2_read_cpuacct_stat(struct cpuacct_stat *cp) {
             cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
         }
     }
-    cp->nr_periods_delta = (cp->nr_periods - nr_periods_last) >= 0 ? cp->nr_periods - nr_periods_last : 0;
-    cp->nr_throttled_delta = (cp->nr_throttled - nr_throttled_last) >= 0 ? cp->nr_throttled - nr_throttled_last : 0;
+    cp->nr_periods_delta = cp->nr_periods >= nr_periods_last ? cp->nr_periods - nr_periods_last : 0;
+    cp->nr_throttled_delta = cp->nr_throttled >= nr_throttled_last ? cp->nr_throttled - nr_throttled_last : 0;
 
     cp->updated = 1;
 
