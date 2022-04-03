@@ -3890,8 +3890,8 @@ netdataDashboard.context = {
     },
 
     'cgroup.throttled': {
-        info: 'The number of times tasks in a cgroup have been throttled. '+ 
-        'The tasks have not been allowed to run because they have exhausted all of the available time as specified by their CPUquota.'
+        info: 'The percentage of runnable periods when tasks in a cgroup have been throttled. '+ 
+        'The tasks have not been allowed to run because they have exhausted all of the available time as specified by their CPU quota.'
     },
 
     'cgroup.throttled_duration': {
