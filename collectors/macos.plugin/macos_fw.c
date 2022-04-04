@@ -78,7 +78,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
     // NEEDED BY: do_bandwidth
     struct ifaddrs *ifa, *ifap;
 
-#if !__is_identifier(IOMainPort) /* macOS >= 12.0 */
+#if !defined(MAC_OS_VERSION_12_0) || (MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_VERSION_12_0)
 #define IOMainPort IOMasterPort
 #endif
 
