@@ -17,14 +17,12 @@ struct capability {
     int enabled;
 };
 
-typedef void capabilities_list;
-
-capabilities_list *new_capabilities_list();
-
-
-
 #ifdef __cplusplus
 }
+
+#include "proto/aclk/v1/lib.pb.h"
+
+void capability_set(aclk_lib::v1::Capability *proto_capa, struct capability *c_capa);
 #endif
 
 #endif /* ACLK_SCHEMA_CAPABILITY_LIST_H */

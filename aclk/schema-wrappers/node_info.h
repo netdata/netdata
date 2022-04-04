@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "database/rrd.h"
+#include "capability_list.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,6 +68,9 @@ struct update_node_info {
     int child;
 
     struct machine_learning_info ml_info;
+
+    struct capability *node_capabilities;
+    struct capability *node_instance_capabilities;
 };
 
 char *generate_update_node_info_message(size_t *len, struct update_node_info *info);

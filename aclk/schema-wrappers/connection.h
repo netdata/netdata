@@ -3,6 +3,8 @@
 #ifndef ACLK_SCHEMA_WRAPPER_CONNECTION_H
 #define ACLK_SCHEMA_WRAPPER_CONNECTION_H
 
+#include "capability_list.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -14,6 +16,8 @@ typedef struct {
     int64_t session_id;
 
     unsigned int lwt:1;
+
+    struct capability *capabilities;
 
 // TODO in future optional fields
 // > 15 optional fields:
