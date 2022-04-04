@@ -13,6 +13,7 @@ static long system_page_size = 4096; // system will be queried via sysconf() in 
 
 static int cgroup_enable_cpuacct_stat = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_cpuacct_cpu_throttling = CONFIG_BOOLEAN_YES;
 static int cgroup_enable_memory = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_detailed_memory = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_AUTO;
@@ -72,6 +73,12 @@ static uint32_t Read_hash = 0;
 static uint32_t Write_hash = 0;
 static uint32_t user_hash = 0;
 static uint32_t system_hash = 0;
+static uint32_t user_usec_hash = 0;
+static uint32_t system_usec_hash = 0;
+static uint32_t nr_periods_hash = 0;
+static uint32_t nr_throttled_hash = 0;
+static uint32_t throttled_time_hash = 0;
+static uint32_t throttled_usec_hash = 0;
 
 enum cgroups_type { CGROUPS_AUTODETECT_FAIL, CGROUPS_V1, CGROUPS_V2 };
 
@@ -248,6 +255,12 @@ void read_cgroup_plugin_configuration() {
     Write_hash = simple_hash("Write");
     user_hash = simple_hash("user");
     system_hash = simple_hash("system");
+    user_usec_hash = simple_hash("user_usec");
+    system_usec_hash = simple_hash("system_usec");
+    nr_periods_hash = simple_hash("nr_periods");
+    nr_throttled_hash = simple_hash("nr_throttled");
+    throttled_time_hash = simple_hash("throttled_time");
+    throttled_usec_hash = simple_hash("throttled_usec");
 
     cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", localhost->rrd_update_every);
     if(cgroup_update_every < localhost->rrd_update_every)
@@ -269,6 +282,7 @@ void read_cgroup_plugin_configuration() {
 
     cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat (total CPU)", cgroup_enable_cpuacct_stat);
     cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage (per core CPU)", cgroup_enable_cpuacct_usage);
+    cgroup_enable_cpuacct_cpu_throttling = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct cpu throttling", cgroup_enable_cpuacct_cpu_throttling);
 
     cgroup_enable_memory = config_get_boolean_ondemand("plugin:cgroups", "enable memory", cgroup_enable_memory);
     cgroup_enable_detailed_memory = config_get_boolean_ondemand("plugin:cgroups", "enable detailed memory", cgroup_enable_detailed_memory);
@@ -658,12 +672,12 @@ struct memory {
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
 struct cpuacct_stat {
     int updated;
-    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
+    int enabled;            // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
 
     char *filename;
 
-    unsigned long long user;
-    unsigned long long system;
+    unsigned long long user;           // v1, v2(user_usec)
+    unsigned long long system;         // v1, v2(system_usec)
 };
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
@@ -675,6 +689,20 @@ struct cpuacct_usage {
 
     unsigned int cpus;
     unsigned long long *cpu_percpu;
+};
+
+// represents cpuacct/cpu.stat, for v2 'cpuacct_stat' is used for 'user_usec', 'system_usec'
+struct cpuacct_cpu_throttling {
+    int updated;
+    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
+
+    char *filename;
+
+    unsigned long long nr_periods;
+    unsigned long long nr_throttled;
+    unsigned long long throttled_time;
+
+    unsigned long long nr_throttled_perc;
 };
 
 struct cgroup_network_interface {
@@ -705,6 +733,7 @@ struct cgroup {
 
     struct cpuacct_stat cpuacct_stat;
     struct cpuacct_usage cpuacct_usage;
+    struct cpuacct_cpu_throttling cpuacct_cpu_throttling;
 
     struct memory memory;
 
@@ -727,6 +756,9 @@ struct cgroup {
     RRDSET *st_cpu;
     RRDSET *st_cpu_limit;
     RRDSET *st_cpu_per_core;
+    RRDSET *st_cpu_nr_throttled;
+    RRDSET *st_cpu_throttled_time;
+
     RRDSET *st_mem;
     RRDSET *st_mem_utilization;
     RRDSET *st_writeback;
@@ -735,6 +767,7 @@ struct cgroup {
     RRDSET *st_mem_usage;
     RRDSET *st_mem_usage_limit;
     RRDSET *st_mem_failcnt;
+
     RRDSET *st_io;
     RRDSET *st_serviced_ops;
     RRDSET *st_throttle_io;
@@ -810,6 +843,22 @@ struct discovery_thread {
 } discovery_thread;
 
 // ----------------------------------------------------------------------------
+
+static unsigned long long calc_delta(unsigned long long curr, unsigned long long prev) {
+    if (prev > curr) {
+        return 0;
+    }
+    return curr - prev;
+}
+
+static unsigned long long calc_percentage(unsigned long long value, unsigned long long total) {
+    if (total == 0) {
+        return 0;
+    }
+    return (calculated_number)value / (calculated_number)total * 100;
+}
+
+// ----------------------------------------------------------------------------
 // read values from /sys
 
 static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
@@ -857,40 +906,126 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
     }
 }
 
-static inline void cgroup2_read_cpuacct_stat(struct cpuacct_stat *cp) {
+static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *cp) {
+    if (unlikely(!cp->filename)) {
+        return;
+    }
+
     static procfile *ff = NULL;
+    ff = procfile_reopen(ff, cp->filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if (unlikely(!ff)) {
+        cp->updated = 0;
+        cgroups_check = 1;
+        return;
+    }
 
-    if(likely(cp->filename)) {
-        ff = procfile_reopen(ff, cp->filename, NULL, PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) {
-            cp->updated = 0;
-            cgroups_check = 1;
-            return;
+    ff = procfile_readall(ff);
+    if (unlikely(!ff)) {
+        cp->updated = 0;
+        cgroups_check = 1;
+        return;
+    }
+
+    unsigned long lines = procfile_lines(ff);
+    if (unlikely(lines < 3)) {
+        error("CGROUP: file '%s' should have 3 lines.", cp->filename);
+        cp->updated = 0;
+        return;
+    }
+
+    unsigned long long nr_periods_last = cp->nr_periods; 
+    unsigned long long nr_throttled_last = cp->nr_throttled; 
+
+    for (unsigned long i = 0; i < lines; i++) {
+        char *s = procfile_lineword(ff, i, 0);
+        uint32_t hash = simple_hash(s);
+
+        if (unlikely(hash == nr_periods_hash && !strcmp(s, "nr_periods"))) {
+            cp->nr_periods = str2ull(procfile_lineword(ff, i, 1));
+        } else if (unlikely(hash == nr_throttled_hash && !strcmp(s, "nr_throttled"))) {
+            cp->nr_throttled = str2ull(procfile_lineword(ff, i, 1));
+        } else if (unlikely(hash == throttled_time_hash && !strcmp(s, "throttled_time"))) {
+            cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
         }
+    }
+    cp->nr_throttled_perc =
+        calc_percentage(calc_delta(cp->nr_throttled, nr_throttled_last), calc_delta(cp->nr_periods, nr_periods_last));
 
-        ff = procfile_readall(ff);
-        if(unlikely(!ff)) {
-            cp->updated = 0;
-            cgroups_check = 1;
-            return;
-        }
+    cp->updated = 1;
 
-        unsigned long lines = procfile_lines(ff);
-
-        if(unlikely(lines < 3)) {
-            error("CGROUP: file '%s' should have 3+ lines.", cp->filename);
-            cp->updated = 0;
-            return;
-        }
-
-        cp->user = str2ull(procfile_lineword(ff, 1, 1));
-        cp->system = str2ull(procfile_lineword(ff, 2, 1));
-
-        cp->updated = 1;
-
-        if(unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO &&
-                    (cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+    if (unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO)) {
+        if (likely(
+                cp->nr_periods || cp->nr_throttled || cp->throttled_time ||
+                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
             cp->enabled = CONFIG_BOOLEAN_YES;
+        }
+    }
+}
+
+static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct cpuacct_cpu_throttling *cpt) {
+    static procfile *ff = NULL;
+    if (unlikely(!cp->filename)) {
+        return;
+    }
+
+    ff = procfile_reopen(ff, cp->filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if (unlikely(!ff)) {
+        cp->updated = 0;
+        cgroups_check = 1;
+        return;
+    }
+
+    ff = procfile_readall(ff);
+    if (unlikely(!ff)) {
+        cp->updated = 0;
+        cgroups_check = 1;
+        return;
+    }
+
+    unsigned long lines = procfile_lines(ff);
+
+    if (unlikely(lines < 3)) {
+        error("CGROUP: file '%s' should have at least 3 lines.", cp->filename);
+        cp->updated = 0;
+        return;
+    }
+
+    unsigned long long nr_periods_last = cpt->nr_periods; 
+    unsigned long long nr_throttled_last = cpt->nr_throttled; 
+
+    for (unsigned long i = 0; i < lines; i++) {
+        char *s = procfile_lineword(ff, i, 0);
+        uint32_t hash = simple_hash(s);
+
+        if (unlikely(hash == user_usec_hash && !strcmp(s, "user_usec"))) {
+            cp->user = str2ull(procfile_lineword(ff, i, 1));
+        } else if (unlikely(hash == system_usec_hash && !strcmp(s, "system_usec"))) {
+            cp->system = str2ull(procfile_lineword(ff, i, 1));
+        } else if (unlikely(hash == nr_periods_hash && !strcmp(s, "nr_periods"))) {
+            cpt->nr_periods = str2ull(procfile_lineword(ff, i, 1));
+        } else if (unlikely(hash == nr_throttled_hash && !strcmp(s, "nr_throttled"))) {
+            cpt->nr_throttled = str2ull(procfile_lineword(ff, i, 1));
+        } else if (unlikely(hash == throttled_usec_hash && !strcmp(s, "throttled_usec"))) {
+            cpt->throttled_time = str2ull(procfile_lineword(ff, i, 1)) * 1000; // usec -> ns
+        }
+    }
+    cpt->nr_throttled_perc =
+        calc_percentage(calc_delta(cpt->nr_throttled, nr_throttled_last), calc_delta(cpt->nr_periods, nr_periods_last));
+
+    cp->updated = 1;
+    cpt->updated = 1;
+
+    if (unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO)) {
+        if (likely(cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
+            cp->enabled = CONFIG_BOOLEAN_YES;
+        }
+    }
+    if (unlikely(cpt->enabled == CONFIG_BOOLEAN_AUTO)) {
+        if (likely(
+                cpt->nr_periods || cpt->nr_throttled || cpt->throttled_time ||
+                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
+            cpt->enabled = CONFIG_BOOLEAN_YES;
+        }
     }
 }
 
@@ -1264,6 +1399,7 @@ static inline void cgroup_read(struct cgroup *cg) {
     if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
         cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
         cgroup_read_cpuacct_usage(&cg->cpuacct_usage);
+        cgroup_read_cpuacct_cpu_stat(&cg->cpuacct_cpu_throttling);
         cgroup_read_memory(&cg->memory, 0);
         cgroup_read_blkio(&cg->io_service_bytes);
         cgroup_read_blkio(&cg->io_serviced);
@@ -1276,7 +1412,7 @@ static inline void cgroup_read(struct cgroup *cg) {
         //TODO: io_service_bytes and io_serviced use same file merge into 1 function
         cgroup2_read_blkio(&cg->io_service_bytes, 0);
         cgroup2_read_blkio(&cg->io_serviced, 4);
-        cgroup2_read_cpuacct_stat(&cg->cpuacct_stat);
+        cgroup2_read_cpuacct_cpu_stat(&cg->cpuacct_stat, &cg->cpuacct_cpu_throttling);
         cgroup2_read_pressure(&cg->cpu_pressure);
         cgroup2_read_pressure(&cg->io_pressure);
         cgroup2_read_pressure(&cg->memory_pressure);
@@ -1627,6 +1763,8 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_cpu)                   rrdset_is_obsolete(cg->st_cpu);
     if(cg->st_cpu_limit)             rrdset_is_obsolete(cg->st_cpu_limit);
     if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
+    if(cg->st_cpu_nr_throttled)      rrdset_is_obsolete(cg->st_cpu_nr_throttled);
+    if(cg->st_cpu_throttled_time)    rrdset_is_obsolete(cg->st_cpu_throttled_time);
     if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
     if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
     if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
@@ -1654,6 +1792,7 @@ static inline void cgroup_free(struct cgroup *cg) {
 
     freez(cg->cpuacct_stat.filename);
     freez(cg->cpuacct_usage.filename);
+    freez(cg->cpuacct_cpu_throttling.filename);
 
     arl_free(cg->memory.arl_base);
     freez(cg->memory.filename_detailed);
@@ -1870,6 +2009,16 @@ static inline void update_filenames()
                 else
                     debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
+            if(unlikely(cgroup_enable_cpuacct_cpu_throttling && !cg->cpuacct_cpu_throttling.filename && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_cpuacct_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->cpuacct_cpu_throttling.filename = strdupz(filename);
+                    cg->cpuacct_cpu_throttling.enabled = cgroup_enable_cpuacct_cpu_throttling;
+                    debug(D_CGROUP, "cpu.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_throttling.filename);
+                }
+                else
+                    debug(D_CGROUP, "cpu.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
 
             if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
@@ -2053,11 +2202,14 @@ static inline void update_filenames()
                 } else
                     debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if(unlikely(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename)) {
+            if (unlikely(
+                    (cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_cpu_throttling) &&
+                    !cg->cpuacct_stat.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_unified_base, cg->id);
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->cpuacct_stat.filename = strdupz(filename);
                     cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
+                    cg->cpuacct_cpu_throttling.enabled = cgroup_enable_cpuacct_cpu_throttling;
                     cg->filename_cpuset_cpus = NULL;
                     cg->filename_cpu_cfs_period = NULL;
                     snprintfz(filename, FILENAME_MAX, "%s%s/cpu.max", cgroup_unified_base, cg->id);
@@ -3460,6 +3612,60 @@ void update_cgroup_charts(int update_every) {
                         }
                     }
                 }
+            }
+        }
+
+        if (likely(cg->cpuacct_cpu_throttling.updated && cg->cpuacct_cpu_throttling.enabled == CONFIG_BOOLEAN_YES)) {
+            if (unlikely(!cg->st_cpu_nr_throttled)) {
+                snprintfz(title, CHART_TITLE_MAX, "CPU Throttled Runnable Periods");
+
+                cg->st_cpu_nr_throttled = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "throttled"
+                        , NULL
+                        , "cpu"
+                        , "cgroup.throttled"
+                        , title
+                        , "percentage"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 10
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_update_labels(cg->st_cpu_nr_throttled, cg->chart_labels);
+                rrddim_add(cg->st_cpu_nr_throttled, "throttled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            } else {
+                rrdset_next(cg->st_cpu_nr_throttled);
+                rrddim_set(cg->st_cpu_nr_throttled, "throttled", cg->cpuacct_cpu_throttling.nr_throttled_perc);
+                rrdset_done(cg->st_cpu_nr_throttled);
+            }
+
+            if (unlikely(!cg->st_cpu_throttled_time)) {
+                snprintfz(title, CHART_TITLE_MAX, "CPU Throttled Time Duration");
+
+                cg->st_cpu_throttled_time = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "throttled_duration"
+                        , NULL
+                        , "cpu"
+                        , "cgroup.throttled_duration"
+                        , title
+                        , "ms"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 15
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_update_labels(cg->st_cpu_throttled_time, cg->chart_labels);
+                rrddim_add(cg->st_cpu_throttled_time, "duration", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+            } else {
+                rrdset_next(cg->st_cpu_throttled_time);
+                rrddim_set(cg->st_cpu_throttled_time, "duration", cg->cpuacct_cpu_throttling.throttled_time);
+                rrdset_done(cg->st_cpu_throttled_time);
             }
         }
 
