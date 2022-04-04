@@ -84,8 +84,8 @@ private:
     std::pair<Dimension *, Duration<double>> findDimensionToTrain(const TimePoint &NowTP);
     void trainDimension(Dimension *D, const TimePoint &NowTP);
 
+    struct rusage ResourceUsage{};
     std::mutex ResourceUsageMutex;
-    struct rusage ResourceUsage;
 };
 
 class DetectableHost : public TrainableHost {

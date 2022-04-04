@@ -420,6 +420,7 @@ int unit_test_static_threads() {
 
     if (n < 2) {
         fprintf(stderr, "only %d static threads registered", n);
+        freez(static_threads);
         return 1;
     }
 
@@ -432,11 +433,12 @@ int unit_test_static_threads() {
                 continue;
 
             fprintf(stderr, "Found duplicate threads with name: %s\n", static_threads[i].name);
+            freez(static_threads);
             return 1;
         }
     }
 
-    free(static_threads);
+    freez(static_threads);
     return 0;
 }
 
