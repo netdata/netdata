@@ -682,8 +682,7 @@ struct cpuacct_stat {
     unsigned long long nr_periods;     // v2 only
     unsigned long long nr_throttled;   // v2 only
     unsigned long long throttled_time; // v2 only (throttled_usec)
-    unsigned long long nr_periods_delta;
-    unsigned long long nr_throttled_delta;
+    unsigned long long nr_throttled_perc;
 };
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
@@ -707,8 +706,7 @@ struct cpuacct_cpu_stat {
     unsigned long long nr_periods;
     unsigned long long nr_throttled;
     unsigned long long throttled_time;
-    unsigned long long nr_periods_delta;
-    unsigned long long nr_throttled_delta;
+    unsigned long long nr_throttled_perc;
 };
 
 struct cgroup_network_interface {
@@ -858,6 +856,20 @@ static inline int is_cgroup_v2(struct cgroup *cg) {
     return !is_cgroup_v1(cg);
 }
 
+static unsigned long long calc_delta(unsigned long long curr, unsigned long long prev) {
+    if (prev > curr) {
+        return 0;
+    }
+    return curr - prev;
+}
+
+static unsigned long long calc_percentage(unsigned long long value, unsigned long long total) {
+    if (total == 0) {
+        return 0;
+    }
+    return (calculated_number)value / (calculated_number)total * 100;
+}
+
 // ----------------------------------------------------------------------------
 // read values from /sys
 
@@ -948,8 +960,8 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_stat *cp){
             cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
         }
     }
-    cp->nr_periods_delta = cp->nr_periods >= nr_periods_last ? cp->nr_periods - nr_periods_last : 0;
-    cp->nr_throttled_delta = cp->nr_throttled >= nr_throttled_last ? cp->nr_throttled - nr_throttled_last : 0;
+    cp->nr_throttled_perc =
+        calc_percentage(calc_delta(cp->nr_throttled, nr_throttled_last), calc_delta(cp->nr_periods, nr_periods_last));
 
     cp->updated = 1;
 
@@ -1009,8 +1021,8 @@ static inline void cgroup2_read_cpuacct_stat(struct cpuacct_stat *cp) {
             cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
         }
     }
-    cp->nr_periods_delta = cp->nr_periods >= nr_periods_last ? cp->nr_periods - nr_periods_last : 0;
-    cp->nr_throttled_delta = cp->nr_throttled >= nr_throttled_last ? cp->nr_throttled - nr_throttled_last : 0;
+    cp->nr_throttled_perc =
+        calc_percentage(calc_delta(cp->nr_throttled, nr_throttled_last), calc_delta(cp->nr_periods, nr_periods_last));
 
     cp->updated = 1;
 
@@ -3642,16 +3654,11 @@ void update_cgroup_charts(int update_every) {
             } else {
                 rrdset_next(cg->st_cpu_nr_throttled);
 
-                calculated_number cpu_throttling_perc = 0;
-                if (is_cgroup_v1(cg) && cg->cpuacct_cpu_stat.nr_periods_delta > 0) {
-                    cpu_throttling_perc = (calculated_number)cg->cpuacct_cpu_stat.nr_throttled_delta /
-                                          (calculated_number)cg->cpuacct_cpu_stat.nr_periods_delta * 100;
-                } else if (cg->cpuacct_stat.nr_periods_delta > 0) {
-                    cpu_throttling_perc = (calculated_number)cg->cpuacct_stat.nr_throttled_delta /
-                                          (calculated_number)cg->cpuacct_stat.nr_periods_delta * 100;
+                if (is_cgroup_v1(cg)) {
+                    rrddim_set(cg->st_cpu_nr_throttled, "throttled", cg->cpuacct_cpu_stat.nr_throttled_perc);
+                } else {
+                    rrddim_set(cg->st_cpu_nr_throttled, "throttled", cg->cpuacct_stat.nr_throttled_perc);
                 }
-
-                rrddim_set(cg->st_cpu_nr_throttled, "throttled", cpu_throttling_perc);
                 rrdset_done(cg->st_cpu_nr_throttled);
             }
 
