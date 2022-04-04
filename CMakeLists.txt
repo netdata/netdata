@@ -813,6 +813,8 @@ set(ACLK_FILES
         aclk/schema-wrappers/alarm_config.h
         aclk/schema-wrappers/node_info.cc
         aclk/schema-wrappers/node_info.h
+        aclk/schema-wrappers/capability_list.cc
+        aclk/schema-wrappers/capability_list.h
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
