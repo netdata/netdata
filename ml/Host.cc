@@ -9,17 +9,6 @@
 
 using namespace ml;
 
-static std::pair<std::string, std::string>
-getHostSpecificIdAndTitle(RRDHOST *RH, const std::string &IdPrefix,
-                                       const std::string &TitlePrefix) {
-    std::stringstream IdSS, TitleSS;
-
-    IdSS << IdPrefix << "_" << RH->machine_guid;
-    TitleSS << TitlePrefix << " " << RH->hostname;
-
-    return {IdSS.str(), TitleSS.str()};
-}
-
 static void updateDimensionsChart(RRDHOST *RH,
                                   collected_number NumTrainedDimensions,
                                   collected_number NumNormalDimensions,
@@ -31,17 +20,20 @@ static void updateDimensionsChart(RRDHOST *RH,
     static thread_local RRDDIM *NumAnomalousDimensionsRD = nullptr;
 
     if (!RS) {
-        std::string IdPrefix = "dimensions";
-        std::string TitlePrefix = "Anomaly detection dimensions for host";
-        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        std::stringstream IdSS, NameSS, TitleSS;
 
-        RS = rrdset_create_localhost(
+        IdSS << "dimensions_on_" << localhost->machine_guid;
+        NameSS << "dimensions_on_" << localhost->hostname;
+        TitleSS << "Anomaly detection dimensions for host " << RH->hostname;
+
+        RS = rrdset_create(
+            RH,
             "anomaly_detection", // type
-            IdTitlePair.first.c_str(), // id
-            NULL, // name
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
             "dimensions", // family
             "anomaly_detection.dimensions", // ctx
-            IdTitlePair.second.c_str(), // title
+            TitleSS.str().c_str(), // title
             "dimensions", // units
             "netdata", // plugin
             "ml", // module
@@ -49,6 +41,7 @@ static void updateDimensionsChart(RRDHOST *RH,
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
+        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
 
         NumTotalDimensionsRD = rrddim_add(RS, "total", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -74,17 +67,20 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
     static thread_local RRDDIM *AnomalyRateRD = nullptr;
 
     if (!RS) {
-        std::string IdPrefix = "anomaly_rate";
-        std::string TitlePrefix = "Percentage of anomalous dimensions for host";
-        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        std::stringstream IdSS, NameSS, TitleSS;
 
-        RS = rrdset_create_localhost(
+        IdSS << "anomaly_rate_on_" << localhost->machine_guid;
+        NameSS << "anomaly_rate_on_" << localhost->hostname;
+        TitleSS << "Percentage of anomalous dimensions for host " << RH->hostname;
+
+        RS = rrdset_create(
+            RH,
             "anomaly_detection", // type
-            IdTitlePair.first.c_str(), // id
-            NULL, // name
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
             "anomaly_rate", // family
             "anomaly_detection.anomaly_rate", // ctx
-            IdTitlePair.second.c_str(), // title
+            TitleSS.str().c_str(), // title
             "percentage", // units
             "netdata", // plugin
             "ml", // module
@@ -92,6 +88,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
+        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
 
         AnomalyRateRD = rrddim_add(RS, "anomaly_rate", NULL,
                 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -108,17 +105,20 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
     static thread_local RRDDIM *WindowLengthRD = nullptr;
 
     if (!RS) {
-        std::string IdPrefix = "detector_window";
-        std::string TitlePrefix = "Anomaly detector window length for host";
-        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        std::stringstream IdSS, NameSS, TitleSS;
 
-        RS = rrdset_create_localhost(
+        IdSS << "detector_window_on_" << localhost->machine_guid;
+        NameSS << "detector_window_on_" << localhost->hostname;
+        TitleSS << "Anomaly detector window length for host " << RH->hostname;
+
+        RS = rrdset_create(
+            RH,
             "anomaly_detection", // type
-            IdTitlePair.first.c_str(), // id
-            NULL, // name
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
             "detector_window", // family
             "anomaly_detection.detector_window", // ctx
-            IdTitlePair.second.c_str(), // title
+            TitleSS.str().c_str(), // title
             "seconds", // units
             "netdata", // plugin
             "ml", // module
@@ -126,6 +126,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
+        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
 
         WindowLengthRD = rrddim_add(RS, "duration", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -146,17 +147,20 @@ static void updateEventsChart(RRDHOST *RH,
     static thread_local RRDDIM *NewAnomalyEventRD = nullptr;
 
     if (!RS) {
-        std::string IdPrefix = "detector_events";
-        std::string TitlePrefix = "Anomaly events triggered for host";
-        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        std::stringstream IdSS, NameSS, TitleSS;
 
-        RS = rrdset_create_localhost(
+        IdSS << "detector_events_on_" << localhost->machine_guid;
+        NameSS << "detector_events_on_" << localhost->hostname;
+        TitleSS << "Anomaly events triggered for host " << RH->hostname;
+
+        RS = rrdset_create(
+            RH,
             "anomaly_detection", // type
-            IdTitlePair.first.c_str(), // id
-            NULL, // name
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
             "detector_events", // family
             "anomaly_detection.detector_events", // ctx
-            IdTitlePair.second.c_str(), // title
+            TitleSS.str().c_str(), // title
             "boolean", // units
             "netdata", // plugin
             "ml", // module
@@ -164,6 +168,7 @@ static void updateEventsChart(RRDHOST *RH,
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
+        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
 
         AboveThresholdRD = rrddim_add(RS, "above_threshold", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -189,21 +194,23 @@ static void updateDetectionChart(RRDHOST *RH) {
     static thread_local RRDDIM *UserRD, *SystemRD = nullptr;
 
     if (!RS) {
-        std::string IdPrefix = "prediction_stats";
-        std::string TitlePrefix = "Prediction thread CPU usage for host";
-        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        std::stringstream IdSS, NameSS, TitleSS;
+
+        IdSS << "prediction_stats_" << RH->machine_guid;
+        NameSS << "prediction_stats_for_" << RH->hostname;
+        TitleSS << "Prediction thread CPU usage for host " << RH->hostname;
 
         RS = rrdset_create_localhost(
-            "anomaly_detection", // type
-            IdTitlePair.first.c_str(), // id
-            NULL, // name
-            "prediction_stats", // family
-            "anomaly_detection.prediction_stats", // ctx
-            IdTitlePair.second.c_str(), // title
+            "netdata", // type
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
+            "ml", // family
+            "prediction_stats", // ctx
+            TitleSS.str().c_str(), // title
             "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
-            39187, // priority
+            136000, // priority
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_STACKED // chart_type
         );
@@ -228,21 +235,23 @@ static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
     static thread_local RRDDIM *SystemRD = nullptr;
 
     if (!RS) {
-        std::string IdPrefix = "training_stats";
-        std::string TitlePrefix = "Training thread CPU usage for host";
-        auto IdTitlePair = getHostSpecificIdAndTitle(RH, IdPrefix, TitlePrefix);
+        std::stringstream IdSS, NameSS, TitleSS;
+
+        IdSS << "training_stats_" << RH->machine_guid;
+        NameSS << "training_stats_for_" << RH->hostname;
+        TitleSS << "Training thread CPU usage for host " << RH->hostname;
 
         RS = rrdset_create_localhost(
-            "anomaly_detection", // type
-            IdTitlePair.first.c_str(), // id
-            NULL, // name
-            "training_stats", // family
-            "anomaly_detection.training_stats", // ctx
-            IdTitlePair.second.c_str(), // title
+            "netdata", // type
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
+            "ml", // family
+            "training_stats", // ctx
+            TitleSS.str().c_str(), // title
             "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
-            39188, // priority
+            136001, // priority
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_STACKED // chart_type
         );

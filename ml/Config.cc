@@ -133,4 +133,6 @@ void Config::readMLConfig(void) {
     Cfg.ChartsToSkip = "anomaly_detection.* ";
     Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training", "netdata.*");
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
+
+    Cfg.StreamADCharts = config_get_boolean(ConfigSectionML, "stream anomaly detection charts", false);
 }
