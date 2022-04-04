@@ -1400,8 +1400,9 @@ void rrdset_done(RRDSET *st) {
 #ifdef ENABLE_ACLK
     if (likely(!st->state->is_ar_chart)) {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-            if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st)))
+            if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+            }
         }
     }
 #endif
@@ -1828,20 +1829,14 @@ after_second_database_work:
             continue;
 
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-    if (likely(!st->state->is_ar_chart)) {
-        if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) {
-            int live =
-                ((mark - rd->last_collected_time.tv_sec) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every);
-            if (unlikely(live != rd->state->aclk_live_status)) {
-                if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-                    if (likely(!queue_dimension_to_aclk(rd))) {
-                        rd->state->aclk_live_status = live;
-                        rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
-                    }
-                }
+        if (likely(!st->state->is_ar_chart)) {
+            if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+                int live =
+                    ((mark - rd->last_collected_time.tv_sec) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every);
+                if (unlikely(live != rd->state->aclk_live_status))
+                        (void)queue_dimension_to_aclk(rd);
             }
         }
-    }
 #endif
         if(unlikely(!rd->updated))
             continue;
@@ -1943,7 +1938,7 @@ after_second_database_work:
                         } else {
                             /* Do not delete this dimension */
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-                            aclk_send_dimension_update(rd);
+                            queue_dimension_to_aclk(rd);
 #endif
                             last = rd;
                             rd = rd->next;
