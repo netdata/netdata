@@ -677,7 +677,7 @@ struct cpuacct_stat {
     char *filename;
 
     unsigned long long user;           // v1, v2(user_usec)
-    unsigned long long system;         // v1, v2(system_user)
+    unsigned long long system;         // v1, v2(system_usec)
 };
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
