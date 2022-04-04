@@ -66,7 +66,7 @@ void Config::readMLConfig(void) {
 
     DiffN = clamp(DiffN, 0u, 1u);
     SmoothN = clamp(SmoothN, 0u, 5u);
-    LagN = clamp(LagN, 0u, 5u);
+    LagN = clamp(LagN, 1u, 5u);
 
     RandomSamplingRatio = clamp(RandomSamplingRatio, 0.2, 1.0);
     MaxKMeansIters = clamp(MaxKMeansIters, 500u, 1000u);
