@@ -844,14 +844,6 @@ struct discovery_thread {
 
 // ----------------------------------------------------------------------------
 
-static inline int is_cgroup_v1(struct cgroup *cg) {
-    return !(cg->options & CGROUP_OPTIONS_IS_UNIFIED);
-}
-
-static inline int is_cgroup_v2(struct cgroup *cg) {
-    return !is_cgroup_v1(cg);
-}
-
 static unsigned long long calc_delta(unsigned long long curr, unsigned long long prev) {
     if (prev > curr) {
         return 0;
