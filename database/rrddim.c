@@ -2,6 +2,10 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
+#include "database/rrddim_mem.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengineapi.h"
+#endif
 
 // ----------------------------------------------------------------------------
 // RRDDIM index
@@ -94,74 +98,6 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
-
-// ----------------------------------------------------------------------------
-// RRDDIM legacy data collection functions
-
-static void rrddim_collect_init(RRDDIM *rd) {
-    rd->state->handle = callocz(1, sizeof(struct mem_collect_handle));
-    rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
-}
-static void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number) {
-    (void)point_in_time;
-
-    rd->values[rd->rrdset->current_entry] = number;
-}
-static int rrddim_collect_finalize(RRDDIM *rd) {
-    freez(rd->state->handle);
-    return 0;
-}
-
-
-// ----------------------------------------------------------------------------
-// RRDDIM legacy database query functions
-
-static void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
-    handle->rd = rd;
-    handle->start_time = start_time;
-    handle->end_time = end_time;
-    struct mem_query_handle* mem_handle = callocz(1, sizeof(struct mem_query_handle));
-    mem_handle->slot = rrdset_time2slot(rd->rrdset, start_time);
-    mem_handle->last_slot = rrdset_time2slot(rd->rrdset, end_time);
-    mem_handle->finished = 0;
-    handle->handle = mem_handle;
-}
-
-static storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time) {
-    RRDDIM *rd = handle->rd;
-    struct mem_query_handle* mem_handle = handle->handle;
-    long entries = rd->rrdset->entries;
-    long slot = mem_handle->slot;
-
-    (void)current_time;
-    if (unlikely(mem_handle->slot == mem_handle->last_slot))
-        mem_handle->finished = 1;
-    storage_number n = rd->values[slot++];
-
-    if(unlikely(slot >= entries)) slot = 0;
-    mem_handle->slot = slot;
-
-    return n;
-}
-
-static int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
-    struct mem_query_handle* mem_handle = handle->handle;
-    return mem_handle->finished;
-}
-
-static void rrddim_query_finalize(struct rrddim_query_handle *handle) {
-    freez(handle->handle);
-    return;
-}
-
-static time_t rrddim_query_latest_time(RRDDIM *rd) {
-    return rrdset_last_entry_t_nolock(rd->rrdset);
-}
-
-static time_t rrddim_query_oldest_time(RRDDIM *rd) {
-    return rrdset_first_entry_t_nolock(rd->rrdset);
-}
-
 
 // ----------------------------------------------------------------------------
 // RRDDIM create a dimension

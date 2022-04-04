@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengineapi.h"
+#endif
 
 static int check_number_printing(void) {
     struct {
@@ -1157,7 +1160,7 @@ int run_test(struct test *test)
     RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1
                                          , test->update_every, RRDSET_TYPE_LINE);
     RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
-    
+
     RRDDIM *rd2 = NULL;
     if(test->feed2)
         rd2 = rrddim_add(st, "dim2", NULL, test->multiplier, test->divisor, test->algorithm);
@@ -1173,7 +1176,7 @@ int run_test(struct test *test)
 
         if(c) {
             time_now += test->feed[c].microseconds;
-            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " CALCULATED_NUMBER_FORMAT ", rate " CALCULATED_NUMBER_FORMAT "\n", 
+            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " CALCULATED_NUMBER_FORMAT ", rate " CALCULATED_NUMBER_FORMAT "\n",
                 test->name, c+1,
                 (float)test->feed[c].microseconds / 1000000.0,
                 (float)time_now / 1000000.0,
@@ -1893,9 +1896,9 @@ int test_dbengine(void)
     }
 error_out:
     rrd_wrlock();
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    rrdeng_prepare_exit((struct rrdengine_instance*)host->rrdeng_ctx);
     rrdhost_delete_charts(host);
-    rrdeng_exit(host->rrdeng_ctx);
+    rrdeng_exit((struct rrdengine_instance*)host->rrdeng_ctx);
     rrd_unlock();
 
     return errors;
@@ -2285,9 +2288,9 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     }
     freez(query_threads);
     rrd_wrlock();
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    rrdeng_prepare_exit((struct rrdengine_instance*)host->rrdeng_ctx);
     rrdhost_delete_charts(host);
-    rrdeng_exit(host->rrdeng_ctx);
+    rrdeng_exit((struct rrdengine_instance*)host->rrdeng_ctx);
     rrd_unlock();
 }
 

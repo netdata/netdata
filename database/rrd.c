@@ -2,6 +2,7 @@
 #define NETDATA_RRD_INTERNALS 1
 
 #include "rrd.h"
+#include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
 // globals
@@ -47,24 +48,19 @@ inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
             return RRD_MEMORY_MODE_DBENGINE_NAME;
     }
 
+    STORAGE_ENGINE* eng = engine_get(id);
+    if (eng) {
+        return eng->name;
+    }
+
     return RRD_MEMORY_MODE_SAVE_NAME;
 }
 
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
-    if(unlikely(!strcmp(name, RRD_MEMORY_MODE_RAM_NAME)))
-        return RRD_MEMORY_MODE_RAM;
-
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_MAP_NAME)))
-        return RRD_MEMORY_MODE_MAP;
-
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_NONE_NAME)))
-        return RRD_MEMORY_MODE_NONE;
-
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_ALLOC_NAME)))
-        return RRD_MEMORY_MODE_ALLOC;
-
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_DBENGINE_NAME)))
-        return RRD_MEMORY_MODE_DBENGINE;
+    STORAGE_ENGINE* eng = engine_find(name);
+    if (eng) {
+        return eng->id;
+    }
 
     return RRD_MEMORY_MODE_SAVE;
 }

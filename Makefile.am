@@ -443,6 +443,10 @@ RRD_PLUGIN_FILES = \
     database/rrdsetvar.h \
     database/rrdvar.c \
     database/rrdvar.h \
+    database/rrddim_mem.c \
+    database/rrddim_mem.h \
+    database/storage_engine.c \
+    database/storage_engine.h \
     database/sqlite/sqlite_functions.c \
     database/sqlite/sqlite_functions.h \
     database/sqlite/sqlite_aclk.c \

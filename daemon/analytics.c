@@ -2,6 +2,9 @@
 
 #include "common.h"
 #include "buildinfo.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengineapi.h"
+#endif
 
 struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);

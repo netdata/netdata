@@ -3,6 +3,10 @@
 #include "query.h"
 #include "web/api/formatters/rrd2json.h"
 #include "rrdr.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengineapi.h"
+#endif
+#include "database/rrddim_mem.h"
 
 #include "average/average.h"
 #include "incremental_sum/incremental_sum.h"

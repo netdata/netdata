@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
-
-/* Default global database instance */
-struct rrdengine_instance multidb_ctx;
+#include "../storage_engine.h"
 
 int default_rrdeng_page_cache_mb = 32;
 int default_rrdeng_disk_quota_mb = 256;
@@ -12,7 +10,7 @@ uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
 static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host)
 {
-    return host->rrdeng_ctx;
+    return (struct rrdengine_instance*) host->rrdeng_ctx;
 }
 
 /* This UUID is not unique across hosts */
@@ -68,7 +66,7 @@ void rrdeng_metric_init(RRDDIM *rd)
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-    if (host != localhost && host->rrdeng_ctx == &multidb_ctx)
+    if (host != localhost && host->rrdeng_ctx->engine && host->rrdeng_ctx == host->rrdeng_ctx->engine->multidb_instance)
         is_multihost_child = 1;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -213,15 +211,11 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
 void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->state->handle;
-    struct rrdengine_instance *ctx;
-    struct page_cache *pg_cache;
-    struct rrdeng_page_descr *descr;
+    struct rrdengine_instance *ctx = handle->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    struct rrdeng_page_descr *descr = handle->descr;
     storage_number *page;
     uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
-
-    ctx = handle->ctx;
-    pg_cache = &ctx->pg_cache;
-    descr = handle->descr;
 
     if (descr) {
         /* Make alignment decisions */
@@ -880,11 +874,9 @@ void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
     pg_cache_put(ctx, (struct rrdeng_page_descr *)handle);
 }
 
-/*
- * Returns 0 on success, negative on error
- */
-int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
-                unsigned disk_space_mb)
+
+STORAGE_ENGINE_INSTANCE*
+rrdeng_init(STORAGE_ENGINE* eng, RRDHOST *host)
 {
     struct rrdengine_instance *ctx;
     int error;
@@ -901,15 +893,19 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
 
         rrd_stat_atomic_add(&global_fs_errors, 1);
         rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
-        return UV_EMFILE;
+        return NULL;//UV_EMFILE;
     }
+    char dbfiles_path[FILENAME_MAX + 1];
+    int ret;
 
-    if (NULL == ctxp) {
-        ctx = &multidb_ctx;
-        memset(ctx, 0, sizeof(*ctx));
-    } else {
-        *ctxp = ctx = callocz(1, sizeof(*ctx));
-    }
+    snprintfz(dbfiles_path, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+    ret = mkdir(dbfiles_path, 0775);
+
+    int page_cache_mb = default_rrdeng_page_cache_mb;
+    int disk_space_mb = default_rrdeng_disk_quota_mb;
+
+    ctx = callocz(1, sizeof(*ctx));
+    ctx->parent.engine = eng;
     ctx->global_compress_alg = RRD_LZ4;
     if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
         page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
@@ -956,18 +952,15 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
         goto error_after_rrdeng_worker;
     }
 
-    return 0;
+    return (STORAGE_ENGINE_INSTANCE *)ctx;
 
 error_after_rrdeng_worker:
     finalize_rrd_files(ctx);
 error_after_init_rrd_files:
     free_page_cache(ctx);
-    if (ctx != &multidb_ctx) {
-        freez(ctx);
-        *ctxp = NULL;
-    }
+    freez(ctx);
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
-    return UV_EIO;
+    return NULL;//UV_EIO;
 }
 
 /*
@@ -990,10 +983,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     finalize_rrd_files(ctx);
     //metalog_exit(ctx->metalog_ctx);
     free_page_cache(ctx);
-
-    if (ctx != &multidb_ctx) {
-        freez(ctx);
-    }
+    freez(ctx);
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;
 }
