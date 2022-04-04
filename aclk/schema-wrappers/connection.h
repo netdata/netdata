@@ -3,7 +3,7 @@
 #ifndef ACLK_SCHEMA_WRAPPER_CONNECTION_H
 #define ACLK_SCHEMA_WRAPPER_CONNECTION_H
 
-#include "capability_list.h"
+#include "capability.h"
 
 #ifdef __cplusplus
 extern "C" {

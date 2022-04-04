@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef ACLK_SCHEMA_CAPABILITY_LIST_H
-#define ACLK_SCHEMA_CAPABILITY_LIST_H
+#ifndef ACLK_SCHEMA_CAPABILITY_H
+#define ACLK_SCHEMA_CAPABILITY_H
 
 #include <stdlib.h>
 
@@ -25,4 +25,4 @@ struct capability {
 void capability_set(aclk_lib::v1::Capability *proto_capa, struct capability *c_capa);
 #endif
 
-#endif /* ACLK_SCHEMA_CAPABILITY_LIST_H */
+#endif /* ACLK_SCHEMA_CAPABILITY_H */

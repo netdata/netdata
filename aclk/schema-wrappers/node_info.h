@@ -6,7 +6,7 @@
 #include <stdlib.h>
 
 #include "database/rrd.h"
-#include "capability_list.h"
+#include "capability.h"
 
 #ifdef __cplusplus
 extern "C" {
