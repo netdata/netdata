@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-s
 # Anonymous statistics
 
 By default, Netdata collects anonymous usage information from the open-source monitoring agent using the open-source
-product analytics platform [PostHog](https://github.com/PostHog/posthog) (we use thier [cloud enterprise offering](https://posthog.com/product)).
+product analytics platform [PostHog](https://github.com/PostHog/posthog). We use their [cloud enterprise platform](https://posthog.com/product).
 
 We are strongly committed to your [data privacy](https://netdata.cloud/data-privacy/).
 
