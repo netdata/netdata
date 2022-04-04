@@ -407,6 +407,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     is_first_region_initialized = 0;
     region_points = 0;
 
+    int is_out_of_order_reported = 0;
     /* pages loop */
     for (i = 0, curr = NULL, prev = NULL ; i < pages_nr ; ++i) {
         old_prev = prev;
@@ -447,7 +448,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
                 is_metric_out_of_order = 1;
             if (is_metric_earlier_than_range || unlikely(is_metric_out_of_order)) {
                 if (unlikely(is_metric_out_of_order))
-                    info("Ignoring metric with out of order timestamp.");
+                    is_out_of_order_reported++;
                 continue; /* next entry */
             }
             /* here is a valid metric */
@@ -520,6 +521,8 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
             freez(region_info_array);
         }
     }
+    if (is_out_of_order_reported)
+        info("Ignored %d metrics with out of order timestamp in %u regions.", is_out_of_order_reported, regions);
     return regions;
 }
 
