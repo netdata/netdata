@@ -9,6 +9,9 @@
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
+#include "aclk_flight_recorder.h"
+#include "aclk_events.h"
+
 struct dictionary_singleton {
     char *key;
     char *result;
@@ -433,6 +436,8 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     int rc = 1;
     BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
 
+    aclk_log_event(ACLK_EVT_CHALLENGE_BEGIN, "GET HTTP Challenge");
+
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
 
@@ -450,27 +455,27 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     req.url = url->buffer;
 
     if (aclk_https_request(&req, &resp)) {
-        error ("ACLK_OTP Challenge failed");
+        aclk_log_event(ACLK_EVT_CHALLENGE_GET_ERR, "ACLK_OTP Challenge failed");
         goto cleanup;
     }
     if (resp.http_code != 200) {
-        error ("ACLK_OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
+        aclk_log_event(ACLK_EVT_CHALLENGE_NOT_200, "ACLK_OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
         if (resp.payload_size)
             aclk_parse_otp_error(resp.payload);
         goto cleanup_resp;
     }
-    info ("ACLK_OTP Got Challenge from Cloud");
+    aclk_log_event(ACLK_EVT_CHALLENGE_RCVD, "ACLK_OTP Received Challenge from Cloud");
 
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
 
     if (json_parse(resp.payload, &challenge, json_extract_singleton) != JSON_OK)
     {
         freez(challenge.result);
-        error("Could not parse the the challenge");
+        aclk_log_event(ACLK_EVT_CHALLENGE_PARSE_ERR, "Could not parse the the challenge");
         goto cleanup_resp;
     }
     if (challenge.result == NULL) {
-        error("Could not retrieve challenge JSON key from challenge response");
+        aclk_log_event(ACLK_EVT_CHALLENGE_PARSE_ERR, "Could not retrieve challenge JSON key from challenge response");
         goto cleanup_resp;
     }
 
@@ -502,12 +507,14 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     req.payload = response_json;
     req.payload_size = strlen(response_json);
 
+    aclk_log_event(ACLK_EVT_PASSWD_BEGIN, "POST HTTP Password");
+
     if (aclk_https_request(&req, &resp)) {
-        error ("ACLK_OTP Password error trying to post result to password");
+        aclk_log_event(ACLK_EVT_PASSWD_POST_ERR, "ACLK_OTP Password error trying to POST result to password endpoint");
         goto cleanup;
     }
     if (resp.http_code != 201) {
-        error ("ACLK_OTP Password HTTP code not 201 Created (got %d)", resp.http_code);
+        aclk_log_event(ACLK_EVT_PASSWD_NOT_201, "ACLK_OTP Password HTTP code not 201 Created (got %d)", resp.http_code);
         if (resp.payload_size)
             aclk_parse_otp_error(resp.payload);
         goto cleanup_resp;
@@ -516,14 +523,16 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
 
     struct auth_data data = { .client_id = NULL, .passwd = NULL, .username = NULL };
     
-    if (parse_passwd_response(resp.payload, &data)){
-        error("Error parsing response of password endpoint");
+    if (parse_passwd_response(resp.payload, &data)) {
+        aclk_log_event(ACLK_EVT_PASSWD_RESPONSE_PARSE_ERROR, "Error parsing response of password endpoint");
         goto cleanup_resp;
     }
 
     *mqtt_pass = data.passwd;
     *mqtt_usr = data.username;
     *mqtt_id = data.client_id;
+
+    aclk_log_event(ACLK_EVT_PASSWD_DONE, "POST HTTP Password Success");
 
     rc = 0;
 cleanup_resp:
@@ -834,10 +843,12 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
 
     req.request_type = HTTP_REQ_GET;
 
+    aclk_log_event(ACLK_EVT_OTP_ENV_BEGIN, "Attempting /api/v1/env HTTP call");
+
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
     {
-        error("Agent was not claimed - cannot perform challenge/response");
+        aclk_log_event(0, "Agent was not claimed - cannot perform challenge/response");
         buffer_free(buf);
         return 1;
     }
@@ -853,13 +864,13 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
     req.port = aclk_port;
     req.url = buf->buffer;
     if (aclk_https_request(&req, &resp)) {
-        error("Error trying to contact env endpoint");
+        aclk_log_event(0, "Error trying to contact env endpoint");
         https_req_response_free(&resp);
         buffer_free(buf);
         return 1;
     }
     if (resp.http_code != 200) {
-        error("The HTTP code not 200 OK (Got %d)", resp.http_code);
+        aclk_log_event(0, "The HTTP code not 200 OK (Got %d)", resp.http_code);
         if (resp.payload_size)
             aclk_parse_otp_error(resp.payload);
         https_req_response_free(&resp);
@@ -868,20 +879,20 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
     }
 
     if (!resp.payload || !resp.payload_size) {
-        error("Unexpected empty payload as response to /env call");
+        aclk_log_event(0, "Unexpected empty payload as response to /env call");
         https_req_response_free(&resp);
         buffer_free(buf);
         return 1;
     }
 
     if (parse_json_env(resp.payload, env)) {
-        error ("error parsing /env message");
+        aclk_log_event(0, "error parsing /env message");
         https_req_response_free(&resp);
         buffer_free(buf);
         return 1;
     }
 
-    info("Getting Cloud /env successful");
+    aclk_log_event(ACLK_EVT_OTP_ENV_DONE, "Getting Cloud /api/v1/env successful");
 
     https_req_response_free(&resp);
     buffer_free(buf);

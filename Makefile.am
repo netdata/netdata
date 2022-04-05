@@ -622,6 +622,8 @@ ACLK_FILES = \
     aclk/aclk_rx_msgs.h \
     aclk/https_client.c \
     aclk/https_client.h \
+    aclk/aclk_flight_recorder.c \
+    aclk/aclk_flight_recorder.h \
     mqtt_websockets/src/mqtt_wss_client.c \
     mqtt_websockets/src/include/mqtt_wss_client.h \
     mqtt_websockets/src/mqtt_wss_log.c \

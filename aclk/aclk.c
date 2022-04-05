@@ -12,6 +12,8 @@
 #include "aclk_rx_msgs.h"
 #include "aclk_collector_list.h"
 #include "https_client.h"
+#include "aclk_flight_recorder.h"
+#include "aclk_events.h"
 
 #include "aclk_proxy.h"
 
@@ -283,6 +285,7 @@ static inline void msg_callback(const char *topic, const void *msg, size_t msgle
 static void puback_callback(uint16_t packet_id)
 {
     if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE) {
+        aclk_log_event(ACLK_EVT_MQTT_PUBACK_LIMIT, "MQTT connection considered stable");
         last_conn_time_appl = now_realtime_sec();
         aclk_tbeb_reset();
     }
@@ -488,7 +491,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
             break;
         }
     }
-    info("ACLK link is down");
+    aclk_log_event(ACLK_EVT_CONN_GRACEFUL_DISCONNECT, "ACLK link is down (wanted disconnect)");
     log_access("ACLK DISCONNECTED");
     aclk_stats_upd_online(0);
     last_disconnect_time = now_realtime_sec();
@@ -605,6 +608,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         if (aclk_block_till_recon_allowed())
             return 1;
 
+        aclk_new_connection_log();
         info("Attempting connection now");
         memset(&base_url, 0, sizeof(url_t));
         if (url_parse(cloud_base_url, &base_url)) {
@@ -654,17 +658,17 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
 #else
             if (!aclk_env_has_capa("proto")) {
-                error ("Can't encoding=proto without at least \"proto\" capability.");
+                aclk_log_event(ACLK_EVT_ENV_NEGOTIATION_FAILURE, "Can't encoding=proto without at least \"proto\" capability.");
                 continue;
             }
-            info("Switching ACLK to new protobuf protocol. Due to /env response.");
+            aclk_log_event(ACLK_EVT_NEW_PROTO_SWITCH, "Switching ACLK to new protobuf protocol. Due to /env response.");
             aclk_use_new_cloud_arch = 1;
 #endif
         }
 
         memset(&auth_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->auth_endpoint, &auth_url)) {
-            error("Parsing URL returned by env endpoint for authentication failed. \"%s\"", aclk_env->auth_endpoint);
+            aclk_log_event(ACLK_EVT_ENV_URL_ERROR, "Parsing URL returned by env endpoint for authentication failed. \"%s\"", aclk_env->auth_endpoint);
             url_t_destroy(&auth_url);
             continue;
         }
@@ -684,20 +688,20 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             mqtt_conn_params.will_topic = aclk_get_topic(ACLK_TOPICID_METADATA);
 
         if (!mqtt_conn_params.will_topic) {
-            error("Couldn't get LWT topic. Will not send LWT.");
+            aclk_log_event(ACLK_EVT_ENV_NO_LWT_TOPIC, "Couldn't get LWT topic.");
             continue;
         }
 
         // Do the MQTT connection
         ret = aclk_get_transport_idx(aclk_env);
         if (ret < 0) {
-            error("Cloud /env endpoint didn't return any transport usable by this Agent.");
+            aclk_log_event(ACLK_EVT_ENV_NO_USABLE_TRANSPORT, "Cloud /env endpoint didn't return any transport usable by this Agent");
             continue;
         }
 
         memset(&mqtt_url, 0, sizeof(url_t));
-        if (url_parse(aclk_env->transports[ret]->endpoint, &mqtt_url)){
-            error("Failed to parse target URL for /env trp idx %d \"%s\"", ret, aclk_env->transports[ret]->endpoint);
+        if (url_parse(aclk_env->transports[ret]->endpoint, &mqtt_url)) {
+            aclk_log_event(ACLK_EVT_ENV_TARGET_URL_ERR, "Failed to parse target URL for /env trp idx %d \"%s\"", ret, aclk_env->transports[ret]->endpoint);
             url_t_destroy(&mqtt_url);
             continue;
         }
@@ -738,7 +742,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         if (!ret) {
             last_conn_time_mqtt = now_realtime_sec();
-            info("ACLK connection successfully established");
+            aclk_log_event(ACLK_EVT_CONN_EST, "ACLK connection successfully established");
             log_access("ACLK CONNECTED");
             mqtt_connected_actions(client);
             return 0;
@@ -800,6 +804,9 @@ void *aclk_main(void *ptr)
     if (wait_till_agent_claim_ready())
         goto exit;
 
+    if (aclk_flight_recorder_init())
+        goto exit;
+
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
 #else
@@ -854,6 +861,7 @@ void *aclk_main(void *ptr)
             queue_connect_payloads();
 
         if (handle_connection(mqttwss_client)) {
+            aclk_log_event(ACLK_EVT_CONN_DROP, "ACLK Disconnected");
             aclk_stats_upd_online(0);
             last_disconnect_time = now_realtime_sec();
             aclk_connected = 0;
