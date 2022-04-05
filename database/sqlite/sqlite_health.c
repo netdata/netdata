@@ -952,6 +952,7 @@ int alert_hash_and_store_config(
 #else
     UNUSED(hash_id);
     UNUSED(cfg);
+    UNUSED(store_hash);
 #endif
 
     return 1;
