@@ -495,7 +495,7 @@ s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_V
         return 0;
     }
     s->version = version;
-    // Manage stream features based on strema versioning
+    // Manage stream features based on stream versioning
     enable_supported_stream_features(s);
 
     info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."

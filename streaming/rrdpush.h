@@ -176,6 +176,7 @@ int need_to_send_chart_definition(RRDSET *st);
 extern int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
 extern void rrdpush_sender_thread_stop(RRDHOST *host);
 
+extern uint32_t negotiating_stream_version(uint32_t host_version, uint32_t incoming_version);
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 #ifdef ENABLE_COMPRESSION
