@@ -501,7 +501,8 @@ char *aclk_generate_lwt(size_t *size) {
     update_agent_connection_t conn = {
         .reachable = 0,
         .lwt = 1,
-        .session_id = aclk_session_newarch
+        .session_id = aclk_session_newarch,
+        .capabilities = NULL
     };
 
     rrdhost_aclk_state_lock(localhost);
