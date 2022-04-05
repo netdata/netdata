@@ -3,10 +3,6 @@
 #ifndef ACLK_SCHEMA_CAPABILITY_H
 #define ACLK_SCHEMA_CAPABILITY_H
 
-#include <stdlib.h>
-
-#include "database/rrd.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
