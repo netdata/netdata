@@ -14,6 +14,7 @@ FORUM_URL="https://community.netdata.cloud/"
 KICKSTART_OPTIONS="${*}"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
+PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-1"
 TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
@@ -28,7 +29,7 @@ INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="1"
 NETDATA_CLAIM_ONLY=0
-NETDATA_CLAIM_URL="https://app.netdata.cloud"
+NETDATA_CLAIM_URL="${PUBLIC_CLOUD_URL}"
 NETDATA_DISABLE_CLOUD=0
 NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
@@ -270,6 +271,11 @@ support_list() {
 
 success_banner() {
   printf >&2 "%s\n\n" "Official documentation can be found online at ${DOCS_URL}."
+
+  if [ -z "${CLAIM_TOKEN}" ]; then
+    printf >&2 "%s\n\n" "Looking to monitor all of your infrastructure with Netdata? Check out Netdata Cloud at ${PUBLIC_CLOUD_URL}."
+  fi
+
   printf >&2 "%s\n" "Join our community and connect with us on:"
   support_list
 }
