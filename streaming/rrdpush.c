@@ -572,24 +572,63 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     netdata_mutex_unlock(&host->sender->mutex);
 }
 
-static uint32_t negotiating_stream_version(uint32_t host, uint32_t incoming)
+uint32_t negotiating_stream_version(uint32_t host_version, uint32_t incoming_version)
 {  
-#if !defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
-    return MIN(host, incoming);
-#elif defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
-    // compression supported and replication not supported
-    return MIN(host, incoming);
-#elif !defined(ENABLE_COMPRESSION) && defined(ENABLE_REPLICATION)
-    // compression not supported and replication supported
-    if(incoming == STREAM_VERSION_COMPRESSION) {
-        default_rrdpush_replication_enabled = 1;
-        return STREAM_VERSION_CLABELS;
+    int host_version_compression_status = 0,
+        incoming_version_compression_status = 0;
+
+    switch (host_version)
+    {
+    case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
+        host_version_compression_status = 1;
+        break;
+    case STREAM_VERSION_COMPRESSION:
+        host_version_compression_status = 1;
+        break;
+    default:
+        break;
     }
-    else
-        return MIN(incoming, host);
-#else
-    return MIN(host, incoming);
-#endif
+
+    switch (incoming_version)
+    {
+    case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
+        incoming_version_compression_status = 1;
+        break;
+    case STREAM_VERSION_COMPRESSION:
+        incoming_version_compression_status = 1;
+        break;
+    default:
+        break;
+    }
+
+    if (host_version_compression_status == incoming_version_compression_status)
+        return MIN(host_version, incoming_version);
+
+    switch (host_version)
+    {
+    case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
+        host_version = STREAM_VERSION_GAP_FILLING;
+        break;
+    case STREAM_VERSION_COMPRESSION:
+        host_version = STREAM_VERSION_CLABELS;
+        break;
+    default:
+        break;
+    }
+
+    switch (incoming_version)
+    {
+    case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
+        incoming_version = STREAM_VERSION_GAP_FILLING;
+        break;
+    case STREAM_VERSION_COMPRESSION:
+        incoming_version = STREAM_VERSION_CLABELS;
+        break;
+    default:
+        break;
+    }
+
+    return MIN(host_version, incoming_version);
 }
 
 int rrdpush_receiver_permission_denied(struct web_client *w) {
@@ -658,6 +697,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             tags = value;
         else if(!strcmp(name, "ver")) {
             stream_version = negotiating_stream_version(STREAMING_PROTOCOL_CURRENT_VERSION, (uint32_t) strtoul(value, NULL, 0));
+            info("STREAM [decided version is %u]", stream_version);
         }
             
         else {

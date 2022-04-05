@@ -714,8 +714,10 @@ int replication_receiver_thread_spawn(struct web_client *w, char *url) {
             system_info->hops = (uint16_t) strtoul(value, NULL, 0);
         else if(!strcmp(name, "tags"))
             tags = value;
-        else if(!strcmp(name, "ver"))
-            stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
+        else if(!strcmp(name, "ver")) {
+            stream_version = negotiating_stream_version(STREAMING_PROTOCOL_CURRENT_VERSION, (uint32_t) strtoul(value, NULL, 0));
+            info("REPLICATION [decided version is %u]", stream_version);
+        }
         else {
             // An old Netdata child does not have a compatible streaming protocol, map to something sane.
             if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && stream_version == UINT_MAX) {
