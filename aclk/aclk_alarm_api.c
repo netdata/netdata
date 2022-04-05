@@ -23,6 +23,8 @@ void aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry)
     char *payload = generate_alarm_log_entry(&payload_size, log_entry);
 
     aclk_send_bin_msg(payload, payload_size, ACLK_TOPICID_ALARM_LOG, "AlarmLogEntry");
+
+    freez(payload);
 }
 
 void aclk_send_provide_alarm_cfg(struct provide_alarm_configuration *cfg)
