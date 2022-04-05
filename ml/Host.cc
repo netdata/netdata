@@ -205,7 +205,7 @@ static void updateDetectionChart(RRDHOST *RH) {
             IdSS.str().c_str(), // id
             NameSS.str().c_str(), // name
             "ml", // family
-            "prediction_stats", // ctx
+            "netdata.prediction_stats", // ctx
             TitleSS.str().c_str(), // title
             "milliseconds/s", // units
             "netdata", // plugin
@@ -246,7 +246,7 @@ static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
             IdSS.str().c_str(), // id
             NameSS.str().c_str(), // name
             "ml", // family
-            "training_stats", // ctx
+            "netdata.training_stats", // ctx
             TitleSS.str().c_str(), // title
             "milliseconds/s", // units
             "netdata", // plugin
