@@ -383,7 +383,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               buffer_tostring(warn_alarms),
               buffer_tostring(crit_alarms),
               ae->classification?ae->classification:"Unknown",
-              edit_command
+              edit_command,
+              host == localhost ? host->machine_guid:""
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
