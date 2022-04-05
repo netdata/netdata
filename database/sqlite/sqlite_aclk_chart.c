@@ -716,15 +716,16 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
         return;
     }
 
-    struct aclk_database_worker_config *wc  = NULL;
+    struct aclk_database_worker_config *wc  = find_inactive_wc_by_node_id(node_id);
     rrd_rdlock();
     RRDHOST *host = localhost;
     while(host) {
-        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+        if (wc || (host->node_id && !(uuid_compare(*host->node_id, node_uuid)))) {
             rrd_unlock();
-            wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
-                     (struct aclk_database_worker_config *)host->dbsync_worker :
-                     (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
+            if (!wc)
+                wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
+                         (struct aclk_database_worker_config *)host->dbsync_worker :
+                         (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
             if (likely(wc)) {
                 wc->chart_reset_count++;
                 __sync_synchronize();
@@ -777,14 +778,6 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         cmd.completion = NULL;
                         aclk_database_enq_cmd(wc, &cmd);
                     } else {
-//                        log_access(
-//                            "ACLK RES [%s (%s)]: CHARTS STREAM from %" PRIu64
-//                            " t=%ld resets=%d",
-//                            wc->node_id,
-//                            wc->host ? wc->host->hostname : "N/A",
-//                            wc->chart_sequence_id,
-//                            wc->chart_timestamp,
-//                            wc->chart_reset_count);
                         wc->chart_reset_count = 0;
                         wc->chart_updates = 1;
                     }
