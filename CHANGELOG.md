@@ -6,9 +6,16 @@
 
 **Merged pull requests:**
 
+- Better check for IOMainPort on MacOS [\#12600](https://github.com/netdata/netdata/pull/12600) ([vlvkobal](https://github.com/vlvkobal))
+- Fix coverity issues [\#12598](https://github.com/netdata/netdata/pull/12598) ([vkalintiris](https://github.com/vkalintiris))
+- chore: make logs less noisy on child reconnect [\#12594](https://github.com/netdata/netdata/pull/12594) ([ilyam8](https://github.com/ilyam8))
+- feat\(cgroups.plugin\): add CPU throttling charts [\#12591](https://github.com/netdata/netdata/pull/12591) ([ilyam8](https://github.com/ilyam8))
+- Fix ebpf exit [\#12590](https://github.com/netdata/netdata/pull/12590) ([thiagoftsm](https://github.com/thiagoftsm))
 - feat\(collectors\): update go.d.plugin version to v0.32.1 [\#12586](https://github.com/netdata/netdata/pull/12586) ([ilyam8](https://github.com/ilyam8))
+- Check if libatomic can be linked [\#12583](https://github.com/netdata/netdata/pull/12583) ([MrZammler](https://github.com/MrZammler))
 - Update links to documentation \(eBPF\) [\#12581](https://github.com/netdata/netdata/pull/12581) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: re-add setuid bit to ioping after installing Debian package [\#12580](https://github.com/netdata/netdata/pull/12580) ([ilyam8](https://github.com/ilyam8))
+- Update ML-related charts [\#12574](https://github.com/netdata/netdata/pull/12574) ([vkalintiris](https://github.com/vkalintiris))
 - Respect dimension hidden option when executing a query  [\#12570](https://github.com/netdata/netdata/pull/12570) ([stelfrag](https://github.com/stelfrag))
 - \[Agent crash on api/v1/info call\] - fixes \#12559 [\#12565](https://github.com/netdata/netdata/pull/12565) ([erdem2000](https://github.com/erdem2000))
 - Fix temporary directory handling for dependency handling script in updater. [\#12562](https://github.com/netdata/netdata/pull/12562) ([Ferroin](https://github.com/Ferroin))
@@ -210,7 +217,6 @@
 - minor - remove ACLK\_NEWARCH\_DEVMODE [\#12018](https://github.com/netdata/netdata/pull/12018) ([underhood](https://github.com/underhood))
 - Adds chart for incoming proto msgs in new cloud protocol [\#11969](https://github.com/netdata/netdata/pull/11969) ([underhood](https://github.com/underhood))
 - Update AWS SNS README.md [\#11946](https://github.com/netdata/netdata/pull/11946) ([kickoke](https://github.com/kickoke))
-- Add `--no-same-owner` to `tar xf` in installer [\#11940](https://github.com/netdata/netdata/pull/11940) ([cimnine](https://github.com/cimnine))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
@@ -247,7 +253,6 @@
 - Fix handling of removed packages with leftover config files in package check. [\#12033](https://github.com/netdata/netdata/pull/12033) ([Ferroin](https://github.com/Ferroin))
 - update existing OS dependencies scripts and add scripts for fedora an… [\#11963](https://github.com/netdata/netdata/pull/11963) ([maneamarius](https://github.com/maneamarius))
 - Posix [\#11961](https://github.com/netdata/netdata/pull/11961) ([maneamarius](https://github.com/maneamarius))
-- Updated formatting issues and copy [\#11944](https://github.com/netdata/netdata/pull/11944) ([kickoke](https://github.com/kickoke))
 
 ## [v1.33.0](https://github.com/netdata/netdata/tree/v1.33.0) (2022-01-26)
 
@@ -305,12 +310,6 @@
 - Fix a broken link in dashboard\_info.js [\#11948](https://github.com/netdata/netdata/pull/11948) ([Ancairon](https://github.com/Ancairon))
 - fix retrieving service commands without failure [\#11947](https://github.com/netdata/netdata/pull/11947) ([maneamarius](https://github.com/maneamarius))
 - Fix yum config-manager check [\#11945](https://github.com/netdata/netdata/pull/11945) ([lgrn](https://github.com/lgrn))
-- Fixed formatting [\#11943](https://github.com/netdata/netdata/pull/11943) ([kickoke](https://github.com/kickoke))
-- Fix error in configure.ac [\#11937](https://github.com/netdata/netdata/pull/11937) ([underhood](https://github.com/underhood))
-- Update dashboard to version v2.20.15. [\#11934](https://github.com/netdata/netdata/pull/11934) ([netdatabot](https://github.com/netdatabot))
-- Blocking publish and in flight buffer regrowth [\#11932](https://github.com/netdata/netdata/pull/11932) ([underhood](https://github.com/underhood))
-- Try to find worker config thread from inactive threads for new architecture [\#11928](https://github.com/netdata/netdata/pull/11928) ([MrZammler](https://github.com/MrZammler))
-- Handle re-claim while the agent is running in new architecture [\#11924](https://github.com/netdata/netdata/pull/11924) ([MrZammler](https://github.com/MrZammler))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
