@@ -1546,6 +1546,18 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 
     if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
         return res;
+    else if(!strcmp(name, "NETDATA_CLOUD_TYPE")){
+        freez(system_info->cloud_provider_type);
+        system_info->cloud_provider_type = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_CLOUD_INSTANCE_TYPE")){
+        freez(system_info->cloud_instance_type);
+        system_info->cloud_instance_type = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_CLOUD_INSTANCE_REGION")){
+        freez(system_info->cloud_instance_region);
+        system_info->cloud_instance_region = strdupz(value);
+    }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_NAME")){
         freez(system_info->container_os_name);
         system_info->container_os_name = strdupz(value);
