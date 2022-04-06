@@ -1037,6 +1037,18 @@ static struct label *rrdhost_load_auto_labels(void)
 {
     struct label *label_list = NULL;
 
+    if (localhost->system_info->cloud_provider_type)
+        label_list =
+            add_label_to_list(label_list, "_cloud_provider_type", localhost->system_info->cloud_provider_type, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->cloud_instance_type)
+        label_list =
+            add_label_to_list(label_list, "_cloud_instance_type", localhost->system_info->cloud_instance_type, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->cloud_instance_region)
+        label_list =
+            add_label_to_list(label_list, "_cloud_instance_region", localhost->system_info->cloud_instance_region, LABEL_SOURCE_AUTO);
+
     if (localhost->system_info->host_os_name)
         label_list =
             add_label_to_list(label_list, "_os_name", localhost->system_info->host_os_name, LABEL_SOURCE_AUTO);
