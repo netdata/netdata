@@ -806,6 +806,9 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     info("SYSTEM_INFO: free %p", system_info);
 
     if(likely(system_info)) {
+        freez(system_info->cloud_provider_type);
+        freez(system_info->cloud_instance_type);
+        freez(system_info->cloud_instance_region);
         freez(system_info->host_os_name);
         freez(system_info->host_os_id);
         freez(system_info->host_os_id_like);
