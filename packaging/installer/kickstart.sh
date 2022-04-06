@@ -1718,7 +1718,7 @@ fi
 
 set_auto_updates
 
-print >&2 "%s\n\n" "Successfully installed the Netdata Agent."
+printf >&2 "%s\n\n" "Successfully installed the Netdata Agent."
 success_banner
 telemetry_event INSTALL_SUCCESS "" ""
 cleanup
