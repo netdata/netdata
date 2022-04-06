@@ -99,6 +99,7 @@ include retroshare/Makefile.inc
 include riakkv/Makefile.inc
 include samba/Makefile.inc
 include sensors/Makefile.inc
+include slurm/Makefile.inc
 include smartd_log/Makefile.inc
 include spigotmc/Makefile.inc
 include springboot/Makefile.inc
