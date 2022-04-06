@@ -982,6 +982,13 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_sprintf(wb, "\t\"container\": \"%s\",\n", (host->system_info->container) ? host->system_info->container : "");
     buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", (host->system_info->container_detection) ? host->system_info->container_detection : "");
 
+    if (host->system_info->cloud_provider_type)
+        buffer_sprintf(wb, "\t\"cloud_provider_type\": \"%s\",\n", host->system_info->cloud_provider_type);
+    if (host->system_info->cloud_instance_type)
+        buffer_sprintf(wb, "\t\"cloud_instance_type\": \"%s\",\n", host->system_info->cloud_instance_type);
+    if (host->system_info->cloud_instance_region)
+        buffer_sprintf(wb, "\t\"cloud_instance_region\": \"%s\",\n", host->system_info->cloud_instance_region);
+
     buffer_strcat(wb, "\t\"host_labels\": {\n");
     host_labels2json(host, wb, 2);
     buffer_strcat(wb, "\t},\n");
