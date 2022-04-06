@@ -1068,7 +1068,7 @@ netdataDashboard.submenu = {
         info: 'eBPF (extended Berkeley Packet Filter) is used to collect metrics from inside Linux kernel giving a zoom inside your <a href="#ebpf_system_process_thread">Process</a>, '+
               '<a href="#menu_disk">Hard Disk</a>, <a href="#menu_filesystem">Filesystems</a> (<a href="#menu_filesystem_submenu_file_access">File Access</a>, and ' +
               '<a href="#menu_filesystem_submenu_directory_cache__eBPF_">Directory Cache</a>), Memory (<a href="#ebpf_global_swap">Swap I/O</a>, Page Cache), ' +
-              'Syscalls (Sync, <a href="#menu_mount_submenu_mount__eBPF_">Mount</a>), and Network.'
+              'Syscalls (<a href="#menu_mem_submenu_synchronization__eBPF_">Sync</a>, <a href="#menu_mount_submenu_mount__eBPF_">Mount</a>), and Network.'
     },
 };
 
@@ -1722,19 +1722,19 @@ netdataDashboard.context = {
     },
 
     'mem.sync': {
-        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/sync.2.html" target="_blank">sync() and syncfs()</a> which flush the file system buffers to storage devices. Performance perturbations might be caused by these calls. The <code>sync()</code> calls are based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/syncsnoop.py" target="_blank">syncsnoop</a> from BCC tools.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-system-sync" target="_blank">syscalls</a> that sync filesystem metadata or cached. This chart has a relationship with <a href="#menu_filesystem">Filesystems</a> and Linux <a href="#menu_mem_submenu_page_cache">Page Cache</a>.' + ebpfChartProvides
     },
 
     'mem.file_sync': {
-        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/fsync.2.html" target="_blank">fsync() and fdatasync()</a> transfer all modified page caches for the files on disk devices. These calls block until the device reports that the transfer has been completed.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-sync" target="_blank">syscalls</a> responsible to transfer modified Linux page cache to disk. This chart has a relationship with <a href="#menu_filesystem">Filesystems</a> and Linux <a href="#menu_mem_submenu_page_cache">Page Cache</a>.' + ebpfChartProvides
     },
 
     'mem.memory_map': {
-        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/msync.2.html" target="_blank">msync()</a> which flushes changes made to the in-core copy of a file that was mapped.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#memory-map-sync" target="_blank">syscall</a> responsible to the in-core copy of a file that was mapped. This chart has a relationship with <a href="#menu_filesystem">Filesystems</a> and Linux <a href="#menu_mem_submenu_page_cache">Page Cache</a>.' + ebpfChartProvides
     },
 
     'mem.file_segment': {
-        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/sync_file_range.2.html" target="_blank">sync_file_range()</a> permits fine control when synchronizing the open file referred to by the file descriptor fd with disk. This system call is extremely dangerous and should not be used in portable programs.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-range-sync" target="_blank">syscall</a> responsible to sync file segments. This chart has a relationship with <a href="#menu_filesystem">Filesystems</a> and Linux <a href="#menu_mem_submenu_page_cache">Page Cache</a>.' + ebpfChartProvides
     },
 
     'filesystem.dc_hit_ratio': {
