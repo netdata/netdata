@@ -5,9 +5,16 @@
 # ======================================================================
 # Constants
 
+AGENT_BUG_REPORT_URL="https://github.com/netdata/netdata/issues/new/choose"
+CLOUD_BUG_REPORT_URL="https://github.com/netdata/netdata-cloud/issues/new/choose"
+DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
+DISCORD_INVITE="https://discord.gg/5ygS846fR6"
+DOCS_URL="https://learn.netdata.cloud/docs/"
+FORUM_URL="https://community.netdata.cloud/"
 KICKSTART_OPTIONS="${*}"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
+PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-1"
 TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
@@ -22,7 +29,7 @@ INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="1"
 NETDATA_CLAIM_ONLY=0
-NETDATA_CLAIM_URL="https://app.netdata.cloud"
+NETDATA_CLAIM_URL="${PUBLIC_CLOUD_URL}"
 NETDATA_DISABLE_CLOUD=0
 NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
@@ -198,6 +205,17 @@ trap_handler() {
 
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ERROR ${TPUT_RESET} Installer exited unexpectedly (${code}-${lineno})"
 
+  case "${code}" in
+    0)
+      printf >&2 "%s\n" "This is almost certainly the result of a bug. If you have time, please report it at ${AGENT_BUG_REPORT_URL}."
+      ;;
+    *)
+      printf >&2 "%s\n" "This is probably a result of a transient issue on your system. Things should work correctly if you try again."
+      printf >&2 "%s\n" "If you continue to experience this issue, you can reacn out to us for support on:"
+      support_list
+      ;;
+  esac
+
   telemetry_event INSTALL_CRASH "Installer exited unexpectedly (${code}-${lineno})" "E${code}-${lineno}"
 
   trap - EXIT
@@ -245,6 +263,23 @@ setup_terminal() {
   return 0
 }
 
+support_list() {
+  printf >&2 "%s\n" "  - GitHub: ${DISCUSSIONS_URL}"
+  printf >&2 "%s\n" "  - Discord: ${DISCORD_INVITE}"
+  printf >&2 "%s\n" "  - Our community forums: ${FORUM_URL}"
+}
+
+success_banner() {
+  printf >&2 "%s\n\n" "Official documentation can be found online at ${DOCS_URL}."
+
+  if [ -z "${CLAIM_TOKEN}" ]; then
+    printf >&2 "%s\n\n" "Looking to monitor all of your infrastructure with Netdata? Check out Netdata Cloud at ${PUBLIC_CLOUD_URL}."
+  fi
+
+  printf >&2 "%s\n" "Join our community and connect with us on:"
+  support_list
+}
+
 cleanup() {
   if [ -z "${NO_CLEANUP}" ]; then
     ${ROOTCMD} rm -rf "${tmpdir}"
@@ -253,6 +288,8 @@ cleanup() {
 
 fatal() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%s\n" "For community support, you can connect with us on:"
+  support_list
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
   cleanup
   trap - EXIT
@@ -582,7 +619,9 @@ uninstall() {
       return 0
     else
       progress "Found existing netdata-uninstaller. Running it.."
-      run ${ROOTCMD} "${uninstaller}" $FLAGS
+      if ! run ${ROOTCMD} "${uninstaller}" $FLAGS; then
+        warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
+      fi
     fi
   else
     if [ "${DRY_RUN}" -eq 1 ]; then
@@ -593,7 +632,9 @@ uninstall() {
       progress "Downloading netdata-uninstaller ..."
       download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
       chmod +x "${tmpdir}/netdata-uninstaller.sh"
-      run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS
+      if ! run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS; then
+        warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
+      fi
     fi
   fi
 }
@@ -702,7 +743,9 @@ handle_existing_install() {
 
       if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
         if ! update; then
-          warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
+          warning "Failed to update existing Netdata install at ${ndprefix}."
+        else
+          progress "Successfully updated existing netdata install at ${ndprefix}."
         fi
       else
         warning "Not updating existing install at ${ndprefix}."
@@ -719,12 +762,13 @@ handle_existing_install() {
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
 
+      success_banner
       cleanup
       trap - EXIT
       exit $ret
       ;;
     oci)
-      fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it." F0203
+      fatal "This is an OCI container, use the regular container lifecycle management commands for your container tools instead of this script for managing it." F0203
       ;;
     *)
       if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
@@ -914,6 +958,8 @@ claim() {
   esac
 
   if [ -z "${NETDATA_NEW_INSTALL}" ]; then
+    printf >&2 "%s\n" "For community support, you can connect with us on:"
+    support_list
     cleanup
     trap - EXIT
     exit 1
@@ -1019,7 +1065,7 @@ check_special_native_deps() {
 try_package_install() {
   if [ -z "${DISTRO}" ] || [ "${DISTRO}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
-    return 1
+    return 2
   fi
 
   if [ "${DRY_RUN}" -eq 1 ]; then
@@ -1167,7 +1213,7 @@ try_package_install() {
     if [ -n "${repo_subcmd}" ]; then
       # shellcheck disable=SC2086
       if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
-        fatal "Failed to update repository metadata." F0205
+        fatal "Failed to refresh repository metadata." F0205
       fi
     fi
   else
@@ -1306,31 +1352,29 @@ install_local_build_dependencies() {
     return 1
   fi
 
-  download "${PACKAGES_SCRIPT}" "${tmpdir}/install-required-packages.sh"
+  if ! download "${PACKAGES_SCRIPT}" "${tmpdir}/install-required-packages.sh"; then
+    fatal "Failed to download dependency handling script for local build." F000D
+  fi
 
-  if [ ! -s "${tmpdir}/install-required-packages.sh" ] && [ "${DRY_RUN}" -ne 1 ]; then
-    warning "Downloaded dependency installation script is empty."
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would run downloaded script to install required build dependencies..."
   else
-    if [ "${DRY_RUN}" -eq 1 ]; then
-      progress "Would run downloaded script to install required build dependencies..."
-    else
-      progress "Running downloaded script to install required build dependencies..."
-    fi
+    progress "Running downloaded script to install required build dependencies..."
+  fi
 
-    if [ "${INTERACTIVE}" -eq 0 ]; then
-      opts="--dont-wait --non-interactive"
-    fi
+  if [ "${INTERACTIVE}" -eq 0 ]; then
+    opts="--dont-wait --non-interactive"
+  fi
 
-    if [ "${SYSTYPE}" = "Darwin" ]; then
-      sudo=""
-    else
-      sudo="${ROOTCMD}"
-    fi
+  if [ "${SYSTYPE}" = "Darwin" ]; then
+    sudo=""
+  else
+    sudo="${ROOTCMD}"
+  fi
 
-    # shellcheck disable=SC2086
-    if ! run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
-      warning "It failed to install all the required packages, but installation might still be possible."
-    fi
+  # shellcheck disable=SC2086
+  if ! run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
+    warning "Failed to install all required packages, but installation might still be possible."
   fi
 }
 
@@ -1368,10 +1412,10 @@ build_and_install() {
 
   case $? in
     1)
-      fatal "netdata-installer.sh exited with error" F0007
+      fatal "netdata-installer.sh failed to run correctly." F0007
       ;;
     2)
-      fatal "Insufficient RAM to install netdata" F0008
+      fatal "Insufficient RAM to install netdata." F0008
       ;;
   esac
 }
@@ -1389,8 +1433,13 @@ try_build_install() {
 
   set_source_archive_urls "${RELEASE_CHANNEL}"
 
-  download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"
-  download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"
+  if !  download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"; then
+    fatal "Failed to download source tarball for local build." F000B
+  fi
+
+  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
+    fatal "Failed to download checksums for source tarball verification." F000C
+  fi
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would validate SHA256 checksum of downloaded source archive."
@@ -1403,7 +1452,7 @@ try_build_install() {
   run tar -xf "${tmpdir}/netdata-latest.tar.gz" -C "${tmpdir}"
   rm -rf "${tmpdir}/netdata-latest.tar.gz" > /dev/null 2>&1
   if [ "${DRY_RUN}" -ne 1 ]; then
-    cd "$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot cd to netdata source tree" F0006
+    cd "$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot change directory to netdata source tree" F0006
   fi
 
   if [ -x netdata-installer.sh ] || [ "${DRY_RUN}" -eq 1 ]; then
@@ -1413,7 +1462,7 @@ try_build_install() {
     if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
       cd "$(find . -mindepth 1 -maxdepth 1 -type d)" &&  build_and_install || return 1
     else
-      fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${tmpdir}" F0009
+      fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh)." F0009
     fi
   fi
 }
@@ -1641,16 +1690,17 @@ confirm_root_support
 get_system_info
 confirm_install_prefix
 
+tmpdir="$(create_tmp_directory)"
+progress "Using ${tmpdir} as a temporary directory."
+cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
+
 if [ "${ACTION}" = "uninstall" ]; then
   uninstall
+  printf >&2 "Finished uninstalling the Netdata Agent."
   cleanup
   trap - EXIT
   exit 0
 fi
-
-tmpdir="$(create_tmp_directory)"
-progress "Using ${tmpdir} as a temporary directory."
-cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
 
 handle_existing_install
 
@@ -1668,6 +1718,8 @@ fi
 
 set_auto_updates
 
+print >&2 "%s\n\n" "Successfully installed the Netdata Agent."
+success_banner
 telemetry_event INSTALL_SUCCESS "" ""
 cleanup
 trap - EXIT
