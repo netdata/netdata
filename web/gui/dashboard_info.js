@@ -4264,20 +4264,36 @@ netdataDashboard.context = {
         info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
     },
 
-    'cgroup.cachestat_ratio': {
+    'cgroup.dc_hit_ratio': {
         info: ebpfDCHit
     },
 
-    'cgroup.cachestat_dirties': {
+    'cgroup.dc_reference': {
         info: ebpfDCReference
     },
 
-    'cgroup.cachestat_hits': {
+    'cgroup.dc_not_cache': {
         info: ebpfDCNotCache
     },
 
-    'cgroup.cachestat_misses': {
+    'cgroup.dc_not_found': {
         info: ebpfDCNotFound
+    },
+
+    'cgroup.cachestat_ratio': {
+        info: ''
+    },
+
+    'cgroup.cachestat_dirties': {
+        info: ''
+    },
+
+    'cgroup.cachestat_hits': {
+        info: ''
+    },
+
+    'cgroup.cachestat_misses': {
+        info: ''
     },
 
     // ------------------------------------------------------------------------
@@ -4494,20 +4510,36 @@ netdataDashboard.context = {
         info: ebpfTaskError + '<div id="ebpf_services_task_error"></div>'
     },
 
-    'services.cachestat_ratio': {
+    'services.dc_hit_ratio': {
         info: ebpfDCHit + '<div id="ebpf_services_dc_hit"></div>'
     },
 
-    'services.cachestat_dirties': {
+    'services.dc_reference': {
         info: ebpfDCReference + '<div id="ebpf_services_dc_reference"></div>'
     },
 
-    'services.cachestat_hits': {
+    'services.dc_not_cache': {
         info: ebpfDCNotCache + '<div id="ebpf_services_dc_not_cache"></div>'
     },
 
-    'services.cachestat_misses': {
+    'services.dc_not_found': {
         info: ebpfDCNotFound + '<div id="ebpf_services_dc_not_found"></div>'
+    },
+
+    'services.cachestat_ratio': {
+        info: '<div id="ebpf_services_cachestat_ratio"></div>'
+    },
+
+    'services.cachestat_dirties': {
+        info: '<div id="ebpf_services_cachestat_dirties"></div>'
+    },
+
+    'services.cachestat_hits': {
+        info: '<div id="ebpf_services_cachestat_hits"></div>'
+    },
+
+    'services.cachestat_misses': {
+        info: '<div id="ebpf_services_cachestat_misses"></div>'
     },
 
     'services.shmget': {
