@@ -732,6 +732,10 @@ typedef struct alarm_log {
 // RRD HOST
 
 struct rrdhost_system_info {
+    char *cloud_provider_type;
+    char *cloud_instance_type;
+    char *cloud_instance_region;
+
     char *host_os_name;
     char *host_os_id;
     char *host_os_id_like;

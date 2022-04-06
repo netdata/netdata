@@ -301,6 +301,9 @@ if(!s->rrdpush_compression)
                  "&ml_enabled=%d"
                  "&tags=%s"
                  "&ver=%d"
+                 "&NETDATA_INSTANCE_CLOUD_TYPE=%s"
+                 "&NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=%s"
+                 "&NETDATA_INSTANCE_CLOUD_INSTANCE_REGION=%s"
                  "&NETDATA_SYSTEM_OS_NAME=%s"
                  "&NETDATA_SYSTEM_OS_ID=%s"
                  "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -343,6 +346,9 @@ if(!s->rrdpush_compression)
                  , host->system_info->ml_enabled
                  , (host->tags) ? host->tags : ""
                  , s->version
+                 , (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
+                 , (host->system_info->cloud_instance_type) ? host->system_info->cloud_instance_type : ""
+                 , (host->system_info->cloud_instance_region) ? host->system_info->cloud_instance_region : ""
                  , se.os_name
                  , se.os_id
                  , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""

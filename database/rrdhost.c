@@ -806,6 +806,9 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     info("SYSTEM_INFO: free %p", system_info);
 
     if(likely(system_info)) {
+        freez(system_info->cloud_provider_type);
+        freez(system_info->cloud_instance_type);
+        freez(system_info->cloud_instance_region);
         freez(system_info->host_os_name);
         freez(system_info->host_os_id);
         freez(system_info->host_os_id_like);
@@ -1033,6 +1036,18 @@ void rrdhost_save_charts(RRDHOST *host) {
 static struct label *rrdhost_load_auto_labels(void)
 {
     struct label *label_list = NULL;
+
+    if (localhost->system_info->cloud_provider_type)
+        label_list =
+            add_label_to_list(label_list, "_cloud_provider_type", localhost->system_info->cloud_provider_type, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->cloud_instance_type)
+        label_list =
+            add_label_to_list(label_list, "_cloud_instance_type", localhost->system_info->cloud_instance_type, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->cloud_instance_region)
+        label_list =
+            add_label_to_list(label_list, "_cloud_instance_region", localhost->system_info->cloud_instance_region, LABEL_SOURCE_AUTO);
 
     if (localhost->system_info->host_os_name)
         label_list =
@@ -1543,6 +1558,18 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 
     if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
         return res;
+    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_TYPE")){
+        freez(system_info->cloud_provider_type);
+        system_info->cloud_provider_type = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE")){
+        freez(system_info->cloud_instance_type);
+        system_info->cloud_instance_type = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION")){
+        freez(system_info->cloud_instance_region);
+        system_info->cloud_instance_region = strdupz(value);
+    }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_NAME")){
         freez(system_info->container_os_name);
         system_info->container_os_name = strdupz(value);
