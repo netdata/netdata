@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix training/prediction stats charts context. [\#12610](https://github.com/netdata/netdata/pull/12610) ([vkalintiris](https://github.com/vkalintiris))
+- Fix a compilation warning [\#12608](https://github.com/netdata/netdata/pull/12608) ([vlvkobal](https://github.com/vlvkobal))
+- Enable streaming of anomaly\_detection.\* charts [\#12606](https://github.com/netdata/netdata/pull/12606) ([vkalintiris](https://github.com/vkalintiris))
 - Better check for IOMainPort on MacOS [\#12600](https://github.com/netdata/netdata/pull/12600) ([vlvkobal](https://github.com/vlvkobal))
 - Fix coverity issues [\#12598](https://github.com/netdata/netdata/pull/12598) ([vkalintiris](https://github.com/vkalintiris))
 - chore: make logs less noisy on child reconnect [\#12594](https://github.com/netdata/netdata/pull/12594) ([ilyam8](https://github.com/ilyam8))
@@ -16,6 +19,7 @@
 - Update links to documentation \(eBPF\) [\#12581](https://github.com/netdata/netdata/pull/12581) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: re-add setuid bit to ioping after installing Debian package [\#12580](https://github.com/netdata/netdata/pull/12580) ([ilyam8](https://github.com/ilyam8))
 - Update ML-related charts [\#12574](https://github.com/netdata/netdata/pull/12574) ([vkalintiris](https://github.com/vkalintiris))
+- update anonymous-statistics readme for PH Cloud [\#12571](https://github.com/netdata/netdata/pull/12571) ([andrewm4894](https://github.com/andrewm4894))
 - Respect dimension hidden option when executing a query  [\#12570](https://github.com/netdata/netdata/pull/12570) ([stelfrag](https://github.com/stelfrag))
 - \[Agent crash on api/v1/info call\] - fixes \#12559 [\#12565](https://github.com/netdata/netdata/pull/12565) ([erdem2000](https://github.com/erdem2000))
 - Fix temporary directory handling for dependency handling script in updater. [\#12562](https://github.com/netdata/netdata/pull/12562) ([Ferroin](https://github.com/Ferroin))
@@ -216,7 +220,6 @@
 - Create a removed alert event if chart goes obsolete [\#12021](https://github.com/netdata/netdata/pull/12021) ([MrZammler](https://github.com/MrZammler))
 - minor - remove ACLK\_NEWARCH\_DEVMODE [\#12018](https://github.com/netdata/netdata/pull/12018) ([underhood](https://github.com/underhood))
 - Adds chart for incoming proto msgs in new cloud protocol [\#11969](https://github.com/netdata/netdata/pull/11969) ([underhood](https://github.com/underhood))
-- Update AWS SNS README.md [\#11946](https://github.com/netdata/netdata/pull/11946) ([kickoke](https://github.com/kickoke))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
@@ -307,9 +310,6 @@
 - fix\(nfacct.plugin\): Netfilter accounting charts priority [\#11952](https://github.com/netdata/netdata/pull/11952) ([ilyam8](https://github.com/ilyam8))
 - fix\(nfacct.plugin\): Netfilter accounting data collection [\#11951](https://github.com/netdata/netdata/pull/11951) ([ilyam8](https://github.com/ilyam8))
 - fix: add a note that netfilter's `new` and `ignore` counters are removed in the latest kernel [\#11950](https://github.com/netdata/netdata/pull/11950) ([ilyam8](https://github.com/ilyam8))
-- Fix a broken link in dashboard\_info.js [\#11948](https://github.com/netdata/netdata/pull/11948) ([Ancairon](https://github.com/Ancairon))
-- fix retrieving service commands without failure [\#11947](https://github.com/netdata/netdata/pull/11947) ([maneamarius](https://github.com/maneamarius))
-- Fix yum config-manager check [\#11945](https://github.com/netdata/netdata/pull/11945) ([lgrn](https://github.com/lgrn))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
