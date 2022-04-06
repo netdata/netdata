@@ -1,24 +1,20 @@
 <!--
-title: "Postfix monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/postfix/README.md
-sidebar_label: "Postfix"
+title: "Slurm queue monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/slurm/README.md
+sidebar_label: "Slurm Queue"
 -->
 
-# Postfix monitoring with Netdata
+# Slurm queue monitoring with Netdata
 
-Monitors MTA email queue statistics using postqueue tool.  
+Monitors slurm queue statistics using the squeue tool.  
 
-Execute `postqueue -p` to grab postfix queue.
+Execute `squeue -o %all` to grab squeue queue.
 
-It produces only two charts:
+It produces only a single chart:
 
-1.  **Postfix Queue Emails**
+1.  **Slurm Queue**
 
-    -   emails
-
-2.  **Postfix Queue Emails Size** in KB
-
-    -   size
+    -   jobs
 
 Configuration is not needed.
 
