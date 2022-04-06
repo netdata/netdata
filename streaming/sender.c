@@ -346,7 +346,7 @@ if(!s->rrdpush_compression)
                  , host->system_info->ml_enabled
                  , (host->tags) ? host->tags : ""
                  , s->version
-                 , (host->system_info->cloud_provider_type) ? host->cloud_provider_type : ""
+                 , (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
                  , (host->system_info->cloud_instance_type) ? host->system_info->cloud_instance_type : ""
                  , (host->system_info->cloud_instance_region) ? host->system_info->cloud_instance_region : ""
                  , se.os_name
