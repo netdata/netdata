@@ -137,15 +137,24 @@ char *get_mgmt_api_key(void) {
 
         // save it
         fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
-        if(fd == -1)
-            fatal("Cannot create unique management API key file '%s'. Please fix this.", api_key_filename);
+        if(fd == -1) {
+            error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
+            goto temp_key;
+        }
 
-        if(write(fd, guid, GUID_LEN) != GUID_LEN)
-            fatal("Cannot write the unique management API key file '%s'. Please fix this.", api_key_filename);
+        if(write(fd, guid, GUID_LEN) != GUID_LEN) {
+            error("Cannot write the unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file with enough space left.", api_key_filename);
+            close(fd);
+            goto temp_key;
+        }
 
         close(fd);
     }
 
+    return guid;
+
+temp_key:
+    info("You can still continue to use the alarm management API using the authorization token %s during this Netdata session only.", guid);
     return guid;
 }
 
