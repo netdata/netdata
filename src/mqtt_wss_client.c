@@ -875,6 +875,10 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     }
 
     if ((ret = poll(client->poll_fds, 2, timeout_ms >= 0 ? timeout_ms : -1)) < 0) {
+        if (errno == EINTR) {
+            mws_warn(client->log, "poll interrupted by EINTR");
+            return 0;
+        }
         mws_error(client->log, "poll error \"%s\"", strerror(errno));
         return -2;
     }
