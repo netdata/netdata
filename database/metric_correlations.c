@@ -14,9 +14,9 @@ struct per_dim {
     double highlight_diffs[MAX_POINTS];
 };
 
-int find_index(double arr[], long long n, double K, long long start)
+int find_index(double arr[], long int n, double K, long int start)
 {
-    for (long long i = start; i < n; i++) {
+    for (long int i = start; i < n; i++) {
         if (K<arr[i]){
             return i;
         }
@@ -33,7 +33,7 @@ int compare(const void *left, const void *right) {
     return 0;
 }
 
-void kstwo(double data1[], long long n1, double data2[], long long n2, double *d, double *prob)
+void kstwo(double data1[], long int n1, double data2[], long int n2, double *d, double *prob)
 {
 	double en1, en2, en, data_all[MAX_POINTS*2], cdf1[MAX_POINTS], cdf2[MAX_POINTS], cddiffs[MAX_POINTS];
     double min = 0.0, max = 0.0;
@@ -84,7 +84,7 @@ void kstwo(double data1[], long long n1, double data2[], long long n2, double *d
     *prob = KSfbar(round(en), *d);
 }
 
-void fill_nan (struct per_dim *d, long long hp, long long bp)
+void fill_nan (struct per_dim *d, long int hp, long int bp)
 {
     int k;
 
@@ -102,7 +102,7 @@ void fill_nan (struct per_dim *d, long long hp, long long bp)
 }
 
 //TODO check counters
-void run_diffs_and_rev (struct per_dim *d, long long hp, long long bp)
+void run_diffs_and_rev (struct per_dim *d, long int hp, long int bp)
 {
     int k, j;
 
@@ -113,7 +113,7 @@ void run_diffs_and_rev (struct per_dim *d, long long hp, long long bp)
     }
 }
 
-int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long baseline_points, long long highlight_points, long long max_points)
+int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points)
 {
     uint32_t options = 0x00000000;
     int group_method = RRDR_GROUPING_AVERAGE;
@@ -122,6 +122,7 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
     long c;
     int i=0, j=0;
     int b_dims = 0;
+    long int baseline_points = 0, highlight_points = 0;
 
     struct per_dim *pd = NULL;
 
@@ -132,6 +133,7 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
         info("Cannot generate metric correlations output with these parameters on this chart.");
         return 0;
     } else {
+        baseline_points = rrdr_rows(rb);
         pd = mallocz(sizeof(struct per_dim) * rb->d);
         b_dims = rb->d;
         for (c = 0; c != rrdr_rows(rb) ; ++c) {
@@ -165,6 +167,7 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
             freez(pd);
             return 0;
         }
+        highlight_points = rrdr_rows(rh);
         for (c = 0; c != rrdr_rows(rh) ; ++c) {
             RRDDIM *d;
             for (j = 0, d = rh->st->dimensions ; d && j < rh->d ; ++j, d = d->next) {
@@ -203,8 +206,6 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
 {
     info ("Running metric correlations, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld", highlight_after, highlight_before, baseline_after, baseline_before, max_points);
 
-    long long highlight_points = 0;
-    long long baseline_points = 0;
     long long dims = 0, total_dims = 0;
     RRDSET *st;
     size_t c;
@@ -224,12 +225,8 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
     rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
-
-            //get the actuall points from the result.
-            highlight_points = (highlight_before - highlight_after) / st->update_every;
-            baseline_points = (baseline_before - baseline_after) / st->update_every;
             buffer_flush(wdims);
-            dims = run_metric_correlations(wdims, st, baseline_after, baseline_before, highlight_after, highlight_before, baseline_points, highlight_points, max_points);
+            dims = run_metric_correlations(wdims, st, baseline_after, baseline_before, highlight_after, highlight_before, max_points);
             if (dims) {
                 if (c)
                   buffer_strcat(wb, "\t\t},");  
