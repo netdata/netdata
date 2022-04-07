@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- fix print: command not found issue [\#12615](https://github.com/netdata/netdata/pull/12615) ([maneamarius](https://github.com/maneamarius))
+- feat: add support for cloud providers info to /api/v1/info [\#12613](https://github.com/netdata/netdata/pull/12613) ([ilyam8](https://github.com/ilyam8))
 - Fix training/prediction stats charts context. [\#12610](https://github.com/netdata/netdata/pull/12610) ([vkalintiris](https://github.com/vkalintiris))
 - Fix a compilation warning [\#12608](https://github.com/netdata/netdata/pull/12608) ([vlvkobal](https://github.com/vlvkobal))
+- Update dashboard to version v2.22.3. [\#12607](https://github.com/netdata/netdata/pull/12607) ([netdatabot](https://github.com/netdatabot))
 - Enable streaming of anomaly\_detection.\* charts [\#12606](https://github.com/netdata/netdata/pull/12606) ([vkalintiris](https://github.com/vkalintiris))
 - Better check for IOMainPort on MacOS [\#12600](https://github.com/netdata/netdata/pull/12600) ([vlvkobal](https://github.com/vlvkobal))
 - Fix coverity issues [\#12598](https://github.com/netdata/netdata/pull/12598) ([vkalintiris](https://github.com/vkalintiris))
@@ -18,6 +21,8 @@
 - Check if libatomic can be linked [\#12583](https://github.com/netdata/netdata/pull/12583) ([MrZammler](https://github.com/MrZammler))
 - Update links to documentation \(eBPF\) [\#12581](https://github.com/netdata/netdata/pull/12581) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: re-add setuid bit to ioping after installing Debian package [\#12580](https://github.com/netdata/netdata/pull/12580) ([ilyam8](https://github.com/ilyam8))
+- Kickstart improved messaging [\#12577](https://github.com/netdata/netdata/pull/12577) ([Ferroin](https://github.com/Ferroin))
+- add some new ml params to README [\#12575](https://github.com/netdata/netdata/pull/12575) ([andrewm4894](https://github.com/andrewm4894))
 - Update ML-related charts [\#12574](https://github.com/netdata/netdata/pull/12574) ([vkalintiris](https://github.com/vkalintiris))
 - update anonymous-statistics readme for PH Cloud [\#12571](https://github.com/netdata/netdata/pull/12571) ([andrewm4894](https://github.com/andrewm4894))
 - Respect dimension hidden option when executing a query  [\#12570](https://github.com/netdata/netdata/pull/12570) ([stelfrag](https://github.com/stelfrag))
@@ -41,6 +46,7 @@
 - docs: fix unresolved file references [\#12528](https://github.com/netdata/netdata/pull/12528) ([ilyam8](https://github.com/ilyam8))
 - fix\(kickstart.sh\): use `$ROOTCMD` when setting auto updates [\#12526](https://github.com/netdata/netdata/pull/12526) ([ilyam8](https://github.com/ilyam8))
 - fix\(netdata-updater\): properly handle update for debian packages [\#12524](https://github.com/netdata/netdata/pull/12524) ([ilyam8](https://github.com/ilyam8))
+- fix centos gpg key issue [\#12519](https://github.com/netdata/netdata/pull/12519) ([maneamarius](https://github.com/maneamarius))
 - fix: Netdata segfault because of 2 timex.plugin threads [\#12512](https://github.com/netdata/netdata/pull/12512) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leaks on Netdata exit [\#12511](https://github.com/netdata/netdata/pull/12511) ([vlvkobal](https://github.com/vlvkobal))
 - fix centos7 gpg key issue [\#12506](https://github.com/netdata/netdata/pull/12506) ([maneamarius](https://github.com/maneamarius))
@@ -302,14 +308,6 @@
 - Perform a host metadata update on child reconnection [\#11965](https://github.com/netdata/netdata/pull/11965) ([stelfrag](https://github.com/stelfrag))
 - Remove bitfields from rrdhost. [\#11964](https://github.com/netdata/netdata/pull/11964) ([vkalintiris](https://github.com/vkalintiris))
 - Update libmongoc CMake config [\#11962](https://github.com/netdata/netdata/pull/11962) ([vlvkobal](https://github.com/vlvkobal))
-- Find host and pass host-\>health\_enabled to cloud AlarmLogHealth message [\#11960](https://github.com/netdata/netdata/pull/11960) ([MrZammler](https://github.com/MrZammler))
-- Updated SNMP v3 documentation [\#11959](https://github.com/netdata/netdata/pull/11959) ([kickoke](https://github.com/kickoke))
-- Add a missing capability for the perf plugin [\#11958](https://github.com/netdata/netdata/pull/11958) ([vlvkobal](https://github.com/vlvkobal))
-- python.d/nvidia\_smi: add bar1 chart [\#11956](https://github.com/netdata/netdata/pull/11956) ([pbouchez](https://github.com/pbouchez))
-- Compute platform-specific list of static\_threads at runtime. [\#11955](https://github.com/netdata/netdata/pull/11955) ([vkalintiris](https://github.com/vkalintiris))
-- fix\(nfacct.plugin\): Netfilter accounting charts priority [\#11952](https://github.com/netdata/netdata/pull/11952) ([ilyam8](https://github.com/ilyam8))
-- fix\(nfacct.plugin\): Netfilter accounting data collection [\#11951](https://github.com/netdata/netdata/pull/11951) ([ilyam8](https://github.com/ilyam8))
-- fix: add a note that netfilter's `new` and `ignore` counters are removed in the latest kernel [\#11950](https://github.com/netdata/netdata/pull/11950) ([ilyam8](https://github.com/ilyam8))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
