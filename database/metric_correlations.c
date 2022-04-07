@@ -222,6 +222,9 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
     c=0;
     buffer_strcat(wb, "{\n\t\"correlated_charts\": {");
 
+    //dont lock here and wait for results
+    //get the charts and run mc after
+    //should not be a problem for the query
     rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
