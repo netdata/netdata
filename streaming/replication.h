@@ -62,7 +62,7 @@ struct replication_state {
     char *key;
     FILE *fp;
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl *ssl;
+    struct netdata_ssl ssl;
 #endif
     char *program_name;
     char *program_version;
@@ -105,7 +105,7 @@ struct rrddim_past_data {
     unsigned long page_correlation_id;
 };
 extern struct config stream_config;
-extern int netdata_use_ssl_on_stream;
+extern int netdata_use_ssl_on_replication;
 
 void replication_gap_to_str(GAP *a_gap, char **gap_str, size_t *len);
 void replication_rdata_to_str(GAP *a_gap, char **rdata_str, size_t *len, int block_id);

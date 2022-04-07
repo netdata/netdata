@@ -45,6 +45,9 @@ unsigned int default_compression_enabled = 1;
 #endif
 #ifdef  ENABLE_REPLICATION
 unsigned int default_rrdpush_replication_enabled = 0;
+#ifdef ENABLE_HTTPS
+int netdata_use_ssl_on_replication = NETDATA_SSL_OPTIONAL;
+#endif
 #endif
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
@@ -97,6 +100,9 @@ int rrdpush_init() {
             if(test){
                 *test = 0X00;
                 netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
+#ifdef ENABLE_REPLICATION
+                netdata_use_ssl_on_replication = NETDATA_SSL_FORCE;
+#endif
             }
         }
     }

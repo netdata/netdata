@@ -583,7 +583,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         sprintf(initial_response, "%s", START_STREAMING_PROMPT);
     }
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-    #ifdef ENABLE_HTTPS
+#ifdef ENABLE_HTTPS
     rpt->host->stream_ssl.conn = rpt->ssl.conn;
     rpt->host->stream_ssl.flags = rpt->ssl.flags;
     if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
