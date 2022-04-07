@@ -4,6 +4,9 @@
 
 SSL_CTX *netdata_exporting_ctx=NULL;
 SSL_CTX *netdata_client_ctx=NULL;
+#ifdef  ENABLE_REPLICATION
+SSL_CTX *netdata_replication_client_ctx=NULL;
+#endif  //ENABLE_REPLICATION
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
@@ -223,6 +226,15 @@ void security_start_ssl(int selector) {
             SSL_CTX_set_mode(netdata_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
             break;
         }
+#ifdef  ENABLE_REPLICATION
+        case NETDATA_SSL_CONTEXT_REPLICATION: {
+            netdata_replication_client_ctx = security_initialize_openssl_client();
+            //This is necessary for the stream, because it is working sometimes with nonblock socket.
+            //It returns the bitmask after to change, there is not any description of errors in the documentation
+            SSL_CTX_set_mode(netdata_replication_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
+            break;
+        }        
+#endif        
         case NETDATA_SSL_CONTEXT_EXPORTING: {
             netdata_exporting_ctx = security_initialize_openssl_client();
             break;
@@ -244,6 +256,11 @@ void security_clean_openssl()
     if (netdata_client_ctx) {
         SSL_CTX_free(netdata_client_ctx);
     }
+#ifdef  ENABLE_REPLICATION
+    if (netdata_replication_client_ctx) {
+        SSL_CTX_free(netdata_replication_client_ctx);
+    }    
+#endif  //ENABLE_REPLICATION    
 
     if (netdata_exporting_ctx) {
         SSL_CTX_free(netdata_exporting_ctx);

@@ -24,9 +24,6 @@ static void replication_state_init(REPLICATION_STATE *state)
     state->buffer = cbuffer_new(1024, 1024*1024);
     state->build = buffer_create(1);
     state->socket = -1;
-#ifdef ENABLE_HTTPS
-    state->ssl = (struct netdata_ssl *)callocz(1, sizeof(struct netdata_ssl));
-#endif
     state->dim_past_data = (RRDDIM_PAST_DATA *)callocz(1, sizeof(RRDDIM_PAST_DATA));
     state->dim_past_data->page = (void *)callocz(RRDENG_BLOCK_SIZE, sizeof(char));
     netdata_mutex_init(&state->mutex);
@@ -39,8 +36,8 @@ void replication_state_destroy(REPLICATION_STATE **state)
     cbuffer_free(r->buffer);
     buffer_free(r->build);
 #ifdef ENABLE_HTTPS
-    if(r->ssl->conn){
-        SSL_free(r->ssl->conn);
+    if(r->ssl.conn){
+        SSL_free(r->ssl.conn);
     }
 #endif
     freez(r->dim_past_data->page);
@@ -59,7 +56,8 @@ void replication_sender_init(RRDHOST *host){
     host->replication->tx_replication->host = host;
     host->replication->tx_replication->enabled = default_rrdpush_replication_enabled;
 #ifdef ENABLE_HTTPS
-    host->replication->tx_replication->ssl = &host->stream_ssl;
+    host->replication->tx_replication->ssl.conn = NULL;
+    host->replication->tx_replication->ssl.flags = NETDATA_SSL_START;
 #endif
     info("%s: Initialize REP Tx state during host creation %s .", REPLICATION_MSG, host->hostname);
     print_replication_state(host->replication->tx_replication);
@@ -97,10 +95,7 @@ void replication_receiver_init(RRDHOST *image_host, struct config *stream_config
     replication_state_init(image_host->replication->rx_replication);
     info("%s: REP Rx state initialized", REPLICATION_MSG);    
     image_host->replication->rx_replication->host = image_host;
-    image_host->replication->rx_replication->enabled = rrdpush_replication_enable;
-#ifdef ENABLE_HTTPS
-    image_host->replication->rx_replication->ssl = &image_host->stream_ssl;
-#endif    
+    image_host->replication->rx_replication->enabled = rrdpush_replication_enable; 
     info("%s: Initialize Rx for host %s ", REPLICATION_MSG, image_host->hostname);
     print_replication_state(image_host->replication->rx_replication);
 }
@@ -146,31 +141,31 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
     info("%s %s [send to %s]: initializing communication...", REPLICATION_MSG, host->hostname, rep_state->connected_to);
 
 #ifdef ENABLE_HTTPS
-    if( netdata_client_ctx ){
-        host->ssl.flags = NETDATA_SSL_START;
-        if (!host->ssl.conn){
-            host->ssl.conn = SSL_new(netdata_client_ctx);
-            if(!host->ssl.conn){
+    if( netdata_replication_client_ctx ){
+        rep_state->ssl.flags = NETDATA_SSL_START;
+        if (!rep_state->ssl.conn){
+            rep_state->ssl.conn = SSL_new(netdata_replication_client_ctx);
+            if(!rep_state->ssl.conn){
                 error("Failed to allocate SSL structure.");
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                rep_state->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
         }
         else{
-            SSL_clear(host->ssl.conn);
+            SSL_clear(rep_state->ssl.conn);
         }
 
-        if (host->ssl.conn)
+        if (rep_state->ssl.conn)
         {
-            if (SSL_set_fd(host->ssl.conn, rep_state->socket) != 1) {
+            if (SSL_set_fd(rep_state->ssl.conn, rep_state->socket) != 1) {
                 error("Failed to set the socket to the SSL on socket fd %d.", rep_state->socket);
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                rep_state->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             } else{
-                host->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                rep_state->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
             }
         }
     }
     else {
-        host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+        rep_state->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
 
@@ -178,48 +173,60 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
     rrdpush_encode_variable(&se, host);
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "%s key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%u"
-                 "&NETDATA_PROTOCOL_VERSION=%s"
-                 " HTTP/1.1\r\n"
-                 "User-Agent: %s\r\n"
-                 "Accept: */*\r\n\r\n"
-                 , REPLICATE_CMD
-                 , host->rrdpush_send_api_key
-                 , host->hostname
-                 , host->registry_hostname
-                 , host->machine_guid
-                 , default_rrd_update_every
-                 , host->timezone
-                 , host->abbrev_timezone
-                 , host->utc_offset
-                 , host->system_info->hops + 1
-                 , (host->tags) ? host->tags : ""
-                 , STREAMING_PROTOCOL_CURRENT_VERSION
-                 , host->program_version
-                 , host->program_name);
+            "%s "
+            "key=%s"
+            "&hostname=%s"
+            "&registry_hostname=%s"
+            "&machine_guid=%s"
+            "&update_every=%d"
+            "&timezone=%s"
+            "&abbrev_timezone=%s"
+            "&utc_offset=%d"
+            "&hops=%d"
+            "&tags=%s"
+            "&ver=%u"
+            "&NETDATA_PROTOCOL_VERSION=%s"
+            " HTTP/1.1\r\n"
+            "User-Agent: %s/%s\r\n"
+            "Accept: */*\r\n\r\n"
+            , REPLICATE_CMD
+            , host->rrdpush_send_api_key
+            , host->hostname
+            , host->registry_hostname
+            , host->machine_guid
+            , default_rrd_update_every
+            , host->timezone
+            , host->abbrev_timezone
+            , host->utc_offset
+            , host->system_info->hops + 1
+            , (host->tags) ? host->tags : ""
+            , STREAMING_PROTOCOL_CURRENT_VERSION
+            , STREAMING_PROTOCOL_VERSION
+            , host->program_name
+            , host->program_version);
     http[eol] = 0x00;
     rrdpush_clean_encoded(&se);
 
 
 #ifdef ENABLE_HTTPS
-    if (!host->ssl.flags) {
+    if (!rep_state->ssl.flags) {
         ERR_clear_error();
-        SSL_set_connect_state(host->ssl.conn);
-        int err = SSL_connect(host->ssl.conn);
+        SSL_set_connect_state(rep_state->ssl.conn);
+        int err = SSL_connect(rep_state->ssl.conn);
         if (err != 1){
-            err = SSL_get_error(host->ssl.conn, err);
-            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
-            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+            err = SSL_get_error(rep_state->ssl.conn, err);
+            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(rep_state->ssl.conn,err),NULL));
+            if (netdata_use_ssl_on_replication == NETDATA_SSL_FORCE) {
                 replication_thread_close_socket(rep_state);
                 return 0;
             }else {
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                rep_state->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
         }
         else {
-            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+            if (netdata_use_ssl_on_replication == NETDATA_SSL_FORCE) {
                 if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
-                    if ( security_test_certificate(host->ssl.conn)) {
+                    if ( security_test_certificate(rep_state->ssl.conn)) {
                         error("Closing the replication stream connection, because the server SSL certificate is not valid.");
                         replication_thread_close_socket(rep_state);
                         return 0;
@@ -228,7 +235,7 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
             }
         }
     }
-    if(send_timeout(&host->ssl, rep_state->socket, http, strlen(http), 0, timeout) == -1) {
+    if(send_timeout(&rep_state->ssl, rep_state->socket, http, strlen(http), 0, timeout) == -1) {
 #else
     if(send_timeout(rep_state->socket, http, strlen(http), 0, timeout) == -1) {
 #endif
@@ -241,7 +248,7 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
 
     ssize_t received;
 #ifdef ENABLE_HTTPS
-    received = recv_timeout(&host->ssl, rep_state->socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    received = recv_timeout(&rep_state->ssl, rep_state->socket, http, HTTP_HEADER_SIZE, 0, timeout);
     if(received == -1) {
 #else
     received = recv_timeout(rep_state->socket, http, HTTP_HEADER_SIZE, 0, timeout);
@@ -303,6 +310,10 @@ static void replication_attempt_to_connect(RRDHOST *host)
         // reset the buffer, to properly gaps and replicate commands
         replication_sender_thread_data_flush(host);
 
+        // Clear the read buffer
+        memset(rep_state->read_buffer, 0, sizeof(rep_state->read_buffer));
+        rep_state->read_len = 0;
+
         // send from the beginning
         rep_state->begin = 0;
 
@@ -357,15 +368,15 @@ void replication_commit(struct replication_state *replication) {
 void replication_attempt_read(struct replication_state *replication) {
 int ret;
 #ifdef ENABLE_HTTPS
-    if (replication->ssl->conn && !replication->ssl->flags) {
+    if (replication->ssl.conn && !replication->ssl.flags) {
         ERR_clear_error();
         int desired = sizeof(replication->read_buffer) - replication->read_len - 1;
-        ret = SSL_read(replication->ssl->conn, replication->read_buffer, desired);
+        ret = SSL_read(replication->ssl.conn, replication->read_buffer, desired);
         if (ret > 0 ) {
             replication->read_len += ret;
             return;
         }
-        int sslerrno = SSL_get_error(replication->ssl->conn, desired);
+        int sslerrno = SSL_get_error(replication->ssl.conn, desired);
         if (sslerrno == SSL_ERROR_WANT_READ || sslerrno == SSL_ERROR_WANT_WRITE)
             return;
         u_long err;
@@ -412,8 +423,8 @@ void replication_attempt_to_send(struct replication_state *replication) {
     int send_retry = 0;
     do {
 #ifdef ENABLE_HTTPS
-        SSL *conn = replication->ssl->conn;
-        if(conn && !replication->ssl->flags) {
+        SSL *conn = replication->ssl.conn;
+        if(conn && !replication->ssl.flags) {
             ret = SSL_write(conn, chunk, outstanding);
         } else {
             ret = send(replication->socket, chunk, outstanding, MSG_DONTWAIT);
@@ -481,9 +492,17 @@ void *replication_sender_thread(void *ptr) {
     rep_state->shutdown = 0;
     info("%s Starting REPlication Tx thread.", REPLICATION_MSG);
 
+#ifdef ENABLE_HTTPS
+    if (netdata_use_ssl_on_replication & NETDATA_SSL_FORCE ){
+        security_start_ssl(NETDATA_SSL_CONTEXT_REPLICATION);
+        security_location_for_context(netdata_replication_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+    }
+#endif
+
     // Read the config for sending in replication
     rep_state->timeout = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
-    rep_state->default_port = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "default port", 19999);    
+    rep_state->default_port = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
+
     netdata_thread_cleanup_push(replication_sender_thread_cleanup_callback, host);
     for(;rrdpush_replication_enabled && !netdata_exit;)
     {
@@ -570,9 +589,7 @@ void *replication_receiver_thread(void *ptr){
     }
     debug(D_REPLICATION,"%s: Initial REPLICATION response to [%s:%s]: %s", REPLICATION_MSG, rep_state->client_ip, rep_state->client_port, initial_response);
 #ifdef ENABLE_HTTPS
-    host->stream_ssl.conn = rep_state->ssl->conn;
-    host->stream_ssl.flags = rep_state->ssl->flags;
-    if(send_timeout(rep_state->ssl, rep_state->socket, initial_response, strlen(initial_response), 0, rep_state->timeout) != (ssize_t)strlen(initial_response)) {
+    if(send_timeout(&rep_state->ssl, rep_state->socket, initial_response, strlen(initial_response), 0, rep_state->timeout) != (ssize_t)strlen(initial_response)) {
 #else
     if(send_timeout(rep_state->socket, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
 #endif
@@ -890,8 +907,8 @@ int replication_receiver_thread_spawn(struct web_client *w, char *url) {
     host->replication->rx_replication->stream_version = stream_version;
     host->replication->rx_replication->connected = 1;
 #ifdef ENABLE_HTTPS
-    host->replication->rx_replication->ssl->conn = w->ssl.conn;
-    host->replication->rx_replication->ssl->flags = w->ssl.flags;
+    host->replication->rx_replication->ssl.conn = w->ssl.conn;
+    host->replication->rx_replication->ssl.flags = w->ssl.flags;
     w->ssl.conn = NULL;
     w->ssl.flags = NETDATA_SSL_START;
 #endif
@@ -1093,9 +1110,9 @@ int save_gap(GAP *a_gap)
 
     if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
         return 0;
-    if (!a_gap || (*a_gap->status == '\0'))
+    if (!a_gap || !a_gap->status)
         return 0;
-    
+
     rc = sql_store_gap(
         &a_gap->gap_uuid,
         a_gap->host_mguid,
@@ -1220,26 +1237,28 @@ static char *receiver_next_line(struct replication_state *r, int *pos) {
 // The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
 static int receiver_read(struct replication_state *r, FILE *fp) {
 #ifdef ENABLE_HTTPS
-    if (r->ssl->conn && !r->ssl->flags) {
+    if (r->ssl.conn && !r->ssl.flags) {
         ERR_clear_error();
         int desired = sizeof(r->read_buffer) - r->read_len - 1;
-        int ret = SSL_read(r->ssl->conn, r->read_buffer + r->read_len, desired);
+        int ret = SSL_read(r->ssl.conn, r->read_buffer + r->read_len, desired);
         if (ret > 0 ) {
             r->read_len += ret;
+            // debug(D_REPLICATION, "%s: RxREAD SSLread [%s]@%d\n", REPLICATION_MSG, r->read_buffer,r->read_len);
             return 0;
         }
-        // info("%s: RxREAD After SSLread", REPLICATION_MSG);
+
         // Don't treat SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE differently on blocking socket
         u_long err;
         char buf[256];
         while ((err = ERR_get_error()) != 0) {
             ERR_error_string_n(err, buf, sizeof(buf));
-            error("%s: STREAM %s [receive from %s] ssl error: %s", REPLICATION_MSG, r->host->hostname, r->client_ip, buf);
+            error("%s: %s [receive from %s] ssl error: %s", REPLICATION_MSG, r->host->hostname, r->client_ip, buf);
         }
         return 1;
     }
 #endif
     if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp)){
+        // debug(D_REPLICATION, "%s: RxREAD FGETS [%s]\n", REPLICATION_MSG, r->read_buffer);
         return 1;
     }
     r->read_len = strlen(r->read_buffer);

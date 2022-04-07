@@ -161,6 +161,9 @@ struct rrdpush_destinations {
 extern unsigned int default_rrdpush_enabled;
 #ifdef  ENABLE_REPLICATION
 extern unsigned int default_rrdpush_replication_enabled;
+#ifdef  ENABLE_HTTPS
+extern int netdata_use_ssl_on_replication;
+#endif
 #endif
 #ifdef ENABLE_COMPRESSION
 extern unsigned int default_compression_enabled;
@@ -169,6 +172,10 @@ extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
+#ifdef  ENABLE_HTTPS
+extern char *netdata_ssl_ca_path;
+extern char *netdata_ssl_ca_file;
+#endif
 
 extern void sender_init(struct sender_state *s, RRDHOST *parent);
 extern struct rrdpush_destinations *destinations_init(const char *destinations);

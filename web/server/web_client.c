@@ -821,9 +821,9 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
 
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
+#ifdef  ENABLE_REPLICATION
     else if(!strncmp(s, "REPLICATE ", 10)) {
         s = &s[10];
-
 #ifdef ENABLE_HTTPS
         if (w->ssl.flags && web_client_is_using_ssl_force(w)){
             w->header_parse_tries = 0;
@@ -849,15 +849,13 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
                 memcpy(hostname,"not available",13);
                 hostname[13] = 0x00;
             }
-            error("The server is configured to always use encrypted connections, please enable the SSL on child with hostname '%s'.", hostname);
+            error("The server is configured to always use encrypted replication connections, please enable the SSL on child with hostname '%s'", hostname);
             s = NULL;
         }
 #endif
-
-#ifdef  ENABLE_REPLICATION
         w->mode = WEB_CLIENT_MODE_REPLICATE;
-#endif  //ENABLE_REPLICATION
-    }    
+    }
+#endif        
     else {
         s = NULL;
     }
