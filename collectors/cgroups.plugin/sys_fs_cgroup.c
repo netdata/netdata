@@ -3588,6 +3588,7 @@ void update_cgroup_charts(int update_every) {
                                 rrddim_add(cg->st_cpu_limit, "used", NULL, 1, system_hz, RRD_ALGORITHM_ABSOLUTE);
                             else
                                 rrddim_add(cg->st_cpu_limit, "used", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
+                            cg->prev_cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
                         }
                         else
                             rrdset_next(cg->st_cpu_limit);
