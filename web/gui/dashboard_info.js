@@ -1234,7 +1234,7 @@ const ebpfVFSCreateError = 'Number of failed calls to <a href="https://learn.net
 const ebpfSwapRead = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap" target="_blank">swap reader function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_swap">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows swap per <a href="#ebpf_apps_swap_read">application</a>.' + ebpfChartProvides
-const ebpfSwapWrite = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap" target="_blank">swap reader function</a>. Netdata gives a summary for this chart in ' +
+const ebpfSwapWrite = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap" target="_blank">swap writer function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_swap">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows swap per <a href="#ebpf_apps_swap_write">application</a>.' + ebpfChartProvides
 const ebpfCachestatRatio = 'The <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-ratio" target="_blank">ratio</a> shows the percentage of data accessed directly in memory. ' +
