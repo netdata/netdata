@@ -5,6 +5,11 @@
 
 #define MAX_POINTS 10000
 
+struct charts {
+    RRDSET *st;
+    struct charts *next;
+};
+
 struct per_dim {
     char *dimension;
     calculated_number baseline[MAX_POINTS];
@@ -208,7 +213,7 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
 
     long long dims = 0, total_dims = 0;
     RRDSET *st;
-    size_t c;
+    size_t c = 0;
     BUFFER *wdims = buffer_create(1000);
 
     if (highlight_before <= highlight_after || baseline_before <= baseline_after) {
@@ -219,41 +224,57 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
     if (!max_points || max_points > MAX_POINTS)
         max_points = MAX_POINTS;
 
-    c=0;
-    buffer_strcat(wb, "{\n\t\"correlated_charts\": {");
-
     //dont lock here and wait for results
     //get the charts and run mc after
     //should not be a problem for the query
+    struct charts *charts = NULL;
     rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
-            buffer_flush(wdims);
-            dims = run_metric_correlations(wdims, st, baseline_after, baseline_before, highlight_after, highlight_before, max_points);
-            if (dims) {
-                if (c)
-                  buffer_strcat(wb, "\t\t},");  
-                buffer_strcat(wb, "\n\t\t\"");
-                buffer_strcat(wb, st->id);
-                buffer_strcat(wb, "\": {\n");
-                buffer_strcat(wb, "\t\t\t\"context\": \"");
-                buffer_strcat(wb, st->context);
-                buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
-                buffer_sprintf(wb, "%s", buffer_tostring(wdims));
-                buffer_strcat(wb, "\t\t\t}\n");
-                total_dims += dims;
-                c++;
+            struct charts *chart = callocz(1, sizeof(struct charts));
+            chart->st = st;
+            chart->next = NULL;
+            if (charts) {
+                chart->next = charts;
             }
-            
+            charts = chart;
         }
     }
     rrdhost_unlock(host);
+
+    buffer_strcat(wb, "{\n\t\"correlated_charts\": {");
+
+    for (struct charts *ch = charts; ch; ch = ch->next) {
+        buffer_flush(wdims);
+        dims = run_metric_correlations(wdims, ch->st, baseline_after, baseline_before, highlight_after, highlight_before, max_points);
+        if (dims) {
+            if (c)
+                buffer_strcat(wb, "\t\t},");
+            buffer_strcat(wb, "\n\t\t\"");
+            buffer_strcat(wb, ch->st->id);
+            buffer_strcat(wb, "\": {\n");
+            buffer_strcat(wb, "\t\t\t\"context\": \"");
+            buffer_strcat(wb, ch->st->context);
+            buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
+            buffer_sprintf(wb, "%s", buffer_tostring(wdims));
+            buffer_strcat(wb, "\t\t\t}\n");
+            total_dims += dims;
+            c++;
+        }
+    }
     buffer_strcat(wb, "\t\t}\n");
     buffer_sprintf(wb, "\t},\n\t\"total_dimensions_count\": %lld\n}", total_dims);
 
     if (!total_dims) {
         buffer_flush(wb);
         buffer_strcat(wb, "{\"error\": \"No results from metric correlations.\" }");
+    }
+
+    struct charts* ch;
+    while(charts){
+        ch = charts;
+        charts = charts->next;
+        free(ch);
     }
 
     info ("Done running metric correlations");
