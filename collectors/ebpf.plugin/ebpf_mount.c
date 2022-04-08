@@ -386,7 +386,7 @@ static void mount_collector(ebpf_module_t *em)
 static void ebpf_create_mount_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_CALLS,
-                      "Calls to mount and umount syscalls.",
+                      "Calls to syscalls",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_MOUNT_FAMILY,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -396,7 +396,7 @@ static void ebpf_create_mount_charts(int update_every)
                       update_every, NETDATA_EBPF_MODULE_NAME_MOUNT);
 
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_ERRORS,
-                      "Errors to mount and umount syscalls.",
+                      "Errors to mount and umount file systems",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_MOUNT_FAMILY,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
