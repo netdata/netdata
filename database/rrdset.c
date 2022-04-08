@@ -2043,3 +2043,39 @@ struct label *rrdset_lookup_label_key(RRDSET *st, char *key, uint32_t key_hash)
     }
     return ret;
 }
+
+static inline int k8s_space(char c) {
+    switch(c) {
+        case ':':
+        case ',':
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+int rrdset_matches_label_keys(RRDSET *st, char *keylist, char *words[], uint32_t *hash_key_list, int *word_count, int size)
+{
+    struct label_index *labels = &st->state->labels;
+
+    if (!labels->head)
+        return 0;
+
+    struct label *one_label;
+
+    if (!*word_count) {
+        *word_count = quoted_strings_splitter(keylist, words, size, k8s_space, NULL, NULL, 0);
+        for (int i = 0; i < *word_count - 1; i += 2) {
+            hash_key_list[i] = simple_hash(words[i]);
+        }
+    }
+
+    int ret = 1;
+    netdata_rwlock_rdlock(&labels->labels_rwlock);
+    for (int i = 0; ret && i < *word_count - 1; i += 2) {
+        one_label = label_list_lookup_key(labels->head, words[i], hash_key_list[i]);
+        ret = (one_label && !strcmp(one_label->value, words[i + 1]));
+    }
+    netdata_rwlock_unlock(&labels->labels_rwlock);
+    return ret;
+}
