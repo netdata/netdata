@@ -40,7 +40,7 @@ sudo su -s /bin/bash netdata
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test ROLE
 ```
 
-If everything works, you'll see alarms in your Gotify platform:
+If everything works, you'll see alarms in Gotify:
 
 ![Example alarm notifications in
 Gotify](https://user-images.githubusercontent.com/103264516/162509205-1e88e5d9-96b6-4f7f-9426-182776158128.png)
