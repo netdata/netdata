@@ -1238,16 +1238,16 @@ const ebpfSwapWrite = 'Number of failed calls to <a href="https://learn.netdata.
     '<a href="#ebpf_global_swap">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows swap per <a href="#ebpf_apps_swap_write">application</a>.' + ebpfChartProvides
 const ebpfCachestatRatio = 'The <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-ratio" target="_blank">ratio</a> shows the percentage of data accessed directly in memory. ' +
-    'Netdata gives a summary for this chart in <a href="#menu_mem_submenu_page_cache">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+    'Netdata gives a summary for this chart in <a href="#menu_mem_submenu_page_cache">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows page cache hit per <a href="#ebpf_apps_cachestat_ratio">application</a>.' + ebpfChartProvides
 const ebpfCachestatDirties = 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#dirty-pages" target="_blank">modified pages</a> in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. ' +
-    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_dirty">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_dirty">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows page cache hit per <a href="#ebpf_apps_cachestat_dirties">application</a>.' + ebpfChartProvides
 const ebpfCachestatHits = 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-hits" target="_blank">access</a> to data in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. ' +
-    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_hits">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_hits">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows page cache hit per <a href="#ebpf_apps_cachestat_hits">application</a>.' + ebpfChartProvides
 const ebpfCachestatMisses = 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-misses" target="_blank">access</a> to data was not present in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. ' +
-    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_misses">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_misses">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows page cache misses per <a href="#ebpf_apps_cachestat_misses">application</a>.' + ebpfChartProvides
 
 netdataDashboard.context = {
