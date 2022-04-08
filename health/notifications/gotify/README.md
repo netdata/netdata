@@ -43,7 +43,7 @@ sudo su -s /bin/bash netdata
 If everything works, you'll see alarms in your Gotify platform:
 
 ![Example alarm notifications in
-Gotify](image)
+Gotify](https://user-images.githubusercontent.com/103264516/162509205-1e88e5d9-96b6-4f7f-9426-182776158128.png)
 
 If sending the test notifications fails, you can look in `/var/log/netdata/error.log` to find the relevant error
 message:
