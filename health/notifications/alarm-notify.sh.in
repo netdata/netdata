@@ -38,6 +38,7 @@
 #  - Dynatrace Event by @illumine
 #  - Stackpulse Event by @thiagoftsm
 #  - Opsgenie by @thiaoftsm #9858
+#  - Gotify by @coffeegrind123
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -400,6 +401,10 @@ SEND_DYNATRACE=
 # stackpulse configs
 STACKPULSE_WEBHOOK=
 
+# gotify configs
+GOTIFY_APP_URL=
+GOTIFY_APP_TOKEN=
+
 # opsgenie configs
 OPSGENIE_API_KEY=
 
@@ -589,6 +594,9 @@ filter_recipient_by_criticality() {
 # check matrix
 { [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ]; } && SEND_MATRIX="NO"
 
+# check gotify
+[ -z "${GOTIFY_APP_TOKEN}" ] && SEND_GOTIFY="NO"
+
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
 
@@ -626,7 +634,8 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_MSTEAMS}" = "YES" ] ||
   [ "${SEND_DYNATRACE}" = "YES" ] ||
   [ "${SEND_STACKPULSE}" = "YES" ] ||
-  [ "${SEND_OPSGENIE}" = "YES" ]; then
+  [ "${SEND_OPSGENIE}" = "YES" ] ||
+  [ "${SEND_GOTIFY}" = "YES" ]; then
   # if we need curl, check for the curl command
   if [ -z "${curl}" ]; then
     curl="$(command -v curl 2>/dev/null)"
@@ -656,6 +665,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
     SEND_DYNATRACE="NO"
     SEND_STACKPULSE="NO"
     SEND_OPSGENIE="NO"
+    SEND_GOTIFY="NO"
   fi
 fi
 
@@ -795,7 +805,8 @@ for method in "${SEND_EMAIL}" \
   "${SEND_MSTEAMS}" \
   "${SEND_DYNATRACE}" \
   "${SEND_STACKPULSE}" \
-  "${SEND_OPSGENIE}" ; do
+  "${SEND_OPSGENIE}" \
+  "${SEND_GOTIFY}" ; do
 
   if [ "${method}" == "YES" ]; then
     proceed=1
@@ -2278,6 +2289,37 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# Gotify sender
+
+send_gotify() {
+  local payload httpcode
+  [ "${SEND_GOTIFY}" != "YES" ] && return 1
+
+  if [ -z "${GOTIFY_APP_TOKEN}" ] ; then
+    info "Can't send Gotify notification, because GOTIFY_APP_TOKEN is not defined"
+    return 1
+  fi
+
+  payload=$(cat <<EOF
+  {
+    "title" : "${prefix} ${status}, ${name} = ${value_string}, on ${host}",
+    "message" : "${date}: ${chart} ${value_string}"
+  }
+EOF
+)
+
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${GOTIFY_APP_URL}/message?token=${GOTIFY_APP_TOKEN}")
+  if [ "${httpcode}" = "200" ]; then
+    info "sent gotify notification for: ${host} ${chart}.${name} is ${status}"
+  else
+    error "failed to send gotify notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+    return 1
+  fi
+
+  return 0
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -3467,6 +3509,11 @@ send_opsgenie
 SENT_OPSGENIE=$?
 
 # -----------------------------------------------------------------------------
+# send messages to Gotify
+send_gotify
+SENT_GOTIFY=$?
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
@@ -3495,7 +3542,8 @@ for state in "${SENT_EMAIL}" \
   "${SENT_MSTEAMS}" \
   "${SENT_DYNATRACE}" \
   "${SENT_STACKPULSE}" \
-  "${SENT_OPSGENIE}"; do
+  "${SENT_OPSGENIE}" \
+  "${SENT_GOTIFY}"; do
   if [ "${state}" -eq 0 ]; then
     # we sent something
     exit 0
