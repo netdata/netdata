@@ -2302,7 +2302,7 @@ send_gotify() {
 
   payload=$(cat <<EOF
   {
-    "title" : "${prefix} ${status}, ${name} = ${value_string}, on ${host}",
+    "title" : "${status}, ${name} = ${value_string}, on ${host}",
     "message" : "${date}: ${chart} ${value_string}"
   }
 EOF
