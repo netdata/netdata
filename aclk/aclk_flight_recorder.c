@@ -163,6 +163,24 @@ int aclk_flight_recorder_init()
     return 0;
 }
 
+void aclk_flight_recorder_shutdown(void)
+{
+    int rc;
+
+    if (!fl_enabled)
+        return;
+
+    if (unlikely(aclk_fl_db == NULL))
+        return;
+
+    info("Closing ACLK SQLite database");
+
+    rc = sqlite3_close_v2(aclk_fl_db);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Error %d while closing the ACLK SQLite database, %s", rc, sqlite3_errstr(rc));
+    return;
+}
+
 #define STMT_NEW_CONN_INSERT "INSERT INTO connection (uuid) values (@uuid);"
 void aclk_new_connection_log()
 {

@@ -8,6 +8,7 @@
 struct aclk_fl;
 
 int aclk_flight_recorder_init();
+void aclk_flight_recorder_shutdown(void);
 void aclk_new_connection_log();
 
 void aclk_log_info(aclk_event_log_t event_id, const char *file, const char *function, const unsigned long line, const char *fmt, ...);

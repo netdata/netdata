@@ -886,6 +886,7 @@ exit_full:
     free_topic_cache();
     mqtt_wss_destroy(mqttwss_client);
 exit:
+    aclk_flight_recorder_shutdown();
     if (aclk_env) {
         aclk_env_t_destroy(aclk_env);
         freez(aclk_env);
