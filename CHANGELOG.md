@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Don't do fatal on error writing the health api management key. [\#12623](https://github.com/netdata/netdata/pull/12623) ([MrZammler](https://github.com/MrZammler))
+- fix\(cgroups.plugin\): set CPU prev usage before first usage. [\#12622](https://github.com/netdata/netdata/pull/12622) ([ilyam8](https://github.com/ilyam8))
 - fix print: command not found issue [\#12615](https://github.com/netdata/netdata/pull/12615) ([maneamarius](https://github.com/maneamarius))
 - feat: add support for cloud providers info to /api/v1/info [\#12613](https://github.com/netdata/netdata/pull/12613) ([ilyam8](https://github.com/ilyam8))
 - Fix training/prediction stats charts context. [\#12610](https://github.com/netdata/netdata/pull/12610) ([vkalintiris](https://github.com/vkalintiris))
@@ -260,8 +262,6 @@
 - Fix compilation errors for OpenSSL on macOS [\#12048](https://github.com/netdata/netdata/pull/12048) ([vlvkobal](https://github.com/vlvkobal))
 - Updated the docs to match new install script [\#12042](https://github.com/netdata/netdata/pull/12042) ([kickoke](https://github.com/kickoke))
 - Fix handling of removed packages with leftover config files in package check. [\#12033](https://github.com/netdata/netdata/pull/12033) ([Ferroin](https://github.com/Ferroin))
-- update existing OS dependencies scripts and add scripts for fedora an… [\#11963](https://github.com/netdata/netdata/pull/11963) ([maneamarius](https://github.com/maneamarius))
-- Posix [\#11961](https://github.com/netdata/netdata/pull/11961) ([maneamarius](https://github.com/maneamarius))
 
 ## [v1.33.0](https://github.com/netdata/netdata/tree/v1.33.0) (2022-01-26)
 
@@ -307,7 +307,6 @@
 - Do not use dbengine headers when dbengine is disabled. [\#11967](https://github.com/netdata/netdata/pull/11967) ([vkalintiris](https://github.com/vkalintiris))
 - Perform a host metadata update on child reconnection [\#11965](https://github.com/netdata/netdata/pull/11965) ([stelfrag](https://github.com/stelfrag))
 - Remove bitfields from rrdhost. [\#11964](https://github.com/netdata/netdata/pull/11964) ([vkalintiris](https://github.com/vkalintiris))
-- Update libmongoc CMake config [\#11962](https://github.com/netdata/netdata/pull/11962) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
