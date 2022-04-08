@@ -327,7 +327,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                               "The ratio is calculated dividing the Hit pages per total cache accesses without counting dirties.",
+                               "Hit ratio",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
                                NETDATA_CACHESTAT_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_LINE,
@@ -336,7 +336,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_DIRTY_CHART,
-                               "Number of pages marked as dirty. When a page is called dirty, this means that the data stored inside the page needs to be written to devices.",
+                               "Number of dirty pages",
                                EBPF_CACHESTAT_DIMENSION_PAGE,
                                NETDATA_CACHESTAT_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -345,7 +345,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_CHART,
-                               "Number of cache access without counting dirty pages and page additions.",
+                               "Number of accessed files",
                                EBPF_CACHESTAT_DIMENSION_HITS,
                                NETDATA_CACHESTAT_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -354,7 +354,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_MISSES_CHART,
-                               "Page caches added without counting dirty pages",
+                               "Files out of page cache",
                                EBPF_CACHESTAT_DIMENSION_MISSES,
                                NETDATA_CACHESTAT_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -599,7 +599,7 @@ void ebpf_cachestat_calc_chart_values()
 static void ebpf_create_systemd_cachestat_charts(int update_every)
 {
     ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                                  "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                                  "Hit ratio",
                                   EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21100,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
@@ -607,21 +607,21 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
                                   update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_DIRTY_CHART,
-                                  "Number of dirty pages added to the page cache.",
+                                  "Number of dirty pages",
                                   EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21101,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                   NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT,
                                   update_every);
 
-    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_CHART, "Hits are function calls that Netdata counts.",
+    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_CHART, "Number of accessed files",
                                   EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21102,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                   NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT,
                                   update_every);
 
-    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_MISSES_CHART, "Misses are function calls that Netdata counts.",
+    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_MISSES_CHART, "Files out of page cache",
                                   EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21103,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
@@ -713,7 +713,7 @@ static void ebpf_send_specific_cachestat_data(char *type, netdata_publish_caches
 static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                      "Hit ratio",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200,
@@ -721,7 +721,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       cachestat_counter_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_DIRTY_CHART,
-                      "Number of dirty pages added to the page cache.",
+                      "Number of dirty pages",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201,
@@ -730,7 +730,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_CHART,
-                      "Hits are function calls that Netdata counts.",
+                      "Number of accessed files",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_CGROUP_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202,
@@ -739,7 +739,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_MISSES_CHART,
-                      "Misses are function calls that Netdata counts.",
+                      "Files out of page cache",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_CGROUP_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203,
@@ -759,25 +759,25 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                      "Hit ratio",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_DIRTY_CHART,
-                      "Number of dirty pages added to the page cache.",
+                      "Number of dirty pages",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_CHART,
-                      "Hits are function calls that Netdata counts.",
+                      "Number of accessed files",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_MISSES_CHART,
-                      "Misses are function calls that Netdata counts.",
+                      "Files out of page cache",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203, update_every);
@@ -892,7 +892,7 @@ static void cachestat_collector(ebpf_module_t *em)
 static void ebpf_create_memory_charts(ebpf_module_t *em)
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                      "Hit ratio",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -901,7 +901,7 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
                       cachestat_counter_publish_aggregated, 1, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
-                      "Number of dirty pages added to the page cache.",
+                      "Number of dirty pages",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -911,7 +911,7 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
                       em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
-                      "Hits are function calls that Netdata counts.",
+                      "Number of accessed files",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -921,7 +921,7 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
                       em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
-                      "Misses are function calls that Netdata counts.",
+                      "Files out of page cache",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
