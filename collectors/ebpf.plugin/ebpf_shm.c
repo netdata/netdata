@@ -988,7 +988,7 @@ static void ebpf_create_shm_charts(int update_every)
     ebpf_create_chart(
         NETDATA_EBPF_SYSTEM_GROUP,
         NETDATA_SHM_GLOBAL_CHART,
-        "Calls to shared memory system calls.",
+        "Calls to system calls.",
         EBPF_COMMON_DIMENSION_CALL,
         NETDATA_SYSTEM_IPC_SHM_SUBMENU,
         NULL,
