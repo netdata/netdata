@@ -27,7 +27,7 @@ DRY_RUN=0
 SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
-NETDATA_AUTO_UPDATES="1"
+NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_ONLY=0
 NETDATA_CLAIM_URL="${PUBLIC_CLOUD_URL}"
 NETDATA_DISABLE_CLOUD=0
@@ -223,6 +223,7 @@ telemetry_event() {
     "error_message": "${2}",
     "install_options": "${KICKSTART_OPTIONS}",
     "install_interactivity": "${INTERACTIVE}",
+    "install_auto_updates": "${NETDATA_AUTO_UPDATES}",
     "total_runtime": "${total_duration}",
     "selected_install_method": "${SELECTED_INSTALL_METHOD}",
     "netdata_release_channel": "${RELEASE_CHANNEL:-null}",
@@ -1085,7 +1086,7 @@ set_auto_updates() {
     return 0
   fi
 
-  if [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
+  if [ "${AUTO_UPDATE}" -eq 1 ]; then
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to enable automatic updates."
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
@@ -1829,6 +1830,12 @@ if [ -n "${STATIC_INSTALL_OPTIONS}" ]; then
   else
     fatal "Specifying installer options options is only supported when the --static-only option is also specified." F0402
   fi
+fi
+
+if [ "${NETDATA_AUTO_UPDATES}" = "default" ] || [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
+  AUTO_UPDATE=1
+else
+  AUTO_UPDATE=0
 fi
 
 check_claim_opts
