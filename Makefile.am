@@ -67,6 +67,8 @@ dist_noinst_DATA = \
     packaging/check-kernel-config.sh \
     packaging/ebpf.checksums \
     packaging/ebpf.version \
+    packaging/ebpf-co-re.checksums \
+    packaging/ebpf-co-re.version \
     packaging/go.d.checksums \
     packaging/go.d.version \
     packaging/installer/README.md \
