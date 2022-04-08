@@ -595,7 +595,7 @@ filter_recipient_by_criticality() {
 { [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ]; } && SEND_MATRIX="NO"
 
 # check gotify
-[ -z "${GOTIFY_APP_TOKEN}" ] && SEND_GOTIFY="NO"
+{ [ -z "${GOTIFY_APP_TOKEN}" ] || [ -z "${GOTIFY_APP_URL}" ]; } && SEND_GOTIFY="NO"
 
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
