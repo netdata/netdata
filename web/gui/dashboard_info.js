@@ -1840,7 +1840,7 @@ netdataDashboard.context = {
         info: 'Number of calls to functions responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-inbound-connections" target="_blank">receiving connections</a>.' + ebpfChartProvides
     },
 
-    'ip.outbound_conn': {
+    'ip.tcp_outbound_conn': {
         info: 'Number of calls to TCP functions responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-outbound-connections" target="_blank">starting connections</a>. ' +
         'Netdata shows TCP outbound connections metrics per <a href="#ebpf_apps_outbound_conn_ipv4">application</a> and <a href="#ebpf_services_outbound_conn_ipv4">cgroup (systemd Services)</a> if ' +
         '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
@@ -1854,7 +1854,7 @@ netdataDashboard.context = {
        '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_tcp_bandwidth_call"></div>'
     },
 
-    'ip.tcp_bandwidth': {
+    'ip.total_tcp_bandwidth': {
         info: 'Total bytes sent and received with <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP internal functions</a>. ' +
         'Netdata shows TCP bandwidth metrics per <a href="#ebpf_apps_bandwidth_tcp_sendmsg">application</a> and <a href="#ebpf_services_bandwidth_tcp_sendmsg">cgroup (systemd Services)</a> if ' +
         '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
@@ -1882,7 +1882,7 @@ netdataDashboard.context = {
         '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_udp_bandwidth_call"></div>'
     },
 
-    'ip.udp_bandwidth': {
+    'ip.total_udp_bandwidth': {
         info: 'Total bytes sent and received with <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-bandwidth" target="_blank">UDP internal functions</a>. ' +
         'Netdata shows UDP bandwidth metrics per <a href="#ebpf_apps_bandwidth_udp_sendmsg">application</a> and <a href="#ebpf_services_bandwidth_udp_sendmsg">cgroup (systemd Services)</a> if ' +
         '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
@@ -1943,42 +1943,6 @@ netdataDashboard.context = {
         'lingered around for long enough. '+
         '<b>Failed</b> - happens when the kernel attempted to send an RST but failed because there was no memory available.</p>'
     },
-
-    'ip.tcp_functions': {
-        title : 'TCP calls',
-        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code>, and <code>tcp_close</code>.'
-    },
-
-    'ip.total_tcp_bandwidth': {
-        title : 'TCP bandwidth',
-        info: 'Bytes sent and received by functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead of <code>tcp_recvmsg</code>, because the last one misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
-    },
-
-    'ip.tcp_error': {
-        title : 'TCP errors',
-        info: 'Failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code>, and <code>tcp_close</code>.'
-    },
-
-    'ip.tcp_retransmit': {
-        title : 'TCP retransmit',
-        info: 'Number of packets retransmitted by function <code>tcp_retransmit_skb</code>.'
-    },
-
-    'ip.udp_functions': {
-        title : 'UDP calls',
-        info: 'Successful or failed calls to functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
-    },
-
-    'ip.total_udp_bandwidth': {
-        title : 'UDP bandwidth',
-        info: 'Bytes sent and received by functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
-    },
-
-    'ip.udp_error': {
-        title : 'UDP errors',
-        info: 'Failed calls to functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
-    },
-
 
     'ip.tcp_syn_queue': {
         info: '<p>The SYN queue of the kernel tracks TCP handshakes until connections get fully established. ' +
