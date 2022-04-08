@@ -25,7 +25,7 @@ SEND_GOTIFY="YES"
 
 # Application token
 # Gotify instance url
-GOTIFY_APP_TOKEN=Ar-6M777HvDPylv
+GOTIFY_APP_TOKEN=XXXXXXXXXXXXXXX
 GOTIFY_APP_URL=https://push.example.de/
 ```
 
