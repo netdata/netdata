@@ -43,15 +43,15 @@ LABELS="$POD_LABELS\nk8s_cluster_id:$KUBE_SYSTEM_NS_UID"
 
 GCP_META_HEADER="Metadata-Flavor: Google"
 GCP_META_URL="http://metadata/computeMetadata/v1"
-GCP_CLUSTER_NAME=""
+GKE_CLUSTER_NAME=""
 
 if id=$(curl --fail -s -m 5 --noproxy "*" -H "$GCP_META_HEADER" "$GCP_META_URL/project/project-id"); then
   loc=$(curl --fail -s -m 5 --noproxy "*" -H "$GCP_META_HEADER" "$GCP_META_URL/instance/attributes/cluster-location")
   name=$(curl --fail -s -m 5 --noproxy "*" -H "$GCP_META_HEADER" "$GCP_META_URL/instance/attributes/cluster-name")
-  [ -n "$id" ] && [ -n "$loc" ] && [ -n "$name" ] && GCP_CLUSTER_NAME="gke_${id}_${loc}_${name}"
+  [ -n "$id" ] && [ -n "$loc" ] && [ -n "$name" ] && GKE_CLUSTER_NAME="gke_${id}_${loc}_${name}"
 fi
 
-[ -n "$GCP_CLUSTER_NAME" ] && LABELS+="\nk8s_cluster_name:$GCP_CLUSTER_NAME"
+[ -n "$GKE_CLUSTER_NAME" ] && LABELS+="\nk8s_cluster_name:$GKE_CLUSTER_NAME"
 
 echo -e "$LABELS"
 
