@@ -5,6 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#define MAX_STAT_FUNCTION_COUNT 64
+
 typedef enum rrdr_options {
     RRDR_OPTION_NONZERO      = 0x00000001, // don't output dimensions with just zero values
     RRDR_OPTION_REVERSED     = 0x00000002, // output the rows in reverse order (oldest to newest)
@@ -50,6 +52,24 @@ typedef enum rrdr_result_flags {
     RRDR_RESULT_OPTION_CANCEL        = 0x00000008, // the query needs to be cancelled
 } RRDR_RESULT_FLAGS;
 
+struct rrdresult;
+// internal rrd2rrdr() members below this point
+typedef struct internal_s{
+    long points_wanted;
+    long resampling_group;
+    calculated_number resampling_divisor;
+    void *(*grouping_create)(struct rrdresult *r);
+    void (*grouping_reset)(struct rrdresult *r);
+    void (*grouping_free)(struct rrdresult *r);
+    void (*grouping_add)(struct rrdresult *r, calculated_number value);
+    calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+    void *grouping_data;
+    #ifdef NETDATA_INTERNAL_CHECKS
+    const char *log;
+    #endif
+    size_t db_points_read;
+    size_t result_points_generated;
+} internal_t;
 typedef struct rrdresult {
     struct rrdset *st;         // the chart this result refers to
 
@@ -77,33 +97,16 @@ typedef struct rrdresult {
     int has_st_lock;        // if st is read locked by us
     uint8_t st_needs_lock;  // if ST should be locked
 
-    // internal rrd2rrdr() members below this point
-    struct {
-        long points_wanted;
-        long resampling_group;
-        calculated_number resampling_divisor;
-
-        void *(*grouping_create)(struct rrdresult *r);
-        void (*grouping_reset)(struct rrdresult *r);
-        void (*grouping_free)(struct rrdresult *r);
-        void (*grouping_add)(struct rrdresult *r, calculated_number value);
-        calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
-        void *grouping_data;
-
-        #ifdef NETDATA_INTERNAL_CHECKS
-        const char *log;
-        #endif
-
-        size_t db_points_read;
-        size_t result_points_generated;
-    } internal;
+    internal_t internal;
+    internal_t stats[MAX_STAT_FUNCTION_COUNT]; // Max 64 is statistic function,
+                                               // it can be handled with dynamic allocation
 } RRDR;
 
 #define rrdr_rows(r) ((r)->rows)
 
 #include "database/rrd.h"
 extern void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
-extern RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_param *context_param_list);
+extern RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, int stats_count, struct context_param *context_param_list);
 
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"

@@ -269,6 +269,16 @@ const char *group_method2string(RRDR_GROUPING group) {
     return "unknown-group-method";
 }
 
+int stats_method_count(uint64_t stats) {
+    int count = 0;
+    for (int i = 0; i < 64; i++)
+    {
+        count += stats & 0x00000001;
+        stats >>= 1;
+    }
+    return count;
+}
+
 RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def) {
     int i;
 
@@ -872,11 +882,12 @@ static RRDR *rrd2rrdr_fixedstep(
     // the duration of the chart
     time_t duration = before_requested - after_requested;
     long available_points = duration / update_every;
+    int stats_count = stats_method_count(stats);
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
     if(duration <= 0 || available_points <= 0)
-        return rrdr_create(owa, st, 1, context_param_list);
+        return rrdr_create(owa, st, 1, stats_count, context_param_list);
 
     // check the number of wanted points in the result
     if(unlikely(points_requested < 0)) points_requested = -points_requested;
@@ -1034,7 +1045,7 @@ static RRDR *rrd2rrdr_fixedstep(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(owa, st, points_wanted, context_param_list);
+    RRDR *r = rrdr_create(owa, st, points_wanted, stats_count, context_param_list);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
@@ -1261,12 +1272,13 @@ static RRDR *rrd2rrdr_variablestep(
     // the duration of the chart
     time_t duration = before_requested - after_requested;
     long available_points = duration / update_every;
+    int stats_count = stats_method_count(stats);
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
     if(duration <= 0 || available_points <= 0) {
         freez(region_info_array);
-        return rrdr_create(owa, st, 1, context_param_list);
+        return rrdr_create(owa, st, 1, stats_count, context_param_list);
     }
 
     // check the number of wanted points in the result
@@ -1425,7 +1437,7 @@ static RRDR *rrd2rrdr_variablestep(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(owa, st, points_wanted, context_param_list);
+    RRDR *r = rrdr_create(owa, st, points_wanted, stats_count, context_param_list);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
