@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Add eBPF CO-RE version and checksum files to distfile list. [\#12627](https://github.com/netdata/netdata/pull/12627) ([Ferroin](https://github.com/Ferroin))
+- Fix ACLK shutdown [\#12625](https://github.com/netdata/netdata/pull/12625) ([underhood](https://github.com/underhood))
 - Don't do fatal on error writing the health api management key. [\#12623](https://github.com/netdata/netdata/pull/12623) ([MrZammler](https://github.com/MrZammler))
 - fix\(cgroups.plugin\): set CPU prev usage before first usage. [\#12622](https://github.com/netdata/netdata/pull/12622) ([ilyam8](https://github.com/ilyam8))
 - fix print: command not found issue [\#12615](https://github.com/netdata/netdata/pull/12615) ([maneamarius](https://github.com/maneamarius))
@@ -303,10 +305,6 @@
 - Bump follow-redirects from 1.13.2 to 1.14.7 [\#11972](https://github.com/netdata/netdata/pull/11972) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Use libnetdata/required\_dummies.h in collectors. [\#11971](https://github.com/netdata/netdata/pull/11971) ([vkalintiris](https://github.com/vkalintiris))
 - Fixes Wrong Chart Description [\#11970](https://github.com/netdata/netdata/pull/11970) ([underhood](https://github.com/underhood))
-- Bump engine.io from 4.1.0 to 4.1.2 [\#11968](https://github.com/netdata/netdata/pull/11968) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Do not use dbengine headers when dbengine is disabled. [\#11967](https://github.com/netdata/netdata/pull/11967) ([vkalintiris](https://github.com/vkalintiris))
-- Perform a host metadata update on child reconnection [\#11965](https://github.com/netdata/netdata/pull/11965) ([stelfrag](https://github.com/stelfrag))
-- Remove bitfields from rrdhost. [\#11964](https://github.com/netdata/netdata/pull/11964) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
