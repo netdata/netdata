@@ -552,7 +552,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintf(id, RRD_ID_LENGTH_MAX, "disk_%s", node->id);
                 snprintf(name, RRD_ID_LENGTH_MAX, "disk_%s", node->label);
-                snprintf(title, 200, "BTRFS Physical Disk Allocation for %s", node->label);
+                snprintf(title, 200, "BTRFS Physical Disk Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -610,7 +610,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintf(id, RRD_ID_LENGTH_MAX, "data_%s", node->id);
                 snprintf(name, RRD_ID_LENGTH_MAX, "data_%s", node->label);
-                snprintf(title, 200, "BTRFS Data Allocation for %s", node->label);
+                snprintf(title, 200, "BTRFS Data Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -653,7 +653,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintf(id, RRD_ID_LENGTH_MAX, "metadata_%s", node->id);
                 snprintf(name, RRD_ID_LENGTH_MAX, "metadata_%s", node->label);
-                snprintf(title, 200, "BTRFS Metadata Allocation for %s", node->label);
+                snprintf(title, 200, "BTRFS Metadata Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -698,7 +698,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintf(id, RRD_ID_LENGTH_MAX, "system_%s", node->id);
                 snprintf(name, RRD_ID_LENGTH_MAX, "system_%s", node->label);
-                snprintf(title, 200, "BTRFS System Allocation for %s", node->label);
+                snprintf(title, 200, "BTRFS System Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
