@@ -19,43 +19,43 @@ ORDER = [
 # This is a prototype of chart definition which is used to dynamically create self.definitions
 CHARTS = {
     'temperature': {
-        'options': [None, ' temperature', 'Celsius', 'temperature', 'sensors.temperature', 'line'],
+        'options': [None, 'Temperature', 'Celsius', 'temperature', 'sensors.temperature', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]
     },
     'voltage': {
-        'options': [None, ' voltage', 'Volts', 'voltage', 'sensors.voltage', 'line'],
+        'options': [None, 'Voltage', 'Volts', 'voltage', 'sensors.voltage', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]
     },
     'current': {
-        'options': [None, ' current', 'Ampere', 'current', 'sensors.current', 'line'],
+        'options': [None, 'Current', 'Ampere', 'current', 'sensors.current', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]
     },
     'power': {
-        'options': [None, ' power', 'Watt', 'power', 'sensors.power', 'line'],
+        'options': [None, 'Power', 'Watt', 'power', 'sensors.power', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]
     },
     'fan': {
-        'options': [None, ' fans speed', 'Rotations/min', 'fans', 'sensors.fan', 'line'],
+        'options': [None, 'Fans speed', 'Rotations/min', 'fans', 'sensors.fan', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]
     },
     'energy': {
-        'options': [None, ' energy', 'Joule', 'energy', 'sensors.energy', 'line'],
+        'options': [None, 'Energy', 'Joule', 'energy', 'sensors.energy', 'line'],
         'lines': [
             [None, None, 'incremental', 1, 1000]
         ]
     },
     'humidity': {
-        'options': [None, ' humidity', 'Percent', 'humidity', 'sensors.humidity', 'line'],
+        'options': [None, 'Humidity', 'Percent', 'humidity', 'sensors.humidity', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]
@@ -143,7 +143,6 @@ class Service(SimpleService):
                         if name not in self.order:
                             self.order.append(name)
                             chart_def = list(CHARTS[sensor]['options'])
-                            chart_def[1] = chip_name + chart_def[1]
                             self.definitions[name] = {'options': chart_def}
                             self.definitions[name]['lines'] = []
                         line = list(CHARTS[sensor]['lines'][0])
