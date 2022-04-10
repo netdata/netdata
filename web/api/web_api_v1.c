@@ -415,6 +415,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *after_str = NULL;
     char *group_time_str = NULL;
     char *points_str = NULL;
+    char *timeout_str = NULL;
     char *max_anomaly_rates_str = NULL;
     char *context = NULL;
     char *chart_label_key = NULL;
@@ -447,6 +448,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
+        else if(!strcmp(name, "timeout")) timeout_str = value;
         else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
@@ -576,6 +578,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
     int       points = (points_str && *points_str)?str2i(points_str):0;
+    int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
     int       max_anomaly_rates = (max_anomaly_rates_str && *max_anomaly_rates_str) ? str2i(max_anomaly_rates_str) : 0;
 
@@ -623,7 +626,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format,
                                  points, after, before, group, group_time,
                                  options, &last_timestamp_in_data, context_param_list,
-                                 chart_label_key, max_anomaly_rates);
+                                 chart_label_key, max_anomaly_rates, timeout);
 
     free_context_param_list(&context_param_list);
 

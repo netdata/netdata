@@ -110,7 +110,7 @@ extern RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *contex
 extern RRDR *rrd2rrdr(
     RRDSET *st, long points_requested, long long after_requested, long long before_requested,
     RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
-    struct context_param *context_param_list);
+    struct context_param *context_param_list, int timeout);
 
 #include "query.h"
 

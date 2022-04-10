@@ -844,6 +844,7 @@ static RRDR *rrd2rrdr_fixedstep(
         , time_t last_entry_t
         , int absolute_period_requested
         , struct context_param *context_param_list
+        , int timeout
 ) {
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
@@ -1217,6 +1218,7 @@ static RRDR *rrd2rrdr_variablestep(
         , int absolute_period_requested
         , struct rrdeng_region_info *region_info_array
         , struct context_param *context_param_list
+        , int timeout
 ) {
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
@@ -1591,6 +1593,7 @@ RRDR *rrd2rrdr(
         , RRDR_OPTIONS options
         , const char *dimensions
         , struct context_param *context_param_list
+        , int timeout
 )
 {
     int rrd_update_every;
@@ -1644,7 +1647,7 @@ RRDR *rrd2rrdr(
             }
             return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                                       resampling_time_requested, options, dimensions, rrd_update_every,
-                                      first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
+                                      first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
         } else {
             if (rrd_update_every != (uint16_t)max_interval) {
                 rrd_update_every = (uint16_t) max_interval;
@@ -1655,11 +1658,11 @@ RRDR *rrd2rrdr(
             }
             return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
                                          resampling_time_requested, options, dimensions, rrd_update_every,
-                                         first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list);
+                                         first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list, timeout);
         }
     }
 #endif
     return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                               resampling_time_requested, options, dimensions,
-                              rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
+                              rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
 }
