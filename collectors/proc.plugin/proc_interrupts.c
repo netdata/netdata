@@ -210,7 +210,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 snprintfz(id, 50, "cpu%d_interrupts", c);
 
                 char title[100+1];
-                snprintfz(title, 100, "CPU%d Interrupts", c);
+                snprintfz(title, 100, "CPU Interrupts");
                 core_st[c] = rrdset_create_localhost(
                         "cpu"
                         , id
