@@ -47,6 +47,7 @@ typedef enum rrdr_result_flags {
     RRDR_RESULT_OPTION_RELATIVE      = 0x00000002, // the query uses relative time-frames
                                                    // (should not to be cached by browsers and proxies)
     RRDR_RESULT_OPTION_VARIABLE_STEP = 0x00000004, // the query uses variable-step time-frames
+    RRDR_RESULT_OPTION_CANCEL        = 0x00000008, // the query needs to be cancelled
 } RRDR_RESULT_FLAGS;
 
 typedef struct rrdresult {

@@ -231,6 +231,11 @@ int rrdset2anything_api_v1(
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
+    if (r->result_options & RRDR_RESULT_OPTION_CANCEL) {
+        rrdr_free(r);
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+    }
+
     if (st && st->state && st->state->is_ar_chart)
         ml_process_rrdr(r, max_anomaly_rates);
 
