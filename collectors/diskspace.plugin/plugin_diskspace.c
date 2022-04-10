@@ -284,7 +284,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
             if(unlikely(!m->st_space)) {
                 char title[4096 + 1];
-                snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mi->mount_source);
+                snprintfz(title, 4096, "Disk Space Usage");
                 m->st_space = rrdset_create_localhost(
                         "disk_space"
                         , disk
@@ -326,7 +326,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
             if(unlikely(!m->st_inodes)) {
                 char title[4096 + 1];
-                snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mi->mount_source);
+                snprintfz(title, 4096, "Disk Files (inodes) Usage");
                 m->st_inodes = rrdset_create_localhost(
                         "disk_inodes"
                         , disk
