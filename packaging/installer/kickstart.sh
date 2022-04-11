@@ -644,11 +644,17 @@ update() {
       return 0
     fi
 
+    export NETDATA_SAVE_WARNINGS=1
+    export NETDATA_PROPAGATE_WARNINGS=1
     if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
     else
-      fatal "Failed to update existing Netdata install at ${ndprefix}" F0100
+      if [ -n "${EXIT_REASON}" ]; then
+        fatal "Failed to update existing Netdata install at ${ndprefix}: ${EXIT_REASON}" "${EXIT_CODE}"
+      else
+        fatal "Failed to update existing Netdata install at ${ndprefix}." U0000
+      fi
     fi
   else
     warning "Could not find a usable copy of the updater script."
