@@ -889,6 +889,9 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     time_t last_entry_t;
     uint32_t update_every = 0;
     uint32_t dimension_update_count = 0;
+    uint32_t total_checked = 0;
+    uint32_t total_deleted= 0;
+    uint32_t total_stopped= 0;
     time_t send_status;
 
     struct retention_updated rotate_data;
@@ -944,9 +947,9 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         if (likely(!rc && first_entry_t))
             start_time = MIN(start_time, first_entry_t);
 
-        if (memory_mode == RRD_MEMORY_MODE_DBENGINE && wc->chart_updates) {
+        if (!rc && memory_mode == RRD_MEMORY_MODE_DBENGINE && wc->chart_updates && (dimension_update_count < ACLK_MAX_DIMENSION_CLEANUP)) {
             int live = ((now - last_entry_t) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * update_every));
-            if ((!live || !first_entry_t) && (dimension_update_count < ACLK_MAX_DIMENSION_CLEANUP)) {
+            if (!wc->host || !first_entry_t) {
                 (void)aclk_upd_dimension_event(
                     wc,
                     claim_id,
@@ -957,10 +960,37 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
                     first_entry_t,
                     live ? 0 : last_entry_t,
                     &send_status);
-                if (!send_status)
+
+                if (!send_status) {
+                    if (!first_entry_t) {
+                        total_deleted++;
+                        debug(
+                            D_ACLK_SYNC,
+                            "Host %s (node %s) deleting dimension id=[%s] name=[%s] chart=[%s]",
+                            wc->host_guid,
+                            wc->node_id,
+                            (const char *)sqlite3_column_text(res, 3),
+                            (const char *)(const char *)sqlite3_column_text(res, 4),
+                            (const char *)(const char *)sqlite3_column_text(res, 2));
+                    }
+                    if (last_entry_t) {
+                        total_stopped++;
+                        debug(
+                            D_ACLK_SYNC,
+                            "Host %s (node %s) stopped collecting dimension id=[%s] name=[%s] chart=[%s] %ld seconds ago at %ld",
+                            wc->host_guid,
+                            wc->node_id,
+                            (const char *)sqlite3_column_text(res, 3),
+                            (const char *)(const char *)sqlite3_column_text(res, 4),
+                            (const char *)(const char *)sqlite3_column_text(res, 2),
+                            now_realtime_sec() - last_entry_t,
+                            last_entry_t);
+                    }
                     dimension_update_count++;
+                }
             }
         }
+        total_checked++;
     }
     if (update_every) {
         debug(D_ACLK_SYNC, "Update %s for %u oldest time = %ld", wc->host_guid, update_every, start_time);
@@ -972,7 +1002,16 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         rotate_data.interval_duration_count++;
     }
 
+    char *hostname = NULL;
+    if (!wc->host)
+        hostname = get_hostname_by_node_id(wc->node_id);
+
+    log_access("ACLK STA [%s (%s)]: UPDATES %d RETENTION MESSAGE SENT. CHECKED %u DIMENSIONS.  %u DELETED, %u STOPPED COLLECTING",
+               wc->node_id, wc->host ? wc->host->hostname : hostname ? hostname : "N/A", wc->chart_updates, total_checked, total_deleted, total_stopped);
+    freez(hostname);
+
 #ifdef NETDATA_INTERNAL_CHECKS
+    info("Retention update for %s (chart updates = %d)", wc->host_guid, wc->chart_updates);
     for (int i = 0; i < rotate_data.interval_duration_count; ++i)
         info(
             "Update for host %s (node %s) for %u Retention = %u",
