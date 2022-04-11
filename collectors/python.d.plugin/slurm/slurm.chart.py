@@ -5,7 +5,7 @@
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-SQUEUE_COMMAND = "squeue -o %all"
+SQUEUE_COMMAND = "squeue -O state"
 
 ORDER = [
     "slurmjobs",
