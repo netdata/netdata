@@ -105,11 +105,15 @@ telemetry_event() {
   fi
 
   if [ -z "${HOST_NAME}" ] || [ -z "${HOST_VERSION}" ] || [ -z "${HOST_ID}" ]; then
-    if [ -f "/etc/lsb-release" ]; then
+    lsb_release="/etc/lsb-release"
+    if [ -f "/etc/upstream-release/lsb-release" ]
+    then lsb_release="/etc/upstream-release/lsb-release"
+    fi
+    if [ -f "${lsb_release}" ]; then
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" < /etc/lsb-release)"
+      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" < "${lsb_release}")"
       if [ -z "${HOST_NAME}" ]; then HOST_NAME="${DISTRIB_ID}"; fi
       if [ -z "${HOST_VERSION}" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
       if [ -z "${HOST_ID}" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
@@ -406,6 +410,13 @@ get_system_info() {
       if [ -n "${os_release_file}" ]; then
         # shellcheck disable=SC1090
         . "${os_release_file}"
+
+	if [ -n "$ID_LIKE" ]
+	then ID="$ID_LIKE"
+	fi
+	if [ -n "$UBUNTU_CODENAME" ]
+	then VERSION_CODENAME="$UBUNTU_CODENAME"
+	fi
 
         DISTRO="${ID}"
         SYSVERSION="${VERSION_ID}"

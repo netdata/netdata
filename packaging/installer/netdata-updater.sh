@@ -454,6 +454,9 @@ update_binpkg() {
   . "${os_release_file}"
 
   DISTRO="${ID}"
+  if [ -n "$ID_LIKE" ]
+  then DISTRO="$ID_LIKE"
+  fi
 
   supported_compat_names="debian ubuntu centos fedora opensuse"
 
