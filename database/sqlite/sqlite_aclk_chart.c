@@ -610,6 +610,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
                 RRDDIM *rd;
                 rrddim_foreach_read(rd, st)
                 {
+                    rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
                     rd->state->aclk_live_status = (rd->state->aclk_live_status == 0);
                 }
                 rrdset_unlock(st);
