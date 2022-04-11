@@ -344,7 +344,8 @@ cleanup() {
 deferred_warnings() {
   if [ -n "${WARNINGS}" ]; then
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
-    printf >&2 "%s\n\n" "${WARNINGS}"
+    echo >&2 "${WARNINGS}"
+    printf >&2 "\n"
   fi
 }
 
@@ -416,7 +417,7 @@ run() {
   if [ ${ret} -ne 0 ]; then
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
-    WARNINGS="${WARNINGS}\n- Command \"${*}\" failed with exit code ${ret}."
+    WARNINGS="${WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
   else
     printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
@@ -427,7 +428,7 @@ run() {
 
 warning() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
-  WARNINGS="${WARNINGS}\n- ${*}"
+  WARNINGS="${WARNINGS}\n  - ${*}"
 }
 
 _cannot_use_tmpdir() {
