@@ -201,7 +201,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 snprintfz(id, 50, "cpu%d_softirqs", c);
 
                 char title[100 + 1];
-                snprintfz(title, 100, "CPU%d softirqs", c);
+                snprintfz(title, 100, "CPU softirqs");
 
                 core_st[c] = rrdset_create_localhost(
                         "cpu"

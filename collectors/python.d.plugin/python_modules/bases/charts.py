@@ -23,7 +23,7 @@ DIMENSION_SET = "SET '{id}' = {value}\n"
 
 CHART_VARIABLE_SET = "VARIABLE CHART '{id}' = {value}\n"
 
-RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time for {job_name}' 'ms' 'python.d' " \
+RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time' 'ms' 'python.d' " \
                        "netdata.pythond_runtime line 145000 {update_every} '' 'python.d.plugin' '{module_name}'\n" \
                        "DIMENSION run_time 'run time' absolute 1 1\n"
 

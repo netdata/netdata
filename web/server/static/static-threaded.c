@@ -331,7 +331,7 @@ static void web_server_tmr_callback(void *timer_data) {
         char title[100 + 1];
 
         snprintfz(id, 100, "web_thread%d_cpu", worker_private->id + 1);
-        snprintfz(title, 100, "Netdata web server thread No %d CPU usage", worker_private->id + 1);
+        snprintfz(title, 100, "Netdata web server thread CPU usage");
 
         st = rrdset_create_localhost(
                 "netdata"
