@@ -59,6 +59,53 @@ else
   INTERACTIVE=1
 fi
 
+main() {
+  if [ "${ACTION}" = "uninstall" ]; then
+    uninstall
+    cleanup
+    trap - EXIT
+    exit 0
+  fi
+
+  if [ "${ACTION}" = "reinstall-clean" ]; then
+    NEW_INSTALL_PREFIX="${INSTALL_PREFIX}"
+    uninstall
+    cleanup
+
+    ACTION=
+    INSTALL_PREFIX="${NEW_INSTALL_PREFIX}"
+    # shellcheck disable=SC2086
+    main
+
+    trap - EXIT
+    exit 0
+  fi
+
+  tmpdir="$(create_tmp_directory)"
+  progress "Using ${tmpdir} as a temporary directory."
+  cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
+
+  case "${SYSTYPE}" in
+    Linux) install_on_linux ;;
+    Darwin) install_on_macos ;;
+    FreeBSD) install_on_freebsd ;;
+  esac
+
+  if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+    claim
+  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
+    soft_disable_cloud
+  fi
+
+  set_auto_updates
+
+  printf >&2 "%s\n\n" "Successfully installed the Netdata Agent."
+  success_banner
+  telemetry_event INSTALL_SUCCESS "" ""
+  cleanup
+  trap - EXIT
+}
+
 # ======================================================================
 # Usage info
 
@@ -85,12 +132,14 @@ USAGE: kickstart.sh [options]
   --disable-cloud            Disable support for Netdata Cloud (default: detect)
   --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
   --install <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
+  --old-install-prefix <path>       Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
   --claim-token              Use a specified token for claiming to Netdata Cloud.
   --claim-rooms              When claiming, add the node to the specified rooms.
   --claim-only               If there is an existing install, only try to claim it, not update it.
   --claim-*                  Specify other options for the claiming script.
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
   --uninstall                Uninstall an existing installation of Netdata.
+  --reinstall-clean          Clean reinstall Netdata.
 
 Additionally, this script may use the following environment variables:
 
@@ -602,7 +651,11 @@ uninstall() {
   get_system_info
   detect_existing_install
 
-  export INSTALL_PREFIX="${ndprefix}"
+  if [ -n "${OLD_INSTALL_PREFIX}" ]; then
+    INSTALL_PREFIX="$(echo "${OLD_INSTALL_PREFIX}/" | sed 's/$/netdata/g')"
+  else
+    INSTALL_PREFIX="${ndprefix}"
+  fi
 
   uninstaller="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh"
   uninstaller_url="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh"
@@ -1654,8 +1707,15 @@ while [ -n "${1}" ]; do
       INSTALL_PREFIX="${2}"
       shift 1
       ;;
+    "--old-install-prefix")
+      OLD_INSTALL_PREFIX="${2}"
+      shift 1
+      ;;
     "--uninstall")
       ACTION="uninstall"
+      ;;
+    "--reinstall-clean")
+      ACTION="reinstall-clean"
       ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1
@@ -1715,36 +1775,8 @@ confirm_root_support
 get_system_info
 confirm_install_prefix
 
-tmpdir="$(create_tmp_directory)"
-progress "Using ${tmpdir} as a temporary directory."
-cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
-
-if [ "${ACTION}" = "uninstall" ]; then
-  uninstall
-  printf >&2 "Finished uninstalling the Netdata Agent."
-  cleanup
-  trap - EXIT
-  exit 0
+if [ -z "${ACTION}" ]; then
+  handle_existing_install
 fi
 
-handle_existing_install
-
-case "${SYSTYPE}" in
-  Linux) install_on_linux ;;
-  Darwin) install_on_macos ;;
-  FreeBSD) install_on_freebsd ;;
-esac
-
-if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-  claim
-elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
-  soft_disable_cloud
-fi
-
-set_auto_updates
-
-printf >&2 "%s\n\n" "Successfully installed the Netdata Agent."
-success_banner
-telemetry_event INSTALL_SUCCESS "" ""
-cleanup
-trap - EXIT
+main
