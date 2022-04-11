@@ -611,7 +611,7 @@ netdataDashboard.menu = {
     'filesystem': {
         title: 'Filesystem',
         icon: '<i class="fas fa-hdd"></i>',
-        info: 'Number of filesystem events for <a href="#menu_filesystem_submenu_vfs">Virtual File System</a>, <a href="#menu_filesystem_submenu_file_access">File Access</a>, <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Directory cache</a>, and file system latency (<a href="#menu_filesystem_submenu_btrfs_latency">BTRFS</a>, <a href="#menu_filesystem_submenu_ext4_latency">EXT4</a>, <a href="#menu_filesystem_submenu_nfs_latency">NFS</a>, <a href="#menu_filesystem_submenu_xfs_latency">XFS</a>, and <a href="#menu_filesystem_submenu_xfs_latency">ZFS</a>) when your disk has the file system. Filesystem charts have relationship with <a href="#menu_system_submenu_swap">SWAP</a>, <a href="#menu_disk">Disk</a>, and <a href="#menu_mount">Mount Points</a>.'
+        info: 'Number of filesystem events for <a href="#menu_filesystem_submenu_vfs">Virtual File System</a>, <a href="#menu_filesystem_submenu_file_access">File Access</a>, <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Directory cache</a>, and file system latency (<a href="#menu_filesystem_submenu_btrfs_latency">BTRFS</a>, <a href="#menu_filesystem_submenu_ext4_latency">EXT4</a>, <a href="#menu_filesystem_submenu_nfs_latency">NFS</a>, <a href="#menu_filesystem_submenu_xfs_latency">XFS</a>, and <a href="#menu_filesystem_submenu_xfs_latency">ZFS</a>) when your disk has the file system. Filesystem charts have relationship with <a href="#menu_system_submenu_swap">SWAP</a>, <a href="#menu_disk">Disk</a>, <a href="#menu_mem_submenu_synchronization__eBPF_">Sync</a>, and <a href="#menu_mount">Mount Points</a>.'
     },
 
     'vernemq': {
@@ -929,7 +929,7 @@ netdataDashboard.submenu = {
 
     'mem.page_cache': {
         title: 'page cache (eBPF)',
-        info: 'Monitor calls to functions used to manipulate <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows page cache manipulation per <a href="#menu_apps_submenu_page_cache">application</a>.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#memory" target="_blank">functions</a> used to manipulate the <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. This chart has a relationship with <a href="#menu_filesystem">File Systems</a>, <a href="#menu_mem_submenu_synchronization__eBPF_">Sync</a>, and <a href="#menu_disk">Hard Disk</a>.'
     },
 
     'apps.page_cache': {
@@ -1066,8 +1066,9 @@ netdataDashboard.submenu = {
     'netdata.ebpf': {
         title: 'eBPF.plugin',
         info: 'eBPF (extended Berkeley Packet Filter) is used to collect metrics from inside Linux kernel giving a zoom inside your <a href="#ebpf_system_process_thread">Process</a>, '+
-              '<a href="#menu_disk">Hard Disk</a>, <a href="#menu_filesystem">Filesystems</a> (<a href="#menu_filesystem_submenu_file_access">File Access</a>, and ' +
-              '<a href="#menu_filesystem_submenu_directory_cache__eBPF_">Directory Cache</a>).'
+              '<a href="#menu_disk">Hard Disk</a>, <a href="#menu_filesystem">File systems</a> (<a href="#menu_filesystem_submenu_file_access">File Access</a>, and ' +
+              '<a href="#menu_filesystem_submenu_directory_cache__eBPF_">Directory Cache</a>), Memory (<a href="#ebpf_global_swap">Swap I/O</a>, <a href="#menu_mem_submenu_page_cache">Page Cache</a>), ' +
+              'Syscalls (<a href="#menu_mem_submenu_synchronization__eBPF_">Sync</a>, <a href="#menu_mount_submenu_mount__eBPF_">Mount</a>), and Network.'
     },
 };
 
@@ -1230,6 +1231,24 @@ const ebpfVFSCreate = 'Number of calls to <a href="https://learn.netdata.cloud/d
 const ebpfVFSCreateError = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">VFS creator function</a>. Netdata gives a summary for this chart in ' +
     '<a href="#ebpf_global_vfs_create_error">Virtual File System</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows virtual file system per <a href="#ebpf_apps_vfs_create_error">application</a>.' + ebpfChartProvides
+const ebpfSwapRead = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap" target="_blank">swap reader function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_swap">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows swap per <a href="#ebpf_apps_swap_read">application</a>.' + ebpfChartProvides
+const ebpfSwapWrite = 'Number of failed calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap" target="_blank">swap writer function</a>. Netdata gives a summary for this chart in ' +
+    '<a href="#ebpf_global_swap">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows swap per <a href="#ebpf_apps_swap_write">application</a>.' + ebpfChartProvides
+const ebpfCachestatRatio = 'The <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-ratio" target="_blank">ratio</a> shows the percentage of data accessed directly in memory. ' +
+    'Netdata gives a summary for this chart in <a href="#menu_mem_submenu_page_cache">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows page cache hit per <a href="#ebpf_apps_cachestat_ratio">application</a>.' + ebpfChartProvides
+const ebpfCachestatDirties = 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#dirty-pages" target="_blank">modified pages</a> in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_dirty">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows page cache hit per <a href="#ebpf_apps_cachestat_dirties">application</a>.' + ebpfChartProvides
+const ebpfCachestatHits = 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-hits" target="_blank">access</a> to data in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_hits">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows page cache hit per <a href="#ebpf_apps_cachestat_hits">application</a>.' + ebpfChartProvides
+const ebpfCachestatMisses = 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-misses" target="_blank">access</a> to data was not present in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_misses">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows page cache misses per <a href="#ebpf_apps_cachestat_misses">application</a>.' + ebpfChartProvides
 
 netdataDashboard.context = {
     'system.cpu': {
@@ -1436,7 +1455,7 @@ netdataDashboard.context = {
     },
 
     'system.swapcalls': {
-        info: 'Monitor calls to functions <code>swap_readpage</code> and <code>swap_writepage</code>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows swap access per <a href="#menu_apps_submenu_swap">application</a>.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap" target="_blank">functions</a> used to manipulate swap data. Netdata shows swap metrics per <a href="#ebpf_apps_swap_read">application</a> and <a href="#ebpf_services_swap_read">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_swap"></div>'
     },
 
     'system.ipc_semaphores': {
@@ -1699,35 +1718,35 @@ netdataDashboard.context = {
     },
 
     'mem.cachestat_ratio': {
-        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. If the entry is not there, a page cache miss has occurred and the kernel allocates a new entry and copies in data from the disk. Netdata calculates the percentage of accessed files that are cached on memory. <a href="https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138" target="_blank">The ratio</a> is calculated counting the accessed cached pages (without counting dirty pages and pages added because of read misses) divided by total access without dirty pages.'
+        info: 'The <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-ratio" target="_blank">ratio</a> shows the percentage of data accessed directly in memory. Netdata shows the ratio per <a href="#ebpf_apps_cachestat_ratio">application</a> and <a href="#ebpf_services_cachestat_ratio">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides
     },
 
     'mem.cachestat_dirties': {
-        info: 'Number of <a href="https://en.wikipedia.org/wiki/Page_cache#Memory_conservation" target="_blank">dirty(modified) pages</a> cache. Pages in the page cache modified after being brought in are called dirty pages. Since non-dirty pages in the page cache have identical copies in <a href="https://en.wikipedia.org/wiki/Secondary_storage" target="_blank">secondary storage</a> (e.g. hard disk drive or solid-state drive), discarding and reusing their space is much quicker than paging out application memory, and is often preferred over flushing the dirty pages into secondary storage and reusing their space.'
+        info: 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#dirty-pages" target="_blank">modified pages</a> in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. Netdata shows the dity page <a href="#ebpf_apps_cachestat_dirties">application</a> and <a href="#ebpf_services_cachestat_dirties">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_cachestat_dirty"></div>'
     },
 
     'mem.cachestat_hits': {
-        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. Hits show pages accessed that were not modified (we are excluding dirty pages), this counting also excludes the recent pages inserted for read.'
+        info: 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-hits" target="_blank">access</a> to data in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. Netdata shows the hits per <a href="#ebpf_apps_cachestat_hits">application</a> and <a href="#ebpf_services_cachestat_hits">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_cachestat_hits"></div>'
     },
 
     'mem.cachestat_misses': {
-        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is not there, a page cache miss has occurred and the cache allocates a new entry and copies in data for the main memory. Misses count page insertions to the memory not related to writing.'
+        info: 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-misses" target="_blank">access</a> to data that was not present in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. Netdata shows the missed access per <a href="#ebpf_apps_cachestat_misses">application</a> and <a href="#ebpf_services_cachestat_misses">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_cachestat_misses"></div>'
     },
 
     'mem.sync': {
-        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/sync.2.html" target="_blank">sync() and syncfs()</a> which flush the file system buffers to storage devices. Performance perturbations might be caused by these calls. The <code>sync()</code> calls are based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/syncsnoop.py" target="_blank">syncsnoop</a> from BCC tools.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-system-sync" target="_blank">syscalls</a> that sync filesystem metadata or cached. This chart has a relationship with <a href="#menu_filesystem">File systems</a> and Linux <a href="#menu_mem_submenu_page_cache">Page Cache</a>.' + ebpfChartProvides
     },
 
     'mem.file_sync': {
-        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/fsync.2.html" target="_blank">fsync() and fdatasync()</a> transfer all modified page caches for the files on disk devices. These calls block until the device reports that the transfer has been completed.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-sync" target="_blank">syscalls</a> responsible to transfer modified Linux page cache to disk. This chart has a relationship with <a href="#menu_filesystem">File systems</a> and Linux <a href="#menu_mem_submenu_page_cache">Page Cache</a>.' + ebpfChartProvides
     },
 
     'mem.memory_map': {
-        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/msync.2.html" target="_blank">msync()</a> which flushes changes made to the in-core copy of a file that was mapped.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#memory-map-sync" target="_blank">syscall</a> responsible to the in-core copy of a file that was mapped. This chart has a relationship with <a href="#menu_filesystem">File systems</a> and Linux <a href="#menu_mem_submenu_page_cache">Page Cache</a>.' + ebpfChartProvides
     },
 
     'mem.file_segment': {
-        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/sync_file_range.2.html" target="_blank">sync_file_range()</a> permits fine control when synchronizing the open file referred to by the file descriptor fd with disk. This system call is extremely dangerous and should not be used in portable programs.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-range-sync" target="_blank">syscall</a> responsible to sync file segments. This chart has a relationship with <a href="#menu_filesystem">File systems</a> and Linux <a href="#menu_mem_submenu_page_cache">Page Cache</a>.' + ebpfChartProvides
     },
 
     'filesystem.dc_hit_ratio': {
@@ -2834,6 +2853,22 @@ netdataDashboard.context = {
         info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
     },
 
+    'apps.cachestat_ratio' : {
+        info: 'The <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-ratio" target="_blank">ratio</a> shows the percentage of data accessed directly in memory. Netdata gives a summary for this chart in <a href="#menu_mem_submenu_page_cache">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows page cache hit per <a href="#ebpf_services_cachestat_ratio">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_cachestat_ratio"></div>'
+    },
+
+    'apps.cachestat_dirties' : {
+        info: 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#dirty-pages" target="_blank">modified pages</a> in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_dirty">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows page cache hit per <a href="#ebpf_services_cachestat_dirties">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_cachestat_dirties"></div>'
+    },
+
+    'apps.cachestat_hits' : {
+        info: 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-hits" target="_blank">access</a> to data in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_hits">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows page cache hit per <a href="#ebpf_services_cachestat_hits">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_cachestat_hits"></div>'
+    },
+
+    'apps.cachestat_misses' : {
+        info: 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-misses" target="_blank">access</a> to data was not present in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_misses">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows page cache misses per <a href="#ebpf_services_cachestat_misses">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_cachestat_misses"></div>'
+    },
+
     'apps.dc_hit_ratio': {
         info: 'Percentage of file accesses that were present in the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#directory-cache" target="_blank">directory cache</a>. Netdata gives a summary for this chart in <a href="#ebpf_dc_hit_ratio">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_hit">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_dc_hit"></div>'
     },
@@ -2847,7 +2882,15 @@ netdataDashboard.context = {
     },
 
     'apps.dc_not_found': {
-        info: 'Number of times a file was not found on the file system. Netdata gives a summary for this chart in  <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_not_found">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_dc_not_found"></div>'
+        info: 'Number of times a file was not found on the file system. Netdata gives a summary for this chart in <a href="#ebpf_dc_reference">directory cache</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows directory cache per <a href="#ebpf_services_dc_not_found">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_dc_not_found"></div>'
+    },
+
+    'apps.swap_read_call': {
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap">swap reader function</a>. Netdata gives a summary for this chart in <a href="#ebpf_global_swap">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows swap metrics per <a href="#ebpf_services_swap_read">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_swap_read"></div>'
+    },
+
+    'apps.swap_write_call': {
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap">swap writer function</a>. Netdata gives a summary for this chart in <a href="#ebpf_global_swap">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows swap metrics per <a href="#ebpf_services_swap_write">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_swap_write"></div>'
     },
 
     // ------------------------------------------------------------------------
@@ -4078,11 +4121,11 @@ netdataDashboard.context = {
     },
 
     'cgroup.swap_read': {
-        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory. This chart is provided by eBPF plugin.'
+        info: ebpfSwapRead
     },
 
     'cgroup.swap_write': {
-        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory. This chart is provided by eBPF plugin.'
+        info: ebpfSwapWrite
     },
 
     'cgroup.fd_open': {
@@ -4177,18 +4220,6 @@ netdataDashboard.context = {
         info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>. Netdata also gives a summary for these charts in <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Filesystem submenu</a>.'
     },
 
-    'cgroup.dc_reference': {
-        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
-    },
-
-    'cgroup.dc_not_cache': {
-        info: 'Counters of file accesses. <code>Slow</code> is when there is a file access and the file is not present in the directory cache, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
-    },
-
-    'cgroup.dc_not_found': {
-        info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
-    },
-
     'cgroup.shmget': {
         info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
     },
@@ -4233,20 +4264,36 @@ netdataDashboard.context = {
         info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
     },
 
-    'cgroup.cachestat_ratio': {
+    'cgroup.dc_hit_ratio': {
         info: ebpfDCHit
     },
 
-    'cgroup.cachestat_dirties': {
+    'cgroup.dc_reference': {
         info: ebpfDCReference
     },
 
-    'cgroup.cachestat_hits': {
+    'cgroup.dc_not_cache': {
         info: ebpfDCNotCache
     },
 
-    'cgroup.cachestat_misses': {
+    'cgroup.dc_not_found': {
         info: ebpfDCNotFound
+    },
+
+    'cgroup.cachestat_ratio': {
+        info: ebpfCachestatRatio
+    },
+
+    'cgroup.cachestat_dirties': {
+        info: ebpfCachestatDirties
+    },
+
+    'cgroup.cachestat_hits': {
+        info: ebpfCachestatHits
+    },
+
+    'cgroup.cachestat_misses': {
+        info: ebpfCachestatMisses
     },
 
     // ------------------------------------------------------------------------
@@ -4368,11 +4415,11 @@ netdataDashboard.context = {
     },
 
     'services.swap_read': {
-        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory. This chart is provided by eBPF plugin.'
+        info: ebpfSwapRead + '<div id="ebpf_services_swap_read"></div>'
     },
 
     'services.swap_write': {
-        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory. This chart is provided by eBPF plugin.'
+        info: ebpfSwapWrite + '<div id="ebpf_services_swap_write"></div>'
     },
 
     'services.fd_open': {
@@ -4463,20 +4510,36 @@ netdataDashboard.context = {
         info: ebpfTaskError + '<div id="ebpf_services_task_error"></div>'
     },
 
-    'services.cachestat_ratio': {
+    'services.dc_hit_ratio': {
         info: ebpfDCHit + '<div id="ebpf_services_dc_hit"></div>'
     },
 
-    'services.cachestat_dirties': {
+    'services.dc_reference': {
         info: ebpfDCReference + '<div id="ebpf_services_dc_reference"></div>'
     },
 
-    'services.cachestat_hits': {
+    'services.dc_not_cache': {
         info: ebpfDCNotCache + '<div id="ebpf_services_dc_not_cache"></div>'
     },
 
-    'services.cachestat_misses': {
+    'services.dc_not_found': {
         info: ebpfDCNotFound + '<div id="ebpf_services_dc_not_found"></div>'
+    },
+
+    'services.cachestat_ratio': {
+        info: ebpfCachestatRatio + '<div id="ebpf_services_cachestat_ratio"></div>'
+    },
+
+    'services.cachestat_dirties': {
+        info: ebpfCachestatDirties + '<div id="ebpf_services_cachestat_dirties"></div>'
+    },
+
+    'services.cachestat_hits': {
+        info: ebpfCachestatHits + '<div id="ebpf_services_cachestat_hits"></div>'
+    },
+
+    'services.cachestat_misses': {
+        info: ebpfCachestatMisses + '<div id="ebpf_services_cachestat_misses"></div>'
     },
 
     'services.shmget': {
@@ -6069,11 +6132,11 @@ netdataDashboard.context = {
     },
 
     'mount_points.call': {
-        info: 'Monitor calls to syscalls <code>mount(2)</code> and <code>umount(2)</code> that are responsible for attaching or removing filesystems.'
+        info: 'Monitor calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#mount-points" target="_blank">syscalls</a> that are responsible for attaching (<code>mount(2)</code>) or removing filesystems (<code>umount(2)</code>). This chart has relationship with <a href="#menu_filesystem">File systems</a>.' + ebpfChartProvides
     },
 
     'mount_points.error': {
-        info: 'Monitor errors in calls to syscalls <code>mount(2)</code> and <code>umount(2)</code>.'
+        info: 'Monitor errors in calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#mount-points" target="_blank">syscalls</a> that are responsible for attaching (<code>mount(2)</code>) or removing filesystems (<code>umount(2)</code>). This chart has relationship with <a href="#menu_filesystem">File systems</a>.' + ebpfChartProvides
     },
 
     'filesystem.file_descriptor': {
@@ -6090,14 +6153,6 @@ netdataDashboard.context = {
 
     // ------------------------------------------------------------------------
     // eBPF
-
-    'apps.swap_read_call': {
-        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_swap">System overview</a>.'
-    },
-
-    'apps.swap_write_call': {
-        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory.'
-    },
 
     'apps.shmget_call': {
         info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
