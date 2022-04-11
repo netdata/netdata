@@ -22,20 +22,20 @@ sql_queue_chart_payload(struct aclk_database_worker_config *wc, void *data, enum
     return rc;
 }
 
-static int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size)
+static time_t payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc;
-    int send_status = 0;
+    time_t send_status = 0;
 
     if (unlikely(!res)) {
         char sql[ACLK_SYNC_QUERY_SIZE];
-        snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "SELECT 1 FROM aclk_chart_latest_%s acl, aclk_chart_payload_%s acp "
-                            "WHERE acl.unique_id = acp.unique_id AND acl.uuid = @uuid AND acp.payload = @payload;",
-                       uuid_str, uuid_str);
+        snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "SELECT acl.date_submitted FROM aclk_chart_latest_%s acl, aclk_chart_payload_%s acp "
+            "WHERE acl.unique_id = acp.unique_id AND acl.uuid = @uuid AND acp.payload = @payload;",
+                  uuid_str, uuid_str);
         rc = prepare_statement(db_meta, sql, &res);
         if (rc != SQLITE_OK) {
-            error_report("Failed to prepare statement to check payload data");
+            error_report("Failed to prepare statement to check payload data on %s", sql);
             return 0;
         }
     }
@@ -49,7 +49,7 @@ static int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payl
         goto bind_fail;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        send_status = sqlite3_column_int(res, 0);
+        send_status = (time_t) sqlite3_column_int64(res, 0);
     }
 
 bind_fail:
@@ -59,22 +59,23 @@ bind_fail:
 }
 
 static int aclk_add_chart_payload(struct aclk_database_worker_config *wc, uuid_t *uuid, char *claim_id,
-                                 ACLK_PAYLOAD_TYPE payload_type, void *payload, size_t payload_size, int *send_status)
+                                  ACLK_PAYLOAD_TYPE payload_type, void *payload, size_t payload_size, time_t *send_status)
 {
     static __thread sqlite3_stmt *res_chart = NULL;
     int rc;
+    time_t date_submitted;
 
-    rc = payload_sent(wc->uuid_str, uuid, payload, payload_size);
+    date_submitted = payload_sent(wc->uuid_str, uuid, payload, payload_size);
     if (send_status)
-        *send_status = rc;
-    if (rc == 1)
+        *send_status = date_submitted;
+    if (date_submitted)
         return 0;
 
     if (unlikely(!res_chart)) {
         char sql[ACLK_SYNC_QUERY_SIZE];
         snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,
-            "INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
-            "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s','now'), @type, @payload);", wc->uuid_str);
+                  "INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
+                  "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s','now'), @type, @payload);", wc->uuid_str);
         rc = prepare_statement(db_meta, sql, &res_chart);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to store chart payload data");
@@ -168,7 +169,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
 
 static inline int aclk_upd_dimension_event(struct aclk_database_worker_config *wc, char *claim_id, uuid_t *dim_uuid,
         const char *dim_id, const char *dim_name, const char *chart_type_id, time_t first_time, time_t last_time,
-        int *send_status)
+        time_t *send_status)
 {
     int rc = 0;
     size_t size;
@@ -279,7 +280,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
     RRDDIM *rd = cmd.data;
 
     if (likely(claim_id)) {
-        int send_status = 0;
+        time_t send_status = 0;
         time_t now = now_realtime_sec();
 
         time_t first_t = rd->state->query_ops.oldest_time(rd);
@@ -887,7 +888,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     time_t last_entry_t;
     uint32_t update_every = 0;
     uint32_t dimension_update_count = 0;
-    int send_status;
+    time_t send_status;
 
     struct retention_updated rotate_data;
 
