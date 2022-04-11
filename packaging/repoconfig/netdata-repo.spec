@@ -19,7 +19,7 @@ Source7:        netdata-edge.repo.ol
 
 BuildArch:      noarch
 
-%if 0%{?centos_ver} < 8
+%if 0%{?centos_ver} && 0%{?centos_ver} < 8
 Requires:       yum-plugin-priorities
 %endif
 
