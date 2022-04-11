@@ -1309,15 +1309,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
             host = sql_create_host_by_uuid(tok);
             if (likely(host)) {
                 int rc = web_client_process_url(host, w, url);
-                freez(host->hostname);
-                freez((char *)host->os);
-                freez((char *)host->tags);
-                freez((char *)host->timezone);
-                freez(host->program_name);
-                freez(host->program_version);
-                freez(host->registry_hostname);
-                freez(host->system_info);
-                freez(host);
+                free_temporary_host(host);
                 return rc;
             }
         }

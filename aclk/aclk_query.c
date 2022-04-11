@@ -155,17 +155,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
 
     // execute the query
     t = aclk_web_api_v1_request(query_host ? query_host : temp_host, w, mysep ? mysep + 1 : "noop");
-    if (unlikely(temp_host)) {
-        freez(temp_host->hostname);
-        freez((char *)temp_host->os);
-        freez((char *)temp_host->tags);
-        freez((char *)temp_host->timezone);
-        freez(temp_host->program_name);
-        freez(temp_host->program_version);
-        freez(temp_host->registry_hostname);
-        freez(temp_host->system_info);
-        freez(temp_host);
-    }
+    free_temporary_host(temp_host);
     size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
     sent = size;
 

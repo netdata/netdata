@@ -1160,6 +1160,21 @@ failed:
     return;
 }
 
+void free_temporary_host(RRDHOST *host)
+{
+    if (host) {
+        freez(host->hostname);
+        freez((char *)host->os);
+        freez((char *)host->tags);
+        freez((char *)host->timezone);
+        freez(host->program_name);
+        freez(host->program_version);
+        freez(host->registry_hostname);
+        freez(host->system_info);
+        freez(host);
+    }
+}
+
 #define SELECT_HOST "select host_id, registry_hostname, update_every, os, timezone, tags from host where hostname = @hostname order by rowid desc;"
 #define SELECT_HOST_BY_UUID "select h.host_id, h.registry_hostname, h.update_every, h.os, h.timezone, h.tags from host h, node_instance ni " \
     "where (ni.host_id = @host_id or ni.node_id = @host_id) AND ni.host_id = h.host_id;"
