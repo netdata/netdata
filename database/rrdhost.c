@@ -1488,9 +1488,8 @@ restart_after_removal:
                             continue;
                         }
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-                        else {
+                        else
                             queue_dimension_to_aclk(rd);
-                        }
 #endif
                     }
                     last = rd;

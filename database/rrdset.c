@@ -1834,7 +1834,7 @@ after_second_database_work:
                 int live =
                     ((mark - rd->last_collected_time.tv_sec) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every);
                 if (unlikely(live != rd->state->aclk_live_status))
-                        (void)queue_dimension_to_aclk(rd);
+                    queue_dimension_to_aclk(rd);
             }
         }
 #endif
