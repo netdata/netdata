@@ -6,9 +6,7 @@ sidebar_label: "Slurm Queue"
 
 # Slurm queue monitoring with Netdata
 
-Monitors slurm queue statistics using the squeue tool.  
-
-Executes `squeue` to grab information from the slurm queue.
+Monitors slurm queue statistics using the [`squeue`](https://slurm.schedmd.com/squeue.html) tool. Currently, only the number of pending and running jobs are collected.
 
 ## Configuring slurm
 
