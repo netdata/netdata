@@ -12,7 +12,7 @@ Execute `squeue` to grab information from the slurm queue.
 
 ## Configuring slurm
 
-Slurm monitoring is enabled by default. 
+Slurm monitoring is disabled by default. 
 
 ## Metrics and Alerts produced by this collector
 
