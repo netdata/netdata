@@ -5,6 +5,8 @@ on:
     paths:
       - 'CMakeLists.txt'
       - '**.c'
+      - '**.cc'
+      - '**.cpp'
       - '**.h'
       - 'mqtt_websockets/**'
       - 'aclk/aclk-schemas/**'
@@ -13,6 +15,8 @@ on:
     paths:
       - 'CMakeLists.txt'
       - '**.c'
+      - '**.cc'
+      - '**.cpp'
       - '**.h'
       - 'mqtt_websockets/**'
       - 'aclk/aclk-schemas/**'
