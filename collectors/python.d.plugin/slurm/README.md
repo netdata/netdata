@@ -10,14 +10,12 @@ Monitors slurm queue statistics using the squeue tool.
 
 Execute `squeue` to grab information from the slurm queue.
 
-It produces only a single chart:
+## Configuring slurm
 
-1.  **Slurm Queue**
+Slurm monitoring is enabled by default. 
 
-    -   jobs
+## Metrics and Alerts produced by this collector
 
-Configuration is not needed.
-
----
-
-
+| Chart      | Metrics     | Alert                    |
+| ---------- | ----------- | ------------------------ |
+| Slurm Queue | jobs | Triggers no alert |
