@@ -170,6 +170,24 @@ paths:
             type: number
             format: integer
             default: 20
+        - name: chart_label_key
+          in: query
+          description: Specify the chart label keys that need to match for context queries as comma separated values.
+                At least one matching key is needed to match the corresponding chart.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+            format: key1,key2,key3
+        - name: chart_labels_filter
+          in: query
+          description: Specify the chart label keys and values to match for context queries. All keys/values need to 
+              match for the chart to be included in the query. The labels are specified as key1:value1,key2:value2
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+            format: key1:value1,key2:value2,key3:value3
         - name: group
           in: query
           description: The grouping method. If multiple collected values are to be grouped
