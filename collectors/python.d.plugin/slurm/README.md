@@ -10,19 +10,27 @@ Monitors slurm queue statistics using the [`squeue`](https://slurm.schedmd.com/s
 
 ## Configuring slurm
 
-Slurm monitoring is disabled by default. 
+Slurm monitoring is disabled by default. It may be enabled by modifying [../python.d.conf](../python.d.conf) from
+
+```yaml
+slurm: no
+```
+
+to
+
+```yaml
+slurm: yes
+```
 
 ### Example
 
+As of now, the slurm plugin only has the default options, cf. [../README.md](../README.md).
+For instance, you can increase the collection frequency from 10 seconds (the default) to 1 second by
+
 ```yaml
-# job_name:
-#     name: myname            # the JOB's name as it will appear at the
-#                             # dashboard (by default is the job_name)
-#                             # JOBs sharing a name are mutually exclusive
-#     update_every: 1         # the JOB's data collection frequency
-#     priority: 60000         # the JOB's order on the dashboard
-#     penalty: yes            # the JOB's penalty
-#     autodetection_retry: 0  # the JOB's re-check interval in seconds
+squeue:
+    name: "Slurm Queue"     # the JOB's name as it will appear on the dashboard
+    update_every: 1         # the JOB's data collection frequency (in seconds)
 ```
 
 ## Metrics and Alerts produced by this collector
