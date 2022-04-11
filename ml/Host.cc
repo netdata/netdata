@@ -20,11 +20,10 @@ static void updateDimensionsChart(RRDHOST *RH,
     static thread_local RRDDIM *NumAnomalousDimensionsRD = nullptr;
 
     if (!RS) {
-        std::stringstream IdSS, NameSS, TitleSS;
+        std::stringstream IdSS, NameSS;
 
         IdSS << "dimensions_on_" << localhost->machine_guid;
         NameSS << "dimensions_on_" << localhost->hostname;
-        TitleSS << "Anomaly detection dimensions for host " << RH->hostname;
 
         RS = rrdset_create(
             RH,
@@ -33,7 +32,7 @@ static void updateDimensionsChart(RRDHOST *RH,
             NameSS.str().c_str(), // name
             "dimensions", // family
             "anomaly_detection.dimensions", // ctx
-            TitleSS.str().c_str(), // title
+            "Anomaly detection dimensions", // title
             "dimensions", // units
             "netdata", // plugin
             "ml", // module
@@ -67,11 +66,10 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
     static thread_local RRDDIM *AnomalyRateRD = nullptr;
 
     if (!RS) {
-        std::stringstream IdSS, NameSS, TitleSS;
+        std::stringstream IdSS, NameSS;
 
         IdSS << "anomaly_rate_on_" << localhost->machine_guid;
         NameSS << "anomaly_rate_on_" << localhost->hostname;
-        TitleSS << "Percentage of anomalous dimensions for host " << RH->hostname;
 
         RS = rrdset_create(
             RH,
@@ -80,7 +78,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
             NameSS.str().c_str(), // name
             "anomaly_rate", // family
             "anomaly_detection.anomaly_rate", // ctx
-            TitleSS.str().c_str(), // title
+            "Percentage of anomalous dimensions", // title
             "percentage", // units
             "netdata", // plugin
             "ml", // module
@@ -105,11 +103,10 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
     static thread_local RRDDIM *WindowLengthRD = nullptr;
 
     if (!RS) {
-        std::stringstream IdSS, NameSS, TitleSS;
+        std::stringstream IdSS, NameSS;
 
         IdSS << "detector_window_on_" << localhost->machine_guid;
         NameSS << "detector_window_on_" << localhost->hostname;
-        TitleSS << "Anomaly detector window length for host " << RH->hostname;
 
         RS = rrdset_create(
             RH,
@@ -118,7 +115,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
             NameSS.str().c_str(), // name
             "detector_window", // family
             "anomaly_detection.detector_window", // ctx
-            TitleSS.str().c_str(), // title
+            "Anomaly detector window length", // title
             "seconds", // units
             "netdata", // plugin
             "ml", // module
@@ -147,11 +144,10 @@ static void updateEventsChart(RRDHOST *RH,
     static thread_local RRDDIM *NewAnomalyEventRD = nullptr;
 
     if (!RS) {
-        std::stringstream IdSS, NameSS, TitleSS;
+        std::stringstream IdSS, NameSS;
 
         IdSS << "detector_events_on_" << localhost->machine_guid;
         NameSS << "detector_events_on_" << localhost->hostname;
-        TitleSS << "Anomaly events triggered for host " << RH->hostname;
 
         RS = rrdset_create(
             RH,
@@ -160,7 +156,7 @@ static void updateEventsChart(RRDHOST *RH,
             NameSS.str().c_str(), // name
             "detector_events", // family
             "anomaly_detection.detector_events", // ctx
-            TitleSS.str().c_str(), // title
+            "Anomaly events triggered", // title
             "boolean", // units
             "netdata", // plugin
             "ml", // module
@@ -194,11 +190,10 @@ static void updateDetectionChart(RRDHOST *RH) {
     static thread_local RRDDIM *UserRD, *SystemRD = nullptr;
 
     if (!RS) {
-        std::stringstream IdSS, NameSS, TitleSS;
+        std::stringstream IdSS, NameSS;
 
         IdSS << "prediction_stats_" << RH->machine_guid;
         NameSS << "prediction_stats_for_" << RH->hostname;
-        TitleSS << "Prediction thread CPU usage for host " << RH->hostname;
 
         RS = rrdset_create_localhost(
             "netdata", // type
@@ -206,7 +201,7 @@ static void updateDetectionChart(RRDHOST *RH) {
             NameSS.str().c_str(), // name
             "ml", // family
             "netdata.prediction_stats", // ctx
-            TitleSS.str().c_str(), // title
+            "Prediction thread CPU usage", // title
             "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
@@ -235,11 +230,10 @@ static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
     static thread_local RRDDIM *SystemRD = nullptr;
 
     if (!RS) {
-        std::stringstream IdSS, NameSS, TitleSS;
+        std::stringstream IdSS, NameSS;
 
         IdSS << "training_stats_" << RH->machine_guid;
         NameSS << "training_stats_for_" << RH->hostname;
-        TitleSS << "Training thread CPU usage for host " << RH->hostname;
 
         RS = rrdset_create_localhost(
             "netdata", // type
@@ -247,7 +241,7 @@ static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
             NameSS.str().c_str(), // name
             "ml", // family
             "netdata.training_stats", // ctx
-            TitleSS.str().c_str(), // title
+            "Training thread CPU usage", // title
             "milliseconds/s", // units
             "netdata", // plugin
             "ml", // module
