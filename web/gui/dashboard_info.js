@@ -690,7 +690,7 @@ netdataDashboard.menu = {
     'slurm': {
         title: 'slurm',
         icon: '<i class="fas fa-list"></i>',
-        info: undefined
+        info: 'Charts showing the status of the Slurm queue (extracted via squeue).'
     },
 };
 
