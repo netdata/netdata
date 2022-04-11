@@ -64,6 +64,9 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
     use runtime configuration to disable cloud support.
 - `--require-cloud`: Only install if Netdata Cloud can be enabled. Overrides `--disable-cloud`.
 - `--install`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
+- `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.
+- `--uninstall`: Uninstall an existing installation of Netdata.
+- `--reinstall-clean`: Performs an uninstall of Netdata and clean installation.
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):
