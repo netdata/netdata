@@ -662,7 +662,7 @@ detect_existing_install() {
       ndprefix="$(dirname "$(dirname "${ndpath}")")"
     fi
 
-    if echo "${ndprefix}" | grep -Eq '/usr$'; then
+    if echo "${ndprefix}" | grep -Eq '^/usr$'; then
       ndprefix="$(dirname "${ndprefix}")"
     fi
   fi
@@ -784,7 +784,20 @@ handle_existing_install() {
           fi
         fi
       else
-        fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed." F0103
+        if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+          progress "Attempting to claim existing install at ${ndprefix}."
+          INSTALL_PREFIX="${ndprefix}"
+          claim
+          ret=$?
+
+          cleanup
+          trap - EXIT
+          exit $ret
+        elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+          fatal "User asked to claim, but did not proide a claiming token." F0202
+        else
+          fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed." F0103
+        fi
       fi
       ;;
   esac
@@ -890,12 +903,24 @@ claim() {
   fi
 
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
-  if [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
+  if command -v netdata-claim.sh > /dev/null 2>&1; then
+    NETDATA_CLAIM_PATH="$(command -v netdata-claim.sh)"
+  elif [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
     NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
+  elif [ ! -d "${INSTALL_PREFIX}/netdata" ]; then
+    if [ -d "${INSTALL_PREFIX}/usr" ]; then
+        NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/usr/sbin/netdata-claim.sh"
+    else
+        NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/sbin/netdata-claim.sh"
+    fi
   else
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
+  fi
+
+  if [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
+    fatal "Unable to find usable claiming script." F0106
   fi
 
   if ! is_netdata_running; then
