@@ -1052,8 +1052,14 @@ void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc)
 
 int queue_dimension_to_aclk(RRDDIM *rd)
 {
+    if (rrddim_flag_check(rd, RRDDIM_FLAG_ACLK))
+        return 0;
+
+    rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
     int rc = sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker,
                                      rd, ACLK_DATABASE_ADD_DIMENSION);
+    if (unlikely(rc))
+        rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
     return rc;
 }
 
@@ -1226,13 +1232,8 @@ void sql_check_chart_liveness(RRDSET *st) {
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) {
             int live = (mark - rd->last_collected_time.tv_sec) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every;
             if (unlikely(live != rd->state->aclk_live_status)) {
-                if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-                    if (likely(!queue_dimension_to_aclk(rd))) {
-                        debug(D_ACLK_SYNC,"Dimension change [%s] on [%s] from live %d --> %d", rd->id, rd->rrdset->name, rd->state->aclk_live_status, live);
-                        rd->state->aclk_live_status = live;
-                        rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
-                    }
-                }
+                debug(D_ACLK_SYNC,"Dimension change [%s] on [%s] from live %d --> %d", rd->id, rd->rrdset->name, rd->state->aclk_live_status, live);
+                (void) queue_dimension_to_aclk(rd);
             }
             else
                 debug(D_ACLK_SYNC,"Dimension check [%s] on [%s] liveness matches", rd->id, st->name);
