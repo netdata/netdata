@@ -1496,12 +1496,18 @@ build_and_install() {
     opts="${opts} --disable-cloud"
   fi
 
+  export NETDATA_SAVE_WARNINGS=1
+  export NETDATA_PROPAGATE_WARNINGS=1
   # shellcheck disable=SC2086
   run ${ROOTCMD} ./netdata-installer.sh ${opts}
 
   case $? in
     1)
-      fatal "netdata-installer.sh failed to run correctly." F0007
+      if [ -n "${EXIT_REASON}" ]; then
+        fatal "netdata-installer.sh failed to run: ${EXIT_REASON}" "${EXIT_CODE}"
+      else
+        fatal "netdata-installer.sh failed to run correctly." I0000
+      fi
       ;;
     2)
       fatal "Insufficient RAM to install netdata." F0008
