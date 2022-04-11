@@ -55,7 +55,7 @@ jobs:
           cp netdata-*.tar.gz artifacts/
       - name: Store
         id: store
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
@@ -109,7 +109,7 @@ jobs:
         run: .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         id: store
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: static-archive
           path: artifacts/*.gz.run
@@ -262,7 +262,7 @@ jobs:
           tags: test:${{ matrix.artifact_key }}
       - name: Upload image artifact
         id: upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.artifact_key }}-test-env
           path: /tmp/image.tar
@@ -477,7 +477,7 @@ jobs:
           cat sha256sums.txt
       - name: Store Artifacts
         id: store
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: final-artifacts
           path: artifacts/*

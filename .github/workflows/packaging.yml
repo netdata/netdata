@@ -210,7 +210,7 @@ jobs:
       - name: Save Packages
         id: artifacts
         continue-on-error: true
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
           path: ${{ github.workspace }}/artifacts/*
