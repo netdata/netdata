@@ -13,6 +13,7 @@ Executes `squeue` to grab information from the slurm queue.
 ## Configuring slurm
 
 Slurm monitoring is disabled by default. 
+
 ### Example
 
 ```yaml
@@ -24,6 +25,8 @@ Slurm monitoring is disabled by default.
 #     priority: 60000         # the JOB's order on the dashboard
 #     penalty: yes            # the JOB's penalty
 #     autodetection_retry: 0  # the JOB's re-check interval in seconds
+```
+
 ## Metrics and Alerts produced by this collector
 
 | Chart      | Metrics     | Alert                    |
