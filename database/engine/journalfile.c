@@ -81,10 +81,10 @@ void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned s
     if (NULL == ctx->commit_log.buf) {
         buf_size = ALIGN_BYTES_CEILING(size);
         ret = posix_memalign((void *)&ctx->commit_log.buf, RRDFILE_ALIGNMENT, buf_size);
-        memset(ctx->commit_log.buf, 0, buf_size);
         if (unlikely(ret)) {
             fatal("posix_memalign:%s", strerror(ret));
         }
+        memset(ctx->commit_log.buf, 0, buf_size);
         buf_pos = ctx->commit_log.buf_pos = 0;
         ctx->commit_log.buf_size =  buf_size;
     }

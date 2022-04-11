@@ -731,11 +731,11 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         break;
     }
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
-    memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING(size_bytes));
     if (unlikely(ret)) {
         fatal("posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);*/
     }
+    memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING(size_bytes));
     (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct rrdeng_page_descr *) * count);
     xt_io_descr->descr_count = count;
 

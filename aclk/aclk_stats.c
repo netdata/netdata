@@ -364,7 +364,7 @@ void aclk_stats_upd_online(int online) {
 }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-static usec_t pub_time[UINT16_MAX] = {0};
+static usec_t pub_time[UINT16_MAX + 1] = {0};
 void aclk_stats_msg_published(uint16_t id)
 {
     ACLK_STATS_LOCK;
