@@ -891,7 +891,7 @@ EOF
 
 confirm_install_prefix() {
   if [ -n "${INSTALL_PREFIX}" ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
-    fatal "The \`--install\` option is only supported together with the \`--only-build\` option." F0204
+    fatal "The \`--install\` option is only supported together with the \`--build-only\` option." F0204
   fi
 
   if [ -n "${INSTALL_PREFIX}" ]; then
