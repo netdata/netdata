@@ -8,7 +8,7 @@ sidebar_label: "Slurm Queue"
 
 Monitors slurm queue statistics using the squeue tool.  
 
-Execute `squeue` to grab information from the slurm queue.
+Executes `squeue` to grab information from the slurm queue.
 
 ## Configuring slurm
 
