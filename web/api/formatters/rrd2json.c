@@ -167,9 +167,10 @@ int rrdset2value_api_v1(
         , time_t *db_after
         , time_t *db_before
         , int *value_is_null
+        , int timeout
 ) {
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions, NULL);
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions, NULL, timeout);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -218,15 +219,21 @@ int rrdset2anything_api_v1(
         , struct context_param *context_param_list
         , char *chart_label_key
         , int max_anomaly_rates
-) {
-
+        , int timeout
+)
+{
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
         st->last_accessed_time = now_realtime_sec();
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, context_param_list);
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, context_param_list, timeout);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
+    }
+
+    if (r->result_options & RRDR_RESULT_OPTION_CANCEL) {
+        rrdr_free(r);
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 
     if (st && st->state && st->state->is_ar_chart)

@@ -202,6 +202,16 @@ paths:
             type: number
             format: integer
             default: 0
+        - name: timeout
+          in: query
+          description: Specify a timeout value in milliseconds after which the agent will
+            abort the query and return a 503 error. A value of 0 indicates no timeout.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: 0
         - name: format
           in: query
           description: The format of the data to be returned.

@@ -830,7 +830,7 @@ void *health_main(void *ptr) {
 
                     int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rc->dimensions, 1, rc->after,
                                                   rc->before, rc->group, 0, rc->options, &rc->db_after,
-                                                  &rc->db_before, &value_is_null
+                                                  &rc->db_before, &value_is_null, 0
                     );
 
                     if (unlikely(ret != 200)) {
