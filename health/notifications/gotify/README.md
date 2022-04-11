@@ -11,9 +11,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 ## Configuring Gotify
 
-#### Prerquisites
+### Prerequisites
+
 To use Gotify as your notification service, you need an application token. 
 You can generate a new token in the Gotify Web UI. 
+
+### Configuration
 
 To set up Gotify in Netdata: 
 
