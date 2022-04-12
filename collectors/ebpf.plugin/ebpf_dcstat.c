@@ -49,6 +49,10 @@ static ebpf_specify_name_t dc_optional_name[] = { {.program_name = "netdata_look
                                                    .retprobe = CONFIG_BOOLEAN_NO},
                                                   {.program_name = NULL}};
 
+netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "d_lookup", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
