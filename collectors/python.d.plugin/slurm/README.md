@@ -29,7 +29,7 @@ Slurm monitoring is disabled by default. To enable the collector:
    slurm: yes
    ```
    
- 4. Save the changes and restart the Agent with `sudo systemctl restart netdata` or the [appropriate method](https://learn.netdata.cloud/docs/configure/start-stop-restart)for your system.
+ 4. Save the changes and restart the Agent with `sudo systemctl restart netdata` or the [appropriate method](https://learn.netdata.cloud/docs/configure/start-stop-restart) for your system.
 
 ### Example
 
