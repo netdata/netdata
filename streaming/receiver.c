@@ -609,6 +609,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if(sock_delnonblock(rpt->fd) < 0)
         error("STREAM %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
 
+    struct timeval timeout;
+    timeout.tv_sec = 600;
+    timeout.tv_usec = 0;
+    setsockopt (rpt->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+
     // convert the socket to a FILE *
     FILE *fp = fdopen(rpt->fd, "r");
     if(!fp) {
