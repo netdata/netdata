@@ -6,10 +6,18 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin version to v0.32.2 [\#12663](https://github.com/netdata/netdata/pull/12663) ([ilyam8](https://github.com/ilyam8))
+- Properly limit repository configuration dependencies. [\#12661](https://github.com/netdata/netdata/pull/12661) ([Ferroin](https://github.com/Ferroin))
+- Show --build-only instead of --only-build [\#12657](https://github.com/netdata/netdata/pull/12657) ([MrZammler](https://github.com/MrZammler))
+- Update dashboard to version v2.22.6. [\#12653](https://github.com/netdata/netdata/pull/12653) ([netdatabot](https://github.com/netdatabot))
+- Add a timeout parameter to data queries [\#12649](https://github.com/netdata/netdata/pull/12649) ([stelfrag](https://github.com/stelfrag))
+- fix: remove instance-specific information from chart titles [\#12644](https://github.com/netdata/netdata/pull/12644) ([ilyam8](https://github.com/ilyam8))
+- feat: add k8s\_cluster\_name host tag \(GKE only\) [\#12638](https://github.com/netdata/netdata/pull/12638) ([ilyam8](https://github.com/ilyam8))
 - Add eBPF CO-RE version and checksum files to distfile list. [\#12627](https://github.com/netdata/netdata/pull/12627) ([Ferroin](https://github.com/Ferroin))
 - Fix ACLK shutdown [\#12625](https://github.com/netdata/netdata/pull/12625) ([underhood](https://github.com/underhood))
 - Don't do fatal on error writing the health api management key. [\#12623](https://github.com/netdata/netdata/pull/12623) ([MrZammler](https://github.com/MrZammler))
 - fix\(cgroups.plugin\): set CPU prev usage before first usage. [\#12622](https://github.com/netdata/netdata/pull/12622) ([ilyam8](https://github.com/ilyam8))
+- eBPF update dashboard [\#12617](https://github.com/netdata/netdata/pull/12617) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix print: command not found issue [\#12615](https://github.com/netdata/netdata/pull/12615) ([maneamarius](https://github.com/maneamarius))
 - feat: add support for cloud providers info to /api/v1/info [\#12613](https://github.com/netdata/netdata/pull/12613) ([ilyam8](https://github.com/ilyam8))
 - Fix training/prediction stats charts context. [\#12610](https://github.com/netdata/netdata/pull/12610) ([vkalintiris](https://github.com/vkalintiris))
@@ -37,6 +45,7 @@
 - Unblock cgroup version detection with systemd [\#12553](https://github.com/netdata/netdata/pull/12553) ([vlvkobal](https://github.com/vlvkobal))
 - fix FreeBSD bundled protobuf build if system one is present [\#12552](https://github.com/netdata/netdata/pull/12552) ([underhood](https://github.com/underhood))
 - fix: use `/proc/cpuinfo` for CPU freq detection as a last resort [\#12550](https://github.com/netdata/netdata/pull/12550) ([ilyam8](https://github.com/ilyam8))
+- add --reinstall-clean flag for kickstart.sh and update documentation [\#12548](https://github.com/netdata/netdata/pull/12548) ([maneamarius](https://github.com/maneamarius))
 - Don't send alert events without wc-\>host [\#12547](https://github.com/netdata/netdata/pull/12547) ([MrZammler](https://github.com/MrZammler))
 - reduce min `dbengine anomaly rate every` 60s-\>30s [\#12543](https://github.com/netdata/netdata/pull/12543) ([andrewm4894](https://github.com/andrewm4894))
 - Explicitly use debhelper to enable systemd service [\#12542](https://github.com/netdata/netdata/pull/12542) ([ralphm](https://github.com/ralphm))
@@ -58,6 +67,7 @@
 - Update ebpf doc [\#12503](https://github.com/netdata/netdata/pull/12503) ([thiagoftsm](https://github.com/thiagoftsm))
 - feat\(collectors/timex.plugin\): add clock status chart [\#12501](https://github.com/netdata/netdata/pull/12501) ([ilyam8](https://github.com/ilyam8))
 - PR template: Include user information section [\#12499](https://github.com/netdata/netdata/pull/12499) ([kickoke](https://github.com/kickoke))
+- add `locust` to `apps_groups.conf` [\#12498](https://github.com/netdata/netdata/pull/12498) ([andrewm4894](https://github.com/andrewm4894))
 - Properly skip running the updater in kickstart dry-run mode. [\#12497](https://github.com/netdata/netdata/pull/12497) ([Ferroin](https://github.com/Ferroin))
 - Adjust timex.plugin information to be less cryptic [\#12495](https://github.com/netdata/netdata/pull/12495) ([DanTheMediocre](https://github.com/DanTheMediocre))
 - ML-related changes to address issue/discussion comments. [\#12494](https://github.com/netdata/netdata/pull/12494) ([vkalintiris](https://github.com/vkalintiris))
@@ -118,6 +128,7 @@
 - minor - fix analytics\_build\_info [\#12354](https://github.com/netdata/netdata/pull/12354) ([underhood](https://github.com/underhood))
 - Docs fix: Add missing frontmatter [\#12353](https://github.com/netdata/netdata/pull/12353) ([kickoke](https://github.com/kickoke))
 - fix\(health\): make ioping\_disk\_latency alarm less sensitive [\#12351](https://github.com/netdata/netdata/pull/12351) ([ilyam8](https://github.com/ilyam8))
+- Trigger cloud intergration workflow for PRs and pushes against master [\#12349](https://github.com/netdata/netdata/pull/12349) ([dimko](https://github.com/dimko))
 - Improve agent to cloud synchronization performance [\#12348](https://github.com/netdata/netdata/pull/12348) ([stelfrag](https://github.com/stelfrag))
 - Prepend context in anomaly rate dimension id. [\#12342](https://github.com/netdata/netdata/pull/12342) ([vkalintiris](https://github.com/vkalintiris))
 - Redirect dependency handling script output to logfile when running from the updater. [\#12341](https://github.com/netdata/netdata/pull/12341) ([Ferroin](https://github.com/Ferroin))
@@ -219,6 +230,7 @@
 - feat\(apps.plugin\): group Apple Filing Protocol daemons into `afp` group [\#12078](https://github.com/netdata/netdata/pull/12078) ([ilyam8](https://github.com/ilyam8))
 - Overhaul handling of auto-updates in the installer code. [\#12076](https://github.com/netdata/netdata/pull/12076) ([Ferroin](https://github.com/Ferroin))
 - Add serial numbers to chart names [\#12067](https://github.com/netdata/netdata/pull/12067) ([vlvkobal](https://github.com/vlvkobal))
+- Add handling for claiming non-standard install types with kickstart. [\#12064](https://github.com/netdata/netdata/pull/12064) ([Ferroin](https://github.com/Ferroin))
 - remove deprecated node.d modules [\#12047](https://github.com/netdata/netdata/pull/12047) ([ilyam8](https://github.com/ilyam8))
 - Remove SIZEOF\_VOIDP and ENVIRONMENT{32,64} macros. [\#12046](https://github.com/netdata/netdata/pull/12046) ([vkalintiris](https://github.com/vkalintiris))
 - Remove unused NETDATA\_NO\_ATOMIC\_INSTRUCTIONS macro [\#12045](https://github.com/netdata/netdata/pull/12045) ([vkalintiris](https://github.com/vkalintiris))
@@ -229,7 +241,6 @@
 - Adds all query types to aclk\_processed\_query\_type [\#12036](https://github.com/netdata/netdata/pull/12036) ([underhood](https://github.com/underhood))
 - Create a removed alert event if chart goes obsolete [\#12021](https://github.com/netdata/netdata/pull/12021) ([MrZammler](https://github.com/MrZammler))
 - minor - remove ACLK\_NEWARCH\_DEVMODE [\#12018](https://github.com/netdata/netdata/pull/12018) ([underhood](https://github.com/underhood))
-- Adds chart for incoming proto msgs in new cloud protocol [\#11969](https://github.com/netdata/netdata/pull/11969) ([underhood](https://github.com/underhood))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
@@ -297,14 +308,6 @@
 - Included link to charts.d example [\#11990](https://github.com/netdata/netdata/pull/11990) ([kickoke](https://github.com/kickoke))
 - Refined the python example for clarity [\#11989](https://github.com/netdata/netdata/pull/11989) ([kickoke](https://github.com/kickoke))
 - fix\(updater\): checksum validation for static build [\#11986](https://github.com/netdata/netdata/pull/11986) ([ilyam8](https://github.com/ilyam8))
-- fix\(python.d\): ignore decoding errors in ExecutableService [\#11979](https://github.com/netdata/netdata/pull/11979) ([ilyam8](https://github.com/ilyam8))
-- Deleted duplicate getting started doc [\#11978](https://github.com/netdata/netdata/pull/11978) ([kickoke](https://github.com/kickoke))
-- Bump lodash from 4.17.19 to 4.17.21 [\#11976](https://github.com/netdata/netdata/pull/11976) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Better handle creation of UUID for claiming. [\#11974](https://github.com/netdata/netdata/pull/11974) ([Ferroin](https://github.com/Ferroin))
-- Fixes coverity 374746 [\#11973](https://github.com/netdata/netdata/pull/11973) ([MrZammler](https://github.com/MrZammler))
-- Bump follow-redirects from 1.13.2 to 1.14.7 [\#11972](https://github.com/netdata/netdata/pull/11972) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Use libnetdata/required\_dummies.h in collectors. [\#11971](https://github.com/netdata/netdata/pull/11971) ([vkalintiris](https://github.com/vkalintiris))
-- Fixes Wrong Chart Description [\#11970](https://github.com/netdata/netdata/pull/11970) ([underhood](https://github.com/underhood))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
