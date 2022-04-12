@@ -53,6 +53,148 @@ netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOA
                                         {.name = "d_lookup", .mode = EBPF_LOAD_TRAMPOLINE},
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/dc.skel.h" // BTF code
+
+static struct dc_bpf *bpf_obj = NULL;
+
+/**
+ * Disable probe
+ *
+ * Disable all probes to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static inline void ebpf_dc_disable_probes(struct dc_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_lookup_fast_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_d_lookup_kretprobe, false);
+}
+
+/*
+ * Disable trampoline
+ *
+ * Disable all trampoline to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_dc_disable_trampoline(struct dc_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_lookup_fast_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_d_lookup_fexit, false);
+}
+
+/**
+ * Set trampoline target
+ *
+ * Set the targets we will monitor.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_dc_set_trampoline_target(struct dc_bpf *obj)
+{
+    bpf_program__set_attach_target(
+        obj->progs.netdata_lookup_fast_fentry, 0, dc_targets[NETDATA_DC_TARGET_LOOKUP_FAST].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_d_lookup_fexit, 0, dc_targets[NETDATA_DC_TARGET_D_LOOKUP].name);
+}
+
+/**
+ * Mount Attach Probe
+ *
+ * Attach probes to target
+ *
+ * @param obj is the main structure for bpf objects.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_dc_attach_probes(struct dc_bpf *obj)
+{
+    obj->links.netdata_d_lookup_kretprobe = bpf_program__attach_kprobe(
+        obj->progs.netdata_d_lookup_kretprobe, true, dc_targets[NETDATA_DC_TARGET_D_LOOKUP].name);
+    int ret = libbpf_get_error(obj->links.netdata_d_lookup_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_lookup_fast_kprobe = bpf_program__attach_kprobe(
+        obj->progs.netdata_lookup_fast_kprobe, false, dc_targets[NETDATA_DC_TARGET_LOOKUP_FAST].name);
+    ret = libbpf_get_error(obj->links.netdata_lookup_fast_kprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Adjust Map Size
+ *
+ * Resize maps according input from users.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ */
+static void ebpf_dc_adjust_map_size(struct dc_bpf *obj, ebpf_module_t *em)
+{
+    ebpf_update_map_size(
+        obj->maps.dcstat_pid, &dcstat_maps[NETDATA_PID_SWAP_TABLE], em, bpf_map__name(obj->maps.dcstat_pid));
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_dc_set_hash_tables(struct dc_bpf *obj)
+{
+    dcstat_maps[NETDATA_DCSTAT_GLOBAL_STATS].map_fd = bpf_map__fd(obj->maps.dcstat_global);
+    dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd = bpf_map__fd(obj->maps.dcstat_pid);
+    dcstat_maps[NETDATA_DCSTAT_CTRL].map_fd = bpf_map__fd(obj->maps.dcstat_ctrl);
+}
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
+{
+    netdata_ebpf_targets_t *mt = em->targets;
+    netdata_ebpf_program_loaded_t test = mt[NETDATA_DC_TARGET_LOOKUP_FAST].mode;
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ebpf_dc_disable_probes(obj);
+
+        ebpf_dc_set_trampoline_target(obj);
+    } else {
+        ebpf_dc_disable_trampoline(obj);
+    }
+
+    int ret = dc_bpf__load(obj);
+    if (ret) {
+        fprintf(stderr, "Failed to load BPF object: %d\n", ret);
+        return ret;
+    }
+
+    ebpf_dc_adjust_map_size(obj, em);
+
+    ret = (test == EBPF_LOAD_TRAMPOLINE) ? dc_bpf__attach(obj) : ebpf_dc_attach_probes(obj);
+    if (!ret) {
+        ebpf_dc_set_hash_tables(obj);
+
+        ebpf_update_controller(dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd, em);
+    }
+
+    return ret;
+}
+#endif
+
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
@@ -145,6 +287,10 @@ static void ebpf_dcstat_cleanup(void *ptr)
         }
         bpf_object__close(objects);
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else if (bpf_obj)
+        dc_bpf__destroy(bpf_obj);
+#endif
 }
 
 /*****************************************************************
@@ -957,6 +1103,15 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
             ret = -1;
         }
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        bpf_obj = dc_bpf__open();
+        if (!bpf_obj)
+            ret = -1;
+        else
+            ret = ebpf_dc_load_and_attach(bpf_obj, em);
+    }
+#endif
 
     if (ret)
         error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
