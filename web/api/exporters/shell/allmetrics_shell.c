@@ -22,7 +22,7 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 
 #define SHELL_ELEMENT_MAX 100
 
-void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
+void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter, BUFFER *wb) {
     analytics_log_shell();
     rrdhost_rdlock(host);
 
@@ -92,7 +92,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
 
 // ----------------------------------------------------------------------------
 
-void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
+void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter, BUFFER *wb) {
     analytics_log_json();
     rrdhost_rdlock(host);
 

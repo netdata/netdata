@@ -23,10 +23,10 @@ typedef enum prometheus_output_flags {
 } PROMETHEUS_OUTPUT_OPTIONS;
 
 extern void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
-    RRDHOST *host, BUFFER *wb, const char *server, const char *prefix,
+    RRDHOST *host, const char *filter, BUFFER *wb, const char *server, const char *prefix,
     EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
 extern void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
-    RRDHOST *host, BUFFER *wb, const char *server, const char *prefix,
+    RRDHOST *host, const char *filter, BUFFER *wb, const char *server, const char *prefix,
     EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
 
 int can_send_rrdset(struct instance *instance, RRDSET *st);

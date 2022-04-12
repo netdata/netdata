@@ -858,6 +858,7 @@ static inline time_t prometheus_preparation(
  */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     RRDHOST *host,
+    const char *filter,
     BUFFER *wb,
     const char *server,
     const char *prefix,
@@ -895,6 +896,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
  */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     RRDHOST *host,
+    const char *filter,
     BUFFER *wb,
     const char *server,
     const char *prefix,
