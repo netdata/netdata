@@ -26,7 +26,7 @@ dist_web_DATA = \
     index.html \
     infographic.html \
     manifest.json \
-    precache-manifest.d7dbb87355c21a3c3ac5d76c5ddafa84.js \
+    precache-manifest.33bf361ebbf593e93bfee5f2a1e5aa62.js \
     refresh-badges.js \
     robots.txt \
     service-worker.js \
@@ -157,9 +157,9 @@ dist_webstaticjs_DATA = \
     static/js/8.b1a4b595.chunk.js.map \
     static/js/9.50358509.chunk.js \
     static/js/9.50358509.chunk.js.map \
-    static/js/main.9a5ebc36.chunk.js \
-    static/js/main.9a5ebc36.chunk.js.LICENSE \
-    static/js/main.9a5ebc36.chunk.js.map \
+    static/js/main.eba573ba.chunk.js \
+    static/js/main.eba573ba.chunk.js.LICENSE \
+    static/js/main.eba573ba.chunk.js.map \
     static/js/runtime-main.b352aa47.js \
     static/js/runtime-main.b352aa47.js.map \
     $(NULL)
