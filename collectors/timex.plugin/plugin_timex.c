@@ -70,12 +70,14 @@ void *timex_main(void *ptr)
         static int prev_sync_state = 0;
 
         sync_state = ADJUST_TIMEX(&timex_buf);
-
-        if (sync_state == -1 && prev_sync_state != -1) {
-            error("Cannot get clock synchronization state");
-        }
-
+        
+        int non_seq_failure = sync_state == -1 && prev_sync_state != -1;
         prev_sync_state = sync_state;
+
+        if (non_seq_failure) {
+            error("Cannot get clock synchronization state");
+            continue;
+        }
 
         collected_number divisor = USEC_PER_MS;
         if (timex_buf.status & STA_NANO)
