@@ -41,6 +41,10 @@ static struct bpf_object *objects = NULL;
 struct netdata_static_thread swap_threads = {"SWAP KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
 
+netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
+                                           {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
+                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
