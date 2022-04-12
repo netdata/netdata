@@ -597,7 +597,9 @@ int ws_client_process_rx_ws(ws_client *client)
                     return WS_CLIENT_NEED_MORE_BYTES;
                 char *insert = rbuf_get_linear_insert_range(client->buf_to_mqtt, &size);
                 if (!insert) {
-                    ERROR("BUFFER TOO FULL. Avail %d req %d", (int)size, (int)remaining);
+#ifdef DEBUG_ULTRA_VERBOSE
+                    DEBUG("BUFFER TOO FULL. Avail %d req %d", (int)size, (int)remaining);
+#endif
                     return WS_CLIENT_BUFFER_FULL;
                 }
                 size = (size > remaining) ? remaining : size;

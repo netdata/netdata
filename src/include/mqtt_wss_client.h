@@ -14,9 +14,11 @@
 #ifndef MQTT_WSS_CLIENT_H
 #define MQTT_WSS_CLIENT_H
 
-#include "mqtt_wss_log.h"
 #include <stdint.h>
 #include <stddef.h> //size_t
+
+#include "mqtt_wss_log.h"
+#include "common_public.h"
 
 // All OK call me at your earliest convinience
 #define MQTT_WSS_OK              0
@@ -36,9 +38,13 @@
 
 #define MQTT_WSS_ERR_CANT_SEND_NOW -6
 #define MQTT_WSS_ERR_BLOCK_TIMEOUT -7
+// if client was initialized with MQTT 3 but MQTT 5 feature
+// was requested by user of library
+#define MQTT_WSS_ERR_CANT_DO       -8
 
 typedef struct mqtt_wss_client_struct *mqtt_wss_client;
 
+typedef void (*msg_callback_fnc_t)(const char *topic, const void *msg, size_t msglen, int qos);
 /* Creates new instance of MQTT over WSS. Doesn't start connection.
  * @param log_prefix this is prefix to be used when logging to discern between multiple
  *        mqtt_wss instances. Can be NULL.
@@ -53,8 +59,9 @@ typedef struct mqtt_wss_client_struct *mqtt_wss_client;
  */
 mqtt_wss_client mqtt_wss_new(const char *log_prefix,
                              mqtt_wss_log_callback_t log_callback,
-                             void (*msg_callback)(const char *topic, const void *msg, size_t msglen, int qos),
-                             void (*puback_callback)(uint16_t packet_id));
+                             msg_callback_fnc_t msg_callback,
+                             void (*puback_callback)(uint16_t packet_id),
+                             int mqtt5);
 
 void mqtt_wss_set_max_buf_size(mqtt_wss_client client, size_t size);
 
@@ -137,12 +144,23 @@ int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *
 
 int mqtt_wss_publish_pid_block(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id, int timeout_ms);
 
+/* Publishes MQTT 5 message
+ */
+int mqtt_wss_publish5(mqtt_wss_client client,
+                      char *topic,
+                      free_fnc_t topic_free,
+                      void *msg,
+                      free_fnc_t msg_free,
+                      size_t msg_len,
+                      uint8_t publish_flags,
+                      uint16_t *packet_id);
+
 /* Subscribes to MQTT topic
  * @param client mqtt_wss_client which should do the subscription
  * @param topic MQTT topic to subscribe to
  * @param max_qos_level maximum QOS level that broker can send to us on this subscription
  * @return Returns 0 on success
  */
-int mqtt_wss_subscribe(mqtt_wss_client client, const char *topic, int max_qos_level);
+int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level);
 
 #endif /* MQTT_WSS_CLIENT_H */
