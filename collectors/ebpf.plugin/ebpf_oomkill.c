@@ -120,7 +120,7 @@ static void ebpf_create_specific_oomkill_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_OOMKILL_CHART, "OOM kills. This chart is provided by eBPF plugin.",
                       EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
-                      NULL, NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CGROUP_OOMKILLS_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5600,
                       ebpf_create_global_dimension,
                       &oomkill_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_OOMKILL);
@@ -194,7 +194,7 @@ static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_OOMKILL_CHART, "OOM kills. This chart is provided by eBPF plugin.",
                               EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_OOMKILLS_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5600, update_every);
 }
 
