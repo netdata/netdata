@@ -848,6 +848,10 @@ void rrdhost_free(RRDHOST *host) {
 
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
+    rrdhost_wrlock(host);
+    ml_delete_host(host);
+    rrdhost_unlock(host);
+
     // ------------------------------------------------------------------------
     // clean up streaming
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
@@ -936,8 +940,6 @@ void rrdhost_free(RRDHOST *host) {
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx != &multidb_ctx)
         rrdeng_exit(host->rrdeng_ctx);
 #endif
-
-    ml_delete_host(host);
 
     // ------------------------------------------------------------------------
     // remove it from the indexes

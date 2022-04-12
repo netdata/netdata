@@ -90,7 +90,10 @@ void ml_delete_dimension(RRDDIM *RD) {
         return;
 
     Host *H = static_cast<Host *>(RD->rrdset->rrdhost->ml_host);
-    H->removeDimension(D);
+    if (!H)
+        delete D;
+    else
+        H->removeDimension(D);
 
     RD->state->ml_dimension = nullptr;
 }
