@@ -977,7 +977,7 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "Create error",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20077,
-                                      ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_CREATE_ERROR_CONTEX,
+                                      ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_CREATE_ERROR_CONTEXT,
                                       NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
     }
 }
