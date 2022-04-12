@@ -380,7 +380,7 @@ netdata INFO  : WEB_SERVER[static4] : STREAM child01 [send]: sending metrics...
 ```
 
 #### How to enable stream compression
-Netdata Agents are shipped with data compression disabled by default. You can also configure which streams will use compression.
+Netdata Agents are shipped with data compression enabled by default. You can also configure which streams will use compression.
 
 With enabled stream compression, a Netdata Agent can negotiate streaming compression with other Netdata Agents. During the negotiation of streaming compression both Netdata Agents should support and enable compression in order to communicate over a compressed stream. The negotiation will result into an uncompressed stream, if one of the Netdata Agents doesn't support **or** has compression disabled.
 
