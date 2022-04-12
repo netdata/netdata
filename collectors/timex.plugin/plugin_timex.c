@@ -71,7 +71,7 @@ void *timex_main(void *ptr)
 
         sync_state = ADJUST_TIMEX(&timex_buf);
         
-        int non_seq_failure = sync_state == -1 && prev_sync_state != -1;
+        int non_seq_failure = (sync_state == -1 && prev_sync_state != -1);
         prev_sync_state = sync_state;
 
         if (non_seq_failure) {
