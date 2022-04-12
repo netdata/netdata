@@ -1272,7 +1272,7 @@ const ebpfBandwidthRecv = 'Total bytes received with <a href="https://learn.netd
 const ebpfTCPSendCall = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> functions responsible to send data. ' +
     'Netdata gives a summary for this chart in <a href="#ebpf_global_tcp_bandwidth_call">Network Stack</a>. ' +
     'When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows TCP calls per <a href="#ebpf_apps_bandwidth_tcp_sent">application</a>.' + ebpfChartProvides
-const ebpfTCPRecvCall = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> functions responsible to receive data.' +
+const ebpfTCPRecvCall = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> functions responsible to receive data. ' +
     'Netdata gives a summary for this chart in <a href="#ebpf_global_tcp_bandwidth_call">Network Stack</a>. ' +
     'When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows TCP calls per <a href="#ebpf_apps_bandwidth_tcp_received">application</a>.' + ebpfChartProvides
