@@ -654,6 +654,26 @@ static void ebpf_create_swap_charts(int update_every)
                       update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 }
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_swap_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    if (em->load == EBPF_LOAD_LEGACY) {
+        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
+        if (!probe_links) {
+            ret = -1;
+        }
+    }
+
+    return ret;
+}
+
 /**
  * SWAP thread
  *
@@ -675,8 +695,10 @@ void *ebpf_swap_thread(void *ptr)
     if (!em->enabled)
         goto endswap;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
+   if (ebpf_swap_load_bpf(em)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endswap;
     }
