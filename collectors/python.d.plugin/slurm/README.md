@@ -11,7 +11,7 @@ Monitors slurm queue statistics using the [`squeue`](https://slurm.schedmd.com/s
 
 ## Configuring slurm
 
-#### Prerequiistes
+#### Prerequisites
 The slurm collector requires `squeue` to be installed and configured properly.
 
 Slurm monitoring is disabled by default. To enable the collector:  
