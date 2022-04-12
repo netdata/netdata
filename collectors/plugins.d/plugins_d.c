@@ -36,7 +36,7 @@ inline int config_isspace(char c)
 }
 
 // split a text into words, respecting quotes
-static inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
+inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
 {
     char *s = str, quote = 0;
     int i = 0, j, rec = 0;

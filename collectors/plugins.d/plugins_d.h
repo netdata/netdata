@@ -66,5 +66,6 @@ extern int pluginsd_initialize_plugin_directories();
 
 extern int config_isspace(char c);
 extern int pluginsd_space(char c);
+int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover);
 
 #endif /* NETDATA_PLUGINS_D_H */

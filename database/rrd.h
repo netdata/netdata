@@ -240,6 +240,7 @@ extern void rrdset_add_label_to_new_list(RRDSET *st, char *key, char *value, LAB
 extern void rrdset_finalize_labels(RRDSET *st);
 extern void rrdset_update_labels(RRDSET *st, struct label *labels);
 extern int rrdset_contains_label_keylist(RRDSET *st, char *key);
+extern int rrdset_matches_label_keys(RRDSET *st, char *key, char *words[], uint32_t *hash_key_list, int *word_count, int size);
 extern struct label *rrdset_lookup_label_key(RRDSET *st, char *key, uint32_t key_hash);
 
 // ----------------------------------------------------------------------------
