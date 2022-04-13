@@ -60,7 +60,8 @@ enum cachestat_indexes {
 
 enum cachestat_tables {
     NETDATA_CACHESTAT_GLOBAL_STATS,
-    NETDATA_CACHESTAT_PID_STATS
+    NETDATA_CACHESTAT_PID_STATS,
+    NETDATA_CACHESTAT_CTRL
 };
 
 typedef struct netdata_publish_cachestat_pid {

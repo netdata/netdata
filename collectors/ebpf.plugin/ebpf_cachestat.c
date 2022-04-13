@@ -51,6 +51,256 @@ netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru",
                                                {.name = "mark_buffer_dirty", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/cachestat.skel.h" // BTF code
+
+static struct cachestat_bpf *bpf_obj = NULL;
+
+/**
+ * Disable probe
+ *
+ * Disable all probes to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static void ebpf_cachestat_disable_probe(struct cachestat_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_add_to_page_cache_lru_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_mark_page_accessed_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_mark_buffer_dirty_kprobe, false);
+}
+
+/*
+ * Disable specific probe
+ *
+ * Disable probes according the kernel version
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static void ebpf_cachestat_disable_specific_probe(struct cachestat_bpf *obj)
+{
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+        bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
+    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+        bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
+    }
+}
+
+/*
+ * Disable trampoline
+ *
+ * Disable all trampoline to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_cachestat_disable_trampoline(struct cachestat_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_add_to_page_cache_lru_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_mark_page_accessed_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_mark_buffer_dirty_fentry, false);
+}
+
+/*
+ * Disable specific trampoline
+ *
+ * Disable trampoline according to kernel version.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_cachestat_disable_specific_trampoline(struct cachestat_bpf *obj)
+{
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+        bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
+    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+        bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
+    }
+}
+
+/**
+ * Set trampoline target
+ *
+ * Set the targets we will monitor.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void netdata_set_trampoline_target(struct cachestat_bpf *obj)
+{
+    bpf_program__set_attach_target(
+        obj->progs.netdata_add_to_page_cache_lru_fentry,
+        0,
+        cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
+
+    bpf_program__set_attach_target(
+        obj->progs.netdata_mark_page_accessed_fentry, 0, cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
+
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+        bpf_program__set_attach_target(
+            obj->progs.netdata_folio_mark_dirty_fentry,
+            0,
+            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+        bpf_program__set_attach_target(
+            obj->progs.netdata_set_page_dirty_fentry,
+            0,
+            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    } else {
+        bpf_program__set_attach_target(
+            obj->progs.netdata_account_page_dirtied_fentry,
+            0,
+            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    }
+
+    bpf_program__set_attach_target(
+        obj->progs.netdata_mark_buffer_dirty_fentry, 0, cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
+}
+
+/**
+ * Mount Attach Probe
+ *
+ * Attach probes to target
+ *
+ * @param obj is the main structure for bpf objects.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
+{
+    obj->links.netdata_add_to_page_cache_lru_kprobe = bpf_program__attach_kprobe(
+        obj->progs.netdata_add_to_page_cache_lru_kprobe,
+        false,
+        cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
+    int ret = libbpf_get_error(obj->links.netdata_add_to_page_cache_lru_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_mark_page_accessed_kprobe = bpf_program__attach_kprobe(
+        obj->progs.netdata_mark_page_accessed_kprobe,
+        false,
+        cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
+    ret = libbpf_get_error(obj->links.netdata_mark_page_accessed_kprobe);
+    if (ret)
+        return -1;
+
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+        obj->links.netdata_folio_mark_dirty_kprobe = bpf_program__attach_kprobe(
+            obj->progs.netdata_folio_mark_dirty_kprobe,
+            false,
+            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        ret = libbpf_get_error(obj->links.netdata_folio_mark_dirty_kprobe);
+    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+        obj->links.netdata_set_page_dirty_kprobe = bpf_program__attach_kprobe(
+            obj->progs.netdata_set_page_dirty_kprobe,
+            false,
+            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        ret = libbpf_get_error(obj->links.netdata_set_page_dirty_kprobe);
+    } else {
+        obj->links.netdata_account_page_dirtied_kprobe = bpf_program__attach_kprobe(
+            obj->progs.netdata_account_page_dirtied_kprobe,
+            false,
+            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        ret = libbpf_get_error(obj->links.netdata_account_page_dirtied_kprobe);
+    }
+
+    if (ret)
+        return -1;
+
+    obj->links.netdata_mark_buffer_dirty_kprobe = bpf_program__attach_kprobe(
+        obj->progs.netdata_mark_buffer_dirty_kprobe,
+        false,
+        cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
+    ret = libbpf_get_error(obj->links.netdata_mark_buffer_dirty_kprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Adjust Map Size
+ *
+ * Resize maps according input from users.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ */
+static void ebpf_cachestat_adjust_map_size(struct cachestat_bpf *obj, ebpf_module_t *em)
+{
+    ebpf_update_map_size(
+        obj->maps.cstat_pid, &cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em, bpf_map__name(obj->maps.cstat_pid));
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_cachestat_set_hash_tables(struct cachestat_bpf *obj)
+{
+    cachestat_maps[NETDATA_CACHESTAT_GLOBAL_STATS].map_fd = bpf_map__fd(obj->maps.cstat_global);
+    cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd = bpf_map__fd(obj->maps.cstat_pid);
+    cachestat_maps[NETDATA_CACHESTAT_CTRL].map_fd = bpf_map__fd(obj->maps.cstat_ctrl);
+}
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf_module_t *em)
+{
+    netdata_ebpf_targets_t *mt = em->targets;
+    netdata_ebpf_program_loaded_t test = mt[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].mode;
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ebpf_cachestat_disable_probe(obj);
+        ebpf_cachestat_disable_specific_trampoline(obj);
+
+        netdata_set_trampoline_target(obj);
+    } else {
+        ebpf_cachestat_disable_trampoline(obj);
+        ebpf_cachestat_disable_specific_probe(obj);
+    }
+
+    int ret = cachestat_bpf__load(obj);
+    if (ret) {
+        return ret;
+    }
+
+    ebpf_cachestat_adjust_map_size(obj, em);
+
+    ret = (test == EBPF_LOAD_TRAMPOLINE) ? cachestat_bpf__attach(obj) : ebpf_cachestat_attach_probe(obj);
+    if (!ret) {
+        ebpf_cachestat_set_hash_tables(obj);
+
+        ebpf_update_controller(cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd, em);
+    }
+
+    return ret;
+}
+#endif
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -104,6 +354,10 @@ static void ebpf_cachestat_cleanup(void *ptr)
         }
         bpf_object__close(objects);
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else if (bpf_obj)
+        cachestat_bpf__destroy(bpf_obj);
+#endif
 }
 
 /*****************************************************************
@@ -999,6 +1253,15 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
             ret = -1;
         }
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        bpf_obj = cachestat_bpf__open();
+        if (!bpf_obj)
+            ret = -1;
+        else
+            ret = ebpf_cachestat_load_and_attach(bpf_obj, em);
+    }
+#endif
 
     if (ret)
         error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
