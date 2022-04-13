@@ -6,10 +6,17 @@
 
 **Merged pull requests:**
 
+- Delete ML-related data of a host in the proper order. [\#12672](https://github.com/netdata/netdata/pull/12672) ([vkalintiris](https://github.com/vkalintiris))
+- fix\(ebpf.plugin\): add missing chart context for cgroups charts [\#12671](https://github.com/netdata/netdata/pull/12671) ([ilyam8](https://github.com/ilyam8))
+- Remove on pull\_request trigger [\#12670](https://github.com/netdata/netdata/pull/12670) ([dimko](https://github.com/dimko))
+- \[Stream compression Docs\] - Enabled by default [\#12669](https://github.com/netdata/netdata/pull/12669) ([odynik](https://github.com/odynik))
+- Update dashboard to version v2.24.0. [\#12668](https://github.com/netdata/netdata/pull/12668) ([netdatabot](https://github.com/netdatabot))
+- Show error when clock synchronization state is unavailable [\#12667](https://github.com/netdata/netdata/pull/12667) ([vlvkobal](https://github.com/vlvkobal))
 - bump go.d.plugin version to v0.32.2 [\#12663](https://github.com/netdata/netdata/pull/12663) ([ilyam8](https://github.com/ilyam8))
 - Properly limit repository configuration dependencies. [\#12661](https://github.com/netdata/netdata/pull/12661) ([Ferroin](https://github.com/Ferroin))
 - Show --build-only instead of --only-build [\#12657](https://github.com/netdata/netdata/pull/12657) ([MrZammler](https://github.com/MrZammler))
 - Update dashboard to version v2.22.6. [\#12653](https://github.com/netdata/netdata/pull/12653) ([netdatabot](https://github.com/netdatabot))
+- Add a chart label filter parameter in context data queries [\#12652](https://github.com/netdata/netdata/pull/12652) ([stelfrag](https://github.com/stelfrag))
 - Add a timeout parameter to data queries [\#12649](https://github.com/netdata/netdata/pull/12649) ([stelfrag](https://github.com/stelfrag))
 - fix: remove instance-specific information from chart titles [\#12644](https://github.com/netdata/netdata/pull/12644) ([ilyam8](https://github.com/ilyam8))
 - feat: add k8s\_cluster\_name host tag \(GKE only\) [\#12638](https://github.com/netdata/netdata/pull/12638) ([ilyam8](https://github.com/ilyam8))
@@ -303,11 +310,6 @@
 - Add alternative install command for macOS. [\#11997](https://github.com/netdata/netdata/pull/11997) ([Ferroin](https://github.com/Ferroin))
 - Fix queue removed alerts [\#11996](https://github.com/netdata/netdata/pull/11996) ([MrZammler](https://github.com/MrZammler))
 - update go.d.plugin version to v0.31.1 [\#11995](https://github.com/netdata/netdata/pull/11995) ([ilyam8](https://github.com/ilyam8))
-- Fix ib counters [\#11994](https://github.com/netdata/netdata/pull/11994) ([Saruspete](https://github.com/Saruspete))
-- eBPF plugin CO-RE and monitoring [\#11992](https://github.com/netdata/netdata/pull/11992) ([thiagoftsm](https://github.com/thiagoftsm))
-- Included link to charts.d example [\#11990](https://github.com/netdata/netdata/pull/11990) ([kickoke](https://github.com/kickoke))
-- Refined the python example for clarity [\#11989](https://github.com/netdata/netdata/pull/11989) ([kickoke](https://github.com/kickoke))
-- fix\(updater\): checksum validation for static build [\#11986](https://github.com/netdata/netdata/pull/11986) ([ilyam8](https://github.com/ilyam8))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
