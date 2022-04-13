@@ -93,10 +93,11 @@ static inline void ebpf_dc_disable_trampoline(struct dc_bpf *obj)
  */
 static void ebpf_dc_set_trampoline_target(struct dc_bpf *obj)
 {
-    bpf_program__set_attach_target(
-        obj->progs.netdata_lookup_fast_fentry, 0, dc_targets[NETDATA_DC_TARGET_LOOKUP_FAST].name);
+    bpf_program__set_attach_target(obj->progs.netdata_lookup_fast_fentry, 0,
+                                   dc_targets[NETDATA_DC_TARGET_LOOKUP_FAST].name);
 
-    bpf_program__set_attach_target(obj->progs.netdata_d_lookup_fexit, 0, dc_targets[NETDATA_DC_TARGET_D_LOOKUP].name);
+    bpf_program__set_attach_target(obj->progs.netdata_d_lookup_fexit, 0,
+                                   dc_targets[NETDATA_DC_TARGET_D_LOOKUP].name);
 }
 
 /**
@@ -110,14 +111,16 @@ static void ebpf_dc_set_trampoline_target(struct dc_bpf *obj)
  */
 static int ebpf_dc_attach_probes(struct dc_bpf *obj)
 {
-    obj->links.netdata_d_lookup_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_d_lookup_kretprobe, true, dc_targets[NETDATA_DC_TARGET_D_LOOKUP].name);
+    obj->links.netdata_d_lookup_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_d_lookup_kretprobe,
+                                                                       true,
+                                                                       dc_targets[NETDATA_DC_TARGET_D_LOOKUP].name);
     int ret = libbpf_get_error(obj->links.netdata_d_lookup_kretprobe);
     if (ret)
         return -1;
 
-    obj->links.netdata_lookup_fast_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_lookup_fast_kprobe, false, dc_targets[NETDATA_DC_TARGET_LOOKUP_FAST].name);
+    obj->links.netdata_lookup_fast_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_lookup_fast_kprobe,
+                                                                       false,
+                                                                       dc_targets[NETDATA_DC_TARGET_LOOKUP_FAST].name);
     ret = libbpf_get_error(obj->links.netdata_lookup_fast_kprobe);
     if (ret)
         return -1;
@@ -178,7 +181,6 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
 
     int ret = dc_bpf__load(obj);
     if (ret) {
-        fprintf(stderr, "Failed to load BPF object: %d\n", ret);
         return ret;
     }
 
