@@ -52,23 +52,105 @@ area/docs:
   - diagrams/*
   - diagrams/**/*
 
+# -----------------collectors----------------------
+
 area/collectors:
   - collectors/*
   - collectors/**/*
 
-area/ebpf:
+collectors/plugins.d:
+  - collectors/plugins.d/*
+  - collectors/plugins.d/**/*
+
+collectors/apps:
+  - collectors/apps.plugin/*
+  - collectors/apps.plugin/**/*
+
+collectors/cgroups:
+  - collectors/cgroups.plugin/*
+  - collectors/cgroups.plugin/**/*
+
+collectors/charts.d:
+  - collectors/charts.d.plugin/*
+  - collectors/charts.d.plugin/**/*
+
+collectors/cups:
+  - collectors/cups.plugin/*
+  - collectors/cups.plugin/**/*
+
+collectors/diskspace:
+  - collectors/diskspace.plugin/*
+  - collectors/diskspace.plugin/**/*
+
+collectors/ebpf:
   - collectors/ebpf.plugin/*
   - collectors/ebpf.plugin/**/*
 
-area/external/python:
+collectors/fping:
+  - collectors/fping.plugin/*
+  - collectors/fping.plugin/**/*
+
+collectors/freebsd:
+  - collectors/freebsd.plugin/*
+  - collectors/freebsd.plugin/**/*
+
+collectors/freeipmi:
+  - collectors/freeipmi.plugin/*
+  - collectors/freeipmi.plugin/**/*
+
+collectors/idlejitter:
+  - collectors/idlejitter.plugin/*
+  - collectors/idlejitter.plugin/**/*
+
+collectors/ioping:
+  - collectors/ioping.plugin/*
+  - collectors/ioping.plugin/**/*
+
+collectors/macos:
+  - collectors/macos.plugin/*
+  - collectors/macos.plugin/**/*
+
+collectors/nfacct:
+  - collectors/nfacct.plugin/*
+  - collectors/nfacct.plugin/**/*
+
+collectors/node.d:
+  - collectors/node.d.plugin/*
+  - collectors/node.d.plugin/**/*
+
+collectors/perf:
+  - collectors/perf.plugin/*
+  - collectors/perf.plugin/**/*
+
+collectors/proc:
+  - collectors/proc.plugin/*
+  - collectors/proc.plugin/**/*
+
+collectors/python.d:
   - collectors/python.d.plugin/*
   - collectors/python.d.plugin/**/*
 
-area/external:
-  - collectors/charts.d.plugin/*
-  - collectors/charts.d.plugin/**/*
-  - collectors/node.d.plugin/*
-  - collectors/node.d.plugin/**/*
+collectors/slabinfo:
+  - collectors/slabinfo.plugin/*
+  - collectors/slabinfo.plugin/**/*
+
+collectors/statsd:
+  - collectors/statsd.plugin/*
+  - collectors/statsd.plugin/**/*
+
+collectors/tc:
+  - collectors/tc.plugin/*
+  - collectors/tc.plugin/**/*
+
+collectors/timex:
+  - collectors/timex.plugin/*
+  - collectors/timex.plugin/**/*
+
+collectors/xenstat:
+  - collectors/xenstat.plugin/*
+  - collectors/xenstat.plugin/**/*
+
+# ----------------/collectors----------------------
 
 area/health:
   - health/*
