@@ -326,7 +326,9 @@ Of course these timing are for badges that use recent data. If you need badges t
 
 #### Embedding badges in GitHub
 
-You have 2 options a) SVG images with markdown and b) SVG images with HTML (directly in .md files).
+You have 2 options:
+- SVG images with markdown 
+- SVG images with HTML (directly in .md files)
 
 For example, this is the cpu badge shown above:
 
@@ -350,7 +352,7 @@ Both produce this:
     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img>
 </a>
 
-#### auto-refreshing badges in GitHub
+#### Auto-refreshing badges in GitHub
 
 Unfortunately it cannot be done. GitHub fetches all the images using a proxy and rewrites all the URLs to be served by the proxy.
 
