@@ -90,7 +90,7 @@ jobs:
           find . -type f -name '*.log' -exec cp {} ../logs/ \;
           popd || exit 1
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v2.2.4
+        uses: actions/upload-artifact@v3
         if: always()
         with:
           name: logs
