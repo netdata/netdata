@@ -4,6 +4,7 @@
 #include "KolmogorovSmirnovDist.h"
 
 #define MAX_POINTS 10000
+int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 
 struct charts {
     RRDSET *st;
@@ -211,15 +212,22 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
 {
     info ("Running metric correlations, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld", highlight_after, highlight_before, baseline_after, baseline_before, max_points);
 
+    if (!enable_metric_correlations) {
+        error("Metric correlations functionality is not enabled.");
+        buffer_strcat(wb, "{\"error\": \"Metric correlations functionality is not enabled.\" }");
+        return;
+    }
+
+    if (highlight_before <= highlight_after || baseline_before <= baseline_after) {
+        error("Invalid baseline or highlight ranges.");
+        buffer_strcat(wb, "{\"error\": \"Invalid baseline or highlight ranges.\" }");
+        return;
+    }
+
     long long dims = 0, total_dims = 0;
     RRDSET *st;
     size_t c = 0;
     BUFFER *wdims = buffer_create(1000);
-
-    if (highlight_before <= highlight_after || baseline_before <= baseline_after) {
-        buffer_strcat(wb, "{\"error\": \"Invalid baseline or highlight ranges.\" }");
-        return;
-    }
 
     if (!max_points || max_points > MAX_POINTS)
         max_points = MAX_POINTS;
@@ -277,5 +285,6 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
         free(ch);
     }
 
+    buffer_free(wdims);
     info ("Done running metric correlations");
 }
