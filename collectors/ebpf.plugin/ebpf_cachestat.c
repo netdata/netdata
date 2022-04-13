@@ -141,33 +141,25 @@ static void ebpf_cachestat_disable_specific_trampoline(struct cachestat_bpf *obj
  */
 static inline void netdata_set_trampoline_target(struct cachestat_bpf *obj)
 {
-    bpf_program__set_attach_target(
-        obj->progs.netdata_add_to_page_cache_lru_fentry,
-        0,
-        cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
+    bpf_program__set_attach_target(obj->progs.netdata_add_to_page_cache_lru_fentry, 0,
+                                   cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
 
-    bpf_program__set_attach_target(
-        obj->progs.netdata_mark_page_accessed_fentry, 0, cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
+    bpf_program__set_attach_target(obj->progs.netdata_mark_page_accessed_fentry, 0,
+                                   cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
 
     if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
-        bpf_program__set_attach_target(
-            obj->progs.netdata_folio_mark_dirty_fentry,
-            0,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        bpf_program__set_attach_target(obj->progs.netdata_folio_mark_dirty_fentry, 0,
+                                       cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
     } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
-        bpf_program__set_attach_target(
-            obj->progs.netdata_set_page_dirty_fentry,
-            0,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        bpf_program__set_attach_target(obj->progs.netdata_set_page_dirty_fentry, 0,
+                                       cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
     } else {
-        bpf_program__set_attach_target(
-            obj->progs.netdata_account_page_dirtied_fentry,
-            0,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        bpf_program__set_attach_target(obj->progs.netdata_account_page_dirtied_fentry, 0,
+                                       cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
     }
 
-    bpf_program__set_attach_target(
-        obj->progs.netdata_mark_buffer_dirty_fentry, 0, cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
+    bpf_program__set_attach_target(obj->progs.netdata_mark_buffer_dirty_fentry, 0,
+                                   cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
 }
 
 /**
@@ -181,49 +173,43 @@ static inline void netdata_set_trampoline_target(struct cachestat_bpf *obj)
  */
 static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
 {
-    obj->links.netdata_add_to_page_cache_lru_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_add_to_page_cache_lru_kprobe,
-        false,
-        cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
+    obj->links.netdata_add_to_page_cache_lru_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_add_to_page_cache_lru_kprobe,
+                                                                                 false,
+                                                                                 cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
     int ret = libbpf_get_error(obj->links.netdata_add_to_page_cache_lru_kprobe);
     if (ret)
         return -1;
 
-    obj->links.netdata_mark_page_accessed_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_mark_page_accessed_kprobe,
-        false,
-        cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
+    obj->links.netdata_mark_page_accessed_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_mark_page_accessed_kprobe,
+                                                                              false,
+                                                                              cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
     ret = libbpf_get_error(obj->links.netdata_mark_page_accessed_kprobe);
     if (ret)
         return -1;
 
     if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
-        obj->links.netdata_folio_mark_dirty_kprobe = bpf_program__attach_kprobe(
-            obj->progs.netdata_folio_mark_dirty_kprobe,
-            false,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        obj->links.netdata_folio_mark_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_folio_mark_dirty_kprobe,
+                                                                                false,
+                                                                                cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
         ret = libbpf_get_error(obj->links.netdata_folio_mark_dirty_kprobe);
     } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
-        obj->links.netdata_set_page_dirty_kprobe = bpf_program__attach_kprobe(
-            obj->progs.netdata_set_page_dirty_kprobe,
-            false,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        obj->links.netdata_set_page_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_set_page_dirty_kprobe,
+                                                                              false,
+                                                                              cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
         ret = libbpf_get_error(obj->links.netdata_set_page_dirty_kprobe);
     } else {
-        obj->links.netdata_account_page_dirtied_kprobe = bpf_program__attach_kprobe(
-            obj->progs.netdata_account_page_dirtied_kprobe,
-            false,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        obj->links.netdata_account_page_dirtied_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_account_page_dirtied_kprobe,
+                                                                                    false,
+                                                                                    cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
         ret = libbpf_get_error(obj->links.netdata_account_page_dirtied_kprobe);
     }
 
     if (ret)
         return -1;
 
-    obj->links.netdata_mark_buffer_dirty_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_mark_buffer_dirty_kprobe,
-        false,
-        cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
+    obj->links.netdata_mark_buffer_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_mark_buffer_dirty_kprobe,
+                                                                             false,
+                                                                             cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
     ret = libbpf_get_error(obj->links.netdata_mark_buffer_dirty_kprobe);
     if (ret)
         return -1;
@@ -241,8 +227,8 @@ static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
  */
 static void ebpf_cachestat_adjust_map_size(struct cachestat_bpf *obj, ebpf_module_t *em)
 {
-    ebpf_update_map_size(
-        obj->maps.cstat_pid, &cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em, bpf_map__name(obj->maps.cstat_pid));
+    ebpf_update_map_size(obj->maps.cstat_pid, &cachestat_maps[NETDATA_CACHESTAT_PID_STATS],
+                         em, bpf_map__name(obj->maps.cstat_pid));
 }
 
 /**
