@@ -359,12 +359,17 @@ void TrainableHost::train() {
     Duration<double> MaxSleepFor = Seconds{10 * updateEvery()};
 
     while (!netdata_exit) {
+        netdata_thread_testcancel();
+        netdata_thread_disable_cancelability();
+
         updateResourceUsage();
 
         TimePoint NowTP = SteadyClock::now();
 
         auto P = findDimensionToTrain(NowTP);
         trainDimension(P.first, NowTP);
+
+        netdata_thread_enable_cancelability();
 
         Duration<double> AllottedDuration = P.second;
         Duration<double> RealDuration = SteadyClock::now() - NowTP;
@@ -477,11 +482,13 @@ void DetectableHost::detect() {
     heartbeat_init(&HB);
 
     while (!netdata_exit) {
+        netdata_thread_testcancel();
         heartbeat_next(&HB, updateEvery() * USEC_PER_SEC);
 
+        netdata_thread_disable_cancelability();
         detectOnce();
-
         updateDetectionChart(getRH());
+        netdata_thread_enable_cancelability();
     }
 }
 
@@ -499,6 +506,9 @@ void DetectableHost::startAnomalyDetectionThreads() {
 }
 
 void DetectableHost::stopAnomalyDetectionThreads() {
+    netdata_thread_cancel(TrainingThread.native_handle());
+    netdata_thread_cancel(DetectionThread.native_handle());
+
     TrainingThread.join();
     DetectionThread.join();
 }
