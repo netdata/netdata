@@ -45,8 +45,8 @@ if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
     run docker pull --platform=${platform}  alpine:3.15
   fi
 
-  run docker run --platform=${platform} -v "$(pwd)":/usr/src/netdata.git:rw alpine:3.15 \
-    /bin/sh /usr/src/netdata.git/packaging/makeself/install-alpine-packages.sh
+  run docker run --platform=${platform} -v "$(pwd)":/netdata:rw alpine:3.15 \
+    /bin/sh /netdata/packaging/makeself/install-alpine-packages.sh
 
   # save the changes made permanently
   id=$(docker ps -l -q)
@@ -55,15 +55,11 @@ fi
 
 # Run the build script inside the container
 if [ -t 1 ]; then
-  run docker run -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/usr/src/netdata.git:rw \
+  run docker run -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
     "${DOCKER_CONTAINER_NAME}" \
-    /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
+    /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 else
-  run docker run -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/usr/src/netdata.git:rw \
+  run docker run -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/netdata:rw \
     -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" "${DOCKER_CONTAINER_NAME}" \
-    /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
-fi
-
-if [ "${USER}" ]; then
-  sudo chown -R "${USER}" .
+    /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 fi
