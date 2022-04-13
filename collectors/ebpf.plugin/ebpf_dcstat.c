@@ -667,7 +667,7 @@ static void ebpf_create_systemd_dc_charts(int update_every)
                                   update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
-                                  "Files not present inside directory cache.",
+                                  "Files not present inside directory cache",
                                   EBPF_COMMON_DIMENSION_FILES,
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
