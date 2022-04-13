@@ -36,6 +36,7 @@ NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
 RELEASE_CHANNEL="nightly"
+WARNINGS=""
 
 if [ -n "$DISABLE_TELEMETRY" ]; then
   NETDATA_DISABLE_TELEMETRY="${DISABLE_TELEMETRY}"
@@ -62,6 +63,8 @@ fi
 main() {
   if [ "${ACTION}" = "uninstall" ]; then
     uninstall
+    printf >&2 "Finished uninstalling the Netdata Agent."
+    deferred_warnings
     cleanup
     trap - EXIT
     exit 0
@@ -100,6 +103,7 @@ main() {
   set_auto_updates
 
   printf >&2 "%s\n\n" "Successfully installed the Netdata Agent."
+  deferred_warnings
   success_banner
   telemetry_event INSTALL_SUCCESS "" ""
   cleanup
@@ -252,6 +256,8 @@ trap_handler() {
   code="${1}"
   lineno="${2}"
 
+  deferred_warnings
+
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ERROR ${TPUT_RESET} Installer exited unexpectedly (${code}-${lineno})"
 
   case "${code}" in
@@ -335,7 +341,16 @@ cleanup() {
   fi
 }
 
+deferred_warnings() {
+  if [ -n "${WARNINGS}" ]; then
+    printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
+    echo >&2 "${WARNINGS}"
+    printf >&2 "\n"
+  fi
+}
+
 fatal() {
+  deferred_warnings
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
   printf >&2 "%s\n" "For community support, you can connect with us on:"
   support_list
@@ -343,14 +358,6 @@ fatal() {
   cleanup
   trap - EXIT
   exit 1
-}
-
-run_ok() {
-  printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
-}
-
-run_failed() {
-  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
 }
 
 ESCAPED_PRINT_METHOD=
@@ -408,10 +415,11 @@ run() {
   fi
 
   if [ ${ret} -ne 0 ]; then
-    run_failed
+    printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
+    WARNINGS="${WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
   else
-    run_ok
+    printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
   fi
 
@@ -420,6 +428,7 @@ run() {
 
 warning() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
+  WARNINGS="${WARNINGS}\n  - ${*}"
 }
 
 _cannot_use_tmpdir() {
@@ -815,6 +824,7 @@ handle_existing_install() {
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
 
+      deferred_warnings
       success_banner
       cleanup
       trap - EXIT
@@ -1036,6 +1046,7 @@ claim() {
   esac
 
   if [ -z "${NETDATA_NEW_INSTALL}" ]; then
+    deferred_warnings
     printf >&2 "%s\n" "For community support, you can connect with us on:"
     support_list
     cleanup
