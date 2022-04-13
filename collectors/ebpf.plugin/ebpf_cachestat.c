@@ -961,6 +961,29 @@ static void ebpf_cachestat_allocate_global_vectors(int apps)
  *
  *****************************************************************/
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    if (em->load == EBPF_LOAD_LEGACY) {
+        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
+        if (!probe_links) {
+            ret = -1;
+        }
+    }
+
+    if (ret)
+        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+
+    return ret;
+}
+
 /**
  * Cachestat thread
  *
@@ -982,17 +1005,15 @@ void *ebpf_cachestat_thread(void *ptr)
     if (!em->enabled)
         goto endcachestat;
 
-    pthread_mutex_lock(&lock);
-    ebpf_cachestat_allocate_global_vectors(em->apps_charts);
-
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
-        pthread_mutex_unlock(&lock);
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
+    if (ebpf_cachestat_load_bpf(em)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endcachestat;
     }
 
-    ebpf_update_stats(&plugin_statistics, em);
+    ebpf_cachestat_allocate_global_vectors(em->apps_charts);
 
     int algorithms[NETDATA_CACHESTAT_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
@@ -1002,8 +1023,9 @@ void *ebpf_cachestat_thread(void *ptr)
                        cachestat_counter_dimension_name, cachestat_counter_dimension_name,
                        algorithms, NETDATA_CACHESTAT_END);
 
+    pthread_mutex_lock(&lock);
+    ebpf_update_stats(&plugin_statistics, em);
     ebpf_create_memory_charts(em);
-
     pthread_mutex_unlock(&lock);
 
     cachestat_collector(em);
