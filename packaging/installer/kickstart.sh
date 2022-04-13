@@ -687,6 +687,8 @@ uninstall() {
       return 0
     else
       progress "Found existing netdata-uninstaller. Running it.."
+      export NETDATA_SAVE_WARNINGS=1
+      export NETDATA_PROPAGATE_WARNINGS=1
       if ! run ${ROOTCMD} "${uninstaller}" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -700,6 +702,8 @@ uninstall() {
       progress "Downloading netdata-uninstaller ..."
       download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
       chmod +x "${tmpdir}/netdata-uninstaller.sh"
+      export NETDATA_SAVE_WARNINGS=1
+      export NETDATA_PROPAGATE_WARNINGS=1
       if ! run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
