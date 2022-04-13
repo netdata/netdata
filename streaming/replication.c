@@ -53,7 +53,7 @@ void replication_sender_init(RRDHOST *host){
     host->replication->tx_replication = (REPLICATION_STATE *)callocz(1, sizeof(REPLICATION_STATE));
     replication_state_init(host->replication->tx_replication);
     host->replication->tx_replication->host = host;
-    host->replication->tx_replication->enabled = default_rrdpush_replication_enabled;
+    host->replication->tx_replication->enabled = default_rrdpush_sender_replication_enabled;
 #ifdef ENABLE_HTTPS
     host->replication->tx_replication->ssl.conn = NULL;
     host->replication->tx_replication->ssl.flags = NETDATA_SSL_START;
@@ -67,7 +67,7 @@ static unsigned int replication_rd_config(RRDHOST *host, struct config *stream_c
     UNUSED(key);
     REPLICATION_STATE *rep_state = host->replication->rx_replication;
     info("%s: Reading config Rx for host %s ", REPLICATION_MSG, host->hostname);
-    unsigned int rrdpush_replication_enable = default_rrdpush_replication_enabled;
+    
 //TODO: Read configuration - https
 // #ifdef ENABLE_HTTPS
 //     //Manage also the SSL configuration and other configuration here
@@ -76,10 +76,13 @@ static unsigned int replication_rd_config(RRDHOST *host, struct config *stream_c
 // #endif
     rep_state->timeout = (int)appconfig_get_number(stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
     rep_state->default_port = (int)appconfig_get_number(stream_config, CONFIG_SECTION_STREAM, "default port", 19999);    
-    rrdpush_replication_enable = appconfig_get_boolean(stream_config, CONFIG_SECTION_STREAM, "enable replication", rrdpush_replication_enable);
+
+    unsigned int rrdpush_receiver_replication_enable = default_rrdpush_receiver_replication_enabled;
+    rrdpush_receiver_replication_enable = appconfig_get_boolean(stream_config, key, "enable replication", rrdpush_receiver_replication_enable);
+    rrdpush_receiver_replication_enable = appconfig_get_boolean(stream_config, host->machine_guid, "enable replication", rrdpush_receiver_replication_enable); 
     
-    info("%s: Configuration applied %u ", REPLICATION_MSG, rrdpush_replication_enable);
-    return rrdpush_replication_enable;
+    info("%s: Configuration applied %u ", REPLICATION_MSG, rrdpush_receiver_replication_enable);
+    return rrdpush_receiver_replication_enable;
 }
 
 void replication_receiver_init(RRDHOST *image_host, struct config *stream_config, char *key)

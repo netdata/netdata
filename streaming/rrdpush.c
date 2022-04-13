@@ -43,7 +43,8 @@ unsigned int default_rrdpush_enabled = 0;
 #ifdef ENABLE_COMPRESSION
 unsigned int default_compression_enabled = 1;
 #endif
-unsigned int default_rrdpush_replication_enabled = 0;
+unsigned int default_rrdpush_receiver_replication_enabled = 0;
+unsigned int default_rrdpush_sender_replication_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
@@ -114,11 +115,11 @@ int rrdpush_init() {
     netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/certs.pem");
 #endif
 
-    default_rrdpush_replication_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable replication", default_rrdpush_replication_enabled);
+    default_rrdpush_sender_replication_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable replication", default_rrdpush_sender_replication_enabled);
     
-    if (!default_rrdpush_replication_enabled || !default_rrdpush_enabled) {
+    if (!default_rrdpush_sender_replication_enabled || !default_rrdpush_enabled) {
         error("%s [send]: Stream Replication is disabled. Check replication and streaming settings in stream.conf.", REPLICATION_MSG);
-        default_rrdpush_replication_enabled = 0;
+        default_rrdpush_sender_replication_enabled = 0;
     }
 
     return default_rrdpush_enabled;
