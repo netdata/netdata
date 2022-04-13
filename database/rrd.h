@@ -39,9 +39,7 @@ struct pg_cache_page_index;
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
-#ifdef  ENABLE_REPLICATION
 #include "streaming/replication.h"
-#endif
 
 enum {
     CONTEXT_FLAGS_ARCHIVE = 0x01,
@@ -814,10 +812,9 @@ struct rrdhost {
     netdata_mutex_t receiver_lock;
     time_t trigger_chart_obsoletion_check;          // set when child connects, will instruct parent to
                                                     // trigger a check for obsoleted charts since previous connect
-#ifdef  ENABLE_REPLICATION
+
     GAPS *gaps_timeline;                       // disconnection gaps of a host
     REPLICATION *replication;                  // replication struct of a host
-#endif  //ENABLE_REPLICATION    
 
     // ------------------------------------------------------------------------
     // health monitoring options

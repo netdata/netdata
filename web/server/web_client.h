@@ -35,9 +35,7 @@ typedef enum web_client_mode {
     WEB_CLIENT_MODE_FILECOPY = 1,
     WEB_CLIENT_MODE_OPTIONS = 2,
     WEB_CLIENT_MODE_STREAM = 3,
-#ifdef  ENABLE_REPLICATION
     WEB_CLIENT_MODE_REPLICATE = 4
-#endif
 } WEB_CLIENT_MODE;
 
 typedef enum {

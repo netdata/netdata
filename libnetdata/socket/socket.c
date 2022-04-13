@@ -339,9 +339,7 @@ WEB_CLIENT_ACL read_acl(char *st) {
     if (!strcmp(st,"badges")) ret |= WEB_CLIENT_ACL_BADGE;
     if (!strcmp(st,"management")) ret |= WEB_CLIENT_ACL_MGMT;
     if (!strcmp(st,"streaming")) ret |= WEB_CLIENT_ACL_STREAMING;
-#ifdef  ENABLE_REPLICATION
     if (!strcmp(st,"replication")) ret |= WEB_CLIENT_ACL_REPLICATION;
-#endif
     if (!strcmp(st,"netdata.conf")) ret |= WEB_CLIENT_ACL_NETDATACONF;
 
     return ret;
@@ -387,11 +385,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             sockets->failed++;
         } else {
             acl_flags = (WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE |
-                        WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING |
-#ifdef ENABLE_REPLICATION
-                        WEB_CLIENT_ACL_REPLICATION |                        
-#endif
-                        WEB_CLIENT_ACL_SSL_DEFAULT);
+                        WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_REPLICATION | WEB_CLIENT_ACL_SSL_DEFAULT);
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
         }
@@ -442,10 +436,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         acl_flags |= read_acl(portconfig);
     } else {
         acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT |
-                    WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | 
-#ifdef  ENABLE_REPLICATION
-                    WEB_CLIENT_ACL_REPLICATION |
-#endif
+                    WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_REPLICATION |
                     WEB_CLIENT_ACL_SSL_DEFAULT;
     }
 

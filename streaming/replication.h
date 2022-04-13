@@ -1,5 +1,3 @@
-#ifdef  ENABLE_REPLICATION
-
 #ifndef NETDATA_REPLICATION_H
 #define NETDATA_REPLICATION_H 1
 
@@ -148,5 +146,5 @@ extern void rrdeng_store_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPL
 extern void rrdeng_flush_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state);
 extern void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state);
 
-#endif  //ENABLE_REPLICATION
-#endif /* NETDATA_REPLICATION_H */
+#endif
+

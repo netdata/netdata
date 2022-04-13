@@ -1091,7 +1091,6 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_strcat(wb, "\t\"stream-compression\": null,\n");
 #endif  //ENABLE_COMPRESSION   
 
-#ifdef ENABLE_REPLICATION
     buffer_strcat(wb, "\t\"stream-replication-Tx\": ");
     if(host->replication->tx_replication)
         buffer_strcat(wb, (host->replication->tx_replication->enabled ? "\"enabled\"" : "\"disabled\""));
@@ -1103,10 +1102,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
         buffer_strcat(wb, (host->replication->rx_replication->enabled ? "\"enabled\"" : "\"disabled\""));
     else
         buffer_strcat(wb, "\"inactive\"");
-    buffer_strcat(wb, ",\n");    
-#else
-    buffer_strcat(wb, "\t\"stream-replication\": \"N/A\",\n");
-#endif //ENABLE_REPLICATION   
+    buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"hosts-available\": ");
     analytics_get_data(analytics_data.netdata_config_hosts_available, wb);

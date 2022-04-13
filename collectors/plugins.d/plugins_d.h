@@ -24,7 +24,6 @@
 #define PLUGINSD_KEYWORD_TOMBSTONE "TOMBSTONE"
 #define PLUGINSD_KEYWORD_HOST "HOST"
 
-#ifdef  ENABLE_REPLICATION
 //Replication keywords
 #define PLUGINSD_KEYWORD_REP "REP"
 #define PLUGINSD_KEYWORD_REP_ON "ON"
@@ -42,7 +41,6 @@ typedef enum rep_arg {
     REP_ON = 2,
     REP_ACK = 3
 } REP_ARG;
-#endif  //ENABLE_REPLICATION
 
 
 

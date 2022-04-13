@@ -1019,7 +1019,7 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
 
     //metalog_prepare_exit(ctx->metalog_ctx);
 }
-#ifdef  ENABLE_REPLICATION
+
 int rrdeng_store_past_metrics_page_init(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
 
     RRDSET *st = rrdset_find_byname(rep_state->host, dim_past_data->rrdset_id);
@@ -1153,4 +1153,4 @@ void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, RE
     uv_rwlock_wrunlock(&page_index->lock);    
     debug(D_REPLICATION, "%s Finalize operation -  Dimension \"%s\".\"%s\" metrics page completed.", REPLICATION_MSG, rd->rrdset->id, rd->id);
 }
-#endif  //ENABLE_REPLICATION
+

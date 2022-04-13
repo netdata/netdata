@@ -55,10 +55,9 @@ const char *database_config[] = {
     "on conflict (chart_id, hash_id) do nothing; END; ",
 
     "PRAGMA user_version="DB_METADATA_VERSION";",
-#ifdef  ENABLE_REPLICATION
+
     "CREATE TABLE IF NOT EXISTS gaps(gap_id blob PRIMARY KEY, host_mguid text, "
     "t_delta_start int, t_delta_first int, t_delta_end int, status text);",
-#endif
     
     NULL
 };
@@ -2176,7 +2175,7 @@ failed:
     return;
 };
 
-#ifdef  ENABLE_REPLICATION
+
 /*
  * Store a gap in the database
  */
@@ -2398,4 +2397,3 @@ void set_host_gap(RRDHOST *host, sqlite3_stmt *res) {
         return;
     }
 }
-#endif  //ENABLE_REPLICATION

@@ -212,9 +212,8 @@ static inline long int parse_stream_version(RRDHOST *host, char *http)
 }
 
 static void enable_supported_stream_features(struct sender_state *s) {
-#if defined(ENABLE_COMPRESSION) && defined(ENABLE_REPLICATION)
-    switch (s->version)
-    {
+#if defined(ENABLE_COMPRESSION)
+    switch (s->version) {
         case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
             default_compression_enabled = 1;
             default_rrdpush_replication_enabled = 1;
@@ -227,23 +226,18 @@ static void enable_supported_stream_features(struct sender_state *s) {
             default_compression_enabled = 1;
             default_rrdpush_replication_enabled = 0;
             break;
+        case STREAM_VERSION_CLABELS:
+        case STREAM_VERSION_CLAIM:
         default:
             default_compression_enabled = 0;
             default_rrdpush_replication_enabled = 0;
             break;
     }
-#elif defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
-    if(s->version < STREAM_VERSION_COMPRESSION)
-        default_compression_enabled = 0;
-    else
-        default_compression_enabled = 1;
-#elif !defined(ENABLE_COMPRESSION) && defined(ENABLE_REPLICATION)
-    if(s->version < STREAM_VERSION_GAP_FILLING)
-        default_rrdpush_replication_enabled = 0;
-    else
-        default_rrdpush_replication_enabled = 1;
 #else
-    UNUSED(s);
+    if (s->version > STREAM_VERSION_COMPRESSION)
+        default_rrdpush_replication_enabled = 1;
+    else
+        default_rrdpush_replication_enabled = 0;
 #endif
 
 #ifdef ENABLE_COMPRESSION
@@ -260,14 +254,12 @@ static void enable_supported_stream_features(struct sender_state *s) {
     }        
 #endif
 
-#ifdef  ENABLE_REPLICATION
     if(s->host->replication->tx_replication){
         s->host->replication->tx_replication->enabled = (s->host->replication->tx_replication->enabled && default_rrdpush_replication_enabled);
         if(!s->host->replication->tx_replication->enabled) {
             infoerr("Stream Replication is not supported in this communication! One of the agents (%s <-> %s) does not support replication.", s->connected_to, s->host->hostname);
         }
     }
-#endif
 }
 
 static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
@@ -537,11 +529,9 @@ static void attempt_to_connect(struct sender_state *state)
         // let the data collection threads know we are ready
         state->host->rrdpush_sender_connected = 1;
         
-#ifdef  ENABLE_REPLICATION
         // Start replication sender thread (Tx).
         if(state->host->replication->tx_replication->enabled && !state->host->replication->tx_replication->spawned)
             replication_sender_thread_spawn(state->host);
-#endif
 
     }
     else {

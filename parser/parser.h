@@ -39,13 +39,12 @@ typedef struct pluginsd_action {
     PARSER_RC (*tombstone_action)(void *user, uuid_t *uuid);
     PARSER_RC (*host_action)(void *user, char *machine_guid, char *hostname, char *registry_hostname, int update_every, char *os,
         char *timezone, char *tags);
-#ifdef  ENABLE_REPLICATION
+
     PARSER_RC (*rep_action)(void *user, REP_ARG command);
     PARSER_RC (*gap_action)(void *user, GAP rx_gap);
     PARSER_RC (*rdata_action)(void *user, GAP meta_rx_rdata, int block_id, char *chart_id, char *dim_id);
     PARSER_RC (*fill_action)(void *user, time_t timestamp, storage_number value);
     PARSER_RC (*fill_end_action)(void *user, int block_id);
-#endif
 
 } PLUGINSD_ACTION;
 
@@ -122,11 +121,10 @@ extern PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION  *pl
 extern PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 extern PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 extern PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-#ifdef  ENABLE_REPLICATION
+
 extern PARSER_RC pluginsd_rep(char **words, void *user, PLUGINSD_ACTION  *pluginr_action);
 extern PARSER_RC pluginsd_gap(char **words, void *user, PLUGINSD_ACTION  *pluginr_action);
 extern PARSER_RC pluginsd_rdata(char **words, void *user, PLUGINSD_ACTION  *pluginr_action);
 extern PARSER_RC pluginsd_fill(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 extern PARSER_RC pluginsd_fill_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-#endif
 #endif
