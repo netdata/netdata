@@ -33,7 +33,7 @@ Slurm monitoring is disabled by default. To enable the collector:
 
 ### Example
 
-As of now, the slurm plugin only has the default options, cf. [../README.md](../README.md).
+The slurm plugin currently supports only the default configuration options, see [python.d documentation](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin).
 For instance, you can increase the collection frequency from 10 seconds (the default) to 1 second by
 
 ```yaml
