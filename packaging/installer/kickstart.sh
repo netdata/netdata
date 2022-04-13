@@ -35,8 +35,8 @@ NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
+NETDATA_WARNINGS=""
 RELEASE_CHANNEL="nightly"
-WARNINGS=""
 
 if [ -n "$DISABLE_TELEMETRY" ]; then
   NETDATA_DISABLE_TELEMETRY="${DISABLE_TELEMETRY}"
@@ -342,9 +342,9 @@ cleanup() {
 }
 
 deferred_warnings() {
-  if [ -n "${WARNINGS}" ]; then
+  if [ -n "${NETDATA_WARNINGS}" ]; then
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
-    echo >&2 "${WARNINGS}"
+    echo >&2 "${NETDATA_WARNINGS}"
     printf >&2 "\n"
   fi
 }
@@ -417,7 +417,8 @@ run() {
   if [ ${ret} -ne 0 ]; then
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
-    WARNINGS="${WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
+    # shellcheck disable=SC2089
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
   else
     printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
@@ -428,7 +429,7 @@ run() {
 
 warning() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
-  WARNINGS="${WARNINGS}\n  - ${*}"
+  NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${*}"
 }
 
 _cannot_use_tmpdir() {
@@ -646,6 +647,8 @@ update() {
 
     export NETDATA_SAVE_WARNINGS=1
     export NETDATA_PROPAGATE_WARNINGS=1
+    # shellcheck disable=SC2090
+    export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
     if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
@@ -689,6 +692,8 @@ uninstall() {
       progress "Found existing netdata-uninstaller. Running it.."
       export NETDATA_SAVE_WARNINGS=1
       export NETDATA_PROPAGATE_WARNINGS=1
+      # shellcheck disable=SC2090
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
       if ! run ${ROOTCMD} "${uninstaller}" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -704,6 +709,8 @@ uninstall() {
       chmod +x "${tmpdir}/netdata-uninstaller.sh"
       export NETDATA_SAVE_WARNINGS=1
       export NETDATA_PROPAGATE_WARNINGS=1
+      # shellcheck disable=SC2090
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
       if ! run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -1508,6 +1515,8 @@ build_and_install() {
 
   export NETDATA_SAVE_WARNINGS=1
   export NETDATA_PROPAGATE_WARNINGS=1
+  # shellcheck disable=SC2090
+  export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
   # shellcheck disable=SC2086
   run ${ROOTCMD} ./netdata-installer.sh ${opts}
 

@@ -255,7 +255,7 @@ exit_reason() {
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
       export EXIT_REASON
       export EXIT_CODE
-      export SAVED_WARNINGS
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
     fi
   fi
 }

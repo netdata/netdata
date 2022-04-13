@@ -63,14 +63,14 @@ info() {
 error() {
   echo >&3 "$(date) : ERROR: ${script_name}: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
   fi
 }
 
 fatal() {
   echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
   fi
   exit_reason "${1}" "${2}"
   exit 1
@@ -83,7 +83,7 @@ exit_reason() {
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
       export EXIT_REASON
       export EXIT_CODE
-      export SAVED_WARNINGS
+      export NETDATA_WARNINGS
     fi
   fi
 }
@@ -591,6 +591,7 @@ update_build() {
     info "Re-installing netdata..."
     export NETDATA_SAVE_WARNINGS=1
     export NETDATA_PROPAGATE_WARNINGS=1
+    export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
     # shellcheck disable=SC2086
     if ! ${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start} >&3 2>&3; then
       if [ -n "${EXIT_REASON}" ]; then

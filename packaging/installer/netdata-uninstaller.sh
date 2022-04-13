@@ -66,14 +66,14 @@ info() {
 error() {
   echo >&3 "$(date) : ERROR: ${script_name}: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
   fi
 }
 
 fatal() {
   echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
   fi
   exit_reason "${1}" "${2}"
   exit 1
@@ -86,7 +86,7 @@ exit_reason() {
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
       export EXIT_REASON
       export EXIT_CODE
-      export SAVED_WARNINGS
+      export NETDATA_WARNINGS
     fi
   fi
 }
@@ -409,7 +409,7 @@ run() {
   if [ ${ret} -ne 0 ]; then
     printf >&2 "%s FAILED %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
     printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
-    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
   else
     printf >&2 "%s OK %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
     printf >> "${run_logfile}" "OK\n"
