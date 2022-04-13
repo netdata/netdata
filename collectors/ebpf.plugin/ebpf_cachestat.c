@@ -45,6 +45,12 @@ struct config cachestat_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
+netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
+                                               {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
+                                               {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
+                                               {.name = "mark_buffer_dirty", .mode = EBPF_LOAD_TRAMPOLINE},
+                                               {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -961,6 +967,22 @@ static void ebpf_cachestat_allocate_global_vectors(int apps)
  *
  *****************************************************************/
 
+/**
+ * Update Internal value
+ *
+ * Update values used during runtime.
+ */
+static void ebpf_cachestat_set_internal_value()
+{
+    static char *account_page[] = { "account_page_dirtied", "__set_page_dirty", "__folio_mark_dirty"  };
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16)
+        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_FOLIO_DIRTY];
+    else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15)
+        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY];
+    else
+        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY];
+}
+
 /*
  * Load BPF
  *
@@ -1004,6 +1026,8 @@ void *ebpf_cachestat_thread(void *ptr)
 
     if (!em->enabled)
         goto endcachestat;
+
+    ebpf_cachestat_set_internal_value();
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
