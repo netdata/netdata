@@ -983,7 +983,6 @@ netdataDashboard.submenu = {
 
     'ip.kernel': {
         title: 'kernel functions (eBPF)',
-        info: 'Next charts are made when <code>ebpf.plugin</code> is running on your host. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows calls for kernel functions per <a href="#menu_apps_submenu_net">application</a>.'
     },
 
     'apps.net': {
@@ -1068,7 +1067,8 @@ netdataDashboard.submenu = {
         info: 'eBPF (extended Berkeley Packet Filter) is used to collect metrics from inside Linux kernel giving a zoom inside your <a href="#ebpf_system_process_thread">Process</a>, '+
               '<a href="#menu_disk">Hard Disk</a>, <a href="#menu_filesystem">File systems</a> (<a href="#menu_filesystem_submenu_file_access">File Access</a>, and ' +
               '<a href="#menu_filesystem_submenu_directory_cache__eBPF_">Directory Cache</a>), Memory (<a href="#ebpf_global_swap">Swap I/O</a>, <a href="#menu_mem_submenu_page_cache">Page Cache</a>), ' +
-              'Syscalls (<a href="#menu_mem_submenu_synchronization__eBPF_">Sync</a>, <a href="#menu_mount_submenu_mount__eBPF_">Mount</a>), and Network.'
+              'IRQ (<a href="#ebpf_global_hard_irq">Hard IRQ</a> and <a href="#ebpf_global_soft_irq">Soft IRQ</a> ), <a href="#ebpf_global_shm">Shared Memory</a>, ' +
+              'Syscalls (<a href="#menu_mem_submenu_synchronization__eBPF_">Sync</a>, <a href="#menu_mount_submenu_mount__eBPF_">Mount</a>), and <a href="#menu_ip_submenu_kernel">Network</a>.'
     },
 };
 
@@ -1249,6 +1249,42 @@ const ebpfCachestatHits = 'Number of <a href="https://learn.netdata.cloud/docs/a
 const ebpfCachestatMisses = 'Number of <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#page-cache-misses" target="_blank">access</a> to data was not present in <a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">Linux page cache</a>. ' +
     'Netdata gives a summary for this chart in <a href="#ebpf_global_cachestat_misses">Memory</a>, and when the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
     'Netdata shows page cache misses per <a href="#ebpf_apps_cachestat_misses">application</a>.' + ebpfChartProvides
+const ebpfSHMget = 'Number of calls to <code>shmget</code>. Netdata gives a summary for this chart in <a href="#ebpf_global_shm">System Overview</a>, and when the integration is ' +
+    '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows shared memory metrics per <a href="#ebpf_apps_shm_get">application</a>.' + ebpfChartProvides
+const ebpfSHMat = 'Number of calls to <code>shmat</code>. Netdata gives a summary for this chart in <a href="#ebpf_global_shm">System Overview</a>, and when the integration is ' +
+    '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows shared memory metrics per <a href="#ebpf_apps_shm_at">application</a>.' + ebpfChartProvides
+const ebpfSHMctl = 'Number of calls to <code>shmctl</code>. Netdata gives a summary for this chart in <a href="#ebpf_global_shm">System Overview</a>, and when the integration is ' +
+    '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows shared memory metrics per <a href="#ebpf_apps_shm_ctl">application</a>.' + ebpfChartProvides
+const ebpfSHMdt = 'Number of calls to <code>shmdt</code>. Netdata gives a summary for this chart in <a href="#ebpf_global_shm">System Overview</a>, and when the integration is ' +
+    '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows shared memory metrics per <a href="#ebpf_apps_shm_dt">application</a>.' + ebpfChartProvides
+const ebpfIPV4conn = 'Number of calls to IPV4 TCP function responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-outbound-connections" target="_blank">starting connections</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_outbound_conn">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows outbound connections per <a href="#ebpf_apps_outbound_conn_ipv4">application</a>.' + ebpfChartProvides
+const ebpfIPV6conn = 'Number of calls to IPV6 TCP function responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-outbound-connections" target="_blank">starting connections</a>. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_outbound_conn">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows outbound connections per <a href="#ebpf_apps_outbound_conn_ipv6">application</a>.' + ebpfChartProvides
+const ebpfBandwidthSent = 'Total bytes sent with <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">UDP</a> internal functions. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_bandwidth_tcp_bytes">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows bandwidth per <a href="#ebpf_apps_bandwidth_sent">application</a>.' + ebpfChartProvides
+const ebpfBandwidthRecv = 'Total bytes received with <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">UDP</a> internal functions. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_bandwidth_tcp_bytes">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows bandwidth per <a href="#ebpf_apps_bandwidth_received">application</a>.' + ebpfChartProvides
+const ebpfTCPSendCall = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> functions responsible to send data. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_tcp_bandwidth_call">Network Stack</a>. ' +
+    'When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows TCP calls per <a href="#ebpf_apps_bandwidth_tcp_sent">application</a>.' + ebpfChartProvides
+const ebpfTCPRecvCall = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> functions responsible to receive data. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_tcp_bandwidth_call">Network Stack</a>. ' +
+    'When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, ' +
+    'Netdata shows TCP calls per <a href="#ebpf_apps_bandwidth_tcp_received">application</a>.' + ebpfChartProvides
+const ebpfTCPRetransmit = 'Number of times a <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-retransmit" target="_blank">TCP</a> packet was retransmitted. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_tcp_retransmit">Network Stack</a>. ' +
+    'When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows TCP calls per <a href="#ebpf_apps_tcp_retransmit">application</a>.' + ebpfChartProvides
+const ebpfUDPsend = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">UDP</a> functions responsible to send data. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_udp_bandwidth_call">Network Stack</a>. ' +
+    'When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows UDP calls per <a href="#ebpf_apps_udp_sendmsg">application</a>.' + ebpfChartProvides
+const ebpfUDPrecv = 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">UDP</a> functions responsible to receive data. ' +
+    'Netdata gives a summary for this chart in <a href="#ebpf_global_udp_bandwidth_call">Network Stack</a>. ' +
+    'When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows UDP calls per <a href="#ebpf_apps_udp_recv">application</a>.' + ebpfChartProvides
 
 netdataDashboard.context = {
     'system.cpu': {
@@ -1370,7 +1406,7 @@ netdataDashboard.context = {
     },
 
     'system.hardirq_latency': {
-        info: 'Total time spent servicing hardware interrupts. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/hardirqs_example.txt" target="_blank">hardirqs</a> from BCC tools.'
+        info: 'Total time spent servicing <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#hard-irq" target="_blank">hardware interrupts</a>. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/hardirqs_example.txt" target="_blank">hardirqs</a> from BCC tools.' + ebpfChartProvides + '<div id="ebpf_global_hard_irq"></div>'
     },
 
     'system.softirqs': {
@@ -1389,7 +1425,7 @@ netdataDashboard.context = {
     },
 
     'system.softirq_latency': {
-        info: 'Total time spent servicing software interrupts. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/softirqs_example.txt" target="_blank">softirqs</a> from BCC tools.'
+        info: 'Total time spent servicing <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#soft-irq" target="_blank">software interrupts</a>. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/softirqs_example.txt" target="_blank">softirqs</a> from BCC tools.' + ebpfChartProvides + '<div id="ebpf_global_soft_irq"></div>'
     },
 
     'system.processes': {
@@ -1480,7 +1516,7 @@ netdataDashboard.context = {
     },
 
     'system.shared_memory_calls': {
-        info: 'Monitor calls to functions <code>shmget</code>, <code>shmat</code>, <code>shmdt</code>, and <code>shmctl</code>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows shared memory system call usage <a href="#menu_apps_submenu_ipc_shared_memory">per application</a>.'
+        info: 'Number of calls to syscalls responsible to manipulate <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ipc-shared-memory" target="_blank">shared memories</a>. Netdata shows shared memory metrics per <a href="#ebpf_apps_shm_get">application</a> and <a href="#ebpf_services_shm_get">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_shm"></div>'
     },
 
     'system.message_queue_messages': {
@@ -1828,6 +1864,66 @@ netdataDashboard.context = {
         '<b>ECTP0</b> and <b>ECTP1</b> - ECN capable transport.</p>'
     },
 
+    'ip.inbound_conn': {
+        info: 'Number of calls to functions responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-inbound-connections" target="_blank">receiving connections</a>.' + ebpfChartProvides
+    },
+
+    'ip.tcp_outbound_conn': {
+        info: 'Number of calls to TCP functions responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-outbound-connections" target="_blank">starting connections</a>. ' +
+        'Netdata shows TCP outbound connections metrics per <a href="#ebpf_apps_outbound_conn_ipv4">application</a> and <a href="#ebpf_services_outbound_conn_ipv4">cgroup (systemd Services)</a> if ' +
+        '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_outbound_conn"></div>'
+    },
+
+    'ip.tcp_functions': {
+        info: 'Number of calls to TCP functions responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth-functions" target="_blank">exchanging data</a>. ' +
+       'Netdata shows TCP outbound connections metrics per <a href="#ebpf_apps_bandwidth_tcp_sent">application</a> and <a href="#ebpf_services_bandwidth_tcp_sent">cgroup (systemd Services)</a> if ' +
+       '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+       '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_tcp_bandwidth_call"></div>'
+    },
+
+    'ip.total_tcp_bandwidth': {
+        info: 'Total bytes sent and received with <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP internal functions</a>. ' +
+        'Netdata shows TCP bandwidth metrics per <a href="#ebpf_apps_bandwidth_sent">application</a> and <a href="#ebpf_services_bandwidth_sent">cgroup (systemd Services)</a> if ' +
+        '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_bandwidth_tcp_bytes"></div>'
+    },
+
+    'ip.tcp_error': {
+        info: 'Number of failed calls to TCP functions responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP bandwidth</a>. ' +
+        'Netdata shows TCP error per <a href="#ebpf_apps_tcp_sendmsg_error">application</a> and <a href="#ebpf_services_tcp_sendmsg_error">cgroup (systemd Services)</a> if ' +
+        '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_tcp_bandwidth_error"></div>'
+    },
+
+    'ip.tcp_retransmit': {
+        info: 'Number of times a TCP packet was <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-retransmit" target="_blank">retransmitted</a>. ' +
+        'Netdata shows TCP retransmit per <a href="#ebpf_apps_tcp_retransmit">application</a> and <a href="#ebpf_services_tcp_retransmit">cgroup (systemd Services)</a> if ' +
+        '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_tcp_retransmit"></div>'
+    },
+
+    'ip.udp_functions': {
+        info: 'Number of calls to UDP functions responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">exchanging data</a>. ' +
+        'Netdata shows TCP outbound connections metrics per <a href="#ebpf_apps_udp_sendmsg">application</a> and <a href="#ebpf_services_udp_sendmsg">cgroup (systemd Services)</a> if ' +
+        '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_udp_bandwidth_call"></div>'
+    },
+
+    'ip.total_udp_bandwidth': {
+        info: 'Total bytes sent and received with <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-bandwidth" target="_blank">UDP internal functions</a>. ' +
+        'Netdata shows UDP bandwidth metrics per <a href="#ebpf_apps_bandwidth_udp_sendmsg">application</a> and <a href="#ebpf_services_bandwidth_udp_sendmsg">cgroup (systemd Services)</a> if ' +
+        '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_bandwidth_udp_sendmsg"></div>'
+    },
+
+    'ip.udp_error': {
+        info: 'Number of failed calls to UDP functions responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-bandwidth" target="_blank">UDP bandwidth</a>. ' +
+        'Netdata shows UDP error per <a href="#ebpf_apps_udp_sendmsg_error">application</a> and <a href="#ebpf_services_udp_sendmsg_error">cgroup (systemd Services)</a> if ' +
+        '<a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> or ' +
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + '<div id="ebpf_global_udp_bandwidth_error"></div>'
+    },
+
     'ip.tcpreorders': {
         info: '<p>TCP prevents out-of-order packets by either sequencing them in the correct order or '+
         'by requesting the retransmission of out-of-order packets.</p>'+
@@ -1875,42 +1971,6 @@ netdataDashboard.context = {
         'lingered around for long enough. '+
         '<b>Failed</b> - happens when the kernel attempted to send an RST but failed because there was no memory available.</p>'
     },
-
-    'ip.tcp_functions': {
-        title : 'TCP calls',
-        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code>, and <code>tcp_close</code>.'
-    },
-
-    'ip.total_tcp_bandwidth': {
-        title : 'TCP bandwidth',
-        info: 'Bytes sent and received by functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead of <code>tcp_recvmsg</code>, because the last one misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
-    },
-
-    'ip.tcp_error': {
-        title : 'TCP errors',
-        info: 'Failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code>, and <code>tcp_close</code>.'
-    },
-
-    'ip.tcp_retransmit': {
-        title : 'TCP retransmit',
-        info: 'Number of packets retransmitted by function <code>tcp_retransmit_skb</code>.'
-    },
-
-    'ip.udp_functions': {
-        title : 'UDP calls',
-        info: 'Successful or failed calls to functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
-    },
-
-    'ip.total_udp_bandwidth': {
-        title : 'UDP bandwidth',
-        info: 'Bytes sent and received by functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
-    },
-
-    'ip.udp_error': {
-        title : 'UDP errors',
-        info: 'Failed calls to functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
-    },
-
 
     'ip.tcp_syn_queue': {
         info: '<p>The SYN queue of the kernel tracks TCP handshakes until connections get fully established. ' +
@@ -2825,32 +2885,40 @@ netdataDashboard.context = {
         info: 'Number of errors to create a new <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">task</a>. Netdata gives a summary for this chart in <a href="#ebpf_system_task_error">Process</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows process per <a href="#ebpf_services_task_error">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_task_error"></div>'
     },
 
+    'apps.outbound_conn_v4': {
+        info: 'Number of calls to IPV4 TCP function responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-outbound-connections" target="_blank">starting connections</a>. Netdata gives a summary for this chart in <a href="#ebpf_global_outbound_conn">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows outbound connections per <a href="#ebpf_services_outbound_conn_ipv4">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_outbound_conn_ipv4"></div>'
+    },
+
+    'apps.outbound_conn_v6': {
+        info: 'Number of calls to IPV6 TCP function responsible for <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-outbound-connections" target="_blank">starting connections</a>. Netdata gives a summary for this chart in <a href="#ebpf_global_outbound_conn">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows outbound connections per <a href="#ebpf_services_outbound_conn_ipv6">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_outbound_conn_ipv6"></div>'
+    },
+
     'apps.total_bandwidth_sent': {
-        info: 'Bytes sent by functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>.'
+        info: 'Total bytes sent with <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">UDP</a> internal functions. Netdata gives a summary for this chart in <a href="#ebpf_global_bandwidth_tcp_bytes">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows bandwidth per <a href="#ebpf_services_bandwidth_sent">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_bandwidth_sent"></div>'
     },
 
     'apps.total_bandwidth_recv': {
-        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+        info: 'Total bytes received with <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">UDP</a> internal functions. Netdata gives a summary for this chart in <a href="#ebpf_global_bandwidth_tcp_bytes">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows bandwidth per <a href="#ebpf_services_bandwidth_received">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_bandwidth_received"></div>'
     },
 
     'apps.bandwidth_tcp_send': {
-        info: 'The function <code>tcp_sendmsg</code> is used to collect number of bytes sent from TCP connections.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> functions responsible to send data. Netdata gives a summary for this chart in <a href="#ebpf_global_tcp_bandwidth_call">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows TCP calls per <a href="#ebpf_services_bandwidth_tcp_sent">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_bandwidth_tcp_sent"></div>'
     },
 
     'apps.bandwidth_tcp_recv': {
-        info: 'The function <code>tcp_cleanup_rbuf</code> is used to collect number of bytes received from TCP connections.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-bandwidth" target="_blank">TCP</a> functions responsible to receive data. Netdata gives a summary for this chart in <a href="#ebpf_global_tcp_bandwidth_call">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows TCP calls per <a href="#ebpf_services_bandwidth_tcp_received">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_bandwidth_tcp_received"></div>'
     },
 
     'apps.bandwidth_tcp_retransmit': {
-        info: 'The function <code>tcp_retransmit_skb</code> is called when the host did not receive the expected return from a packet sent.'
+        info: 'Number of times a <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#tcp-retransmit" target="_blank">TCP</a> packet was retransmitted. Netdata gives a summary for this chart in <a href="#ebpf_global_tcp_retransmit">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows TCP calls per <a href="#ebpf_services_tcp_retransmit">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_tcp_retransmit"></div>'
     },
 
     'apps.bandwidth_udp_send': {
-        info: 'The function <code>udp_sendmsg</code> is used to collect number of bytes sent from UDP connections.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">UDP</a> functions responsible to send data. Netdata gives a summary for this chart in <a href="#ebpf_global_udp_bandwidth_call">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows UDP calls per <a href="#ebpf_services_udp_sendmsg">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_udp_sendmsg"></div>'
     },
 
     'apps.bandwidth_udp_recv': {
-        info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
+        info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#udp-functions" target="_blank">UDP</a> functions responsible to receive data. Netdata gives a summary for this chart in <a href="#ebpf_global_udp_bandwidth_call">Network Stack</a>. When the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows UDP calls per <a href="#ebpf_services_udp_recv">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_udp_recv"></div>'
     },
 
     'apps.cachestat_ratio' : {
@@ -2891,6 +2959,22 @@ netdataDashboard.context = {
 
     'apps.swap_write_call': {
         info: 'Number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#swap">swap writer function</a>. Netdata gives a summary for this chart in <a href="#ebpf_global_swap">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows swap metrics per <a href="#ebpf_services_swap_write">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_swap_write"></div>'
+    },
+
+    'apps.shmget_call': {
+        info: 'Number of calls to <code>shmget</code>. Netdata gives a summary for this chart in <a href="#ebpf_global_shm">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows shared memory metrics per <a href="#ebpf_services_shm_get">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_shm_get"></div>'
+    },
+
+    'apps.shmat_call': {
+        info: 'Number of calls to <code>shmat</code>. Netdata gives a summary for this chart in <a href="#ebpf_global_shm">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows shared memory metrics per <a href="#ebpf_services_shm_at">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_shm_at"></div>'
+    },
+
+    'apps.shmdt_call': {
+        info: 'Number of calls to <code>shmdt</code>. Netdata gives a summary for this chart in <a href="#ebpf_global_shm">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows shared memory metrics per <a href="#ebpf_services_shm_dt">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_shm_dt"></div>'
+    },
+
+    'apps.shmctl_call': {
+        info: 'Number of calls to <code>shmctl</code>. Netdata gives a summary for this chart in <a href="#ebpf_global_shm">System Overview</a>, and when the integration is <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">enabled</a>, Netdata shows shared memory metrics per <a href="#ebpf_services_shm_ctl">cgroup (systemd Services)</a>.' + ebpfChartProvides + '<div id="ebpf_apps_shm_ctl"></div>'
     },
 
     // ------------------------------------------------------------------------
@@ -4221,47 +4305,55 @@ netdataDashboard.context = {
     },
 
     'cgroup.shmget': {
-        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
+        info: ebpfSHMget
     },
 
     'cgroup.shmat': {
-        info: 'Number of times the syscall <code>shmat</code> is called.'
+        info: ebpfSHMat
     },
 
     'cgroup.shmdt': {
-        info: 'Number of times the syscall <code>shmdt</code> is called.'
+        info: ebpfSHMdt
     },
 
     'cgroup.shmctl': {
-        info: 'Number of times the syscall <code>shmctl</code> is called.'
+        info: ebpfSHMctl
+    },
+
+    'cgroup.outbound_conn_v4': {
+        info: ebpfIPV4conn
+    },
+
+    'cgroup.outbound_conn_v6': {
+        info: ebpfIPV6conn
     },
 
     'cgroup.net_bytes_send': {
-        info: 'Bytes sent by functions <code>tcp_sendmsg</code>.'
+        info: ebpfBandwidthSent
     },
 
     'cgroup.net_bytes_recv': {
-        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> . We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+        info: ebpfBandwidthRecv
     },
 
     'cgroup.net_tcp_send': {
-        info: 'The function <code>tcp_sendmsg</code> is used to collect number of bytes sent from TCP connections.'
+        info: ebpfTCPSendCall
     },
 
     'cgroup.net_tcp_recv': {
-        info: 'The function <code>tcp_cleanup_rbuf</code> is used to collect number of bytes received from TCP connections.'
+        info: ebpfTCPRecvCall
     },
 
     'cgroup.net_retransmit': {
-        info: 'The function <code>tcp_retransmit_skb</code> is called when the host did not receive the expected return from a packet sent.'
+        info: ebpfTCPRetransmit
     },
 
     'cgroup.net_udp_send': {
-        info: 'The function <code>udp_sendmsg</code> is used to collect number of bytes sent from UDP connections.'
+        info: ebpfUDPsend
     },
 
     'cgroup.net_udp_recv': {
-        info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
+        info: ebpfUDPrecv
     },
 
     'cgroup.dc_hit_ratio': {
@@ -4543,47 +4635,55 @@ netdataDashboard.context = {
     },
 
     'services.shmget': {
-        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
+        info: ebpfSHMget + '<div id="ebpf_services_shm_get"></div>'
     },
 
     'services.shmat': {
-        info: 'Number of times the syscall <code>shmat</code> is called.'
+        info: ebpfSHMat + '<div id="ebpf_services_shm_at"></div>'
     },
 
     'services.shmdt': {
-        info: 'Number of times the syscall <code>shmdt</code> is called.'
+        info: ebpfSHMdt + '<div id="ebpf_services_shm_dt"></div>'
     },
 
     'services.shmctl': {
-        info: 'Number of times the syscall <code>shmctl</code> is called.'
+        info: ebpfSHMctl + '<div id="ebpf_services_shm_ctl"></div>'
+    },
+
+    'services.outbound_conn_v4': {
+        info: ebpfIPV4conn + '<div id="ebpf_services_outbound_conn_ipv4"></div>'
+    },
+
+    'services.outbound_conn_v6': {
+        info: ebpfIPV6conn + '<div id="ebpf_services_outbound_conn_ipv6"></div>'
     },
 
     'services.net_bytes_send': {
-        info: 'Bytes sent by functions <code>tcp_sendmsg</code>.'
+        info: ebpfBandwidthSent + '<div id="ebpf_services_bandwidth_sent"></div>'
     },
 
     'services.net_bytes_recv': {
-        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> . We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+        info: ebpfBandwidthRecv + '<div id="ebpf_services_bandwidth_received"></div>'
     },
 
     'services.net_tcp_send': {
-        info: 'The function <code>tcp_sendmsg</code> is used to collect number of bytes sent from TCP connections.'
+        info: ebpfTCPSendCall + '<div id="ebpf_services_bandwidth_tcp_sent"></div>'
     },
 
     'services.net_tcp_recv': {
-        info: 'The function <code>tcp_cleanup_rbuf</code> is used to collect number of bytes received from TCP connections.'
+        info: ebpfTCPRecvCall + '<div id="ebpf_services_bandwidth_tcp_received"></div>'
     },
 
     'services.net_retransmit': {
-        info: 'The function <code>tcp_retransmit_skb</code> is called when the host did not receive the expected return from a packet sent.'
+        info: ebpfTCPRetransmit + '<div id="ebpf_services_tcp_retransmit"></div>'
     },
 
     'services.net_udp_send': {
-        info: 'The function <code>udp_sendmsg</code> is used to collect number of bytes sent from UDP connections.'
+        info: ebpfUDPsend + '<div id="ebpf_services_udp_sendmsg"></div>'
     },
 
     'services.net_udp_recv': {
-        info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
+       info: ebpfUDPrecv + '<div id="ebpf_services_udp_recv"></div>'
     },
 
     // ------------------------------------------------------------------------
@@ -6149,25 +6249,6 @@ netdataDashboard.context = {
         info: 'Number of failed calls to the kernel internal function responsible <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file-descriptor" target="_blank">to open and closing files</a>. ' +
               'Netdata shows file error per <a href="#ebpf_apps_file_open_error">application</a> and <a href="#ebpf_services_file_open_error">cgroup (systemd Services)</a> if <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">apps</a> ' +
               'or <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-cgroupsplugin" target="_blank">cgroup (systemd Services)</a> plugins are enabled.' + ebpfChartProvides + ' to monitor <a href="#menu_filesystem">File systems</a>.'
-    },
-
-    // ------------------------------------------------------------------------
-    // eBPF
-
-    'apps.shmget_call': {
-        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
-    },
-
-    'apps.shmat_call': {
-        info: 'Number of times the syscall <code>shmat</code> is called.'
-    },
-
-    'apps.shmdt_call': {
-        info: 'Number of times the syscall <code>shmdt</code> is called.'
-    },
-
-    'apps.shmctl_call': {
-        info: 'Number of times the syscall <code>shmctl</code> is called.'
     },
 
     // ------------------------------------------------------------------------
