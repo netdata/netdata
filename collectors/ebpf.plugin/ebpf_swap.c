@@ -163,7 +163,7 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
     netdata_ebpf_targets_t *mt = em->targets;
     netdata_ebpf_program_loaded_t test = mt[NETDATA_KEY_SWAP_READPAGE_CALL].mode;
 
-    if (test == EBPF_LOAD_TRAMPOLINE ) {
+    if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_swap_disable_probe(obj);
 
         ebpf_swap_set_trampoline_target(obj);
@@ -173,13 +173,12 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
 
     int ret = swap_bpf__load(obj);
     if (ret) {
-        fprintf(stderr, "Failed to load BPF object: %d\n", ret);
         return ret;
     }
 
     ebpf_swap_adjust_map_size(obj, em);
 
-    ret = (test == EBPF_LOAD_TRAMPOLINE ) ? swap_bpf__attach(obj) : ebpf_swap_attach_kprobe(obj);
+    ret = (test == EBPF_LOAD_TRAMPOLINE) ? swap_bpf__attach(obj) : ebpf_swap_attach_kprobe(obj);
     if (!ret) {
         ebpf_swap_set_hash_tables(obj);
 
