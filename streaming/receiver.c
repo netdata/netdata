@@ -620,10 +620,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
         return 0;
     }
 
-#ifdef ENABLE_REPLICATION
     // Guard it with rx_replication->enabled
     evaluate_gap_onconnection(rpt);
-#endif
 
     // remove the non-blocking flag from the socket
     if(sock_delnonblock(rpt->fd) < 0)
@@ -688,10 +686,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 0);
 #endif
 
-#ifdef ENABLE_REPLICATION
     // Guard it with rx_replication->enabled
     evaluate_gap_ondisconnection(rpt);
-#endif
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit && rpt->host) {

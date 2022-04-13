@@ -56,12 +56,7 @@
 #define  FEAT_STREAM_COMPRESSION 0
 #endif  //ENABLE_COMPRESSION
 
-#ifdef  ENABLE_REPLICATION
 #define  FEAT_STREAM_REPLICATION 1
-#else
-#define  FEAT_STREAM_REPLICATION 0
-#endif
-
 
 // Optional libraries
 
@@ -405,9 +400,7 @@ void analytics_build_info(BUFFER *b) {
 #ifdef ENABLE_COMPRESSION
     add_to_bi(b, "Stream Compression");
 #endif
-#ifdef ENABLE_REPLICATION
     add_to_bi(b, "Stream Replication");
-#endif
 #ifdef HAVE_PROTOBUF
     add_to_bi(b, "protobuf");
 #endif

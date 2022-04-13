@@ -6,9 +6,7 @@
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
 long web_client_streaming_rate_t = 0L;
-#ifdef  ENABLE_REPLICATION
 long web_client_replication_rate_t = 0L;
-#endif
 
 #define WORKER_JOB_ADD_CONNECTION 0
 #define WORKER_JOB_DEL_COLLECTION 1

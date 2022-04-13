@@ -740,8 +740,6 @@ static void pluginsd_process_thread_cleanup(void *ptr) {
     parser_destroy(parser);
 }
 
-// New plugins.d parser
-#ifdef  ENABLE_REPLICATION
 // Pluginsd_action for the replication commands
 PARSER_RC pluginsd_rep_action(void *user, REP_ARG command)
 {
@@ -980,7 +978,7 @@ disable:
 //     //Parser stops?
 //     // return PARSER_RC_ERROR;
 // }
-#endif  //ENABLE_REPLICATION
+
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
 {

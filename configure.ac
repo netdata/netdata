@@ -161,12 +161,6 @@ AC_ARG_ENABLE(
     [enable_compression="detect"]
 )
 AC_ARG_ENABLE(
-    [replication],
-    [AS_HELP_STRING([--enable-replication], [Enable data replication for gap filling@<:@default autodetect@:>@])],
-    ,
-    [enable_replication="detect"]
-)
-AC_ARG_ENABLE(
     [dbengine],
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
@@ -587,32 +581,6 @@ else
 fi
 AC_MSG_RESULT([${enable_compression}])
 AM_CONDITIONAL([ENABLE_COMPRESSION], [test "${enable_compression}" = "yes"])
-
-# -----------------------------------------------------------------------------
-# Stream REPlication
-
-AC_MSG_CHECKING([if netdata stream replication should be used])
-if test "${enable_replication}" != "no" -a "${SSL_LIBS}"; then
-    if test "${enable_dbengine}" == "yes"; then
-        if test "${enable_https}" == "yes"; then
-            enable_replication="yes"
-            AC_DEFINE([ENABLE_REPLICATION], [1], [netdata stream REPlication usability])
-        else
-            enable_replication="no"
-        fi
-    else
-        enable_replication="no"
-    fi
-    # Check is https is enabled and if dbengine is enabled...otherwise deactivate replication 
-    # AS_IF([test "${enable_replication}" != "no"], [],
-    #  [test "${enable_dbengine}" != "no"], [enable_replication="yes"],
-    #  [test "${enable_https}" != "no"], [enable_replication="yes"],
-    #  [enable_replication="no"])
-else
-    enable_replication="no"
-fi
-AC_MSG_RESULT([${enable_replication}])
-AM_CONDITIONAL([ENABLE_REPLICATION], [test "${enable_replication}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C

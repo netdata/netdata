@@ -435,14 +435,12 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->health_default_recipient
     );
     
-#ifdef  ENABLE_REPLICATION
     // ------------------------------------------------------------------------
     //GAPs struct initialization only for child hosts
     if(strcmp(host->machine_guid, localhost->machine_guid))
         gaps_init(&host);
     host->replication = (REPLICATION *)callocz(1, sizeof(REPLICATION));
     replication_sender_init(host);
-#endif  //ENABLE_REPLICATION
 
     rrd_hosts_available++;
 
@@ -864,9 +862,8 @@ void rrdhost_free(RRDHOST *host) {
     rrdhost_unlock(host);
 
     // ------------------------------------------------------------------------
-#ifdef  ENABLE_REPLICATION
+
     replication_sender_thread_stop(host); // stop a possibly running Tx replication thread and clean-up the state of the REP Tx thread.
-#endif
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
     buffer_free(host->sender->build);
@@ -892,10 +889,9 @@ void rrdhost_free(RRDHOST *host) {
         else
             netdata_mutex_unlock(&host->receiver_lock);
     }
-#ifdef  ENABLE_REPLICATION
+
     if(strcmp(host->machine_guid, localhost->machine_guid))
         gaps_destroy(&host);
-#endif  //ENABLE_REPLICATION 
 
     rrdhost_wrlock(host);   // lock this RRDHOST
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)

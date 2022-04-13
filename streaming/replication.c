@@ -1,7 +1,6 @@
 #include "rrdpush.h"
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-#ifdef ENABLE_REPLICATION
 // TODO: fix the header file to look nice and clean
 extern void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host);
 extern void rrdpush_clean_encoded(stream_encoded_t *se);
@@ -1836,4 +1835,3 @@ void print_collected_metric_past_data(RRDDIM_PAST_DATA *past_data, REPLICATION_S
         t += rd->update_every;
     }
 }
-#endif  //ENABLE_REPLICATION

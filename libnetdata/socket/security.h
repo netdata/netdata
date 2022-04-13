@@ -15,9 +15,7 @@
 #define NETDATA_SSL_CONTEXT_SERVER 0
 #define NETDATA_SSL_CONTEXT_STREAMING 1
 #define NETDATA_SSL_CONTEXT_EXPORTING 2
-#ifdef  ENABLE_REPLICATION
 #define NETDATA_SSL_CONTEXT_REPLICATION 3
-#endif
 
 # ifdef ENABLE_HTTPS
 
@@ -39,9 +37,8 @@ struct netdata_ssl{
 
 extern SSL_CTX *netdata_exporting_ctx;
 extern SSL_CTX *netdata_client_ctx;
-#ifdef  ENABLE_REPLICATION
 extern SSL_CTX *netdata_replication_client_ctx;
-#endif  //ENABLE_REPLICATION
+
 extern SSL_CTX *netdata_srv_ctx;
 extern const char *security_key;
 extern const char *security_cert;

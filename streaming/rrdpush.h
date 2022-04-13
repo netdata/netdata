@@ -16,15 +16,11 @@
 #define STREAM_VERSION_GAP_FILLING 6
 #define STREAM_VERSION_GAP_FILL_N_COMPRESSION 7
 
-#if defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_COMPRESSION)
-#elif !defined(ENABLE_COMPRESSION) && !defined(ENABLE_REPLICATION)
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_CLABELS)
-#elif !defined(ENABLE_COMPRESSION) && defined(ENABLE_REPLICATION)
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_GAP_FILLING)
-#else
+#if defined(ENABLE_COMPRESSION)
 #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_GAP_FILL_N_COMPRESSION)
-#endif  //ENABLE_COMPRESSION || ENABLE_REPLICATION 
+#else
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_GAP_FILLING)
+#endif  //ENABLE_COMPRESSION
 
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
@@ -159,12 +155,7 @@ struct rrdpush_destinations {
 };
 
 extern unsigned int default_rrdpush_enabled;
-#ifdef  ENABLE_REPLICATION
 extern unsigned int default_rrdpush_replication_enabled;
-#ifdef  ENABLE_HTTPS
-extern int netdata_use_ssl_on_replication;
-#endif
-#endif
 #ifdef ENABLE_COMPRESSION
 extern unsigned int default_compression_enabled;
 #endif
@@ -175,6 +166,7 @@ extern unsigned int remote_clock_resync_iterations;
 #ifdef  ENABLE_HTTPS
 extern char *netdata_ssl_ca_path;
 extern char *netdata_ssl_ca_file;
+extern int netdata_use_ssl_on_replication;
 #endif
 
 extern void sender_init(struct sender_state *s, RRDHOST *parent);
@@ -221,10 +213,9 @@ struct decompressor_state *create_decompressor();
 size_t is_compressed_data(const char *data, size_t data_size);
 #endif
 
-#ifdef  ENABLE_REPLICATION
 void log_replication_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 extern void evaluate_gap_onconnection(struct receiver_state *stream_recv);
 extern void evaluate_gap_ondisconnection(struct receiver_state *stream_recv);
-#endif
+
 
 #endif //NETDATA_RRDPUSH_H
