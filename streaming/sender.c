@@ -251,28 +251,28 @@ static void enable_supported_stream_features(struct sender_state *s) {
     switch (s->version) {
         case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
             default_compression_enabled = 1;
-            default_rrdpush_replication_enabled = 1;
+            default_rrdpush_sender_replication_enabled = 1;
             break;
         case STREAM_VERSION_GAP_FILLING:
             default_compression_enabled = 0;
-            default_rrdpush_replication_enabled = 1;
+            default_rrdpush_sender_replication_enabled = 1;
             break;
         case STREAM_VERSION_COMPRESSION:
             default_compression_enabled = 1;
-            default_rrdpush_replication_enabled = 0;
+            default_rrdpush_sender_replication_enabled = 0;
             break;
         case STREAM_VERSION_CLABELS:
         case STREAM_VERSION_CLAIM:
         default:
             default_compression_enabled = 0;
-            default_rrdpush_replication_enabled = 0;
+            default_rrdpush_sender_replication_enabled = 0;
             break;
     }
 #else
     if (s->version > STREAM_VERSION_COMPRESSION)
-        default_rrdpush_replication_enabled = 1;
+        default_rrdpush_sender_replication_enabled = 1;
     else
-        default_rrdpush_replication_enabled = 0;
+        default_rrdpush_sender_replication_enabled = 0;
 #endif
 
 #ifdef ENABLE_COMPRESSION
@@ -290,7 +290,7 @@ static void enable_supported_stream_features(struct sender_state *s) {
 #endif
 
     if(s->host->replication->tx_replication){
-        s->host->replication->tx_replication->enabled = (s->host->replication->tx_replication->enabled && default_rrdpush_replication_enabled);
+        s->host->replication->tx_replication->enabled = default_rrdpush_sender_replication_enabled;
         if(!s->host->replication->tx_replication->enabled) {
             infoerr("Stream Replication is not supported in this communication! One of the agents (%s <-> %s) does not support replication.", s->connected_to, s->host->hostname);
         }

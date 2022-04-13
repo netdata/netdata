@@ -155,7 +155,8 @@ struct rrdpush_destinations {
 };
 
 extern unsigned int default_rrdpush_enabled;
-extern unsigned int default_rrdpush_replication_enabled;
+extern unsigned int default_rrdpush_sender_replication_enabled;
+extern unsigned int default_rrdpush_receiver_replication_enabled;
 #ifdef ENABLE_COMPRESSION
 extern unsigned int default_compression_enabled;
 #endif
