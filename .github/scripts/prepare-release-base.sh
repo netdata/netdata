@@ -148,14 +148,13 @@ elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
         echo "::error::A branch named ${branch_name} already exists in the repository."
         exit 1
     fi
-    git branch "${branch_name}"
-    git checkout "${branch_name}"
     echo "${EVENT_VERSION}" > packaging/version || exit 1
     echo "::set-output name=run::true"
     echo "::set-output name=message::Minor release ${EVENT_VERSION}."
     echo "::set-output name=ref::${EVENT_VERSION}"
     echo "::set-output name=type::release"
-    echo "::set-output name=branch::${branch_name}"
+    echo "::set-output name=branch::master"
+    echo "::set-output name=new-branch:${branch_name}"
     echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
 elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a major release build."
