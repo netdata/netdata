@@ -138,8 +138,8 @@ static int ebpf_dc_attach_probes(struct dc_bpf *obj)
  */
 static void ebpf_dc_adjust_map_size(struct dc_bpf *obj, ebpf_module_t *em)
 {
-    ebpf_update_map_size(
-        obj->maps.dcstat_pid, &dcstat_maps[NETDATA_PID_SWAP_TABLE], em, bpf_map__name(obj->maps.dcstat_pid));
+    ebpf_update_map_size(obj->maps.dcstat_pid, &dcstat_maps[NETDATA_DCSTAT_PID_STATS],
+                         em, bpf_map__name(obj->maps.dcstat_pid));
 }
 
 /**
@@ -190,7 +190,7 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
     if (!ret) {
         ebpf_dc_set_hash_tables(obj);
 
-        ebpf_update_controller(dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd, em);
+        ebpf_update_controller(dcstat_maps[NETDATA_DCSTAT_CTRL].map_fd, em);
     }
 
     return ret;

@@ -281,7 +281,7 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
     if (!ret) {
         ebpf_cachestat_set_hash_tables(obj);
 
-        ebpf_update_controller(cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd, em);
+        ebpf_update_controller(cachestat_maps[NETDATA_CACHESTAT_CTRL].map_fd, em);
     }
 
     return ret;

@@ -182,7 +182,7 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
     if (!ret) {
         ebpf_swap_set_hash_tables(obj);
 
-        ebpf_update_controller(swap_maps[NETDATA_PID_SWAP_TABLE].map_fd, em);
+        ebpf_update_controller(swap_maps[NETDATA_SWAP_CONTROLLER].map_fd, em);
     }
 
     return ret;
