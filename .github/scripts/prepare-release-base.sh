@@ -11,21 +11,21 @@ EVENT_VERSION="${4}"
 # Version validation functions
 
 check_version_format() {
-    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[::digit::]]+\.[[::digit::]]+\.[[::digit::]]+$'; then
+    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
         echo "::error::The supplied version (${EVENT_VERSION}) is not a valid version string."
         return 1
     fi
 }
 
 patch_is_zero() {
-    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[::digit::]]+\.[[::digit::]]+\.0$'; then
+    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[:digit:]]+\.[[:digit:]]+\.0$'; then
         echo "::error::The patch number for a ${EVENT_TYPE} build must be 0."
         return 1
     fi
 }
 
 minor_is_zero() {
-    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[::digit::]]+\.0';  then
+    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[:digit:]]+\.0';  then
         echo "::error::The minor version number for a ${EVENT_TYPE} build must be 0."
         return 1
     fi
