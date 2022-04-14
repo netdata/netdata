@@ -483,6 +483,12 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_ANOMALY_DETECTION   = 1 << 18 // flag to identify anomaly detection charts.
 } RRDSET_FLAGS;
 
+typedef enum {
+    RRDSET_API_FILTER_SHELL         = 1 << 0,
+    RRDSET_API_FILTER_JSON          = 1 << 1,
+    RRDSET_API_FILTER_PROMETHEUS    = 1 << 2
+} RRDSET_API_FILTER;
+
 #ifdef HAVE_C___ATOMIC
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
@@ -532,6 +538,7 @@ struct rrdset {
 
     RRDSET_FLAGS flags;                             // configuration flags
     RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
+    int api_filter;                                 // bit array for filtering the chart out from API responses
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this

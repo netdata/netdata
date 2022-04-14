@@ -22,13 +22,85 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 
 #define SHELL_ELEMENT_MAX 100
 
+/**
+ * @brief Update simple pattern for chart filtering if there is a new filter
+ * 
+ * @param filter_sp simple pattern to update
+ * @param prev_filter previously stored filter
+ * @param filter a new filter
+ * @return Returns 1 if the filter has changed, 0 otherwise 
+ */
+inline int update_filter(SIMPLE_PATTERN **filter_sp, char **prev_filter, const char *filter)
+{
+    int filter_changed = 0;
+
+    if (*prev_filter && filter) {
+        if (strcmp(*prev_filter, filter))
+            filter_changed = 1;
+    } else if (*prev_filter || filter) {
+        filter_changed = 1;
+    }
+
+    if (filter_changed) {
+        freez(*prev_filter);
+        simple_pattern_free(*filter_sp);
+
+        if (filter) {
+            *prev_filter = strdupz(filter);
+            *filter_sp = simple_pattern_create(filter, NULL, SIMPLE_PATTERN_EXACT);
+        } else {
+            *prev_filter = NULL;
+            *filter_sp = NULL;
+        }
+    }
+
+    return filter_changed;
+}
+
+int chart_is_filtered_out(SIMPLE_PATTERN *filter_sp, int filter_changed, int filter_type)
+{
+    if (filter_changed) {
+
+/*
+        if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
+        return 0;
+
+        if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
+            // we have not checked this chart
+            if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
+                simple_pattern_matches(instance->config.charts_pattern, st->name))
+                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
+            else {
+                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
+                debug(
+                    D_EXPORTING,
+                    "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
+                    st->id,
+                    host->hostname);
+                return 0;
+            }
+        }
+*/
+    }
+
+    return 0;
+}
+
 void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter, BUFFER *wb) {
     analytics_log_shell();
     rrdhost_rdlock(host);
 
+    static char *prev_filter = NULL;
+    static SIMPLE_PATTERN *filter_sp = NULL;
+
+    int filter_changed = update_filter(&filter_sp, &prev_filter, filter);
+
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        if (chart_is_filtered_out(filter_sp, filter_changed, RRDSET_API_FILTER_SHELL))
+            continue;
+
         calculated_number total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(chart, st->name?st->name:st->id, SHELL_ELEMENT_MAX);
