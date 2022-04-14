@@ -21,7 +21,10 @@ static void after_pipe_write(uv_write_t* req, int status)
 #ifdef SPAWN_DEBUG
     info("CLIENT %s called status=%d", __func__, status);
 #endif
-    freez(req->data);
+    void **data = req->data;
+    freez(data[0]);
+    freez(data[1]);
+    freez(data);
 }
 
 static void client_parse_spawn_protocol(unsigned source_len, char *source)
@@ -135,11 +138,16 @@ static void on_read_alloc(uv_handle_t* handle,
 static void spawn_process_cmd(struct spawn_cmd_info *cmdinfo)
 {
     int ret;
-    uv_buf_t writebuf[3];
+    uv_buf_t *writebuf;
     struct write_context *write_ctx;
 
+    void **data = callocz(2, sizeof(void *));
+    writebuf = callocz(3, sizeof(uv_buf_t));
     write_ctx = callocz(1, sizeof(*write_ctx));
-    write_ctx->write_req.data = write_ctx;
+
+    data[0] = write_ctx;
+    data[1] = writebuf;
+    write_ctx->write_req.data = data;
 
     uv_mutex_lock(&cmdinfo->mutex);
     cmdinfo->flags |= SPAWN_CMD_PROCESSED;
