@@ -71,12 +71,15 @@ static void after_pipe_write(uv_write_t *req, int status)
 #ifdef SPAWN_DEBUG
     fprintf(stderr, "SERVER %s called status=%d\n", __func__, status);
 #endif
-    freez(req->data);
+    void **data = req->data;
+    freez(data[0]);
+    freez(data[1]);
+    freez(data);
 }
 
 static void child_waited_async_cb(uv_async_t *async_handle)
 {
-    uv_buf_t writebuf[2];
+    uv_buf_t *writebuf;
     int ret;
     struct spawn_execution_info *exec_info;
     struct write_context *write_ctx;
@@ -84,8 +87,13 @@ static void child_waited_async_cb(uv_async_t *async_handle)
     (void)async_handle;
     while (NULL != (exec_info = dequeue_child_waited_list())) {
         write_ctx = mallocz(sizeof(*write_ctx));
-        write_ctx->write_req.data = write_ctx;
 
+        void **data = callocz(2, sizeof(void *));
+        writebuf = callocz(2, sizeof(uv_buf_t));
+
+        data[0] = write_ctx;
+        data[1] = writebuf;
+        write_ctx->write_req.data = data;
 
         write_ctx->header.opcode = SPAWN_PROT_CMD_EXIT_STATUS;
         write_ctx->header.handle = exec_info->handle;
@@ -151,14 +159,18 @@ static void wait_children(void *arg)
 
 void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t command_length)
 {
-    uv_buf_t writebuf[2];
+    uv_buf_t *writebuf;
     int ret;
     avl_t *avl_ret;
     struct spawn_execution_info *exec_info;
     struct write_context *write_ctx;
 
     write_ctx = mallocz(sizeof(*write_ctx));
-    write_ctx->write_req.data = write_ctx;
+    void **data = callocz(2, sizeof(void *));
+    writebuf = callocz(2, sizeof(uv_buf_t));
+    data[0] = write_ctx;
+    data[1] = writebuf;
+    write_ctx->write_req.data = data;
 
     command_to_run[command_length] = '\0';
 #ifdef SPAWN_DEBUG
