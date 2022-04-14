@@ -277,12 +277,12 @@ warning() {
 }
 
 run_ok() {
-  printf >&2 "%s OK %s %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
+  printf >&2 "%s OK %s %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1:-''}"
 }
 
 run_failed() {
-  printf >&2 "%s FAILED %s %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
-  if [ -n "${NETDATA_SAVE_WARNINGS}" ] && [ -n "${1}" ]; then
+  printf >&2 "%s FAILED %s %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1:-''}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ] && [ -n "${1:-''}" ]; then
     SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
   fi
 }
