@@ -121,11 +121,10 @@ elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     check_version_format || exit 1
     check_for_existing_tag || exit 1
     branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
-    if [ -z "$(git branch --list "${branch_name}")" ]; then
+    if ! git checkout "${branch_name}"; then
         echo "::error::Could not find a branch for the ${branch_name}.x release series."
         exit 1
     fi
-    git checkout "${branch_name}"
     minor_matches || exit 1
     major_matches || exit 1
     check_newer_patch_version || exit 1
