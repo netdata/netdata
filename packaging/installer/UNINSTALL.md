@@ -43,7 +43,7 @@ NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user ru
 
     3.2 Non-interactive mode
 
-    If you are sure and you know what you are doing, you can speed up the removal of the netdata assets from the filesystem without any questions by using the force option (`-f`/`--force`). This option will remove all the netdata assets in an `non-interactive` mode.
+    If you are sure and you know what you are doing, you can speed up the removal of the Netdata assets from the filesystem without any questions by using the force option (`-f`/`--force`). This option will remove all the Netdata assets in a **non-interactive** mode.
 
     ```sh
     ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --force --env <environment_file>
