@@ -22,45 +22,92 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 
 #define SHELL_ELEMENT_MAX 100
 
+// TODO: move the structure to the header, add it to the host structure
+struct url_filter {
+    SIMPLE_PATTERN *filter_sp;
+
+    char *prev_filter;
+    int filter_changed;
+
+    uv_mutex_t filter_mutex;
+    uv_cond_t filter_cond;
+    int request_number;
+};
+
+// TODO: fix the doxygen comment
 /**
  * @brief Update simple pattern for chart filtering if there is a new filter
  * 
- * @param filter_sp simple pattern to update
- * @param prev_filter previously stored filter
- * @param filter a new filter
+ * @param filter filter structure to update
+ * @param filter_string a new filter to create
  * @return Returns 1 if the filter has changed, 0 otherwise 
  */
-inline int update_filter(SIMPLE_PATTERN **filter_sp, char **prev_filter, const char *filter)
+int lock_and_update_filter(struct url_filter **filter_p, const char *filter_string)
 {
+    struct url_filter *filter = *filter_p;
     int filter_changed = 0;
 
-    if (*prev_filter && filter) {
-        if (strcmp(*prev_filter, filter))
+    uv_mutex_lock(&filter->filter_mutex);
+    filter->request_number++;
+
+    if (!filter) {
+        filter = callocz(1, sizeof(struct url_filter));
+        *filter_p = filter;
+
+        if (uv_mutex_init(&filter->filter_mutex)) {
+            freez(filter);
+            fatal("Cannot initialize mutex for allmetrics filter"); // TODO: can we do without fatal()?
+        }
+
+        if (uv_cond_init(&filter->filter_cond)) {
+            freez(filter);
+            fatal("Cannot initialize conditional variable for allmetrics filter"); // TODO: can we do without fatal()?
+        }
+    }
+
+    if (filter->prev_filter && filter_string) {
+        if (strcmp(filter->prev_filter, filter_string))
             filter_changed = 1;
-    } else if (*prev_filter || filter) {
+    } else if (filter->prev_filter || filter_string) {
         filter_changed = 1;
     }
 
     if (filter_changed) {
-        freez(*prev_filter);
-        simple_pattern_free(*filter_sp);
+        while (filter->request_number > 1)
+            uv_cond_wait(&filter->filter_cond, &filter->filter_mutex);
+
+        freez(filter->prev_filter);
+        simple_pattern_free(filter->filter_sp);
 
         if (filter) {
-            *prev_filter = strdupz(filter);
-            *filter_sp = simple_pattern_create(filter, NULL, SIMPLE_PATTERN_EXACT);
+            filter->prev_filter = strdupz(filter_string);
+            filter->filter_sp = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
         } else {
-            *prev_filter = NULL;
-            *filter_sp = NULL;
+            filter->prev_filter = NULL;
+            filter->filter_sp = NULL;
         }
+    } else {
+        uv_mutex_unlock(&filter->filter_mutex);
     }
 
     return filter_changed;
 }
 
-int chart_is_filtered_out(SIMPLE_PATTERN *filter_sp, int filter_changed, int filter_type)
+void unlock_filter(struct url_filter *filter, int filter_changed)
+{
+    if (!filter_changed) {
+        uv_mutex_lock(&filter->filter_mutex);
+    }
+
+    filter->request_number--;
+
+    uv_mutex_unlock(&filter->filter_mutex);
+    uv_cond_signal(&filter->filter_cond);
+}
+
+int chart_is_filtered_out(struct url_filter *filter, int filter_changed, int filter_type)
 {
     if (filter_changed) {
-
 /*
         if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
         return 0;
@@ -81,46 +128,26 @@ int chart_is_filtered_out(SIMPLE_PATTERN *filter_sp, int filter_changed, int fil
             }
         }
 */
+    } else {
+        
     }
 
     return 0;
 }
 
-void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter, BUFFER *wb) {
+void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_shell();
     rrdhost_rdlock(host);
 
-    static char *prev_filter = NULL;
-    static SIMPLE_PATTERN *filter_sp = NULL;
-    static uv_mutex_t *filter_mutex = NULL;
-    static uv_cond_t *filter_cond = NULL;
-    static int request_number = 0;
+    // TODO: move the filter to the host structure
+    static struct url_filter *filter = NULL;
 
-    if (!filter_mutex) {
-        filter_mutex = callocz(1, sizeof(uv_mutex_t));
-        if (uv_mutex_init(filter_mutex)
-            fatal("Cannot initialize mutex for allmetrics filter");
-
-        filter_cond = callocz(1, sizeof(uv_cond_t));
-        if (uv_cond_init(filter_cond)
-            fatal("Cannot initialize conditional variable for allmetrics filter");
-    }
-
-    uv_mutex_lock(filter_mutex);
-    request_number++;
-    int filter_changed = update_filter(&filter_sp, &prev_filter, filter);
-    if (filter_changed) {
-        while (request_number > 1)
-            uv_cond_wait(filter_cond, filter_mutex);
-        
-    } else {
-        uv_mutex_unlock(filter_mutex);
-    }
+    int filter_changed = lock_and_update_filter(&filter, filter_string);
 
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (chart_is_filtered_out(filter_sp, filter_changed, RRDSET_API_FILTER_SHELL))
+        if (chart_is_filtered_out(filter, filter_changed, RRDSET_API_FILTER_SHELL))
             continue;
 
         calculated_number total = 0.0;
@@ -156,6 +183,8 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter,
             rrdset_unlock(st);
         }
     }
+
+    unlock_filter(filter, filter_changed);
 
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
