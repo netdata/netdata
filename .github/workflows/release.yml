@@ -80,7 +80,7 @@ jobs:
           git add packaging/version CHANGELOG.md
           git commit -m "[ci skip] ${{ steps.target.outputs.message }}"
           if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
-            git tag "${{ github.event.inputs.version }}"
+            git tag -a "${{ github.event.inputs.version }}" -m "${{ steps.target.outputs.message }}"
           fi
           if [ -n "${{ steps.target.outputs.new-branch }}" ]; then
             git branch "${{ steps.target.outputs.new-branch }}"
