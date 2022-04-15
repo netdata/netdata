@@ -128,7 +128,7 @@ elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     git checkout "${branch_name}"
     minor_matches || exit 1
     major_matches || exit 1
-    check_newer_patch_number || exit 1
+    check_newer_patch_version || exit 1
     echo "${EVENT_VERSION}" > packaging/version || exit 1
     echo "::set-output name=run::true"
     echo "::set-output name=message::Patch release ${EVENT_VERSION}."
