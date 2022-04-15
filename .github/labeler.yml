@@ -10,9 +10,10 @@
 #
 # Please keep the labels sorted and deduplicated.
 
-ACLK:
+area/ACLK:
   - aclk/*
   - aclk/**/*
+  - database/sqlite/sqlite_aclk*
   - mqtt_websockets
 
 area/claim:
