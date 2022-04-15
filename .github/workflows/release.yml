@@ -80,9 +80,15 @@ jobs:
           git add packaging/version CHANGELOG.md
           git commit -m "[ci skip] ${{ steps.target.outputs.message }}"
           if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
-            git tag ${{ github.event.inputs.version }}
+            git tag "${{ github.event.inputs.version }}"
           fi
-          git push --follow-tags origin ${{ steps.target.outputs.branch }}
+          if [ -n "${{ steps.target.outputs.new-branch }}" ]; then
+            git branch "${{ steps.target.outputs.new-branch }}"
+          fi
+          git push --tags origin "${{ steps.target.outputs.branch }}"
+          if [ -n "${{ steps.target.outputs.new-branch }}" ]; then
+            git push origin "${{ steps.target.outputs.new-branch }}"
+          fi
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
