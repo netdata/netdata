@@ -654,6 +654,22 @@ jobs:
             && github.event_name != 'pull_request'
           }}
 
+  normalize-tag: # Fix the release tag if needed
+    name: Normalize Release Tag
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release'
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Normalize Tag
+        id: tag
+        run: |
+          if echo ${{ github.event.inputs.version }} | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
+            echo "::set-output name=tag::v${{ github.event.inputs.version }}"
+          else
+            echo "::set-output name=tag::${{ github.event.inputs.version }}"
+          fi
+
   upload-release: # Create the draft release and upload the build artifacts.
     name: Create Release Draft
     runs-on: ubuntu-latest
@@ -663,6 +679,7 @@ jobs:
       - source-build
       - artifact-verification-dist
       - artifact-verification-static
+      - normalize-tag
     steps:
       - name: Checkout
         id: checkout
@@ -681,7 +698,7 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run'
           draft: true
-          tag: ${{ github.event.inputs.version }}
+          tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2

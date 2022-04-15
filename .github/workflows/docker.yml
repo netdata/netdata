@@ -116,10 +116,28 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
           }}
 
+  normalize-tag: # Fix the release tag if needed
+    name: Normalize Release Tag
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Normalize Tag
+        id: tag
+        run: |
+          if echo ${{ github.event.inputs.version }} | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
+            echo "::set-output name=tag::v${{ github.event.inputs.version }}"
+          else
+            echo "::set-output name=tag::${{ github.event.inputs.version }}"
+          fi
+
   docker-publish:
     if: github.event_name == 'workflow_dispatch'
     name: Docker Build and Publish
-    needs: docker-test
+    needs:
+      - docker-test
+      - normalize-tag
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -131,7 +149,7 @@ jobs:
         id: release-tags
         if: github.event.inputs.version != 'nightly'
         run: |
-          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ github.event.inputs.version }})" \
+          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }})" \
               >> "${GITHUB_ENV}"
       - name: Determine which tags to use
         id: nightly-tags
@@ -195,4 +213,4 @@ jobs:
           repo: netdata/helmchart
           workflow: Agent Version PR
           ref: refs/heads/master
-          inputs: '{"agent_version": "${{ github.event.inputs.version }}"}'
+          inputs: '{"agent_version": "${{ needs.normalize-tag.outputs.tag }}"}'
