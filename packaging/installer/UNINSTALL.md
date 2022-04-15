@@ -35,19 +35,19 @@ NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user ru
 
     3.1 Interactive mode (Default)
 
-The default mode in the uninstaller script is `interactive`. This means that the script provides to the user the option to reply with "yes" (`y`/`Y`) or no (`n`/`N`) to control the removal of each netdata asset in the filesystem.
+    The default mode in the uninstaller script is `interactive`. This means that the script provides to the user the option to reply with "yes" (`y`/`Y`) or "no" (`n`/`N`) to control the removal of each netdata asset in the filesystem.
 
-```sh
-${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --env <environment_file>
-```
+    ```sh
+    ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --env <environment_file>
+    ```
 
     3.2 Non-interactive mode
 
-If you are sure and you know what you are doing, you can speed up the removal of the netdata assets from the filesystem without any questions by using the force option (`-f`/`--force`). This option will remove all the netdata assets in an `non-interactive` mode.
+    If you are sure and you know what you are doing, you can speed up the removal of the netdata assets from the filesystem without any questions by using the force option (`-f`/`--force`). This option will remove all the netdata assets in an `non-interactive` mode.
 
-```sh
-${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --force --env <environment_file>
-```
+    ```sh
+    ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --force --env <environment_file>
+    ```
 
 Note: Existing installations may still need to download the file if it's not present. To execute uninstall in that case,
 run the following commands:
