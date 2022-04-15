@@ -105,34 +105,19 @@ void unlock_filter(struct url_filter *filter, int filter_changed)
     uv_cond_signal(&filter->filter_cond);
 }
 
-int chart_is_filtered_out(struct url_filter *filter, int filter_changed, int filter_type)
+int chart_is_filtered_out(RRDSET *st, struct url_filter *filter, int filter_changed, int filter_type)
 {
     if (filter_changed) {
-/*
-        if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
-        return 0;
-
-        if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
-            // we have not checked this chart
-            if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
-                simple_pattern_matches(instance->config.charts_pattern, st->name))
-                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
-            else {
-                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
-                debug(
-                    D_EXPORTING,
-                    "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
-                    st->id,
-                    host->hostname);
-                return 0;
-            }
-        }
-*/
-    } else {
-        
+        if (simple_pattern_matches(filter->filter_sp, st->id) || simple_pattern_matches(filter->filter_sp, st->name))
+            st->api_filter = st->api_filter & !filter_type; // chart should be sent
+        else
+            st->api_filter = st->api_filter & filter_type; // chart should be filtered out
     }
 
-    return 0;
+    if (unlikely(st->api_filter & filter_type))
+        return 1;
+    else
+        return 0;
 }
 
 void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb) {
@@ -147,7 +132,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (chart_is_filtered_out(filter, filter_changed, RRDSET_API_FILTER_SHELL))
+        if (chart_is_filtered_out(st, filter, filter_changed, RRDSET_API_FILTER_SHELL))
             continue;
 
         calculated_number total = 0.0;
