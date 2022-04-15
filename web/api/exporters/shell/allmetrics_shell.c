@@ -92,8 +92,30 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter,
 
     static char *prev_filter = NULL;
     static SIMPLE_PATTERN *filter_sp = NULL;
+    static uv_mutex_t *filter_mutex = NULL;
+    static uv_cond_t *filter_cond = NULL;
+    static int request_number = 0;
 
+    if (!filter_mutex) {
+        filter_mutex = callocz(1, sizeof(uv_mutex_t));
+        if (uv_mutex_init(filter_mutex)
+            fatal("Cannot initialize mutex for allmetrics filter");
+
+        filter_cond = callocz(1, sizeof(uv_cond_t));
+        if (uv_cond_init(filter_cond)
+            fatal("Cannot initialize conditional variable for allmetrics filter");
+    }
+
+    uv_mutex_lock(filter_mutex);
+    request_number++;
     int filter_changed = update_filter(&filter_sp, &prev_filter, filter);
+    if (filter_changed) {
+        while (request_number > 1)
+            uv_cond_wait(filter_cond, filter_mutex);
+        
+    } else {
+        uv_mutex_unlock(filter_mutex);
+    }
 
     // for each chart
     RRDSET *st;
