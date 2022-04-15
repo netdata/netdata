@@ -79,7 +79,7 @@ int lock_and_update_filter(struct url_filter **filter_p, const char *filter_stri
         freez(filter->prev_filter);
         simple_pattern_free(filter->filter_sp);
 
-        if (filter) {
+        if (filter_string) {
             filter->prev_filter = strdupz(filter_string);
             filter->filter_sp = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
         } else {
@@ -109,9 +109,9 @@ int chart_is_filtered_out(RRDSET *st, struct url_filter *filter, int filter_chan
 {
     if (filter_changed) {
         if (simple_pattern_matches(filter->filter_sp, st->id) || simple_pattern_matches(filter->filter_sp, st->name))
-            st->api_filter = st->api_filter & !filter_type; // chart should be sent
+            st->api_filter &= !filter_type; // chart should be sent
         else
-            st->api_filter = st->api_filter & filter_type; // chart should be filtered out
+            st->api_filter |= filter_type; // chart should be filtered out
     }
 
     if (unlikely(st->api_filter & filter_type))
