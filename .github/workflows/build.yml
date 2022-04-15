@@ -226,10 +226,10 @@ jobs:
           outputs: type=oci,dest=/tmp/image.tar
           tags: test:${{ matrix.artifact_key }}
       - name: Retry delay
-        if: ${{ steps.build1.outcome }} == 'failure'
+        if: ${{ steps.build1.outcome == 'failure' }}
         run: sleep "${RETRY_DELAY}"
       - name: Build test environment (attempt 2)
-        if: ${{ steps.build1.outcome }} == 'failure'
+        if: ${{ steps.build1.outcome == 'failure' }}
         id: build2
         uses: docker/build-push-action@v2
         continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
@@ -244,10 +244,10 @@ jobs:
           outputs: type=oci,dest=/tmp/image.tar
           tags: test:${{ matrix.artifact_key }}
       - name: Retry delay
-        if: ${{ steps.build1.outcome }} == 'failure' && ${{ steps.build2.outcome }} == 'failure'
+        if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
         run: sleep "${RETRY_DELAY}"
       - name: Build test environment (attempt 3)
-        if: ${{ steps.build1.outcome }} == 'failure' && ${{ steps.build2.outcome }} == 'failure'
+        if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
         id: build3
         uses: docker/build-push-action@v2
         with:
