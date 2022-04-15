@@ -47,9 +47,6 @@ int lock_and_update_filter(struct url_filter **filter_p, const char *filter_stri
     struct url_filter *filter = *filter_p;
     int filter_changed = 0;
 
-    uv_mutex_lock(&filter->filter_mutex);
-    filter->request_number++;
-
     if (!filter) {
         filter = callocz(1, sizeof(struct url_filter));
         *filter_p = filter;
@@ -64,6 +61,9 @@ int lock_and_update_filter(struct url_filter **filter_p, const char *filter_stri
             fatal("Cannot initialize conditional variable for allmetrics filter"); // TODO: can we do without fatal()?
         }
     }
+    
+    uv_mutex_lock(&filter->filter_mutex);
+    filter->request_number++;
 
     if (filter->prev_filter && filter_string) {
         if (strcmp(filter->prev_filter, filter_string))
