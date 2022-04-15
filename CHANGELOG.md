@@ -2,7 +2,15 @@
 
 ## [v1.34.0](https://github.com/netdata/netdata/tree/v1.34.0) (2022-04-14)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.33.1...v1.34.0)
+[Full Changelog](https://github.com/netdata/netdata/compare/1.34.0...v1.34.0)
+
+**Merged pull requests:**
+
+- \[Stream compression Docs\] - Enabled by default [\#12669](https://github.com/netdata/netdata/pull/12669) ([odynik](https://github.com/odynik))
+
+## [1.34.0](https://github.com/netdata/netdata/tree/1.34.0) (2022-04-14)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.33.1...1.34.0)
 
 **Merged pull requests:**
 
