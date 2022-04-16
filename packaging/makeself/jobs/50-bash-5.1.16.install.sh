@@ -20,7 +20,8 @@ run ./configure \
   --enable-array-variables \
   --disable-progcomp \
   --disable-profiling \
-  --disable-nls
+  --disable-nls \
+  --disable-dependency-tracking
 
 run make clean
 run make -j "$(nproc)"

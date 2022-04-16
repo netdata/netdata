@@ -33,7 +33,7 @@ docker run \
   -v "${PWD}:/netdata" \
   -w /netdata \
   "ubuntu:latest" \
-  /bin/bash -c "./install-required-packages.sh --dont-wait --non-interactive netdata && apt install wget && ./netdata-installer.sh --dont-wait --require-cloud --disable-telemetry --install /tmp && echo \"Validating netdata instance is running\" && wget -O - 'http://127.0.0.1:19999/api/v1/info' | grep version"
+  /bin/bash -c "./install-required-packages.sh --dont-wait --non-interactive netdata && apt install wget && ./netdata-installer.sh --dont-wait --require-cloud --disable-telemetry --install /tmp --one-time-build && echo \"Validating netdata instance is running\" && wget -O - 'http://127.0.0.1:19999/api/v1/info' | grep version"
 popd || exit 1
 
 echo "All Done!"

@@ -32,7 +32,8 @@ run ./netdata-installer.sh \
   --dont-start-it \
   --require-cloud \
   --use-system-protobuf \
-  --dont-scrub-cflags-even-though-it-may-break-things
+  --dont-scrub-cflags-even-though-it-may-break-things \
+  --one-time-build
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Finishing netdata install" || true

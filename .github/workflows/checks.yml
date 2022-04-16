@@ -27,7 +27,7 @@ jobs:
           apk del openssl openssl-dev;
           apk add libressl libressl-dev;
           autoreconf -ivf;
-          ./configure;
+          ./configure --disable-dependency-trackiong;
           make;'
   clang-checks:
     name: Clang
@@ -51,7 +51,7 @@ jobs:
       - name: Prepare environment
         run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
       - name: Build netdata
-        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install /tmp/install
+        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install /tmp/install --one-time-build
       - name: Check that repo is clean
         run: |
           git status --porcelain=v1 > /tmp/porcelain
