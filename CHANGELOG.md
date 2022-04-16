@@ -1,16 +1,16 @@
 # Changelog
 
-## [v1.34.0](https://github.com/netdata/netdata/tree/v1.34.0) (2022-04-14)
+## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/1.34.0...v1.34.0)
-
-**Merged pull requests:**
-
-- \[Stream compression Docs\] - Enabled by default [\#12669](https://github.com/netdata/netdata/pull/12669) ([odynik](https://github.com/odynik))
+[Full Changelog](https://github.com/netdata/netdata/compare/1.34.0...v1.34.1)
 
 ## [1.34.0](https://github.com/netdata/netdata/tree/1.34.0) (2022-04-14)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.33.1...1.34.0)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.34.0...1.34.0)
+
+## [v1.34.0](https://github.com/netdata/netdata/tree/v1.34.0) (2022-04-14)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.33.1...v1.34.0)
 
 **Merged pull requests:**
 
@@ -309,9 +309,6 @@
 - mqtt\_websockets submodule to latest master \(fix \#12011\) [\#12015](https://github.com/netdata/netdata/pull/12015) ([underhood](https://github.com/underhood))
 - Remove uncessary call [\#12014](https://github.com/netdata/netdata/pull/12014) ([thiagoftsm](https://github.com/thiagoftsm))
 - Updated idlejitter-plugin docs [\#12012](https://github.com/netdata/netdata/pull/12012) ([kickoke](https://github.com/kickoke))
-- Add install type info to `-W buildinfo` output. [\#12010](https://github.com/netdata/netdata/pull/12010) ([Ferroin](https://github.com/Ferroin))
-- Remove internal dbengine header from spawn/spawn\_client.c [\#12009](https://github.com/netdata/netdata/pull/12009) ([vkalintiris](https://github.com/vkalintiris))
-- Fix typo in the dashboard\_info.js spigot part [\#12008](https://github.com/netdata/netdata/pull/12008) ([lokerhp](https://github.com/lokerhp))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
