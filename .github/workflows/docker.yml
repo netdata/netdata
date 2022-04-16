@@ -91,7 +91,7 @@ jobs:
       - name: Generate Image Tag
         id: tag
         run:
-          echo "tag=netdata/netdata:test-$(echo ${{ matrix.platforms }} | cut -f 2 -d '/')" >> "${GITHUB_EVN}"
+          echo "tag=netdata/netdata:test-$(echo ${{ matrix.platforms }} | cut -f 2 -d '/')" >> "${GITHUB_ENV}"
       - name: Build
         id: build
         uses: docker/build-push-action@v2
