@@ -14,7 +14,7 @@ aclocal || exit 1
 autoheader || exit 1
 automake --add-missing --force --copy --include-deps || exit 1
 autoconf || exit 1
-./configure || exit 1
+./configure --disable-dependncy-tracking || exit 1
 make -C src || exit 1
 ar -r src/libJudy.a src/Judy*/*.o || exit 1
 cd "${OLDPWD}" || exit 1
