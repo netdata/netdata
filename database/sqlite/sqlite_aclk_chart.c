@@ -338,6 +338,12 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     char sql[ACLK_SYNC_QUERY_SIZE];
     static __thread sqlite3_stmt *res = NULL;
 
+    char *hostname = NULL;
+    if (wc->host)
+        hostname = strdupz(wc->host->hostname);
+    else
+        hostname = get_hostname_by_node_id(wc->node_id);
+
     if (unlikely(!res)) {
         snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"SELECT ac.sequence_id, acp.payload, ac.date_created, ac.type, ac.uuid  " \
              "FROM aclk_chart_%s ac, aclk_chart_payload_%s acp " \
@@ -420,7 +426,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             log_access(
                 "ACLK RES [%s (%s)]: CHARTS SENT from %" PRIu64 " to %" PRIu64 " batch=%" PRIu64,
                 wc->node_id,
-                wc->host ? wc->host->hostname : "N/A",
+                hostname ? hostname : "N/A",
                 first_sequence,
                 last_sequence,
                 wc->batch_id);
@@ -441,7 +447,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             log_access(
                 "ACLK STA [%s (%s)]: Sync of charts and dimensions done in %ld seconds.",
                 wc->node_id,
-                wc->host ? wc->host->hostname : "N/A",
+                hostname ? hostname : "N/A",
                 now_realtime_sec() - wc->startup_time);
     }
 
@@ -460,6 +466,7 @@ bind_fail:
         error_report("Failed to reset statement when pushing chart events, rc = %d", rc);
 
     freez(claim_id);
+    freez(hostname);
     return;
 }
 
@@ -584,8 +591,13 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
         cmd.param1);
     db_execute(buffer_tostring(sql));
     if (cmd.param1 == 1) {
+        char *hostname = NULL;
+        if (wc->host)
+            hostname = strdupz(wc->host->hostname);
+        else
+            hostname = get_hostname_by_node_id(wc->node_id);
         buffer_flush(sql);
-        log_access("ACLK REQ [%s (%s)]: Received chart full resync.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
+        log_access("ACLK REQ [%s (%s)]: Received chart full resync.", wc->node_id, hostname? hostname : "N/A");
         buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; " \
                             "DELETE FROM aclk_chart_latest_%s;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
         db_lock();
@@ -723,7 +735,12 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                 wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
                          (struct aclk_database_worker_config *)host->dbsync_worker :
                          (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
+            char *hostname = NULL;
             if (likely(wc)) {
+                if (wc->host)
+                    hostname = strdupz(wc->host->hostname);
+                else
+                    hostname = get_hostname_by_node_id(node_id);
                 wc->chart_reset_count++;
                 __sync_synchronize();
                 wc->chart_updates = 0;
@@ -733,7 +750,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                 log_access(
                     "ACLK REQ [%s (%s)]: CHARTS STREAM from %" PRIu64 " t=%ld resets=%d",
                     wc->node_id,
-                    wc->host ? wc->host->hostname : "N/A",
+                    hostname ? hostname : "N/A",
                     wc->chart_sequence_id,
                     wc->chart_timestamp,
                     wc->chart_reset_count);
@@ -742,7 +759,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         "ACLK RES [%s (%s)]: CHARTS FULL RESYNC REQUEST "
                         "remote_seq=%" PRIu64 " local_seq=%" PRIu64 " resets=%d ",
                         wc->node_id,
-                        wc->host ? wc->host->hostname : "N/A",
+                        hostname ? hostname : "N/A",
                         sequence_id,
                         wc->chart_sequence_id,
                         wc->chart_reset_count);
@@ -766,7 +783,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         log_access(
                             "ACLK REQ [%s (%s)]: CHART RESET from %" PRIu64 " t=%ld batch=%" PRIu64,
                             wc->node_id,
-                            wc->host ? wc->host->hostname : "N/A",
+                            hostname ? hostname : "N/A",
                             wc->chart_sequence_id,
                             wc->chart_timestamp,
                             wc->batch_id);
@@ -779,8 +796,12 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         wc->chart_updates = 1;
                     }
                 }
-            } else
-                log_access("ACLK STA [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
+                freez(hostname);
+            } else {
+                hostname = get_hostname_by_node_id(node_id);
+                log_access("ACLK STA [%s (%s)]: ACLK synchronization thread is not active.", node_id, hostname ? hostname : "N/A");
+                freez(hostname);
+            }
             return;
         }
         host = host->next;
