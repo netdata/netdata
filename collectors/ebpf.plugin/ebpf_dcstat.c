@@ -118,9 +118,13 @@ static int ebpf_dc_attach_probes(struct dc_bpf *obj)
     if (ret)
         return -1;
 
+    char *lookup_name = (dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].optional) ?
+        dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].optional :
+        dc_targets[NETDATA_DC_TARGET_LOOKUP_FAST].name ;
+
     obj->links.netdata_lookup_fast_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_lookup_fast_kprobe,
                                                                        false,
-                                                                       dc_targets[NETDATA_DC_TARGET_LOOKUP_FAST].name);
+                                                                       lookup_name);
     ret = libbpf_get_error(obj->links.netdata_lookup_fast_kprobe);
     if (ret)
         return -1;
@@ -157,6 +161,22 @@ static void ebpf_dc_set_hash_tables(struct dc_bpf *obj)
 }
 
 /**
+ * Update Load
+ *
+ * For directory cache, some distributions change the function name, and we do not have condition to use
+ * TRAMPOLINE like other functions.
+ *
+ * @return When then symbols were not modified, it returns TRAMPOLINE, else it returns RETPROBE.
+ */
+netdata_ebpf_program_loaded_t ebpf_dc_update_load()
+{
+    if (!strcmp(dc_optional_name[0].optional, dc_optional_name[0].function_to_attach))
+        return EBPF_LOAD_TRAMPOLINE;
+
+    return EBPF_LOAD_RETPROBE;
+}
+
+/**
  * Load and attach
  *
  * Load and attach the eBPF code in kernel.
@@ -169,8 +189,7 @@ static void ebpf_dc_set_hash_tables(struct dc_bpf *obj)
 static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
 {
     netdata_ebpf_targets_t *mt = em->targets;
-    netdata_ebpf_program_loaded_t test = mt[NETDATA_DC_TARGET_LOOKUP_FAST].mode;
-
+    netdata_ebpf_program_loaded_t test =  ebpf_dc_update_load();
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_dc_disable_probes(obj);
 

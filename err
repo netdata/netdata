@@ -1,0 +1,627 @@
+netdata: no process found
+shred: /usr/sbin/netdata: pass 1/51 (random)...
+shred: /usr/sbin/netdata: pass 2/51 (36db6d)...
+shred: /usr/sbin/netdata: pass 3/51 (124924)...
+shred: /usr/sbin/netdata: pass 4/51 (6eeeee)...
+shred: /usr/sbin/netdata: pass 5/51 (b6db6d)...
+shred: /usr/sbin/netdata: pass 6/51 (5b6db6)...
+shred: /usr/sbin/netdata: pass 7/51 (aaaaaa)...
+shred: /usr/sbin/netdata: pass 8/51 (777777)...
+shred: /usr/sbin/netdata: pass 9/51 (edb6db)...
+shred: /usr/sbin/netdata: pass 10/51 (dddddd)...
+shred: /usr/sbin/netdata: pass 11/51 (random)...
+shred: /usr/sbin/netdata: pass 12/51 (666666)...
+shred: /usr/sbin/netdata: pass 13/51 (888888)...
+shred: /usr/sbin/netdata: pass 14/51 (999999)...
+shred: /usr/sbin/netdata: pass 15/51 (2aaaaa)...
+shred: /usr/sbin/netdata: pass 16/51 (924924)...
+shred: /usr/sbin/netdata: pass 17/51 (a22222)...
+shred: /usr/sbin/netdata: pass 18/51 (333333)...
+shred: /usr/sbin/netdata: pass 19/51 (222222)...
+shred: /usr/sbin/netdata: pass 20/51 (d55555)...
+shred: /usr/sbin/netdata: pass 21/51 (random)...
+shred: /usr/sbin/netdata: pass 22/51 (a49249)...
+shred: /usr/sbin/netdata: pass 23/51 (111111)...
+shred: /usr/sbin/netdata: pass 24/51 (e66666)...
+shred: /usr/sbin/netdata: pass 25/51 (ffffff)...
+shred: /usr/sbin/netdata: pass 26/51 (555555)...
+shred: /usr/sbin/netdata: pass 27/51 (7fffff)...
+shred: /usr/sbin/netdata: pass 28/51 (4ccccc)...
+shred: /usr/sbin/netdata: pass 29/51 (cccccc)...
+shred: /usr/sbin/netdata: pass 30/51 (5ddddd)...
+shred: /usr/sbin/netdata: pass 31/51 (random)...
+shred: /usr/sbin/netdata: pass 32/51 (eeeeee)...
+shred: /usr/sbin/netdata: pass 33/51 (911111)...
+shred: /usr/sbin/netdata: pass 34/51 (c92492)...
+shred: /usr/sbin/netdata: pass 35/51 (c44444)...
+shred: /usr/sbin/netdata: pass 36/51 (199999)...
+shred: /usr/sbin/netdata: pass 37/51 (444444)...
+shred: /usr/sbin/netdata: pass 38/51 (6db6db)...
+shred: /usr/sbin/netdata: pass 39/51 (088888)...
+shred: /usr/sbin/netdata: pass 40/51 (b33333)...
+shred: /usr/sbin/netdata: pass 41/51 (random)...
+shred: /usr/sbin/netdata: pass 42/51 (249249)...
+shred: /usr/sbin/netdata: pass 43/51 (3bbbbb)...
+shred: /usr/sbin/netdata: pass 44/51 (f77777)...
+shred: /usr/sbin/netdata: pass 45/51 (800000)...
+shred: /usr/sbin/netdata: pass 46/51 (000000)...
+shred: /usr/sbin/netdata: pass 47/51 (bbbbbb)...
+shred: /usr/sbin/netdata: pass 48/51 (db6db6)...
+shred: /usr/sbin/netdata: pass 49/51 (492492)...
+shred: /usr/sbin/netdata: pass 50/51 (random)...
+shred: /usr/sbin/netdata: pass 51/51 (000000)...
+shred: /usr/sbin/netdata: removing
+shred: /usr/sbin/netdata: renamed to /usr/sbin/0000000
+shred: /usr/sbin/0000000: renamed to /usr/sbin/000000
+shred: /usr/sbin/000000: renamed to /usr/sbin/00000
+shred: /usr/sbin/00000: renamed to /usr/sbin/0000
+shred: /usr/sbin/0000: renamed to /usr/sbin/000
+shred: /usr/sbin/000: renamed to /usr/sbin/00
+shred: /usr/sbin/00: renamed to /usr/sbin/0
+shred: /usr/sbin/netdata: removed
+
+  ^
+  |.-.   .-.   .-.   .-.   .-.   .  netdata  .-.   .-.   .-.   .-.   .-.   .-
+  |   '-'   '-'   '-'   '-'   '-'               '-'   '-'   '-'   '-'   '-'   
+  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
+
+ --- real-time performance monitoring, done right! --- 
+[/agent]# curl -q -sSL --connect-timeout 10 --retry 3 --output /tmp/netdata-protobuf-FXnnON/protobuf-cpp-3.19.4.tar.gz https://github.com/protocolbuffers/protobuf/releases/download/v3.19.4/protobuf-cpp-3.19.4.tar.gz 
+ OK   
+
+[/agent]# tar --no-same-owner -xf /tmp/netdata-protobuf-FXnnON/protobuf-cpp-3.19.4.tar.gz -C /tmp/netdata-protobuf-FXnnON 
+ OK   
+
+[/tmp/netdata-protobuf-FXnnON/protobuf-3.19.4]# env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= ./configure --disable-shared --without-zlib --disable-dependency-tracking --with-pic 
+ OK   
+
+[/tmp/netdata-protobuf-FXnnON/protobuf-3.19.4]# env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= make -j1 
+In file included from google/protobuf/generated_message_tctable_lite.cc:36:
+./google/protobuf/generated_message_tctable_impl.h: In function 'void google::protobuf::internal::AlignFail(uintptr_t) [with long unsigned int align = 4]':
+./google/protobuf/generated_message_tctable_impl.h:103:1: warning: 'noreturn' function does return
+  103 | }
+      | ^
+./google/protobuf/generated_message_tctable_impl.h: In function 'void google::protobuf::internal::AlignFail(uintptr_t) [with long unsigned int align = 8]':
+./google/protobuf/generated_message_tctable_impl.h:103:1: warning: 'noreturn' function does return
+ OK   
+
+[/agent]# mkdir -p /agent/externaldeps/protobuf 
+ OK   
+
+[/agent]# cp -a /tmp/netdata-protobuf-FXnnON/protobuf-3.19.4/src /agent/externaldeps/protobuf 
+ OK   
+
+ OK  protobuf built and prepared. 
+
+ Detected GLIBC
+ --- Prepare libbpf --- 
+[/agent]# curl -q -sSL --connect-timeout 10 --retry 3 --output /tmp/netdata-libbpf-bnBEry/v0.7_netdata.tar.gz https://github.com/netdata/libbpf/archive/v0.7_netdata.tar.gz 
+ OK   
+
+[/agent]# tar --no-same-owner -xf /tmp/netdata-libbpf-bnBEry/v0.7_netdata.tar.gz -C /tmp/netdata-libbpf-bnBEry 
+ OK   
+
+[/tmp/netdata-libbpf-bnBEry/libbpf-0.7_netdata/src]# env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make -j1 install 
+ OK   
+
+[/agent]# mkdir -p /agent/externaldeps/libbpf 
+ OK   
+
+[/agent]# cp /tmp/netdata-libbpf-bnBEry/libbpf-0.7_netdata/usr/lib64/libbpf.a /agent/externaldeps/libbpf/libbpf.a 
+ OK   
+
+[/agent]# cp -r /tmp/netdata-libbpf-bnBEry/libbpf-0.7_netdata/usr/include /agent/externaldeps/libbpf 
+ OK   
+
+[/agent]# cp -r /tmp/netdata-libbpf-bnBEry/libbpf-0.7_netdata/include/uapi /agent/externaldeps/libbpf/include 
+ OK   
+
+ OK  libbpf built and prepared. 
+
+ --- eBPF CO-RE --- 
+[/agent]# curl -q -sSL --connect-timeout 10 --retry 3 --output /tmp/netdata-ebpf-co-re-HWyKbr/netdata-ebpf-co-re-glibc-v0.9.3.3.tar.xz https://github.com/netdata/ebpf-co-re/releases/download/v0.9.3.3/netdata-ebpf-co-re-glibc-v0.9.3.3.tar.xz 
+ OK   
+
+[/agent]# tar --no-same-owner -xf /tmp/netdata-ebpf-co-re-HWyKbr/netdata-ebpf-co-re-glibc-v0.9.3.3.tar.xz -C /tmp/netdata-ebpf-co-re-HWyKbr 
+ OK   
+
+ OK  libbpf built and prepared. 
+
+
+ --- Updating tags in git to ensure a consistent version number --- 
+[/agent]# git fetch -t 
+fatal: unsafe repository ('/agent' is owned by someone else)
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /agent
+ FAILED   
+
+
+ --- Run autotools to configure the build environment --- 
+[/agent]# autoreconf -ivf 
+autoreconf: export WARNINGS=
+autoreconf: Entering directory '.'
+autoreconf: configure.ac: not using Gettext
+autoreconf: running: aclocal --force -I build/m4
+autoreconf: configure.ac: tracing
+autoreconf: configure.ac: not using Libtool
+autoreconf: configure.ac: not using Intltool
+autoreconf: configure.ac: not using Gtkdoc
+autoreconf: running: /usr/bin/autoconf --force
+configure.ac:39: warning: The macro `AC_PROG_CC_C99' is obsolete.
+configure.ac:39: You should run autoupdate.
+./lib/autoconf/c.m4:1659: AC_PROG_CC_C99 is expanded from...
+configure.ac:39: the top level
+configure.ac:330: warning: The macro `ACX_PTHREAD' is obsolete.
+configure.ac:330: You should run autoupdate.
+build/m4/ax_pthread.m4:92: ACX_PTHREAD is expanded from...
+configure.ac:330: the top level
+configure.ac:557: warning: The macro `AC_TRY_LINK' is obsolete.
+configure.ac:557: You should run autoupdate.
+./lib/autoconf/general.m4:2920: AC_TRY_LINK is expanded from...
+configure.ac:557: the top level
+configure.ac:1093: warning: The macro `AC_TRY_LINK' is obsolete.
+configure.ac:1093: You should run autoupdate.
+./lib/autoconf/general.m4:2920: AC_TRY_LINK is expanded from...
+configure.ac:1093: the top level
+configure.ac:1415: warning: The macro `AC_LANG_CPLUSPLUS' is obsolete.
+configure.ac:1415: You should run autoupdate.
+./lib/autoconf/c.m4:262: AC_LANG_CPLUSPLUS is expanded from...
+configure.ac:1415: the top level
+configure.ac:1421: warning: The macro `AC_TRY_LINK' is obsolete.
+configure.ac:1421: You should run autoupdate.
+./lib/autoconf/general.m4:2920: AC_TRY_LINK is expanded from...
+configure.ac:1421: the top level
+autoreconf: running: /usr/bin/autoheader --force
+autoreconf: running: automake --add-missing --copy --force-missing
+autoreconf: Leaving directory '.'
+ OK   
+
+[/agent]# ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libexecdir=/usr/libexec --libdir=/usr/lib --with-zlib --with-math --with-user=netdata --disable-lto --disable-ml --disable-cloud --disable-dbengine --with-bundled-protobuf CFLAGS=-O1 -ggdb -Wall -Wextra -fno-omit-frame-pointer -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 LDFLAGS= 
+ OK   
+
+ --- Cleanup compilation directory --- 
+[/agent]# make clean 
+make: Warning: File 'Makefile' has modification time 0.079 s in the future
+make[1]: Warning: File 'Makefile' has modification time 0.7 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 1.5 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 1.5 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 0.081 s in the future
+make[2]: Warning: File 'Makefile' has modification time 0.4 s in the future
+make[3]: Warning: File 'Makefile' has modification time 0.39 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.08 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.098 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.11 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.12 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.27 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.13 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.15 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.17 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.18 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.19 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.21 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.24 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.26 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.27 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.45 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.47 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.28 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.31 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.33 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.34 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.35 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.37 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.38 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 0.43 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 0.44 s in the future
+make[2]: Warning: File 'Makefile' has modification time 0.46 s in the future
+make[3]: Warning: File 'Makefile' has modification time 0.47 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 0.44 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.42 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 0.49 s in the future
+make[2]: Warning: File 'Makefile' has modification time 0.66 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.5 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.52 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.54 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.55 s in the future
+make[3]: Warning: File 'Makefile' has modification time 0.56 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 0.53 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.56 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.58 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.59 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.43 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 0.62 s in the future
+make[2]: Warning: File 'Makefile' has modification time 0.64 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.61 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 0.68 s in the future
+make[2]: Warning: File 'Makefile' has modification time 0.71 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.72 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.74 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.75 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.77 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.78 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.8 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.81 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.83 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.84 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.86 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.87 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.89 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.91 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.92 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.93 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.95 s in the future
+make[3]: Warning: File 'Makefile' has modification time 0.96 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 0.94 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.97 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.98 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.57 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.55 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 1 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 1 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[2]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[3]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 1.3 s in the future
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.5 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.3 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[4]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[4]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.2 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.2 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.2 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[4]: Warning: File 'Makefile' has modification time 1.1 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 0.96 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[3]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[3]: Warning: File 'Makefile' has modification time 1.5 s in the future
+make[4]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[4]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[3]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[3]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.89 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 1.4 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 1.5 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 1.5 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Warning: File 'Makefile' has modification time 0.26 s in the future
+make[2]: Warning: File 'Makefile' has modification time 0.27 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[2]: Warning: File 'Makefile' has modification time 0.24 s in the future
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make: warning:  Clock skew detected.  Your build may be incomplete.
+ OK   
+
+ --- Compile netdata --- 
+[/agent]# make -j1 
+make: Warning: File 'config.h' has modification time 0.21 s in the future
+collectors/ebpf.plugin/ebpf_dcstat.c: In function 'ebpf_dc_load_and_attach':
+collectors/ebpf.plugin/ebpf_dcstat.c:191:29: warning: unused variable 'mt' [-Wunused-variable]
+  191 |     netdata_ebpf_targets_t *mt = em->targets;
+      |                             ^~
+make: warning:  Clock skew detected.  Your build may be incomplete.
+ OK   
+
+ --- Migrate configuration files for node.d.plugin and charts.d.plugin --- 
+ --- Install netdata --- 
+[/agent]# make install 
+make: Warning: File 'collectors/tc.plugin/.deps/plugin_tc.Po' has modification time 0.22 s in the future
+make[1]: Warning: File 'cli/.deps/cli.Po' has modification time 1.6 s in the future
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make: warning:  Clock skew detected.  Your build may be incomplete.
+ OK   
+
+ --- Fix generated files permissions --- 
+[/agent]# find ./system/ -type f -a ! -name *.in -a ! -name Makefile* -a ! -name *.conf -a ! -name *.service -a ! -name *.timer -a ! -name *.logrotate -a ! -name .install-type -exec chmod 755 {} ; 
+ OK   
+
+ --- Creating standard user and groups for netdata --- 
+ --- Adding group 'netdata' --- 
+Group 'netdata' already exists.
+ --- Adding user 'netdata' --- 
+User 'netdata' already exists.
+ --- Assign user 'netdata' to required groups --- 
+Group 'docker' does not exist.
+Group 'nginx' does not exist.
+Group 'varnish' does not exist.
+Group 'haproxy' does not exist.
+Adding netdata user to the adm group ...
+[/agent]# usermod -a -G adm netdata 
+ OK   
+
+Group 'nsd' does not exist.
+Group 'proxy' does not exist.
+Group 'squid' does not exist.
+Group 'ceph' does not exist.
+User 'netdata' is already in group 'nobody'.
+ --- Install logrotate configuration for netdata --- 
+ --- Read installation options from netdata.conf --- 
+Netdata user and group is finally set to: netdata/netdata
+ --- Fix permissions of netdata directories (using user 'netdata') --- 
+[/agent]# rm -f /etc/netdata/orig 
+ OK   
+
+[/agent]# ln -s /usr/lib/netdata/conf.d /etc/netdata/orig 
+ OK   
+
+[/agent]# find /usr/share/netdata/web -type f -exec chmod 0664 {} ; 
+ OK   
+
+[/agent]# find /usr/share/netdata/web -type d -exec chmod 0775 {} ; 
+ OK   
+
+[/agent]# chown -R netdata:netdata /var/lib/netdata 
+ OK   
+
+[/agent]# chown -R netdata:netdata /var/cache/netdata 
+ OK   
+
+[/agent]# chown -R netdata:netdata /var/log/netdata 
+ OK   
+
+[/agent]# chmod 755 /var/log/netdata 
+ OK   
+
+[/agent]# chown -R netdata:netdata /var/lib/netdata/cloud.d 
+ OK   
+
+[/agent]# chmod 770 /var/lib/netdata/cloud.d 
+ OK   
+
+[/agent]# chown netdata:root /var/log/netdata 
+ OK   
+
+[/agent]# chown -R root:root /usr/libexec/netdata 
+ OK   
+
+[/agent]# find /usr/libexec/netdata -type d -exec chmod 0755 {} ; 
+ OK   
+
+[/agent]# find /usr/libexec/netdata -type f -exec chmod 0644 {} ; 
+ OK   
+
+[/agent]# find /usr/libexec/netdata -type f -a -name *.plugin -exec chown :netdata {} ; 
+ OK   
+
+[/agent]# find /usr/libexec/netdata -type f -a -name *.plugin -exec chmod 0750 {} ; 
+ OK   
+
+[/agent]# find /usr/libexec/netdata -type f -a -name *.sh -exec chmod 0755 {} ; 
+ OK   
+
+[/agent]# chown root:netdata /usr/libexec/netdata/plugins.d/apps.plugin 
+ OK   
+
+[/agent]# chmod 0750 /usr/libexec/netdata/plugins.d/apps.plugin 
+ OK   
+
+[/agent]# setcap cap_dac_read_search,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin 
+ OK   
+
+[/agent]# chown root:netdata /usr/libexec/netdata/plugins.d/perf.plugin 
+ OK   
+
+[/agent]# chmod 0750 /usr/libexec/netdata/plugins.d/perf.plugin 
+ OK   
+
+[/agent]# sh -c setcap cap_perfmon+ep "/usr/libexec/netdata/plugins.d/perf.plugin" || setcap cap_sys_admin+ep "/usr/libexec/netdata/plugins.d/perf.plugin" 
+ OK   
+
+[/agent]# chown root:netdata /usr/libexec/netdata/plugins.d/slabinfo.plugin 
+ OK   
+
+[/agent]# chmod 0750 /usr/libexec/netdata/plugins.d/slabinfo.plugin 
+ OK   
+
+[/agent]# setcap cap_dac_read_search+ep /usr/libexec/netdata/plugins.d/slabinfo.plugin 
+ OK   
+
+[/agent]# chown root:netdata /usr/libexec/netdata/plugins.d/ebpf.plugin 
+ OK   
+
+[/agent]# chmod 4750 /usr/libexec/netdata/plugins.d/ebpf.plugin 
+ OK   
+
+[/agent]# chown root:netdata /usr/libexec/netdata/plugins.d/cgroup-network 
+ OK   
+
+[/agent]# chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network 
+ OK   
+
+[/agent]# chown root:netdata /usr/libexec/netdata/plugins.d/cgroup-network-helper.sh 
+ OK   
+
+[/agent]# chmod 0750 /usr/libexec/netdata/plugins.d/cgroup-network-helper.sh 
+ OK   
+
+ --- eBPF Kernel Collector --- 
+[/agent]# ./packaging/check-kernel-config.sh 
+ OK   
+
+ --- Installing eBPF plugin --- 
+ Detected GLIBC
+[/agent]# curl -q -sSL --connect-timeout 10 --retry 3 --output /tmp/netdata-ebpf-mZzR45/netdata-kernel-collector-glibc-v0.9.3.tar.xz https://github.com/netdata/kernel-collector/releases/download/v0.9.3/netdata-kernel-collector-glibc-v0.9.3.tar.xz 
+ OK   
+
+ Extracting netdata-kernel-collector-glibc-v0.9.3.tar.xz ...
+[/agent]# chown -R root:netdata /tmp/netdata-ebpf-mZzR45 
+ OK   
+
+[/agent]# cp -a -v /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_btrfs.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_btrfs.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_btrfs.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_btrfs.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_btrfs.5.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_btrfs.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_cachestat.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_cachestat.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_cachestat.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_cachestat.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_cachestat.5.15.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_cachestat.5.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_cachestat.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_dc.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_dc.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_dc.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_dc.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_dc.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_disk.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_disk.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_disk.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_disk.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_disk.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_ext4.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_ext4.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_ext4.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_ext4.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_ext4.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fd.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fd.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fd.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fd.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fd.5.11.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fd.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fdatasync.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fdatasync.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fdatasync.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fdatasync.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fdatasync.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fsync.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fsync.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fsync.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fsync.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_fsync.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_hardirq.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_hardirq.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_hardirq.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_hardirq.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_hardirq.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mdflush.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mdflush.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mdflush.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mdflush.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mdflush.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mount.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mount.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mount.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mount.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_mount.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_msync.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_msync.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_msync.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_msync.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_msync.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_nfs.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_nfs.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_nfs.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_nfs.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_nfs.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_oomkill.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_oomkill.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_oomkill.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_oomkill.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_oomkill.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_process.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_process.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_process.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_process.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_process.5.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_process.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_shm.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_shm.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_shm.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_shm.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_shm.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_socket.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_socket.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_socket.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_socket.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_socket.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_softirq.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_softirq.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_softirq.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_softirq.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_softirq.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_swap.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_swap.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_swap.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_swap.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_swap.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync_file_range.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync_file_range.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync_file_range.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync_file_range.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_sync_file_range.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_syncfs.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_syncfs.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_syncfs.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_syncfs.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_syncfs.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_vfs.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_vfs.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_vfs.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_vfs.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_vfs.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_xfs.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_xfs.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_xfs.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_xfs.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_xfs.5.4.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_zfs.3.10.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_zfs.4.14.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_zfs.4.16.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_zfs.4.18.o /tmp/netdata-ebpf-mZzR45/pnetdata_ebpf_zfs.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_btrfs.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_btrfs.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_btrfs.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_btrfs.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_btrfs.5.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_btrfs.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_cachestat.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_cachestat.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_cachestat.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_cachestat.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_cachestat.5.15.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_cachestat.5.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_cachestat.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_dc.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_dc.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_dc.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_dc.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_dc.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_disk.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_disk.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_disk.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_disk.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_disk.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_ext4.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_ext4.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_ext4.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_ext4.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_ext4.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fd.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fd.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fd.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fd.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fd.5.11.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fd.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fdatasync.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fdatasync.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fdatasync.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fdatasync.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fdatasync.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fsync.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fsync.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fsync.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fsync.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_fsync.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_hardirq.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_hardirq.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_hardirq.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_hardirq.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_hardirq.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mdflush.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mdflush.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mdflush.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mdflush.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mdflush.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mount.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mount.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mount.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mount.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_mount.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_msync.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_msync.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_msync.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_msync.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_msync.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_nfs.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_nfs.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_nfs.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_nfs.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_nfs.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_oomkill.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_oomkill.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_oomkill.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_oomkill.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_oomkill.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_process.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_process.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_process.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_process.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_process.5.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_process.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_shm.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_shm.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_shm.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_shm.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_shm.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_socket.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_socket.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_socket.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_socket.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_socket.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_softirq.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_softirq.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_softirq.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_softirq.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_softirq.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_swap.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_swap.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_swap.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_swap.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_swap.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync_file_range.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync_file_range.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync_file_range.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync_file_range.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_sync_file_range.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_syncfs.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_syncfs.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_syncfs.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_syncfs.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_syncfs.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_vfs.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_vfs.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_vfs.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_vfs.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_vfs.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_xfs.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_xfs.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_xfs.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_xfs.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_xfs.5.4.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_zfs.3.10.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_zfs.4.14.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_zfs.4.16.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_zfs.4.18.o /tmp/netdata-ebpf-mZzR45/rnetdata_ebpf_zfs.5.4.o /usr/libexec/netdata/plugins.d/ebpf.d 
+ OK   
+
+ --- Telemetry configuration --- 
+[/agent]# touch /etc/netdata/.opt-out-from-anonymous-statistics 
+ OK   
+
+ --- Install netdata at system init --- 
+Installing systemd service...
+[/agent]# cp system/netdata.service /lib/systemd/system/netdata.service 
+ OK   
+
+[/agent]# systemctl daemon-reload 
+ OK   
+
+[/agent]# systemctl enable netdata 
+ OK   
+
+[/agent]# chmod 0644 /etc/netdata/netdata.conf 
+ OK   
+
+ --- Check KSM (kernel memory deduper) --- 
+ --- Check version.txt --- 
+ --- Check apps.plugin --- 
+ --- Copy uninstaller --- 
+ --- Basic netdata instructions --- 
+Uninstall script copied to: /usr/libexec/netdata/netdata-uninstaller.sh
+
+ --- Installing (but not enabling) the netdata updater tool --- 
+Update script is located at /usr/libexec/netdata/netdata-updater.sh
+
+ --- Wrap up environment set up --- 
+Preparing .environment file
+[/agent]# chmod 0644 /etc/netdata/.environment 
+ OK   
+
+Setting netdata.tarball.checksum to 'new_installation'
+
+ --- We are done! --- 
+
+  ^
+  |.-.   .-.   .-.   .-.   .-.   .  netdata  .-.   .-.   .-.   .-.   .-.   .-
+  |   '-'   '-'   '-'   '-'   '-'               '-'   '-'   '-'   '-'   '-'   
+  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
+
+ --- is installed now! --- 
+  enjoy real-time performance and health monitoring...
+
