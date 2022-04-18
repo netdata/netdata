@@ -129,7 +129,7 @@ renice 19 $$ > /dev/null 2> /dev/null
 # you can set CFLAGS before running installer
 # shellcheck disable=SC2269
 LDFLAGS="${LDFLAGS}"
-CFLAGS="${CFLAGS--O2}"
+CFLAGS="${CFLAGS-"-O2 -pipe"}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
 # shellcheck disable=SC2269
 ACLK="${ACLK}"
@@ -576,7 +576,7 @@ build_protobuf() {
   env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
   fi
 
   cd "${1}" > /dev/null || return 1
@@ -651,7 +651,7 @@ build_judy() {
   libtoolize="libtoolize"
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
   fi
 
   if [ "$(uname)" = "Darwin" ]; then
@@ -742,7 +742,7 @@ build_jsonc() {
   env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
   fi
 
   cd "${1}" > /dev/null || return 1
@@ -866,7 +866,7 @@ build_libbpf() {
   cd "${1}/src" > /dev/null || return 1
   mkdir root build
   # shellcheck disable=SC2086
-  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
+  run env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
   cd - > /dev/null || return 1
 }
 

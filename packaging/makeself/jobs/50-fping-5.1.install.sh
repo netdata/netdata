@@ -10,7 +10,7 @@
 fetch "fping-5.1" "https://fping.org/dist/fping-5.1.tar.gz" \
     1ee5268c063d76646af2b4426052e7d81a42b657e6a77d8e7d3d2e60fd7409fe
 
-export CFLAGS="-static -I/openssl-static/include"
+export CFLAGS="-static -I/openssl-static/include -pipe"
 export LDFLAGS="-static -L/openssl-static/lib"
 export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 

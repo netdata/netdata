@@ -10,7 +10,7 @@
 fetch "ioping-1.2" "https://github.com/koct9i/ioping/archive/v1.2.tar.gz" \
     d3e4497c653a1e96df67c72ce2b70da18e9f5e3b93179a5bb57a6e30ceacfa75
 
-export CFLAGS="-static"
+export CFLAGS="-static -pipe"
 
 run make clean
 run make -j "$(nproc)"
