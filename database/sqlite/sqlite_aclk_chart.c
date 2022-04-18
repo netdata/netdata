@@ -707,9 +707,6 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     if (unlikely(!node_id))
         return;
 
-    //    log_access("ACLK REQ [%s (N/A)]: CHARTS STREAM from %"PRIu64" t=%ld batch=%"PRIu64, node_id,
-    //          sequence_id, created_at, batch_id);
-
     uuid_t node_uuid;
     if (uuid_parse(node_id, node_uuid)) {
         log_access("ACLK REQ [%s (N/A)]: CHARTS STREAM ignored, invalid node id", node_id);
