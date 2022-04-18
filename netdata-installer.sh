@@ -576,19 +576,16 @@ build_protobuf() {
   env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    # shellcheck disable=SC2089
     env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
   fi
 
   cd "${1}" > /dev/null || return 1
-  # shellcheck disable=SC2086,SC2090
-  if ! run ${env_cmd} ./configure --disable-shared --without-zlib --disable-dependency-tracking --with-pic; then
+  if ! run eval "${env_cmd} ./configure --disable-shared --without-zlib --disable-dependency-tracking --with-pic"; then
     cd - > /dev/null || return 1
     return 1
   fi
 
-  # shellcheck disable=SC2086,SC2090
-  if ! run ${env_cmd} $make ${MAKEOPTS}; then
+  if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
     cd - > /dev/null || return 1
     return 1
   fi
@@ -652,7 +649,6 @@ build_judy() {
   libtoolize="libtoolize"
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    # shellcheck disable=SC2089
     env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
   fi
 
@@ -661,15 +657,14 @@ build_judy() {
   fi
 
   cd "${1}" > /dev/null || return 1
-  # shellcheck disable=SC2086,SC2090
-  if run ${env_cmd} ${libtoolize} --force --copy &&
-    run ${env_cmd} aclocal &&
-    run ${env_cmd} autoheader &&
-    run ${env_cmd} automake --add-missing --force --copy --include-deps &&
-    run ${env_cmd} autoconf &&
-    run ${env_cmd} ./configure --disable-dependency-tracking &&
-    run ${env_cmd} ${make} ${MAKEOPTS} -C src &&
-    run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o; then
+  if run eval "${env_cmd} ${libtoolize} --force --copy" &&
+    run eval "${env_cmd} aclocal" &&
+    run eval "${env_cmd} autoheader" &&
+    run eval "${env_cmd} automake --add-missing --force --copy --include-deps" &&
+    run eval "${env_cmd} autoconf" &&
+    run eval "${env_cmd} ./configure" &&
+    run eval "${env_cmd} ${make} ${MAKEOPTS} -C src" &&
+    run eval "${env_cmd} ar -r src/libJudy.a src/Judy*/*.o"; then
     cd - > /dev/null || return 1
   else
     cd - > /dev/null || return 1
@@ -744,15 +739,12 @@ build_jsonc() {
   env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    # shellcheck disable=SC2089
     env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
   fi
 
-  cd "${1}" > /dev/null || return 1
-  # shellcheck disable=SC2086,SC2090
-  run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
-  # shellcheck disable=SC2086,SC2090
-  run ${env_cmd} ${make} ${MAKEOPTS}
+  cd "${1}" > /dev/null || exit 1
+  run eval "${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF ."
+  run eval "${env_cmd} ${make} ${MAKEOPTS}"
   cd - > /dev/null || return 1
 }
 
