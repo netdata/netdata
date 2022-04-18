@@ -272,7 +272,8 @@ autoreconf -ivf
 	--libdir="%{_libdir}" \
 	--with-zlib \
 	--with-math \
-	--with-user=netdata
+	--with-user=netdata \
+	--disable-dependency-tracking
 
 # Build step
 %{__make} %{?_smp_mflags}

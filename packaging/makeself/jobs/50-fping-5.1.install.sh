@@ -17,7 +17,8 @@ export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 run ./configure \
   --prefix="${NETDATA_INSTALL_PATH}" \
   --enable-ipv4 \
-  --enable-ipv6
+  --enable-ipv6 \
+  --disable-dependency-tracking
 
 cat > doc/Makefile << EOF
 all:

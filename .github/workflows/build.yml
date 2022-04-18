@@ -321,23 +321,23 @@ jobs:
         id: build-basic
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
+              /bin/sh -c 'autoreconf -ivf && ./configure --disable-dependency-tracking && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}, disable cloud
         id: build-no-cloud
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud --one-time-build'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud
         id: build-cloud
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
         id: build-no-jsonc
         if: matrix.jsonc_removal != ''
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

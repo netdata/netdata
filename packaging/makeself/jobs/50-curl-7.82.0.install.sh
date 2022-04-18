@@ -37,7 +37,8 @@ run ./configure \
   --enable-ipv6 \
   --enable-cookies \
   --with-ca-fallback \
-  --with-openssl
+  --with-openssl \
+  --disable-dependency-tracking
 
 # Curl autoconf does not honour the curl_LDFLAGS environment variable
 run sed -i -e "s/LDFLAGS =/LDFLAGS = -all-static/" src/Makefile

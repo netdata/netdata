@@ -343,6 +343,7 @@ while [ -n "${1}" ]; do
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
     "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')" ;;
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
+    "--one-time-build") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-dependency-tracking)}" | sed 's/$/ --disable-dependency-tracking/g')" ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
@@ -711,7 +712,7 @@ build_judy() {
     run ${env_cmd} autoheader &&
     run ${env_cmd} automake --add-missing --force --copy --include-deps &&
     run ${env_cmd} autoconf &&
-    run ${env_cmd} ./configure &&
+    run ${env_cmd} ./configure --disable-dependency-tracking &&
     run ${env_cmd} ${make} ${MAKEOPTS} -C src &&
     run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o; then
     cd - > /dev/null || return 1
