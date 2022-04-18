@@ -226,6 +226,7 @@ netnsid_find_all_interfaces_for_cgroup() {
         for p in $(< "${c}/cgroup.procs" )
         do
             netnsid_find_all_interfaces_for_pid "${p}"
+            return 0
         done
     else
         debug "Cannot find file '${c}/cgroup.procs', not searching for netnsid interfaces."
