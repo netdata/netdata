@@ -808,7 +808,6 @@ void *health_main(void *ptr) {
 #endif
                         }
                     }
-                    continue;
                 }
 
                 if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run))) {
