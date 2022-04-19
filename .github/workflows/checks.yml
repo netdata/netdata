@@ -27,7 +27,7 @@ jobs:
           apk del openssl openssl-dev;
           apk add libressl libressl-dev;
           autoreconf -ivf;
-          ./configure --disable-dependency-trackiong;
+          ./configure --disable-dependency-tracking;
           make;'
   clang-checks:
     name: Clang
