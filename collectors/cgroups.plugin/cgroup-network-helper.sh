@@ -218,15 +218,8 @@ netnsid_find_all_interfaces_for_pid() {
 netnsid_find_all_interfaces_for_cgroup() {
     local c="${1}" # the cgroup path
 
-    # for each pid of the cgroup
-    # find any tun/tap devices linked to the pid
-    if [ -f "${c}/cgroup.procs" ]
-    then
-        local p
-        for p in $(< "${c}/cgroup.procs" )
-        do
-            netnsid_find_all_interfaces_for_pid "${p}"
-        done
+    if [ -f "${c}/cgroup.procs" ]; then
+        netnsid_find_all_interfaces_for_pid "$(head -n 1 "${c}/cgroup.procs" 2 >/dev/null)"
     else
         debug "Cannot find file '${c}/cgroup.procs', not searching for netnsid interfaces."
     fi
