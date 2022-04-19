@@ -212,6 +212,11 @@ typedef struct ebpf_plugin_stats {
     uint32_t trampolines; // Number of trampolines used
 } ebpf_plugin_stats_t;
 
+typedef enum ebpf_memory_allocate {
+    NETDATA_EBPF_ALLOCATE_DYNAMIC,
+    NETDATA_EBPF_ALLOCATE_STATIC
+} ebpf_memory_allocate_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -233,6 +238,7 @@ typedef struct ebpf_module {
     uint64_t kernels;
     netdata_ebpf_load_mode_t load;
     netdata_ebpf_targets_t *targets;
+    ebpf_memory_allocate_t allocate;
 } ebpf_module_t;
 
 extern int ebpf_get_kernel_version();
