@@ -188,7 +188,6 @@ netdata_ebpf_program_loaded_t ebpf_dc_update_load()
  */
 static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_targets_t *mt = em->targets;
     netdata_ebpf_program_loaded_t test =  ebpf_dc_update_load();
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_dc_disable_probes(obj);
