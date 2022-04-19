@@ -735,6 +735,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         fatal("posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);*/
     }
+    memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING(size_bytes));
     (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct rrdeng_page_descr *) * count);
     xt_io_descr->descr_count = count;
 

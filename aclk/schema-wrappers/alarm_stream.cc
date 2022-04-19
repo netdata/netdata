@@ -176,8 +176,10 @@ char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
 
     *len = PROTO_COMPAT_MSG_SIZE(le);
     char *bin = (char*)mallocz(*len);
-    if (!le.SerializeToArray(bin, *len))
+    if (!le.SerializeToArray(bin, *len)) {
+        freez(bin);
         return NULL;
+    }
 
     return bin;
 }
