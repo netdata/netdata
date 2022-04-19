@@ -29,9 +29,9 @@ time_t removed_when(uint32_t alarm_id, uint32_t before_unique_id, uint32_t after
         when = (time_t) sqlite3_column_int64(res, 0);
     }
 
-    rc = sqlite3_reset(res);
+    rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement when trying to find removed gap, rc = %d", rc);
+        error_report("Failed to finalize statement when trying to find removed gap, rc = %d", rc);
 
     return when;
 }
@@ -67,7 +67,7 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to filter alert events.");
         send = 1;
-        goto done;
+        return send;
     }
 
     rc = sqlite3_step(res);
@@ -112,9 +112,9 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     }
      
 done:
-    rc = sqlite3_reset(res);
+    rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement when trying to filter alert events, rc = %d", rc);
+        error_report("Failed to finalize statement when trying to filter alert events, rc = %d", rc);
 
     return send;
 }
