@@ -33,7 +33,7 @@ NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user ru
 
 3.  Run `netdata-uninstaller.sh` as follows
 
-    3.1 Interactive mode (Default)
+    3.1 **Interactive mode (Default)**
 
     The default mode in the uninstaller script is **interactive**. This means that the script provides the user the option to reply with "yes" (`y`/`Y`) or "no" (`n`/`N`) to control the removal of each Netdata asset in the filesystem.
 
