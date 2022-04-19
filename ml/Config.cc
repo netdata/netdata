@@ -58,7 +58,7 @@ void Config::readMLConfig(void) {
      * Clamp
      */
 
-    MaxTrainSamples = clamp(MaxTrainSamples, 1 * 3600u, 6 * 3600u);
+    MaxTrainSamples = clamp(MaxTrainSamples, 1 * 3600u, 32 * 3600u);
     MinTrainSamples = clamp(MinTrainSamples, 1 * 3600u, 6 * 3600u);
     TrainEvery = clamp(TrainEvery, 1 * 3600u, 6 * 3600u);
 
