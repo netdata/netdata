@@ -675,7 +675,7 @@ update_binpkg() {
     debian)
       pm_cmd="apt-get"
       repo_subcmd="update"
-      upgrade_cmd="upgrade"
+      upgrade_cmd="--only-upgrade install"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="dpkg -s"
@@ -684,7 +684,7 @@ update_binpkg() {
     ubuntu)
       pm_cmd="apt-get"
       repo_subcmd="update"
-      upgrade_cmd="upgrade"
+      upgrade_cmd="--only-upgrade install"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="dpkg -s"
