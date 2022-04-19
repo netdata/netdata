@@ -166,12 +166,19 @@ static void ebpf_dc_set_hash_tables(struct dc_bpf *obj)
  * For directory cache, some distributions change the function name, and we do not have condition to use
  * TRAMPOLINE like other functions.
  *
+ * @param em  structure with configuration
+ *
  * @return When then symbols were not modified, it returns TRAMPOLINE, else it returns RETPROBE.
  */
-netdata_ebpf_program_loaded_t ebpf_dc_update_load()
+netdata_ebpf_program_loaded_t ebpf_dc_update_load(ebpf_module_t *em)
 {
-    if (!strcmp(dc_optional_name[0].optional, dc_optional_name[0].function_to_attach))
+    if (!strcmp(dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].optional,
+                dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].function_to_attach))
         return EBPF_LOAD_TRAMPOLINE;
+
+    if (em->targets[NETDATA_DC_TARGET_LOOKUP_FAST].mode != EBPF_LOAD_RETPROBE)
+        info("When your kernel was compiled the symbol %s was modified, instead to use `trampoline`, the plugin will use `probes`.",
+             dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].function_to_attach);
 
     return EBPF_LOAD_RETPROBE;
 }
@@ -188,7 +195,7 @@ netdata_ebpf_program_loaded_t ebpf_dc_update_load()
  */
 static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_program_loaded_t test =  ebpf_dc_update_load();
+    netdata_ebpf_program_loaded_t test =  ebpf_dc_update_load(em);
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_dc_disable_probes(obj);
 
