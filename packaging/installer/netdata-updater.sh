@@ -566,7 +566,7 @@ update_build() {
       do_not_start="--dont-start-it"
     fi
 
-    env="/bin/env TMPDIR=${TMPDIR}"
+    env="env TMPDIR=${TMPDIR}"
 
     if [ -n "${NETDATA_SELECTED_DASHBOARD}" ]; then
       env="${env} NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
