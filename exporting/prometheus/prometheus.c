@@ -17,13 +17,13 @@
 inline int can_send_rrdset(struct instance *instance, RRDSET *st, int filter_changed)
 {
     RRDHOST *host = st->rrdhost;
-    struct allmetrics_filter *filter = &host->allmetrics_filter[API_FILTER_PROMETHEUS];
+    struct allmetrics_filter *filter = &host->allmetrics_filter[ALLMETRICS_FILTER_PROMETHEUS];
 
     // Do not send anomaly rates charts.
     if (st->state && st->state->is_ar_chart)
         return 0;
 
-    if (chart_is_filtered_out(st, filter, filter_changed, RRDSET_API_FILTER_PROMETHEUS))
+    if (chart_is_filtered_out(st, filter, filter_changed, RRDSET_ALLMETRICS_FILTER_PROMETHEUS))
         return 0;
 
     if (!filter->filter_sp) {
@@ -593,7 +593,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         foreach_host_variable_callback(host, print_host_variables, &opts);
     }
 
-    struct allmetrics_filter *filter = &host->allmetrics_filter[API_FILTER_PROMETHEUS];
+    struct allmetrics_filter *filter = &host->allmetrics_filter[ALLMETRICS_FILTER_PROMETHEUS];
     int filter_changed = lock_and_update_allmetrics_filter(&filter, filter_string);
 
     // for each chart
