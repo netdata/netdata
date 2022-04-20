@@ -78,8 +78,8 @@ enum fd_syscalls {
 extern void *ebpf_fd_thread(void *ptr);
 extern void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern struct config fd_config;
-extern netdata_fd_stat_t **fd_pid;
 extern void clean_fd_pid_structures();
+extern void ebpf_fd_clean_specific_pid(uint32_t pid);
 
 #endif /* NETDATA_EBPF_FD_H */
 

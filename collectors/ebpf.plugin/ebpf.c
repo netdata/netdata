@@ -253,7 +253,6 @@ static void ebpf_exit(int sig)
     if (ebpf_modules[EBPF_MODULE_FD_IDX].enabled) {
         ebpf_modules[EBPF_MODULE_FD_IDX].enabled = 0;
         clean_fd_pid_structures();
-        freez(fd_pid);
     }
 
     if (ebpf_modules[EBPF_MODULE_SHM_IDX].enabled) {

@@ -40,6 +40,7 @@ static netdata_idx_t *fd_values = NULL;
 
 netdata_fd_stat_t *fd_vector = NULL;
 netdata_fd_stat_t **fd_pid = NULL;
+netdata_fd_stat_t *fd_static_pid = NULL;
 
 /*****************************************************************
  *
@@ -48,17 +49,36 @@ netdata_fd_stat_t **fd_pid = NULL;
  *****************************************************************/
 
 /**
+ * Clean Specific PID
+ *
+ * Clean a specific PID that is no running anymore.
+ *
+ * @param pid clean the pid closed.
+ */
+void ebpf_fd_clean_specific_pid(uint32_t pid)
+{
+    if (likely(fd_pid) && fd_pid[pid]) {
+        freez(fd_pid[pid]);
+        fd_pid[pid] = NULL;
+    }
+}
+
+/**
  * Clean PID structures
  *
  * Clean the allocated structures.
  */
 void clean_fd_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(fd_pid[pids->pid]);
+    if (likely(fd_pid)) {
+        struct pid_stat *pids = root_of_pids;
+        while (pids) {
+            freez(fd_pid[pids->pid]);
 
-        pids = pids->next;
-    }
+            pids = pids->next;
+        }
+        freez(fd_pid);
+    } else
+        freez(fd_static_pid);
 }
 
 /**
@@ -204,18 +224,24 @@ static void fd_apps_accumulator(netdata_fd_stat_t *out)
  *
  * Fill PID structures
  *
- * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
+ * @param pid      pid that we are collecting data
+ * @param mem      data read from memory
+ * @param allocate behavior selected to allocate memory
  */
-static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
+static void fd_fill_pid(uint32_t pid, netdata_fd_stat_t *mem)
 {
-    netdata_fd_stat_t *curr = fd_pid[current_pid];
-    if (!curr) {
-        curr = callocz(1, sizeof(netdata_fd_stat_t));
-        fd_pid[current_pid] = curr;
-    }
+    netdata_fd_stat_t *curr = NULL;
+    if (likely(fd_pid)) {
+        curr = fd_pid[pid];
+        if (!curr) {
+            curr = callocz(1, sizeof(netdata_fd_stat_t));
+            fd_pid[pid] = curr;
+        }
+    } else if(likely(fd_static_pid))
+        curr = &fd_static_pid[pid];
 
-    memcpy(curr, &publish[0], sizeof(netdata_fd_stat_t));
+    if (curr)
+        memcpy(curr, mem, sizeof(netdata_fd_stat_t));
 }
 
 /**
@@ -223,7 +249,7 @@ static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
  *
  * Read the apps table and store data inside the structure.
  */
-static void read_apps_table()
+static void ebpf_fd_read_apps_table()
 {
     netdata_fd_stat_t *fv = fd_vector;
     uint32_t key;
@@ -271,6 +297,10 @@ static void ebpf_update_fd_cgroup()
                 netdata_fd_stat_t *in = fd_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_fd_stat_t));
+            } else if (fd_static_pid) {
+                netdata_fd_stat_t *in = &fd_static_pid[pid];
+
+                memcpy(out, in, sizeof(netdata_fd_stat_t));
             } else {
                 memset(fv, 0, length);
                 if (!bpf_map_lookup_elem(fd, &pid, fv)) {
@@ -301,7 +331,13 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct pid_on_target *root)
 
     while (root) {
         int32_t pid = root->pid;
-        netdata_fd_stat_t *w = fd_pid[pid];
+        netdata_fd_stat_t *w = NULL;
+        if (likely(fd_pid) && fd_pid[pid]) {
+            w = fd_pid[pid];
+        } else if (likely(fd_static_pid)) {
+            w = &fd_static_pid[pid];
+        }
+
         if (w) {
             open_call += w->open_call;
             close_call += w->close_call;
@@ -679,7 +715,7 @@ static void fd_collector(ebpf_module_t *em)
         if (++counter == update_every) {
             counter = 0;
             if (apps)
-                read_apps_table();
+                ebpf_fd_read_apps_table();
 
             if (cgroups)
                 ebpf_update_fd_cgroup();
@@ -808,12 +844,16 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param apps is apps enabled?
+ * @param em the structure with thread information
  */
-static void ebpf_fd_allocate_global_vectors(int apps)
+static void ebpf_fd_allocate_global_vectors(ebpf_module_t *em)
 {
-    if (apps)
-        fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
+    if (em->apps_charts) {
+        if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
+            fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
+        else
+            fd_static_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t));
+    }
 
     fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
 
@@ -839,7 +879,7 @@ void *ebpf_fd_thread(void *ptr)
     if (!em->enabled)
         goto endfd;
 
-    ebpf_fd_allocate_global_vectors(em->apps_charts);
+    ebpf_fd_allocate_global_vectors(em);
 
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
     if (!probe_links) {
