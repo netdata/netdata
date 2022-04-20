@@ -911,8 +911,10 @@ void rrdhost_free(RRDHOST *host) {
 
     freez(host->exporting_flags);
 
-    simple_pattern_free(host->allmetrics_filter.filter_sp);
-    freez(host->allmetrics_filter.filter_string);
+    for (size_t i = 0; i < API_FILTER_NUM; i++) {
+        simple_pattern_free(host->allmetrics_filter[i].filter_sp);
+        freez(host->allmetrics_filter[i].filter_string);
+    }
 
     while(host->alarms)
         rrdcalc_unlink_and_free(host, host->alarms);

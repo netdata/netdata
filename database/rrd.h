@@ -489,6 +489,13 @@ typedef enum {
     RRDSET_API_FILTER_PROMETHEUS    = 1 << 2
 } RRDSET_API_FILTER;
 
+enum {
+    API_FILTER_SHELL,
+    API_FILTER_JSON,
+    API_FILTER_PROMETHEUS,
+    API_FILTER_NUM
+};
+
 #ifdef HAVE_C___ATOMIC
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
@@ -814,7 +821,7 @@ struct rrdhost {
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
-    struct allmetrics_filter allmetrics_filter;            // filters for the allmetrics API request
+    struct allmetrics_filter allmetrics_filter[API_FILTER_NUM]; // filters for the allmetrics API request
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
