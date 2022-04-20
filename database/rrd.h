@@ -545,7 +545,8 @@ struct rrdset {
 
     RRDSET_FLAGS flags;                             // configuration flags
     RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
-    int allmetrics_filter;                                 // bit array for filtering the chart out from API responses
+    int allmetrics_filter;                          // bit array for filtering the chart out from API responses
+    int allmetrics_filter_updated;
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this

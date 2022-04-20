@@ -89,11 +89,13 @@ void unlock_allmetrics_filter(struct allmetrics_filter *filter, int filter_chang
 
 int chart_is_filtered_out(RRDSET *st, struct allmetrics_filter *filter, int filter_changed, int filter_type)
 {
-    if (filter_changed) {
+    if (filter_changed || !(st->allmetrics_filter_updated & filter_type)) {
         if (!filter->filter_sp || simple_pattern_matches(filter->filter_sp, st->id) || simple_pattern_matches(filter->filter_sp, st->name))
             st->allmetrics_filter &= !filter_type; // chart should be sent
         else
             st->allmetrics_filter |= filter_type; // chart should be filtered out
+        
+        st->allmetrics_filter_updated |= filter_type;
     }
 
     if (unlikely(st->allmetrics_filter & filter_type))
