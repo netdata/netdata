@@ -788,7 +788,6 @@ struct allmetrics_filter {
     SIMPLE_PATTERN *filter_sp;
 
     char *filter_string;
-    int filter_changed;
 
     uv_mutex_t filter_mutex;
     uv_cond_t filter_cond;
