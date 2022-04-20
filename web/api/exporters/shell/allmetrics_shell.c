@@ -113,7 +113,6 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     rrdhost_rdlock(host);
 
     struct allmetrics_filter *filter = &host->allmetrics_filter;
-
     int filter_changed = lock_and_update_filter(&filter, filter_string);
 
     // for each chart
@@ -187,9 +186,12 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 
 // ----------------------------------------------------------------------------
 
-void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter, BUFFER *wb) {
+void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_json();
     rrdhost_rdlock(host);
+
+    struct allmetrics_filter *filter = &host->allmetrics_filter;
+    int filter_changed = lock_and_update_filter(&filter, filter_string);
 
     buffer_strcat(wb, "{");
 
@@ -199,6 +201,9 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter, 
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        if (chart_is_filtered_out(st, filter, filter_changed, RRDSET_API_FILTER_SHELL))
+            continue;
+
         if(rrdset_is_available_for_viewers(st)) {
             rrdset_rdlock(st);
 
@@ -252,6 +257,8 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter, 
             rrdset_unlock(st);
         }
     }
+
+    unlock_filter(filter, filter_changed);
 
     buffer_strcat(wb, "\n}");
     rrdhost_unlock(host);
