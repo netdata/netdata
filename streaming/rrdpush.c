@@ -571,36 +571,40 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
 }
 
 uint32_t negotiating_stream_version(uint32_t host_version, uint32_t incoming_version)
-{  
+{
+#ifdef ENABLE_COMPRESSION
     int host_version_compression_status = 0,
         incoming_version_compression_status = 0;
 
-    switch (host_version)
-    {
-    case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
-        host_version_compression_status = 1;
-        break;
-    case STREAM_VERSION_COMPRESSION:
-        host_version_compression_status = 1;
-        break;
-    default:
-        break;
-    }
+    if(default_compression_enabled) {
+        switch (host_version)
+        {
+        case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
+            host_version_compression_status = 1;
+            break;
+        case STREAM_VERSION_COMPRESSION:
+            host_version_compression_status = 1;
+            break;
+        default:
+            break;
+        }
 
-    switch (incoming_version)
-    {
-    case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
-        incoming_version_compression_status = 1;
-        break;
-    case STREAM_VERSION_COMPRESSION:
-        incoming_version_compression_status = 1;
-        break;
-    default:
-        break;
-    }
+        switch (incoming_version)
+        {
+        case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
+            incoming_version_compression_status = 1;
+            break;
+        case STREAM_VERSION_COMPRESSION:
+            incoming_version_compression_status = 1;
+            break;
+        default:
+            break;
+        }
 
-    if (host_version_compression_status == incoming_version_compression_status)
-        return MIN(host_version, incoming_version);
+        if (host_version_compression_status == incoming_version_compression_status)
+            return MIN(host_version, incoming_version);
+    }
+#endif
 
     switch (host_version)
     {

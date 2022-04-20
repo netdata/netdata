@@ -32,14 +32,16 @@ void replication_state_destroy(REPLICATION_STATE **state)
 {
     REPLICATION_STATE *r = *state;
     pthread_mutex_destroy(&r->mutex);
-    cbuffer_free(r->buffer);
+    if(r->buffer)
+        cbuffer_free(r->buffer);
     buffer_free(r->build);
 #ifdef ENABLE_HTTPS
     if(r->ssl.conn){
         SSL_free(r->ssl.conn);
     }
 #endif
-    freez(r->dim_past_data->page);
+    if(r->dim_past_data && r->dim_past_data->page)
+        freez(r->dim_past_data->page);
     freez(r->dim_past_data);
     freez(*state);
     info("%s: Replication state destroyed.", REPLICATION_MSG);
@@ -79,7 +81,7 @@ static unsigned int replication_rd_config(RRDHOST *host, struct config *stream_c
 
     unsigned int rrdpush_receiver_replication_enable = default_rrdpush_receiver_replication_enabled;
     rrdpush_receiver_replication_enable = appconfig_get_boolean(stream_config, key, "enable replication", rrdpush_receiver_replication_enable);
-    rrdpush_receiver_replication_enable = appconfig_get_boolean(stream_config, host->machine_guid, "enable replication", rrdpush_receiver_replication_enable); 
+    rrdpush_receiver_replication_enable = appconfig_get_boolean(stream_config, host->machine_guid, "enable replication", rrdpush_receiver_replication_enable);
     
     info("%s: Configuration applied %u ", REPLICATION_MSG, rrdpush_receiver_replication_enable);
     return rrdpush_receiver_replication_enable;
@@ -94,6 +96,15 @@ void replication_receiver_init(RRDHOST *image_host, struct config *stream_config
         infoerr("%s: Could not initialize Rx replication thread. Replication is disabled or not supported!", REPLICATION_MSG);
         return;
     }
+    RRD_MEMORY_MODE mode = RRD_MEMORY_MODE_DBENGINE;
+    mode = rrd_memory_mode_id(appconfig_get(stream_config, key, "default memory mode", rrd_memory_mode_name(mode)));
+    if(mode != RRD_MEMORY_MODE_DBENGINE)
+    {
+        infoerr("%s: Could not initialize Rx replication thread. Memory mode of child is not supported!", REPLICATION_MSG);
+        rrdpush_replication_enable = 0;
+        return;
+    }
+
     replication_state_init(image_host->replication->rx_replication);
     info("%s: REP Rx state initialized", REPLICATION_MSG);    
     image_host->replication->rx_replication->host = image_host;
