@@ -90,7 +90,7 @@ void unlock_filter(struct allmetrics_filter *filter, int filter_changed)
 int chart_is_filtered_out(RRDSET *st, struct allmetrics_filter *filter, int filter_changed, int filter_type)
 {
     if (filter_changed) {
-        if (simple_pattern_matches(filter->filter_sp, st->id) || simple_pattern_matches(filter->filter_sp, st->name))
+        if (!filter->filter_sp || simple_pattern_matches(filter->filter_sp, st->id) || simple_pattern_matches(filter->filter_sp, st->name))
             st->allmetrics_filter &= !filter_type; // chart should be sent
         else
             st->allmetrics_filter |= filter_type; // chart should be filtered out
