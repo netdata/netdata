@@ -104,13 +104,13 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
     analytics_log_json();
     rrdhost_rdlock(host);
 
-    struct allmetrics_filter *filter = &host->allmetrics_filter[API_FILTER_JSON];
-    int filter_changed = lock_and_update_filter(&filter, filter_string);
-
     buffer_strcat(wb, "{");
 
     size_t chart_counter = 0;
     size_t dimension_counter = 0;
+
+    struct allmetrics_filter *filter = &host->allmetrics_filter[API_FILTER_JSON];
+    int filter_changed = lock_and_update_filter(&filter, filter_string);
 
     // for each chart
     RRDSET *st;
