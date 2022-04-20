@@ -245,3 +245,27 @@ void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
 
     function_called();
 }
+
+int lock_and_update_allmetrics_filter(struct allmetrics_filter **filter_p, const char *filter_string)
+{
+    (void)filter_p;
+    (void)filter_string;
+    
+    return 0;
+}
+
+void unlock_allmetrics_filter(struct allmetrics_filter *filter, int filter_changed)
+{
+    (void)filter;
+    (void)filter_changed;
+}
+
+int chart_is_filtered_out(RRDSET *st, struct allmetrics_filter *filter, int filter_changed, int filter_type)
+{
+    (void)st;
+    (void)filter;
+    (void)filter_changed;
+    (void)filter_type;
+
+    return 0;
+}
