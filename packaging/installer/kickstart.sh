@@ -1482,10 +1482,6 @@ build_and_install() {
     opts="${opts} --dont-wait"
   fi
 
-  if [ "${NETDATA_AUTO_UPDATES}" -eq 1 ]; then
-    opts="${opts} --auto-update"
-  fi
-
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
     opts="${opts} --stable-channel"
   fi
