@@ -593,7 +593,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         foreach_host_variable_callback(host, print_host_variables, &opts);
     }
 
-    struct allmetrics_filter *filter = &host->allmetrics_filter;
+    struct allmetrics_filter *filter = &host->allmetrics_filter[API_FILTER_PROMETHEUS];
     int filter_changed = lock_and_update_filter(&filter, filter_string);
 
     // for each chart
