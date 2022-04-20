@@ -23,10 +23,10 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, int filter_cha
     if (st->state && st->state->is_ar_chart)
         return 0;
 
-    if (filter->filter_sp) { // Prioritize the URL filter
-        if (chart_is_filtered_out(st, filter, filter_changed, RRDSET_API_FILTER_SHELL))
-            return 0;
-    } else {
+    if (chart_is_filtered_out(st, filter, filter_changed, RRDSET_API_FILTER_SHELL))
+        return 0;
+
+    if (!filter->filter_sp) {
         if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
             return 0;
 
