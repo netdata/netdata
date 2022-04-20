@@ -324,9 +324,11 @@ On modern hardware, Netdata can generate about **2.000 badges per second per cor
 
 Of course these timing are for badges that use recent data. If you need badges that do calculations over long durations (a day, or more), timing will differ. Netdata logs its timings at its `access.log`, so take a look there before adding a heavy badge on a busy web site. Of course, you can cache such badges or have a cron job get them from Netdata and save them at your web server at regular intervals.
 
-#### Embedding badges in github
+#### Embedding badges in GitHub
 
-You have 2 options a) SVG images with markdown and b) SVG images with HTML (directly in .md files).
+You have 2 options:
+- SVG images with markdown 
+- SVG images with HTML (directly in .md files)
 
 For example, this is the cpu badge shown above:
 
@@ -350,9 +352,9 @@ Both produce this:
     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img>
 </a>
 
-#### auto-refreshing badges in github
+#### Auto-refreshing badges in GitHub
 
-Unfortunately it cannot be done. Github fetches all the images using a proxy and rewrites all the URLs to be served by the proxy.
+Unfortunately it cannot be done. GitHub fetches all the images using a proxy and rewrites all the URLs to be served by the proxy.
 
 You can refresh them from your browser console though. Press F12 to open the web browser console (switch to the console too), paste the following and press enter. They will refresh:
 
