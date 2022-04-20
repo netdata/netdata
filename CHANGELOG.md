@@ -6,8 +6,16 @@
 
 **Merged pull requests:**
 
+- fix upgrading all currently installed packages when updating Netdata on Debian [\#12716](https://github.com/netdata/netdata/pull/12716) ([iigorkarpov](https://github.com/iigorkarpov))
+- chore\(cgroups.plugin\): reduce the CPU time required for cgroup-network-helper.sh [\#12711](https://github.com/netdata/netdata/pull/12711) ([ilyam8](https://github.com/ilyam8))
+- feat\(apps.plugin\): add proxmox-ve processes to apps\_groups.conf [\#12704](https://github.com/netdata/netdata/pull/12704) ([ilyam8](https://github.com/ilyam8))
+- chore\(ebpf.plugin\): re-enable socket module by default [\#12702](https://github.com/netdata/netdata/pull/12702) ([ilyam8](https://github.com/ilyam8))
 - Disable automake dependency tracking in our various one-time builds. [\#12701](https://github.com/netdata/netdata/pull/12701) ([Ferroin](https://github.com/Ferroin))
 - Add missing values to algorithm vector \(eBPF\) [\#12698](https://github.com/netdata/netdata/pull/12698) ([thiagoftsm](https://github.com/thiagoftsm))
+- Allocate buffer memory for uv\_write and release in the callback function [\#12688](https://github.com/netdata/netdata/pull/12688) ([stelfrag](https://github.com/stelfrag))
+- fix: use NETDATA\_LISTENER\_PORT in docker healtcheck [\#12676](https://github.com/netdata/netdata/pull/12676) ([ilyam8](https://github.com/ilyam8))
+- Add the ability to perform a data query using an offline node id [\#12650](https://github.com/netdata/netdata/pull/12650) ([stelfrag](https://github.com/stelfrag))
+- Fix Valgrind errors [\#12619](https://github.com/netdata/netdata/pull/12619) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
@@ -266,8 +274,6 @@
 - inform cloud about inability to satisfy request [\#12041](https://github.com/netdata/netdata/pull/12041) ([underhood](https://github.com/underhood))
 - adds install method to /api/v1/info as label [\#12040](https://github.com/netdata/netdata/pull/12040) ([underhood](https://github.com/underhood))
 - Stream compression - Deactivate compression at runtime in case of a compressor buffer overflow [\#12037](https://github.com/netdata/netdata/pull/12037) ([odynik](https://github.com/odynik))
-- Adds all query types to aclk\_processed\_query\_type [\#12036](https://github.com/netdata/netdata/pull/12036) ([underhood](https://github.com/underhood))
-- Create a removed alert event if chart goes obsolete [\#12021](https://github.com/netdata/netdata/pull/12021) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
@@ -301,7 +307,6 @@
 - \[Stream Compression\] - Bug fix \#12043 - lz4.h compilation error - compile from source [\#12049](https://github.com/netdata/netdata/pull/12049) ([odynik](https://github.com/odynik))
 - Fix compilation errors for OpenSSL on macOS [\#12048](https://github.com/netdata/netdata/pull/12048) ([vlvkobal](https://github.com/vlvkobal))
 - Updated the docs to match new install script [\#12042](https://github.com/netdata/netdata/pull/12042) ([kickoke](https://github.com/kickoke))
-- Fix handling of removed packages with leftover config files in package check. [\#12033](https://github.com/netdata/netdata/pull/12033) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.33.0](https://github.com/netdata/netdata/tree/v1.33.0) (2022-01-26)
 
@@ -311,9 +316,6 @@
 
 - Re-instate plugins\_action for clabels [\#12039](https://github.com/netdata/netdata/pull/12039) ([MrZammler](https://github.com/MrZammler))
 - Have cURL properly fail on non-2xx status codes in the installer. [\#12038](https://github.com/netdata/netdata/pull/12038) ([Ferroin](https://github.com/Ferroin))
-- Docs Bugfix: Fixed Markdown formatting [\#12026](https://github.com/netdata/netdata/pull/12026) ([kickoke](https://github.com/kickoke))
-- update README [\#12024](https://github.com/netdata/netdata/pull/12024) ([cboydstun](https://github.com/cboydstun))
-- \[Stream Compression\] - Compressor buffer overflow causes stream corruption. [\#12019](https://github.com/netdata/netdata/pull/12019) ([odynik](https://github.com/odynik))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
