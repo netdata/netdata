@@ -14,32 +14,36 @@
  * @param st a chart.
  * @return Returns 1 if the chart can be sent, 0 otherwise.
  */
-inline int can_send_rrdset(struct instance *instance, RRDSET *st)
+inline int can_send_rrdset(struct instance *instance, RRDSET *st, int filter_changed)
 {
-#ifdef NETDATA_INTERNAL_CHECKS
     RRDHOST *host = st->rrdhost;
-#endif
+    struct allmetrics_filter *filter = &host->allmetrics_filter;
 
     // Do not send anomaly rates charts.
     if (st->state && st->state->is_ar_chart)
         return 0;
 
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
-        return 0;
-
-    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
-        // we have not checked this chart
-        if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
-            simple_pattern_matches(instance->config.charts_pattern, st->name))
-            rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
-        else {
-            rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
-            debug(
-                D_EXPORTING,
-                "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
-                st->id,
-                host->hostname);
+    if (filter->filter_sp) { // Prioritize the URL filter
+        if (chart_is_filtered_out(st, filter, filter_changed, RRDSET_API_FILTER_SHELL))
             return 0;
+    } else {
+        if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
+            return 0;
+
+        if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
+            // we have not checked this chart
+            if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
+                simple_pattern_matches(instance->config.charts_pattern, st->name))
+                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
+            else {
+                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
+                debug(
+                    D_EXPORTING,
+                    "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
+                    st->id,
+                    host->hostname);
+                return 0;
+            }
         }
     }
 
@@ -480,6 +484,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
  *
  * @param instance an instance data structure.
  * @param host a data collecting host.
+ * @param filter_string URL simple pattern filter.
  * @param wb the buffer to fill with metrics.
  * @param prefix a prefix for every metric.
  * @param exporting_options options to configure what data is exported.
@@ -489,6 +494,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     struct instance *instance,
     RRDHOST *host,
+    const char *filter_string,
     BUFFER *wb,
     const char *prefix,
     EXPORTING_OPTIONS exporting_options,
@@ -587,12 +593,15 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         foreach_host_variable_callback(host, print_host_variables, &opts);
     }
 
+    struct allmetrics_filter *filter = &host->allmetrics_filter;
+    int filter_changed = lock_and_update_filter(&filter, filter_string);
+
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host)
     {
 
-        if (likely(can_send_rrdset(instance, st))) {
+        if (likely(can_send_rrdset(instance, st, filter_changed))) {
             rrdset_rdlock(st);
 
             char chart[PROMETHEUS_ELEMENT_MAX + 1];
@@ -776,6 +785,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         }
     }
 
+    unlock_filter(filter, filter_changed);
+
     rrdhost_unlock(host);
 }
 
@@ -858,7 +869,7 @@ static inline time_t prometheus_preparation(
  */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     RRDHOST *host,
-    const char *filter,
+    const char *filter_string,
     BUFFER *wb,
     const char *server,
     const char *prefix,
@@ -881,7 +892,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
         output_options);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(
-        prometheus_exporter_instance, host, wb, prefix, exporting_options, 0, output_options);
+        prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options);
 }
 
 /**
@@ -896,7 +907,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
  */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     RRDHOST *host,
-    const char *filter,
+    const char *filter_string,
     BUFFER *wb,
     const char *server,
     const char *prefix,
@@ -922,7 +933,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     rrdhost_foreach_read(host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
-            prometheus_exporter_instance, host, wb, prefix, exporting_options, 1, output_options);
+            prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options);
     }
     rrd_unlock();
 }
