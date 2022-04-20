@@ -594,7 +594,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     }
 
     struct allmetrics_filter *filter = &host->allmetrics_filter[API_FILTER_PROMETHEUS];
-    int filter_changed = lock_and_update_filter(&filter, filter_string);
+    int filter_changed = lock_and_update_allmetrics_filter(&filter, filter_string);
 
     // for each chart
     RRDSET *st;
@@ -785,7 +785,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         }
     }
 
-    unlock_filter(filter, filter_changed);
+    unlock_allmetrics_filter(filter, filter_changed);
 
     rrdhost_unlock(host);
 }

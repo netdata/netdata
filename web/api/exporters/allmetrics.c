@@ -24,7 +24,7 @@ struct prometheus_output_options {
  * @param filter_string a new filter to create
  * @return Returns 1 if the filter has changed, 0 otherwise 
  */
-int lock_and_update_filter(struct allmetrics_filter **filter_p, const char *filter_string)
+int lock_and_update_allmetrics_filter(struct allmetrics_filter **filter_p, const char *filter_string)
 {
     struct allmetrics_filter *filter = *filter_p;
     int filter_changed = 0;
@@ -75,7 +75,7 @@ int lock_and_update_filter(struct allmetrics_filter **filter_p, const char *filt
     return filter_changed;
 }
 
-void unlock_filter(struct allmetrics_filter *filter, int filter_changed)
+void unlock_allmetrics_filter(struct allmetrics_filter *filter, int filter_changed)
 {
     if (!filter_changed) {
         uv_mutex_lock(&filter->filter_mutex);
