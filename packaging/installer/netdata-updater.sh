@@ -28,7 +28,7 @@
 # Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 # Author: Austin S. Hemmelgarn <austin@netdata.cloud>
 
-# Next unused error code: U0014
+# Next unused error code: U001A
 
 set -e
 
@@ -529,7 +529,7 @@ update_build() {
 
   RUN_INSTALLER=0
   ndtmpdir=$(create_tmp_directory)
-  cd "$ndtmpdir" || exit 1
+  cd "$ndtmpdir" || fatal "Failed to change current working directory to ${ndtmpdir}" U0016
 
   install_build_dependencies
 
@@ -547,7 +547,7 @@ update_build() {
       NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
       tar -xf netdata-latest.tar.gz >&3 2>&3
       rm netdata-latest.tar.gz >&3 2>&3
-      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || exit 1
+      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
       RUN_INSTALLER=1
     fi
   fi
@@ -574,7 +574,7 @@ update_build() {
 
     if [ ! -x ./netdata-installer.sh ]; then
       if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
-        cd "$(find . -mindepth 1 -maxdepth 1 -type d)" || exit 1
+        cd "$(find . -mindepth 1 -maxdepth 1 -type d)" || fatal "Failed to switch to build directory" U0018
       fi
     fi
 
@@ -622,7 +622,7 @@ update_static() {
   PREVDIR="$(pwd)"
 
   info "Entering ${ndtmpdir}"
-  cd "${ndtmpdir}" || exit 1
+  cd "${ndtmpdir}" || fatal "Failed to change current working directory to ${ndtmpdir}" U0019
 
   if update_available; then
     sysarch="$(uname -m)"
@@ -827,12 +827,12 @@ fi
 
 if [ -r "${ENVIRONMENT_FILE}" ] ; then
   # shellcheck source=/dev/null
-  . "${ENVIRONMENT_FILE}" || exit 1
+  . "${ENVIRONMENT_FILE}" || fatal "Failed to source ${ENVIRONMENT_FILE}" U0014
 fi
 
 if [ -r "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
   # shellcheck source=/dev/null
-  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || exit 1
+  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || fatal "Failed to source $(dirname "${ENVIRONMENT_FILE}")/.install-type" U0015
 fi
 
 while [ -n "${1}" ]; do
