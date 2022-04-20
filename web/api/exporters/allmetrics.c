@@ -18,11 +18,11 @@ struct prometheus_output_options {
 };
 
 /**
- * @brief Update simple pattern for chart filtering if there is a new filter
+ * @brief Lock and update simple pattern for chart filtering if there is a new filter
  * 
- * @param filter_p filter structure to update
- * @param filter_string a new filter to create
- * @return Returns 1 if the filter has changed, 0 otherwise 
+ * @param filter_p a filter structure to update.
+ * @param filter_string a simple pattern string used to update the filter.
+ * @return Returns 1 if the filter has changed, 0 otherwise.
  */
 int lock_and_update_allmetrics_filter(struct allmetrics_filter **filter_p, const char *filter_string)
 {
@@ -75,6 +75,12 @@ int lock_and_update_allmetrics_filter(struct allmetrics_filter **filter_p, const
     return filter_changed;
 }
 
+/**
+ * @brief Unlock filter
+ * 
+ * @param filter a filter structure to unlock.
+ * @param filter_changed 1 if filter has changed, 0 otherwise.
+ */
 void unlock_allmetrics_filter(struct allmetrics_filter *filter, int filter_changed)
 {
     if (!filter_changed) {
@@ -87,6 +93,14 @@ void unlock_allmetrics_filter(struct allmetrics_filter *filter, int filter_chang
     uv_cond_signal(&filter->cond);
 }
 
+/**
+ * @brief Check if the chart should not be displayed
+ * 
+ * @param filter a filter structure to check.
+ * @param filter_changed 1 if filter has changed, 0 otherwise.
+ * @param filter_type the type of the filter to check.
+ * @return 1 if the chart should not be displayed, 0 otherwise.
+ */
 int chart_is_filtered_out(RRDSET *st, struct allmetrics_filter *filter, int filter_changed, int filter_type)
 {
     if (filter_changed || !(st->allmetrics_filter_updated & filter_type)) {

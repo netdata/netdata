@@ -12,6 +12,7 @@
  *
  * @param instance an instance data structure.
  * @param st a chart.
+ * @param filter_changed 1 if filter has changed, 0 otherwise.
  * @return Returns 1 if the chart can be sent, 0 otherwise.
  */
 inline int can_send_rrdset(struct instance *instance, RRDSET *st, int filter_changed)
@@ -484,7 +485,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
  *
  * @param instance an instance data structure.
  * @param host a data collecting host.
- * @param filter_string URL simple pattern filter.
+ * @param filter_string a simple pattern filter.
  * @param wb the buffer to fill with metrics.
  * @param prefix a prefix for every metric.
  * @param exporting_options options to configure what data is exported.
@@ -861,6 +862,7 @@ static inline time_t prometheus_preparation(
  * Write metrics and auxiliary information for one host to a buffer.
  *
  * @param host a data collecting host.
+ * @param filter_string a simple pattern filter.
  * @param wb the buffer to write to.
  * @param server the name of a Prometheus server.
  * @param prefix a prefix for every metric.
@@ -899,6 +901,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
  * Write metrics and auxiliary information for all hosts to a buffer.
  *
  * @param host a data collecting host.
+ * @param filter_string a simple pattern filter.
  * @param wb the buffer to write to.
  * @param server the name of a Prometheus server.
  * @param prefix a prefix for every metric.
