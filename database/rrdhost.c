@@ -912,7 +912,7 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->exporting_flags);
 
     for (size_t i = 0; i < ALLMETRICS_FILTER_NUM; i++) {
-        simple_pattern_free(host->allmetrics_filter[i].filter_sp);
+        simple_pattern_free(host->allmetrics_filter[i].simple_pattern);
         freez(host->allmetrics_filter[i].filter_string);
     }
 

@@ -785,12 +785,12 @@ struct rrdhost_system_info {
 };
 
 struct allmetrics_filter {
-    SIMPLE_PATTERN *filter_sp;
+    SIMPLE_PATTERN *simple_pattern;
 
     char *filter_string;
 
-    uv_mutex_t filter_mutex;
-    uv_cond_t filter_cond;
+    uv_mutex_t mutex;
+    uv_cond_t cond;
     int request_number;
 };
 

@@ -33,18 +33,18 @@ int lock_and_update_allmetrics_filter(struct allmetrics_filter **filter_p, const
         filter = callocz(1, sizeof(struct allmetrics_filter));
         *filter_p = filter;
 
-        if (uv_mutex_init(&filter->filter_mutex)) {
+        if (uv_mutex_init(&filter->mutex)) {
             freez(filter);
             fatal("Cannot initialize mutex for allmetrics filter");
         }
 
-        if (uv_cond_init(&filter->filter_cond)) {
+        if (uv_cond_init(&filter->cond)) {
             freez(filter);
             fatal("Cannot initialize conditional variable for allmetrics filter");
         }
     }
     
-    uv_mutex_lock(&filter->filter_mutex);
+    uv_mutex_lock(&filter->mutex);
     filter->request_number++;
 
     if (filter->filter_string && filter_string) {
@@ -56,20 +56,20 @@ int lock_and_update_allmetrics_filter(struct allmetrics_filter **filter_p, const
 
     if (filter_changed) {
         while (filter->request_number > 1)
-            uv_cond_wait(&filter->filter_cond, &filter->filter_mutex);
+            uv_cond_wait(&filter->cond, &filter->mutex);
 
         freez(filter->filter_string);
-        simple_pattern_free(filter->filter_sp);
+        simple_pattern_free(filter->simple_pattern);
 
         if (filter_string) {
             filter->filter_string = strdupz(filter_string);
-            filter->filter_sp = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
+            filter->simple_pattern = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
         } else {
             filter->filter_string = NULL;
-            filter->filter_sp = NULL;
+            filter->simple_pattern = NULL;
         }
     } else {
-        uv_mutex_unlock(&filter->filter_mutex);
+        uv_mutex_unlock(&filter->mutex);
     }
 
     return filter_changed;
@@ -78,19 +78,19 @@ int lock_and_update_allmetrics_filter(struct allmetrics_filter **filter_p, const
 void unlock_allmetrics_filter(struct allmetrics_filter *filter, int filter_changed)
 {
     if (!filter_changed) {
-        uv_mutex_lock(&filter->filter_mutex);
+        uv_mutex_lock(&filter->mutex);
     }
 
     filter->request_number--;
 
-    uv_mutex_unlock(&filter->filter_mutex);
-    uv_cond_signal(&filter->filter_cond);
+    uv_mutex_unlock(&filter->mutex);
+    uv_cond_signal(&filter->cond);
 }
 
 int chart_is_filtered_out(RRDSET *st, struct allmetrics_filter *filter, int filter_changed, int filter_type)
 {
     if (filter_changed || !(st->allmetrics_filter_updated & filter_type)) {
-        if (!filter->filter_sp || simple_pattern_matches(filter->filter_sp, st->id) || simple_pattern_matches(filter->filter_sp, st->name))
+        if (!filter->simple_pattern || simple_pattern_matches(filter->simple_pattern, st->id) || simple_pattern_matches(filter->simple_pattern, st->name))
             st->allmetrics_filter &= !filter_type; // chart should be sent
         else
             st->allmetrics_filter |= filter_type; // chart should be filtered out

@@ -26,7 +26,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, int filter_cha
     if (chart_is_filtered_out(st, filter, filter_changed, RRDSET_ALLMETRICS_FILTER_PROMETHEUS))
         return 0;
 
-    if (!filter->filter_sp) {
+    if (!filter->simple_pattern) {
         if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
             return 0;
 
