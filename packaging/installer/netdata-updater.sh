@@ -456,7 +456,7 @@ get_latest_version() {
 }
 
 validate_environment_file() {
-  if [ -n "${NETDATA_PREFIX}" ] && [ -n "${REINSTALL_OPTIONS}" ]; then
+  if [ -n "${NETDATA_PREFIX+SET_BUT_NULL}" ] && [ -n "${REINSTALL_OPTIONS}" ]; then
     return 0
   else
     fatal "Environment file located at ${ENVIRONMENT_FILE} is not valid, unable to update." U0007
