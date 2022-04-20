@@ -456,7 +456,7 @@ get_latest_version() {
 }
 
 validate_environment_file() {
-  if [ -n "${RELEASE_CHANNEL}" ] && [ -n "${NETDATA_PREFIX}" ] && [ -n "${REINSTALL_OPTIONS}" ] && [ -n "${IS_NETDATA_STATIC_BINARY}" ]; then
+  if [ -n "${NETDATA_PREFIX}" ] && [ -n "${REINSTALL_OPTIONS}" ]; then
     return 0
   else
     fatal "Environment file located at ${ENVIRONMENT_FILE} is not valid, unable to update." U0007
@@ -889,12 +889,12 @@ self_update
 # shellcheck disable=SC2153
 case "${INSTALL_TYPE}" in
     *-build)
-      validate_environment_file || exit 1
+      validate_environment_file
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_build && exit 0
       ;;
     *-static*)
-      validate_environment_file || exit 1
+      validate_environment_file
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_static && exit 0
       ;;
@@ -902,13 +902,13 @@ case "${INSTALL_TYPE}" in
       update_binpkg && exit 0
       ;;
     "") # Fallback case for no `.install-type` file. This just works like the old install type detection.
-      validate_environment_file || exit 1
+      validate_environment_file
       update_legacy
       ;;
     custom)
       # At this point, we _should_ have a valid `.environment` file, but it's best to just check.
       # If we do, then behave like the legacy updater.
-      if validate_environment_file; then
+      if validate_environment_file && [ -n "${IS_NETDATA_STATIC_BINARY}" ]; then
         update_legacy
       else
         fatal "This script does not support updating custom installations without valid environment files." U0012
