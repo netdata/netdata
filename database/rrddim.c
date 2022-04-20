@@ -43,9 +43,10 @@ inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
 
     debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
 
-    char varname[CONFIG_MAX_NAME + 1];
-    snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-    rd->name = config_set_default(st->config_section, varname, name);
+    if (rd->name)
+        freez((void *) rd->name);
+
+    rd->name = strdupz(name);
     rd->hash_name = simple_hash(rd->name);
 
     if (!st->state->is_ar_chart)

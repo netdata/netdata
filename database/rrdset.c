@@ -366,11 +366,6 @@ void rrdset_free(RRDSET *st) {
     rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
     // ------------------------------------------------------------------------
-    // remove it from the configuration
-
-    appconfig_section_destroy_non_loaded(&netdata_config, st->config_section);
-
-    // ------------------------------------------------------------------------
     // unlink it from the host
 
     if(st == host->rrdset_root) {
@@ -402,7 +397,6 @@ void rrdset_free(RRDSET *st) {
     freez(st->units);
     freez(st->context);
     freez(st->cache_dir);
-    freez(st->config_section);
     freez(st->plugin_name);
     freez(st->module_name);
     freez(st->state->old_title);
@@ -713,26 +707,14 @@ RRDSET *rrdset_create_custom(
     char fullfilename[FILENAME_MAX + 1];
 
     // ------------------------------------------------------------------------
-    // compose the config_section for this chart
-
-    char config_section[RRD_ID_LENGTH_MAX + GUID_LEN + 2];
-    if(host == localhost)
-        strcpy(config_section, fullid);
-    else
-        snprintfz(config_section, RRD_ID_LENGTH_MAX + GUID_LEN + 1, "%s/%s", host->machine_guid, fullid);
-
-    // ------------------------------------------------------------------------
     // get the options from the config, we need to create it
 
-    long entries;
-    int enabled = config_get_boolean(config_section, "enabled", 1);
-    if(!enabled || memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        entries = 5;
-    else
+    long entries = 5;
+    if (memory_mode != RRD_MEMORY_MODE_DBENGINE)
         entries = align_entries_to_pagesize(memory_mode, history_entries);
 
     unsigned long size = sizeof(RRDSET);
-    char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
+    char *cache_dir = rrdset_cache_dir(host, fullid);
 
     time_t now = now_realtime_sec();
 
@@ -759,7 +741,6 @@ RRDSET *rrdset_create_custom(
             memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
 
             st->name = NULL;
-            st->config_section = NULL;
             st->type = NULL;
             st->family = NULL;
             st->title = NULL;
@@ -832,7 +813,6 @@ RRDSET *rrdset_create_custom(
     st->plugin_name = plugin?strdupz(plugin):NULL;
     st->module_name = module?strdupz(module):NULL;
 
-    st->config_section = strdupz(config_section);
     st->rrdhost = host;
     st->memsize = size;
     st->entries = entries;
@@ -867,10 +847,6 @@ RRDSET *rrdset_create_custom(
     st->hash_context = simple_hash(st->context);
 
     st->priority = priority;
-    if(enabled)
-        rrdset_flag_set(st, RRDSET_FLAG_ENABLED);
-    else
-        rrdset_flag_clear(st, RRDSET_FLAG_ENABLED);
 
     rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
     rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
