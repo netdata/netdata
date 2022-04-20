@@ -776,6 +776,17 @@ struct rrdhost_system_info {
     char *prebuilt_dist;
 };
 
+struct url_filter {
+    SIMPLE_PATTERN *filter_sp;
+
+    char *prev_filter;
+    int filter_changed;
+
+    uv_mutex_t filter_mutex;
+    uv_cond_t filter_cond;
+    int request_number;
+};
+
 struct rrdhost {
     avl_t avl;                                      // the index of hosts
 
@@ -803,6 +814,7 @@ struct rrdhost {
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
+    struct url_filter allmetrics_filter;            // filters for the allmetrics API request
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts

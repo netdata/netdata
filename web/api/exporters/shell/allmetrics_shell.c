@@ -22,18 +22,6 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 
 #define SHELL_ELEMENT_MAX 100
 
-// TODO: move the structure to the header, add it to the host structure
-struct url_filter {
-    SIMPLE_PATTERN *filter_sp;
-
-    char *prev_filter;
-    int filter_changed;
-
-    uv_mutex_t filter_mutex;
-    uv_cond_t filter_cond;
-    int request_number;
-};
-
 // TODO: fix the doxygen comment
 /**
  * @brief Update simple pattern for chart filtering if there is a new filter
@@ -124,8 +112,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     analytics_log_shell();
     rrdhost_rdlock(host);
 
-    // TODO: move the filter to the host structure
-    static struct url_filter *filter = NULL;
+    struct url_filter *filter = &host->allmetrics_filter;
 
     int filter_changed = lock_and_update_filter(&filter, filter_string);
 
