@@ -65,17 +65,6 @@ int aclk_env_has_capa(const char *capa)
 
 #ifdef ACLK_LOG_CONVERSATION_DIR
 volatile int aclk_conversation_log_counter = 0;
-#if !defined(HAVE_C___ATOMIC)
-netdata_mutex_t aclk_conversation_log_mutex = NETDATA_MUTEX_INITIALIZER;
-int aclk_get_conv_log_next()
-{
-    int ret;
-    netdata_mutex_lock(&aclk_conversation_log_mutex);
-    ret = aclk_conversation_log_counter++;
-    netdata_mutex_unlock(&aclk_conversation_log_mutex);
-    return ret;
-}
-#endif
 #endif
 
 #define ACLK_TOPIC_PREFIX "/agent/"
