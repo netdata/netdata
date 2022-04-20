@@ -47,10 +47,10 @@ int lock_and_update_filter(struct allmetrics_filter **filter_p, const char *filt
     uv_mutex_lock(&filter->filter_mutex);
     filter->request_number++;
 
-    if (filter->prev_filter && filter_string) {
-        if (strcmp(filter->prev_filter, filter_string))
+    if (filter->filter_string && filter_string) {
+        if (strcmp(filter->filter_string, filter_string))
             filter_changed = 1;
-    } else if (filter->prev_filter || filter_string) {
+    } else if (filter->filter_string || filter_string) {
         filter_changed = 1;
     }
 
@@ -58,14 +58,14 @@ int lock_and_update_filter(struct allmetrics_filter **filter_p, const char *filt
         while (filter->request_number > 1)
             uv_cond_wait(&filter->filter_cond, &filter->filter_mutex);
 
-        freez(filter->prev_filter);
+        freez(filter->filter_string);
         simple_pattern_free(filter->filter_sp);
 
         if (filter_string) {
-            filter->prev_filter = strdupz(filter_string);
+            filter->filter_string = strdupz(filter_string);
             filter->filter_sp = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
         } else {
-            filter->prev_filter = NULL;
+            filter->filter_string = NULL;
             filter->filter_sp = NULL;
         }
     } else {

@@ -779,7 +779,7 @@ struct rrdhost_system_info {
 struct allmetrics_filter {
     SIMPLE_PATTERN *filter_sp;
 
-    char *prev_filter;
+    char *filter_string;
     int filter_changed;
 
     uv_mutex_t filter_mutex;
