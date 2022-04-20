@@ -35,12 +35,12 @@ int lock_and_update_allmetrics_filter(struct allmetrics_filter **filter_p, const
 
         if (uv_mutex_init(&filter->filter_mutex)) {
             freez(filter);
-            fatal("Cannot initialize mutex for allmetrics filter"); // TODO: can we do without fatal()?
+            fatal("Cannot initialize mutex for allmetrics filter");
         }
 
         if (uv_cond_init(&filter->filter_cond)) {
             freez(filter);
-            fatal("Cannot initialize conditional variable for allmetrics filter"); // TODO: can we do without fatal()?
+            fatal("Cannot initialize conditional variable for allmetrics filter");
         }
     }
     
