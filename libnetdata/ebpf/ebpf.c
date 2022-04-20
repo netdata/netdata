@@ -952,6 +952,38 @@ static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program
 }
 
 /**
+ * Convert allocate to string
+ *
+ * Convert the value given for expected string.
+ *
+ * @param test current value for variable allocate inside ebpf_module_t.
+ *
+ * @return It returns "static" when 1 is given as argument, and "dynamic" otherwise.
+ */
+char *ebpf_convert_allocate_to_string(ebpf_memory_allocate_t test)
+{
+    if (test == NETDATA_EBPF_ALLOCATE_STATIC)
+        return NETDATA_EBPF_STATIC_ALLOCATION;
+
+    return NETDATA_EBPF_DYNAMIC_ALLOCATION;
+}
+
+/**
+ * Convert string to allocate
+ *
+ * This function convert string to its respective ID.
+ *
+ * @param value is the value read from configuration file.
+ *
+ * @return It returns 0 when `dynamic` is given, and 1 otherwise.
+ */
+ebpf_memory_allocate_t ebpf_convert_string_to_allocate(char *value)
+{
+    return (!strcasecmp(value, NETDATA_EBPF_STATIC_ALLOCATION)) ?
+           NETDATA_EBPF_ALLOCATE_STATIC : NETDATA_EBPF_ALLOCATE_DYNAMIC;
+}
+
+/**
  * Update Module using config
  *
  * Update configuration for a specific thread.
@@ -984,6 +1016,11 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(value, modules->mode);
     ebpf_update_target_with_conf(modules, fill_lm);
+
+    value = ebpf_convert_allocate_to_string(modules->allocate);
+    value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, NETDATA_EBPF_ALLOCATE_OPTION,
+                          value);
+    modules->allocate = ebpf_convert_string_to_allocate(value);
 }
 
 /**

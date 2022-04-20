@@ -212,6 +212,10 @@ typedef struct ebpf_plugin_stats {
     uint32_t trampolines; // Number of trampolines used
 } ebpf_plugin_stats_t;
 
+#define NETDATA_EBPF_ALLOCATE_OPTION "allocate memory"
+#define NETDATA_EBPF_STATIC_ALLOCATION "static"
+#define NETDATA_EBPF_DYNAMIC_ALLOCATION "dynamic"
+
 typedef enum ebpf_memory_allocate {
     NETDATA_EBPF_ALLOCATE_DYNAMIC,
     NETDATA_EBPF_ALLOCATE_STATIC
@@ -259,6 +263,7 @@ extern char **ebpf_fill_histogram_dimension(size_t maximum);
 extern void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em);
 extern void ebpf_update_controller(int fd, ebpf_module_t *em);
 extern void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name);
+extern ebpf_memory_allocate_t ebpf_convert_string_to_allocate(char *value);
 
 // Histogram
 #define NETDATA_EBPF_HIST_MAX_BINS 24UL

@@ -1196,6 +1196,22 @@ static inline void epbf_update_load_mode(char *str)
 }
 
 /**
+ * Update Allocate Value
+ *
+ * Set allocate value according to user configuration.
+ *
+ * @param conf value read from ebpf.d.conf
+ */
+static void ebpf_update_allocate_value(char *conf)
+{
+    ebpf_memory_allocate_t value = ebpf_convert_string_to_allocate(conf);
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_modules[i].allocate = value;
+    }
+}
+
+/**
  * Read collector values
  *
  * @param disable_apps    variable to store information related to apps.
@@ -1279,6 +1295,11 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups, int u
         enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
                                         CONFIG_BOOLEAN_NO);
     ebpf_modules[EBPF_MODULE_SOCKET_IDX].optional = (int)enabled;
+
+    // Memory allocation
+    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, NETDATA_EBPF_ALLOCATE_OPTION,
+                          NETDATA_EBPF_DYNAMIC_ALLOCATION);
+    ebpf_update_allocate_value(value);
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
                                     CONFIG_BOOLEAN_NO);
