@@ -28,7 +28,7 @@ To install Netdata using our automatic [kickstart](/packaging/installer/README.m
 ```bash
 curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
-The Netdata Agent is be installed under `/usr/local/netdata`. Dependencies are handled via Homebrew.
+The Netdata Agent is installed under `/usr/local/netdata`. Dependencies are handled via Homebrew.
 
 **Automatically connect to Netdata Cloud during installation**
 <!-- Potential reuse: https://learn.netdata.cloud/docs/agent/claim#connect-an-agent-running-in-macos-->
