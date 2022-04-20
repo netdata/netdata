@@ -9,4 +9,10 @@
 
 extern int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url);
 
+struct allmetrics_filter; // declared in rrd.h
+
+int lock_and_update_filter(struct allmetrics_filter **filter_p, const char *filter_string);
+void unlock_filter(struct allmetrics_filter *filter, int filter_changed);
+int chart_is_filtered_out(RRDSET *st, struct allmetrics_filter *filter, int filter_changed, int filter_type);
+
 #endif //NETDATA_API_ALLMETRICS_H
