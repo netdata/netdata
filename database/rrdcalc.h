@@ -121,6 +121,7 @@ struct rrdcalc {
     time_t next_update;             // the next update timestamp of the alarm
     time_t last_status_change;      // the timestamp of the last time this alarm changed status
     time_t last_repeat; // the last time the alarm got repeated
+    uint32_t times_repeat;          // number of times the alarm got repeated
 
     time_t db_after;                // the first timestamp evaluated by the db lookup
     time_t db_before;               // the last timestamp evaluated by the db lookup

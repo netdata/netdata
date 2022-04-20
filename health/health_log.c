@@ -560,10 +560,6 @@ inline void health_alarm_log(
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
-    if(unlikely(alarm_entry_isrepeating(host, ae))) {
-        error("Repeating alarms cannot be added to host's alarm log entries. It seems somewhere in the logic, API is being misused. Alarm id: %u", ae->alarm_id);
-        return;
-    }
     // link it
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
     ae->next = host->health_log.alarms;
