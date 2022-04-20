@@ -882,12 +882,6 @@ RRDSET *rrdset_create_custom(
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
 
-    // if(!strcmp(st->id, "disk_util.dm-0")) {
-    //     st->debug = 1;
-    //     error("enabled debugging for '%s'", st->id);
-    // }
-    // else error("not enabled debugging for '%s'", st->id);
-
     st->green = NAN;
     st->red = NAN;
 
