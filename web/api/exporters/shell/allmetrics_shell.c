@@ -30,13 +30,13 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
  * @param filter_string a new filter to create
  * @return Returns 1 if the filter has changed, 0 otherwise 
  */
-int lock_and_update_filter(struct url_filter **filter_p, const char *filter_string)
+int lock_and_update_filter(struct allmetrics_filter **filter_p, const char *filter_string)
 {
-    struct url_filter *filter = *filter_p;
+    struct allmetrics_filter *filter = *filter_p;
     int filter_changed = 0;
 
     if (!filter) {
-        filter = callocz(1, sizeof(struct url_filter));
+        filter = callocz(1, sizeof(struct allmetrics_filter));
         *filter_p = filter;
 
         if (uv_mutex_init(&filter->filter_mutex)) {
@@ -81,7 +81,7 @@ int lock_and_update_filter(struct url_filter **filter_p, const char *filter_stri
     return filter_changed;
 }
 
-void unlock_filter(struct url_filter *filter, int filter_changed)
+void unlock_filter(struct allmetrics_filter *filter, int filter_changed)
 {
     if (!filter_changed) {
         uv_mutex_lock(&filter->filter_mutex);
@@ -93,16 +93,16 @@ void unlock_filter(struct url_filter *filter, int filter_changed)
     uv_cond_signal(&filter->filter_cond);
 }
 
-int chart_is_filtered_out(RRDSET *st, struct url_filter *filter, int filter_changed, int filter_type)
+int chart_is_filtered_out(RRDSET *st, struct allmetrics_filter *filter, int filter_changed, int filter_type)
 {
     if (filter_changed) {
         if (simple_pattern_matches(filter->filter_sp, st->id) || simple_pattern_matches(filter->filter_sp, st->name))
-            st->api_filter &= !filter_type; // chart should be sent
+            st->allmetrics_filter &= !filter_type; // chart should be sent
         else
-            st->api_filter |= filter_type; // chart should be filtered out
+            st->allmetrics_filter |= filter_type; // chart should be filtered out
     }
 
-    if (unlikely(st->api_filter & filter_type))
+    if (unlikely(st->allmetrics_filter & filter_type))
         return 1;
     else
         return 0;
@@ -112,7 +112,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     analytics_log_shell();
     rrdhost_rdlock(host);
 
-    struct url_filter *filter = &host->allmetrics_filter;
+    struct allmetrics_filter *filter = &host->allmetrics_filter;
 
     int filter_changed = lock_and_update_filter(&filter, filter_string);
 

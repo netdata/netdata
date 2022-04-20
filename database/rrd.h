@@ -538,7 +538,7 @@ struct rrdset {
 
     RRDSET_FLAGS flags;                             // configuration flags
     RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
-    int api_filter;                                 // bit array for filtering the chart out from API responses
+    int allmetrics_filter;                                 // bit array for filtering the chart out from API responses
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
@@ -776,7 +776,7 @@ struct rrdhost_system_info {
     char *prebuilt_dist;
 };
 
-struct url_filter {
+struct allmetrics_filter {
     SIMPLE_PATTERN *filter_sp;
 
     char *prev_filter;
@@ -814,7 +814,7 @@ struct rrdhost {
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
-    struct url_filter allmetrics_filter;            // filters for the allmetrics API request
+    struct allmetrics_filter allmetrics_filter;            // filters for the allmetrics API request
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
