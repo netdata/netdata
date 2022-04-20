@@ -322,7 +322,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 #endif
 
 #ifdef  ENABLE_COMPRESSION
-s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_VERSION_COMPRESSION));
+s->rrdpush_compression = (default_compression_enabled && (s->version == STREAM_VERSION_COMPRESSION || s->version == STREAM_VERSION_GAP_FILL_N_COMPRESSION));
 #endif  //ENABLE_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
