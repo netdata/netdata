@@ -183,7 +183,7 @@ If you would like to run ML on a parent instead of at the edge below shows some 
 
 This example assumes 3 child nodes streaming to 1 parent node and illustrates the main ways you might want to configure running ml for the children on the parent, running ml on the children themselves or even a mix of approaches.
 
-![parent_child_options](https://aws1.discourse-cdn.com/business5/uploads/netdata2/original/2X/1/1febb775c7eb8448a59324ae757b715e3b7d85a9.png)
+![parent_child_options](https://user-images.githubusercontent.com/2178292/164439761-8fb7dddd-c4d8-4329-9f44-9a794937a086.png)
 
 ```
 # parent will run ml for itself and child 1,2.
