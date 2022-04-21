@@ -853,6 +853,12 @@ static void ebpf_fd_allocate_global_vectors(ebpf_module_t *em)
             fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
         else
             fd_static_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t));
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("This thread is allocating memory %s.",
+             (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
+             "dinamically" :
+             "only in the beginning.");
+#endif
     }
 
     fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
