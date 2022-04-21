@@ -177,6 +177,51 @@ Below is a list of all the available configuration params and their default valu
 	# charts to skip from training = netdata.*
 ```
 
+### Configuration Examples
+
+If you would like to run ML on a parent instead of at the edge below shows some configuration options.
+
+This example assumes 3 child nodes streaming to 1 parent node and illustrates the main ways you might want to configure running ml for the children on the parent, running ml on the children themselves or even a mix of approaches.
+
+![parent_child_options](https://aws1.discourse-cdn.com/business5/uploads/netdata2/original/2X/1/1febb775c7eb8448a59324ae757b715e3b7d85a9.png)
+
+```
+# parent will run ml for itself and child 1,2.
+# child 0 will run its own ml at the edge and just stream its ml charts to parent.
+# child 1 will run its own ml at the edge, even though parent will also run ml for it, a bit wasteful potentially to run ml in both places but is possible.
+# child 2 will not run ml at the edge, it will be run in the parent only.
+
+# parent-ml-ml-stress-0
+# run ml on all hosts apart from child-ml-ml-stress-0
+[ml]
+        enabled = yes
+        minimum num samples to train = 900
+        train every = 900
+        charts to skip from training = !*
+        hosts to skip from training = child-ml-ml-stress-0
+
+# child-ml-ml-stress-0
+# run ml on child-ml-ml-stress-0 and stream ml charts to parent
+[ml]
+        enabled = yes
+        minimum num samples to train = 900
+        train every = 900
+        stream anomaly detection charts = yes
+
+# child-ml-ml-stress-1
+# run ml on child-ml-ml-stress-1 and stream ml charts to parent
+[ml]
+        enabled = yes
+        minimum num samples to train = 900
+        train every = 900
+        stream anomaly detection charts = yes
+
+# child-ml-ml-stress-2
+# don't run ml on child-ml-ml-stress-2, it will instead run on parent-ml-ml-stress-0
+[ml]
+        enabled = no
+```
+
 ### Descriptions (min/max)
 
 - `enabled`: `yes` to enable, `no` to disable.
