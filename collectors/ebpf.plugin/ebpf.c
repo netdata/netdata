@@ -223,7 +223,6 @@ static void ebpf_exit(int sig)
     if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled) {
         ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
         clean_socket_apps_structures();
-        freez(socket_bandwidth_curr);
     }
 
     if (ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled) {

@@ -944,10 +944,7 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
 void cleanup_variables_from_other_threads(uint32_t pid)
 {
     // Clean socket structures
-    if (socket_bandwidth_curr) {
-        freez(socket_bandwidth_curr[pid]);
-        socket_bandwidth_curr[pid] = NULL;
-    }
+    ebpf_socket_clean_specific_pid(pid);
 
     // Clean cachestat structure
     if (cachestat_pid) {

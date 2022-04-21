@@ -59,6 +59,7 @@ static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
 
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
+ebpf_socket_publish_apps_t *static_socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
@@ -717,7 +718,12 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
     long long ret = 0;
     while (root) {
         int32_t pid = root->pid;
-        ebpf_socket_publish_apps_t *w = socket_bandwidth_curr[pid];
+        ebpf_socket_publish_apps_t *w = NULL;
+        if (likely(socket_bandwidth_curr))
+            w = socket_bandwidth_curr[pid];
+        else if (likely(static_socket_bandwidth_curr))
+            w = &static_socket_bandwidth_curr[pid];
+
         if (w) {
             ret += get_value_from_structure((char *)w, offset);
         }
@@ -2008,11 +2014,18 @@ static void read_hash_global_tables()
  */
 void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
-    ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
-    if (!curr) {
-        curr = callocz(1, sizeof(ebpf_socket_publish_apps_t));
-        socket_bandwidth_curr[current_pid] = curr;
-    }
+    ebpf_socket_publish_apps_t *curr;
+    if (likely(socket_bandwidth_curr)) {
+        curr = socket_bandwidth_curr[current_pid];
+        if (!curr) {
+            curr = callocz(1, sizeof(ebpf_socket_publish_apps_t));
+            socket_bandwidth_curr[current_pid] = curr;
+        }
+    } else
+        curr = &static_socket_bandwidth_curr[current_pid];
+
+    if (!curr)
+        return;
 
     curr->bytes_sent = eb->bytes_sent;
     curr->bytes_received = eb->bytes_received;
@@ -2094,8 +2107,15 @@ static void ebpf_update_socket_cgroup()
             int pid = pids->pid;
             ebpf_bandwidth_t *out = &pids->socket;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            if (likely(socket_bandwidth_curr) && socket_bandwidth_curr[pid]) {
-                ebpf_socket_publish_apps_t *in = socket_bandwidth_curr[pid];
+            if (likely(socket_bandwidth_curr) || likely(static_socket_bandwidth_curr)) {
+                ebpf_socket_publish_apps_t *in;
+                if (likely(static_socket_bandwidth_curr))
+                    in = &static_socket_bandwidth_curr[pid];
+                else
+                    in = socket_bandwidth_curr[pid];
+
+                if (!in)
+                    continue;
 
                 publish->bytes_sent = in->bytes_sent;
                 publish->bytes_received = in->bytes_received;
@@ -2827,13 +2847,37 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
     }
 }
 
-void clean_socket_apps_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(socket_bandwidth_curr[pids->pid]);
+/**
+ * Clean Specific PID
+ *
+ * Clean a specific PID that is no running anymore.
+ *
+ * @param pid clean the pid closed.
+ */
+void ebpf_socket_clean_specific_pid(uint32_t pid)
+{
+    if (likely(socket_bandwidth_curr)) {
+        freez(socket_bandwidth_curr[pid]);
+        socket_bandwidth_curr[pid] = NULL;
+    } else if (likely(static_socket_bandwidth_curr))
+        memset(&static_socket_bandwidth_curr[pid], 0, sizeof(ebpf_socket_publish_apps_t));
+}
 
-        pids = pids->next;
-    }
+/**
+ * Clen socket apps structure
+ *
+ * Cleanup all allocate data.
+ */
+void clean_socket_apps_structures() {
+    if (likely(socket_bandwidth_curr)) {
+        struct pid_stat *pids = root_of_pids;
+        while (pids) {
+            freez(socket_bandwidth_curr[pids->pid]);
+
+            pids = pids->next;
+        }
+    } else
+        freez(static_socket_bandwidth_curr);
 }
 
 /**
@@ -2955,16 +2999,28 @@ static void ebpf_socket_cleanup(void *ptr)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param apps is apps enabled?
+ * @param em the structure with thread information
  */
-static void ebpf_socket_allocate_global_vectors(int apps)
+static void ebpf_socket_allocate_global_vectors(ebpf_module_t *em)
 {
     memset(socket_aggregated_data, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_syscall_stat_t));
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    if (apps)
-        socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
+    if (em->apps_charts) {
+        if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
+            socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
+        else
+            static_socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t));
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("%s %s.",
+             EBPF_DEFAULT_MEMORY_MESSAGE,
+             (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
+             EBPF_MEMORY_MESSAGE_DYNAMIC :
+             EBPF_MEMORY_MESSAGE_BEGIN);
+#endif
+    }
 
     bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 
@@ -3948,7 +4004,7 @@ void *ebpf_socket_thread(void *ptr)
     }
     pthread_mutex_lock(&lock);
 
-    ebpf_socket_allocate_global_vectors(em->apps_charts);
+    ebpf_socket_allocate_global_vectors(em);
     initialize_inbound_outbound();
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
