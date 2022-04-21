@@ -247,7 +247,6 @@ static void ebpf_exit(int sig)
     if (ebpf_modules[EBPF_MODULE_VFS_IDX].enabled) {
         ebpf_modules[EBPF_MODULE_VFS_IDX].enabled = 0;
         clean_vfs_pid_structures();
-        freez(vfs_pid);
     }
 
     if (ebpf_modules[EBPF_MODULE_FD_IDX].enabled) {

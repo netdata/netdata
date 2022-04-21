@@ -152,11 +152,10 @@ enum netdata_vfs_tables {
     NETDATA_VFS_ALL
 };
 
-extern netdata_publish_vfs_t **vfs_pid;
-
 extern void *ebpf_vfs_thread(void *ptr);
 extern void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void clean_vfs_pid_structures();
+extern void ebpf_vfs_clean_specific_pid(uint32_t pid);
 
 extern struct config vfs_config;
 

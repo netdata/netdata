@@ -14,6 +14,7 @@ static netdata_idx_t *vfs_hash_values = NULL;
 static netdata_syscall_stat_t vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_END];
 static netdata_publish_syscall_t vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_END];
 netdata_publish_vfs_t **vfs_pid = NULL;
+netdata_publish_vfs_t *vfs_static_pid = NULL;
 netdata_publish_vfs_t *vfs_vector = NULL;
 
 static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
@@ -50,17 +51,36 @@ static int read_thread_closed = 1;
  *****************************************************************/
 
 /**
+ * Clean Specific PID
+ *
+ * Clean a specific PID that is no running anymore.
+ *
+ * @param pid clean the pid closed.
+ */
+void ebpf_vfs_clean_specific_pid(uint32_t pid)
+{
+    if (likely(vfs_pid) && vfs_pid[pid]) {
+        freez(vfs_pid[pid]);
+        vfs_pid[pid] = NULL;
+    }
+}
+
+/**
  * Clean PID structures
  *
  * Clean the allocated structures.
  */
 void clean_vfs_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(vfs_pid[pids->pid]);
+    if (likely(vfs_pid)) {
+        struct pid_stat *pids = root_of_pids;
+        while (pids) {
+            freez(vfs_pid[pids->pid]);
 
-        pids = pids->next;
-    }
+            pids = pids->next;
+        }
+        freez(vfs_pid);
+    } else
+        freez(vfs_static_pid);
 }
 
 /**
@@ -216,7 +236,12 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *
 
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_vfs_t *w = vfs_pid[pid];
+        netdata_publish_vfs_t *w = NULL;
+        if (likely(vfs_pid) && vfs_pid[pid])
+            w = vfs_pid[pid];
+        else if (likely(vfs_static_pid))
+            w = &vfs_static_pid[pid];
+
         if (w) {
             accumulator.write_call += w->write_call;
             accumulator.writev_call += w->writev_call;
@@ -442,11 +467,15 @@ static void vfs_apps_accumulator(netdata_publish_vfs_t *out)
  */
 static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
 {
-    netdata_publish_vfs_t *curr = vfs_pid[current_pid];
-    if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_vfs_t));
-        vfs_pid[current_pid] = curr;
-    }
+    netdata_publish_vfs_t *curr;
+    if (likely(vfs_pid)) {
+        curr = vfs_pid[current_pid];
+        if (!curr) {
+            curr = callocz(1, sizeof(netdata_publish_vfs_t));
+            vfs_pid[current_pid] = curr;
+        }
+    } else
+        curr = &vfs_static_pid[current_pid];
 
     memcpy(curr, &publish[0], sizeof(netdata_publish_vfs_t));
 }
@@ -497,10 +526,15 @@ static void read_update_vfs_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_vfs_t *out = &pids->vfs;
-            if (likely(vfs_pid) && vfs_pid[pid]) {
-                netdata_publish_vfs_t *in = vfs_pid[pid];
+            if (likely(vfs_pid) || likely(vfs_static_pid)) {
+                netdata_publish_vfs_t *in = NULL;
+                if (likely(vfs_static_pid))
+                    in = &vfs_static_pid[pid];
+                else
+                    in = vfs_pid[pid];
 
-                memcpy(out, in, sizeof(netdata_publish_vfs_t));
+                if (in)
+                    memcpy(out, in, sizeof(netdata_publish_vfs_t));
             } else {
                 memset(vv, 0, length);
                 if (!bpf_map_lookup_elem(fd, &pid, vv)) {
@@ -1533,9 +1567,9 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- *  @param apps is apps enabled?
+ * @param em the structure with thread information
  */
-static void ebpf_vfs_allocate_global_vectors(int apps)
+static void ebpf_vfs_allocate_global_vectors(ebpf_module_t *em)
 {
     memset(vfs_aggregated_data, 0, sizeof(vfs_aggregated_data));
     memset(vfs_publish_aggregated, 0, sizeof(vfs_publish_aggregated));
@@ -1543,8 +1577,20 @@ static void ebpf_vfs_allocate_global_vectors(int apps)
     vfs_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
 
-    if (apps)
-        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
+    if (em->apps_charts) {
+        if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
+            vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
+        else
+            vfs_static_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t));
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("%s %s.",
+             EBPF_DEFAULT_MEMORY_MESSAGE,
+             (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
+             EBPF_MEMORY_MESSAGE_DYNAMIC :
+             EBPF_MEMORY_MESSAGE_BEGIN);
+#endif
+    }
 }
 
 /*****************************************************************
@@ -1571,7 +1617,7 @@ void *ebpf_vfs_thread(void *ptr)
 
     ebpf_update_pid_table(&vfs_maps[NETDATA_VFS_PID], em);
 
-    ebpf_vfs_allocate_global_vectors(em->apps_charts);
+    ebpf_vfs_allocate_global_vectors(em);
 
     if (!em->enabled)
         goto endvfs;
