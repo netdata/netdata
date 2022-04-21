@@ -1004,10 +1004,11 @@ static void ebpf_shm_allocate_global_vectors(ebpf_module_t *em)
             shm_static_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t));
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        info("This thread is allocating memory %s.",
+        info("%s %s.",
+             EBPF_DEFAULT_MEMORY_MESSAGE,
              (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
-             "dinamically" :
-             "only in the beginning.");
+             EBPF_MEMORY_MESSAGE_DYNAMIC :
+             EBPF_MEMORY_MESSAGE_BEGIN);
 #endif
     }
 

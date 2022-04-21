@@ -253,6 +253,11 @@ extern void ebpf_pid_file(char *filename, size_t length);
 #define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
 #define EBPF_COMMON_DIMENSION_KILLS "kills"
 
+//Memory messages
+#define EBPF_DEFAULT_MEMORY_MESSAGE "This thread is allocating memory"
+#define EBPF_MEMORY_MESSAGE_DYNAMIC "dinamically"
+#define EBPF_MEMORY_MESSAGE_BEGIN "only in the beginning"
+
 // Common variables
 extern int debug_enabled;
 extern struct pid_stat *root_of_pids;
