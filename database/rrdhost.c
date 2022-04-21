@@ -1533,7 +1533,7 @@ void rrdset_check_obsoletion(RRDHOST *host)
     RRDSET *st;
     rrdset_foreach_write(st, host) {
         if (rrdset_last_entry_t(st) < host->trigger_chart_obsoletion_check) {
-            rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
+            rrdset_is_obsolete(st);
         }
     }
 }
