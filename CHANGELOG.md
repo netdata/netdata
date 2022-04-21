@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Remove commented code. [\#12726](https://github.com/netdata/netdata/pull/12726) ([vkalintiris](https://github.com/vkalintiris))
+- \[Chore\]: Small typo in macos document [\#12724](https://github.com/netdata/netdata/pull/12724) ([MrZammler](https://github.com/MrZammler))
 - fix upgrading all currently installed packages when updating Netdata on Debian [\#12716](https://github.com/netdata/netdata/pull/12716) ([iigorkarpov](https://github.com/iigorkarpov))
 - chore\(cgroups.plugin\): reduce the CPU time required for cgroup-network-helper.sh [\#12711](https://github.com/netdata/netdata/pull/12711) ([ilyam8](https://github.com/ilyam8))
 - feat\(apps.plugin\): add proxmox-ve processes to apps\_groups.conf [\#12704](https://github.com/netdata/netdata/pull/12704) ([ilyam8](https://github.com/ilyam8))
@@ -13,9 +15,16 @@
 - Disable automake dependency tracking in our various one-time builds. [\#12701](https://github.com/netdata/netdata/pull/12701) ([Ferroin](https://github.com/Ferroin))
 - Add missing values to algorithm vector \(eBPF\) [\#12698](https://github.com/netdata/netdata/pull/12698) ([thiagoftsm](https://github.com/thiagoftsm))
 - Allocate buffer memory for uv\_write and release in the callback function [\#12688](https://github.com/netdata/netdata/pull/12688) ([stelfrag](https://github.com/stelfrag))
+- \[Uninstall Netdata\] - Add description in the docs to use uninstaller script with force arg [\#12687](https://github.com/netdata/netdata/pull/12687) ([odynik](https://github.com/odynik))
+- Docs: fix GitHub format [\#12682](https://github.com/netdata/netdata/pull/12682) ([eltociear](https://github.com/eltociear))
+- feat\(apps.plugin\): add caddy to apps\_groups.conf [\#12678](https://github.com/netdata/netdata/pull/12678) ([simon300000](https://github.com/simon300000))
 - fix: use NETDATA\_LISTENER\_PORT in docker healtcheck [\#12676](https://github.com/netdata/netdata/pull/12676) ([ilyam8](https://github.com/ilyam8))
+- Add a 2 minute timeout to stream receiver socket [\#12673](https://github.com/netdata/netdata/pull/12673) ([MrZammler](https://github.com/MrZammler))
 - Add the ability to perform a data query using an offline node id [\#12650](https://github.com/netdata/netdata/pull/12650) ([stelfrag](https://github.com/stelfrag))
+- Gotify notifications [\#12639](https://github.com/netdata/netdata/pull/12639) ([coffeegrind123](https://github.com/coffeegrind123))
 - Fix Valgrind errors [\#12619](https://github.com/netdata/netdata/pull/12619) ([vlvkobal](https://github.com/vlvkobal))
+- Docs templates [\#12466](https://github.com/netdata/netdata/pull/12466) ([kickoke](https://github.com/kickoke))
+- Store alert log entries even if alert it is repeating. [\#12226](https://github.com/netdata/netdata/pull/12226) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
@@ -267,13 +276,6 @@
 - Overhaul handling of auto-updates in the installer code. [\#12076](https://github.com/netdata/netdata/pull/12076) ([Ferroin](https://github.com/Ferroin))
 - Add serial numbers to chart names [\#12067](https://github.com/netdata/netdata/pull/12067) ([vlvkobal](https://github.com/vlvkobal))
 - Add handling for claiming non-standard install types with kickstart. [\#12064](https://github.com/netdata/netdata/pull/12064) ([Ferroin](https://github.com/Ferroin))
-- remove deprecated node.d modules [\#12047](https://github.com/netdata/netdata/pull/12047) ([ilyam8](https://github.com/ilyam8))
-- Remove SIZEOF\_VOIDP and ENVIRONMENT{32,64} macros. [\#12046](https://github.com/netdata/netdata/pull/12046) ([vkalintiris](https://github.com/vkalintiris))
-- Remove unused NETDATA\_NO\_ATOMIC\_INSTRUCTIONS macro [\#12045](https://github.com/netdata/netdata/pull/12045) ([vkalintiris](https://github.com/vkalintiris))
-- Remove NETDATA\_WITH\_UUID def because it's not used anywhere. [\#12044](https://github.com/netdata/netdata/pull/12044) ([vkalintiris](https://github.com/vkalintiris))
-- inform cloud about inability to satisfy request [\#12041](https://github.com/netdata/netdata/pull/12041) ([underhood](https://github.com/underhood))
-- adds install method to /api/v1/info as label [\#12040](https://github.com/netdata/netdata/pull/12040) ([underhood](https://github.com/underhood))
-- Stream compression - Deactivate compression at runtime in case of a compressor buffer overflow [\#12037](https://github.com/netdata/netdata/pull/12037) ([odynik](https://github.com/odynik))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
@@ -305,17 +307,10 @@
 - fix\(docs\): unresolved file references [\#12053](https://github.com/netdata/netdata/pull/12053) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.16. [\#12052](https://github.com/netdata/netdata/pull/12052) ([netdatabot](https://github.com/netdatabot))
 - \[Stream Compression\] - Bug fix \#12043 - lz4.h compilation error - compile from source [\#12049](https://github.com/netdata/netdata/pull/12049) ([odynik](https://github.com/odynik))
-- Fix compilation errors for OpenSSL on macOS [\#12048](https://github.com/netdata/netdata/pull/12048) ([vlvkobal](https://github.com/vlvkobal))
-- Updated the docs to match new install script [\#12042](https://github.com/netdata/netdata/pull/12042) ([kickoke](https://github.com/kickoke))
 
 ## [v1.33.0](https://github.com/netdata/netdata/tree/v1.33.0) (2022-01-26)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/1.32.1...v1.33.0)
-
-**Merged pull requests:**
-
-- Re-instate plugins\_action for clabels [\#12039](https://github.com/netdata/netdata/pull/12039) ([MrZammler](https://github.com/MrZammler))
-- Have cURL properly fail on non-2xx status codes in the installer. [\#12038](https://github.com/netdata/netdata/pull/12038) ([Ferroin](https://github.com/Ferroin))
 
 ## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
 
