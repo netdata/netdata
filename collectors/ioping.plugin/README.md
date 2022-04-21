@@ -1,86 +1,120 @@
 <!--
 title: "ioping.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ioping.plugin/README.md
+description: "Netdata's ioping plugin allows you to measure your disk latency."
 -->
 
 # ioping.plugin
 
-The ioping plugin supports monitoring latency for any number of directories/files/devices,
-by pinging them with `ioping`.
+The ioping plugin supports monitoring latency for any number of directories/files/devices, by pinging them with `ioping`.
+When your disks don't respond in the time you defined in `ioping.conf`, the plugin raises an alert (`ioping_disk_latency`).
 
-A recent version of `ioping` is required (one that supports option `-N`).
-The supplied plugin can install it, by running:
+The collector is enabled if Netdata detects that you have `ioping` installed. Otherwise, it is disabled. 
+
+## Prerequisites
+
+To use this plugin, you need to install `ioping`.
+
+## Installing ioping
+
+You can install `ioping` using the plugin.
+The following command will download, build and install the correct `ioping` version as `/usr/libexec/netdata/plugins.d/ioping`.
+
+To install `ioping`, run:
+
+   ```sh
+   /usr/libexec/netdata/plugins.d/ioping.plugin install
+   ```
+   Once `ioping` is installed, Netdata will automatically start collecting disk latency data.
+
+> Note: If you set up Netdata using a different environment path than the default (`/etc/netdata/.environment`), use the option `-e` to indicate where the Netdata environment file is installed.
+
+## Configuring ioping.plugin
+
+Netdata ships each plugin and collector with a default configuration. To determine whether you need to make changes, check the [default configuration for `ioping.conf`](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/ioping.conf).
+
+To make changes to the ioping.plugin configuration: 
+
+1. Navigate to the [Netdata config directory](/docs/configure/nodes#the-netdata-config-directory):
+
+   ```bash
+   cd /etc/netdata
+   ``` 
+
+2. Use the [`edit-config`](/docs/configure/nodes#use-edit-config-to-edit-configuration-files) script to edit `ioping.conf`.
+
+   ```bash
+   sudo ./edit-config ioping.conf
+   ```
+ ### Example
 
 ```sh
-/usr/libexec/netdata/plugins.d/ioping.plugin install
-```
-
-The `-e` option can be supplied to indicate where the Netdata environment file is installed. The default path is `/etc/netdata/.environment`.
-
-The above will download, build and install the right version as `/usr/libexec/netdata/plugins.d/ioping`.
-
-Then you need to edit `/etc/netdata/ioping.conf` (to edit it on your system run
-`/etc/netdata/edit-config ioping.conf`) like this:
-
-```sh
-# uncomment the following line - it should already be there
+# Uncomment the following line
 ioping="/usr/libexec/netdata/plugins.d/ioping"
 
-# set here the directory/file/device, you need to ping
+# Set the directory/file/device you need to ping
 destination="destination"
 
-# override the chart update frequency - the default is inherited from Netdata
-update_every="1s"
+# Override the chart update frequency - the default is inherited from Netdata
+update_every="10s"
 
-# the request size in bytes to ping the destination
+# The request size in bytes to ping the destination
 request_size="4k"
 
-# other iping options - these are the defaults
+# Other ioping options (- these are the defaults)
 ioping_opts="-T 1000000 -R"
 ```
 
-## alarms
+### Setting up multiple ioping plugins with different settings
 
-Netdata will automatically attach a few alarms for each host.
-Check the [latest versions of the ioping alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/ioping.conf)
-
-## Multiple ioping Plugins With Different Settings
-
-You may need to run multiple ioping plugins with different settings or different end points.
-For example, you may need to ping one destination once per 10 seconds, and another once per second.
-
+In case you have multiple nodes that should be pinged in different intervals, you need to run multiple ioping plugins with different settings.
 Netdata allows you to add as many `ioping` plugins as you like.
+For example, you may need to ping one node once per 10 seconds, and another once per second.
 
-Follow this procedure:
+To set up multiple ioping plugins:
 
-**1. Create New ioping Configuration File**
+1. Open a new terminal and change into the configuration directory.
 
-```sh
-# Step Into Configuration Directory
-cd /etc/netdata
+   ```bash
+   cd /etc/netdata
+   ```
 
-# Copy Original ioping Configuration File To New Configuration File
-cp ioping.conf ioping2.conf
-```
+2. Copy the original ioping configuration file. You can name the file any name you like.
 
-Edit `ioping2.conf` and set the settings and the destination you need for the seconds instance.
+   ```bash
+   cp ioping.conf ioping2.conf
+   ```
 
-**2. Soft Link Original ioping Plugin to New Plugin File**
+3. Edit `ioping2.conf` and set the settings and the destination you need for the second instance.
 
-```sh
-# Become root (If The Step Step Is Performed As Non-Root User)
-sudo su
+4. To complete the next steps, you need change to the superuser.
 
-# Step Into The Plugins Directory
-cd /usr/libexec/netdata/plugins.d
+   ```bash
+   sudo su
+   ```
 
-# Link ioping.plugin to ioping2.plugin
-ln -s ioping.plugin ioping2.plugin
-```
+5. Change into the plugins directory.
 
-That's it. Netdata will detect the new plugin and start it.
+   ```bash
+   cd /usr/libexec/netdata/plugins.d
+   ```
 
-You can name the new plugin any name you like.
-Just make sure the plugin and the configuration file have the same name.
+6. Create a soft link to connect the original ioping plugin to new plugin file. Make sure the plugin and the configuration file have the same name (in our example "ioping2").
 
+   ```bash
+   ln -s ioping.plugin ioping2.plugin
+   ```
 
+   Netdata will detect the new plugin and start it.
+
+## Metrics and Alerts produced by this collector
+
+| Chart  | Metrics        | Alert                                                                             |
+| ------ | -------------- | --------------------------------------------------------------------------------- |
+| ioping | ioping.latency | [ioping_disk_latency](https://community.netdata.cloud/t/ioping-disk-latency/2120) |
+
+## Related links
+
+- [Default configuration for `ioping.conf`](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/ioping.conf)
+- [Manpage for ioping options](https://www.systutorials.com/docs/linux/man/1-ioping/#lbAE)
+- [Troubleshooting ioping alerts](https://community.netdata.cloud/t/ioping-disk-latency/2120)
