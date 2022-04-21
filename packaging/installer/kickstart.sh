@@ -84,9 +84,15 @@ main() {
     exit 0
   fi
 
-  tmpdir="$(create_tmp_directory)"
-  progress "Using ${tmpdir} as a temporary directory."
-  cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
+  tempfoo=`basename -s .sh $0`
+  # mktemp behaves slightly differently on macOS but we ignore this fact...
+  wrkdir=`mktemp -q -d -t ${tempfoo}.XXXXX`
+    if [ $? -ne 0 ]; then
+      echo "$0: Can't create temp directory, exiting..."
+      exit 1
+    fi
+
+  cd $wrkdir
 
   case "${SYSTYPE}" in
     Linux) install_on_linux ;;
@@ -337,7 +343,7 @@ success_banner() {
 
 cleanup() {
   if [ -z "${NO_CLEANUP}" ]; then
-    ${ROOTCMD} rm -rf "${tmpdir}"
+    ${ROOTCMD} rm -rf "${wrkdir}"
   fi
 }
 
@@ -429,42 +435,6 @@ run() {
 warning() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
   WARNINGS="${WARNINGS}\n  - ${*}"
-}
-
-_cannot_use_tmpdir() {
-  testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
-  ret=0
-
-  if [ -z "${testfile}" ]; then
-    return "${ret}"
-  fi
-
-  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}"; then
-    if chmod +x "${testfile}"; then
-      if [ "$("${testfile}")" = "SUCCESS" ]; then
-        ret=1
-      fi
-    fi
-  fi
-
-  rm -f "${testfile}"
-  return "${ret}"
-}
-
-create_tmp_directory() {
-  if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
-    if _cannot_use_tmpdir /tmp; then
-      if _cannot_use_tmpdir "${PWD}"; then
-        fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." F0400
-      else
-        TMPDIR="${PWD}"
-      fi
-    else
-      TMPDIR="/tmp"
-    fi
-  fi
-
-  mktemp -d -t netdata-kickstart-XXXXXXXXXX
 }
 
 check_for_remote_file() {
@@ -692,9 +662,9 @@ uninstall() {
       return 0
     else
       progress "Downloading netdata-uninstaller ..."
-      download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
-      chmod +x "${tmpdir}/netdata-uninstaller.sh"
-      if ! run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS; then
+      download "${uninstaller_url}" "${wrkdir}/netdata-uninstaller.sh"
+      chmod +x "${wrkdir}/netdata-uninstaller.sh"
+      if ! run ${ROOTCMD} "${wrkdir}/netdata-uninstaller.sh" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
     fi
@@ -732,9 +702,9 @@ detect_existing_install() {
   if [ -n "${ndprefix}" ]; then
     typefile="${ndprefix}/etc/netdata/.install-type"
     if [ -r "${typefile}" ]; then
-      ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
+      ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${wrkdir}/install-type\""
       # shellcheck disable=SC1090,SC1091
-      . "${tmpdir}/install-type"
+      . "${wrkdir}/install-type"
     else
       INSTALL_TYPE="unknown"
     fi
@@ -742,9 +712,9 @@ detect_existing_install() {
     envfile="${ndprefix}/etc/netdata/.environment"
     if [ "${INSTALL_TYPE}" = "unknown" ] || [ "${INSTALL_TYPE}" = "custom" ]; then
       if [ -r "${envfile}" ]; then
-        ${ROOTCMD} sh -c "cat \"${envfile}\" > \"${tmpdir}/environment\""
+        ${ROOTCMD} sh -c "cat \"${envfile}\" > \"${wrkdir}/environment\""
         # shellcheck disable=SC1091
-        . "${tmpdir}/environment"
+        . "${wrkdir}/environment"
         if [ -n "${NETDATA_IS_STATIC_INSTALL}" ]; then
           if [ "${NETDATA_IS_STATIC_INSTALL}" = "yes" ]; then
             INSTALL_TYPE="legacy-static"
@@ -871,12 +841,12 @@ soft_disable_cloud() {
 
   run ${ROOTCMD} mkdir -p "${cloud_prefix}"
 
-  cat > "${tmpdir}/cloud.conf" << EOF
+  cat > "${wrkdir}/cloud.conf" << EOF
 [global]
   enabled = no
 EOF
 
-  run ${ROOTCMD} cp "${tmpdir}/cloud.conf" "${cloud_prefix}/cloud.conf"
+  run ${ROOTCMD} cp "${wrkdir}/cloud.conf" "${cloud_prefix}/cloud.conf"
 
   if [ -z "${NETDATA_NO_START}" ]; then
     case "${SYSTYPE}" in
@@ -1281,7 +1251,7 @@ try_package_install() {
       return 2
     fi
 
-    if ! download "${repoconfig_url}" "${tmpdir}/${repoconfig_file}"; then
+    if ! download "${repoconfig_url}" "${wrkdir}/${repoconfig_file}"; then
       fatal "Failed to download repository configuration package." F0209
     fi
 
@@ -1294,7 +1264,7 @@ try_package_install() {
     fi
 
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
+    if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} "${wrkdir}/${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
@@ -1374,18 +1344,18 @@ try_static_install() {
     return 2
   fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${tmpdir}/netdata-${SYSARCH}-latest.gz.run"; then
+  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${wrkdir}/netdata-${SYSARCH}-latest.gz.run"; then
     fatal "Unable to download static build archive for ${SYSARCH}." F0208
   fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
+  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${wrkdir}/sha256sum.txt"; then
     fatal "Unable to fetch checksums to verify static build archive." F0206
   fi
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would validate SHA256 checksum of downloaded static build archive."
   else
-    if ! grep "netdata-${SYSARCH}-latest.gz.run" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+    if ! grep "netdata-${SYSARCH}-latest.gz.run" "${wrkdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
       fatal "Static binary checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0207
     fi
   fi
@@ -1396,7 +1366,7 @@ try_static_install() {
 
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run ${ROOTCMD} sh "${tmpdir}/netdata-${SYSARCH}-latest.gz.run" ${opts} -- ${NETDATA_AUTO_UPDATES:+--auto-update} ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run ${ROOTCMD} sh "${wrkdir}/netdata-${SYSARCH}-latest.gz.run" ${opts} -- ${NETDATA_AUTO_UPDATES:+--auto-update} ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
@@ -1405,16 +1375,16 @@ try_static_install() {
   if [ "${DRY_RUN}" -ne 1 ]; then
   install_type_file="/opt/netdata/etc/netdata/.install-type"
     if [ -f "${install_type_file}" ]; then
-      ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
-      ${ROOTCMD} chown "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
+      ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${wrkdir}/install-type\""
+      ${ROOTCMD} chown "$(id -u)":"$(id -g)" "${wrkdir}/install-type"
       # shellcheck disable=SC1090,SC1091
-      . "${tmpdir}/install-type"
-      cat > "${tmpdir}/install-type" <<- EOF
+      . "${wrkdir}/install-type"
+      cat > "${wrkdir}/install-type" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
 	EOF
-      ${ROOTCMD} chown netdata:netdata "${tmpdir}/install-type"
-      ${ROOTCMD} cp "${tmpdir}/install-type" "${install_type_file}"
+      ${ROOTCMD} chown netdata:netdata "${wrkdir}/install-type"
+      ${ROOTCMD} cp "${wrkdir}/install-type" "${install_type_file}"
     fi
   fi
 }
@@ -1441,7 +1411,7 @@ install_local_build_dependencies() {
     return 1
   fi
 
-  if ! download "${PACKAGES_SCRIPT}" "${tmpdir}/install-required-packages.sh"; then
+  if ! download "${PACKAGES_SCRIPT}" "${wrkdir}/install-required-packages.sh"; then
     fatal "Failed to download dependency handling script for local build." F000D
   fi
 
@@ -1462,7 +1432,7 @@ install_local_build_dependencies() {
   fi
 
   # shellcheck disable=SC2086
-  if ! run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
+  if ! run ${sudo} "${bash}" "${wrkdir}/install-required-packages.sh" ${opts} netdata; then
     warning "Failed to install all required packages, but installation might still be possible."
   fi
 }
@@ -1522,26 +1492,26 @@ try_build_install() {
 
   set_source_archive_urls "${RELEASE_CHANNEL}"
 
-  if !  download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"; then
+  if !  download "${NETDATA_SOURCE_ARCHIVE_URL}" "${wrkdir}/netdata-latest.tar.gz"; then
     fatal "Failed to download source tarball for local build." F000B
   fi
 
-  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
+  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${wrkdir}/sha256sum.txt"; then
     fatal "Failed to download checksums for source tarball verification." F000C
   fi
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would validate SHA256 checksum of downloaded source archive."
   else
-    if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+    if ! grep netdata-latest.tar.gz "${wrkdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
       fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0005
     fi
   fi
 
-  run tar -xf "${tmpdir}/netdata-latest.tar.gz" -C "${tmpdir}"
-  rm -rf "${tmpdir}/netdata-latest.tar.gz" > /dev/null 2>&1
+  run tar -xf "${wrkdir}/netdata-latest.tar.gz" -C "${wrkdir}"
+  rm -rf "${wrkdir}/netdata-latest.tar.gz" > /dev/null 2>&1
   if [ "${DRY_RUN}" -ne 1 ]; then
-    cd "$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot change directory to netdata source tree" F0006
+    cd "$(find "${wrkdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot change directory to netdata source tree" F0006
   fi
 
   if [ -x netdata-installer.sh ] || [ "${DRY_RUN}" -eq 1 ]; then
