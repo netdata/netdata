@@ -258,7 +258,6 @@ static void ebpf_exit(int sig)
     if (ebpf_modules[EBPF_MODULE_SHM_IDX].enabled) {
         ebpf_modules[EBPF_MODULE_SHM_IDX].enabled = 0;
         clean_shm_pid_structures();
-        freez(shm_pid);
     }
 
     ebpf_close_cgroup_shm();

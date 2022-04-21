@@ -14,6 +14,7 @@ static netdata_idx_t shm_hash_values[NETDATA_SHM_END];
 static netdata_idx_t *shm_values = NULL;
 
 netdata_publish_shm_t **shm_pid = NULL;
+netdata_publish_shm_t *shm_static_pid = NULL;
 
 struct config shm_config = { .first_section = NULL,
     .last_section = NULL,
@@ -243,15 +244,35 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
  *****************************************************************/
 
 /**
+ * Clean Specific PID
+ *
+ * Clean a specific PID that is no running anymore.
+ *
+ * @param pid clean the pid closed.
+ */
+void ebpf_shm_clean_specific_pid(uint32_t pid)
+{
+    if (likely(shm_pid) && shm_pid[pid]) {
+        freez(shm_pid[pid]);
+        shm_pid[pid] = NULL;
+    }
+}
+
+/**
  * Clean shm structure
  */
 void clean_shm_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(shm_pid[pids->pid]);
+    if (likely(shm_pid)) {
+        struct pid_stat *pids = root_of_pids;
+        while (pids) {
+            freez(shm_pid[pids->pid]);
 
-        pids = pids->next;
-    }
+            pids = pids->next;
+        }
+
+        freez(shm_pid);
+    } else
+        freez(shm_static_pid);
 }
 
 /**
@@ -328,11 +349,15 @@ static void shm_apps_accumulator(netdata_publish_shm_t *out)
  */
 static void shm_fill_pid(uint32_t current_pid, netdata_publish_shm_t *publish)
 {
-    netdata_publish_shm_t *curr = shm_pid[current_pid];
-    if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_shm_t));
-        shm_pid[current_pid] = curr;
-    }
+    netdata_publish_shm_t *curr;
+    if (likely(shm_pid)) {
+        curr = shm_pid[current_pid];
+        if (!curr) {
+            curr = callocz(1, sizeof(netdata_publish_shm_t));
+            shm_pid[current_pid] = curr;
+        }
+    } else
+        curr = &shm_static_pid[current_pid];
 
     memcpy(curr, publish, sizeof(netdata_publish_shm_t));
 }
@@ -357,11 +382,15 @@ static void ebpf_update_shm_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            if (likely(shm_pid) && shm_pid[pid]) {
-                netdata_publish_shm_t *in = shm_pid[pid];
+            if (likely(shm_pid) || likely(shm_static_pid)) {
+                netdata_publish_shm_t *in;
+                if (shm_static_pid)
+                    in = &shm_static_pid[pid];
+                else
+                    in = shm_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_publish_shm_t));
-            } else {
+            }  else {
                 if (!bpf_map_lookup_elem(fd, &pid, cv)) {
                     shm_apps_accumulator(cv);
 
@@ -492,7 +521,13 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct pid_on_target *
 {
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_shm_t *w = shm_pid[pid];
+        netdata_publish_shm_t *w = NULL;
+
+        if (likely(shm_pid) && shm_pid[pid])
+            w = shm_pid[pid];
+        else if  (likely(shm_static_pid))
+            w = &shm_static_pid[pid];
+
         if (w) {
             shm->get += w->get;
             shm->at += w->at;
@@ -958,12 +993,23 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param apps is apps enabled?
+ * @param em the structure with thread information
  */
-static void ebpf_shm_allocate_global_vectors(int apps)
+static void ebpf_shm_allocate_global_vectors(ebpf_module_t *em)
 {
-    if (apps)
-        shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
+    if (em->apps_charts) {
+        if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
+            shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
+        else
+            shm_static_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t));
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("This thread is allocating memory %s.",
+             (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
+             "dinamically" :
+             "only in the beginning.");
+#endif
+    }
 
     shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_t));
 
@@ -1064,7 +1110,7 @@ void *ebpf_shm_thread(void *ptr)
         goto endshm;
     }
 
-    ebpf_shm_allocate_global_vectors(em->apps_charts);
+    ebpf_shm_allocate_global_vectors(em);
 
     int algorithms[NETDATA_SHM_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX,

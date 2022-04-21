@@ -977,10 +977,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
     ebpf_fd_clean_specific_pid(pid);
 
     // Clean shm structure
-    if (shm_pid) {
-        freez(shm_pid[pid]);
-        shm_pid[pid] = NULL;
-    }
+    ebpf_shm_clean_specific_pid(pid);
 }
 
 /**

@@ -857,7 +857,7 @@ static void ebpf_fd_allocate_global_vectors(ebpf_module_t *em)
         info("This thread is allocating memory %s.",
              (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
              "dinamically" :
-             "only in the beginning.");
+             "only in the beginning");
 #endif
     }
 
