@@ -1396,7 +1396,7 @@ try_static_install() {
 
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run ${ROOTCMD} sh "${tmpdir}/netdata-${SYSARCH}-latest.gz.run" ${opts} -- ${NETDATA_AUTO_UPDATES:+--auto-update} ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run ${ROOTCMD} sh "${tmpdir}/netdata-${SYSARCH}-latest.gz.run" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
@@ -1480,10 +1480,6 @@ build_and_install() {
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
     opts="${opts} --dont-wait"
-  fi
-
-  if [ "${NETDATA_AUTO_UPDATES}" -eq 1 ]; then
-    opts="${opts} --auto-update"
   fi
 
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
