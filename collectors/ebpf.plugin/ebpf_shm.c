@@ -255,7 +255,8 @@ void ebpf_shm_clean_specific_pid(uint32_t pid)
     if (likely(shm_pid) && shm_pid[pid]) {
         freez(shm_pid[pid]);
         shm_pid[pid] = NULL;
-    }
+    } else if (likely(shm_static_pid))
+        memset(&shm_static_pid[pid], 0, sizeof(netdata_publish_shm_t));
 }
 
 /**
@@ -389,7 +390,8 @@ static void ebpf_update_shm_cgroup()
                 else
                     in = shm_pid[pid];
 
-                memcpy(out, in, sizeof(netdata_publish_shm_t));
+                if (in)
+                    memcpy(out, in, sizeof(netdata_publish_shm_t));
             }  else {
                 if (!bpf_map_lookup_elem(fd, &pid, cv)) {
                     shm_apps_accumulator(cv);

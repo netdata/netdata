@@ -60,7 +60,8 @@ void ebpf_fd_clean_specific_pid(uint32_t pid)
     if (likely(fd_pid) && fd_pid[pid]) {
         freez(fd_pid[pid]);
         fd_pid[pid] = NULL;
-    }
+    } else if (likely(fd_static_pid))
+        memset(&fd_static_pid[pid], 0, sizeof(netdata_fd_stat_t));
 }
 
 /**
@@ -300,7 +301,8 @@ static void ebpf_update_fd_cgroup()
                 else
                     in = fd_pid[pid];
 
-                memcpy(out, in, sizeof(netdata_fd_stat_t));
+                if (in)
+                    memcpy(out, in, sizeof(netdata_fd_stat_t));
             } else {
                 memset(fv, 0, length);
                 if (!bpf_map_lookup_elem(fd, &pid, fv)) {

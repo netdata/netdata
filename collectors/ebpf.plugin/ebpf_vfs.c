@@ -62,7 +62,8 @@ void ebpf_vfs_clean_specific_pid(uint32_t pid)
     if (likely(vfs_pid) && vfs_pid[pid]) {
         freez(vfs_pid[pid]);
         vfs_pid[pid] = NULL;
-    }
+    } else if (likely(vfs_static_pid))
+        memset(&vfs_static_pid[pid], 0, sizeof(netdata_publish_vfs_t));
 }
 
 /**
@@ -527,7 +528,7 @@ static void read_update_vfs_cgroup()
             int pid = pids->pid;
             netdata_publish_vfs_t *out = &pids->vfs;
             if (likely(vfs_pid) || likely(vfs_static_pid)) {
-                netdata_publish_vfs_t *in = NULL;
+                netdata_publish_vfs_t *in;
                 if (likely(vfs_static_pid))
                     in = &vfs_static_pid[pid];
                 else
