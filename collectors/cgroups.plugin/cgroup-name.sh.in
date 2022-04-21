@@ -286,8 +286,8 @@ function k8s_get_kubepod_name() {
   if [ -n "$cntr_id" ]; then
     if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
       labels+=',kind="container"'
+      labels+=",qos_class=\"$qos_class\""
       [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
-      [ -n "$qos_class" ] && labels+=",qos_class=\"$qos_class\""
       name="cntr"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
@@ -299,8 +299,8 @@ function k8s_get_kubepod_name() {
     if labels=$(grep "$pod_uid" -m 1 <<< "$containers" 2> /dev/null); then
       labels="${labels%%,container_*}"
       labels+=',kind="pod"'
+      labels+=",qos_class=\"$qos_class\""
       [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
-      [ -n "$qos_class" ] && labels+=",qos_class=\"$qos_class\""
       name="pod"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
