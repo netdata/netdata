@@ -273,6 +273,13 @@ function k8s_get_kubepod_name() {
     return 1
   fi
 
+  local qos_class
+  if [[ $clean_id =~ .+(besteffort|burstable) ]]; then
+    qos_class="${BASH_REMATCH[1]}"
+  else
+    qos_class="guaranteed"
+  fi
+
   # available labels:
   # namespace, pod_name, pod_uid, container_name, container_id, node_name
   local labels
@@ -280,6 +287,7 @@ function k8s_get_kubepod_name() {
     if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
       labels+=',kind="container"'
       [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
+      [ -n "$qos_class" ] && labels+=",qos_class=\"$qos_class\""
       name="cntr"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
@@ -292,6 +300,7 @@ function k8s_get_kubepod_name() {
       labels="${labels%%,container_*}"
       labels+=',kind="pod"'
       [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
+      [ -n "$qos_class" ] && labels+=",qos_class=\"$qos_class\""
       name="pod"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
