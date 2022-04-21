@@ -253,7 +253,7 @@ Configure individual connectors and override any global settings with the follow
     gives a negative match. So to match all charts named `apps.*` except charts ending in `*reads`, use `!*reads
     apps.*` (so, the order is important: the first pattern matching the chart id or the chart name will be used -
     positive or negative). There is also a URL parameter `filter` that can be used while querying `allmetrics`. The URL
-    parameter has higher priority than the configuration options.
+    parameter has a higher priority than the configuration option.
 
 -   `send names instead of ids = yes | no` controls the metric names Netdata should send to the external database.
     Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system
