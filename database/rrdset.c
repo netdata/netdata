@@ -1004,7 +1004,9 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
         if(unlikely(since_last_usec < 0)) {
             // oops! the database is in the future
+            #ifdef NETDATA_INTERNAL_CHECKS
             info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+            #endif
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
             st->last_collected_time.tv_usec = now.tv_usec;
@@ -1021,7 +1023,9 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         }
         else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
             // oops! the database is too far behind
+            #ifdef NETDATA_INTERNAL_CHECKS
             info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+            #endif
 
             microseconds = (usec_t)since_last_usec;
             #ifdef NETDATA_INTERNAL_CHECKS
