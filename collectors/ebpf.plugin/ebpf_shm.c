@@ -384,7 +384,7 @@ static void ebpf_update_shm_cgroup()
             netdata_publish_shm_t *out = &pids->shm;
             if (likely(shm_pid) || likely(shm_static_pid)) {
                 netdata_publish_shm_t *in;
-                if (shm_static_pid)
+                if (likely(shm_static_pid))
                     in = &shm_static_pid[pid];
                 else
                     in = shm_pid[pid];

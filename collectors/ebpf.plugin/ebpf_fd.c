@@ -230,14 +230,14 @@ static void fd_apps_accumulator(netdata_fd_stat_t *out)
  */
 static void fd_fill_pid(uint32_t pid, netdata_fd_stat_t *mem)
 {
-    netdata_fd_stat_t *curr = NULL;
+    netdata_fd_stat_t *curr;
     if (likely(fd_pid)) {
         curr = fd_pid[pid];
         if (!curr) {
             curr = callocz(1, sizeof(netdata_fd_stat_t));
             fd_pid[pid] = curr;
         }
-    } else if(likely(fd_static_pid))
+    } else
         curr = &fd_static_pid[pid];
 
     if (curr)
@@ -293,12 +293,12 @@ static void ebpf_update_fd_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_fd_stat_t *out = &pids->fd;
-            if (likely(fd_pid) && fd_pid[pid]) {
-                netdata_fd_stat_t *in = fd_pid[pid];
-
-                memcpy(out, in, sizeof(netdata_fd_stat_t));
-            } else if (fd_static_pid) {
-                netdata_fd_stat_t *in = &fd_static_pid[pid];
+            if (likely(fd_pid) || likely(fd_static_pid)) {
+                netdata_fd_stat_t *in;
+                if (likely(fd_static_pid))
+                    in = &fd_static_pid[pid];
+                else
+                    in = fd_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_fd_stat_t));
             } else {
@@ -332,11 +332,10 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct pid_on_target *root)
     while (root) {
         int32_t pid = root->pid;
         netdata_fd_stat_t *w = NULL;
-        if (likely(fd_pid) && fd_pid[pid]) {
+        if (likely(fd_pid) && fd_pid[pid])
             w = fd_pid[pid];
-        } else if (likely(fd_static_pid)) {
+        else if (likely(fd_static_pid))
             w = &fd_static_pid[pid];
-        }
 
         if (w) {
             open_call += w->open_call;
