@@ -14,9 +14,7 @@ static long system_page_size = 4096; // system will be queried via sysconf() in 
 static int cgroup_enable_cpuacct_stat = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_cpuacct_cpu_throttling = CONFIG_BOOLEAN_YES;
-static int cgroup_enable_cpuacct_cpu_shares =
-    getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL ? CONFIG_BOOLEAN_YES :
-                                                                                             CONFIG_BOOLEAN_NO;
+static int cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_NO;
 static int cgroup_enable_memory = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_detailed_memory = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_AUTO;
@@ -4552,6 +4550,10 @@ void *cgroups_main(void *ptr) {
     netdata_thread_cleanup_push(cgroup_main_cleanup, ptr);
 
     struct rusage thread;
+
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
+        cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_YES;
+    }
 
     // when ZERO, attempt to do it
     int vdo_cpu_netdata = config_get_boolean("plugin:cgroups", "cgroups plugin resource charts", 1);
