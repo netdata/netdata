@@ -1049,7 +1049,7 @@ static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp)
         return;
     }
 
-    // no need to read more then once
+    // no need to read more than once
     if (likely(cp->updated)) {
         return;
     }
