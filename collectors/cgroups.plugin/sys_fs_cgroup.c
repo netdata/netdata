@@ -1049,11 +1049,6 @@ static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp)
         return;
     }
 
-    // no need to read more than once
-    if (likely(cp->updated)) {
-        return;
-    }
-
     if (unlikely(read_single_number_file(cp->filename, &cp->shares))) {
         cp->updated = 0;
         cgroups_check = 1;
