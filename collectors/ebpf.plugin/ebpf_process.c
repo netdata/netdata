@@ -1093,6 +1093,29 @@ static void process_collector(ebpf_module_t *em)
  *
  *****************************************************************/
 
+/**
+ * Clean Specific PID
+ *
+ * Clean a specific PID that is no running anymore.
+ *
+ * @param pid clean the pid closed.
+ */
+void ebpf_process_clean_specific_pid(uint32_t pid)
+{
+    if (likely(current_apps_data) && current_apps_data[pid]) {
+        freez(global_process_stats[pid]);
+        global_process_stats[pid] = NULL;
+
+        freez(current_apps_data[pid]);
+        current_apps_data[pid] = NULL;
+    }
+}
+
+/**
+ * Clean global memory
+ *
+ * Clean vectors used during runtime.
+ */
 void clean_global_memory() {
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     struct pid_stat *pids = root_of_pids;

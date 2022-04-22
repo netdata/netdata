@@ -943,6 +943,9 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
  */
 void cleanup_variables_from_other_threads(uint32_t pid)
 {
+    // Clean process structure
+    ebpf_process_clean_specific_pid(pid);
+
     // Clean socket structures
     ebpf_socket_clean_specific_pid(pid);
 
@@ -988,13 +991,6 @@ void cleanup_exited_pids()
 
             pid_t r = p->pid;
             p = p->next;
-
-            // Clean process structure
-            freez(global_process_stats[r]);
-            global_process_stats[r] = NULL;
-
-            freez(current_apps_data[r]);
-            current_apps_data[r] = NULL;
 
             cleanup_variables_from_other_threads(r);
 
@@ -1107,18 +1103,11 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
         key = pids->pid;
         ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
-            w = mallocz(sizeof(ebpf_process_stat_t));
+            w = callocz(1, sizeof(ebpf_process_stat_t));
             global_process_stats[key] = w;
         }
 
         if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
-            // Clean Process structures
-            freez(w);
-            global_process_stats[key] = NULL;
-
-            freez(current_apps_data[key]);
-            current_apps_data[key] = NULL;
-
             cleanup_variables_from_other_threads(key);
 
             pids = pids->next;

@@ -102,4 +102,6 @@ enum ebpf_process_tables {
 
 extern struct config process_config;
 
+extern void ebpf_process_clean_specific_pid(uint32_t pid);
+
 #endif /* NETDATA_EBPF_PROCESS_H */
