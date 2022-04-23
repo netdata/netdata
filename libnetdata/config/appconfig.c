@@ -257,6 +257,53 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     freez(co);
 }
 
+void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name)
+{
+    debug(D_CONFIG, "Destroying section option '%s -> %s'.", section, name);
+
+    struct section *co;
+    co = appconfig_section_find(root, section);
+    if (!co) {
+        error("Could not destroy section option '%s -> %s'. The section not found.", section, name);
+        return;
+    }
+
+    config_section_wrlock(co);
+
+    struct config_option *cv;
+
+    cv = appconfig_option_index_find(co, name, simple_hash(name));
+    if (unlikely(!(cv && appconfig_option_index_del(co, cv)))) {
+        config_section_unlock(co);
+        error("Could not destroy section option '%s -> %s'. The option not found.", section, name);
+        return;
+    }
+
+    if (cv->flags & CONFIG_VALUE_LOADED) {
+        config_section_unlock(co);
+        return;
+    }
+
+    if (co->values == cv) {
+        co->values = co->values->next;
+    } else {
+        struct config_option *cv_cur = co->values, *cv_prev = NULL;
+        while (cv_cur && cv_cur != cv) {
+            cv_prev = cv_cur;
+            cv_cur = cv_cur->next;
+        }
+        if (cv_cur) {
+            cv_prev->next = cv_cur->next;
+        }
+    }
+
+    freez(cv->value);
+    freez(cv->name);
+    freez(cv);
+
+    config_section_unlock(co);
+    return;
+}
 
 // ----------------------------------------------------------------------------
 // config name-value methods

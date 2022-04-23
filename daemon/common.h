@@ -27,6 +27,8 @@
 
 #define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
 
+#define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
+
 // ----------------------------------------------------------------------------
 // netdata include files
 
