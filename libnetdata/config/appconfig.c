@@ -273,14 +273,15 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
     struct config_option *cv;
 
     cv = appconfig_option_index_find(co, name, simple_hash(name));
-    if (unlikely(!(cv && appconfig_option_index_del(co, cv)))) {
+
+    if (cv && cv->flags & CONFIG_VALUE_LOADED) {
         config_section_unlock(co);
-        error("Could not destroy section option '%s -> %s'. The option not found.", section, name);
         return;
     }
 
-    if (cv->flags & CONFIG_VALUE_LOADED) {
+    if (unlikely(!(cv && appconfig_option_index_del(co, cv)))) {
         config_section_unlock(co);
+        error("Could not destroy section option '%s -> %s'. The option not found.", section, name);
         return;
     }
 
