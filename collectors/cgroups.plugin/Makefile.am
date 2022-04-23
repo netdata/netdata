@@ -4,7 +4,6 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 include $(top_srcdir)/build/subst.inc
-SUFFIXES = .in
 
 dist_plugins_SCRIPTS = \
     cgroup-name.sh \
@@ -12,6 +11,5 @@ dist_plugins_SCRIPTS = \
     $(NULL)
 
 dist_noinst_DATA = \
-    cgroup-name.sh \
     README.md \
     $(NULL)
