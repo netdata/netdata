@@ -435,7 +435,6 @@ extern void collect_data_for_all_processes(int tbl_pid_stats_fd);
 
 extern void clean_global_memory();
 
-extern ebpf_process_stat_t **global_process_stats;
 extern ebpf_process_publish_apps_t **current_apps_data;
 extern netdata_publish_cachestat_t **cachestat_pid;
 extern netdata_publish_dcstat_t **dcstat_pid;

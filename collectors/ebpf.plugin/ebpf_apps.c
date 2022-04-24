@@ -1101,18 +1101,27 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
     while (pids) {
         key = pids->pid;
-        ebpf_process_stat_t *w = global_process_stats[key];
-        if (!w) {
-            w = callocz(1, sizeof(ebpf_process_stat_t));
-            global_process_stats[key] = w;
+        ebpf_process_publish_apps_t *cad = current_apps_data[key];
+        if (!cad) {
+            cad = callocz(1, sizeof(ebpf_process_publish_apps_t));
+            current_apps_data[key] = cad;
         }
 
-        if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
+        ebpf_process_stat_t w;
+        if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, &w)) {
             cleanup_variables_from_other_threads(key);
 
             pids = pids->next;
             continue;
         }
+
+        cad->call_do_exit = w.exit_call;
+        cad->call_release_task = w.release_call;
+        cad->create_process = w.create_process;
+        cad->create_thread = w.create_thread;
+
+        cad->task_err = w.task_err;
+        cad->removeme = w.removeme;
 
         pids = pids->next;
     }

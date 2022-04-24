@@ -92,6 +92,8 @@ typedef struct ebpf_process_publish_apps {
 
     // Number of errors during the last read
     uint64_t task_err;
+
+    uint8_t removeme;
 } ebpf_process_publish_apps_t;
 
 enum ebpf_process_tables {
