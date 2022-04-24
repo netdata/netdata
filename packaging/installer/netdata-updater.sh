@@ -58,6 +58,10 @@ info() {
   echo >&3 "$(date) : INFO: ${script_name}: " "${@}"
 }
 
+warning() {
+  echo >&3 "$(date) : WARNING: ${script_name}: " "${@}"
+}
+
 error() {
   echo >&3 "$(date) : ERROR: ${script_name}: " "${@}"
 }
@@ -650,17 +654,13 @@ update_binpkg() {
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
     DISTRO_COMPAT_NAME="${DISTRO}"
   else
-    case "${DISTRO}" in
-      opensuse-leap)
-        DISTRO_COMPAT_NAME="opensuse"
-        ;;
-      rhel)
-        DISTRO_COMPAT_NAME="centos"
-        ;;
-      *)
-        DISTRO_COMPAT_NAME="unknown"
-        ;;
-    esac
+    DISTRO_COMPAT_NAME="unknown"
+    for compat_id in ${ID_LIKE}; do
+      if str_in_list "${compat_id}" "${supported_compat_names}"; then
+        DISTRO_COMPAT_NAME="${compat_id}"
+        break
+      fi
+    done
   fi
 
   if [ "${INTERACTIVE}" = "0" ]; then
