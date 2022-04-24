@@ -489,8 +489,8 @@ typedef enum rrdset_flags {
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~flag, __ATOMIC_SEQ_CST)
 #else
 #define rrdset_flag_check(st, flag) ((st)->flags & (flag))
-#define rrdset_flag_set(st, flag)   (st)->flags |= (flag)
-#define rrdset_flag_clear(st, flag) (st)->flags &= ~(flag)
+#define rrdset_flag_set(st, flag)   (st)->flags = (RRDSET_FLAGS)((st)->flags | flag)
+#define rrdset_flag_clear(st, flag) (st)->flags = (RRDSET_FLAGS)((st)->flags & ~(flag))
 #endif
 #define rrdset_flag_check_noatomic(st, flag) ((st)->flags & (flag))
 
