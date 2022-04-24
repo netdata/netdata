@@ -43,6 +43,7 @@ static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCES
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
 ebpf_process_publish_apps_t **current_apps_data = NULL;
+ebpf_process_publish_apps_t *static_apps_data = NULL;
 
 int process_enabled = 0;
 
@@ -152,7 +153,12 @@ long long ebpf_process_sum_values_for_pids(struct pid_on_target *root, size_t of
     long long ret = 0;
     while (root) {
         int32_t pid = root->pid;
-        ebpf_process_publish_apps_t *w = current_apps_data[pid];
+        ebpf_process_publish_apps_t *w;
+        if (likely(current_apps_data))
+            w = current_apps_data[pid];
+        else
+            w = &static_apps_data[pid];
+
         if (w) {
             ret += get_value_from_structure((char *)w, offset);
         }
@@ -174,11 +180,20 @@ void ebpf_process_remove_pids()
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     while (pids) {
         uint32_t pid = pids->pid;
-        ebpf_process_publish_apps_t *w = current_apps_data[pid];
+        ebpf_process_publish_apps_t *w = NULL;
+        if (likely(current_apps_data))
+            w = current_apps_data[pid];
+        else if (likely(static_apps_data))
+            w = &static_apps_data[pid];
+
         if (w) {
             if (w->removeme) {
-                freez(w);
-                current_apps_data[pid] = NULL;
+                if (likely(current_apps_data)) {
+                    freez(w);
+                    current_apps_data[pid] = NULL;
+                } else
+                    memset(&static_apps_data[pid], 0, sizeof(ebpf_process_publish_apps_t));
+
                 bpf_map_delete_elem(pid_fd, &pid);
             }
         }
@@ -303,10 +318,15 @@ static void ebpf_update_process_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_process_publish_apps_t *out = &pids->ps;
-            if (current_apps_data[pid]) {
-                ebpf_process_publish_apps_t *in = current_apps_data[pid];
+            if (likely(current_apps_data) || likely(static_apps_data)) {
+                ebpf_process_publish_apps_t *in;
+                if (likely(static_apps_data))
+                    in = &static_apps_data[pid];
+                else
+                    in = current_apps_data[pid];
 
-                memcpy(out, in, sizeof(ebpf_process_publish_apps_t));
+                if (in)
+                    memcpy(out, in, sizeof(ebpf_process_publish_apps_t));
             }
         }
     }
@@ -993,6 +1013,7 @@ static void process_collector(ebpf_module_t *em)
         ebpf_process_update_cgroup_algorithm();
 
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
+    ebpf_memory_allocate_t allocate_memory = em->allocate;
     int update_every = em->update_every;
     int counter = update_every - 1;
     while (!close_ebpf_plugin) {
@@ -1065,7 +1086,8 @@ void ebpf_process_clean_specific_pid(uint32_t pid)
     if (likely(current_apps_data) && current_apps_data[pid]) {
         freez(current_apps_data[pid]);
         current_apps_data[pid] = NULL;
-    }
+    } else if (likely(static_apps_data))
+        memset(&static_apps_data[pid], 0, sizeof(ebpf_process_publish_apps_t));
 }
 
 /**
@@ -1074,16 +1096,16 @@ void ebpf_process_clean_specific_pid(uint32_t pid)
  * Clean vectors used during runtime.
  */
 void clean_global_memory() {
-    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        uint32_t pid = pids->pid;
+    if (likely(current_apps_data)) {
+        struct pid_stat *pids = root_of_pids;
+        while (pids) {
+            uint32_t pid = pids->pid;
+            freez(current_apps_data[pid]);
 
-        bpf_map_delete_elem(pid_fd, &pid);
-        freez(current_apps_data[pid]);
-
-        pids = pids->next;
-    }
+            pids = pids->next;
+        }
+    } else
+        freez(static_apps_data);
 }
 
 /**
@@ -1132,6 +1154,7 @@ static void ebpf_process_cleanup(void *ptr)
 
     clean_global_memory();
     freez(current_apps_data);
+    freez(static_apps_data);
 
     ebpf_process_disable_tracepoints();
 
