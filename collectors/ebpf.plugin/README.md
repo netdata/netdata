@@ -203,6 +203,38 @@ Linux metrics:
     -   Number of calls to `shm_dt`. (`shmdt_call`)
     -   Number of calls to `shm_ctl`. (`shmctl_call`)
 
+#### Allocate memory
+
+The `allocate memory` specifies how collector will manage the memory during runtime to monitor application and cgroup.
+ The following options are accepted:
+
+-   `dynamic`:  When plugin runs with this option, it will allocate memory for a specific PID when the PID is used, but
+    it needs to use a minimum necessary for these future PIDs. Thanks the fact it will allocate during runtime,
+    it will need more iteration with the kernel. It is the preferred method when the host has a small amount of memory.
+    This is the default option.
+- `static`:  This option is preferred for high loaded or dedicated servers. It will use more memory, but it needs less
+    iteration with kernels.
+
+Next table demonstates a comparison between memory usage for each method on a 64 bits computer running a Linux
+ distribution that allows the maximum of `32768` PIDs (Value obtained from `/proc/sys/kernel/pid_max`).
+
+|  Thread   | Size (bytes) | Static | Dynamic |
+|-----------|--------------|--------|---------|
+| cachestat |           32 | 262144 |  1310720|
+| dcstat    |           64 | 262144 |  2359296|
+| fd        |           32 | 262144 |  1310720|
+| process   |           80 | 262144 |  2883584|
+| shm       |           32 | 262144 |  1310720|
+| socket    |           80 | 262144 |  2883584|
+| swap      |           16 | 262144 |   786432|
+| vfs       |          112 | 262144 |  3932160|
+
+Dynamic allocates the minimum necessary by default, this value is calculated multiplying the total number of PIDs (`32768`)
+times 8 bytes (64 bits).
+
+Static will allocate everything necessary to process when the collector starts. The value for this column is calculated
+multiplying the column `Size (bytes)` times number of PIDs (`32768`) and the result we sum the value inside `Static` column.
+
 ### `[ebpf programs]` configuration options
 
 The eBPF collector enables and runs the following eBPF programs by default:
