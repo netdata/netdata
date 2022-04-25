@@ -1617,7 +1617,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     char command[CGROUP_CHARTID_LINE_MAX + 1];
 
     // TODO: use cg->id when the renaming script is fixed
-    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->intermediate_id);
+    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s' '%s'", cgroups_rename_script, cg->id, cg->intermediate_id);
 
     debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->chart_id);
     FILE *fp = mypopen(command, &cgroup_pid);

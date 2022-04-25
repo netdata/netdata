@@ -114,6 +114,31 @@ function add_lbl_prefix() {
   echo "${new_labels:0:-1}" # trim last ','
 }
 
+function k8s_is_container_pause() {
+  local cgroup_path="${1}"
+
+  local file
+  if [ -d "${NETDATA_HOST_PREFIX}/sys/fs/cgroup/cpuacct" ]; then
+    file="${NETDATA_HOST_PREFIX}/sys/fs/cgroup/cpuacct/$cgroup_path/cgroup.procs"
+  else
+    file="${NETDATA_HOST_PREFIX}/sys/fs/cgroup/$cgroup_path/cgroup.procs"
+  fi
+
+  [ ! -f "$file" ] && return 1
+
+  local procs
+  IFS= read -rd' ' procs 2>/dev/null <"$file"
+  #shellcheck disable=SC2206
+  procs=($procs)
+
+  [ "${#procs[@]}" -ne 1 ] && return 1
+
+  IFS= read -r comm 2>/dev/null <"/proc/${procs[0]}/comm"
+
+  [ "$comm" == "pause" ]
+  return
+}
+
 # k8s_get_kubepod_name resolves */kubepods/* cgroup name.
 # pod level cgroup name format: 'pod_<namespace>_<pod_name>'
 # container level cgroup name format: 'cntr_<namespace>_<pod_name>_<container_name>'
@@ -151,7 +176,8 @@ function k8s_get_kubepod_name() {
   # - replaces '.' with '-'
 
   local fn="${FUNCNAME[0]}"
-  local id="${1}"
+  local cgroup_path="${1}"
+  local id="${2}"
 
   if [[ ! $id =~ ^kubepods ]]; then
     warning "${fn}: '${id}' is not kubepod cgroup."
@@ -194,6 +220,10 @@ function k8s_get_kubepod_name() {
 
   [ -n "$pod_uid" ] && info "${fn}: cgroup '$id' is a pod(uid:$pod_uid)"
   [ -n "$cntr_id" ] && info "${fn}: cgroup '$id' is a container(id:$cntr_id)"
+
+  if [ -n "$cntr_id" ] && k8s_is_container_pause "$cgroup_path"; then
+    return 1
+  fi
 
   if ! command -v jq > /dev/null 2>&1; then
     warning "${fn}: 'jq' command not available."
@@ -322,7 +352,8 @@ function k8s_get_kubepod_name() {
 
 function k8s_get_name() {
   local fn="${FUNCNAME[0]}"
-  local id="${1}"
+  local cgroup_path="${1}"
+  local id="${2}"
 
   NAME=$(k8s_get_kubepod_name "$id")
 
@@ -398,7 +429,8 @@ function podman_validate_id() {
 
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
-CGROUP="${1}"
+CGROUP_PATH="${1}" # the path as it is (e.g. '/docker/efcf4c409')
+CGROUP="${2}"      # the modified path (e.g. 'docker_efcf4c409')
 NAME_NOT_FOUND=0
 NAME=
 
@@ -410,7 +442,7 @@ fi
 
 if [ -z "${NAME}" ]; then
   if [[ ${CGROUP} =~ ^.*kubepods.* ]]; then
-    k8s_get_name "${CGROUP}"
+    k8s_get_name "${CGROUP_PATH}" "${CGROUP}"
   fi
 fi
 
