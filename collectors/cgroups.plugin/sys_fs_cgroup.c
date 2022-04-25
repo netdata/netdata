@@ -2371,6 +2371,9 @@ static inline void cleanup_all_cgroups() {
             else
                 last->discovered_next = cg->discovered_next;
 
+            char option[FILENAME_MAX + 1];
+            snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
+            config_section_option_destroy("plugin:cgroups", option);
             cgroup_free(cg);
 
             if(!last)
