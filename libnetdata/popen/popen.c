@@ -78,28 +78,50 @@ static void myp_del(pid_t pid) {
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-/* custom_popene flag definitions */
-#define FLAG_CREATE_PIPE    1 // Create a pipe like popen() when set, otherwise set stdout to /dev/null
-#define FLAG_CLOSE_FD       2 // Close all file descriptors other than STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO
-
 /*
- * Returns -1 on failure, 0 on success. When FLAG_CREATE_PIPE is set, on success set the FILE *fp pointer.
+ * Returns -1 on failure, 0 on success. When POPEN_FLAG_CREATE_PIPE is set, on success set the FILE *fp pointer.
  */
-static inline int custom_popene(const char *command, volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp) {
+int custom_popene(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, ...) {
+    va_list args;
+    const char *s;
+    int __params, i;
+
+    // count the variable parameters
+    va_start(args, command);
+    __params = 0;
+    while((s = va_arg(args, const char *))) __params++;
+    va_end(args);
+
+    // create a string pointer array
+    const char *spawn_argv[__params + 1];
+    char __format[(__params + 1) * 5 + 1];
+    va_start(args, command);
+    __format[0] = 0;
+    for(i = 0; i < __params ;i++) {
+        s = va_arg(args, const char *);
+        strcat(__format, "'%s' ");
+        spawn_argv[i] = s;
+    }
+    spawn_argv[__params] = NULL;
+    va_end(args);
+
+    // generate a command string for the logs
+    char __command[2048];
+    snprintf(__command, 1024, "%s ", command);
+    __command[1024] = 0;
+    va_start(args, command);
+    vsnprintfz(&__command[strlen(__command)], 2048 - strlen(__command), __format, args);
+    __command[2048] = 0;
+    va_end(args);
+
     FILE *fp = NULL;
     int ret = 0; // success by default
     int pipefd[2], error;
     pid_t pid;
-    char *const spawn_argv[] = {
-            "sh",
-            "-c",
-            (char *)command,
-            NULL
-    };
     posix_spawnattr_t attr;
     posix_spawn_file_actions_t fa;
 
-    if (flags & FLAG_CREATE_PIPE) {
+    if (flags & POPEN_FLAG_CREATE_PIPE) {
         if (pipe(pipefd) == -1)
             return -1;
         if ((fp = fdopen(pipefd[PIPE_READ], "r")) == NULL) {
@@ -107,7 +129,7 @@ static inline int custom_popene(const char *command, volatile pid_t *pidptr, cha
         }
     }
 
-    if (flags & FLAG_CLOSE_FD) {
+    if (flags & POPEN_FLAG_CLOSE_FD) {
         // Mark all files to be closed by the exec() stage of posix_spawn()
         int i;
         for (i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--) {
@@ -117,7 +139,7 @@ static inline int custom_popene(const char *command, volatile pid_t *pidptr, cha
     }
 
     if (!posix_spawn_file_actions_init(&fa)) {
-        if (flags & FLAG_CREATE_PIPE) {
+        if (flags & POPEN_FLAG_CREATE_PIPE) {
             // move the pipe to stdout in the child
             if (posix_spawn_file_actions_adddup2(&fa, pipefd[PIPE_WRITE], STDOUT_FILENO)) {
                 error("posix_spawn_file_actions_adddup2() failed");
@@ -150,19 +172,19 @@ static inline int custom_popene(const char *command, volatile pid_t *pidptr, cha
     // Take the lock while we fork to ensure we don't race with SIGCHLD
     // delivery on a process which exits quickly.
     myp_add_lock();
-    if (!posix_spawn(&pid, "/bin/sh", &fa, &attr, spawn_argv, env)) {
+    if (!posix_spawn(&pid, command, &fa, &attr, (char * const*)spawn_argv, env)) {
         *pidptr = pid;
         myp_add_locked(pid);
-        debug(D_CHILDS, "Spawned command: '%s' on pid %d from parent pid %d.", command, pid, getpid());
+        debug(D_CHILDS, "Spawned command: \"%s\" on pid %d from parent pid %d.", __command, pid, getpid());
     } else {
         myp_add_unlock();
-        error("Failed to spawn command: '%s' from parent pid %d.", command, getpid());
-        if (flags & FLAG_CREATE_PIPE) {
+        error("Failed to spawn command: \"%s\" from parent pid %d.", __command, getpid());
+        if (flags & POPEN_FLAG_CREATE_PIPE) {
             fclose(fp);
         }
         ret = -1;
     }
-    if (flags & FLAG_CREATE_PIPE) {
+    if (flags & POPEN_FLAG_CREATE_PIPE) {
         close(pipefd[PIPE_WRITE]);
         if (0 == ret) // on success set FILE * pointer
             *fpp = fp;
@@ -182,7 +204,7 @@ error_after_posix_spawn_file_actions_init:
     if (posix_spawn_file_actions_destroy(&fa))
         error("posix_spawn_file_actions_destroy");
 error_after_pipe:
-    if (flags & FLAG_CREATE_PIPE) {
+    if (flags & POPEN_FLAG_CREATE_PIPE) {
         if (fp)
             fclose(fp);
         else
@@ -252,19 +274,19 @@ int myp_reap(pid_t pid) {
 
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
     FILE *fp = NULL;
-    (void)custom_popene(command, pidptr, environ, FLAG_CREATE_PIPE | FLAG_CLOSE_FD, &fp);
+    (void)custom_popene(pidptr, environ, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, &fp, "/bin/sh", "sh", "-c", command, NULL);
     return fp;
 }
 
 FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
     FILE *fp = NULL;
-    (void)custom_popene(command, pidptr, env, FLAG_CREATE_PIPE | FLAG_CLOSE_FD, &fp);
+    (void)custom_popene( pidptr, env, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, &fp, "/bin/sh", "sh", "-c", command, NULL);
     return fp;
 }
 
 // returns 0 on success, -1 on failure
 int netdata_spawn(const char *command, volatile pid_t *pidptr) {
-    return custom_popene(command, pidptr, environ, 0, NULL);
+    return custom_popene( pidptr, environ, 0, NULL, "/bin/sh", "sh", "-c", command, NULL);
 }
 
 int custom_pclose(FILE *fp, pid_t pid) {
