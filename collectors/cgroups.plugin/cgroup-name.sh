@@ -230,77 +230,88 @@ function k8s_get_kubepod_name() {
     return 1
   fi
 
-  local kube_system_ns
-  local tmp_kube_system_ns_file="${TMPDIR:-"/tmp/"}netdata-cgroups-kube-system-ns"
-  [ -f "$tmp_kube_system_ns_file" ] && kube_system_ns=$(cat "$tmp_kube_system_ns_file" 2> /dev/null)
-
-  local pods
-  if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
-    local token header host url
-    token="$(< /var/run/secrets/kubernetes.io/serviceaccount/token)"
-    header="Authorization: Bearer $token"
-    host="$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT"
-
-    if [ -z "$kube_system_ns" ]; then
-      url="https://$host/api/v1/namespaces/kube-system"
-      # FIX: check HTTP response code
-      if ! kube_system_ns=$(curl -sSk -H "$header" "$url" 2>&1); then
-        warning "${fn}: error on curl '${url}': ${kube_system_ns}."
-      else
-        echo "$kube_system_ns" > "$tmp_kube_system_ns_file" 2> /dev/null
-      fi
-    fi
-
-    url="https://$host/api/v1/pods"
-    [ -n "$MY_NODE_NAME" ] && url+="?fieldSelector=spec.nodeName==$MY_NODE_NAME"
-    # FIX: check HTTP response code
-    if ! pods=$(curl -sSk -H "$header" "$url" 2>&1); then
-      warning "${fn}: error on curl '${url}': ${pods}."
-      return 1
-    fi
-  elif ps -C kubelet > /dev/null 2>&1 && command -v kubectl > /dev/null 2>&1; then
-    if [ -z "$kube_system_ns" ]; then
-      if ! kube_system_ns=$(kubectl get namespaces kube-system -o json 2>&1); then
-        warning "${fn}: error on 'kubectl': ${kube_system_ns}."
-      else
-        echo "$kube_system_ns" > "$tmp_kube_system_ns_file" 2> /dev/null
-      fi
-    fi
-
-    [[ -z ${KUBE_CONFIG+x} ]] && KUBE_CONFIG="/etc/kubernetes/admin.conf"
-    if ! pods=$(kubectl --kubeconfig="$KUBE_CONFIG" get pods --all-namespaces -o json 2>&1); then
-      warning "${fn}: error on 'kubectl': ${pods}."
-      return 1
-    fi
-  else
-    warning "${fn}: not inside the k8s cluster and 'kubectl' command not available."
-    return 1
-  fi
+  local tmp_kube_system_ns_uid_file="${TMPDIR:-"/tmp"}/netdata-cgroups-kubesystem-uid"
+  local tmp_kube_containers_file="${TMPDIR:-"/tmp"}/netdata-cgroups-containers"
 
   local kube_system_uid
-  if [ -n "$kube_system_ns" ] && ! kube_system_uid=$(jq -r '.metadata.uid' <<< "$kube_system_ns" 2>&1); then
-    warning "${fn}: error on 'jq' parse kube_system_ns: ${kube_system_uid}."
-  fi
+  local labels
 
-  local jq_filter
-  jq_filter+='.items[] | "'
-  jq_filter+='namespace=\"\(.metadata.namespace)\",'
-  jq_filter+='pod_name=\"\(.metadata.name)\",'
-  jq_filter+='pod_uid=\"\(.metadata.uid)\",'
-  #jq_filter+='\(.metadata.labels | to_entries | map("pod_label_"+.key+"=\""+.value+"\"") | join(",") | if length > 0 then .+"," else . end)'
-  jq_filter+='\((.metadata.ownerReferences[]? | select(.controller==true) | "controller_kind=\""+.kind+"\",controller_name=\""+.name+"\",") // "")'
-  jq_filter+='node_name=\"\(.spec.nodeName)\",'
-  jq_filter+='" + '
-  jq_filter+='(.status.containerStatuses[]? | "'
-  jq_filter+='container_name=\"\(.name)\",'
-  jq_filter+='container_id=\"\(.containerID)\"'
-  jq_filter+='") | '
-  jq_filter+='sub("(docker|cri-o|containerd)://";"")' # containerID: docker://a346da9bc0e3eaba6b295f64ac16e02f2190db2cef570835706a9e7a36e2c722
+  if [ -n "$cntr_id" ] &&
+    [ -f "$tmp_kube_system_ns_uid_file" ] &&
+    [ -f "$tmp_kube_containers_file" ] &&
+    labels=$(grep "$cntr_id" "$tmp_kube_containers_file" 2>/dev/null); then
+    IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
+    info "${fn}: K8S CACHE HIT (cgroup $cgroup_path)"
+  else
+    info "${fn}: K8S CACHE MISS (cgroup $cgroup_path)"
+    IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
+    local kube_system_ns
+    local pods
+    if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
+      local token header host url
+      token="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
+      header="Authorization: Bearer $token"
+      host="$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT"
 
-  local containers
-  if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
-    warning "${fn}: error on 'jq' parse pods: ${containers}."
-    return 1
+      if [ -z "$kube_system_uid" ]; then
+        url="https://$host/api/v1/namespaces/kube-system"
+        # FIX: check HTTP response code
+        if ! kube_system_ns=$(curl -sSk -H "$header" "$url" 2>&1); then
+          warning "${fn}: error on curl '${url}': ${kube_system_ns}."
+        fi
+      fi
+
+      url="https://$host/api/v1/pods"
+      [ -n "$MY_NODE_NAME" ] && url+="?fieldSelector=spec.nodeName==$MY_NODE_NAME"
+      # FIX: check HTTP response code
+      if ! pods=$(curl -sSk -H "$header" "$url" 2>&1); then
+        warning "${fn}: error on curl '${url}': ${pods}."
+        return 1
+      fi
+    elif ps -C kubelet >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
+      if [ -z "$kube_system_uid" ]; then
+        if ! kube_system_ns=$(kubectl get namespaces kube-system -o json 2>&1); then
+          warning "${fn}: error on 'kubectl': ${kube_system_ns}."
+        fi
+      fi
+
+      [[ -z ${KUBE_CONFIG+x} ]] && KUBE_CONFIG="/etc/kubernetes/admin.conf"
+      if ! pods=$(kubectl --kubeconfig="$KUBE_CONFIG" get pods --all-namespaces -o json 2>&1); then
+        warning "${fn}: error on 'kubectl': ${pods}."
+        return 1
+      fi
+    else
+      warning "${fn}: not inside the k8s cluster and 'kubectl' command not available."
+      return 1
+    fi
+
+    if [ -n "$kube_system_ns" ] && ! kube_system_uid=$(jq -r '.metadata.uid' <<<"$kube_system_ns" 2>&1); then
+      warning "${fn}: error on 'jq' parse kube_system_ns: ${kube_system_uid}."
+    fi
+
+    local jq_filter
+    jq_filter+='.items[] | "'
+    jq_filter+='namespace=\"\(.metadata.namespace)\",'
+    jq_filter+='pod_name=\"\(.metadata.name)\",'
+    jq_filter+='pod_uid=\"\(.metadata.uid)\",'
+    #jq_filter+='\(.metadata.labels | to_entries | map("pod_label_"+.key+"=\""+.value+"\"") | join(",") | if length > 0 then .+"," else . end)'
+    jq_filter+='\((.metadata.ownerReferences[]? | select(.controller==true) | "controller_kind=\""+.kind+"\",controller_name=\""+.name+"\",") // "")'
+    jq_filter+='node_name=\"\(.spec.nodeName)\",'
+    jq_filter+='" + '
+    jq_filter+='(.status.containerStatuses[]? | "'
+    jq_filter+='container_name=\"\(.name)\",'
+    jq_filter+='container_id=\"\(.containerID)\"'
+    jq_filter+='") | '
+    jq_filter+='sub("(docker|cri-o|containerd)://";"")' # containerID: docker://a346da9bc0e3eaba6b295f64ac16e02f2190db2cef570835706a9e7a36e2c722
+
+    local containers
+    if ! containers=$(jq -r "${jq_filter}" <<<"$pods" 2>&1); then
+      warning "${fn}: error on 'jq' parse pods: ${containers}."
+      return 1
+    fi
+
+    [ -n "$kube_system_ns" ] && [ -n "$kube_system_uid" ] && echo "$kube_system_uid" >"$tmp_kube_system_ns_uid_file" 2>/dev/null
+    echo "$containers" >"$tmp_kube_containers_file" 2>/dev/null
   fi
 
   local qos_class
@@ -312,9 +323,8 @@ function k8s_get_kubepod_name() {
 
   # available labels:
   # namespace, pod_name, pod_uid, container_name, container_id, node_name
-  local labels
   if [ -n "$cntr_id" ]; then
-    if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
+    if [ -n "$labels" ] || labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
       labels+=',kind="container"'
       labels+=",qos_class=\"$qos_class\""
       [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
