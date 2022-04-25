@@ -9,6 +9,7 @@ SUBDIRS = \
     incremental_sum \
     max \
     max_s \
+    zscore_s \
     min \
     sum \
     median \

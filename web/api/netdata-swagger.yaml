@@ -209,6 +209,17 @@ paths:
               - sum
               - incremental-sum
             default: average
+        - name: stats
+          in: query
+          description: The multi statistical function query method. This option can be used with multiple statistical functions like "stats=max_s&stats=zsore_s". The output is created in a seperate value ("stats") in the json format.  
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+            enum:
+              - max_s
+              - zscore_s
+            default: zscore_s
         - name: gtime
           in: query
           description: The grouping number of seconds. This is used in conjunction with

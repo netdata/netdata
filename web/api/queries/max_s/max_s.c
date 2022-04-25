@@ -25,7 +25,7 @@ void stats_reset_max(RRDR *r, int index) {
 
 void stats_free_max(RRDR *r, int index) {
     freez(r->stats[index].stat_data);
-    r->internal.grouping_data = NULL;
+    r->stats[index].stat_data = NULL;
 }
 
 void stats_add_max(RRDR *r, calculated_number value, int index) {

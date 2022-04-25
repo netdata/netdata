@@ -1789,6 +1789,7 @@ AC_CONFIG_FILES([
     web/api/queries/incremental_sum/Makefile
     web/api/queries/max/Makefile
     web/api/queries/max_s/Makefile
+    web/api/queries/zscore_s/Makefile
     web/api/queries/median/Makefile
     web/api/queries/min/Makefile
     web/api/queries/ses/Makefile

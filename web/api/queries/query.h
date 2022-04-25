@@ -18,10 +18,9 @@ typedef enum rrdr_grouping {
 } RRDR_GROUPING;
 
 typedef enum rrdr_stats {
-    RRDR_STATS_UNDEFINED = 0x00000000,
-    RRDR_STATS_MIN = 0x00000001,
-    RRDR_STATS_MAX = 0x00000002,
-    RRDR_STATS_ZSCORE = 0x00000004
+    RRDR_STATS_UNDEFINED = 0,
+    RRDR_STATS_MAX = 1,
+    RRDR_STATS_ZSCORE = 2
 } RRDR_STATS;
 
 extern const char *group_method2string(RRDR_GROUPING group);

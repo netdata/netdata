@@ -46,8 +46,7 @@ static struct {
     uint32_t hash;
     RRDR_GROUPING value;
 } api_v1_stats[] = {
-          {"min_s"                , 0    , RRDR_STATS_MIN}
-        , {"max_s"                , 0    , RRDR_STATS_MAX}
+        {"max_s"                , 0    , RRDR_STATS_MAX}
         , {"zscore_s"             , 0    , RRDR_STATS_ZSCORE}
         , {                 NULL, 0, 0}
 };

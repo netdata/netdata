@@ -242,6 +242,23 @@
             }
           },
           {
+            "name": "stats",
+            "in": "query",
+            "description": "The multi statistical function query method. This option can be used with multiple statistical functions like \"stats=max_s&stats=zsore_s\". The output is created in a seperate value (\"stats\") in the json format.",
+            "required": false,
+            "allowEmptyValue": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string",
+              "default": "zscore_s",
+              "enum": [
+                "max_s",
+                "zscore_s"
+              ]
+            }
+          },
+          {
             "name": "gtime",
             "in": "query",
             "description": "The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).",

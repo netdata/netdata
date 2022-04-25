@@ -15,6 +15,7 @@
 #include "ses/ses.h"
 #include "des/des.h"
 #include "max_s/max_s.h"
+#include "zscore_s/zscore_s.h"
 
 // ----------------------------------------------------------------------------
 
@@ -280,16 +281,6 @@ static struct {
     // cleanup of the internal structures may be required).
     calculated_number (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, int index);
 } api_v1_data_stats[] = {
-        {.name = "min_s",
-                .hash  = 0,
-                .value = RRDR_STATS_MIN,
-                .init  = NULL,
-                .create= stats_create_max,
-                .reset = stats_reset_max,
-                .free  = stats_free_max,
-                .add   = stats_add_max,
-                .flush = stats_flush_max
-        },
         {.name = "max_s",
                 .hash  = 0,
                 .value = RRDR_STATS_MAX,
@@ -304,16 +295,16 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_STATS_ZSCORE,
                 .init  = NULL,
-                .create= stats_create_max,
-                .reset = stats_reset_max,
-                .free  = stats_free_max,
-                .add   = stats_add_max,
-                .flush = stats_flush_max
+                .create= stats_create_zscore,
+                .reset = stats_reset_zscore,
+                .free  = stats_free_zscore,
+                .add   = stats_add_zscore,
+                .flush = stats_flush_zscore
         },
         // terminator
         {.name = NULL,
                 .hash  = 0,
-                .value = RRDR_GROUPING_UNDEFINED,
+                .value = RRDR_STATS_UNDEFINED,
                 .init = NULL,
                 .create= NULL,
                 .reset = NULL,
@@ -482,6 +473,7 @@ static inline void do_dimension_variablestep(
         , time_t after_wanted
         , time_t before_wanted
         , uint32_t options
+        , int stats_count
 ){
 //  RRDSET *st = r->st;
 
@@ -557,6 +549,10 @@ static inline void do_dimension_variablestep(
             }
             // add this value to grouping
             r->internal.grouping_add(r, value);
+            for(int i = 0; i < stats_count; i++){
+                r->stats[i].stat_add(r, value, i);
+                info("Stats value add: %Lf to the index of %d", value, i);
+            }
             values_in_group++;
             db_points_read++;
         }
@@ -596,6 +592,21 @@ static inline void do_dimension_variablestep(
             // runs only when dim_id_in_rrdr == 0 && points_added == 0
             // so, on the first point added for the query.
             min = max = value;
+        }
+
+        if(points_added + 1 >= points_wanted){
+            for(int i = 0; i < stats_count; i++){
+                rrdr_line = rrdr_line_init(r, now, rrdr_line);
+                // find the place to store our values
+                RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_line * r->d + dim_id_in_rrdr];
+
+                // store the specific point options
+                *rrdr_value_options_ptr = group_value_flags;
+
+                // store the value
+                calculated_number value = r->stats[i].stat_flush(r, rrdr_value_options_ptr, i);
+                r->v[rrdr_line * r->d + dim_id_in_rrdr] = value;
+            }
         }
 
         points_added++;
@@ -1392,13 +1403,13 @@ static RRDR *rrd2rrdr_variablestep(
         , struct context_param *context_param_list
         , int timeout
 ) {
-    UNUSED(stats);
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
     // the duration of the chart
     time_t duration = before_requested - after_requested;
     long available_points = duration / update_every;
-    int stats_count = stats_method_count(stats);
+    uint64_t stats_temp = stats;
+    int stats_count = stats_method_count(stats_temp);
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
@@ -1605,7 +1616,7 @@ static RRDR *rrd2rrdr_variablestep(
     // assign the processor functions
 
     {
-        int i, found = 0;
+        int i, j, found = 0;
         for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
             if(api_v1_data_groups[i].value == group_method) {
                 r->internal.grouping_create= api_v1_data_groups[i].create;
@@ -1626,6 +1637,22 @@ static RRDR *rrd2rrdr_variablestep(
             r->internal.grouping_free  = grouping_free_average;
             r->internal.grouping_add   = grouping_add_average;
             r->internal.grouping_flush = grouping_flush_average;
+        }
+
+        //assign statistic functions
+        j = 0;
+        for(i = 0; api_v1_data_stats[i].name; i++) {
+            if(api_v1_data_stats[i].value & stats_temp){
+                r->stats[j].stat_create= api_v1_data_stats[i].create;
+                r->stats[j].stat_reset = api_v1_data_stats[i].reset;
+                r->stats[j].stat_free  = api_v1_data_stats[i].free;
+                r->stats[j].stat_add   = api_v1_data_stats[i].add;
+                r->stats[j].stat_flush = api_v1_data_stats[i].flush;
+                r->stats[j].stat_data = r->stats[j].stat_create(r);
+                strcpy(r->stats[j].name, api_v1_data_stats[i].name);
+                stats_temp &= ~api_v1_data_stats[i].value;
+                j++;
+            }
         }
     }
 
@@ -1665,6 +1692,10 @@ static RRDR *rrd2rrdr_variablestep(
 
         // reset the grouping for the new dimension
         r->internal.grouping_reset(r);
+        for (int i = 0; i < stats_count; i++)
+        {
+            r->stats[i].stat_reset(r, i);
+        }
 
         do_dimension_variablestep(
                 r
@@ -1674,6 +1705,7 @@ static RRDR *rrd2rrdr_variablestep(
                 , after_wanted
                 , before_wanted
                 , options
+                , stats_count
         );
         if (timeout)
             now_realtime_timeval(&query_current_time);
@@ -1752,6 +1784,10 @@ static RRDR *rrd2rrdr_variablestep(
 
     // free all resources used by the grouping method
     r->internal.grouping_free(r);
+
+    for(int i = 0; i < stats_count; i++){
+        r->stats[i].stat_free(r, i);
+    }
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero && !(r->result_options & RRDR_RESULT_OPTION_CANCEL))) {
