@@ -334,6 +334,8 @@ function k8s_get_kubepod_name() {
       name+="_$(get_lbl_val "$labels" container_name)"
       labels=$(add_lbl_prefix "$labels" "k8s_")
       name+=" $labels"
+    else
+      return 2
     fi
   elif [ -n "$pod_uid" ]; then
     if labels=$(grep "$pod_uid" -m 1 <<< "$containers" 2> /dev/null); then
@@ -346,6 +348,8 @@ function k8s_get_kubepod_name() {
       name+="_$(get_lbl_val "$labels" pod_name)"
       labels=$(add_lbl_prefix "$labels" "k8s_")
       name+=" $labels"
+    else 
+      return 2
     fi
   fi
 
@@ -365,13 +369,10 @@ function k8s_get_name() {
   local cgroup_path="${1}"
   local id="${2}"
 
-  NAME=$(k8s_get_kubepod_name "$id")
-
-  if [ -z "${NAME}" ]; then
-    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
-    NAME="${id}"
-    NAME_NOT_FOUND=3
-  else
+  NAME=$(k8s_get_kubepod_name "$cgroup_path" "$id")
+ 
+  case "$?" in
+  0)
     NAME="k8s_${NAME}"
 
     local name labels
@@ -382,7 +383,19 @@ function k8s_get_name() {
     else
       info "${fn}: cgroup '${id}' has chart name '${NAME}'"
     fi
-  fi
+    NAME_NOT_FOUND=0
+    ;;
+  2)
+    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and asking for retry."
+    NAME="${id}"
+    NAME_NOT_FOUND=2
+    ;;
+  *)
+    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
+    NAME="${id}"
+    NAME_NOT_FOUND=3
+    ;;
+  esac
 }
 
 function docker_get_name() {
