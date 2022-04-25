@@ -492,7 +492,9 @@ void read_cgroup_plugin_configuration() {
                     " *docker* "
                     " *lxc* "
                     " *qemu* "
-                    " *kubepods* "                        // #3396 kubernetes
+                    " /kubepods/pod*/* "                   // k8s containers
+                    " /kubepods/*/pod*/* "                 // k8s containers
+                    " !/kubepods* "                        // all other k8s cgroups
                     " *.libvirt-qemu "                    // #3010
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
