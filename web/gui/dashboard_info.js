@@ -4026,6 +4026,13 @@ netdataDashboard.context = {
         'When an application has used its allotted CPU quota for a given period, it gets throttled until the next period.'
     },
 
+    'cgroup.cpu_shares': {
+        info: '<p>The weight of each group living in the same hierarchy, that translates into the amount of CPU it is expected to get. '+
+        'The percentage of CPU assigned to the cgroup is the value of shares divided by the sum of all shares in all cgroups in the same level.</p>'+
+        '<p>For example, tasks in two cgroups that have <b>cpu.shares</b> set to 100 will receive equal CPU time, '+
+        'but tasks in a cgroup that has <b>cpu.shares</b> set to 200 receive twice the CPU time of tasks in a cgroup where <b>cpu.shares</b> is set to 100.</p>'
+    },
+
     'cgroup.cpu_per_core': {
         info: 'Total CPU utilization per core within the system-wide CPU resources.'
     },

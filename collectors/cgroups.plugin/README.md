@@ -45,13 +45,6 @@ Netdata rescans these directories for added or removed cgroups every `check for 
 
 Since cgroups are hierarchical, for each of the directories shown above, Netdata walks through the subdirectories recursively searching for cgroups (each subdirectory is another cgroup).
 
-For each of the directories found, Netdata provides a configuration variable:
-
-```
-[plugin:cgroups]
-	search for cgroups under PATH = yes | no
-```
-
 To provide a sane default for this setting, Netdata uses the following pattern list (patterns starting with `!` give a negative match and their order is important: the first matching a path will be used):
 
 ```

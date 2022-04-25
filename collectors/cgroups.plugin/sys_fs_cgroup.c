@@ -14,6 +14,7 @@ static long system_page_size = 4096; // system will be queried via sysconf() in 
 static int cgroup_enable_cpuacct_stat = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_cpuacct_cpu_throttling = CONFIG_BOOLEAN_YES;
+static int cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_NO;
 static int cgroup_enable_memory = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_detailed_memory = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_AUTO;
@@ -283,6 +284,7 @@ void read_cgroup_plugin_configuration() {
     cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat (total CPU)", cgroup_enable_cpuacct_stat);
     cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage (per core CPU)", cgroup_enable_cpuacct_usage);
     cgroup_enable_cpuacct_cpu_throttling = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct cpu throttling", cgroup_enable_cpuacct_cpu_throttling);
+    cgroup_enable_cpuacct_cpu_shares = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct cpu shares", cgroup_enable_cpuacct_cpu_shares);
 
     cgroup_enable_memory = config_get_boolean_ondemand("plugin:cgroups", "enable memory", cgroup_enable_memory);
     cgroup_enable_detailed_memory = config_get_boolean_ondemand("plugin:cgroups", "enable detailed memory", cgroup_enable_detailed_memory);
@@ -492,7 +494,9 @@ void read_cgroup_plugin_configuration() {
                     " *docker* "
                     " *lxc* "
                     " *qemu* "
-                    " *kubepods* "                        // #3396 kubernetes
+                    " /kubepods/pod*/* "                   // k8s containers
+                    " /kubepods/*/pod*/* "                 // k8s containers
+                    " !/kubepods* "                        // all other k8s cgroups
                     " *.libvirt-qemu "                    // #3010
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
@@ -705,6 +709,17 @@ struct cpuacct_cpu_throttling {
     unsigned long long nr_throttled_perc;
 };
 
+// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/resource_management_guide/sec-cpu#sect-cfs
+// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/managing_monitoring_and_updating_the_kernel/using-cgroups-v2-to-control-distribution-of-cpu-time-for-applications_managing-monitoring-and-updating-the-kernel#proc_controlling-distribution-of-cpu-time-for-applications-by-adjusting-cpu-weight_using-cgroups-v2-to-control-distribution-of-cpu-time-for-applications
+struct cpuacct_cpu_shares {
+    int updated;
+    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
+
+    char *filename;
+
+    unsigned long long shares;
+};
+
 struct cgroup_network_interface {
     const char *host_device;
     const char *container_device;
@@ -734,6 +749,7 @@ struct cgroup {
     struct cpuacct_stat cpuacct_stat;
     struct cpuacct_usage cpuacct_usage;
     struct cpuacct_cpu_throttling cpuacct_cpu_throttling;
+    struct cpuacct_cpu_shares cpuacct_cpu_shares;
 
     struct memory memory;
 
@@ -758,6 +774,7 @@ struct cgroup {
     RRDSET *st_cpu_per_core;
     RRDSET *st_cpu_nr_throttled;
     RRDSET *st_cpu_throttled_time;
+    RRDSET *st_cpu_shares;
 
     RRDSET *st_mem;
     RRDSET *st_mem_utilization;
@@ -1026,6 +1043,24 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
             cpt->enabled = CONFIG_BOOLEAN_YES;
         }
+    }
+}
+
+static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp) {
+    if (unlikely(!cp->filename)) {
+        return;
+    }
+
+    if (unlikely(read_single_number_file(cp->filename, &cp->shares))) {
+        cp->updated = 0;
+        cgroups_check = 1;
+        return;
+    }
+
+    cp->updated = 1;
+    if (unlikely((cp->enabled == CONFIG_BOOLEAN_AUTO)) &&
+        (cp->shares || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
+        cp->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
@@ -1400,6 +1435,7 @@ static inline void cgroup_read(struct cgroup *cg) {
         cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
         cgroup_read_cpuacct_usage(&cg->cpuacct_usage);
         cgroup_read_cpuacct_cpu_stat(&cg->cpuacct_cpu_throttling);
+        cgroup_read_cpuacct_cpu_shares(&cg->cpuacct_cpu_shares);
         cgroup_read_memory(&cg->memory, 0);
         cgroup_read_blkio(&cg->io_service_bytes);
         cgroup_read_blkio(&cg->io_serviced);
@@ -1413,6 +1449,7 @@ static inline void cgroup_read(struct cgroup *cg) {
         cgroup2_read_blkio(&cg->io_service_bytes, 0);
         cgroup2_read_blkio(&cg->io_serviced, 4);
         cgroup2_read_cpuacct_cpu_stat(&cg->cpuacct_stat, &cg->cpuacct_cpu_throttling);
+        cgroup_read_cpuacct_cpu_shares(&cg->cpuacct_cpu_shares);
         cgroup2_read_pressure(&cg->cpu_pressure);
         cgroup2_read_pressure(&cg->io_pressure);
         cgroup2_read_pressure(&cg->memory_pressure);
@@ -1771,6 +1808,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
     if(cg->st_cpu_nr_throttled)      rrdset_is_obsolete(cg->st_cpu_nr_throttled);
     if(cg->st_cpu_throttled_time)    rrdset_is_obsolete(cg->st_cpu_throttled_time);
+    if(cg->st_cpu_shares)            rrdset_is_obsolete(cg->st_cpu_shares);
     if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
     if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
     if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
@@ -1799,6 +1837,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->cpuacct_stat.filename);
     freez(cg->cpuacct_usage.filename);
     freez(cg->cpuacct_cpu_throttling.filename);
+    freez(cg->cpuacct_cpu_shares.filename);
 
     arl_free(cg->memory.arl_base);
     freez(cg->memory.filename_detailed);
@@ -1931,15 +1970,7 @@ static inline int find_dir_in_subdirs(const char *base, const char *this, void (
                 if(*r == '\0') r = "/";
 
                 // do not decent in directories we are not interested
-                int def = simple_pattern_matches(enabled_cgroup_paths, r);
-
-                // we check for this option here
-                // so that the config will not have settings
-                // for leaf directories
-                char option[FILENAME_MAX + 1];
-                snprintfz(option, FILENAME_MAX, "search for cgroups under %s", r);
-                option[FILENAME_MAX] = '\0';
-                enabled = config_get_boolean("plugin:cgroups", option, def);
+                enabled = simple_pattern_matches(enabled_cgroup_paths, r);
             }
 
             if(enabled) {
@@ -2024,6 +2055,18 @@ static inline void update_filenames()
                 }
                 else
                     debug(D_CGROUP, "cpu.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
+            if (unlikely(
+                    cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename &&
+                    !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.shares", cgroup_cpuacct_base, cg->id);
+                if (likely(stat(filename, &buf) != -1)) {
+                    cg->cpuacct_cpu_shares.filename = strdupz(filename);
+                    cg->cpuacct_cpu_shares.enabled = cgroup_enable_cpuacct_cpu_shares;
+                    debug(
+                        D_CGROUP, "cpu.shares filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_shares.filename);
+                } else
+                    debug(D_CGROUP, "cpu.shares file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
@@ -2225,6 +2268,16 @@ static inline void update_filenames()
                 else
                     debug(D_CGROUP, "cpu.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
+            if (unlikely(cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.weight", cgroup_unified_base, cg->id);
+                if (likely(stat(filename, &buf) != -1)) {
+                    cg->cpuacct_cpu_shares.filename = strdupz(filename);
+                    cg->cpuacct_cpu_shares.enabled = cgroup_enable_cpuacct_cpu_shares;
+                    debug(D_CGROUP, "cpu.weight filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_shares.filename);
+                } else
+                    debug(D_CGROUP, "cpu.weight file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
+
             if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_unified_base, cg->id);
                 if(likely(stat(filename, &buf) != -1)) {
@@ -2324,6 +2377,9 @@ static inline void cleanup_all_cgroups() {
             else
                 last->discovered_next = cg->discovered_next;
 
+            char option[FILENAME_MAX + 1];
+            snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
+            config_section_option_destroy("plugin:cgroups", option);
             cgroup_free(cg);
 
             if(!last)
@@ -3676,6 +3732,34 @@ void update_cgroup_charts(int update_every) {
             }
         }
 
+        if (likely(cg->cpuacct_cpu_shares.updated && cg->cpuacct_cpu_shares.enabled == CONFIG_BOOLEAN_YES)) {
+            if (unlikely(!cg->st_cpu_shares)) {
+                snprintfz(title, CHART_TITLE_MAX, "CPU Time Relative Share");
+
+                cg->st_cpu_shares = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "cpu_shares"
+                        , NULL
+                        , "cpu"
+                        , "cgroup.cpu_shares"
+                        , title
+                        , "shares"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 20
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_update_labels(cg->st_cpu_shares, cg->chart_labels);
+                rrddim_add(cg->st_cpu_shares, "shares", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            } else {
+                rrdset_next(cg->st_cpu_shares);
+                rrddim_set(cg->st_cpu_shares, "shares", cg->cpuacct_cpu_shares.shares);
+                rrdset_done(cg->st_cpu_shares);
+            }
+        }
+
         if(likely(cg->cpuacct_usage.updated && cg->cpuacct_usage.enabled == CONFIG_BOOLEAN_YES)) {
             char id[RRD_ID_LENGTH_MAX + 1];
             unsigned int i;
@@ -4464,6 +4548,10 @@ void *cgroups_main(void *ptr) {
     netdata_thread_cleanup_push(cgroup_main_cleanup, ptr);
 
     struct rusage thread;
+
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
+        cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_YES;
+    }
 
     // when ZERO, attempt to do it
     int vdo_cpu_netdata = config_get_boolean("plugin:cgroups", "cgroups plugin resource charts", 1);
