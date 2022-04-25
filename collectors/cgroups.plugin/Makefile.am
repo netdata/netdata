@@ -3,8 +3,6 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-include $(top_srcdir)/build/subst.inc
-
 dist_plugins_SCRIPTS = \
     cgroup-name.sh \
     cgroup-network-helper.sh \
