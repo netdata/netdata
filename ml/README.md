@@ -179,7 +179,7 @@ Below is a list of all the available configuration params and their default valu
 
 ### Configuration Examples
 
-If you would like to run ML on a parent instead of at the edge, some configuration options are illustrated below..
+If you would like to run ML on a parent instead of at the edge, some configuration options are illustrated below.
 
 This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/agent/streaming) to 1 parent node and illustrates the main ways you might want to configure running ml for the children on the parent, running ML on the children themselves, or even a mix of approaches.
 
