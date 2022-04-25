@@ -1964,15 +1964,7 @@ static inline int find_dir_in_subdirs(const char *base, const char *this, void (
                 if(*r == '\0') r = "/";
 
                 // do not decent in directories we are not interested
-                int def = simple_pattern_matches(enabled_cgroup_paths, r);
-
-                // we check for this option here
-                // so that the config will not have settings
-                // for leaf directories
-                char option[FILENAME_MAX + 1];
-                snprintfz(option, FILENAME_MAX, "search for cgroups under %s", r);
-                option[FILENAME_MAX] = '\0';
-                enabled = config_get_boolean("plugin:cgroups", option, def);
+                enabled = simple_pattern_matches(enabled_cgroup_paths, r);
             }
 
             if(enabled) {
