@@ -1013,7 +1013,6 @@ static void process_collector(ebpf_module_t *em)
         ebpf_process_update_cgroup_algorithm();
 
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
-    ebpf_memory_allocate_t allocate_memory = em->allocate;
     int update_every = em->update_every;
     int counter = update_every - 1;
     while (!close_ebpf_plugin) {
