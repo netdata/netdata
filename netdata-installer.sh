@@ -270,7 +270,10 @@ For the installer to complete successfully, you will need these packages install
 
 For the plugins, you will at least need:
 
-  curl, bash v4+, python v2 or v3, node.js
+  curl
+  bash (v4+)
+  python (v2 or v3)
+  node.js
 
 HEREDOC
 }
