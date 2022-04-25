@@ -2292,7 +2292,7 @@ EOF
 # Gotify sender
 
 send_gotify() {
-  local payload httpcode
+  local payload httpcode priority
   [ "${SEND_GOTIFY}" != "YES" ] && return 1
 
   if [ -z "${GOTIFY_APP_TOKEN}" ] ; then
@@ -2300,10 +2300,18 @@ send_gotify() {
     return 1
   fi
 
+  # priority for Gotify Android app
+  case "${status}" in
+    CRITICAL) priority=10 ;; # sound + vibration
+    WARNING) priority=4 ;; # sound
+    *) priority=1 ;; # notification only
+  esac
+
   payload=$(cat <<EOF
   {
     "title" : "${status}, ${name} = ${value_string}, on ${host}",
-    "message" : "${date}: ${chart} ${value_string}"
+    "message" : "${date}: ${chart} ${value_string}",
+    "priority" : ${priority}
   }
 EOF
 )
