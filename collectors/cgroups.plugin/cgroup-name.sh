@@ -383,17 +383,17 @@ function k8s_get_name() {
     else
       info "${fn}: cgroup '${id}' has chart name '${NAME}'"
     fi
-    NAME_NOT_FOUND=0
+    EXIT_CODE=$EXIT_SUCCESS
     ;;
   2)
     warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and asking for retry."
     NAME="${id}"
-    NAME_NOT_FOUND=2
+    EXIT_CODE=$EXIT_RETRY
     ;;
   *)
     warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
     NAME="${id}"
-    NAME_NOT_FOUND=3
+    EXIT_CODE=$EXIT_DISABLE
     ;;
   esac
 }
@@ -407,7 +407,7 @@ function docker_get_name() {
   fi
   if [ -z "${NAME}" ]; then
     warning "cannot find the name of docker container '${id}'"
-    NAME_NOT_FOUND=2
+    EXIT_CODE=$EXIT_RETRY
     NAME="${id:0:12}"
   else
     info "docker container '${id}' is named '${NAME}'"
@@ -432,7 +432,7 @@ function podman_get_name() {
 
   if [ -z "${NAME}" ]; then
     warning "cannot find the name of podman container '${id}'"
-    NAME_NOT_FOUND=2
+    EXIT_CODE=$EXIT_RETRY
     NAME="${id:0:12}"
   else
     info "podman container '${id}' is named '${NAME}'"
@@ -454,7 +454,10 @@ DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
 CGROUP_PATH="${1}" # the path as it is (e.g. '/docker/efcf4c409')
 CGROUP="${2}"      # the modified path (e.g. 'docker_efcf4c409')
-NAME_NOT_FOUND=0
+EXIT_SUCCESS=0
+EXIT_RETRY=2
+EXIT_DISABLE=3
+EXIT_CODE=$EXIT_SUCCESS
 NAME=
 
 # -----------------------------------------------------------------------------
@@ -536,4 +539,4 @@ fi
 info "cgroup '${CGROUP}' is called '${NAME}'"
 echo "${NAME}"
 
-exit ${NAME_NOT_FOUND}
+exit ${EXIT_CODE}
