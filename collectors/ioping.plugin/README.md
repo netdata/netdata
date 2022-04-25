@@ -13,7 +13,7 @@ The collector is enabled if Netdata detects that you have `ioping` installed. Ot
 
 ## Prerequisites
 
-To use this plugin, you need to install `ioping`.
+To use this plugin, you need to install [ioping](https://github.com/koct9i/ioping#ioping).
 
 ## Installing ioping
 
@@ -25,7 +25,7 @@ To install `ioping`, run:
    ```sh
    /usr/libexec/netdata/plugins.d/ioping.plugin install
    ```
-   Once `ioping` is installed, Netdata will automatically start collecting disk latency data.
+   Once `ioping` is installed, you need to [restart Netdata](https://learn.netdata.cloud/docs/configure/start-stop-restart) so the new collector is recognized. 
 
 > Note: If you set up Netdata using a different environment path than the default (`/etc/netdata/.environment`), use the option `-e` to indicate where the Netdata environment file is installed.
 
@@ -50,7 +50,6 @@ To make changes to the ioping.plugin configuration:
 
 ```sh
 # Uncomment the following line
-ioping="/usr/libexec/netdata/plugins.d/ioping"
 
 # Set the directory/file/device you need to ping
 destination="destination"
@@ -111,7 +110,7 @@ To set up multiple ioping plugins:
 
 | Chart  | Metrics        | Alert                                                                             |
 | ------ | -------------- | --------------------------------------------------------------------------------- |
-| ioping | ioping.latency | [ioping_disk_latency](https://community.netdata.cloud/t/ioping-disk-latency/2120) |
+| read_latency, write_latency | ioping.latency | [ioping_disk_latency](https://community.netdata.cloud/t/ioping-disk-latency/2120) |
 
 ## Related links
 
