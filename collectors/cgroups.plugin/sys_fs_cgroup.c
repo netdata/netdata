@@ -274,7 +274,7 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
     
-    cgroup_renaming_tries = config_get_number("plugin:cgroups", "cgroup renaming tries", cgroup_renaming_tries)
+    cgroup_renaming_tries = config_get_number("plugin:cgroups", "cgroup renaming tries", cgroup_renaming_tries);
     if (cgroup_renaming_tries < 1) {
         cgroup_renaming_tries = 1;
     }
