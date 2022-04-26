@@ -114,7 +114,7 @@ function add_lbl_prefix() {
   echo "${new_labels:0:-1}" # trim last ','
 }
 
-function k8s_is_container_pause() {
+function k8s_is_pause_container() {
   local cgroup_path="${1}"
 
   local file
@@ -221,7 +221,7 @@ function k8s_get_kubepod_name() {
   [ -n "$pod_uid" ] && info "${fn}: cgroup '$id' is a pod(uid:$pod_uid)"
   [ -n "$cntr_id" ] && info "${fn}: cgroup '$id' is a container(id:$cntr_id)"
 
-  if [ -n "$cntr_id" ] && k8s_is_container_pause "$cgroup_path"; then
+  if [ -n "$cntr_id" ] && k8s_is_pause_container "$cgroup_path"; then
     return 1
   fi
 
