@@ -45,6 +45,12 @@ enum cachestat_counters {
     NETDATA_CACHESTAT_END
 };
 
+enum cachestat_account_dirty_pages {
+    NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY,
+    NETDATA_CACHESTAT_SET_PAGE_DIRTY,
+    NETDATA_CACHESTAT_FOLIO_DIRTY
+};
+
 enum cachestat_indexes {
     NETDATA_CACHESTAT_IDX_RATIO,
     NETDATA_CACHESTAT_IDX_DIRTY,
@@ -54,7 +60,8 @@ enum cachestat_indexes {
 
 enum cachestat_tables {
     NETDATA_CACHESTAT_GLOBAL_STATS,
-    NETDATA_CACHESTAT_PID_STATS
+    NETDATA_CACHESTAT_PID_STATS,
+    NETDATA_CACHESTAT_CTRL
 };
 
 typedef struct netdata_publish_cachestat_pid {
@@ -78,5 +85,6 @@ extern void *ebpf_cachestat_thread(void *ptr);
 extern void clean_cachestat_pid_structures();
 
 extern struct config cachestat_config;
+extern netdata_ebpf_targets_t cachestat_targets[];
 
 #endif // NETDATA_EBPF_CACHESTAT_H

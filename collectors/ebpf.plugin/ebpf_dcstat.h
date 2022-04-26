@@ -42,7 +42,8 @@ enum directory_cache_indexes {
 
 enum directory_cache_tables {
     NETDATA_DCSTAT_GLOBAL_STATS,
-    NETDATA_DCSTAT_PID_STATS
+    NETDATA_DCSTAT_PID_STATS,
+    NETDATA_DCSTAT_CTRL
 };
 
 // variables
@@ -53,6 +54,11 @@ enum directory_cache_counters {
 
     // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_DIRECTORY_CACHE_END
+};
+
+enum directory_cache_targets {
+    NETDATA_DC_TARGET_LOOKUP_FAST,
+    NETDATA_DC_TARGET_D_LOOKUP
 };
 
 typedef struct netdata_publish_dcstat_pid {
@@ -73,5 +79,6 @@ extern void *ebpf_dcstat_thread(void *ptr);
 extern void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void clean_dcstat_pid_structures();
 extern struct config dcstat_config;
+extern netdata_ebpf_targets_t dc_targets[];
 
 #endif // NETDATA_EBPF_DCSTAT_H
