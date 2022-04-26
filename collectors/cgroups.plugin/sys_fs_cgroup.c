@@ -1654,8 +1654,9 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
             cg->pending_renames = 0;
             break;
         case 3:
-            debug(D_CGROUP, "cgroup '%s' renaming failed (exit code %d), will not try again", cg->chart_id, rename_exit_code);
+            debug(D_CGROUP, "cgroup '%s' renaming failed, disabled based due to rename command (exit code %d)", cg->chart_id, rename_exit_code);
             cg->pending_renames = 0;
+            cg->enabled = 0;
             break;
         default:
             if (!cg->pending_renames) {
@@ -1695,6 +1696,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     int def = simple_pattern_matches(enabled_cgroup_patterns, id)?cgroup_enable_new_cgroups_detected_at_runtime:0;
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
+    cg->enabled = 1;
     cg->id = strdupz(id);
     cg->hash = simple_hash(cg->id);
 
@@ -1727,7 +1729,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     } else {
         cg->pending_renames = 0;
         debug(D_CGROUP, "cgroup '%s' will not be renamed - it matches the list of disabled cgroup renames (will be shown as '%s')", cg->id, cg->chart_id);
-    }        
+    }
 
     int user_configurable = 1;
 
@@ -1770,11 +1772,11 @@ static inline struct cgroup *cgroup_add(const char *id) {
             debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') does not match systemd services groups", cg->id, cg->chart_id, cg->chart_title);
     }
 
-    if(user_configurable) {
+    if (cg->enanbled && user_configurable) {
         // allow the user to enable/disable this individually
         char option[FILENAME_MAX + 1];
         snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
-        cg->enabled = (char) config_get_boolean("plugin:cgroups", option, def);
+        cg->enabled = (char)config_get_boolean("plugin:cgroups", option, def);
     }
 
     // detect duplicate cgroups
