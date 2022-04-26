@@ -239,6 +239,7 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
     rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
+            rrdset_rdlock(st);
             struct charts *chart = callocz(1, sizeof(struct charts));
             chart->st = st;
             chart->next = NULL;
@@ -282,6 +283,7 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
     while(charts){
         ch = charts;
         charts = charts->next;
+        rrdset_unlock(ch->st);
         free(ch);
     }
 
