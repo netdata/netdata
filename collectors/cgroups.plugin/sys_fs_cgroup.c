@@ -868,7 +868,7 @@ struct discovery_thread {
 } discovery_thread;
 
 static int is_inside_k8s() {
-    return (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+    return (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL);
 }
 // ----------------------------------------------------------------------------
 
