@@ -950,10 +950,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
     ebpf_socket_clean_specific_pid(pid);
 
     // Clean cachestat structure
-    if (cachestat_pid) {
-        freez(cachestat_pid[pid]);
-        cachestat_pid[pid] = NULL;
-    }
+    ebpf_cachestat_clean_specific_pid(pid);
 
     // Clean directory cache structure
     if (dcstat_pid) {

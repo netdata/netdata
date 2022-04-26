@@ -3,7 +3,8 @@
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
 
-netdata_publish_cachestat_t **cachestat_pid;
+netdata_publish_cachestat_t **cachestat_pid = NULL;
+netdata_publish_cachestat_t *cachestat_static_pid = NULL;
 
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
@@ -294,17 +295,37 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *****************************************************************/
 
 /**
+ * Clean Specific PID
+ *
+ * Clean a specific PID that is no running anymore.
+ *
+ * @param pid clean the pid closed.
+ */
+void ebpf_cachestat_clean_specific_pid(uint32_t pid)
+{
+    if (likely(cachestat_pid) && likely(cachestat_pid[pid])) {
+        freez(cachestat_pid[pid]);
+        cachestat_pid[pid] = NULL;
+    } else if (likely(cachestat_static_pid))
+        memset(&cachestat_static_pid[pid], 0, sizeof(netdata_publish_cachestat_t));
+}
+
+/**
  * Clean PID structures
  *
  * Clean the allocated structures.
  */
 void clean_cachestat_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(cachestat_pid[pids->pid]);
+    if (likely(cachestat_pid)) {
+        struct pid_stat *pids = root_of_pids;
+        while (pids) {
+            freez(cachestat_pid[pids->pid]);
 
-        pids = pids->next;
-    }
+            pids = pids->next;
+        }
+        freez(cachestat_pid);
+    } else
+        freez(cachestat_static_pid);
 }
 
 /**
@@ -482,14 +503,18 @@ static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, n
  */
 static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *publish)
 {
-    netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
-    if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_cachestat_t));
-        cachestat_pid[current_pid] = curr;
+    netdata_publish_cachestat_t *curr;
+    if (likely(cachestat_pid)) {
+        curr = cachestat_pid[current_pid];
+        if (!curr) {
+            curr = callocz(1, sizeof(netdata_publish_cachestat_t));
+            cachestat_pid[current_pid] = curr;
 
-        cachestat_save_pid_values(curr, publish);
-        return;
-    }
+            cachestat_save_pid_values(curr, publish);
+            return;
+        }
+    } else
+        curr = &cachestat_static_pid[current_pid];
 
     cachestat_save_pid_values(curr, publish);
 }
@@ -543,10 +568,15 @@ static void ebpf_update_cachestat_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_cachestat_pid_t *out = &pids->cachestat;
-            if (likely(cachestat_pid) && cachestat_pid[pid]) {
-                netdata_publish_cachestat_t *in = cachestat_pid[pid];
+            if (likely(cachestat_pid) || likely(cachestat_static_pid)) {
+                netdata_publish_cachestat_t *in;
+                if (likely(cachestat_static_pid))
+                    in = &cachestat_static_pid[pid];
+                else
+                    in = cachestat_pid[pid];
 
-                memcpy(out, &in->current, sizeof(netdata_cachestat_pid_t));
+                if (in)
+                    memcpy(out, &in->current, sizeof(netdata_cachestat_pid_t));
             } else {
                 memset(cv, 0, length);
                 if (bpf_map_lookup_elem(fd, &pid, cv)) {
@@ -713,7 +743,12 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on
     netdata_cachestat_pid_t *dst = &publish->current;
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_cachestat_t *w = cachestat_pid[pid];
+        netdata_publish_cachestat_t *w = NULL;
+        if (likely(cachestat_pid) && likely(cachestat_pid[pid]))
+            w = cachestat_pid[pid];
+        else if (likely(cachestat_static_pid))
+            w = &cachestat_static_pid[pid];
+
         if (w) {
             netdata_cachestat_pid_t *src = &w->current;
             dst->account_page_dirtied += src->account_page_dirtied;
@@ -1185,12 +1220,24 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param apps is apps enabled?
+ * @param em the structure with thread information
  */
-static void ebpf_cachestat_allocate_global_vectors(int apps)
+static void ebpf_cachestat_allocate_global_vectors(ebpf_module_t *em)
 {
-    if (apps)
-        cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
+    if (em->apps_charts || em->cgroup_charts) {
+        if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
+            cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
+        else
+            cachestat_static_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t));
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("%s %s.",
+             EBPF_DEFAULT_MEMORY_MESSAGE,
+             (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
+             EBPF_MEMORY_MESSAGE_DYNAMIC :
+             EBPF_MEMORY_MESSAGE_BEGIN);
+#endif
+    }
 
     cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
 
@@ -1286,7 +1333,7 @@ void *ebpf_cachestat_thread(void *ptr)
         goto endcachestat;
     }
 
-    ebpf_cachestat_allocate_global_vectors(em->apps_charts);
+    ebpf_cachestat_allocate_global_vectors(em);
 
     int algorithms[NETDATA_CACHESTAT_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX

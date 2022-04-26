@@ -86,5 +86,6 @@ extern void clean_cachestat_pid_structures();
 
 extern struct config cachestat_config;
 extern netdata_ebpf_targets_t cachestat_targets[];
+extern void ebpf_cachestat_clean_specific_pid(uint32_t pid);
 
 #endif // NETDATA_EBPF_CACHESTAT_H
