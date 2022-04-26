@@ -492,8 +492,10 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
 
 uint32_t negotiating_stream_version(uint32_t host_version, uint32_t incoming_version)
 {
+#ifdef ENABLE_COMPRESSION
     int host_version_compression_status = 0,
         incoming_version_compression_status = 0;
+
     if(default_compression_enabled) {
         switch (host_version)
         {
@@ -522,6 +524,7 @@ uint32_t negotiating_stream_version(uint32_t host_version, uint32_t incoming_ver
         if (host_version_compression_status == incoming_version_compression_status)
             return MIN(host_version, incoming_version);
     }
+#endif
 
     switch (host_version)
     {
