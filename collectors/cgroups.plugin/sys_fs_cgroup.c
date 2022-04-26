@@ -4573,7 +4573,7 @@ void *cgroups_main(void *ptr) {
 
     struct rusage thread;
 
-    if is_inside_k8s() {
+    if (is_inside_k8s()) {
         cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_YES;
         // 2 was not enough on an AWS K8s cluster when: CPU % is high, many containers are created in a short time.
         cgroup_renaming_tries = 4;
