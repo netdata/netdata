@@ -867,6 +867,9 @@ struct discovery_thread {
     int exited;
 } discovery_thread;
 
+static int is_inside_k8s() {
+    return (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+}
 // ----------------------------------------------------------------------------
 
 static unsigned long long calc_delta(unsigned long long curr, unsigned long long prev) {
@@ -4570,8 +4573,10 @@ void *cgroups_main(void *ptr) {
 
     struct rusage thread;
 
-    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
+    if is_inside_k8s() {
         cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_YES;
+        // 2 was not enough on an AWS K8s cluster when: CPU % is high, many containers are created in a short time.
+        cgroup_renaming_tries = 4;
     }
 
     // when ZERO, attempt to do it
