@@ -202,7 +202,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             /* handle->prev_descr = descr;*/
         }
     } else {
-        freez(descr->pg_cache_descr->page);
+        dbengine_page_free(descr->pg_cache_descr->page);
         rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
         freez(descr);
     }
@@ -724,7 +724,7 @@ void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrde
 
     descr = pg_cache_create_descr();
     descr->id = id; /* TODO: add page type: metric, log, something? */
-    page = mallocz(RRDENG_BLOCK_SIZE); /*TODO: add page size */
+    page = dbengine_page_alloc(); /*TODO: add page size */
     rrdeng_page_descr_mutex_lock(ctx, descr);
     pg_cache_descr = descr->pg_cache_descr;
     pg_cache_descr->page = page;

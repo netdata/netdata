@@ -11,7 +11,12 @@
 #endif /* __FreeBSD__ || __APPLE__*/
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
+
+#ifdef MADV_MERGEABLE
 int enable_ksm = 1;
+#else
+int enable_ksm = 0;
+#endif
 
 volatile sig_atomic_t netdata_exit = 0;
 const char *program_version = VERSION;
@@ -973,7 +978,7 @@ static void *memory_file_mmap(const char *filename, size_t size, int flags) {
 #ifdef MADV_MERGEABLE
 static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
     // info("memory_file_mmap_ksm('%s', %zu", filename, size);
-    static int log_madvise_2 = 1, log_madvise_3 = 1;
+    static int log_madvise_1 = 1, log_madvise_2 = 1, log_madvise_3 = 1, log_madvise_4 = 1;
 
     int fd = -1;
     if(filename) {
@@ -994,15 +999,24 @@ static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) 
             else error("Cannot seek to beginning of file '%s'.", filename);
         }
 
-        // don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
-        if (madvise(mem, size, MADV_SEQUENTIAL | MADV_DONTFORK) != 0 && log_madvise_2) {
-            error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.", filename);
+        if (madvise(mem, size, MADV_SEQUENTIAL) != 0 && log_madvise_1) {
+            error("Cannot advise the kernel about the memory usage MADV_SEQUENTIAL.");
+            log_madvise_1--;
+        }
+
+        if (madvise(mem, size, MADV_DONTFORK) != 0 && log_madvise_2) {
+            error("Cannot advise the kernel about the memory usage MADV_DONTFORK.");
             log_madvise_2--;
         }
 
         if (madvise(mem, size, MADV_MERGEABLE) != 0 && log_madvise_3) {
-            error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.", filename);
+            error("Cannot advise the kernel about the memory usage MADV_MERGEABLE.");
             log_madvise_3--;
+        }
+
+        if (madvise(mem, size, MADV_DONTDUMP) != 0 && log_madvise_4) {
+            error("Cannot advise the kernel about the memory usage MADV_DONTDUMP.");
+            log_madvise_4--;
         }
     }
 
