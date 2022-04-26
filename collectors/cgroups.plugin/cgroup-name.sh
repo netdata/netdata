@@ -241,9 +241,7 @@ function k8s_get_kubepod_name() {
     [ -f "$tmp_kube_containers_file" ] &&
     labels=$(grep "$cntr_id" "$tmp_kube_containers_file" 2>/dev/null); then
     IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
-    info "${fn}: K8S CACHE HIT (cgroup $cgroup_path)"
   else
-    info "${fn}: K8S CACHE MISS (cgroup $cgroup_path)"
     IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
     local kube_system_ns
     local pods
