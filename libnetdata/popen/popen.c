@@ -82,37 +82,54 @@ static void myp_del(pid_t pid) {
  * Returns -1 on failure, 0 on success. When POPEN_FLAG_CREATE_PIPE is set, on success set the FILE *fp pointer.
  */
 int custom_popene(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, ...) {
+    // convert the variable list arguments into what posix_spawn() needs
+    // all arguments are expected strings
     va_list args;
-    const char *s;
-    int __params, i;
+    int args_count;
 
-    // count the variable parameters
-    va_start(args, command);
-    __params = 0;
-    while((s = va_arg(args, const char *))) __params++;
-    va_end(args);
+    // the string to be logged about the command executed
+    char command_to_be_logged[2048];
 
-    // create a string pointer array
-    const char *spawn_argv[__params + 1];
-    char __format[(__params + 1) * 5 + 1];
-    va_start(args, command);
-    __format[0] = 0;
-    for(i = 0; i < __params ;i++) {
-        s = va_arg(args, const char *);
-        strcat(__format, "'%s' ");
-        spawn_argv[i] = s;
+    {
+        // count the number variable parameters
+        // the variable parameters are expected NULL terminated
+        const char *s;
+
+        va_start(args, command);
+        args_count = 0;
+        while ((s = va_arg(args, const char *))) args_count++;
+        va_end(args);
     }
-    spawn_argv[__params] = NULL;
-    va_end(args);
 
-    // generate a command string for the logs
-    char __command[2048];
-    snprintf(__command, 1024, "%s ", command);
-    __command[1024] = 0;
-    va_start(args, command);
-    vsnprintfz(&__command[strlen(__command)], 2048 - strlen(__command), __format, args);
-    __command[2048] = 0;
-    va_end(args);
+    // create a string pointer array as needed by posix_spawn()
+    // variable array in the stack
+    const char *spawn_argv[args_count + 1];
+    {
+        const char *s;
+        char __format[(args_count + 1) * 5 + 1];
+
+        va_start(args, command);
+        __format[0] = 0;
+        int i;
+        for (i = 0; i < args_count; i++) {
+            s = va_arg(args, const char *);
+            strcat(__format, "'%s' ");
+            spawn_argv[i] = s;
+        }
+        spawn_argv[args_count] = NULL;
+        va_end(args);
+
+        // generate a command string for the logs
+        int len = sizeof(command_to_be_logged) - 1;
+        snprintfz(command_to_be_logged, len, "%s ", command);
+        int offset = strlen(command_to_be_logged);
+        len -= offset;
+        if(len > 0) {
+            va_start(args, command);
+            vsnprintfz(&command_to_be_logged[offset], len, __format, args);
+            va_end(args);
+        }
+    }
 
     FILE *fp = NULL;
     int ret = 0; // success by default
@@ -175,10 +192,10 @@ int custom_popene(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp,
     if (!posix_spawn(&pid, command, &fa, &attr, (char * const*)spawn_argv, env)) {
         *pidptr = pid;
         myp_add_locked(pid);
-        debug(D_CHILDS, "Spawned command: \"%s\" on pid %d from parent pid %d.", __command, pid, getpid());
+        debug(D_CHILDS, "Spawned command: \"%s\" on pid %d from parent pid %d.", command_to_be_logged, pid, getpid());
     } else {
         myp_add_unlock();
-        error("Failed to spawn command: \"%s\" from parent pid %d.", __command, getpid());
+        error("Failed to spawn command: \"%s\" from parent pid %d.", command_to_be_logged, getpid());
         if (flags & POPEN_FLAG_CREATE_PIPE) {
             fclose(fp);
         }

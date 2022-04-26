@@ -487,7 +487,7 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     }
     else {
         char buffer[100];
-        snprintfz(buffer, 100, "%d", pid);
+        snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
         (void)custom_popene(&cgroup_pid, environment, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "cgroup-network-helper.sh", "--pid", buffer, NULL);
     }
 
