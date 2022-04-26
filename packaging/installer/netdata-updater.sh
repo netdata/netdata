@@ -654,13 +654,17 @@ update_binpkg() {
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
     DISTRO_COMPAT_NAME="${DISTRO}"
   else
-    DISTRO_COMPAT_NAME="unknown"
-    for compat_id in ${ID_LIKE}; do
-      if str_in_list "${compat_id}" "${supported_compat_names}"; then
-        DISTRO_COMPAT_NAME="${compat_id}"
-        break
-      fi
-    done
+    case "${DISTRO}" in
+      opensuse-leap)
+        DISTRO_COMPAT_NAME="opensuse"
+        ;;
+      almalinux|rocky|rhel)
+        DISTRO_COMPAT_NAME="centos"
+        ;;
+      *)
+        DISTRO_COMPAT_NAME="unknown"
+        ;;
+    esac
   fi
 
   if [ "${INTERACTIVE}" = "0" ]; then
