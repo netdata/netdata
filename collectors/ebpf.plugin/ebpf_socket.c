@@ -3007,7 +3007,7 @@ static void ebpf_socket_allocate_global_vectors(ebpf_module_t *em)
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    if (em->apps_charts) {
+    if (em->apps_charts || em->cgroup_charts) {
         if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
             socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
         else

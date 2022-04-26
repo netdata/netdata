@@ -1103,6 +1103,8 @@ void clean_global_memory() {
 
             pids = pids->next;
         }
+
+        freez(current_apps_data);
     } else
         freez(static_apps_data);
 }
@@ -1152,7 +1154,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(process_hash_values);
 
     clean_global_memory();
-    freez(current_apps_data);
     freez(static_apps_data);
 
     ebpf_process_disable_tracepoints();
@@ -1181,15 +1182,28 @@ static void ebpf_process_cleanup(void *ptr)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- *  @param length is the length for the vectors used inside the collector.
+ *  @param em the structure with thread information
  */
-static void ebpf_process_allocate_global_vectors(size_t length)
+static void ebpf_process_allocate_global_vectors(ebpf_module_t *em)
 {
+    size_t length = NETDATA_KEY_PUBLISH_PROCESS_END;
     memset(process_aggregated_data, 0, length * sizeof(netdata_syscall_stat_t));
     memset(process_publish_aggregated, 0, length * sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    current_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
+    if (em->apps_charts || em->cgroup_charts) {
+        if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
+            current_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
+        else
+            static_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t));
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("%s %s.",
+             EBPF_DEFAULT_MEMORY_MESSAGE,
+             (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
+             EBPF_MEMORY_MESSAGE_DYNAMIC :
+             EBPF_MEMORY_MESSAGE_BEGIN);
+#endif
+    }
 }
 
 static void change_syscalls()
@@ -1303,7 +1317,7 @@ void *ebpf_process_thread(void *ptr)
     process_enabled = em->enabled;
 
     pthread_mutex_lock(&lock);
-    ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
+    ebpf_process_allocate_global_vectors(em);
 
     ebpf_update_pid_table(&process_maps[0], em);
 

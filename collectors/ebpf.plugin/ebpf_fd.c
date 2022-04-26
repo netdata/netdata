@@ -849,7 +849,7 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  */
 static void ebpf_fd_allocate_global_vectors(ebpf_module_t *em)
 {
-    if (em->apps_charts) {
+    if (em->apps_charts || em->cgroup_charts) {
         if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
             fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
         else

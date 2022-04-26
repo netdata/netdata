@@ -1578,7 +1578,7 @@ static void ebpf_vfs_allocate_global_vectors(ebpf_module_t *em)
     vfs_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
 
-    if (em->apps_charts) {
+    if (em->apps_charts || em->cgroup_charts) {
         if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
             vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
         else

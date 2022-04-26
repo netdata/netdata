@@ -999,7 +999,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_shm_allocate_global_vectors(ebpf_module_t *em)
 {
-    if (em->apps_charts) {
+    if (em->apps_charts || em->cgroup_charts) {
         if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
             shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
         else
