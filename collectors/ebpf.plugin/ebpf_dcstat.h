@@ -78,6 +78,7 @@ typedef struct netdata_publish_dcstat {
 extern void *ebpf_dcstat_thread(void *ptr);
 extern void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void clean_dcstat_pid_structures();
+extern void ebpf_dcstat_clean_specific_pid(uint32_t pid);
 extern struct config dcstat_config;
 extern netdata_ebpf_targets_t dc_targets[];
 

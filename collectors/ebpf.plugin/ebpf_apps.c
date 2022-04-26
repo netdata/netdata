@@ -953,10 +953,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
     ebpf_cachestat_clean_specific_pid(pid);
 
     // Clean directory cache structure
-    if (dcstat_pid) {
-        freez(dcstat_pid[pid]);
-        dcstat_pid[pid] = NULL;
-    }
+    ebpf_dcstat_clean_specific_pid(pid);
 
     // Clean swap structure
     if (swap_pid) {

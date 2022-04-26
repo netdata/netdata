@@ -9,6 +9,7 @@ static netdata_publish_syscall_t dcstat_counter_publish_aggregated[NETDATA_DCSTA
 
 netdata_dcstat_pid_t *dcstat_vector = NULL;
 netdata_publish_dcstat_t **dcstat_pid = NULL;
+netdata_publish_dcstat_t *dcstat_static_pid = NULL;
 
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
@@ -252,17 +253,37 @@ void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access,
  *****************************************************************/
 
 /**
+ * Clean Specific PID
+ *
+ * Clean a specific PID that is no running anymore.
+ *
+ * @param pid clean the pid closed.
+ */
+void ebpf_dcstat_clean_specific_pid(uint32_t pid)
+{
+    if (likely(dcstat_pid) && likely(dcstat_pid[pid])) {
+        freez(dcstat_pid[pid]);
+        dcstat_pid[pid] = NULL;
+    } else if (likely(dcstat_static_pid))
+        memset(&dcstat_static_pid[pid], 0, sizeof(netdata_publish_dcstat_t));
+}
+
+/**
  * Clean PID structures
  *
  * Clean the allocated structures.
  */
 void clean_dcstat_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(dcstat_pid[pids->pid]);
+    if (likely(dcstat_pid)) {
+        struct pid_stat *pids = root_of_pids;
+        while (pids) {
+            freez(dcstat_pid[pids->pid]);
 
-        pids = pids->next;
-    }
+            pids = pids->next;
+        }
+        freez(dcstat_pid);
+    } else
+        freez(dcstat_static_pid);
 }
 
 /**
@@ -421,11 +442,15 @@ static inline void dcstat_save_pid_values(netdata_publish_dcstat_t *out, netdata
  */
 static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
 {
-    netdata_publish_dcstat_t *curr = dcstat_pid[current_pid];
-    if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_dcstat_t));
-        dcstat_pid[current_pid] = curr;
-    }
+    netdata_publish_dcstat_t *curr;
+    if (likely(dcstat_pid)) {
+        curr = dcstat_pid[current_pid];
+        if (!curr) {
+            curr = callocz(1, sizeof(netdata_publish_dcstat_t));
+            dcstat_pid[current_pid] = curr;
+        }
+    } else
+        curr = &dcstat_static_pid[current_pid];
 
     dcstat_save_pid_values(curr, publish);
 }
@@ -479,10 +504,15 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            if (likely(dcstat_pid) && dcstat_pid[pid]) {
-                netdata_publish_dcstat_t *in = dcstat_pid[pid];
+            if (likely(dcstat_pid) || likely(dcstat_static_pid)) {
+                netdata_publish_dcstat_t *in;
+                if (likely(dcstat_static_pid))
+                    in = &dcstat_static_pid[pid];
+                else
+                    in = dcstat_pid[pid];
 
-                memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
+                if (in)
+                    memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
             } else {
                 memset(cv, 0, length);
                 if (bpf_map_lookup_elem(fd, &pid, cv)) {
@@ -568,7 +598,12 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_targe
     netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_dcstat_t *w = dcstat_pid[pid];
+        netdata_publish_dcstat_t *w = NULL;
+        if (likely(dcstat_pid))
+            w = dcstat_pid[pid];
+        else if (likely(dcstat_static_pid))
+            w = &dcstat_static_pid[pid];
+
         if (w) {
             netdata_dcstat_pid_t *src = &w->curr;
             dst->cache_access += src->cache_access;
@@ -1094,12 +1129,23 @@ static void ebpf_create_filesystem_charts(int update_every)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param apps is apps enabled?
+ * @param em the structure with thread information
  */
-static void ebpf_dcstat_allocate_global_vectors(int apps)
+static void ebpf_dcstat_allocate_global_vectors(ebpf_module_t *em)
 {
-    if (apps)
-        dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
+    if (em->apps_charts || em->cgroup_charts) {
+        if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
+            dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
+        else
+            dcstat_static_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t));
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("%s %s.",
+             EBPF_DEFAULT_MEMORY_MESSAGE,
+             (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
+             EBPF_MEMORY_MESSAGE_DYNAMIC :
+             EBPF_MEMORY_MESSAGE_BEGIN);
+#endif
+    }
 
     dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -1177,7 +1223,7 @@ void *ebpf_dcstat_thread(void *ptr)
         goto enddcstat;
     }
 
-    ebpf_dcstat_allocate_global_vectors(em->apps_charts);
+    ebpf_dcstat_allocate_global_vectors(em);
 
     int algorithms[NETDATA_DCSTAT_IDX_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
