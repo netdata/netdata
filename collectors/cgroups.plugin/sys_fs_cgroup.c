@@ -41,6 +41,9 @@ static int cgroup_unified_exist = CONFIG_BOOLEAN_AUTO;
 static int cgroup_search_in_devices = 1;
 
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
+
+static int cgroup_renaming_tries = 2;
+
 static int cgroup_check_for_new_every = 10;
 static int cgroup_update_every = 1;
 static int cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
@@ -270,6 +273,11 @@ void read_cgroup_plugin_configuration() {
     cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", (long long)cgroup_check_for_new_every * (long long)cgroup_update_every);
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
+    
+    cgroup_renaming_tries = config_get_number("plugin:cgroups", "cgroup renaming tries", cgroup_renaming_tries)
+    if (cgroup_renaming_tries < 1) {
+        cgroup_renaming_tries = 1;
+    }
 
     cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
     if(cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
@@ -1723,7 +1731,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
     // fix the chart_id and title by calling the external script
     if(simple_pattern_matches(enabled_cgroup_renames, cg->id)) {
-        cg->pending_renames = 2;
+        cg->pending_renames = cgroup_renaming_tries;
         cgroup_get_chart_name(cg);
         debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
     } else {
