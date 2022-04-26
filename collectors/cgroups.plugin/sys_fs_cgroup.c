@@ -1772,7 +1772,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
             debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') does not match systemd services groups", cg->id, cg->chart_id, cg->chart_title);
     }
 
-    if (cg->enanbled && user_configurable) {
+    if (cg->enabled && user_configurable) {
         // allow the user to enable/disable this individually
         char option[FILENAME_MAX + 1];
         snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
