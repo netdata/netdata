@@ -35,8 +35,8 @@ NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
+NETDATA_WARNINGS=""
 RELEASE_CHANNEL="nightly"
-WARNINGS=""
 
 if [ -n "$DISABLE_TELEMETRY" ]; then
   NETDATA_DISABLE_TELEMETRY="${DISABLE_TELEMETRY}"
@@ -343,9 +343,9 @@ cleanup() {
 }
 
 deferred_warnings() {
-  if [ -n "${WARNINGS}" ]; then
+  if [ -n "${NETDATA_WARNINGS}" ]; then
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
-    echo >&2 "${WARNINGS}"
+    echo >&2 "${NETDATA_WARNINGS}"
     printf >&2 "\n"
   fi
 }
@@ -418,7 +418,8 @@ run() {
   if [ ${ret} -ne 0 ]; then
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
-    WARNINGS="${WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
+    # shellcheck disable=SC2089
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
   else
     printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
@@ -429,7 +430,7 @@ run() {
 
 warning() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
-  WARNINGS="${WARNINGS}\n  - ${*}"
+  NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${*}"
 }
 
 _cannot_use_tmpdir() {
@@ -645,11 +646,19 @@ update() {
       return 0
     fi
 
+    export NETDATA_SAVE_WARNINGS=1
+    export NETDATA_PROPAGATE_WARNINGS=1
+    # shellcheck disable=SC2090
+    export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
     if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
     else
-      fatal "Failed to update existing Netdata install at ${ndprefix}" F0100
+      if [ -n "${EXIT_REASON}" ]; then
+        fatal "Failed to update existing Netdata install at ${ndprefix}: ${EXIT_REASON}" "${EXIT_CODE}"
+      else
+        fatal "Failed to update existing Netdata install at ${ndprefix}." U0000
+      fi
     fi
   else
     warning "Could not find a usable copy of the updater script."
@@ -682,6 +691,10 @@ uninstall() {
       return 0
     else
       progress "Found existing netdata-uninstaller. Running it.."
+      export NETDATA_SAVE_WARNINGS=1
+      export NETDATA_PROPAGATE_WARNINGS=1
+      # shellcheck disable=SC2090
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
       if ! run ${ROOTCMD} "${uninstaller}" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -695,6 +708,10 @@ uninstall() {
       progress "Downloading netdata-uninstaller ..."
       download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
       chmod +x "${tmpdir}/netdata-uninstaller.sh"
+      export NETDATA_SAVE_WARNINGS=1
+      export NETDATA_PROPAGATE_WARNINGS=1
+      # shellcheck disable=SC2090
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
       if ! run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -1493,12 +1510,20 @@ build_and_install() {
     opts="${opts} --disable-cloud"
   fi
 
+  export NETDATA_SAVE_WARNINGS=1
+  export NETDATA_PROPAGATE_WARNINGS=1
+  # shellcheck disable=SC2090
+  export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
   # shellcheck disable=SC2086
   run ${ROOTCMD} ./netdata-installer.sh ${opts}
 
   case $? in
     1)
-      fatal "netdata-installer.sh failed to run correctly." F0007
+      if [ -n "${EXIT_REASON}" ]; then
+        fatal "netdata-installer.sh failed to run: ${EXIT_REASON}" "${EXIT_CODE}"
+      else
+        fatal "netdata-installer.sh failed to run correctly." I0000
+      fi
       ;;
     2)
       fatal "Insufficient RAM to install netdata." F0008

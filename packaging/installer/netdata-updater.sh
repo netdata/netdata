@@ -28,6 +28,8 @@
 # Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 # Author: Austin S. Hemmelgarn <austin@netdata.cloud>
 
+# Next unused error code: U001A
+
 set -e
 
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
@@ -55,16 +57,35 @@ else
 fi
 
 info() {
-  echo >&3 "$(date) : INFO: ${script_name}: " "${@}"
+  echo >&3 "$(date) : INFO: ${script_name}: " "${1}"
 }
 
 error() {
-  echo >&3 "$(date) : ERROR: ${script_name}: " "${@}"
+  echo >&3 "$(date) : ERROR: ${script_name}: " "${1}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
+  fi
 }
 
 fatal() {
-  echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${@}"
+  echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${1}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
+  fi
+  exit_reason "${1}" "${2}"
   exit 1
+}
+
+exit_reason() {
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    EXIT_REASON="${1}"
+    EXIT_CODE="${2}"
+    if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
+      export EXIT_REASON
+      export EXIT_CODE
+      export NETDATA_WARNINGS
+    fi
+  fi
 }
 
 issystemd() {
@@ -158,8 +179,7 @@ enable_netdata_updater() {
       updater_type="$(_get_scheduler_type)"
       ;;
     *)
-      error "Unrecognized updater type ${updater_type} requested. Supported types are 'systemd', 'interval', and 'crontab'."
-      exit 1
+      fatal "Unrecognized updater type ${updater_type} requested. Supported types are 'systemd', 'interval', and 'crontab'." U0001
       ;;
   esac
 
@@ -172,8 +192,7 @@ enable_netdata_updater() {
         info "If the update process fails, the failure will be logged to the systemd journal just like a regular service failure."
         info "Successful updates should produce empty logs."
       else
-        error "Systemd-based auto-update scheduling requested, but this does not appear to be a systemd system."
-        error "Auto-updates have NOT been enabled."
+        error "Systemd-based auto-update scheduling requested, but this does not appear to be a systemd system. Auto-updates have NOT been enabled."
         return 1
       fi
       ;;
@@ -185,8 +204,7 @@ enable_netdata_updater() {
         info "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
         info "Successful updates will not send an email."
       else
-        error "Interval-based auto-update scheduling requested, but I could not find an interval scheduling directory."
-        error "Auto-updates have NOT been enabled."
+        error "Interval-based auto-update scheduling requested, but I could not find an interval scheduling directory. Auto-updates have NOT been enabled."
         return 1
       fi
       ;;
@@ -200,14 +218,12 @@ enable_netdata_updater() {
         info "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
         info "Successful updates will not send an email."
       else
-        error "Crontab-based auto-update scheduling requested, but there is no '/etc/cron.d'."
-        error "Auto-updates have NOT been enabled."
+        error "Crontab-based auto-update scheduling requested, but there is no '/etc/cron.d'. Auto-updates have NOT been enabled."
         return 1
       fi
       ;;
     *)
-      error "Unable to determine what type of auto-update scheduling to use."
-      error "Auto-updates have NOT been enabled."
+      error "Unable to determine what type of auto-update scheduling to use. Auto-updates have NOT been enabled."
       return 1
   esac
 
@@ -251,7 +267,7 @@ safe_sha256sum() {
   elif command -v shasum > /dev/null 2>&1; then
     shasum -a 256 "$@"
   else
-    fatal "I could not find a suitable checksum binary to use"
+    fatal "I could not find a suitable checksum binary to use" U0002
   fi
 }
 
@@ -294,7 +310,7 @@ create_tmp_directory() {
       if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
         if _cannot_use_tmpdir /tmp ; then
           if _cannot_use_tmpdir "${PWD}" ; then
-            fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+            fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." U0003
           else
             TMPDIR="${PWD}"
           fi
@@ -334,9 +350,9 @@ download() {
   if [ ${ret} -eq 0 ]; then
     return 0
   elif [ ${ret} -eq 255 ]; then
-    fatal "I need curl or wget to proceed, but neither is available on this system."
+    fatal "I need curl or wget to proceed, but neither is available on this system." U0004
   else
-    fatal "Cannot download ${url}"
+    fatal "Cannot download ${url}" U0005
   fi
 }
 
@@ -349,7 +365,7 @@ get_netdata_latest_tag() {
   elif command -v wget >/dev/null 2>&1; then
     tag=$(wget --max-redirect=0 "${url}" 2>&1 | grep Location | cut -d ' ' -f2 | grep -m 1 -o '[^/]*$')
   else
-    fatal "I need curl or wget to proceed, but neither of them are available on this system."
+    fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
   fi
 
   echo "${tag}" >"${dest}"
@@ -440,10 +456,10 @@ get_latest_version() {
 }
 
 validate_environment_file() {
-  if [ -n "${RELEASE_CHANNEL}" ] && [ -n "${NETDATA_PREFIX}" ] && [ -n "${REINSTALL_OPTIONS}" ] && [ -n "${IS_NETDATA_STATIC_BINARY}" ]; then
+  if [ -n "${NETDATA_PREFIX+SET_BUT_NULL}" ] && [ -n "${REINSTALL_OPTIONS}" ]; then
     return 0
   else
-    error "Environment file located at ${ENVIRONMENT_FILE} is not valid, unable to update."
+    fatal "Environment file located at ${ENVIRONMENT_FILE} is not valid, unable to update." U0007
   fi
 }
 
@@ -513,7 +529,7 @@ update_build() {
 
   RUN_INSTALLER=0
   ndtmpdir=$(create_tmp_directory)
-  cd "$ndtmpdir" || exit 1
+  cd "$ndtmpdir" || fatal "Failed to change current working directory to ${ndtmpdir}" U0016
 
   install_build_dependencies
 
@@ -526,12 +542,12 @@ update_build() {
       info "Newest version is already installed"
     else
       if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
-        fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour."
+        fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour." U0008
       fi
       NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
       tar -xf netdata-latest.tar.gz >&3 2>&3
       rm netdata-latest.tar.gz >&3 2>&3
-      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || exit 1
+      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
       RUN_INSTALLER=1
     fi
   fi
@@ -550,7 +566,7 @@ update_build() {
       do_not_start="--dont-start-it"
     fi
 
-    env="TMPDIR='${TMPDIR}'"
+    env="env TMPDIR=${TMPDIR}"
 
     if [ -n "${NETDATA_SELECTED_DASHBOARD}" ]; then
       env="${env} NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
@@ -558,7 +574,7 @@ update_build() {
 
     if [ ! -x ./netdata-installer.sh ]; then
       if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
-        cd "$(find . -mindepth 1 -maxdepth 1 -type d)" || exit 1
+        cd "$(find . -mindepth 1 -maxdepth 1 -type d)" || fatal "Failed to switch to build directory" U0018
       fi
     fi
 
@@ -573,7 +589,18 @@ update_build() {
     fi
 
     info "Re-installing netdata..."
-    eval "${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
+    export NETDATA_SAVE_WARNINGS=1
+    export NETDATA_PROPAGATE_WARNINGS=1
+    export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
+    # shellcheck disable=SC2086
+    if ! ${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start} >&3 2>&3; then
+      if [ -n "${EXIT_REASON}" ]; then
+        fatal "Failed to rebuild existing netdata install: ${EXIT_REASON}" "U${EXIT_CODE}"
+      else
+        fatal "Failed to rebuild existing netdata reinstall." UI0000
+      fi
+    fi
+    eval "${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA" U0009
 
     # We no longer store checksum info here. but leave this so that we clean up all environment files upon next update.
     sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
@@ -595,14 +622,14 @@ update_static() {
   PREVDIR="$(pwd)"
 
   info "Entering ${ndtmpdir}"
-  cd "${ndtmpdir}" || exit 1
+  cd "${ndtmpdir}" || fatal "Failed to change current working directory to ${ndtmpdir}" U0019
 
   if update_available; then
     sysarch="$(uname -m)"
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
     download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-${sysarch}-latest.gz.run"
     if ! grep "netdata-${sysarch}-latest.gz.run" "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-      fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour."
+      fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour." U000A
     fi
 
     if [ -e /opt/netdata/etc/netdata/.install-type ] ; then
@@ -637,7 +664,7 @@ update_binpkg() {
   elif [ -s "/usr/lib/os-release" ] && [ -r "/usr/lib/os-release" ]; then
     os_release_file="/usr/lib/os-release"
   else
-    fatal "Cannot find an os-release file ..." F0401
+    fatal "Cannot find an os-release file ..." U000B
   fi
 
   # shellcheck disable=SC1090
@@ -733,20 +760,20 @@ update_binpkg() {
 
   if [ -n "${repo_subcmd}" ]; then
     # shellcheck disable=SC2086
-    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
+    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata." U000C
   fi
 
   for repopkg in netdata-repo netdata-repo-edge; do
     if ${pkg_installed_check} ${repopkg} > /dev/null 2>&1; then
       # shellcheck disable=SC2086
-      env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} ${repopkg} || fatal "Failed to update Netdata repository config."
+      env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} ${repopkg} || fatal "Failed to update Netdata repository config." U000D
       # shellcheck disable=SC2086
-      env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
+      env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata." U000E
     fi
   done
 
   # shellcheck disable=SC2086
-  env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata || fatal "Failed to update Netdata package."
+  env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata || fatal "Failed to update Netdata package." U000F
 }
 
 # Simple function to encapsulate original updater behavior.
@@ -793,19 +820,19 @@ if [ "${ENVIRONMENT_FILE}" = "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; th
     elif [ -r "${itpath}" ]; then
       ENVIRONMENT_FILE="$(dirname "${itpath}")/.environment"
     else
-      fatal "Cannot find environment file or install type file, unable to update."
+      fatal "Cannot find environment file or install type file, unable to update." U0010
     fi
   fi
 fi
 
 if [ -r "${ENVIRONMENT_FILE}" ] ; then
   # shellcheck source=/dev/null
-  . "${ENVIRONMENT_FILE}" || exit 1
+  . "${ENVIRONMENT_FILE}" || fatal "Failed to source ${ENVIRONMENT_FILE}" U0014
 fi
 
 if [ -r "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
   # shellcheck source=/dev/null
-  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || exit 1
+  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || fatal "Failed to source $(dirname "${ENVIRONMENT_FILE}")/.install-type" U0015
 fi
 
 while [ -n "${1}" ]; do
@@ -854,7 +881,7 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 export NETDATA_NIGHTLIES_BASEURL="${NETDATA_NIGHTLIES_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
 
 if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]; then
-  fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
+  fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)" U0011
 fi
 
 self_update
@@ -862,12 +889,12 @@ self_update
 # shellcheck disable=SC2153
 case "${INSTALL_TYPE}" in
     *-build)
-      validate_environment_file || exit 1
+      validate_environment_file
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_build && exit 0
       ;;
     *-static*)
-      validate_environment_file || exit 1
+      validate_environment_file
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_static && exit 0
       ;;
@@ -875,22 +902,22 @@ case "${INSTALL_TYPE}" in
       update_binpkg && exit 0
       ;;
     "") # Fallback case for no `.install-type` file. This just works like the old install type detection.
-      validate_environment_file || exit 1
+      validate_environment_file
       update_legacy
       ;;
     custom)
       # At this point, we _should_ have a valid `.environment` file, but it's best to just check.
       # If we do, then behave like the legacy updater.
-      if validate_environment_file; then
+      if validate_environment_file && [ -n "${IS_NETDATA_STATIC_BINARY}" ]; then
         update_legacy
       else
-        fatal "This script does not support updating custom installations without valid environment files."
+        fatal "This script does not support updating custom installations without valid environment files." U0012
       fi
       ;;
     oci)
-      fatal "This script does not support updating Netdata inside our official Docker containers, please instead update the container itself."
+      fatal "This script does not support updating Netdata inside our official Docker containers, please instead update the container itself." U0013
       ;;
     *)
-      fatal "Unrecognized installation type (${INSTALL_TYPE}), unable to update."
+      fatal "Unrecognized installation type (${INSTALL_TYPE}), unable to update." U0014
       ;;
 esac

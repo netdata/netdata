@@ -10,6 +10,8 @@
 #
 # Author: Paweł Krupa <paulfantom@gmail.com>
 # Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
+#
+# Next unused error code: R0005
 
 usage="$(basename "$0") [-h] [-f ] -- program to calculate the answer to life, the universe and everything
 
@@ -51,17 +53,57 @@ while :; do
   esac
 done
 
+if [ -n "${script_source}" ]; then
+  script_name="$(basename "${script_source}")"
+else
+  script_name="netdata-updater.sh"
+fi
+
+info() {
+  echo >&3 "$(date) : INFO: ${script_name}: " "${1}"
+}
+
+error() {
+  echo >&3 "$(date) : ERROR: ${script_name}: " "${1}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
+  fi
+}
+
+fatal() {
+  echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${1}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
+  fi
+  exit_reason "${1}" "${2}"
+  exit 1
+}
+
+exit_reason() {
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    EXIT_REASON="${1}"
+    EXIT_CODE="${2}"
+    if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
+      export EXIT_REASON
+      export EXIT_CODE
+      export NETDATA_WARNINGS
+    fi
+  fi
+}
+
 if [ "$YES" != "1" ]; then
   echo >&2 "This script will REMOVE netdata from your system."
   echo >&2 "Run it again with --yes to do it."
+  exit_reason "User did not accept uninstalling." R0001
   exit 1
 fi
 
 if [ "$(id -u)" -ne 0 ]; then
-  echo >&2 "This script SHOULD be run as root or otherwise it won't delete all installed components."
+  error "This script SHOULD be run as root or otherwise it won't delete all installed components."
   key="n"
   read -r 1 -p "Do you want to continue as non-root user [y/n] ? " key
   if [ "$key" != "y" ] && [ "$key" != "Y" ]; then
+    exit_reason "User cancelled uninstall." R0002
     exit 1
   fi
 fi
@@ -107,7 +149,7 @@ create_tmp_directory() {
   if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
     if _cannot_use_tmpdir /tmp; then
       if _cannot_use_tmpdir "${PWD}"; then
-        fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." F0400
+        fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." R0003
       else
         TMPDIR="${PWD}"
       fi
@@ -325,14 +367,6 @@ setup_terminal() {
 }
 setup_terminal || echo > /dev/null
 
-run_ok() {
-  printf >&2 "%s OK %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
-}
-
-run_failed() {
-  printf >&2 "%s FAILED %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
-}
-
 ESCAPED_PRINT_METHOD=
 if printf "%s " test > /dev/null 2>&1; then
   ESCAPED_PRINT_METHOD="printfq"
@@ -373,10 +407,11 @@ run() {
 
   ret=$?
   if [ ${ret} -ne 0 ]; then
-    run_failed
+    printf >&2 "%s FAILED %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
     printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
   else
-    run_ok
+    printf >&2 "%s OK %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
     printf >> "${run_logfile}" "OK\n"
   fi
 
@@ -387,14 +422,14 @@ portable_del_group() {
   groupname="${1}"
 
   # Check if group exist
-  echo >&2 "Removing ${groupname} user group ..."
+  info "Removing ${groupname} user group ..."
 
   # Linux
   if command -v groupdel 1> /dev/null 2>&1; then
     if grep -q "${groupname}" /etc/group; then
       run groupdel "${groupname}" && return 0
     else
-      echo >&2 "Group ${groupname} already removed in a previous step."
+      info "Group ${groupname} already removed in a previous step."
       return 0
     fi
   fi
@@ -404,12 +439,12 @@ portable_del_group() {
     if dseditgroup -o read netdata 1> /dev/null 2>&1; then
       run dseditgroup -o delete "${groupname}" && return 0
     else
-      echo >&2 "Could not find group ${groupname}, nothing to do"
+      info "Could not find group ${groupname}, nothing to do"
       return 0
     fi
   fi
 
-  echo >&2 "Group ${groupname} was not automatically removed, you might have to remove it manually"
+  error "Group ${groupname} was not automatically removed, you might have to remove it manually"
   return 1
 }
 
@@ -453,7 +488,7 @@ issystemd() {
 
 portable_del_user() {
   username="${1}"
-  echo >&2 "Deleting ${username} user account ..."
+  info "Deleting ${username} user account ..."
 
   # Linux
   if command -v userdel 1> /dev/null 2>&1; then
@@ -465,7 +500,7 @@ portable_del_user() {
     run sysadminctl -deleteUser "${username}" && return 0
   fi
 
-  echo >&2 "User ${username} could not be deleted from system, you might have to remove it manually"
+  error "User ${username} could not be deleted from system, you might have to remove it manually"
   return 1
 }
 
@@ -474,7 +509,7 @@ portable_del_user_from_group() {
   username="${2}"
 
   # username is not in group
-  echo >&2 "Deleting ${username} user from ${groupname} group ..."
+  info "Deleting ${username} user from ${groupname} group ..."
 
   # Linux
   if command -v gpasswd 1> /dev/null 2>&1; then
@@ -496,16 +531,16 @@ portable_del_user_from_group() {
     run dseditgroup -o delete -u "${username}" "${groupname}" && return 0
   fi
 
-  echo >&2 "Failed to delete user ${username} from group ${groupname} !"
+  error "Failed to delete user ${username} from group ${groupname} !"
   return 1
 }
 
 quit_msg() {
   echo
   if [ "$FILE_REMOVAL_STATUS" -eq 0 ]; then
-    echo >&2 "Something went wrong :("
+    fatal "Failed to completely remove Netdata from this system." R0004
   else
-    echo >&2 "Netdata files were successfully removed from your system"
+    info "Netdata files were successfully removed from your system"
   fi
 }
 
@@ -513,7 +548,7 @@ rm_file() {
   FILE="$1"
   if [ -f "${FILE}" ]; then
     if user_input "Do you want to delete this file '$FILE' ? "; then
-	  run rm -v "${FILE}"
+      run rm -v "${FILE}"
     fi
   fi
 }
@@ -559,10 +594,10 @@ stop_netdata_on_pid() {
 
   pidisnetdata "${pid}" || return 0
 
-  printf >&2 "Stopping netdata on pid %s ..." "${pid}"
+  info "Stopping netdata on pid ${pid} ..."
   while [ -n "$pid" ] && [ ${ret} -eq 0 ]; do
     if [ ${count} -gt 24 ]; then
-      echo >&2 "Cannot stop the running netdata on pid ${pid}."
+      error "Cannot stop the running netdata on pid ${pid}."
       return 1
     fi
 
@@ -587,11 +622,11 @@ stop_netdata_on_pid() {
 
   echo >&2
   if [ ${ret} -eq 0 ]; then
-    echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
+    error "SORRY! CANNOT STOP netdata ON PID ${pid} !"
     return 1
   fi
 
-  echo >&2 "netdata on pid ${pid} stopped."
+  info "netdata on pid ${pid} stopped."
   return 0
 }
 
@@ -657,7 +692,7 @@ trap quit_msg EXIT
 . "${ENVIRONMENT_FILE}" || exit 1
 
 #### STOP NETDATA
-echo >&2 "Stopping a possibly running netdata..."
+info "Stopping a possibly running netdata..."
 stop_all_netdata
 
 #### REMOVE NETDATA FILES
