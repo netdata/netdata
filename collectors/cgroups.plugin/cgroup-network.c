@@ -481,7 +481,6 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     pid_t cgroup_pid;
     FILE *fp;
 
-    // fp = mypopene(command, &cgroup_pid, environment);
     if(cgroup) {
         (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "cgroup-network-helper.sh", "--cgroup", cgroup);
     }

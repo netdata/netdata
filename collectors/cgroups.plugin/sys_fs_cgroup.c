@@ -1478,17 +1478,14 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
     if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-        // snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
         snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_cpuacct_base, cg->id);
     }
     else {
-        // snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_unified_base, cg->id);
         snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_unified_base, cg->id);
     }
 
     debug(D_CGROUP, "executing command %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, command, cg->id);
     FILE *fp;
-    // fp = mypopen(command, &cgroup_pid);
     (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, cgroups_network_interface_script, "--cgroup", command);
     if(!fp) {
         error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, command);
@@ -1625,7 +1622,6 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
 
     debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
     FILE *fp;
-    // fp = mypopen(command, &cgroup_pid);
     (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_rename_script, cgroups_rename_script, cg->intermediate_id);
     if(fp) {
         // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", command, cg->id);
