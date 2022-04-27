@@ -291,19 +291,19 @@ int myp_reap(pid_t pid) {
 
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
     FILE *fp = NULL;
-    (void)custom_popene(pidptr, environ, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, &fp, "/bin/sh", "sh", "-c", command, NULL);
+    (void)mypopen_raw_default_flags_and_environment(pidptr, &fp, "/bin/sh", "sh", "-c", command);
     return fp;
 }
 
 FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
     FILE *fp = NULL;
-    (void)custom_popene( pidptr, env, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, &fp, "/bin/sh", "sh", "-c", command, NULL);
+    (void)mypopen_raw_default_flags( pidptr, env, &fp, "/bin/sh", "sh", "-c", command);
     return fp;
 }
 
 // returns 0 on success, -1 on failure
 int netdata_spawn(const char *command, volatile pid_t *pidptr) {
-    return custom_popene( pidptr, environ, 0, NULL, "/bin/sh", "sh", "-c", command, NULL);
+    return mypopen_raw_default_flags_and_environment( pidptr, NULL, "/bin/sh", "sh", "-c", command);
 }
 
 int custom_pclose(FILE *fp, pid_t pid) {

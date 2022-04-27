@@ -10,7 +10,12 @@
 
 /* custom_popene flag definitions */
 #define POPEN_FLAG_CREATE_PIPE 1 // Create a pipe like popen() when set, otherwise set stdout to /dev/null
-#define POPEN_FLAG_CLOSE_FD 2 // Close all file descriptors other than STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO
+#define POPEN_FLAG_CLOSE_FD    2 // Close all file descriptors other than STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO
+
+#define POPEN_FLAGS_DEFAULT (POPEN_FLAG_CREATE_PIPE|POPEN_FLAG_CLOSE_FD)
+
+#define mypopen_raw_default_flags_and_environment(pidptr, fpp, command, args...) custom_popene(pidptr, environ, POPEN_FLAGS_DEFAULT, fpp, command, ##args, NULL)
+#define mypopen_raw_default_flags(pidptr, env, fpp, command, args...) custom_popene(pidptr, env, POPEN_FLAGS_DEFAULT, fpp, command, ##args, NULL)
 
 extern int custom_popene(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, ...);
 

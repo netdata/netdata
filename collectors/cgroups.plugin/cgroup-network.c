@@ -483,12 +483,12 @@ void call_the_helper(pid_t pid, const char *cgroup) {
 
     // fp = mypopene(command, &cgroup_pid, environment);
     if(cgroup) {
-        (void)custom_popene(&cgroup_pid, environment, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "cgroup-network-helper.sh", "--cgroup", cgroup, NULL);
+        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "cgroup-network-helper.sh", "--cgroup", cgroup);
     }
     else {
         char buffer[100];
         snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
-        (void)custom_popene(&cgroup_pid, environment, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "cgroup-network-helper.sh", "--pid", buffer, NULL);
+        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "cgroup-network-helper.sh", "--pid", buffer);
     }
 
     if(fp) {
