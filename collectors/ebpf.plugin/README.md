@@ -208,12 +208,11 @@ Linux metrics:
 The `allocate memory` specifies how collector will manage the memory during runtime to monitor application and cgroup.
  The following options are accepted:
 
+-   `static`:  This option is preferred for high loaded or dedicated servers. It will use more memory, but it needs less
+    iteration with kernels. This is the default option.
 -   `dynamic`:  When plugin runs with this option, it will allocate memory for a specific PID when the PID is used, but
     it needs to use a minimum necessary for these future PIDs. Thanks the fact it will allocate during runtime,
     it will need more iteration with the kernel. It is the preferred method when the host has a small amount of memory.
-    This is the default option.
-- `static`:  This option is preferred for high loaded or dedicated servers. It will use more memory, but it needs less
-    iteration with kernels.
 
 Next table demonstates a comparison between memory usage for each method on a 64 bits computer running a Linux
  distribution that allows the maximum of `32768` PIDs (Value obtained from `/proc/sys/kernel/pid_max`).
