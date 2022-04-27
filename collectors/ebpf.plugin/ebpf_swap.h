@@ -42,11 +42,10 @@ enum swap_counters {
     NETDATA_SWAP_END
 };
 
-extern netdata_publish_swap_t **swap_pid;
-
 extern void *ebpf_swap_thread(void *ptr);
 extern void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void clean_swap_pid_structures();
+extern void ebpf_swap_clean_specific_pid(uint32_t pid);
 
 extern struct config swap_config;
 extern netdata_ebpf_targets_t swap_targets[];

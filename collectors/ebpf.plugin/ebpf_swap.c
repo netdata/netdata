@@ -14,6 +14,7 @@ static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
 static netdata_idx_t *swap_values = NULL;
 
 netdata_publish_swap_t **swap_pid = NULL;
+netdata_publish_swap_t *swap_static_pid = NULL;
 
 struct config swap_config = { .first_section = NULL,
     .last_section = NULL,
@@ -196,15 +197,35 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  *****************************************************************/
 
 /**
+ * Clean Specific PID
+ *
+ * Clean a specific PID that is no running anymore.
+ *
+ * @param pid clean the pid closed.
+ */
+void ebpf_swap_clean_specific_pid(uint32_t pid)
+{
+    if (likely(swap_pid) && likely(swap_pid[pid])) {
+        freez(swap_pid[pid]);
+        swap_pid[pid] = NULL;
+    } else if (likely(swap_static_pid))
+        memset(&swap_static_pid[pid], 0, sizeof(netdata_publish_swap_t));
+}
+
+/**
  * Clean swap structure
  */
 void clean_swap_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(swap_pid[pids->pid]);
+    if (likely(swap_pid)) {
+        struct pid_stat *pids = root_of_pids;
+        while (pids) {
+            freez(swap_pid[pids->pid]);
 
-        pids = pids->next;
-    }
+            pids = pids->next;
+        }
+        freez(swap_pid);
+    } else
+        freez(swap_static_pid);
 }
 
 /**
@@ -280,11 +301,15 @@ static void swap_apps_accumulator(netdata_publish_swap_t *out)
  */
 static void swap_fill_pid(uint32_t current_pid, netdata_publish_swap_t *publish)
 {
-    netdata_publish_swap_t *curr = swap_pid[current_pid];
-    if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_swap_t));
-        swap_pid[current_pid] = curr;
-    }
+    netdata_publish_swap_t *curr;
+    if (likely(swap_pid)) {
+        curr = swap_pid[current_pid];
+        if (!curr) {
+            curr = callocz(1, sizeof(netdata_publish_swap_t));
+            swap_pid[current_pid] = curr;
+        }
+    } else
+        curr = &swap_static_pid[current_pid];
 
     memcpy(curr, publish, sizeof(netdata_publish_swap_t));
 }
@@ -306,10 +331,15 @@ static void ebpf_update_swap_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            if (likely(swap_pid) && swap_pid[pid]) {
-                netdata_publish_swap_t *in = swap_pid[pid];
+            if (likely(swap_pid) || likely(swap_static_pid)) {
+                netdata_publish_swap_t *in;
+                if (likely(swap_static_pid))
+                    in = swap_pid[pid];
+                else
+                    in = &swap_static_pid[pid];
 
-                memcpy(out, in, sizeof(netdata_publish_swap_t));
+                if (in)
+                    memcpy(out, in, sizeof(netdata_publish_swap_t));
             } else {
                 memset(cv, 0, length);
                 if (!bpf_map_lookup_elem(fd, &pid, cv)) {
@@ -437,7 +467,12 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_targe
 
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_swap_t *w = swap_pid[pid];
+        netdata_publish_swap_t *w = NULL;
+        if (likely(swap_pid))
+            w = swap_pid[pid];
+        else if (likely(swap_static_pid))
+            w = &swap_static_pid[pid];
+
         if (w) {
             local_write += w->write;
             local_read += w->read;
@@ -766,12 +801,24 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param apps is apps enabled?
+ * @param em the structure with thread information
  */
-static void ebpf_swap_allocate_global_vectors(int apps)
+static void ebpf_swap_allocate_global_vectors(ebpf_module_t *em)
 {
-    if (apps)
-        swap_pid = callocz((size_t)pid_max, sizeof(netdata_publish_swap_t *));
+    if (em->apps_charts || em->cgroup_charts)  {
+        if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
+            swap_pid = callocz((size_t)pid_max, sizeof(netdata_publish_swap_t *));
+        else
+            swap_static_pid = callocz((size_t)pid_max, sizeof(netdata_publish_swap_t));
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("%s %s.",
+             EBPF_DEFAULT_MEMORY_MESSAGE,
+             (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC) ?
+             EBPF_MEMORY_MESSAGE_DYNAMIC :
+             EBPF_MEMORY_MESSAGE_BEGIN);
+#endif
+    }
 
     swap_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_swap_t));
 
@@ -867,7 +914,7 @@ void *ebpf_swap_thread(void *ptr)
         goto endswap;
     }
 
-    ebpf_swap_allocate_global_vectors(em->apps_charts);
+    ebpf_swap_allocate_global_vectors(em);
 
     int algorithms[NETDATA_SWAP_END] = { NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
     ebpf_global_labels(swap_aggregated_data, swap_publish_aggregated, swap_dimension_name, swap_dimension_name,
