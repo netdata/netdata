@@ -12,19 +12,13 @@ rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 static unsigned pages_per_extent = MAX_PAGES_PER_EXTENT;
 
 void *dbengine_page_alloc() {
-#ifdef MADV_MERGEABLE
-    return mymmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
-#else
-    return mallocz(RRDENG_BLOCK_SIZE);
-#endif
+    void *page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
+    if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
+    return page;
 }
 
 void dbengine_page_free(void *page) {
-#ifdef MADV_MERGEABLE
     munmap(page, RRDENG_BLOCK_SIZE);
-#else
-    freez(page);
-#endif
 }
 
 static void sanity_check(void)

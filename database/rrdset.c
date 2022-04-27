@@ -744,12 +744,11 @@ RRDSET *rrdset_create_custom(
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
     if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
        memory_mode == RRD_MEMORY_MODE_RAM) {
-        st = (RRDSET *) mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename
-                , size
-                , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
-                , 0
-        );
+        st = (RRDSET *)netdata_mmap(
+            (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename,
+            size,
+            ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE),
+            0);
 
         if(st) {
             memset(&st->avl, 0, sizeof(avl_t));
