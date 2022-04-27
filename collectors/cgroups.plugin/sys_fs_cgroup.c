@@ -9,6 +9,8 @@
 // ----------------------------------------------------------------------------
 // cgroup globals
 
+static int is_inside_k8s = 0;
+
 static long system_page_size = 4096; // system will be queried via sysconf() in configuration()
 
 static int cgroup_enable_cpuacct_stat = CONFIG_BOOLEAN_AUTO;
@@ -867,9 +869,71 @@ struct discovery_thread {
     int exited;
 } discovery_thread;
 
-static int is_inside_k8s() {
-    return (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL);
+static int k8s_is_container(const char *id) {
+    const char *p = id;
+    const char *pp = NULL;
+    int i = 0;
+    while ((p = strstr(p, "pod"))) {
+        i++;
+        p += strlen("pod");
+        pp = p;
+    }
+    return (i < 2 || !pp || !(pp = strchr(pp, '/')) || !pp++ || !*pp);
 }
+
+static int k8s_is_pause_container(const char *id) {
+    if (k8s_is_container(id)) {
+        return 1;
+    }
+
+    static procfile *ff = NULL;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/%s/cgroup.procs", cgroup_cpuacct_base, id);
+
+    ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if (unlikely(!ff)) {
+        error("CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
+        return 1;
+    }
+
+    ff = procfile_readall(ff);
+    if (unlikely(!ff)) {
+        error("CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
+        return 1;
+    }
+
+    unsigned long lines = procfile_lines(ff);
+    if (likely(lines != 1 )) {
+        return 1;
+    }
+
+    char *pid = procfile_lineword(ff, 0, 0);
+
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%s/comm", netdata_configured_host_prefix, pid);
+
+    ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if (unlikely(!ff)) {
+        error("CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
+        return 1;
+    }
+
+    ff = procfile_readall(ff);
+    if (unlikely(!ff)) {
+        error("CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
+        return 1;
+    }
+
+    lines = procfile_lines(ff);
+    if (unlikely(lines != 1 )) {
+        return 1;
+    }
+
+    char *comm = procfile_lineword(ff, 0, 0);
+
+    return strcmp(comm, "pause");
+}
+
 // ----------------------------------------------------------------------------
 
 static unsigned long long calc_delta(unsigned long long curr, unsigned long long prev) {
@@ -1731,6 +1795,12 @@ static inline struct cgroup *cgroup_add(const char *id) {
     }
 
     cgroup_root_count++;
+
+    if (is_inside_k8s && !k8s_is_pause_container(id)) {
+        info("cgroup '%s' is a pause container, disabling it", cg->id);
+        cg->enabled = 0;
+        return cg;
+    }
 
     // fix the chart_id and title by calling the external script
     if(simple_pattern_matches(enabled_cgroup_renames, cg->id)) {
@@ -4573,7 +4643,11 @@ void *cgroups_main(void *ptr) {
 
     struct rusage thread;
 
-    if (is_inside_k8s()) {
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
+        is_inside_k8s = 1;
+    }
+
+    if (is_inside_k8s) {
         cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_YES;
         // 2 was not enough on an AWS K8s cluster when: CPU % is high, many containers are created in a short time.
         cgroup_renaming_tries = 4;
