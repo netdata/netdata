@@ -10,7 +10,7 @@ keywords: [machine learning, anomaly detection, Netdata ML]
 
 As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0), Netdata comes with some ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box, with minimal configuration required.
 
-🚧 **Note**: This functionality is still under active development and considered experimental. Changes might cause the feature to break. We dogfood it internally and among early adopters within the Netdata community to build the feature. If you would like to get involved and help us with some feedback, email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
+🚧 **Note**: This functionality is still under active development and considered experimental. Changes might cause the feature to break. We dogfood it internally and among early adopters within the Netdata community to build the feature. If you would like to get involved and help us with some feedback, email us at analytics-ml-team@netdata.cloud, comment on the [beta launch post](https://community.netdata.cloud/t/anomaly-advisor-beta-launch/2717) in the Netdata community, or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 
 Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of potentially anomalous patterns in recent observations as opposed to just point anomalies like big spikes or drops. ([This infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies.) 
 
@@ -175,6 +175,51 @@ Below is a list of all the available configuration params and their default valu
 	# anomaly event min dimension rate threshold = 0.05000
 	# hosts to skip from training = !*
 	# charts to skip from training = netdata.*
+```
+
+### Configuration Examples
+
+If you would like to run ML on a parent instead of at the edge, some configuration options are illustrated below.
+
+This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/agent/streaming) to 1 parent node and illustrates the main ways you might want to configure running ml for the children on the parent, running ML on the children themselves, or even a mix of approaches.
+
+![parent_child_options](https://user-images.githubusercontent.com/2178292/164439761-8fb7dddd-c4d8-4329-9f44-9a794937a086.png)
+
+```
+# parent will run ml for itself and child 1,2.
+# child 0 will run its own ml at the edge and just stream its ml charts to parent.
+# child 1 will run its own ml at the edge, even though parent will also run ml for it, a bit wasteful potentially to run ml in both places but is possible.
+# child 2 will not run ml at the edge, it will be run in the parent only.
+
+# parent-ml-ml-stress-0
+# run ml on all hosts apart from child-ml-ml-stress-0
+[ml]
+        enabled = yes
+        minimum num samples to train = 900
+        train every = 900
+        charts to skip from training = !*
+        hosts to skip from training = child-ml-ml-stress-0
+
+# child-ml-ml-stress-0
+# run ml on child-ml-ml-stress-0 and stream ml charts to parent
+[ml]
+        enabled = yes
+        minimum num samples to train = 900
+        train every = 900
+        stream anomaly detection charts = yes
+
+# child-ml-ml-stress-1
+# run ml on child-ml-ml-stress-1 and stream ml charts to parent
+[ml]
+        enabled = yes
+        minimum num samples to train = 900
+        train every = 900
+        stream anomaly detection charts = yes
+
+# child-ml-ml-stress-2
+# don't run ml on child-ml-ml-stress-2, it will instead run on parent-ml-ml-stress-0
+[ml]
+        enabled = no
 ```
 
 ### Descriptions (min/max)
