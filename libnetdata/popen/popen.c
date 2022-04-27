@@ -81,7 +81,7 @@ static void myp_del(pid_t pid) {
 /*
  * Returns -1 on failure, 0 on success. When POPEN_FLAG_CREATE_PIPE is set, on success set the FILE *fp pointer.
  */
-int custom_popene(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, ...) {
+int custom_popene_internal_dont_use_directly(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, ...) {
     // convert the variable list arguments into what posix_spawn() needs
     // all arguments are expected strings
     va_list args;
@@ -291,19 +291,19 @@ int myp_reap(pid_t pid) {
 
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
     FILE *fp = NULL;
-    (void)mypopen_raw_default_flags_and_environment(pidptr, &fp, "/bin/sh", "sh", "-c", command);
+    (void)mypopen_raw_default_flags_and_environment(pidptr, &fp, "/bin/sh", "-c", command);
     return fp;
 }
 
 FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
     FILE *fp = NULL;
-    (void)mypopen_raw_default_flags( pidptr, env, &fp, "/bin/sh", "sh", "-c", command);
+    (void)mypopen_raw_default_flags( pidptr, env, &fp, "/bin/sh", "-c", command);
     return fp;
 }
 
 // returns 0 on success, -1 on failure
 int netdata_spawn(const char *command, volatile pid_t *pidptr) {
-    return mypopen_raw_default_flags_and_environment( pidptr, NULL, "/bin/sh", "sh", "-c", command);
+    return mypopen_raw_default_flags_and_environment( pidptr, NULL, "/bin/sh", "-c", command);
 }
 
 int custom_pclose(FILE *fp, pid_t pid) {

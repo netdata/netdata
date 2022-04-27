@@ -482,12 +482,12 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     FILE *fp;
 
     if(cgroup) {
-        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "cgroup-network-helper.sh", "--cgroup", cgroup);
+        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup);
     }
     else {
         char buffer[100];
         snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
-        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "cgroup-network-helper.sh", "--pid", buffer);
+        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer);
     }
 
     if(fp) {

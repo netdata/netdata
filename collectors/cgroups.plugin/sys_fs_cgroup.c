@@ -1486,7 +1486,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
 
     debug(D_CGROUP, "executing command %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, command, cg->id);
     FILE *fp;
-    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, cgroups_network_interface_script, "--cgroup", command);
+    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, "--cgroup", command);
     if(!fp) {
         error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, command);
         return;
@@ -1618,7 +1618,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     // TODO: use cg->id when the renaming script is fixed
     debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
     FILE *fp;
-    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_rename_script, cgroups_rename_script, cg->intermediate_id);
+    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_rename_script, cg->intermediate_id);
     if(fp) {
         // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", command, cg->id);
         char buffer[CGROUP_CHARTID_LINE_MAX + 1];
