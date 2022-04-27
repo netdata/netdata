@@ -870,6 +870,8 @@ struct discovery_thread {
 } discovery_thread;
 
 static int k8s_is_container(const char *id) {
+    // examples:
+    // https://github.com/netdata/netdata/blob/0fc101679dcd12f1cb8acdd07bb4c85d8e553e53/collectors/cgroups.plugin/cgroup-name.sh#L121-L147
     const char *p = id;
     const char *pp = NULL;
     int i = 0;
@@ -893,45 +895,49 @@ static int k8s_is_pause_container(const char *id) {
 
     ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
     if (unlikely(!ff)) {
-        error("CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
+        debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
     }
 
     ff = procfile_readall(ff);
     if (unlikely(!ff)) {
-        error("CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
+        debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
         return 1;
     }
 
     unsigned long lines = procfile_lines(ff);
-    if (likely(lines != 1 )) {
+    // 'pause' container has 1 process
+    if (likely(lines != 2 )) {
         return 1;
     }
 
     char *pid = procfile_lineword(ff, 0, 0);
+    if (!pid || !*pid) {
+        return 1;
+    }
 
     snprintfz(filename, FILENAME_MAX, "%s/proc/%s/comm", netdata_configured_host_prefix, pid);
 
     ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
     if (unlikely(!ff)) {
-        error("CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
+        debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
     }
 
     ff = procfile_readall(ff);
     if (unlikely(!ff)) {
-        error("CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
+        debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
         return 1;
     }
 
     lines = procfile_lines(ff);
-    if (unlikely(lines != 1 )) {
+    if (unlikely(lines != 2 )) {
         return 1;
     }
 
     char *comm = procfile_lineword(ff, 0, 0);
 
-    return strcmp(comm, "pause");
+    return comm && *comm && strcmp(comm, "pause");
 }
 
 // ----------------------------------------------------------------------------
