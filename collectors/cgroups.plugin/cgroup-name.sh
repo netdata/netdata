@@ -221,7 +221,10 @@ function k8s_get_kubepod_name() {
   [ -n "$pod_uid" ] && info "${fn}: cgroup '$id' is a pod(uid:$pod_uid)"
   [ -n "$cntr_id" ] && info "${fn}: cgroup '$id' is a container(id:$cntr_id)"
 
-  if [ -n "$cntr_id" ] && k8s_is_pause_container "$cgroup_path"; then
+  if [ -n "$cntr_id" ] &&
+    [ -z "$KUBERNETES_SERVICE_HOST" ] &&
+    [ -z "$KUBERNETES_SERVICE_PORT" ] &&
+    k8s_is_pause_container "$cgroup_path"; then
     return 1
   fi
 
