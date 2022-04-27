@@ -90,9 +90,9 @@ int custom_popene(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp,
     // the string to be logged about the command executed
     char command_to_be_logged[2048];
 
+    // count the number variable parameters
+    // the variable parameters are expected NULL terminated
     {
-        // count the number variable parameters
-        // the variable parameters are expected NULL terminated
         const char *s;
 
         va_start(args, command);
