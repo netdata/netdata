@@ -1741,9 +1741,12 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
             break;
         default:
             if (!cg->pending_renames) {
-                debug(D_CGROUP, "cgroup '%s' renaming failed (exit code %s), will retry later", cg->chart_id, rename_exit_code);
-            } else {
+                if (is_inside_k8s) {
+                    cg->enabled = 0;
+                }
                 debug(D_CGROUP, "cgroup '%s' renaming failed (exit code %s), will not try again", cg->chart_id, rename_exit_code);
+            } else {
+                debug(D_CGROUP, "cgroup '%s' renaming failed (exit code %s), will retry later", cg->chart_id, rename_exit_code);
             }
     }
 
@@ -1802,6 +1805,8 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
     cgroup_root_count++;
 
+    // TODO: CRI creates containers ~slow when CPU % is high
+    // /proc/PID/comm can be 'runc:[2:INIT]' for a while.
     if (is_inside_k8s && !k8s_is_pause_container(id)) {
         info("cgroup '%s' is a pause container, disabling it", cg->id);
         cg->enabled = 0;
