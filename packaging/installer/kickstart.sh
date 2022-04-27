@@ -144,6 +144,8 @@ USAGE: kickstart.sh [options]
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
   --uninstall                Uninstall an existing installation of Netdata.
   --reinstall-clean          Clean reinstall Netdata.
+  --local-build-options      Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
+  --static-install-options   Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
 
 Additionally, this script may use the following environment variables:
 
@@ -155,7 +157,6 @@ Additionally, this script may use the following environment variables:
                              you need special options for one of those to work, or have a different tool to do
                              the same thing on your system, you can specify it here.
   DISABLE_TELEMETRY          If set to a value other than 0, behave as if \`--disable-telemetry\` was specified.
-  NETDATA_INSTALLER_OPTIONS: Specifies extra options to pass to the static installer or local build script.
 
 HEREDOC
 }
@@ -1664,6 +1665,10 @@ install_on_freebsd() {
 
 setup_terminal || echo > /dev/null
 
+if [ -n "${NETDATA_INSTALLER_OPTIONS}" ]; then
+    warning "Explicitly specifying additional installer options with NETDATA_INSTALLER_OPTIONS is deprecated. Please instead pass the options to the script using either --local-build-options or --static-install-options as appropriate."
+fi
+
 while [ -n "${1}" ]; do
   case "${1}" in
     "--help")
@@ -1769,13 +1774,37 @@ while [ -n "${1}" ]; do
           ;;
       esac
       ;;
+    "--local-build-options")
+      LOCAL_BUILD_OPTIONS="${2}"
+      shift 1
+      ;;
+    "--static-install-options")
+      STATIC_INSTALL_OPTIONS="${2}"
+      shift 1
+      ;;
     *)
-      warning "Passing unrecognized option '${1}' to installer script. If this is intended, please add it to \$NETDATA_INSTALLER_OPTIONS instead."
+      warning "Passing unrecognized option '${1}' to installer script. This behavior is deprecated and will be removed in the near future. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
       ;;
   esac
   shift 1
 done
+
+if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
+  if [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
+    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${LOCAL_BUILD_OPTIONS}"
+  else
+    fatal "Specifying local build options is only supported when the --build-only option is also specified." F0401
+  fi
+fi
+
+if [ -n "${STATIC_INSTALL_OPTIONS}" ]; then
+  if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${STATIC_INSTALL_OPTIONS}"
+  else
+    fatal "Specifying installer options options is only supported when the --static-only option is also specified." F0402
+  fi
+fi
 
 check_claim_opts
 confirm_root_support
