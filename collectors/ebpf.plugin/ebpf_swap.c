@@ -334,9 +334,9 @@ static void ebpf_update_swap_cgroup()
             if (likely(swap_pid) || likely(swap_static_pid)) {
                 netdata_publish_swap_t *in;
                 if (likely(swap_static_pid))
-                    in = swap_pid[pid];
-                else
                     in = &swap_static_pid[pid];
+                else
+                    in = swap_pid[pid];
 
                 if (in)
                     memcpy(out, in, sizeof(netdata_publish_swap_t));
