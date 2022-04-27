@@ -106,7 +106,7 @@ int custom_popene_internal_dont_use_directly(volatile pid_t *pidptr, char **env,
     const char *spawn_argv[args_count + 1];
     {
         const char *s;
-        char __format[(args_count + 1) * 5 + 1];
+        char __format[(args_count) * 5 + 1];
 
         va_start(args, command);
         __format[0] = 0;
