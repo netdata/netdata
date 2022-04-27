@@ -106,14 +106,14 @@ int custom_popene_internal_dont_use_directly(volatile pid_t *pidptr, char **env,
     const char *spawn_argv[args_count + 1];
     {
         const char *s;
-        char __format[(args_count) * 5 + 1];
+        char format[args_count * 5 + 1];
 
         va_start(args, command);
-        __format[0] = 0;
+        format[0] = 0;
         int i;
         for (i = 0; i < args_count; i++) {
             s = va_arg(args, const char *);
-            strcat(__format, "'%s' ");
+            strcat(format, "'%s' ");
             spawn_argv[i] = s;
         }
         spawn_argv[args_count] = NULL;
@@ -126,7 +126,7 @@ int custom_popene_internal_dont_use_directly(volatile pid_t *pidptr, char **env,
         len -= offset;
         if(len > 0) {
             va_start(args, command);
-            vsnprintfz(&command_to_be_logged[offset], len, __format, args);
+            vsnprintfz(&command_to_be_logged[offset], len, format, args);
             va_end(args);
         }
     }
@@ -204,7 +204,7 @@ int custom_popene_internal_dont_use_directly(volatile pid_t *pidptr, char **env,
     if (flags & POPEN_FLAG_CREATE_PIPE) {
         close(pipefd[PIPE_WRITE]);
         if (0 == ret) // on success set FILE * pointer
-            *fpp = fp;
+            if(fpp) *fpp = fp;
     }
 
     if (!error) {
@@ -220,6 +220,7 @@ int custom_popene_internal_dont_use_directly(volatile pid_t *pidptr, char **env,
 error_after_posix_spawn_file_actions_init:
     if (posix_spawn_file_actions_destroy(&fa))
         error("posix_spawn_file_actions_destroy");
+
 error_after_pipe:
     if (flags & POPEN_FLAG_CREATE_PIPE) {
         if (fp)
@@ -303,7 +304,7 @@ FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
 
 // returns 0 on success, -1 on failure
 int netdata_spawn(const char *command, volatile pid_t *pidptr) {
-    return mypopen_raw_default_flags_and_environment( pidptr, NULL, "/bin/sh", "-c", command);
+    return mypopen_raw( pidptr, environ, POPEN_FLAG_NONE, NULL, "/bin/sh", "-c", command);
 }
 
 int custom_pclose(FILE *fp, pid_t pid) {

@@ -9,6 +9,7 @@
 #define PIPE_WRITE 1
 
 /* custom_popene_internal_dont_use_directly flag definitions */
+#define POPEN_FLAG_NONE        0
 #define POPEN_FLAG_CREATE_PIPE 1 // Create a pipe like popen() when set, otherwise set stdout to /dev/null
 #define POPEN_FLAG_CLOSE_FD    2 // Close all file descriptors other than STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO
 

@@ -1475,20 +1475,20 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
-    char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    char cgroup_identifier[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
     if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-        snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_cpuacct_base, cg->id);
+        snprintfz(cgroup_identifier, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_cpuacct_base, cg->id);
     }
     else {
-        snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_unified_base, cg->id);
+        snprintfz(cgroup_identifier, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_unified_base, cg->id);
     }
 
-    debug(D_CGROUP, "executing command %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, command, cg->id);
+    debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
     FILE *fp;
-    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, "--cgroup", command);
+    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
     if(!fp) {
-        error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, command);
+        error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
     }
 
@@ -1529,7 +1529,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     }
 
     mypclose(fp, cgroup_pid);
-    // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
+    // debug(D_CGROUP, "closed cgroup_identifier for cgroup '%s'", cg->id);
 }
 
 static inline void free_cgroup_network_interfaces(struct cgroup *cg) {
