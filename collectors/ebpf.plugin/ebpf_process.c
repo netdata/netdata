@@ -1154,7 +1154,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(process_hash_values);
 
     clean_global_memory();
-    freez(static_apps_data);
 
     ebpf_process_disable_tracepoints();
 
