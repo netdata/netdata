@@ -134,7 +134,7 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
 
     //TODO get everything in one go, when baseline is right before highlight
     //get baseline
-    RRDR *rb = rrd2rrdr(st, max_points, baseline_after, baseline_before, group_method, group_time, options, NULL, context_param_list);
+    RRDR *rb = rrd2rrdr(st, max_points, baseline_after, baseline_before, group_method, group_time, options, NULL, context_param_list, 0);
     if(!rb) {
         info("Cannot generate metric correlations output with these parameters on this chart.");
         return 0;
@@ -161,7 +161,7 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
         return 0;
 
     //get highlight
-    RRDR *rh = rrd2rrdr(st, max_points, highlight_after, highlight_before, group_method, group_time, options, NULL, context_param_list);
+    RRDR *rh = rrd2rrdr(st, max_points, highlight_after, highlight_before, group_method, group_time, options, NULL, context_param_list, 0);
     if(!rh) {
         info("Cannot generate metric correlations output with these parameters on this chart.");
         freez(pd);
