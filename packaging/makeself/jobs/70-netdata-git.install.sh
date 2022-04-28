@@ -7,7 +7,7 @@
 cd "${NETDATA_SOURCE_PATH}" || exit 1
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
-  export CFLAGS="-static -O3 -I/openssl-static/include"
+  export CFLAGS="-static -O2 -I/openssl-static/include"
 else
   export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include"
 fi
@@ -52,12 +52,6 @@ if run readelf -l "${NETDATA_INSTALL_PATH}"/bin/netdata | grep 'INTERP'; then
   printf >&2 "Ooops. %s is not a statically linked binary!\n" "${NETDATA_INSTALL_PATH}"/bin/netdata
   ldd "${NETDATA_INSTALL_PATH}"/bin/netdata
   exit 1
-fi
-
-if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
-  run strip "${NETDATA_INSTALL_PATH}"/bin/netdata
-  run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/apps.plugin
-  run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/cgroup-network
 fi
 
 # shellcheck disable=SC2015

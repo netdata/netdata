@@ -49,5 +49,6 @@ extern void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void clean_swap_pid_structures();
 
 extern struct config swap_config;
+extern netdata_ebpf_targets_t swap_targets[];
 
 #endif

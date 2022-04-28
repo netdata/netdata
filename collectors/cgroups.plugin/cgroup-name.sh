@@ -396,9 +396,6 @@ function podman_validate_id() {
 
 # -----------------------------------------------------------------------------
 
-[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
-[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
-
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
 CGROUP="${1}"
@@ -410,19 +407,6 @@ NAME=
 if [ -z "${CGROUP}" ]; then
   fatal "called without a cgroup name. Nothing to do."
 fi
-
-for CONFIG in "${NETDATA_USER_CONFIG_DIR}/cgroups-names.conf" "${NETDATA_STOCK_CONFIG_DIR}/cgroups-names.conf"; do
-  if [ -f "${CONFIG}" ]; then
-    NAME="$(grep "^${CGROUP} " "${CONFIG}" | sed 's/[[:space:]]\+/ /g' | cut -d ' ' -f 2)"
-    if [ -z "${NAME}" ]; then
-      info "cannot find cgroup '${CGROUP}' in '${CONFIG}'."
-    else
-      break
-    fi
-  #else
-  #   info "configuration file '${CONFIG}' is not available."
-  fi
-done
 
 if [ -z "${NAME}" ]; then
   if [[ ${CGROUP} =~ ^.*kubepods.* ]]; then

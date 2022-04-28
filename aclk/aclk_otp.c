@@ -860,6 +860,8 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
     }
     if (resp.http_code != 200) {
         error("The HTTP code not 200 OK (Got %d)", resp.http_code);
+        if (resp.payload_size)
+            aclk_parse_otp_error(resp.payload);
         https_req_response_free(&resp);
         buffer_free(buf);
         return 1;

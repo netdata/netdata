@@ -27,7 +27,7 @@ DRY_RUN=0
 SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
-NETDATA_AUTO_UPDATES="1"
+NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_ONLY=0
 NETDATA_CLAIM_URL="${PUBLIC_CLOUD_URL}"
 NETDATA_DISABLE_CLOUD=0
@@ -35,8 +35,8 @@ NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
+NETDATA_WARNINGS=""
 RELEASE_CHANNEL="nightly"
-WARNINGS=""
 
 if [ -n "$DISABLE_TELEMETRY" ]; then
   NETDATA_DISABLE_TELEMETRY="${DISABLE_TELEMETRY}"
@@ -144,6 +144,8 @@ USAGE: kickstart.sh [options]
   --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
   --uninstall                Uninstall an existing installation of Netdata.
   --reinstall-clean          Clean reinstall Netdata.
+  --local-build-options      Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
+  --static-install-options   Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
 
 Additionally, this script may use the following environment variables:
 
@@ -155,7 +157,6 @@ Additionally, this script may use the following environment variables:
                              you need special options for one of those to work, or have a different tool to do
                              the same thing on your system, you can specify it here.
   DISABLE_TELEMETRY          If set to a value other than 0, behave as if \`--disable-telemetry\` was specified.
-  NETDATA_INSTALLER_OPTIONS: Specifies extra options to pass to the static installer or local build script.
 
 HEREDOC
 }
@@ -222,6 +223,7 @@ telemetry_event() {
     "error_message": "${2}",
     "install_options": "${KICKSTART_OPTIONS}",
     "install_interactivity": "${INTERACTIVE}",
+    "install_auto_updates": "${NETDATA_AUTO_UPDATES}",
     "total_runtime": "${total_duration}",
     "selected_install_method": "${SELECTED_INSTALL_METHOD}",
     "netdata_release_channel": "${RELEASE_CHANNEL:-null}",
@@ -342,9 +344,9 @@ cleanup() {
 }
 
 deferred_warnings() {
-  if [ -n "${WARNINGS}" ]; then
+  if [ -n "${NETDATA_WARNINGS}" ]; then
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
-    echo >&2 "${WARNINGS}"
+    echo >&2 "${NETDATA_WARNINGS}"
     printf >&2 "\n"
   fi
 }
@@ -417,7 +419,8 @@ run() {
   if [ ${ret} -ne 0 ]; then
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
-    WARNINGS="${WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
+    # shellcheck disable=SC2089
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
   else
     printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
@@ -428,7 +431,7 @@ run() {
 
 warning() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
-  WARNINGS="${WARNINGS}\n  - ${*}"
+  NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${*}"
 }
 
 _cannot_use_tmpdir() {
@@ -644,11 +647,19 @@ update() {
       return 0
     fi
 
+    export NETDATA_SAVE_WARNINGS=1
+    export NETDATA_PROPAGATE_WARNINGS=1
+    # shellcheck disable=SC2090
+    export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
     if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
     else
-      fatal "Failed to update existing Netdata install at ${ndprefix}" F0100
+      if [ -n "${EXIT_REASON}" ]; then
+        fatal "Failed to update existing Netdata install at ${ndprefix}: ${EXIT_REASON}" "${EXIT_CODE}"
+      else
+        fatal "Failed to update existing Netdata install at ${ndprefix}." U0000
+      fi
     fi
   else
     warning "Could not find a usable copy of the updater script."
@@ -681,6 +692,10 @@ uninstall() {
       return 0
     else
       progress "Found existing netdata-uninstaller. Running it.."
+      export NETDATA_SAVE_WARNINGS=1
+      export NETDATA_PROPAGATE_WARNINGS=1
+      # shellcheck disable=SC2090
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
       if ! run ${ROOTCMD} "${uninstaller}" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -694,6 +709,10 @@ uninstall() {
       progress "Downloading netdata-uninstaller ..."
       download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
       chmod +x "${tmpdir}/netdata-uninstaller.sh"
+      export NETDATA_SAVE_WARNINGS=1
+      export NETDATA_PROPAGATE_WARNINGS=1
+      # shellcheck disable=SC2090
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
       if ! run ${ROOTCMD} "${tmpdir}/netdata-uninstaller.sh" $FLAGS; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -1067,7 +1086,7 @@ set_auto_updates() {
     return 0
   fi
 
-  if [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
+  if [ "${AUTO_UPDATE}" -eq 1 ]; then
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to enable automatic updates."
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
@@ -1492,12 +1511,20 @@ build_and_install() {
     opts="${opts} --disable-cloud"
   fi
 
+  export NETDATA_SAVE_WARNINGS=1
+  export NETDATA_PROPAGATE_WARNINGS=1
+  # shellcheck disable=SC2090
+  export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
   # shellcheck disable=SC2086
   run ${ROOTCMD} ./netdata-installer.sh ${opts}
 
   case $? in
     1)
-      fatal "netdata-installer.sh failed to run correctly." F0007
+      if [ -n "${EXIT_REASON}" ]; then
+        fatal "netdata-installer.sh failed to run: ${EXIT_REASON}" "${EXIT_CODE}"
+      else
+        fatal "netdata-installer.sh failed to run correctly." I0000
+      fi
       ;;
     2)
       fatal "Insufficient RAM to install netdata." F0008
@@ -1664,6 +1691,10 @@ install_on_freebsd() {
 
 setup_terminal || echo > /dev/null
 
+if [ -n "${NETDATA_INSTALLER_OPTIONS}" ]; then
+    warning "Explicitly specifying additional installer options with NETDATA_INSTALLER_OPTIONS is deprecated. Please instead pass the options to the script using either --local-build-options or --static-install-options as appropriate."
+fi
+
 while [ -n "${1}" ]; do
   case "${1}" in
     "--help")
@@ -1769,13 +1800,43 @@ while [ -n "${1}" ]; do
           ;;
       esac
       ;;
+    "--local-build-options")
+      LOCAL_BUILD_OPTIONS="${2}"
+      shift 1
+      ;;
+    "--static-install-options")
+      STATIC_INSTALL_OPTIONS="${2}"
+      shift 1
+      ;;
     *)
-      warning "Passing unrecognized option '${1}' to installer script. If this is intended, please add it to \$NETDATA_INSTALLER_OPTIONS instead."
+      warning "Passing unrecognized option '${1}' to installer script. This behavior is deprecated and will be removed in the near future. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
       ;;
   esac
   shift 1
 done
+
+if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
+  if [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
+    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${LOCAL_BUILD_OPTIONS}"
+  else
+    fatal "Specifying local build options is only supported when the --build-only option is also specified." F0401
+  fi
+fi
+
+if [ -n "${STATIC_INSTALL_OPTIONS}" ]; then
+  if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${STATIC_INSTALL_OPTIONS}"
+  else
+    fatal "Specifying installer options options is only supported when the --static-only option is also specified." F0402
+  fi
+fi
+
+if [ "${NETDATA_AUTO_UPDATES}" = "default" ] || [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
+  AUTO_UPDATE=1
+else
+  AUTO_UPDATE=0
+fi
 
 check_claim_opts
 confirm_root_support

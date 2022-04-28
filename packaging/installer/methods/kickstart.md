@@ -67,6 +67,8 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.
 - `--uninstall`: Uninstall an existing installation of Netdata.
 - `--reinstall-clean`: Performs an uninstall of Netdata and clean installation.
+- `--local-build-options`: Specify additional options to pass to the installer code when building locally. Only valid if `--build-only` is also specified.
+- `--static-install-options`: Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):
@@ -78,7 +80,6 @@ should not need to use special values for any of these):
   we try to use sudo, doas, or pkexec (in that order of preference), but if you need special options for one of
   those to work, or have a different tool to do the same thing on your system, you can specify it here.
 - `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
-- `NETDATA_INSTALLER_OPTIONS`: Specifies extra options to pass to the static installer or local build script.
 
 ### Connect node to Netdata Cloud during installation
 

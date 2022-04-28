@@ -332,18 +332,23 @@ DISK_SIZE="unknown"
 DISK_DETECTION="none"
 
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
-  types='hfs'
+  if DISK_SIZE=$(diskutil info / 2>/dev/null | awk '/Disk Size/ {total += substr($5,2,length($5))} END { print total }') &&
+    [ -n "$DISK_SIZE" ] && [ "$DISK_SIZE" != "0" ]; then
+    DISK_DETECTION="diskutil"
+  else
+    types='hfs'
 
-  if (lsvfs | grep -q apfs); then
-    types="${types},apfs"
+    if (lsvfs | grep -q apfs); then
+      types="${types},apfs"
+    fi
+
+    if (lsvfs | grep -q ufs); then
+      types="${types},ufs"
+    fi
+
+    DISK_DETECTION="df"
+    DISK_SIZE=$(($(/bin/df -k -t ${types} | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | tr '\n' '+' | rev | cut -f 2- -d '+' | rev) * 1024))
   fi
-
-  if (lsvfs | grep -q ufs); then
-    types="${types},ufs"
-  fi
-
-  DISK_DETECTION="df"
-  DISK_SIZE=$(($(/bin/df -k -t ${types} | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | tr '\n' '+' | rev | cut -f 2- -d '+' | rev) * 1024))
 elif [ "${KERNEL_NAME}" = FreeBSD ]; then
   types='ufs'
 

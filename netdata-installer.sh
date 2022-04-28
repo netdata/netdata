@@ -2,6 +2,8 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# Next unused error code: I0012
+
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
   path=""
@@ -38,6 +40,21 @@ fi
 cd "${NETDATA_SOURCE_DIR}" || exit 1
 
 # -----------------------------------------------------------------------------
+# load the required functions
+
+if [ -f "${INSTALLER_DIR}/packaging/installer/functions.sh" ]; then
+  # shellcheck source=packaging/installer/functions.sh
+  . "${INSTALLER_DIR}/packaging/installer/functions.sh" || exit 1
+else
+  # shellcheck source=packaging/installer/functions.sh
+  . "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
+fi
+
+# Used to enable saved warnings support in functions.sh
+# shellcheck disable=SC2034
+NETDATA_SAVE_WARNINGS=1
+
+# -----------------------------------------------------------------------------
 # figure out an appropriate temporary directory
 _cannot_use_tmpdir() {
   testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
@@ -62,9 +79,7 @@ _cannot_use_tmpdir() {
 if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
   if _cannot_use_tmpdir /tmp; then
     if _cannot_use_tmpdir "${PWD}"; then
-      echo >&2
-      echo >&2 "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
-      exit 1
+      fatal "UUnable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." I0000
     else
       TMPDIR="${PWD}"
     fi
@@ -75,35 +90,17 @@ fi
 
 # -----------------------------------------------------------------------------
 # set up handling for deferred error messages
-NETDATA_DEFERRED_ERRORS=""
-
-defer_error() {
-  NETDATA_DEFERRED_ERRORS="${NETDATA_DEFERRED_ERRORS}\n* ${1}"
-}
-
-defer_error_highlighted() {
-  NETDATA_DEFERRED_ERRORS="${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_DEFERRED_ERRORS}\n* ${1}${TPUT_RESET}"
-}
+#
+# This leverages the saved warnings functionality shared with some functions from functions.sh
 
 print_deferred_errors() {
-  if [ -n "${NETDATA_DEFERRED_ERRORS}" ]; then
-    echo >&2
-    echo >&2 "The following non-fatal errors were encountered during the installation process:"
-    printf '%s' >&2 "${NETDATA_DEFERRED_ERRORS}"
-    echo >&2
+  if [ -n "${SAVED_WARNINGS}" ]; then
+    printf >&2 "\n"
+    printf >&2 "%s\n" "The following warnings and non-fatal errors were encountered during the installation process:"
+    printf >&2 "%s\n" "${SAVED_WARNINGS}"
+    printf >&2 "\n"
   fi
 }
-
-# -----------------------------------------------------------------------------
-# load the required functions
-
-if [ -f "${INSTALLER_DIR}/packaging/installer/functions.sh" ]; then
-  # shellcheck source=packaging/installer/functions.sh
-  . "${INSTALLER_DIR}/packaging/installer/functions.sh" || exit 1
-else
-  # shellcheck source=packaging/installer/functions.sh
-  . "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
-fi
 
 download_go() {
   download_file "${1}" "${2}" "go.d plugin" "go"
@@ -159,7 +156,7 @@ banner_nonroot_install() {
 
   ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
 
-  You are attempting to install netdata as non-root, but you plan
+  You are attempting to install netdata as a non-root user, but you plan
   to install it in system paths.
 
   Please set an installation prefix, like this:
@@ -270,7 +267,10 @@ For the installer to complete successfully, you will need these packages install
 
 For the plugins, you will at least need:
 
-  curl, bash v4+, python v2 or v3, node.js
+  curl
+  bash (v4+)
+  python (v2 or v3)
+  node.js
 
 HEREDOC
 }
@@ -346,7 +346,7 @@ while [ -n "${1}" ]; do
     "--one-time-build") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-dependency-tracking)}" | sed 's/$/ --disable-dependency-tracking/g')" ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        echo "Cloud explicitly enabled, ignoring --disable-cloud."
+        warning "Cloud explicitly enabled, ignoring --disable-cloud."
       else
         NETDATA_DISABLE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-cloud)}" | sed 's/$/ --disable-cloud/g')"
@@ -354,7 +354,7 @@ while [ -n "${1}" ]; do
       ;;
     "--require-cloud")
       if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
-        echo "Cloud explicitly disabled, ignoring --require-cloud."
+        warning "Cloud explicitly disabled, ignoring --require-cloud."
       else
         NETDATA_REQUIRE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-cloud)}" | sed 's/$/ --enable-cloud/g')"
@@ -379,7 +379,8 @@ while [ -n "${1}" ]; do
       exit 1
       ;;
     *)
-      run_failed "I cannot understand option '$1'."
+      echo >&2 "Unrecognized option '${1}'."
+      exit_reason "Unrecognized option '${1}'." I000E
       usage
       exit 1
       ;;
@@ -434,8 +435,8 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
     if [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ] && [ -z "${SKIP_RAM_CHECK}" ]; then
       target_ram="$(echo "${target_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
       total_ram="$(echo "${total_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
-      run_failed "Netdata needs ${target_ram} of RAM to safely install, but this system only has ${total_ram}."
-      run_failed "Insufficient RAM available for an install. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
+      run_failed "Netdata needs ${target_ram} of RAM to safely install, but this system only has ${total_ram}. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
+      exit_reason "Insufficent RAM to safely install." I000F
       exit 2
     fi
   fi
@@ -451,8 +452,8 @@ fi
 if [ "$(id -u)" -ne 0 ]; then
   if [ -z "${NETDATA_PREFIX}" ]; then
     netdata_banner
-	progress "wrong command line options!"
     banner_nonroot_install "${@}"
+    exit_reason "Attempted install as non-root user to /." I0010
     exit 1
   else
     banner_root_notify "${@}"
@@ -535,18 +536,7 @@ if [ ! "$have_autotools" ]; then
   if [ -f configure ]; then
     echo "Will skip autoreconf step"
   else
-    netdata_banner
-	progress "autotools v2.60 required"
-    cat << "EOF"
-
--------------------------------------------------------------------------------
-autotools 2.60 or later is required
-
-Sorry, you do not seem to have autotools 2.60 or later, which is
-required to build from the git sources of netdata.
-
-EOF
-    exit 1
+    fatal "Could not find a usable version of GNU autotools, which is required for building Netdata. Version 2.60 or later of GNU autotools is required." I0001
   fi
 fi
 
@@ -558,6 +548,7 @@ if [ ${DONOTWAIT} -eq 0 ]; then
   fi
   read -r REPLY
   if [ "$REPLY" != '' ]; then
+    exit_reason "User did not accept install attempt." I0011
     exit 1
   fi
 
@@ -565,44 +556,8 @@ fi
 
 build_error() {
   netdata_banner
-  progress "sorry, it failed to build..."
-  cat << EOF
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Sorry! netdata failed to build...
-
-You may need to check these:
-
-1. The package uuid-dev (or libuuid-devel) has to be installed.
-
-   If your system cannot find libuuid, although it is installed
-   run me with the option:  --libs-are-really-here
-
-2. The package zlib1g-dev (or zlib-devel) has to be installed.
-
-   If your system cannot find zlib, although it is installed
-   run me with the option:  --libs-are-really-here
-
-3. The package json-c-dev (or json-c-devel) has to be installed.
-
-   If your system cannot find json-c, although it is installed
-   run me with the option:  --libs-are-really-here
-
-4. You need basic build tools installed, like:
-
-   gcc make autoconf automake pkg-config
-
-   Autoconf version 2.60 or higher is required.
-
-If you still cannot get it to build, ask for help at github:
-
-   https://github.com/netdata/netdata/issues
-
-
-EOF
   trap - EXIT
-  exit 1
+  fatal "Netdata failed to build for an unknown reason." I0002
 }
 
 if [ ${LIBS_ARE_HERE} -eq 1 ]; then
@@ -655,7 +610,7 @@ bundle_protobuf() {
 
   if [ -n "${USE_SYSTEM_PROTOBUF}" ]; then
     echo "Skipping protobuf"
-    defer_error "You have requested use of a system copy of protobuf. This should work, but it is not recommended as it's very likely to break if you upgrade the currently installed version of protobuf."
+    warning "You have requested use of a system copy of protobuf. This should work, but it is not recommended as it's very likely to break if you upgrade the currently installed version of protobuf."
     return 0
   fi
 
@@ -678,12 +633,10 @@ bundle_protobuf() {
       run_ok "protobuf built and prepared."
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
     else
-      run_failed "Failed to build protobuf."
-      defer_error_highlighted "Failed to build protobuf. You may not be able to connect this node to Netdata Cloud."
+      run_failed "Failed to build protobuf. Netdata Cloud support will not be available in this build."
     fi
   else
-    run_failed "Unable to fetch sources for protobuf."
-    defer_error_highlighted "Unable to fetch sources for protobuf. You may not be able to connect this node to Netdata Cloud."
+    run_failed "Unable to fetch sources for protobuf. Netdata Cloud support will not be available in this build."
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
@@ -763,23 +716,19 @@ bundle_judy() {
       run_ok "libJudy built and prepared."
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-libJudy"
     else
-      run_failed "Failed to build libJudy."
       if [ -n "${NETDATA_BUILD_JUDY}" ]; then
         [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-
-        exit 1
+        fatal "failed to build libJudy." I0003
       else
-        defer_error_highlighted "Failed to build libJudy. dbengine support will be disabled."
+        run_failed "Failed to build libJudy, dbengine support will be disabled."
       fi
     fi
   else
-    run_failed "Unable to fetch sources for libJudy."
     if [ -n "${NETDATA_BUILD_JUDY}" ]; then
       [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-
-      exit 1
+      fatal "Unable to fetch sources for libJudy, which is required for this build of Netdata." I0004
     else
-      defer_error_highlighted "Unable to fetch sources for libJudy. dbengine support will be disabled."
+      run_failed "Unable to fetch sources for libJudy, which is required for this build of Netdata."
     fi
   fi
 
@@ -796,12 +745,12 @@ build_jsonc() {
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
-  cd "${1}" > /dev/null || exit 1
+  cd "${1}" > /dev/null || return 1
   # shellcheck disable=SC2086
   run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
   # shellcheck disable=SC2086
   run ${env_cmd} ${make} ${MAKEOPTS}
-  cd - > /dev/null || exit 1
+  cd - > /dev/null || return 1
 }
 
 copy_jsonc() {
@@ -822,7 +771,6 @@ bundle_jsonc() {
 
   if [ -z "$(command -v cmake)" ]; then
     run_failed "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
-    defer_error_highlighted "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
     return 0
   fi
 
@@ -846,12 +794,10 @@ bundle_jsonc() {
       rm -rf "${tmp}"; then
       run_ok "JSON-C built and prepared."
     else
-      run_failed "Failed to build JSON-C."
-      defer_error_highlighted "Failed to build JSON-C. Netdata Cloud support will be disabled."
+      run_failed "Failed to build JSON-C, Netdata Cloud support will be disabled in this build."
     fi
   else
-    run_failed "Unable to fetch sources for JSON-C."
-    defer_error_highlighted "Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled."
+    run_failed "Unable to fetch sources for JSON-C, Netdata Cloud support will be disabled in this build."
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
@@ -891,13 +837,13 @@ detect_libc() {
       cmd=$(ldd "$ls_path" | grep -w libc | cut -d" " -f 3)
       if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
         echo >&2 " Detected GLIBC"
-        libc="glibc"    
-      fi    
-    fi    
+        libc="glibc"
+      fi
+    fi
   fi
 
   if [ -z "$libc" ]; then
-    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
+    warning "Cannot detect a supported libc on your system, eBPF support will be disabled."
     return 1
   fi
 
@@ -917,11 +863,11 @@ rename_libbpf_packaging() {
 
 
 build_libbpf() {
-  cd "${1}/src" > /dev/null || exit 1
+  cd "${1}/src" > /dev/null || return 1
   mkdir root build
   # shellcheck disable=SC2086
   run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
-  cd - > /dev/null || exit 1
+  cd - > /dev/null || return 1
 }
 
 copy_libbpf() {
@@ -975,19 +921,17 @@ bundle_libbpf() {
       rm -rf "${tmp}"; then
       run_ok "libbpf built and prepared."
     else
-      run_failed "Failed to build libbpf."
       if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
-        exit 1
+        fatal "failed to build libbpf." I0005
       else
-        defer_error_highlighted "Failed to build libbpf. You may not be able to use eBPF plugin."
+        run_failed "Failed to build libbpf. eBPF support will be disabled"
       fi
     fi
   else
-    run_failed "Unable to fetch sources for libbpf."
     if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
-      exit 1
+      fatal "Failed to fetch sources for libbpf." I0006
     else
-      defer_error_highlighted "Unable to fetch sources for libbpf. You may not be able to use eBPF plugin."
+      run_failed "Unable to fetch sources for libbpf. eBPF support will be disabled"
     fi
   fi
 
@@ -1024,21 +968,19 @@ bundle_ebpf_co_re() {
       rm -rf "${tmp}"; then
       run_ok "libbpf built and prepared."
     else
-      run_failed "Failed to get eBPF CO-RE files."
       if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
-        exit 1
+        fatal "Failed to get eBPF CO-RE files." I0007
       else
-        defer_error_highlighted "Failed to get CO-RE. You will not be able to use eBPF plugin."
+        run_failed "Failed to get eBPF CO-RE files. eBPF support will be disabled"
         NETDATA_DISABLE_EBPF=1
         NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
       fi
     fi
   else
-    run_failed "Unable to fetch sources for libbpf."
     if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
-      exit 1
+      fatal "Failed to fetch eBPF CO-RE files." I0008
     else
-      defer_error_highlighted "Unable to fetch sources for eBPF CO-RE. You will not be able to use eBPF plugin."
+      run_failed "Failed to fetch eBPF CO-RE files. eBPF support will be disabled"
       NETDATA_DISABLE_EBPF=1
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
     fi
@@ -1075,21 +1017,26 @@ echo >&2
 progress "Run autotools to configure the build environment"
 
 if [ "$have_autotools" ]; then
-  run autoreconf -ivf || exit 1
+  if ! run autoreconf -ivf; then
+    fatal "Failed to prepare Netdata sources." I0009
+  fi
 fi
 
 # shellcheck disable=SC2086
-run ./configure \
-  --prefix="${NETDATA_PREFIX}/usr" \
-  --sysconfdir="${NETDATA_PREFIX}/etc" \
-  --localstatedir="${NETDATA_PREFIX}/var" \
-  --libexecdir="${NETDATA_PREFIX}/usr/libexec" \
-  --libdir="${NETDATA_PREFIX}/usr/lib" \
-  --with-zlib \
-  --with-math \
-  --with-user=netdata \
-  ${NETDATA_CONFIGURE_OPTIONS} \
-  CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" || exit 1
+if ! run ./configure \
+         --prefix="${NETDATA_PREFIX}/usr" \
+         --sysconfdir="${NETDATA_PREFIX}/etc" \
+         --localstatedir="${NETDATA_PREFIX}/var" \
+         --libexecdir="${NETDATA_PREFIX}/usr/libexec" \
+         --libdir="${NETDATA_PREFIX}/usr/lib" \
+         --with-zlib \
+         --with-math \
+         --with-user=netdata \
+         ${NETDATA_CONFIGURE_OPTIONS} \
+         CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}"; then
+  fatal "Failed to configure Netdata sources." I000A
+fi
+
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
@@ -1107,7 +1054,9 @@ run $make clean
 progress "Compile netdata"
 
 # shellcheck disable=SC2086
-run $make ${MAKEOPTS} || exit 1
+if ! run $make ${MAKEOPTS}; then
+  fatal "Failed to build Netdata." I000B
+fi
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
@@ -1200,7 +1149,9 @@ touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
-run $make install || exit 1
+if ! run $make install; then
+  fatal "Failed to install Netdata." I000C
+fi
 
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
@@ -1308,7 +1259,9 @@ progress "Fix permissions of netdata directories (using user '${NETDATA_USER}')"
 
 if [ ! -d "${NETDATA_RUN_DIR}" ]; then
   # this is needed if NETDATA_PREFIX is not empty
-  run mkdir -p "${NETDATA_RUN_DIR}" || exit 1
+  if ! run mkdir -p "${NETDATA_RUN_DIR}"; then
+    warning "Failed to create ${NETDATA_RUN_DIR}, it must becreated by hand or the Netdata Agent will not be able to be started."
+  fi
 fi
 
 # --- stock conf dir ----
@@ -1339,7 +1292,9 @@ run find "${NETDATA_WEB_DIR}" -type d -exec chmod 0775 {} \;
 for x in "${NETDATA_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"; do
   if [ ! -d "${x}" ]; then
     echo >&2 "Creating directory '${x}'"
-    run mkdir -p "${x}" || exit 1
+    if ! run mkdir -p "${x}"; then
+      warning "Failed to create ${x}, it must be created by hand or the Netdata Agent will not be able to be started."
+    fi
   fi
 
   run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
@@ -1353,7 +1308,9 @@ run chmod 755 "${NETDATA_LOG_DIR}"
 
 if [ ! -d "${NETDATA_CLAIMING_DIR}" ]; then
   echo >&2 "Creating directory '${NETDATA_CLAIMING_DIR}'"
-  run mkdir -p "${NETDATA_CLAIMING_DIR}" || exit 1
+  if ! run mkdir -p "${NETDATA_CLAIMING_DIR}"; then
+    warning "failed to create ${NETDATA_CLAIMING_DIR}, it will need to be created manually."
+  fi
 fi
 run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
 run chmod 770 "${NETDATA_CLAIMING_DIR}"
@@ -1564,7 +1521,6 @@ install_go() {
 
   if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
     run_failed "go.d plugin download failed, go.d plugin will not be available"
-    defer_error "go.d plugin download failed, go.d plugin will not be available"
     echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
     echo >&2
     [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
@@ -1581,8 +1537,7 @@ install_go() {
     echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
     echo >&2
 
-    run_failed "go.d.plugin package files checksum validation failed."
-    defer_error "go.d.plugin package files checksum validation failed, go.d.plugin will not be available"
+    run_failed "go.d.plugin package files checksum validation failed. go.d.plugin will not be available."
     [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
     return 0
   fi
@@ -1608,20 +1563,21 @@ install_go
 
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
-    run_failed "eBPF explicitly disabled."
-    defer_error "eBPF explicitly disabled."
+    run_failed "eBPF has been explicitly disabled, it will not be available in this install."
     return 1
   fi
 
   if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
-    run_failed "Currently eBPF is only supported on Linux on X86_64."
-    defer_error "Currently eBPF is only supported on Linux on X86_64."
+    if [ "${NETDATA_DISABLE_EBPF:=1}" -eq 0 ]; then
+      run_failed "Currently eBPF is only supported on Linux on X86_64."
+    fi
+
     return 1
   fi
 
   # Check Kernel Config
   if ! run "${INSTALLER_DIR}"/packaging/check-kernel-config.sh; then
-    echo >&2 "Warning: Kernel unsupported or missing required config (eBPF may not work on your system)"
+    warning "Kernel unsupported or missing required config (eBPF may not work on your system)"
   fi
 
   return 0
@@ -1777,7 +1733,7 @@ if [ ${DONOTSTART} -eq 1 ]; then
   create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 else
   if ! restart_netdata "${NETDATA_PREFIX}/usr/sbin/netdata" "${@}"; then
-    fatal "Cannot start netdata!"
+    fatal "Cannot start netdata!" I000D
   fi
 
   started=1

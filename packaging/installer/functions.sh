@@ -2,6 +2,8 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# next unused error code: L0003
+
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
 # -----------------------------------------------------------------------------
@@ -42,6 +44,7 @@ setup_terminal() {
       TPUT_RESET="$(tput sgr 0)"
       # shellcheck disable=SC2034
       TPUT_BLACK="$(tput setaf 0)"
+      # shellcheck disable=SC2034
       TPUT_RED="$(tput setaf 1)"
       TPUT_GREEN="$(tput setaf 2)"
       # shellcheck disable=SC2034
@@ -99,7 +102,7 @@ get() {
   elif command -v wget > /dev/null 2>&1; then
     wget -T 15 -O - "${url}"
   else
-    fatal "I need curl or wget to proceed, but neither is available on this system."
+    fatal "I need curl or wget to proceed, but neither is available on this system." "L0002"
   fi
 }
 
@@ -245,17 +248,43 @@ find_processors() {
 }
 
 # -----------------------------------------------------------------------------
+exit_reason() {
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    EXIT_REASON="${1}"
+    EXIT_CODE="${2}"
+    if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
+      export EXIT_REASON
+      export EXIT_CODE
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
+    fi
+  fi
+}
+
 fatal() {
-  printf >&2 "%s ABORTED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  printf >&2 "%s ABORTED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+  fi
+  exit_reason "${1}" "${2}"
   exit 1
 }
 
+warning() {
+  printf >&2 "%s WARNING %s %s\n\n" "%{TPUT_BGYELLOW}${TPUT_BLACK}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+  fi
+}
+
 run_ok() {
-  printf >&2 "%s OK %s %s \n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  printf >&2 "%s OK %s %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1:-''}"
 }
 
 run_failed() {
-  printf >&2 "%s FAILED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  printf >&2 "%s FAILED %s %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1:-''}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ] && [ -n "${1:-''}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+  fi
 }
 
 ESCAPED_PRINT_METHOD=
@@ -299,6 +328,9 @@ run() {
   if [ ${ret} -ne 0 ]; then
     run_failed
     printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
+    if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+      SAVED_WARNINGS="${SAVED_WARNINGS}\n  - Command '${*}' failed with exit code ${ret}."
+    fi
   else
     run_ok
     printf >> "${run_logfile}" "OK\n"
@@ -430,14 +462,14 @@ install_non_systemd_init() {
         run chkconfig netdata on &&
         return 0
     else
-      echo >&2 "I don't know what init file to install on system '${key}'. Open a github issue to help us fix it."
+      warning "Could not determine what type of init script to install on this system."
       return 1
     fi
   elif [ -f /etc/init.d/netdata ]; then
     echo >&2 "file '/etc/init.d/netdata' already exists."
     return 0
   else
-    echo >&2 "I don't know what init file to install on system '${key}'. Open a github issue to help us fix it."
+    warning "Could not determine what type of init script to install on this system."
   fi
 
   return 1
@@ -507,7 +539,7 @@ install_netdata_service() {
           ${ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED} &&
           return 0
       else
-        echo >&2 "no systemd directory; cannot install netdata.service"
+        warning "Could not find a systemd service directory, unable to install Netdata systemd service."
       fi
     else
       install_non_systemd_init
@@ -559,7 +591,7 @@ stop_netdata_on_pid() {
   printf >&2 "Stopping netdata on pid %s ..." "${pid}"
   while [ -n "${pid}" ] && [ ${ret} -eq 0 ]; do
     if [ ${count} -gt 24 ]; then
-      echo >&2 "Cannot stop the running netdata on pid ${pid}."
+      warning "Cannot stop netdata agent with PID ${pid}."
       return 1
     fi
 
@@ -584,7 +616,7 @@ stop_netdata_on_pid() {
 
   echo >&2
   if [ ${ret} -eq 0 ]; then
-    echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
+    warning "Failed to stop netdata agent process with PID ${pid}."
     return 1
   fi
 
@@ -687,7 +719,7 @@ restart_netdata() {
 
   if [ ${started} -eq 0 ]; then
     # still not started... another forced attempt, just run the binary
-    echo >&2 "Netdata service still not started, attempting another forced restart by running '${netdata} ${*}'"
+    warning "Netdata service still not started, attempting another forced restart by running '${netdata} ${*}'"
     run stop_all_netdata
     run "${netdata}" "${@}"
     return $?
@@ -798,7 +830,7 @@ portable_add_user() {
     run sysadminctl -addUser "${username}" && return 0
   fi
 
-  echo >&2 "Failed to add ${username} user account !"
+  warning "Failed to add ${username} user account!"
 
   return 1
 }
@@ -834,7 +866,7 @@ portable_add_group() {
     dseditgroup -o create "${groupname}" && return 0
   fi
 
-  echo >&2 "Failed to add ${groupname} user group !"
+  warning >&2 "Failed to add ${groupname} user group !"
   return 1
 }
 
@@ -845,7 +877,8 @@ portable_add_user_to_group() {
   # Check if group exist
   if ! cut -d ':' -f 1 < /etc/group | grep "^${groupname}$" > /dev/null 2>&1; then
     echo >&2 "Group '${groupname}' does not exist."
-    return 1
+    # Don’t treat this as a failure, if the group does not exist we should not be trying to add the user to it.
+    return 0
   fi
 
   # Check if user is in group
@@ -876,7 +909,8 @@ portable_add_user_to_group() {
     if command -v dseditgroup 1> /dev/null 2>&1; then
       dseditgroup -u "${username}" "${groupname}" && return 0
     fi
-    echo >&2 "Failed to add user ${username} to group ${groupname} !"
+
+    warning >&2 "Failed to add user ${username} to group ${groupname}!"
     return 1
   fi
 }
@@ -889,7 +923,7 @@ safe_sha256sum() {
   elif command -v shasum > /dev/null 2>&1; then
     shasum -a 256 "$@"
   else
-    fatal "I could not find a suitable checksum binary to use"
+    fatal "I could not find a suitable checksum binary to use" "L0001"
   fi
 }
 

@@ -356,7 +356,7 @@ static void pg_cache_evict_unsafe(struct rrdengine_instance *ctx, struct rrdeng_
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
-    freez(pg_cache_descr->page);
+    dbengine_page_free(pg_cache_descr->page);
     pg_cache_descr->page = NULL;
     pg_cache_descr->flags &= ~RRD_PAGE_POPULATED;
     pg_cache_release_pages_unsafe(ctx, 1);
@@ -1222,7 +1222,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
                 /* Check rrdenglocking.c */
                 pg_cache_descr = descr->pg_cache_descr;
                 if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
-                    freez(pg_cache_descr->page);
+                    dbengine_page_free(pg_cache_descr->page);
                     bytes_freed += RRDENG_BLOCK_SIZE;
                 }
                 rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
