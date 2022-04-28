@@ -1186,6 +1186,7 @@ void rrdeng_worker(void* arg)
 
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
+    int set_name = 0;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
         uv_run(loop, UV_RUN_DEFAULT);
         rrdeng_cleanup_finished_threads(wc);
@@ -1230,6 +1231,10 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_READ_EXTENT:
                 do_read_extent(wc, cmd.read_extent.page_cache_descr, cmd.read_extent.page_count, 1);
+                if (unlikely(!set_name)) {
+                    set_name = 1;
+                    uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
+                }
                 break;
             case RRDENG_COMMIT_PAGE:
                 do_commit_transaction(wc, STORE_DATA, NULL);
