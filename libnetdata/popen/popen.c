@@ -78,58 +78,25 @@ static void myp_del(pid_t pid) {
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
+static inline void convert_argv_to_string(char *dst, size_t size, const char *spawn_argv[]) {
+    int i;
+    for(i = 0; spawn_argv[i] ;i++) {
+        if(i == 0) snprintfz(dst, size, "%s", spawn_argv[i]);
+        else {
+            size_t len = strlen(dst);
+            snprintfz(&dst[len], size - len, " '%s'", spawn_argv[i]);
+        }
+    }
+}
+
 /*
  * Returns -1 on failure, 0 on success. When POPEN_FLAG_CREATE_PIPE is set, on success set the FILE *fp pointer.
  */
-int custom_popene_internal_dont_use_directly(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, ...) {
-    // convert the variable list arguments into what posix_spawn() needs
-    // all arguments are expected strings
-    va_list args;
-    int args_count;
-
-    // the string to be logged about the command executed
+static int custom_popene(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, const char *spawn_argv[]) {
+    // create a string to be logged about the command we are running
     char command_to_be_logged[2048];
-
-    // count the number variable parameters
-    // the variable parameters are expected NULL terminated
-    {
-        const char *s;
-
-        va_start(args, command);
-        args_count = 0;
-        while ((s = va_arg(args, const char *))) args_count++;
-        va_end(args);
-    }
-
-    // create a string pointer array as needed by posix_spawn()
-    // variable array in the stack
-    const char *spawn_argv[args_count + 1];
-    {
-        const char *s;
-        char format[args_count * 5 + 1];
-
-        va_start(args, command);
-        format[0] = 0;
-        int i;
-        for (i = 0; i < args_count; i++) {
-            s = va_arg(args, const char *);
-            strcat(format, "'%s' ");
-            spawn_argv[i] = s;
-        }
-        spawn_argv[args_count] = NULL;
-        va_end(args);
-
-        // generate a command string for the logs
-        int len = sizeof(command_to_be_logged) - 1;
-        snprintfz(command_to_be_logged, len, "%s ", command);
-        int offset = strlen(command_to_be_logged);
-        len -= offset;
-        if(len > 0) {
-            va_start(args, command);
-            vsnprintfz(&command_to_be_logged[offset], len, format, args);
-            va_end(args);
-        }
-    }
+    convert_argv_to_string(command_to_be_logged, sizeof(command_to_be_logged), spawn_argv);
+    // info("custom_popene() running command: %s", command_to_be_logged);
 
     FILE *fp = NULL;
     int ret = 0; // success by default
@@ -233,6 +200,41 @@ error_after_pipe:
     return -1;
 }
 
+int custom_popene_variadic_internal_dont_use_directly(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, ...) {
+    // convert the variable list arguments into what posix_spawn() needs
+    // all arguments are expected strings
+    va_list args;
+    int args_count;
+
+    // count the number variable parameters
+    // the variable parameters are expected NULL terminated
+    {
+        const char *s;
+
+        va_start(args, command);
+        args_count = 0;
+        while ((s = va_arg(args, const char *))) args_count++;
+        va_end(args);
+    }
+
+    // create a string pointer array as needed by posix_spawn()
+    // variable array in the stack
+    const char *spawn_argv[args_count + 1];
+    {
+        const char *s;
+        va_start(args, command);
+        int i;
+        for (i = 0; i < args_count; i++) {
+            s = va_arg(args, const char *);
+            spawn_argv[i] = s;
+        }
+        spawn_argv[args_count] = NULL;
+        va_end(args);
+    }
+
+    return custom_popene(pidptr, env, flags, fpp, command, spawn_argv);
+}
+
 // See man environ
 extern char **environ;
 
@@ -292,19 +294,37 @@ int myp_reap(pid_t pid) {
 
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
     FILE *fp = NULL;
-    (void)mypopen_raw_default_flags_and_environment(pidptr, &fp, "/bin/sh", "-c", command);
+    const char *spawn_argv[] = {
+        "sh",
+        "-c",
+        command,
+        NULL
+    };
+    (void)custom_popene(pidptr, environ, POPEN_FLAG_CREATE_PIPE|POPEN_FLAG_CLOSE_FD, &fp, "/bin/sh", spawn_argv);
     return fp;
 }
 
 FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
     FILE *fp = NULL;
-    (void)mypopen_raw_default_flags( pidptr, env, &fp, "/bin/sh", "-c", command);
+    const char *spawn_argv[] = {
+        "sh",
+        "-c",
+        command,
+        NULL
+    };
+    (void)custom_popene( pidptr, env, POPEN_FLAG_CREATE_PIPE|POPEN_FLAG_CLOSE_FD, &fp, "/bin/sh", spawn_argv);
     return fp;
 }
 
 // returns 0 on success, -1 on failure
 int netdata_spawn(const char *command, volatile pid_t *pidptr) {
-    return mypopen_raw( pidptr, environ, POPEN_FLAG_NONE, NULL, "/bin/sh", "-c", command);
+    const char *spawn_argv[] = {
+        "sh",
+        "-c",
+        command,
+        NULL
+    };
+    return custom_popene( pidptr, environ, POPEN_FLAG_NONE, NULL, "/bin/sh", spawn_argv);
 }
 
 int custom_pclose(FILE *fp, pid_t pid) {
