@@ -155,7 +155,7 @@ static double **CreateMatrixD (int N, int M)
    double **T2;
 
    T2 = (double **) malloc (N * sizeof (double *));
-   T2[0] = (double *) malloc (N * M * sizeof (double));
+   T2[0] = (double *) malloc ((size_t) N * M * sizeof (double));
    for (i = 1; i < N; i++)
       T2[i] = T2[0] + i * M;
    return T2;
