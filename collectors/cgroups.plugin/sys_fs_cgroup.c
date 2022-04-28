@@ -2113,7 +2113,7 @@ static inline void discovery_update_filenames() {
                 else
                     debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if(unlikely(cgroup_enable_cpuacct_cpu_throttling && !cg->cpuacct_cpu_throttling.filename && is_cgroup_systemd_service(cg))) {
+            if(unlikely(cgroup_enable_cpuacct_cpu_throttling && !cg->cpuacct_cpu_throttling.filename && !is_cgroup_systemd_service(cg))) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_cpuacct_base, cg->id);
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->cpuacct_cpu_throttling.filename = strdupz(filename);
@@ -2604,7 +2604,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
         return;
     }
 
-    if (!(cg->enabled && (cg->enabled = matches_enabled_cgroup_paths(cg->id)))) {
+    if (!(cg->enabled = matches_enabled_cgroup_paths(cg->id))) {
         return;
     }
 
