@@ -1475,19 +1475,20 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
-    char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    char cgroup_identifier[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
     if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-        snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
+        snprintfz(cgroup_identifier, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_cpuacct_base, cg->id);
     }
     else {
-        snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_unified_base, cg->id);
+        snprintfz(cgroup_identifier, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_unified_base, cg->id);
     }
 
-    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", command, cg->id);
-    FILE *fp = mypopen(command, &cgroup_pid);
+    debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
+    FILE *fp;
+    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
     if(!fp) {
-        error("CGROUP: cannot popen(\"%s\", \"r\").", command);
+        error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
     }
 
@@ -1528,7 +1529,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     }
 
     mypclose(fp, cgroup_pid);
-    // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
+    // debug(D_CGROUP, "closed cgroup_identifier for cgroup '%s'", cg->id);
 }
 
 static inline void free_cgroup_network_interfaces(struct cgroup *cg) {
@@ -1614,13 +1615,10 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
-    char command[CGROUP_CHARTID_LINE_MAX + 1];
-
     // TODO: use cg->id when the renaming script is fixed
-    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->intermediate_id);
-
-    debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->chart_id);
-    FILE *fp = mypopen(command, &cgroup_pid);
+    debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
+    FILE *fp;
+    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_rename_script, cg->intermediate_id);
     if(fp) {
         // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", command, cg->id);
         char buffer[CGROUP_CHARTID_LINE_MAX + 1];
@@ -1661,7 +1659,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
         }
     }
     else
-        error("CGROUP: cannot popen(\"%s\", \"r\").", command);
+        error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
 }
 
 static inline struct cgroup *cgroup_add(const char *id) {

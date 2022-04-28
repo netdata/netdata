@@ -479,7 +479,17 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     info("running: %s", command);
 
     pid_t cgroup_pid;
-    FILE *fp = mypopene(command, &cgroup_pid, environment);
+    FILE *fp;
+
+    if(cgroup) {
+        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup);
+    }
+    else {
+        char buffer[100];
+        snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
+        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer);
+    }
+
     if(fp) {
         char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
         char *s;
@@ -643,8 +653,13 @@ int main(int argc, char **argv) {
     if(argc != 3)
         usage();
 
-    if(!strcmp(argv[1], "-p") || !strcmp(argv[1], "--pid")) {
-        pid = atoi(argv[2]);
+    int arg = 1;
+    int helper = 1;
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+        helper = 0;
+
+    if(!strcmp(argv[arg], "-p") || !strcmp(argv[arg], "--pid")) {
+        pid = atoi(argv[arg+1]);
 
         if(pid <= 0) {
             errno = 0;
@@ -652,17 +667,17 @@ int main(int argc, char **argv) {
             return 2;
         }
 
-        call_the_helper(pid, NULL);
+        if(helper) call_the_helper(pid, NULL);
     }
-    else if(!strcmp(argv[1], "--cgroup")) {
-        char *cgroup = argv[2];
+    else if(!strcmp(argv[arg], "--cgroup")) {
+        char *cgroup = argv[arg+1];
         if(verify_path(cgroup) == -1) {
             error("cgroup '%s' does not exist or is not valid.", cgroup);
             return 1;
         }
 
         pid = read_pid_from_cgroup(cgroup);
-        call_the_helper(pid, cgroup);
+        if(helper) call_the_helper(pid, cgroup);
 
         if(pid <= 0 && !detected_devices) {
             errno = 0;
