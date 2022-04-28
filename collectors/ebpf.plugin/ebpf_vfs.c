@@ -1582,7 +1582,7 @@ static void ebpf_vfs_allocate_global_vectors(ebpf_module_t *em)
         if (em->allocate == NETDATA_EBPF_ALLOCATE_DYNAMIC)
             vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
         else
-            vfs_static_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t));
+            vfs_static_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t));
 
 #ifdef NETDATA_INTERNAL_CHECKS
         info("%s %s.",
