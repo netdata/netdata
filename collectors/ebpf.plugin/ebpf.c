@@ -1291,7 +1291,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups, int u
 
     // Memory allocation
     value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, NETDATA_EBPF_ALLOCATE_OPTION,
-                          NETDATA_EBPF_DYNAMIC_ALLOCATION);
+                          NETDATA_EBPF_STATIC_ALLOCATION);
     ebpf_update_allocate_value(value);
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
