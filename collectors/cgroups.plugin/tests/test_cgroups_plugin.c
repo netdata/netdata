@@ -8,7 +8,7 @@ int netdata_zero_metrics_enabled = 1;
 struct config netdata_config;
 char *netdata_configured_primary_plugins_dir = NULL;
 
-static void test_parse_k8s_data(void **state)
+static void test_k8s_parse_resolved_name(void **state)
 {
     UNUSED(state);
 
@@ -89,7 +89,7 @@ static void test_parse_k8s_data(void **state)
             expect_value(__wrap_add_label_to_list, label_source, LABEL_SOURCE_KUBERNETES);    
         }
 
-        char *name = parse_k8s_data(&labels, data);
+        char *name = k8s_parse_resolved_name(&labels, data);
 
         assert_string_equal(name, test_data[i].name);
         assert_ptr_equal(labels, 0xff);
@@ -101,10 +101,10 @@ static void test_parse_k8s_data(void **state)
 int main(void)
 {
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_parse_k8s_data),
+        cmocka_unit_test(test_k8s_parse_resolved_name),
     };
 
-    int test_res = cmocka_run_group_tests_name("test_parse_k8s_data", tests, NULL, NULL);
+    int test_res = cmocka_run_group_tests_name("test_k8s_parse_resolved_name", tests, NULL, NULL);
 
     return test_res;
 }
