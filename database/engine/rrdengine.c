@@ -11,6 +11,16 @@ rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
 static unsigned pages_per_extent = MAX_PAGES_PER_EXTENT;
 
+void *dbengine_page_alloc() {
+    void *page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
+    if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
+    return page;
+}
+
+void dbengine_page_free(void *page) {
+    munmap(page, RRDENG_BLOCK_SIZE);
+}
+
 static void sanity_check(void)
 {
     /* Magic numbers must fit in the super-blocks */
@@ -176,7 +186,7 @@ void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, str
     struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
 
     for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
-        page = mallocz(RRDENG_BLOCK_SIZE);
+        page = dbengine_page_alloc();
         descr = xt_io_descr->descr_array[i];
         for (j = 0, page_offset = 0 ; j < extent->number_of_pages ; ++j) {
             /* care, we don't hold the descriptor mutex */
@@ -331,7 +341,7 @@ after_crc_check:
                 continue; /* Failed to reserve a suitable page */
             is_prefetched_page = 1;
         }
-        page = mallocz(RRDENG_BLOCK_SIZE);
+        page = dbengine_page_alloc();
 
         /* care, we don't hold the descriptor mutex */
         if (have_read_error) {

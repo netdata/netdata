@@ -250,7 +250,7 @@ extern void freez(void *ptr);
 extern void json_escape_string(char *dst, const char *src, size_t size);
 extern void json_fix_string(char *s);
 
-extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
+extern void *netdata_mmap(const char *filename, size_t size, int flags, int ksm);
 extern int memory_file_save(const char *filename, void *mem, size_t size);
 
 extern int fd_is_valid(int fd);
