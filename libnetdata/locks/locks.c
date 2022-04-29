@@ -229,7 +229,7 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 void not_supported_by_posix_rwlocks(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, char locktype, const char *reason) {
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
-            "RW_LOCK FATAL ON LOCK 0x%08x: %zu, '%s' (function %s() %llu@%s) attempts to acquire a '%c' lock but is not supported by POSIX because: %s\n"
+            "RW_LOCK FATAL ON LOCK 0x%08x: %zu '%s' (function %s() %llu@%s) attempts to acquire a '%c' lock but is not supported by POSIX because: %s\n"
             "There are %zu readers and %zu writers are holding the lock:\n",
             (uintptr_t)rwlock,
             gettid(), netdata_thread_tag(),
@@ -256,7 +256,7 @@ void not_supported_by_posix_rwlocks(const char *file, const char *function, cons
 static void log_rwlock_lockers(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, const char *reason, char locktype) {
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
-            "RW_LOCK ON LOCK 0x%08x: %zu, '%s' (function %s() %llu@%s) %s a '%c' lock.\n"
+            "RW_LOCK ON LOCK 0x%08x: %zu '%s' (function %s() %llu@%s) %s a '%c' lock.\n"
             "There are %zu readers and %zu writers are holding the lock:\n",
             (uintptr_t)rwlock,
             gettid(), netdata_thread_tag(),
