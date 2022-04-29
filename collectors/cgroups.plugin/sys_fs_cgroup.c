@@ -1826,7 +1826,6 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
     debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
     pid_t cgroup_pid;
-    char command[CGROUP_CHARTID_LINE_MAX + 1];
 
     FILE *fp;
     (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_rename_script, cg->id, cg->intermediate_id);
