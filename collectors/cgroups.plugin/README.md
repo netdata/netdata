@@ -28,7 +28,7 @@ Linux exposes resource usage reporting and provides dynamic configuration for cg
 under `/sys/fs/cgroup`. Netdata reads `/proc/self/mountinfo` to detect the exact mount point of cgroups. Netdata also
 allows manual configuration of this mount point, using these settings:
 
-```
+```text
 [plugin:cgroups]
 	check for new cgroups every = 10
 	path to /sys/fs/cgroup/cpuacct = /sys/fs/cgroup/cpuacct
@@ -47,7 +47,7 @@ recursively searching for cgroups (each subdirectory is another cgroup).
 To provide a sane default for this setting, Netdata uses the following pattern list (patterns starting with `!` give a
 negative match and their order is important: the first matching a path will be used):
 
-```
+```text
 [plugin:cgroups]
 	search for cgroups in subpaths matching =  !*/init.scope  !*-qemu  !/init.scope  !/system  !/systemd  !/user  !/user.slice  *
 ```
@@ -62,7 +62,7 @@ others are enabled.
 Netdata automatically detects cgroups version. If detection fails Netdata assumes v1.
 To switch to v2 manually add:
 
-```
+```text
 [plugin:cgroups]
 	use unified cgroups = yes
 	path to unified cgroups = /sys/fs/cgroup
@@ -78,21 +78,21 @@ following [pattern list](https://learn.netdata.cloud/docs/agent/libnetdata/simpl
 
 - checks the pattern against the path of the cgroup
 
-  ```
+  ```text
   [plugin:cgroups]
   	enable by default cgroups matching =  !*/init.scope  *.scope  !*/vcpu*  !*/emulator  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  !/  !/docker  !/libvirt  !/lxc  !/lxc/*/ns  !/lxc/*/ns/*  !/machine  !/qemu  !/system  !/systemd  !/user  *
   ```
 
 - checks the pattern against the name of the cgroup (as you see it on the dashboard)
 
-  ```
+  ```text
   [plugin:cgroups]
   	enable by default cgroups names matching = *
   ```
 
 Renaming is configured with the following options:
 
-```
+```text
 [plugin:cgroups]
 	run script to rename cgroups matching =  *.scope  *docker*  *lxc*  *qemu*  !/  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  *
 	script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name.sh
@@ -126,7 +126,7 @@ ignored. Metrics that will start having values, after Netdata is started, will b
 automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Set `yes` for a
 chart instead of `auto` to enable it permanently. For example:
 
-```
+```text
 [plugin:cgroups]
 	enable memory (used mem including cache) = yes
 ```
@@ -148,16 +148,16 @@ Netdata monitors **systemd services**. Example:
 
 Support per distribution:
 
-|      system      | systemd services<br/>charts shown |     `tree`<br/>`/sys/fs/cgroup`      | comments                  |
-|:----------------:|:---------------------------------:|:------------------------------------:|:--------------------------|
-|    Arch Linux    |                YES                |                                      |                           |
-|      Gentoo      |                NO                 |                                      | can be enabled, see below |
-| Ubuntu 16.04 LTS |                YES                |                                      |                           |
-|   Ubuntu 16.10   |                YES                | [here](http://pastebin.com/PiWbQEXy) |                           |
-|    Fedora 25     |                YES                | [here](http://pastebin.com/ax0373wF) |                           |
-|     Debian 8     |                NO                 |                                      | can be enabled, see below |
-|       AMI        |                NO                 | [here](http://pastebin.com/FrxmptjL) | not a systemd system      |
-| CentOS 7.3.1611  |                NO                 | [here](http://pastebin.com/SpzgezAg) | can be enabled, see below |
+|      system      | charts shown |        `/sys/fs/cgroup` tree         | comments                  |
+|:----------------:|:------------:|:------------------------------------:|:--------------------------|
+|    Arch Linux    |     YES      |                                      |                           |
+|      Gentoo      |      NO      |                                      | can be enabled, see below |
+| Ubuntu 16.04 LTS |     YES      |                                      |                           |
+|   Ubuntu 16.10   |     YES      | [here](http://pastebin.com/PiWbQEXy) |                           |
+|    Fedora 25     |     YES      | [here](http://pastebin.com/ax0373wF) |                           |
+|     Debian 8     |      NO      |                                      | can be enabled, see below |
+|       AMI        |      NO      | [here](http://pastebin.com/FrxmptjL) | not a systemd system      |
+| CentOS 7.3.1611  |      NO      | [here](http://pastebin.com/SpzgezAg) | can be enabled, see below |
 
 ### Monitored systemd service metrics
 
@@ -199,7 +199,7 @@ sed -e 's|^#Default\(.*\)Accounting=.*$|Default\1Accounting=yes|g' /etc/systemd/
 
 To see the changes it made, run this:
 
-```
+```sh
 # diff /etc/systemd/system.conf /tmp/system.conf
 40,44c40,44
 < #DefaultCPUAccounting=no
@@ -235,7 +235,7 @@ Now, when you run `systemd-cgtop`, services will start reporting usage (if it do
 In case memory accounting is missing, you will need to enable it at your kernel, by appending the following kernel boot
 options and rebooting:
 
-```
+```sh
 cgroup_enable=memory swapaccount=1
 ```
 
@@ -245,7 +245,7 @@ DigitalOcean debian images you may have to set it at `/etc/default/grub.d/50-clo
 
 Which systemd services are monitored by Netdata is determined by the following pattern list:
 
-```
+```text
 [plugin:cgroups]
 	cgroups to match as systemd services =  !/system.slice/*/*.service  /system.slice/*.service
 ```
@@ -308,5 +308,3 @@ cannot find, but immediately:
 
 Network interfaces are monitored by means of
 the [proc plugin](/collectors/proc.plugin/README.md#monitored-network-interface-metrics).
-
-
