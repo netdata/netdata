@@ -115,7 +115,7 @@ The whole point for the additional pattern list, is to limit the number of times
 pattern list, the script might be called thousands of times, depending on the number of cgroups available in the system.
 
 The above pattern list is matched against the path of the cgroup. For matched cgroups, Netdata calls the
-script [cgroup-name.sh](https://raw.githubusercontent.com/netdata/netdata/master/collectors/cgroups.plugin/cgroup-name.sh.in)
+script [cgroup-name.sh](https://raw.githubusercontent.com/netdata/netdata/master/collectors/cgroups.plugin/cgroup-name.sh)
 to get its name. This script queries `docker`, `kubectl`, `podman`, or applies heuristics to find give a name for the
 cgroup.
 
