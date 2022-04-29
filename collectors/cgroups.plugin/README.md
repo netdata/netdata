@@ -162,16 +162,16 @@ Netdata monitors **systemd services**. Example:
 
 Support per distribution:
 
-|system|systemd services<br/>charts shown|`tree`<br/>`/sys/fs/cgroup`|comments|
-|:----:|:-------------------------------:|:-------------------------:|:-------|
-|Arch Linux|YES|||
-|Gentoo|NO||can be enabled, see below|
-|Ubuntu 16.04 LTS|YES|||
-|Ubuntu 16.10|YES|[here](http://pastebin.com/PiWbQEXy)||
-|Fedora 25|YES|[here](http://pastebin.com/ax0373wF)||
-|Debian 8|NO||can be enabled, see below|
-|AMI|NO|[here](http://pastebin.com/FrxmptjL)|not a systemd system|
-|CentOS 7.3.1611|NO|[here](http://pastebin.com/SpzgezAg)|can be enabled, see below|
+|      system      | systemd services<br/>charts shown |     `tree`<br/>`/sys/fs/cgroup`      | comments                  |
+|:----------------:|:---------------------------------:|:------------------------------------:|:--------------------------|
+|    Arch Linux    |                YES                |                                      |                           |
+|      Gentoo      |                NO                 |                                      | can be enabled, see below |
+| Ubuntu 16.04 LTS |                YES                |                                      |                           |
+|   Ubuntu 16.10   |                YES                | [here](http://pastebin.com/PiWbQEXy) |                           |
+|    Fedora 25     |                YES                | [here](http://pastebin.com/ax0373wF) |                           |
+|     Debian 8     |                NO                 |                                      | can be enabled, see below |
+|       AMI        |                NO                 | [here](http://pastebin.com/FrxmptjL) | not a systemd system      |
+| CentOS 7.3.1611  |                NO                 | [here](http://pastebin.com/SpzgezAg) | can be enabled, see below |
 
 ### Monitored systemd service metrics
 
