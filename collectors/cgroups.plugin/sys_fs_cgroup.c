@@ -974,7 +974,7 @@ static int k8s_get_container_first_proc_comm(const char *id, char *comm) {
         return 1;
     }
 
-    strncpy(comm, proc_comm, TASK_COMM_LEN);
+    strncpyz(comm, proc_comm, TASK_COMM_LEN);
     return 0;
 }
 
@@ -1905,9 +1905,9 @@ static void is_cgroup_procs_exist(netdata_ebpf_cgroup_shm_body_t *out, char *id)
 }
 
 static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
-    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+    char buffer[CGROUP_CHARTID_LINE_MAX];
     cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
-    strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
+    strncpyz(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
     char *s = buffer;
 
     // skip to the last slash
