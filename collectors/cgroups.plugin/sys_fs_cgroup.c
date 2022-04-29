@@ -2541,7 +2541,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     }
     cg->first_time_seen = 0;
 
-    char comm[TASK_COMM_LEN] = "";
+    char comm[TASK_COMM_LEN];
 
     if (is_inside_k8s && !k8s_get_container_first_proc_comm(cg->id, comm)) {
         // container initialization may take some time when CPU % is high
