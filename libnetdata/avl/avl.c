@@ -374,7 +374,7 @@ void avl_destroy_lock(avl_tree_lock *tree) {
 #ifdef AVL_LOCK_WITH_MUTEX
     lock = pthread_mutex_destroy(&tree->mutex);
 #else
-    lock = pthread_rwlock_destroy(&tree->rwlock);
+    lock = netdata_rwlock_destroy(&tree->rwlock);
 #endif
 
     if(lock != 0)

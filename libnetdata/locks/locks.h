@@ -4,12 +4,51 @@
 #define NETDATA_LOCKS_H 1
 
 #include "../libnetdata.h"
+#include "../clocks/clocks.h"
 
 typedef pthread_mutex_t netdata_mutex_t;
 #define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
-typedef pthread_rwlock_t netdata_rwlock_t;
-#define NETDATA_RWLOCK_INITIALIZER PTHREAD_RWLOCK_INITIALIZER
+#ifdef NETDATA_INTERNAL_CHECKS
+typedef struct netdata_rwlock_locker {
+    pid_t pid;
+    const char *tag;
+    char lock; // 'R', 'W'
+    const char *file;
+    const char *function;
+    unsigned long line;
+    size_t callers;
+    usec_t start_s;
+    struct netdata_rwlock_locker *next;
+} netdata_rwlock_locker;
+
+typedef struct netdata_rwlock_t {
+    pthread_rwlock_t rwlock_t;
+    size_t readers;
+    size_t writers;
+    netdata_mutex_t lockers_mutex;
+    netdata_rwlock_locker *lockers;
+} netdata_rwlock_t;
+
+#define NETDATA_RWLOCK_INITIALIZER { \
+        .rwlock_t = PTHREAD_RWLOCK_INITIALIZER, \
+        .readers = 0, \
+        .writers = 0, \
+        .lockers_mutex = NETDATA_MUTEX_INITIALIZER, \
+        .lockers = NULL \
+    }
+
+#else // NETDATA_INTERNAL_CHECKS
+
+typedef struct netdata_rwlock_t {
+    pthread_rwlock_t rwlock_t;
+} netdata_rwlock_t;
+
+#define NETDATA_RWLOCK_INITIALIZER { \
+        .rwlock_t = PTHREAD_RWLOCK_INITIALIZER \
+    }
+
+#endif // NETDATA_INTERNAL_CHECKS
 
 extern int __netdata_mutex_init(netdata_mutex_t *mutex);
 extern int __netdata_mutex_lock(netdata_mutex_t *mutex);
@@ -24,6 +63,11 @@ extern int __netdata_rwlock_unlock(netdata_rwlock_t *rwlock);
 extern int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock);
 extern int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock);
 
+extern void netdata_thread_disable_cancelability(void);
+extern void netdata_thread_enable_cancelability(void);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+
 extern int netdata_mutex_init_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
 extern int netdata_mutex_lock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
 extern int netdata_mutex_trylock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
@@ -36,11 +80,6 @@ extern int netdata_rwlock_wrlock_debug( const char *file, const char *function, 
 extern int netdata_rwlock_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 extern int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 extern int netdata_rwlock_trywrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
-
-extern void netdata_thread_disable_cancelability(void);
-extern void netdata_thread_enable_cancelability(void);
-
-#ifdef NETDATA_INTERNAL_CHECKS
 
 #define netdata_mutex_init(mutex)    netdata_mutex_init_debug(__FILE__, __FUNCTION__, __LINE__, mutex)
 #define netdata_mutex_lock(mutex)    netdata_mutex_lock_debug(__FILE__, __FUNCTION__, __LINE__, mutex)
