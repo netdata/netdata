@@ -44,8 +44,6 @@ static int cgroup_search_in_devices = 1;
 
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
 
-static int cgroup_renaming_tries = 2;
-
 static int cgroup_check_for_new_every = 10;
 static int cgroup_update_every = 1;
 static int cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
@@ -276,11 +274,6 @@ void read_cgroup_plugin_configuration() {
     cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", (long long)cgroup_check_for_new_every * (long long)cgroup_update_every);
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
-    
-    cgroup_renaming_tries = config_get_number("plugin:cgroups", "cgroup renaming tries", cgroup_renaming_tries);
-    if (cgroup_renaming_tries < 1) {
-        cgroup_renaming_tries = 1;
-    }
 
     cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
     if(cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
@@ -465,7 +458,7 @@ void read_cgroup_plugin_configuration() {
             ), NULL, SIMPLE_PATTERN_EXACT);
 
     enabled_cgroup_names = simple_pattern_create(
-            config_get("plugin:cgroups", "enable by default cgroups matching names",
+            config_get("plugin:cgroups", "enable by default cgroups names matching",
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
 
@@ -2552,25 +2545,34 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     char comm[TASK_COMM_LEN] = "";
 
     if (is_inside_k8s && !k8s_get_container_first_proc_comm(cg->id, comm)) {
+        // container initialization may take some time when CPU % is high
+        // TODO: not sure run-level 2 is enough (just came across this problem on an AWS K8s cluster)
         if (!strcmp(comm, "runc:[2:INIT]")) {
             cg->first_time_seen = 1;
             return;
         }
         if (!strcmp(comm, "pause")) {
+            // a container that holds the network namespace for the pod
+            // we don't need to collect its metrics
             cg->processed = 1;
             return;
         }
     }
 
     if (cgroup_enable_systemd_services && matches_systemd_services_cgroups(cg->id)) {
+        debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'cgroups to match as systemd services'", cg->id, cg->chart_title);
         convert_cgroup_to_systemd_service(cg);
         return;
     }
 
     if (matches_enabled_cgroup_renames(cg->id)) {
-        cg->pending_renames = cgroup_renaming_tries;
-        if (is_inside_k8s && k8s_is_container(cg->id) && cg->pending_renames < 8) {
-            cg->pending_renames = 8;
+        debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'run script to rename cgroups matching', will try to rename it", cg->id, cg->chart_title);
+        if (is_inside_k8s && k8s_is_container(cg->id)) {
+            // it may take up to a minute for the K8s API to return data for the container
+            // tested on AWS K8s cluster with 100% CPU utilization
+            cg->pending_renames = 9; // 1.5 minute
+        } else {
+            cg->pending_renames = 2;
         }
     }
 }
@@ -2602,10 +2604,12 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     }
 
     if (!(cg->enabled = matches_enabled_cgroup_names(cg->chart_title))) {
+        debug(D_CGROUP, "cgroup '%s' (name '%s') disabled by 'enable by default cgroups names matching'", cg->id, cg->chart_title);
         return;
     }
 
     if (!(cg->enabled = matches_enabled_cgroup_paths(cg->id))) {
+        debug(D_CGROUP, "cgroup '%s' (name '%s') disabled by 'enable by default cgroups matching'", cg->id, cg->chart_title);
         return;
     }
 
@@ -4662,12 +4666,7 @@ void *cgroups_main(void *ptr) {
 
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
         is_inside_k8s = 1;
-    }
-
-    if (is_inside_k8s) {
         cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_YES;
-        // 2 was not enough on an AWS K8s cluster when: CPU % is high, many containers are created in a short time.
-        cgroup_renaming_tries = 4;
     }
 
     // when ZERO, attempt to do it
