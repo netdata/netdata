@@ -32,7 +32,7 @@ void Config::readMLConfig(void) {
     unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 3600);
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
 
-    unsigned DBEngineAnomalyRateEvery = config_get_number(ConfigSectionML, "dbengine anomaly rate every", 60);
+    unsigned DBEngineAnomalyRateEvery = config_get_number(ConfigSectionML, "dbengine anomaly rate every", 30);
 
     unsigned DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
@@ -58,8 +58,8 @@ void Config::readMLConfig(void) {
      * Clamp
      */
 
-    MaxTrainSamples = clamp(MaxTrainSamples, 1 * 3600u, 6 * 3600u);
-    MinTrainSamples = clamp(MinTrainSamples, 1 * 3600u, 6 * 3600u);
+    MaxTrainSamples = clamp(MaxTrainSamples, 1 * 3600u, 24 * 3600u);
+    MinTrainSamples = clamp(MinTrainSamples, 1 * 900u, 6 * 3600u);
     TrainEvery = clamp(TrainEvery, 1 * 3600u, 6 * 3600u);
 
     DBEngineAnomalyRateEvery = clamp(DBEngineAnomalyRateEvery, 1 * 30u, 15 * 60u);
