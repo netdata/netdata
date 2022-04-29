@@ -746,8 +746,8 @@ struct cgroup_network_interface {
 struct cgroup {
     uint32_t options;
 
-    int first_time_seen;    // set when first time seen by the discovery worker
-    int skip;               // set when should be skipped by the discovery worker (e.g.: 'pause' container in K8s)
+    int first_time_seen; // first time seen by the discoverer
+    int processed;       // the discoverer is done processing a cgroup (resolved name, set 'enabled' option)
 
     char available;      // found in the filesystem
     char enabled;        // enabled in the config
@@ -1840,6 +1840,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     if (!fp) {
         error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
         cg->pending_renames = 0;
+        cg->processed = 1;
         return;
     }
 
@@ -1853,15 +1854,15 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
             break;
         case 3:
             cg->pending_renames = 0;
-            cg->skip = 1;
+            cg->processed = 1;
             break;
         default:
             if (!cg->pending_renames && is_inside_k8s) {
-                cg->skip = 1;
+                cg->processed = 1;
             }
     }
 
-    if (cg->pending_renames || cg->skip) {
+    if (cg->pending_renames || cg->processed) {
         return;
     }
     if (!(new_name && *new_name && *new_name != '\n')) {
@@ -2556,7 +2557,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
             return;
         }
         if (!strcmp(comm, "pause")) {
-            cg->skip = 1;
+            cg->processed = 1;
             return;
         }
     }
@@ -2575,25 +2576,25 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
 }
 
 static inline void discovery_process_cgroup(struct cgroup *cg) {
-    if (!cg->available || cg->skip) {
+    if (!cg->available || cg->processed) {
         return;
     }
 
     if (cg->first_time_seen) {
         discovery_process_first_time_seen_cgroup(cg);
-        if (unlikely(cg->first_time_seen || cg->skip)) {
+        if (unlikely(cg->first_time_seen || cg->processed)) {
             return;
         }
     }
 
     if (cg->pending_renames) {
         discovery_rename_cgroup(cg);
-        if (unlikely(cg->pending_renames || cg->skip)) {
+        if (unlikely(cg->pending_renames || cg->processed)) {
             return;
         }
     }
 
-    cg->skip = 1;
+    cg->processed = 1;
 
     if (is_cgroup_systemd_service(cg)) {
         cg->enabled = 1;
