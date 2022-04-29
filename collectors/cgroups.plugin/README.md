@@ -137,8 +137,7 @@ metrics for all internal Netdata plugins.
 ### alarms
 
 CPU and memory limits are watched and used to rise alarms. Memory usage for every cgroup is checked against `ram`
-and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us`
-+ `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alarms is available in `health.d/cgroups.conf`
+and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alarms is available in `health.d/cgroups.conf`
 file.
 
 ## Monitoring systemd services
