@@ -4707,7 +4707,6 @@ void *cgroups_main(void *ptr) {
     usec_t step = cgroup_update_every * USEC_PER_SEC;
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
-    int init_discovery = 1;
     while(!netdata_exit) {
         usec_t hb_dt = heartbeat_next(&hb, step);
         if(unlikely(netdata_exit)) break;
@@ -4718,7 +4717,6 @@ void *cgroups_main(void *ptr) {
             discovery_thread.start_discovery = 1;
             find_dt = 0;
             cgroups_check = 0;
-            init_discovery = 0;
         }
 
         uv_mutex_lock(&cgroup_root_mutex);
