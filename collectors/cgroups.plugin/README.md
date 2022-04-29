@@ -17,18 +17,10 @@ To visualize cgroup metrics Netdata provides configuration for cherry picking th
 without any configuration) Netdata should pick **systemd services**, all kinds of **containers** (lxc, docker, etc)
 and **virtual machines** spawn by managers that register them with cgroups (qemu, libvirt, etc).
 
-## configuring Netdata for cgroups
+## Configuring Netdata for cgroups
 
-For each cgroup available in the system, Netdata provides this configuration:
-
-```
-[plugin:cgroups]
-    enable cgroup XXX = yes | no
-```
-
-But it also provides a few patterns to provide a sane default (`yes` or `no`).
-
-Below we see, how this works.
+In general, no additional settings are required. Netdata discovers all available cgroups on the host system and
+collects their metrics.
 
 ### how Netdata finds the available cgroups
 
@@ -67,7 +59,8 @@ others are enabled.
 
 ### unified cgroups (cgroups v2) support
 
-Basic unified cgroups metrics are supported. To use them instead of v1 cgroups add:
+Netdata automatically detects cgroups version. If detection fails Netdata assumes v1.
+To switch to v2 manually add:
 
 ```
 [plugin:cgroups]
@@ -80,30 +73,24 @@ currently unsupported when using unified cgroups.
 
 ### enabled cgroups
 
-To check if the cgroup is enabled, Netdata uses this setting:
+To provide a sane default, Netdata uses the
+following [pattern list](https://learn.netdata.cloud/docs/agent/libnetdata/simple_pattern):
 
-```
-[plugin:cgroups]
-	enable cgroup NAME = yes | no
-```
+- checks the pattern against the path of the cgroup
 
-To provide a sane default, Netdata uses the following pattern list (it checks the pattern against the path of the
-cgroup):
+  ```
+  [plugin:cgroups]
+  	enable by default cgroups matching =  !*/init.scope  *.scope  !*/vcpu*  !*/emulator  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  !/  !/docker  !/libvirt  !/lxc  !/lxc/*/ns  !/lxc/*/ns/*  !/machine  !/qemu  !/system  !/systemd  !/user  *
+  ```
 
-```
-[plugin:cgroups]
-	enable by default cgroups matching =  !*/init.scope  *.scope  !*/vcpu*  !*/emulator  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  !/  !/docker  !/libvirt  !/lxc  !/lxc/*/ns  !/lxc/*/ns/*  !/machine  !/qemu  !/system  !/systemd  !/user  *
-```
+- checks the pattern against the name of the cgroup (as you see it on the dashboard)
 
-The above provides the default `yes` or `no` setting for the cgroup. However, there is an additional step. In many cases
-the cgroups found in the `/sys/fs/cgroup` hierarchy are just random numbers and in many cases these numbers are
-ephemeral: they change across reboots or sessions.
+  ```
+  [plugin:cgroups]
+  	enable by default cgroups names matching = *
+  ```
 
-So, we need to somehow map the paths of the cgroups to names, to provide consistent Netdata configuration (i.e. there is
-no point to say `enable cgroup 1234 = yes | no`, if `1234` is a random number that changes over time - we need a name
-for the cgroup first, so that `enable cgroup NAME = yes | no` will be consistent).
-
-For this mapping Netdata provides 2 configuration options:
+Renaming is configured with the following options:
 
 ```
 [plugin:cgroups]
@@ -243,6 +230,7 @@ sudo systemctl daemon-reexec
 execute `systemctl daemon-reexec`).
 
 Now, when you run `systemd-cgtop`, services will start reporting usage (if it does not, restart a service - any service
+
 - to wake it up). Refresh your Netdata dashboard, and you will have the charts too.
 
 In case memory accounting is missing, you will need to enable it at your kernel, by appending the following kernel boot
