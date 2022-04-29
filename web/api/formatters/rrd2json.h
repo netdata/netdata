@@ -88,7 +88,7 @@ extern int rrdset2value_api_v1(
         , int timeout
 );
 
-extern void build_context_param_list(struct context_param **param_list, RRDSET *st);
+extern void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list, RRDSET *st);
 extern void rebuild_context_param_list(struct context_param *context_param_list, time_t after_requested);
 extern void free_context_param_list(struct context_param **param_list);
 

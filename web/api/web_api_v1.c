@@ -519,8 +519,11 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     struct context_param  *context_param_list = NULL;
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+
     if (context && !chart) {
         RRDSET *st1;
+
         uint32_t context_hash = simple_hash(context);
 
         rrdhost_rdlock(host);
@@ -532,7 +535,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                 (!chart_label_key || rrdset_contains_label_keylist(st1, chart_label_key)) &&
                 (!chart_labels_filter ||
                  rrdset_matches_label_keys(st1, chart_labels_filter, words, hash_key_list, &word_count, MAX_CHART_LABELS_FILTER)))
-                    build_context_param_list(&context_param_list, st1);
+                    build_context_param_list(owa, &context_param_list, st1);
         }
         rrdhost_unlock(host);
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
@@ -652,7 +655,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     else if(format == DATASOURCE_JSONP)
         buffer_strcat(w->response.data, ");");
 
-    cleanup:
+cleanup:
+    onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;
 }

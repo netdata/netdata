@@ -7,8 +7,8 @@ static inline void free_single_rrdrim(RRDDIM *temp_rd, int archive_mode)
     if (unlikely(!temp_rd))
         return;
 
-    freez((char *)temp_rd->id);
-    freez((char *)temp_rd->name);
+    // freez((char *)temp_rd->id);
+    // freez((char *)temp_rd->name);
 
     if (unlikely(archive_mode)) {
         temp_rd->rrdset->counter--;
@@ -18,8 +18,8 @@ static inline void free_single_rrdrim(RRDDIM *temp_rd, int archive_mode)
             freez(temp_rd->rrdset);
         }
     }
-    freez(temp_rd->state);
-    freez(temp_rd);
+    // freez(temp_rd->state);
+    // freez(temp_rd);
 }
 
 static inline void free_rrddim_list(RRDDIM *temp_rd, int archive_mode)
@@ -41,7 +41,7 @@ void free_context_param_list(struct context_param **param_list)
         return;
 
     free_rrddim_list(((*param_list)->rd), (*param_list)->flags & CONTEXT_FLAGS_ARCHIVE);
-    freez((*param_list));
+    // freez((*param_list));
     *param_list = NULL;
 }
 
@@ -65,13 +65,13 @@ void rebuild_context_param_list(struct context_param *context_param_list, time_t
     context_param_list->rd = new_rd_list;
 };
 
-void build_context_param_list(struct context_param **param_list, RRDSET *st)
+void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list, RRDSET *st)
 {
     if (unlikely(!param_list || !st))
         return;
 
     if (unlikely(!(*param_list))) {
-        *param_list = mallocz(sizeof(struct context_param));
+        *param_list = onewayalloc_mallocz(owa, sizeof(struct context_param));
         (*param_list)->first_entry_t = LONG_MAX;
         (*param_list)->last_entry_t = 0;
         (*param_list)->flags = CONTEXT_FLAGS_CONTEXT;
@@ -86,12 +86,10 @@ void build_context_param_list(struct context_param **param_list, RRDSET *st)
     (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t_nolock(st));
 
     rrddim_foreach_read(rd1, st) {
-        RRDDIM *rd = mallocz(rd1->memsize);
-        memcpy(rd, rd1, rd1->memsize);
-        rd->id = strdupz(rd1->id);
-        rd->name = strdupz(rd1->name);
-        rd->state = mallocz(sizeof(*rd->state));
-        memcpy(rd->state, rd1->state, sizeof(*rd->state));
+        RRDDIM *rd = onewayalloc_memdupz(owa, rd1, rd1->memsize);
+        rd->id = onewayalloc_strdupz(owa, rd1->id);
+        rd->name = onewayalloc_strdupz(owa, rd1->name);
+        rd->state = onewayalloc_memdupz(owa, rd1->state, sizeof(*rd->state));
         memcpy(&rd->state->collect_ops, &rd1->state->collect_ops, sizeof(struct rrddim_collect_ops));
         memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
         rd->next = (*param_list)->rd;
