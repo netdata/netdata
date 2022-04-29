@@ -8,30 +8,28 @@ const char* get_release_channel() {
     static int use_stable = -1;
 
     if (use_stable == -1) {
-		char filename[FILENAME_MAX + 1];
+        char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/.environment", netdata_configured_user_config_dir);
         procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_DEFAULT);
-        if(!ff) {
-            use_stable=1;
-        } else {
+        if (ff) {
             procfile_set_quotes(ff, "'\"");
             ff = procfile_readall(ff);
-            if(!ff) {
-                use_stable=1;
-            } else {
+            if (ff) {
                 unsigned int i;
-                for(i = 0; i < procfile_lines(ff); i++) {
-                    if (!procfile_linewords(ff, i)) continue;
-
-                    if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL") && !strcmp(procfile_lineword(ff, i, 1), "stable")) {
+                for (i = 0; i < procfile_lines(ff); i++) {
+                    if (!procfile_linewords(ff, i))
+                        continue;
+                    if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL") &&
+                        !strcmp(procfile_lineword(ff, i, 1), "stable")) {
                         use_stable = 1;
                         break;
                     }
                 }
                 procfile_close(ff);
-                if (use_stable == -1) use_stable = 0;
             }
         }
+        if (use_stable == -1)
+            use_stable = strchr(program_version, '-') ? 0 : 1;
     }
     return (use_stable)?"stable":"nightly";
 }
