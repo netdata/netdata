@@ -3,6 +3,7 @@
 static size_t PAGE_SIZE = 0;
 
 typedef struct owa_page {
+    size_t pages;
     size_t size;        // the total size of the page
     size_t offset;      // the first free byte of the page
     struct owa_page *next;     // the next page on the list
@@ -31,6 +32,7 @@ ONEWAYALLOC *onewayalloc_create(size_t size_hint) {
     page->size = size;
     page->offset = alignment(sizeof(OWA_PAGE));
     page->next = NULL;
+    page->pages = 1;
     page->last = page;
 
     return (ONEWAYALLOC *)page;
@@ -46,7 +48,14 @@ void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
     if(unlikely(page->size - page->offset < size)) {
         // we don't have enough space to fit the data
         // let's get another page
-        page = page->last = head->last = onewayalloc_create((size > page->size)?size:page->size);
+
+        page->next = onewayalloc_create((size > page->size)?size:page->size);
+        page->last = page->next;
+
+        head->last = page->next;
+        head->pages++;
+
+        page = head->last;
     }
 
     char *mem = (char *)page;
@@ -74,4 +83,24 @@ void onewayalloc_destroy(ONEWAYALLOC *ptr) {
         onewayalloc_destroy((ONEWAYALLOC *)page->next);
 
     munmap(page, page->size);
+}
+
+
+void onewayalloc_unittest(void) {
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+
+    // strdupz
+    char *buffer, *s, *mem = (char *)owa;
+    int i, size = 200;
+
+    buffer = mallocz(size);
+    for(i = 0; i < size ;i++) buffer[i] = 'A' + (i % 26);
+    s = onewayalloc_strdupz(owa, buffer);
+
+    if(s - mem != sizeof(OWA_PAGE))
+        printf("allocation is not in place mem=0x%08x, buffer=0x%08X, delta = %zu, expected %zu\n", mem, s, (size_t)s - (size_t)mem, sizeof(OWA_PAGE));
+
+    for(i = 0; i < size ;i++) if(s[i] != buffer[i]) printf("onewayalloc_strdupz() check failed\n");
+
+
 }
