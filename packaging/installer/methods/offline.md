@@ -28,7 +28,7 @@ cd /tmp
 curl -s https://my-netdata.io/kickstart.sh > kickstart.sh
 
 # Netdata tarball
-curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
+curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep -v netdata-latest | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
 
 # Netdata checksums
 curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*txt" | cut -d '"' -f 4 | wget -qi -
