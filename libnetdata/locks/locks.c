@@ -6,7 +6,10 @@
 // automatic thread cancelability management, based on locks
 
 static __thread int netdata_thread_first_cancelability = 0;
-static __thread int netdata_thread_lock_cancelability = 0;
+static __thread int netdata_thread_nested_disables = 0;
+
+static __thread size_t netdata_locks_acquired_rwlocks = 0;
+static __thread size_t netdata_locks_acquired_mutexes = 0;
 
 inline void netdata_thread_disable_cancelability(void) {
     int old;
@@ -14,18 +17,19 @@ inline void netdata_thread_disable_cancelability(void) {
     if(ret != 0)
         error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d", netdata_thread_tag(), ret);
     else {
-        if(!netdata_thread_lock_cancelability)
+        if(!netdata_thread_nested_disables)
             netdata_thread_first_cancelability = old;
 
-        netdata_thread_lock_cancelability++;
+        netdata_thread_nested_disables++;
     }
 }
 
 inline void netdata_thread_enable_cancelability(void) {
-    if(netdata_thread_lock_cancelability < 1) {
-        error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): invalid thread cancelability count %d on thread %s - results will be undefined - please report this!", netdata_thread_lock_cancelability, netdata_thread_tag());
+    if(netdata_thread_nested_disables < 1) {
+        error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): invalid thread cancelability count %d on thread %s - results will be undefined - please report this!",
+            netdata_thread_nested_disables, netdata_thread_tag());
     }
-    else if(netdata_thread_lock_cancelability == 1) {
+    else if(netdata_thread_nested_disables == 1) {
         int old = 1;
         int ret = pthread_setcancelstate(netdata_thread_first_cancelability, &old);
         if(ret != 0)
@@ -35,10 +39,10 @@ inline void netdata_thread_enable_cancelability(void) {
                 error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): old thread cancelability on thread %s was changed, expected DISABLED (%d), found %s (%d) - please report this!", netdata_thread_tag(), PTHREAD_CANCEL_DISABLE, (old == PTHREAD_CANCEL_ENABLE)?"ENABLED":"UNKNOWN", old);
         }
 
-        netdata_thread_lock_cancelability = 0;
+        netdata_thread_nested_disables = 0;
     }
     else
-        netdata_thread_lock_cancelability--;
+        netdata_thread_nested_disables--;
 }
 
 // ----------------------------------------------------------------------------
@@ -59,6 +63,9 @@ int __netdata_mutex_lock(netdata_mutex_t *mutex) {
         netdata_thread_enable_cancelability();
         error("MUTEX_LOCK: failed to get lock (code %d)", ret);
     }
+    else
+        netdata_locks_acquired_mutexes++;
+
     return ret;
 }
 
@@ -68,6 +75,8 @@ int __netdata_mutex_trylock(netdata_mutex_t *mutex) {
     int ret = pthread_mutex_trylock(mutex);
     if(ret != 0)
         netdata_thread_enable_cancelability();
+    else
+        netdata_locks_acquired_mutexes++;
 
     return ret;
 }
@@ -76,11 +85,15 @@ int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
     int ret = pthread_mutex_unlock(mutex);
     if(unlikely(ret != 0))
         error("MUTEX_LOCK: failed to unlock (code %d).", ret);
-    else
+    else {
+        netdata_locks_acquired_mutexes--;
         netdata_thread_enable_cancelability();
+    }
 
     return ret;
 }
+
+#ifdef NETDATA_TRACE_RWLOCKS
 
 int netdata_mutex_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                              const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
@@ -150,6 +163,8 @@ int netdata_mutex_unlock_debug(const char *file __maybe_unused, const char *func
     return ret;
 }
 
+#endif // NETDATA_TRACE_RWLOCKS
+
 // ----------------------------------------------------------------------------
 // rwlock
 
@@ -175,6 +190,8 @@ int __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock) {
         netdata_thread_enable_cancelability();
         error("RW_LOCK: failed to obtain read lock (code %d)", ret);
     }
+    else
+        netdata_locks_acquired_rwlocks++;
 
     return ret;
 }
@@ -187,6 +204,8 @@ int __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock) {
         error("RW_LOCK: failed to obtain write lock (code %d)", ret);
         netdata_thread_enable_cancelability();
     }
+    else
+        netdata_locks_acquired_rwlocks++;
 
     return ret;
 }
@@ -195,8 +214,10 @@ int __netdata_rwlock_unlock(netdata_rwlock_t *rwlock) {
     int ret = pthread_rwlock_unlock(&rwlock->rwlock_t);
     if(unlikely(ret != 0))
         error("RW_LOCK: failed to release lock (code %d)", ret);
-    else
+    else {
         netdata_thread_enable_cancelability();
+        netdata_locks_acquired_rwlocks--;
+    }
 
     return ret;
 }
@@ -207,6 +228,8 @@ int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock) {
     int ret = pthread_rwlock_tryrdlock(&rwlock->rwlock_t);
     if(ret != 0)
         netdata_thread_enable_cancelability();
+    else
+        netdata_locks_acquired_rwlocks++;
 
     return ret;
 }
@@ -217,11 +240,13 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
     int ret = pthread_rwlock_trywrlock(&rwlock->rwlock_t);
     if(ret != 0)
         netdata_thread_enable_cancelability();
+    else
+        netdata_locks_acquired_rwlocks++;
 
     return ret;
 }
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_TRACE_RWLOCKS
 
 // ----------------------------------------------------------------------------
 // lockers list
@@ -229,21 +254,24 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 void not_supported_by_posix_rwlocks(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, char locktype, const char *reason) {
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
-            "RW_LOCK FATAL ON LOCK 0x%08x: %zu '%s' (function %s() %llu@%s) attempts to acquire a '%c' lock but is not supported by POSIX because: %s\n"
-            "There are %zu readers and %zu writers are holding the lock:\n",
-            (uintptr_t)rwlock,
+            "RW_LOCK FATAL ON LOCK 0x%p: %u '%s' (function %s() %lu@%s) attempts to acquire a '%c' lock.\n"
+            "But it is not supported by POSIX because: %s\n"
+            "At this attempt, the task is holding %zu rwlocks and %zu mutexes.\n"
+            "There are %zu readers and %zu writers are holding the lock requested now:\n",
+            rwlock,
             gettid(), netdata_thread_tag(),
             function, line, file,
             locktype,
             reason,
+            netdata_locks_acquired_rwlocks, netdata_locks_acquired_mutexes,
             rwlock->readers, rwlock->writers);
 
     int i;
-    usec_t now = now_monotonic_usec();
+    usec_t now = now_boottime_usec();
     netdata_rwlock_locker *p;
     for(i = 1, p = rwlock->lockers; p ;p = p->next, i++) {
         fprintf(stderr,
-                "     => %i: RW_LOCK: process %zu '%s' (function %s() %llu@%s) is having %zu '%c' lock for %llu usec.\n",
+                "     => %i: RW_LOCK: process %u '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
                 i,
                 p->pid, p->tag,
                 p->function, p->line, p->file,
@@ -256,20 +284,21 @@ void not_supported_by_posix_rwlocks(const char *file, const char *function, cons
 static void log_rwlock_lockers(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, const char *reason, char locktype) {
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
-            "RW_LOCK ON LOCK 0x%08x: %zu '%s' (function %s() %llu@%s) %s a '%c' lock.\n"
+            "RW_LOCK ON LOCK 0x%p: %u '%s' (function %s() %lu@%s) %s a '%c' lock (while holding %zu rwlocks and %zu mutexes).\n"
             "There are %zu readers and %zu writers are holding the lock:\n",
-            (uintptr_t)rwlock,
+            rwlock,
             gettid(), netdata_thread_tag(),
             function, line, file,
             reason, locktype,
+            netdata_locks_acquired_rwlocks, netdata_locks_acquired_mutexes,
             rwlock->readers, rwlock->writers);
 
     int i;
-    usec_t now = now_monotonic_usec();
+    usec_t now = now_boottime_usec();
     netdata_rwlock_locker *p;
     for(i = 1, p = rwlock->lockers; p ;p = p->next, i++) {
         fprintf(stderr,
-                "     => %i: RW_LOCK: process %zu '%s' (function %s() %llu@%s) is having %zu '%c' lock for %llu usec.\n",
+                "     => %i: RW_LOCK: process %u '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
                 i,
                 p->pid, p->tag,
                 p->function, p->line, p->file,
@@ -288,7 +317,7 @@ static netdata_rwlock_locker *add_rwlock_locker(const char *file, const char *fu
     p->function = function;
     p->line = line;
     p->callers = 1;
-    p->start_s = now_monotonic_usec();
+    p->start_s = now_boottime_usec();
 
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     p->next = rwlock->lockers;
@@ -300,18 +329,18 @@ static netdata_rwlock_locker *add_rwlock_locker(const char *file, const char *fu
     return p;
 }
 
-static void remove_rwlock_locker(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, netdata_rwlock_locker *locker) {
+static void remove_rwlock_locker(const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock, netdata_rwlock_locker *locker) {
     if(locker->callers == 0)
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%08x: %d, '%s' (function %s() %lu@%s) callers should be positive but it is zero\n",
-                (uintptr_t)rwlock,
+                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) callers should be positive but it is zero\n",
+                rwlock,
                 locker->pid, locker->tag,
                 locker->function, locker->line, locker->file);
 
     if(locker->callers > 1 && locker->lock != 'R')
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%08x: %d, '%s' (function %s() %lu@%s) only 'R' locks support nesting, but here we have %zu on '%c' lock.\n",
-                (uintptr_t)rwlock,
+                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) only 'R' locks support multiple holders, but here we have %zu callers holding a '%c' lock.\n",
+                rwlock,
                 locker->pid, locker->tag,
                 locker->function, locker->line, locker->file,
                 locker->callers, locker->lock);
@@ -341,8 +370,8 @@ static void remove_rwlock_locker(const char *file, const char *function, const u
 
         if(!doit) {
             fprintf(stderr,
-                    "RW_LOCK ON LOCK 0x%08x: %d, '%s' (function %s() %lu@%s) with %zu '%c' lock is not found.\n",
-                    (uintptr_t)rwlock,
+                    "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) with %zu '%c' lock is not found.\n",
+                    rwlock,
                     locker->pid, locker->tag,
                     locker->function, locker->line, locker->file,
                     locker->callers, locker->lock);
@@ -355,7 +384,7 @@ static void remove_rwlock_locker(const char *file, const char *function, const u
     __netdata_mutex_unlock(&rwlock->lockers_mutex);
 }
 
-static netdata_rwlock_locker *find_rwlock_locker(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+static netdata_rwlock_locker *find_rwlock_locker(const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
     pid_t pid = gettid();
     netdata_rwlock_locker *p;
 
@@ -571,4 +600,4 @@ int netdata_rwlock_trywrlock_debug(const char *file __maybe_unused, const char *
     return ret;
 }
 
-#endif // NETDATA_INTERNAL_CHECKS
+#endif // NETDATA_TRACE_RWLOCKS
