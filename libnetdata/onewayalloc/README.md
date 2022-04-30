@@ -26,9 +26,10 @@ these data can be freed immediately after the query finishes.
    does not really check if there is memory available for `mmap()` calls.
    
 2. The caller can then perform any number of the following calls to acquire memory:
-   - `onewayalloc_mallocz(owa, size)` to just get a buffer of `size`
-   - `onewayalloc_strdupz(owa, string)` similar to `strdup()`
-   - `onewayalloc_memdupz(owa, ptr, size)` similar to `malloc()` and then `memcpy()`
+   - `onewayalloc_mallocz(owa, size)`, similar to `mallocz()`
+   - `onewayalloc_callocz(owa, nmemb, size)`, similar to `callocz()`
+   - `onewayalloc_strdupz(owa, string)`, similar to `strdupz()`
+   - `onewayalloc_memdupz(owa, ptr, size)`, similar to `mallocz()` and then `memcpy()`
    
 3. Once the caller has done all the work with the allocated buffers, all memory allocated 
    can be freed with `onewayalloc_destroy(owa)`.

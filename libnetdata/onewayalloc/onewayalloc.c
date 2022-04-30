@@ -104,6 +104,13 @@ void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
     return (void *)mem;
 }
 
+void *onewayalloc_callocz(ONEWAYALLOC *owa, size_t nmemb, size_t size) {
+    size_t total = nmemb * size;
+    void *mem = onewayalloc_mallocz(owa, total);
+    memset(mem, 0, total);
+    return mem;
+}
+
 char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s) {
     size_t size = strlen(s) + 1;
     char *d = onewayalloc_mallocz((OWA_PAGE *)owa, size);
