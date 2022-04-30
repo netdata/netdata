@@ -1,61 +1,93 @@
 #include "onewayalloc.h"
 
 static size_t PAGE_SIZE = 0;
+static size_t NATURAL_ALIGNMENT = sizeof(size_t);
 
 typedef struct owa_page {
-    size_t pages;
+    size_t stats_pages;
+    size_t stats_pages_size;
+    size_t stats_mallocs_made;
+    size_t stats_mallocs_size;
     size_t size;        // the total size of the page
     size_t offset;      // the first free byte of the page
     struct owa_page *next;     // the next page on the list
     struct owa_page *last;     // the last page on the list - we currently allocate on this
 } OWA_PAGE;
 
-static inline size_t alignment(size_t size) {
-    size_t wanted = sizeof(size_t);
-
-    if(unlikely(size % wanted))
-        size = size + wanted - (size % wanted);
+// allocations need to be aligned to CPU register width
+// https://en.wikipedia.org/wiki/Data_structure_alignment
+static inline size_t natural_alignment(size_t size) {
+    if(unlikely(size % NATURAL_ALIGNMENT))
+        size = size + NATURAL_ALIGNMENT - (size % NATURAL_ALIGNMENT);
 
     return size;
 }
 
-ONEWAYALLOC *onewayalloc_create(size_t size_hint) {
+// Create an OWA
+// Once it is created, the called may call the onewayalloc_mallocz()
+// any number of times, for any amount of memory.
+
+static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     if(unlikely(!PAGE_SIZE)) PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
 
+    // make sure the new page will fit both the requested size
+    // and the OWA_PAGE structure at its beginning
+    size_hint += sizeof(OWA_PAGE);
+
+    // our default page size
     size_t size = PAGE_SIZE;
+
+    // prefer the user page size if it is bigger
+    // but make sure it is always a multiple of the
+    // hardware page size
     if(size_hint > size) size = ((PAGE_SIZE / size_hint) + 1) * PAGE_SIZE;
 
-    void *mem = netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0);
-    if(!mem) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
+    OWA_PAGE *page = (OWA_PAGE *)netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0);
+    if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
 
-    OWA_PAGE *page = (OWA_PAGE *)mem;
     page->size = size;
-    page->offset = alignment(sizeof(OWA_PAGE));
-    page->next = NULL;
-    page->pages = 1;
-    page->last = page;
+    page->offset = natural_alignment(sizeof(OWA_PAGE));
+    page->next = page->last = NULL;
+
+    if(unlikely(!head)) {
+        // this is the first time we are called
+        head = page;
+        head->stats_pages = 0;
+        head->stats_pages_size = 0;
+        head->stats_mallocs_made = 0;
+        head->stats_mallocs_size = 0;
+    }
+    else {
+        // link this page into our existing linked list
+        head->last->next = page;
+    }
+
+    head->last = page;
+    head->stats_pages++;
+    head->stats_pages_size += size;
 
     return (ONEWAYALLOC *)page;
+}
+
+ONEWAYALLOC *onewayalloc_create(size_t size_hint) {
+    return onewayalloc_create_internal(NULL, size_hint);
 }
 
 void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
     OWA_PAGE *head = (OWA_PAGE *)owa;
     OWA_PAGE *page = head->last;
 
+    // update stats
+    head->stats_mallocs_made++;
+    head->stats_mallocs_size += size;
+
     // make sure the size is aligned
-    size = alignment(size);
+    size = natural_alignment(size);
 
     if(unlikely(page->size - page->offset < size)) {
         // we don't have enough space to fit the data
         // let's get another page
-
-        page->next = onewayalloc_create((size > page->size)?size:page->size);
-        page->last = page->next;
-
-        head->last = page->next;
-        head->pages++;
-
-        page = head->last;
+        page = onewayalloc_create_internal(head, (size > page->size)?size:page->size);
     }
 
     char *mem = (char *)page;
@@ -77,30 +109,17 @@ void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
     return mem;
 }
 
-void onewayalloc_destroy(ONEWAYALLOC *ptr) {
-    OWA_PAGE *page = (OWA_PAGE *)ptr;
-    if(page->next)
-        onewayalloc_destroy((ONEWAYALLOC *)page->next);
+void onewayalloc_destroy(ONEWAYALLOC *owa) {
+    OWA_PAGE *head = (OWA_PAGE *)owa;
 
-    munmap(page, page->size);
-}
+    info("OWA: %zu allocations of %zu total bytes, in %zu pages of %zu total bytes",
+         head->stats_mallocs_made, head->stats_mallocs_size,
+         head->stats_pages, head->stats_pages_size);
 
-
-void onewayalloc_unittest(void) {
-    ONEWAYALLOC *owa = onewayalloc_create(0);
-
-    // strdupz
-    char *buffer, *s, *mem = (char *)owa;
-    int i, size = 200;
-
-    buffer = mallocz(size);
-    for(i = 0; i < size ;i++) buffer[i] = 'A' + (i % 26);
-    s = onewayalloc_strdupz(owa, buffer);
-
-    if(s - mem != sizeof(OWA_PAGE))
-        printf("allocation is not in place mem=0x%08x, buffer=0x%08X, delta = %zu, expected %zu\n", mem, s, (size_t)s - (size_t)mem, sizeof(OWA_PAGE));
-
-    for(i = 0; i < size ;i++) if(s[i] != buffer[i]) printf("onewayalloc_strdupz() check failed\n");
-
-
+    OWA_PAGE *page = head;
+    while(page) {
+        OWA_PAGE *p = page;
+        page = page->next;
+        munmap(p, p->size);
+    }
 }
