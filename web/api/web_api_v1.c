@@ -512,6 +512,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     fix_google_param(outFileName);
 
     RRDSET *st = NULL;
+    ONEWAYALLOC *owa = onewayalloc_create(0);
 
     if((!chart || !*chart) && (!context)) {
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
@@ -519,7 +520,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     struct context_param  *context_param_list = NULL;
-    ONEWAYALLOC *owa = onewayalloc_create(0);
 
     if (context && !chart) {
         RRDSET *st1;

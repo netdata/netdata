@@ -113,16 +113,19 @@ char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s) {
 
 void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
     void *mem = onewayalloc_mallocz((OWA_PAGE *)owa, size);
+    // memcpy() is way faster than strcpy() since it does not check for '\0'
     memcpy(mem, src, size);
     return mem;
 }
 
 void onewayalloc_destroy(ONEWAYALLOC *owa) {
+    if(!owa) return;
+
     OWA_PAGE *head = (OWA_PAGE *)owa;
 
-    info("OWA: %zu allocations of %zu total bytes, in %zu pages of %zu total bytes",
-         head->stats_mallocs_made, head->stats_mallocs_size,
-         head->stats_pages, head->stats_pages_size);
+    //info("OWA: %zu allocations of %zu total bytes, in %zu pages of %zu total bytes",
+    //     head->stats_mallocs_made, head->stats_mallocs_size,
+    //     head->stats_pages, head->stats_pages_size);
 
     OWA_PAGE *page = head;
     while(page) {
