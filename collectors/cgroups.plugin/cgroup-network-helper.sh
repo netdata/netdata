@@ -219,7 +219,7 @@ netnsid_find_all_interfaces_for_cgroup() {
     local c="${1}" # the cgroup path
 
     if [ -f "${c}/cgroup.procs" ]; then
-        netnsid_find_all_interfaces_for_pid "$(head -n 1 "${c}/cgroup.procs" 2 >/dev/null)"
+        netnsid_find_all_interfaces_for_pid "$(head -n 1 "${c}/cgroup.procs" 2>/dev/null)"
     else
         debug "Cannot find file '${c}/cgroup.procs', not searching for netnsid interfaces."
     fi
