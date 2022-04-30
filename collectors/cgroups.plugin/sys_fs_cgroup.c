@@ -2576,6 +2576,18 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     }
 }
 
+static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
+   // https://github.com/netdata/netdata/issues/797#issuecomment-241248884
+   struct cgroup *c;
+   for (c = discovered_cgroup_root; c; c = c->discovered_next) {
+       if (c != cg && c->enabled && c->hash_chart == cg->hash_chart && !strcmp(c->chart_id, cg->chart_id)) {
+           error("CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.", cg->chart_id, c->id, cg->id);
+           return 1;
+       }
+   }
+   return 0;
+}
+
 static inline void discovery_process_cgroup(struct cgroup *cg) {
     if (!cg->available || cg->processed) {
         return;
@@ -2612,9 +2624,13 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
         return;
     }
 
-    if (cg->enabled) {
-        read_cgroup_network_interfaces(cg);
+    if (discovery_is_cgroup_duplicate(cg)) {
+        cg->enabled = 0;
+        cg->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
+        return;
     }
+
+    read_cgroup_network_interfaces(cg);
 }
 
 static inline void discovery_find_all_cgroups() {
