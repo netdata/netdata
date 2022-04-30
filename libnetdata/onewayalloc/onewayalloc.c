@@ -30,17 +30,24 @@ static inline size_t natural_alignment(size_t size) {
 static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     if(unlikely(!PAGE_SIZE)) PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
 
+    // our default page size
+    size_t size = PAGE_SIZE;
+
     // make sure the new page will fit both the requested size
     // and the OWA_PAGE structure at its beginning
     size_hint += sizeof(OWA_PAGE);
 
-    // our default page size
-    size_t size = PAGE_SIZE;
+    // prefer the user size if it is bigger than our size
+    if(size_hint > size) size = size_hint;
 
-    // prefer the user page size if it is bigger
-    // but make sure it is always a multiple of the
-    // hardware page size
-    if(size_hint > size) size = ((PAGE_SIZE / size_hint) + 1) * PAGE_SIZE;
+    // try to allocate half of the total we have allocated already
+    if(likely(head)) {
+        size_t optimal_size = head->stats_pages_size / 2;
+        if(optimal_size > size) size = optimal_size;
+    }
+
+    // Make sure our allocations are always a multiple of the hardware page size
+    if(size % PAGE_SIZE) size = size + PAGE_SIZE - (size % PAGE_SIZE);
 
     OWA_PAGE *page = (OWA_PAGE *)netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0);
     if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
