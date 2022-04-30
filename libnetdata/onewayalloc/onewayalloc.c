@@ -105,8 +105,9 @@ void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
 }
 
 char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s) {
-    char *d = onewayalloc_mallocz((OWA_PAGE *)owa, strlen(s) + 1);
-    strcpy(d, s);
+    size_t size = strlen(s) + 1;
+    char *d = onewayalloc_mallocz((OWA_PAGE *)owa, size);
+    memcpy(d, s, size);
     return d;
 }
 
