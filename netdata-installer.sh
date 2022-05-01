@@ -618,9 +618,9 @@ bundle_protobuf() {
 
   PROTOBUF_PACKAGE_VERSION="$(cat packaging/protobuf.version)"
 
-  if [ -f ${PWD}/externaldeps/protobuf/.version ] && [ "${PROTOBUF_PACKAGE_VERSION}" = "$(< "${PWD}/externaldeps/protobuf/.version")" ]
+  if [ -f "${PWD}/externaldeps/protobuf/.version" ] && [ "${PROTOBUF_PACKAGE_VERSION}" = "$(< "${PWD}/externaldeps/protobuf/.version")" ]
   then
-    echo >&2 "Found compiled protobuf, same version"
+    echo >&2 "Found compiled protobuf, same version, not compiling it again. Remove file '${PWD}/externaldeps/protobuf/.version' to recompile."
     NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
     return 0
   fi
