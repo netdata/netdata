@@ -278,7 +278,7 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 void not_supported_by_posix_rwlocks(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, char locktype, const char *reason) {
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
-            "RW_LOCK FATAL ON LOCK 0x%p: %u '%s' (function %s() %lu@%s) attempts to acquire a '%c' lock.\n"
+            "RW_LOCK FATAL ON LOCK 0x%p: %d '%s' (function %s() %lu@%s) attempts to acquire a '%c' lock.\n"
             "But it is not supported by POSIX because: %s\n"
             "At this attempt, the task is holding %zu rwlocks and %zu mutexes.\n"
             "There are %zu readers and %zu writers are holding the lock requested now:\n",
@@ -295,7 +295,7 @@ void not_supported_by_posix_rwlocks(const char *file, const char *function, cons
     netdata_rwlock_locker *p;
     for(i = 1, p = rwlock->lockers; p ;p = p->next, i++) {
         fprintf(stderr,
-                "     => %i: RW_LOCK: process %u '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
+                "     => %i: RW_LOCK: process %d '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
                 i,
                 p->pid, p->tag,
                 p->function, p->line, p->file,
@@ -308,7 +308,7 @@ void not_supported_by_posix_rwlocks(const char *file, const char *function, cons
 static void log_rwlock_lockers(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, const char *reason, char locktype) {
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
-            "RW_LOCK ON LOCK 0x%p: %u '%s' (function %s() %lu@%s) %s a '%c' lock (while holding %zu rwlocks and %zu mutexes).\n"
+            "RW_LOCK ON LOCK 0x%p: %d '%s' (function %s() %lu@%s) %s a '%c' lock (while holding %zu rwlocks and %zu mutexes).\n"
             "There are %zu readers and %zu writers are holding the lock:\n",
             rwlock,
             gettid(), netdata_thread_tag(),
@@ -322,7 +322,7 @@ static void log_rwlock_lockers(const char *file, const char *function, const uns
     netdata_rwlock_locker *p;
     for(i = 1, p = rwlock->lockers; p ;p = p->next, i++) {
         fprintf(stderr,
-                "     => %i: RW_LOCK: process %u '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
+                "     => %i: RW_LOCK: process %d '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
                 i,
                 p->pid, p->tag,
                 p->function, p->line, p->file,
