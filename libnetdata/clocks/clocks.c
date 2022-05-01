@@ -2,8 +2,10 @@
 
 #include "../libnetdata.h"
 
-static int clock_boottime_valid = 1;
-static int clock_monotonic_coarse_valid = 1;
+// defaults are for compatibility
+// call clocks_init() once, to optimize these default settings
+static clockid_t clock_boottime_to_use = CLOCK_MONOTONIC;
+static clockid_t clock_monotonic_to_use = CLOCK_MONOTONIC;
 
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
@@ -18,19 +20,39 @@ inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
 }
 #endif
 
-void test_clock_boottime(void) {
-    struct timespec ts;
-    if(clock_gettime(CLOCK_BOOTTIME, &ts) == -1 && errno == EINVAL)
-        clock_boottime_valid = 0;
-}
+// When running a binary with CLOCK_MONOTONIC_COARSE defined on a system with a linux kernel older than Linux 2.6.32 the
+// clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
 
-void test_clock_monotonic_coarse(void) {
+static void test_clock_monotonic_coarse(void) {
     struct timespec ts;
     if(clock_gettime(CLOCK_MONOTONIC_COARSE, &ts) == -1 && errno == EINVAL)
-        clock_monotonic_coarse_valid = 0;
+        clock_monotonic_to_use = CLOCK_MONOTONIC;
+    else
+        clock_monotonic_to_use = CLOCK_MONOTONIC_COARSE;
 }
 
-static inline time_t now_sec(clockid_t clk_id) {
+// When running a binary with CLOCK_BOOTTIME defined on a system with a linux kernel older than Linux 2.6.39 the
+// clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
+
+static void test_clock_boottime(void) {
+    struct timespec ts;
+    if(clock_gettime(CLOCK_BOOTTIME, &ts) == -1 && errno == EINVAL)
+        clock_boottime_to_use = clock_monotonic_to_use;
+    else
+        clock_boottime_to_use = CLOCK_BOOTTIME;
+}
+
+// perform any initializations required for clocks
+
+void clocks_init(void) {
+    // monotonic coarse has to be tested before boottime
+    test_clock_monotonic_coarse();
+
+    // boottime has to be tested after monotonic coarse
+    test_clock_boottime();
+}
+
+inline time_t now_sec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
         error("clock_gettime(%d, &timespec) failed.", clk_id);
@@ -39,7 +61,7 @@ static inline time_t now_sec(clockid_t clk_id) {
     return ts.tv_sec;
 }
 
-static inline usec_t now_usec(clockid_t clk_id) {
+inline usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
         error("clock_gettime(%d, &timespec) failed.", clk_id);
@@ -48,7 +70,7 @@ static inline usec_t now_usec(clockid_t clk_id) {
     return (usec_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
 }
 
-static inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
+inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
@@ -76,15 +98,15 @@ inline int now_realtime_timeval(struct timeval *tv) {
 }
 
 inline time_t now_monotonic_sec(void) {
-    return now_sec(likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
+    return now_sec(clock_monotonic_to_use);
 }
 
 inline usec_t now_monotonic_usec(void) {
-    return now_usec(likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
+    return now_usec(clock_monotonic_to_use);
 }
 
 inline int now_monotonic_timeval(struct timeval *tv) {
-    return now_timeval(likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC, tv);
+    return now_timeval(clock_monotonic_to_use, tv);
 }
 
 inline time_t now_monotonic_high_precision_sec(void) {
@@ -100,19 +122,15 @@ inline int now_monotonic_high_precision_timeval(struct timeval *tv) {
 }
 
 inline time_t now_boottime_sec(void) {
-    return now_sec(likely(clock_boottime_valid) ? CLOCK_BOOTTIME :
-                   likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
+    return now_sec(clock_boottime_to_use);
 }
 
 inline usec_t now_boottime_usec(void) {
-    return now_usec(likely(clock_boottime_valid) ? CLOCK_BOOTTIME :
-                    likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
+    return now_usec(clock_boottime_to_use);
 }
 
 inline int now_boottime_timeval(struct timeval *tv) {
-    return now_timeval(likely(clock_boottime_valid) ? CLOCK_BOOTTIME :
-                       likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC,
-                       tv);
+    return now_timeval(clock_boottime_to_use, tv);
 }
 
 inline usec_t timeval_usec(struct timeval *tv) {
@@ -137,8 +155,7 @@ inline usec_t dt_usec(struct timeval *now, struct timeval *old) {
     return (ts1 > ts2) ? (ts1 - ts2) : (ts2 - ts1);
 }
 
-inline void heartbeat_init(heartbeat_t *hb)
-{
+inline void heartbeat_init(heartbeat_t *hb) {
     hb->monotonic = hb->realtime = 0ULL;
 }
 
