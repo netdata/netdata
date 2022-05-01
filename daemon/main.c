@@ -679,63 +679,7 @@ void post_conf_load(char **user)
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
-struct clock {
-    clockid_t clockid;
-    const char *name;
-};
-
-#define HISTOGRAM_SIZE 10000
-#define ITERATIONS 10000000
-
 int main(int argc, char **argv) {
-    struct clock clocks[] = {
-        {CLOCK_BOOTTIME, "CLOCK_BOOTTIME now_boottime_*()"},
-        {CLOCK_MONOTONIC, "CLOCK_MONOTONIC now_monotonic_high_precision_*()"},
-        {CLOCK_MONOTONIC_COARSE, "CLOCK_MONOTONIC_COARSE now_monotonic_*()"},
-        {CLOCK_MONOTONIC_RAW, "CLOCK_MONOTONIC_RAW"},
-        {CLOCK_REALTIME, "CLOCK_REALTIME now_realtime_*()" },
-        {CLOCK_REALTIME_COARSE, "CLOCK_REALTIME_COARSE" },
-        {0, NULL }
-    };
-
-    int current_clock;
-    for(current_clock = 0; clocks[current_clock].name ; current_clock++) {
-        printf("\n\nTesting %s ...\n", clocks[current_clock].name);
-
-        usec_t histogram[HISTOGRAM_SIZE + 1] = { 0 };
-        size_t count, total;
-        usec_t us, oldus, delta, min, max, start, end;
-        start = oldus = now_usec(clocks[current_clock].clockid);
-        for (count = 0; count < ITERATIONS; count++) {
-            us = now_usec(clocks[current_clock].clockid);
-            delta = us - oldus;
-            if (count == 0)
-                min = max = delta;
-            else {
-                if (delta < min)
-                    min = delta;
-                if (delta > max)
-                    max = delta;
-            }
-            oldus = us;
-
-            if (delta > HISTOGRAM_SIZE)
-                delta = HISTOGRAM_SIZE;
-            histogram[delta]++;
-        }
-        total = count;
-
-        end = now_usec(clocks[current_clock].clockid);
-        delta = end - start;
-        printf("%zu iterations in %llu usec, min %llu, max %llu, average %llu\n", count, delta, min, max, delta / total);
-
-        for (count = 0; count <= HISTOGRAM_SIZE; count++)
-            if (histogram[count])
-                printf(
-                    "   %04zu usec : %llu (%.02f%%)\n", count, histogram[count], (float)(histogram[count] * 100.0) / (float)total);
-    }
-    exit(0);
-
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
