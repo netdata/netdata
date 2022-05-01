@@ -70,6 +70,7 @@ include hpssa/Makefile.inc
 include icecast/Makefile.inc
 include ipfs/Makefile.inc
 include isc_dhcpd/Makefile.inc
+include jitsi/Makefile.inc
 include litespeed/Makefile.inc
 include logind/Makefile.inc
 include megacli/Makefile.inc
