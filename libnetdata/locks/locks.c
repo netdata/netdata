@@ -55,6 +55,13 @@ int __netdata_mutex_init(netdata_mutex_t *mutex) {
     return ret;
 }
 
+int __netdata_mutex_destroy(netdata_mutex_t *mutex) {
+    int ret = pthread_mutex_destroy(mutex);
+    if(unlikely(ret != 0))
+        error("MUTEX_LOCK: failed to destroy (code %d).", ret);
+    return ret;
+}
+
 int __netdata_mutex_lock(netdata_mutex_t *mutex) {
     netdata_thread_disable_cancelability();
 
@@ -108,6 +115,23 @@ int netdata_mutex_init_debug(const char *file __maybe_unused, const char *functi
     int ret = __netdata_mutex_init(mutex);
 
     debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, now_boottime_usec() - start, line, file, function);
+
+    return ret;
+}
+
+int netdata_mutex_destroy_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                             const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
+    usec_t start = 0;
+    (void)start;
+
+    if(unlikely(debug_flags & D_LOCKS)) {
+        start = now_boottime_usec();
+        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(0x%p) from %lu@%s, %s()", mutex, line, file, function);
+    }
+
+    int ret = __netdata_mutex_destroy(mutex);
+
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
