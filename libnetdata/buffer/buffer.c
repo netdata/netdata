@@ -236,15 +236,23 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
 {
     if(unlikely(!fmt || !*fmt)) return;
 
-    buffer_need_bytes(wb, 2);
+    size_t wrote = 0, need = 2, space_remaining = 0;
 
-    size_t len = wb->size - wb->len - 1;
+    do {
+        need += space_remaining * 2;
 
-    wb->len += vsnprintfz(&wb->buffer[wb->len], len, fmt, args);
+        debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
+        buffer_need_bytes(wb, need);
 
-    buffer_overflow_check(wb);
+        space_remaining = wb->size - wb->len - 1;
 
-    // the buffer is \0 terminated by vsnprintfz
+        wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], space_remaining, fmt, args);
+
+    } while(wrote >= space_remaining);
+
+    wb->len += wrote;
+
+    // the buffer is \0 terminated by vsnprintf
 }
 
 void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
@@ -252,22 +260,21 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
     if(unlikely(!fmt || !*fmt)) return;
 
     va_list args;
-    size_t wrote = 0, need = 2, multiplier = 0, len;
+    size_t wrote = 0, need = 2, space_remaining = 0;
 
     do {
-        need += wrote + multiplier * WEB_DATA_LENGTH_INCREASE_STEP;
-        multiplier++;
+        need += space_remaining * 2;
 
         debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
         buffer_need_bytes(wb, need);
 
-        len = wb->size - wb->len - 1;
+        space_remaining = wb->size - wb->len - 1;
 
         va_start(args, fmt);
-        wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], len, fmt, args);
+        wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], space_remaining, fmt, args);
         va_end(args);
 
-    } while(wrote >= len);
+    } while(wrote >= space_remaining);
 
     wb->len += wrote;
 
@@ -426,7 +433,10 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     size_t minimum = WEB_DATA_LENGTH_INCREASE_STEP;
     if(minimum > wanted) wanted = minimum;
 
-    size_t optimal = b->size / 2;
+    size_t optimal = b->size * 2;
+    if(b->size > 5*1024*1024) optimal = b->size / 3;
+    else if(b->size > 1*1024*1024) optimal = b->size;
+
     if(optimal > wanted) wanted = optimal;
 
     debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + wanted);
