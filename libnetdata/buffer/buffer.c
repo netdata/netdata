@@ -420,16 +420,19 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     buffer_overflow_check(b);
 
     size_t left = b->size - b->len;
-
     if(left >= free_size_required) return;
 
-    size_t increase = free_size_required - left;
-    if(increase < WEB_DATA_LENGTH_INCREASE_STEP) increase = WEB_DATA_LENGTH_INCREASE_STEP;
+    size_t wanted = free_size_required - left;
+    size_t minimum = WEB_DATA_LENGTH_INCREASE_STEP;
+    if(minimum > wanted) wanted = minimum;
 
-    debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + increase);
+    size_t optimal = b->size / 2;
+    if(optimal > wanted) wanted = optimal;
 
-    b->buffer = reallocz(b->buffer, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
-    b->size += increase;
+    debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + wanted);
+
+    b->buffer = reallocz(b->buffer, b->size + wanted + sizeof(BUFFER_OVERFLOW_EOF) + 2);
+    b->size += wanted;
 
     buffer_overflow_init(b);
     buffer_overflow_check(b);
