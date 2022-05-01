@@ -618,6 +618,13 @@ bundle_protobuf() {
 
   PROTOBUF_PACKAGE_VERSION="$(cat packaging/protobuf.version)"
 
+  if [ -f ${PWD}/externaldeps/protobuf/.version ] && [ "${PROTOBUF_PACKAGE_VERSION}" = "$(< "${PWD}/externaldeps/protobuf/.version")" ]
+  then
+    echo >&2 "Found compiled protobuf, same version"
+    NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
+    return 0
+  fi
+
   tmp="$(mktemp -d -t netdata-protobuf-XXXXXX)"
   PROTOBUF_PACKAGE_BASENAME="protobuf-cpp-${PROTOBUF_PACKAGE_VERSION}.tar.gz"
 
@@ -629,6 +636,7 @@ bundle_protobuf() {
     if run tar --no-same-owner -xf "${tmp}/${PROTOBUF_PACKAGE_BASENAME}" -C "${tmp}" &&
       build_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
       copy_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
+      echo "${PROTOBUF_PACKAGE_VERSION}" >"${PWD}/externaldeps/protobuf/.version" &&
       rm -rf "${tmp}"; then
       run_ok "protobuf built and prepared."
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
