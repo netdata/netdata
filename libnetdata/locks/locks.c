@@ -101,6 +101,7 @@ int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
 }
 
 #ifdef NETDATA_TRACE_RWLOCKS
+#warning NETDATA_TRACE_RWLOCKS ENABLED - EXPECT A LOT OF OUTPUT
 
 int netdata_mutex_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                              const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
