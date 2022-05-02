@@ -135,7 +135,7 @@ USAGE: kickstart.sh [options]
   --reinstall-even-if-unsafe Even try to reinstall if we don't think we can do so safely (implies --reinstall).
   --disable-cloud            Disable support for Netdata Cloud (default: detect)
   --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
-  --install <path>           This option is deprecated and will be removed in the future version, use --install-prefix instead.
+  --install <path>           This option is deprecated and will be removed in a future version, use --install-prefix instead.
   --install-prefix <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>       Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
   --claim-token              Use a specified token for claiming to Netdata Cloud.
@@ -1743,8 +1743,7 @@ while [ -n "${1}" ]; do
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
       ;;
     "--install")
-      warning "--install flag is deprecated and will be removed in the future version."
-      warning "Please use --install-prefix instead."
+      warning "--install flag is deprecated and will be removed in the future version. Please use --install-prefix instead."
       INSTALL_PREFIX="${2}"
       shift 1
       ;;

@@ -203,7 +203,7 @@ usage() {
 USAGE: ${PROGRAM} [options]
        where options include:
 
-  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata, this option is deprecated and will be removed in the future version, please use --install-prefix instead.
+  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata, this option is deprecated and will be removed in a future version, please use --install-prefix instead.
   --install-prefix <path>           Install netdata in <path>. Ex. --install-prefix /opt will put netdata in /opt/netdata.
   --dont-start-it            Do not (re)start netdata after installation.
   --dont-wait                Run installation in non-interactive mode.
