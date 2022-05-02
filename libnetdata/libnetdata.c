@@ -951,6 +951,7 @@ static inline int madvise_sequential(void *mem, size_t len) {
     if (ret != 0 && logger-- > 0) error("madvise(MADV_SEQUENTIAL) failed.");
     return ret;
 }
+
 static inline int madvise_dontfork(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTFORK);
@@ -958,6 +959,7 @@ static inline int madvise_dontfork(void *mem, size_t len) {
     if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTFORK) failed.");
     return ret;
 }
+
 static inline int madvise_willneed(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_WILLNEED);
@@ -965,6 +967,8 @@ static inline int madvise_willneed(void *mem, size_t len) {
     if (ret != 0 && logger-- > 0) error("madvise(MADV_WILLNEED) failed.");
     return ret;
 }
+
+#if __linux__
 static inline int madvise_dontdump(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTDUMP);
@@ -972,6 +976,15 @@ static inline int madvise_dontdump(void *mem, size_t len) {
     if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTDUMP) failed.");
     return ret;
 }
+#else
+static inline int madvise_dontdump(void *mem, size_t len) {
+    UNUSED(mem);
+    UNUSED(len);
+
+    return 0;
+}
+#endif
+
 static inline int madvise_mergeable(void *mem, size_t len) {
 #ifdef MADV_MERGEABLE
     static int logger = 1;
