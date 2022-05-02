@@ -12,6 +12,12 @@
 #define NETDATA_TRACE_RWLOCKS_HOLD_TIME_TO_IGNORE_USEC 10000
 #endif
 
+#ifndef NETDATA_THREAD_LOCKS_ARRAY_SIZE
+#define NETDATA_THREAD_LOCKS_ARRAY_SIZE 10
+#endif
+static __thread netdata_rwlock_t *netdata_thread_locks[NETDATA_THREAD_LOCKS_ARRAY_SIZE];
+
+
 #endif // NETDATA_TRACE_RWLOCKS
 
 // ----------------------------------------------------------------------------
@@ -305,6 +311,13 @@ void not_supported_by_posix_rwlocks(const char *file, const char *function, cons
 }
 
 static void log_rwlock_lockers(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, const char *reason, char locktype) {
+
+    // this function can only be used by one thread at a time
+    // because otherwise, the threads may deadlock waiting for each other
+    static netdata_mutex_t log_lockers_mutex = NETDATA_MUTEX_INITIALIZER;
+    __netdata_mutex_lock(&log_lockers_mutex);
+
+    // now work on this locker
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
             "RW_LOCK ON LOCK %p: %d '%s' (function %s() %lu@%s) %s a '%c' lock (while holding %zu rwlocks and %zu mutexes). There are %zu readers and %zu writers holding this lock:\n",
@@ -326,8 +339,47 @@ static void log_rwlock_lockers(const char *file, const char *function, const uns
                 p->function, p->line, p->file,
                 p->callers, p->lock,
                 (now - p->start_s));
+
+        if(p->all_caller_locks) {
+            // find the lock in the netdata_thread_locks[]
+            // and remove it
+            int k;
+            for(k = 0; k < NETDATA_THREAD_LOCKS_ARRAY_SIZE ;k++) {
+                if (p->all_caller_locks[k] && p->all_caller_locks[k] != rwlock) {
+
+                    // lock the other lock lockers list
+                    __netdata_mutex_lock(&p->all_caller_locks[k]->lockers_mutex);
+
+                    // print the list of lockers of the other lock
+                    netdata_rwlock_locker *r;
+                    int j;
+                    for(j = 1, r = p->all_caller_locks[k]->lockers; r ;r = r->next, j++) {
+                        fprintf(
+                            stderr,
+                            "     ~~~> %i: RW_LOCK %p: process %d '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
+                            j,
+                            p->all_caller_locks[k],
+                            r->pid,
+                            r->tag,
+                            r->function,
+                            r->line,
+                            r->file,
+                            r->callers,
+                            r->lock,
+                            (now - r->start_s));
+                    }
+
+                    // unlock the other lock lockers list
+                    __netdata_mutex_unlock(&p->all_caller_locks[k]->lockers_mutex);
+                }
+            }
+        }
+
     }
     __netdata_mutex_unlock(&rwlock->lockers_mutex);
+
+    // unlock this function for other threads
+    __netdata_mutex_unlock(&log_lockers_mutex);
 }
 
 static netdata_rwlock_locker *add_rwlock_locker(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, char lock_type) {
@@ -339,7 +391,17 @@ static netdata_rwlock_locker *add_rwlock_locker(const char *file, const char *fu
     p->function = function;
     p->line = line;
     p->callers = 1;
+    p->all_caller_locks = netdata_thread_locks;
     p->start_s = now_monotonic_high_precision_usec();
+
+    // find a slot in the netdata_thread_locks[]
+    int i;
+    for(i = 0; i < NETDATA_THREAD_LOCKS_ARRAY_SIZE ;i++) {
+        if (!netdata_thread_locks[i]) {
+            netdata_thread_locks[i] = rwlock;
+            break;
+        }
+    }
 
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     p->next = rwlock->lockers;
@@ -401,6 +463,14 @@ static void remove_rwlock_locker(const char *file __maybe_unused, const char *fu
                     locker->callers, locker->lock);
         }
         else {
+            // find the lock in the netdata_thread_locks[]
+            // and remove it
+            int i;
+            for(i = 0; i < NETDATA_THREAD_LOCKS_ARRAY_SIZE ;i++) {
+                if (netdata_thread_locks[i] == rwlock)
+                    netdata_thread_locks[i] = NULL;
+            }
+
             if(end_s - locker->start_s >= NETDATA_TRACE_RWLOCKS_HOLD_TIME_TO_IGNORE_USEC)
                 fprintf(stderr,
                         "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) holded a '%c' for %llu usec.\n",

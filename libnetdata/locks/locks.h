@@ -19,6 +19,7 @@ typedef struct netdata_rwlock_locker {
     unsigned long line;
     size_t callers;
     usec_t start_s;
+    struct netdata_rwlock_t **all_caller_locks;
     struct netdata_rwlock_locker *next;
 } netdata_rwlock_locker;
 
