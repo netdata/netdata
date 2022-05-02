@@ -26,5 +26,6 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
 void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t snapshot_id, uint64_t sequence_id);
 int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert_status);
+extern int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter);
 
 #endif //NETDATA_SQLITE_ACLK_ALERT_H
