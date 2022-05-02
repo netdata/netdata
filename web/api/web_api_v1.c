@@ -542,7 +542,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             st = context_param_list->rd->rrdset;
         else {
             if (!chart_label_key && !chart_labels_filter)
-                sql_build_context_param_list(&context_param_list, host, context, NULL);
+                sql_build_context_param_list(owa, &context_param_list, host, context, NULL);
         }
     }
     else {
@@ -552,7 +552,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         if (likely(st))
             st->last_accessed_time = now_realtime_sec();
         else
-            sql_build_context_param_list(&context_param_list, host, NULL, chart);
+            sql_build_context_param_list(owa, &context_param_list, host, NULL, chart);
     }
 
     if (!st) {

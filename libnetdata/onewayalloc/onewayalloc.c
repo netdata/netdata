@@ -125,10 +125,11 @@ void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
     return mem;
 }
 
-void onewayalloc_freez(ONEWAYALLOC *owa, const void *ptr) {
+void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_unused) {
+#ifdef NETDATA_INTERNAL_CHECKS
     // allow the caller to call us for a mallocz() allocation
     // so try to find it in our memory and if it is not there
-    // call freez(ptr)
+    // log an error
 
     OWA_PAGE *head = (OWA_PAGE *)owa;
     OWA_PAGE *page;
@@ -147,8 +148,10 @@ void onewayalloc_freez(ONEWAYALLOC *owa, const void *ptr) {
 
     // not found - it is not ours
     // let's free it with the system allocator
-    info("ONEWAYALLOC: freeing address 0x%p that is not allocated by OWA", ptr);
-    freez((void *)ptr);
+    error("ONEWAYALLOC: request to free address 0x%p that is not allocated by this OWA", ptr);
+#endif
+
+    return;
 }
 
 void onewayalloc_destroy(ONEWAYALLOC *owa) {
