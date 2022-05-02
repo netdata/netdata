@@ -12,15 +12,11 @@ By parsing web server log files with Netdata, and seeing the volume of redirects
 you can better understand what's happening on your infrastructure. Too many bad requests? Maybe a recent deploy missed a
 few small SVG icons. Too many requests? Time to batten down the hatches—it's a DDoS.
 
-Netdata has been capable of monitoring web log files for quite some time, thanks for the [weblog python.d
-module](/collectors/python.d.plugin/web_log/README.md), but we recently refactored this module in Go, and that effort
-comes with a ton of improvements.
-
-You can now use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage, and the whole parser is faster than
+You can use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage, and the whole parser is faster than
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
-200ms, using ~30% of a single core. To learn more about these improvements, see our [v1.19 release post](https://blog.netdata.cloud/posts/release-1.19/).
+200ms, using ~30% of a single core.
 
-The [go.d plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/) is currently compatible
+The [web_log](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/) collector is currently compatible
 with [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This guide will walk you through using the new Go-based web log collector to turn the logs these web servers
@@ -152,11 +148,7 @@ documentation](/health/README.md).
 
 ## What's next?
 
-Now that you have web log collection up and running, we recommend you take a look at the documentation for our
-[python.d](/collectors/python.d.plugin/web_log/README.md) for some ideas of how you can turn these rather "boring" logs
-into powerful real-time tools for keeping your servers happy.
+Now that you have web log collection up and running, we recommend you take a look at the collector's [documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/) for some ideas of how you can turn these rather "boring" logs into powerful real-time tools for keeping your servers happy.
 
 Don't forget to give GitHub user [Wing924](https://github.com/Wing924) a big 👍 for his hard work in starting up the Go
 refactoring effort.
-
-
