@@ -96,8 +96,8 @@ fi
 print_deferred_errors() {
   if [ -n "${SAVED_WARNINGS}" ]; then
     printf >&2 "\n"
-    printf >&2 "%s\n" "The following warnings and non-fatal errors were encountered during the installation process:"
-    printf >&2 "%s\n" "${SAVED_WARNINGS}"
+    printf >&2 "%b\n" "The following warnings and non-fatal errors were encountered during the installation process:"
+    printf >&2 "%b\n" "${SAVED_WARNINGS}"
     printf >&2 "\n"
   fi
 }
