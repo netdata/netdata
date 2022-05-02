@@ -29,7 +29,7 @@ struct iface {
 
 unsigned int calc_num_ifaces(struct iface *root) {
     unsigned int num = 0;
-    for (h = root; h != NULL; h = h->next) {
+    for (struct iface *h = root; h != NULL; h = h->next) {
         num++;
     }
     return num;
