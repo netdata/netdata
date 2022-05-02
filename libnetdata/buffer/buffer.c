@@ -136,6 +136,24 @@ void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
     wb->len += wstr - str;
 }
 
+void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
+    if(unlikely(!txt || !*txt)) return;
+
+    buffer_need_bytes(wb, len + 1);
+
+    char *s = &wb->buffer[wb->len];
+    const char *end = &txt[len + 1];
+
+    while(txt != end)
+        *s++ = *txt++;
+
+    wb->len += len;
+
+    // keep it NULL terminating
+    // not counting it at wb->len
+    wb->buffer[wb->len] = '\0';
+}
+
 void buffer_strcat(BUFFER *wb, const char *txt)
 {
     // buffer_sprintf(wb, "%s", txt);
@@ -159,8 +177,7 @@ void buffer_strcat(BUFFER *wb, const char *txt)
     if(*txt) {
         debug(D_WEB_BUFFER, "strcat(): increasing web_buffer at position %zu, size = %zu\n", wb->len, wb->size);
         len = strlen(txt);
-        buffer_increase(wb, len);
-        buffer_strcat(wb, txt);
+        buffer_fast_strcat(wb, txt, len);
     }
     else {
         // terminate the string
@@ -433,9 +450,8 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     size_t minimum = WEB_DATA_LENGTH_INCREASE_STEP;
     if(minimum > wanted) wanted = minimum;
 
-    size_t optimal = b->size * 2;
-    if(b->size > 5*1024*1024) optimal = b->size / 3;
-    else if(b->size > 1*1024*1024) optimal = b->size;
+    size_t optimal = b->size;
+    if(b->size > 5*1024*1024) optimal = b->size / 2;
 
     if(optimal > wanted) wanted = optimal;
 
