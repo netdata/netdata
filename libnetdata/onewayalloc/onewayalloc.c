@@ -1,7 +1,7 @@
 #include "onewayalloc.h"
 
 static size_t PAGE_SIZE = 0;
-static size_t NATURAL_ALIGNMENT = sizeof(size_t);
+static size_t NATURAL_ALIGNMENT = sizeof(int*);
 
 typedef struct owa_page {
     size_t stats_pages;
