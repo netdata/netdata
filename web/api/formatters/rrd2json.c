@@ -2,13 +2,12 @@
 
 #include "web/api/web_api_v1.h"
 
-static inline void free_single_rrdrim(RRDDIM *temp_rd, int archive_mode)
+static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int archive_mode)
 {
     if (unlikely(!temp_rd))
         return;
 
-    // freez((char *)temp_rd->id);
-    // freez((char *)temp_rd->name);
+    onewayalloc_freez(owa, (char *)temp_rd->id);
 
     if (unlikely(archive_mode)) {
         temp_rd->rrdset->counter--;
@@ -18,11 +17,12 @@ static inline void free_single_rrdrim(RRDDIM *temp_rd, int archive_mode)
             freez(temp_rd->rrdset);
         }
     }
-    // freez(temp_rd->state);
-    // freez(temp_rd);
+
+    onewayalloc_freez(owa, temp_rd->state);
+    onewayalloc_freez(owa, temp_rd);
 }
 
-static inline void free_rrddim_list(RRDDIM *temp_rd, int archive_mode)
+static inline void free_rrddim_list(ONEWAYALLOC *owa, RRDDIM *temp_rd, int archive_mode)
 {
     if (unlikely(!temp_rd))
         return;
@@ -30,22 +30,22 @@ static inline void free_rrddim_list(RRDDIM *temp_rd, int archive_mode)
     RRDDIM *t;
     while (temp_rd) {
         t = temp_rd->next;
-        free_single_rrdrim(temp_rd, archive_mode);
+        free_single_rrdrim(owa, temp_rd, archive_mode);
         temp_rd = t;
     }
 }
 
-void free_context_param_list(struct context_param **param_list)
+void free_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list)
 {
     if (unlikely(!param_list || !*param_list))
         return;
 
-    free_rrddim_list(((*param_list)->rd), (*param_list)->flags & CONTEXT_FLAGS_ARCHIVE);
-    // freez((*param_list));
+    free_rrddim_list(owa, ((*param_list)->rd), (*param_list)->flags & CONTEXT_FLAGS_ARCHIVE);
+    onewayalloc_freez(owa, (*param_list));
     *param_list = NULL;
 }
 
-void rebuild_context_param_list(struct context_param *context_param_list, time_t after_requested)
+void rebuild_context_param_list(ONEWAYALLOC *owa, struct context_param *context_param_list, time_t after_requested)
 {
     RRDDIM *temp_rd = context_param_list->rd;
     RRDDIM *new_rd_list = NULL, *t;
@@ -59,7 +59,7 @@ void rebuild_context_param_list(struct context_param *context_param_list, time_t
             temp_rd->next = new_rd_list;
             new_rd_list = temp_rd;
         } else
-            free_single_rrdrim(temp_rd, is_archived);
+            free_single_rrdrim(owa, temp_rd, is_archived);
         temp_rd = t;
     }
     context_param_list->rd = new_rd_list;
@@ -167,22 +167,27 @@ int rrdset2value_api_v1(
         , int *value_is_null
         , int timeout
 ) {
+    int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions, NULL, timeout);
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+
+    RRDR *r = rrd2rrdr(owa, st, points, after, before, group_method, group_time, options, dimensions, NULL, timeout);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
-        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+        ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
+        goto cleanup;
     }
 
     if(rrdr_rows(r) == 0) {
-        rrdr_free(r);
+        rrdr_free(owa, r);
 
         if(db_after)  *db_after  = 0;
         if(db_before) *db_before = 0;
         if(value_is_null) *value_is_null = 1;
 
-        return HTTP_RESP_BAD_REQUEST;
+        ret = HTTP_RESP_BAD_REQUEST;
+        goto cleanup;
     }
 
     if(wb) {
@@ -197,13 +202,17 @@ int rrdset2value_api_v1(
 
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null, NULL);
+    ret = HTTP_RESP_OK;
 
-    rrdr_free(r);
-    return HTTP_RESP_OK;
+cleanup:
+    if(r) rrdr_free(owa, r);
+    onewayalloc_destroy(owa);
+    return ret;
 }
 
 int rrdset2anything_api_v1(
-          RRDSET *st
+          ONEWAYALLOC *owa
+        , RRDSET *st
         , BUFFER *wb
         , BUFFER *dimensions
         , uint32_t format
@@ -223,14 +232,14 @@ int rrdset2anything_api_v1(
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
         st->last_accessed_time = now_realtime_sec();
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, context_param_list, timeout);
+    RRDR *r = rrd2rrdr(owa, st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, context_param_list, timeout);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     if (r->result_options & RRDR_RESULT_OPTION_CANCEL) {
-        rrdr_free(r);
+        rrdr_free(owa, r);
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 
@@ -409,6 +418,6 @@ int rrdset2anything_api_v1(
         break;
     }
 
-    rrdr_free(r);
+    rrdr_free(owa, r);
     return HTTP_RESP_OK;
 }

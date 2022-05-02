@@ -125,6 +125,32 @@ void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
     return mem;
 }
 
+void onewayalloc_freez(ONEWAYALLOC *owa, const void *ptr) {
+    // allow the caller to call us for a mallocz() allocation
+    // so try to find it in our memory and if it is not there
+    // call freez(ptr)
+
+    OWA_PAGE *head = (OWA_PAGE *)owa;
+    OWA_PAGE *page;
+    size_t seeking = (size_t)ptr;
+
+    for(page = head; page ;page = page->next) {
+        size_t start = (size_t)page;
+        size_t end = start + page->size;
+
+        if(seeking >= start && seeking <= end) {
+            // found it - it is ours
+            // just return to let the caller think we actually did something
+            return;
+        }
+    }
+
+    // not found - it is not ours
+    // let's free it with the system allocator
+    info("ONEWAYALLOC: freeing address 0x%p that is not allocated by OWA", ptr);
+    freez((void *)ptr);
+}
+
 void onewayalloc_destroy(ONEWAYALLOC *owa) {
     if(!owa) return;
 

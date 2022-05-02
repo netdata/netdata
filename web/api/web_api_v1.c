@@ -559,7 +559,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         if (likely(context_param_list && context_param_list->rd && context_param_list->rd->rrdset))
             st = context_param_list->rd->rrdset;
         else {
-            free_context_param_list(&context_param_list);
+            free_context_param_list(owa, &context_param_list);
             context_param_list = NULL;
         }
     }
@@ -633,12 +633,12 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format,
+    ret = rrdset2anything_api_v1(owa, st, w->response.data, dimensions, format,
                                  points, after, before, group, group_time,
                                  options, &last_timestamp_in_data, context_param_list,
                                  chart_label_key, max_anomaly_rates, timeout);
 
-    free_context_param_list(&context_param_list);
+    free_context_param_list(owa, &context_param_list);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)
