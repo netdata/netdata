@@ -50,7 +50,6 @@ include ceph/Makefile.inc
 include changefinder/Makefile.inc
 include chrony/Makefile.inc
 include dnsdist/Makefile.inc
-include dns_query_time/Makefile.inc
 include dockerd/Makefile.inc
 include dovecot/Makefile.inc
 include elasticsearch/Makefile.inc
