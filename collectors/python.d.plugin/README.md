@@ -227,8 +227,7 @@ For additional security it uses python `subprocess.Popen` (without `shell=True` 
 
 _Examples: `apache`, `nginx`, `tomcat`_
 
-_Multiple Endpoints (urls) Examples: [`rabbitmq`](/collectors/python.d.plugin/rabbitmq/README.md) (simpler) ,
-[`elasticsearch`](/collectors/python.d.plugin/elasticsearch/README.md) (threaded)_
+_Multiple Endpoints (urls) Examples: [`rabbitmq`](/collectors/python.d.plugin/rabbitmq/README.md) (simpler).
 
 
 _Variables from config file_: `url`, `user`, `pass`.
