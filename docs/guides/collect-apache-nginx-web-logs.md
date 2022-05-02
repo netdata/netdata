@@ -30,33 +30,6 @@ installation procedures.
 Almost all web server installations will need _no_ configuration to start collecting metrics. As long as your web server
 has readable access log file, you can configure the web log plugin to access and parse it.
 
-## Configure the web log collector
-
-To use the Go version of this plugin, you need to explicitly enable it, and disable the deprecated Python version.
-First, open `python.d.conf`:
-
-```bash
-cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config python.d.conf
-```
-
-Find the `web_log` line, uncomment it, and set it to `web_log: no`. Next, open the `go.d.conf` file for editing.
-
-```bash
-./edit-config go.d.conf
-```
-
-Find the `web_log` line again, uncomment it, and set it to `web_log: yes`.
-
-Finally, restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system. You should see metrics in your Netdata dashboard!
-
-![Example of real-time web server log metrics in Netdata's
-dashboard](https://user-images.githubusercontent.com/1153921/69448130-2980c280-0d15-11ea-9fa5-6dcff25a92c3.png)
-
-If you don't see web log charts, or **web log nginx**/**web log apache** menus on the right-hand side of your dashboard,
-continue reading for other configuration options.
-
 ## Custom configuration of the web log collector
 
 The web log collector's default configuration comes with a few example jobs that should cover most Linux distributions
