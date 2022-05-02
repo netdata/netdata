@@ -405,7 +405,7 @@ static void remove_rwlock_locker(const char *file __maybe_unused, const char *fu
                     locker->callers, locker->lock);
         }
         else {
-            if(end_s - locker->start_s > NETDATA_TRACE_RWLOCKS_HOLD_TIME_TO_IGNORE_USEC)
+            if(end_s - locker->start_s >= NETDATA_TRACE_RWLOCKS_HOLD_TIME_TO_IGNORE_USEC)
                 fprintf(stderr,
                         "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) holded a '%c' for %llu usec.\n",
                         rwlock,
@@ -523,7 +523,7 @@ int netdata_rwlock_rdlock_debug(const char *file __maybe_unused, const char *fun
 
     }
 
-    if(end_s - start_s > NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
+    if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
                 "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED for a READ lock for %llu usec.\n",
                 rwlock,
@@ -560,7 +560,7 @@ int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *fun
         if(log) log_rwlock_lockers(file, function, line, rwlock, "GOT", 'W');
     }
 
-    if(end_s - start_s > NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
+    if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
                 "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED for a WRITE lock for %llu usec.\n",
                 rwlock,
@@ -586,7 +586,7 @@ int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *fun
     int ret = __netdata_rwlock_unlock(rwlock);
     usec_t end_s = now_monotonic_high_precision_usec();
 
-    if(end_s - start_s > NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
+    if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
                 "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED to UNLOCK for %llu usec.\n",
                 rwlock,
@@ -616,7 +616,7 @@ int netdata_rwlock_tryrdlock_debug(const char *file __maybe_unused, const char *
     if(!ret)
         locker = update_or_add_rwlock_locker(file, function, line, rwlock, locker, 'R');
 
-    if(end_s - start_s > NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
+    if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
                 "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED to TRYREAD for %llu usec.\n",
                 rwlock,
@@ -644,7 +644,7 @@ int netdata_rwlock_trywrlock_debug(const char *file __maybe_unused, const char *
     if(!ret)
         locker = update_or_add_rwlock_locker(file, function, line, rwlock, locker, 'W');
 
-    if(end_s - start_s > NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
+    if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
                 "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED to TRYWRITE for %llu usec.\n",
                 rwlock,
