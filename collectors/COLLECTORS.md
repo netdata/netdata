@@ -112,10 +112,10 @@ configure any of these collectors according to your setup and infrastructure.
 -   [CockroachDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/cockroachdb/): Monitor various
     database components using `_status/vars` endpoint.
 -   [Consul](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/consul/): Capture service and unbound
-    checks status (passing, warning, critical, maintenance). 
+    checks status (passing, warning, critical, maintenance).
 -   [Couchbase](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/couchbase/): Gather per-bucket
     metrics from any number of instances of the distributed JSON document database.
--   [CouchDB](/collectors/python.d.plugin/couchdb/README.md): Monitor database health and performance metrics
+-   [CouchDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/couchdb): Monitor database health and performance metrics
     (reads/writes, HTTP traffic, replication status, etc).
 -   [MongoDB](/collectors/python.d.plugin/mongodb/README.md): Collect memory-caching system performance metrics and
     reads the server's response to `stats` command (stats interface).
@@ -127,10 +127,8 @@ configure any of these collectors according to your setup and infrastructure.
 -   [Postgres](/collectors/python.d.plugin/postgres/README.md): Collect database health and performance metrics. 
 -   [ProxySQL](/collectors/python.d.plugin/proxysql/README.md): Monitor database backend and frontend performance
     metrics.
--   [Redis (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis/): Monitor status from any
+-   [Redis](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis/): Monitor status from any
     number of database instances by reading the server's response to the `INFO ALL` command.
--   [Redis (Python)](/collectors/python.d.plugin/redis/README.md): Monitor database status by reading the server's response to
-    the `INFO` command.
 -   [RethinkDB](/collectors/python.d.plugin/rethinkdbs/README.md): Collect database server and cluster statistics.
 -   [Riak KV](/collectors/python.d.plugin/riakkv/README.md): Collect database stats from the `/stats` endpoint.
 -   [Zookeeper](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/zookeeper/): Monitor application
@@ -176,7 +174,7 @@ configure any of these collectors according to your setup and infrastructure.
 -   [Web server logs (Go version for Apache,
     NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/): Tail access logs and provide
     very detailed web server performance statistics. This module is able to parse 200k+ rows in less than half a second.
--   [Web server logs (Python version for Apache, NGINX, Squid)](/collectors/python.d.plugin/web_log/README.md): Tail access log
+-   [Web server logs (Apache, NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog): Tail access log
     file and collect web server/caching proxy metrics.
 
 ### Messaging
@@ -204,27 +202,20 @@ configure any of these collectors according to your setup and infrastructure.
     trip time.
 -   [Dnsmasq](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsmasq_dhcp/): Automatically
     detects all configured `Dnsmasq` DHCP ranges and Monitor their utilization.
--   [DNSdist (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsdist/): Collect
+-   [DNSdist](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsdist/): Collect
     load-balancer performance and health metrics.
--   [DNSdist (Python)](/collectors/python.d.plugin/dnsdist/README.md): Collect load-balancer performance and health
-    metrics.
 -   [Dnsmasq DNS Forwarder](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsmasq/): Gather
     queries, entries, operations, and events for the lightweight DNS forwarder.
--   [dns_query](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsquery/): Monitor the round
-    trip time for DNS queries in milliseconds.
+-   [DNS Query Time](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsquery/): Monitor the round trip time for DNS queries in milliseconds.
 -   [DNS Query Time](/collectors/python.d.plugin/dns_query_time/README.md): Measure DNS query round trip time.
--   [Freeradius (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/freeradius/): Collect
+-   [Freeradius](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/freeradius/): Collect
     server authentication and accounting statistics from the `status server`.
--   [Freeradius (Python)](/collectors/python.d.plugin/freeradius/README.md): Collect server authentication and
-    accounting statistics from the `status server` using the `radclient` tool.
 -   [Libreswan](/collectors/charts.d.plugin/libreswan/README.md): Collect bytes-in, bytes-out, and uptime metrics.
 -   [Icecast](/collectors/python.d.plugin/icecast/README.md): Monitor the number of listeners for active sources.
 -   [ISC Bind (RDNC)](/collectors/python.d.plugin/bind_rndc/README.md): Collect nameserver summary performance
     statistics using the `rndc` tool.
--   [ISC DHCP (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/isc_dhcpd): Reads a
+-   [ISC DHCP](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/isc_dhcpd): Reads a
     `dhcpd.leases` file and collects metrics on total active leases, pool active leases, and pool utilization.
--   [ISC DHCP (Python)](/collectors/python.d.plugin/isc_dhcpd/README.md): Reads `dhcpd.leases` file and reports DHCP
-    pools utilization and leases statistics (total number, leases per pool).
 -   [OpenLDAP](/collectors/python.d.plugin/openldap/README.md): Provides statistics information from the OpenLDAP
     (`slapd`) server.
 -   [NSD](/collectors/python.d.plugin/nsd/README.md): Monitor nameserver performance metrics using the `nsd-control`
@@ -238,13 +229,9 @@ configure any of these collectors according to your setup and infrastructure.
 -   [Pi-hole](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pihole/): Monitor basic (DNS
     queries, clients, blocklist) and extended (top clients, top permitted, and blocked domains) statistics using the PHP
     API.
--   [PowerDNS Authoritative Server
-    (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns): Monitor one or more instances
-    of the nameserver software to collect questions, events, and latency metrics.
--   [PowerDNS Recursor (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns_recursor):
+-   [PowerDNS Authoritative Server](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns): Monitor one or more instances of the nameserver software to collect questions, events, and latency metrics.
+-   [PowerDNS Recursor](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns_recursor):
     Gather incoming/outgoing questions, drops, timeouts, and cache usage from any number of DNS recursor instances.
--   [PowerDNS (Python)](/collectors/python.d.plugin/powerdns/README.md): Monitor authoritative server and recursor
-    statistics.
 -   [RetroShare](/collectors/python.d.plugin/retroshare/README.md): Monitor application bandwidth, peers, and DHT
     metrics.
 -   [Tor](/collectors/python.d.plugin/tor/README.md): Capture traffic usage statistics using the Tor control port.
@@ -261,21 +248,17 @@ configure any of these collectors according to your setup and infrastructure.
 -   [Access point](/collectors/charts.d.plugin/ap/README.md): Monitor client, traffic and signal metrics using the `aw`
     tool.
 -   [APC UPS](/collectors/charts.d.plugin/apcupsd/README.md): Capture status information using the `apcaccess` tool.
--   [Energi Core (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/energid): Monitor
+-   [Energi Core](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/energid): Monitor
     blockchain indexes, memory usage, network usage, and transactions of wallet instances.
--   [Energi Core (Python)](/collectors/python.d.plugin/energid/README.md): Monitor blockchain, memory, network, and
-    unspent transactions statistics.
 -   [UPS/PDU](/collectors/charts.d.plugin/nut/README.md): Read the status of UPS/PDU devices using the `upsc` tool.
 -   [SNMP devices](/collectors/node.d.plugin/snmp/README.md): Gather data using the SNMP protocol.
 -   [1-Wire sensors](/collectors/python.d.plugin/w1sensor/README.md): Monitor sensor temperature.
 
 ### Search
 
--   [Elasticsearch (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/elasticsearch): Collect
+-   [Elasticsearch](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/elasticsearch): Collect
     dozens of metrics on search engine performance from local nodes and local indices. Includes cluster health and
     statistics.
--   [Elasticsearch (Python)](/collectors/python.d.plugin/elasticsearch/README.md): Collect search engine performance and
-    health statistics. Optionally collects per-index metrics.
 -   [Solr](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/solr/): Collect application search
     requests, search errors, update requests, and update errors statistics.
 
@@ -291,38 +274,26 @@ configure any of these collectors according to your setup and infrastructure.
 
 ### Web
 
--   [Apache (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache/): Collect Apache web
+-   [Apache](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache/): Collect Apache web
     server performance metrics via the `server-status?auto` endpoint.
--   [Apache (Python)](/collectors/python.d.plugin/apache/README.md): Collect Apache web server performance metrics via
-    the `server-status?auto` endpoint.
 -   [HAProxy](/collectors/python.d.plugin/haproxy/README.md): Collect frontend, backend, and health metrics.
--   [HTTP endpoints (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/httpcheck/): Monitor
+-   [HTTP endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/httpcheck/): Monitor
     any HTTP endpoint's availability and response time.
--   [HTTP endpoints (Python)](/collectors/python.d.plugin/httpcheck/README.md): Monitor any HTTP endpoint's
-    availability and response time.
 -   [Lighttpd](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/lighttpd/): Collect web server
     performance metrics using the `server-status?auto` endpoint.
 -   [Lighttpd2](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/lighttpd2/): Collect web server
     performance metrics using the `server-status?format=plain` endpoint.
 -   [Litespeed](/collectors/python.d.plugin/litespeed/README.md): Collect web server data (network, connection,
     requests, cache) by reading `.rtreport*` files.
--   [Nginx (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx/): Monitor web server
+-   [Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx/): Monitor web server
     status information by gathering metrics via `ngx_http_stub_status_module`.
--   [Nginx (Python)](/collectors/python.d.plugin/nginx/README.md): Monitor web server status information by gathering
-    metrics via `ngx_http_stub_status_module`.
--   [Nginx Plus](/collectors/python.d.plugin/nginx_plus/README.md): Collect global and per-server zone, upstream, and
-    cache metrics.
 -   [Nginx VTS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginxvts/): Gathers metrics from
     any Nginx deployment with the _virtual host traffic status module_ enabled, including metrics on uptime, memory
     usage, and cache, and more.
--   [PHP-FPM (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application
+-   [PHP-FPM](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application
     summary and processes health metrics by scraping the status page (`/status?full`).
--   [PHP-FPM (Python)](/collectors/python.d.plugin/phpfpm/README.md): Collect application summary and processes health
-    metrics by scraping the status page (`/status?full`).
--   [TCP endpoints (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/portcheck/): Monitor any
+-   [TCP endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/portcheck/): Monitor any
     TCP endpoint's availability and response time.
--   [TCP endpoints (Python)](/collectors/python.d.plugin/portcheck/README.md): Monitor any TCP endpoint's availability
-    and response time.
 -   [Spigot Minecraft servers](/collectors/python.d.plugin/spigotmc/README.md): Monitor average ticket rate and number
     of users.
 -   [Squid](/collectors/python.d.plugin/squid/README.md): Monitor client and server bandwidth/requests by gathering
