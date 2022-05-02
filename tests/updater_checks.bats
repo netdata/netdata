@@ -13,8 +13,7 @@ ENV="${INSTALLATION}/netdata/etc/netdata/.environment"
 # list of files which need to be checked. Path cannot start from '/'
 FILES="usr/libexec/netdata/plugins.d/go.d.plugin
        usr/libexec/netdata/plugins.d/charts.d.plugin
-       usr/libexec/netdata/plugins.d/python.d.plugin
-       usr/libexec/netdata/plugins.d/node.d.plugin"
+       usr/libexec/netdata/plugins.d/python.d.plugin"
 
 DIRS="usr/sbin/netdata
       etc/netdata

@@ -39,7 +39,7 @@ they were built in.
 
 These modules are primarily written in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/) (`go.d`) and
 [Python](/collectors/python.d.plugin/README.md), although some use [Bash](/collectors/charts.d.plugin/README.md)
-(`charts.d`) or [Node.js](/collectors/node.d.plugin/README.md) (`node.d`).
+(`charts.d`).
 
 ## Enable and disable plugins
 
@@ -58,14 +58,14 @@ Enabled:
 
 ```conf
 [plugins]
-  # node.d = yes
+  # python.d = yes
 ```
 
 Disabled:
 
 ```conf
 [plugins]
-  node.d = no
+  python.d = no
 ```
 
 When you explicitly disable a plugin this way, it won't auto-collect metrics using its collectors.

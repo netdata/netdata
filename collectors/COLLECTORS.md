@@ -248,16 +248,16 @@ configure any of these collectors according to your setup and infrastructure.
 
 ### Remote devices
 
--   [AM2320](/collectors/python.d.plugin/am2320/README.md): Monitor sensor temperature and humidity.
--   [Access point](/collectors/charts.d.plugin/ap/README.md): Monitor client, traffic and signal metrics using the `aw`
+- [AM2320](/collectors/python.d.plugin/am2320/README.md): Monitor sensor temperature and humidity.
+- [Access point](/collectors/charts.d.plugin/ap/README.md): Monitor client, traffic and signal metrics using the `aw`
     tool.
--   [APC UPS](/collectors/charts.d.plugin/apcupsd/README.md): Capture status information using the `apcaccess` tool.
--   [Energi Core (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/energid): Monitor
+- [APC UPS](/collectors/charts.d.plugin/apcupsd/README.md): Capture status information using the `apcaccess` tool.
+- [Energi Core (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/energid): Monitor
     blockchain indexes, memory usage, network usage, and transactions of wallet instances.
--   [Energi Core (Python)](/collectors/python.d.plugin/energid/README.md): Monitor blockchain, memory, network, and
+- [Energi Core (Python)](/collectors/python.d.plugin/energid/README.md): Monitor blockchain, memory, network, and
     unspent transactions statistics.
--   [UPS/PDU](/collectors/charts.d.plugin/nut/README.md): Read the status of UPS/PDU devices using the `upsc` tool.
-- [SNMP devices](/collectors/go.d.plugin/snmp/README.md): Gather data using the SNMP protocol.
+- [UPS/PDU](/collectors/charts.d.plugin/nut/README.md): Read the status of UPS/PDU devices using the `upsc` tool.
+- [SNMP devices](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/snmp): Gather data using the SNMP protocol.
 -   [1-Wire sensors](/collectors/python.d.plugin/w1sensor/README.md): Monitor sensor temperature.
 
 ### Search
