@@ -1743,7 +1743,7 @@ while [ -n "${1}" ]; do
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
       ;;
     "--install")
-      warning "--install flag is deprecated and will be removed in the future version. Please use --install-prefix instead."
+      warning "--install flag is deprecated and will be removed in a future version. Please use --install-prefix instead."
       INSTALL_PREFIX="${2}"
       shift 1
       ;;
