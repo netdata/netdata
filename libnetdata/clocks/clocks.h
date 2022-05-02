@@ -133,7 +133,6 @@ extern int now_boottime_timeval(struct timeval *tv);
 extern time_t now_boottime_sec(void);
 extern usec_t now_boottime_usec(void);
 
-
 extern usec_t timeval_usec(struct timeval *tv);
 extern msec_t timeval_msec(struct timeval *tv);
 
@@ -152,17 +151,12 @@ extern usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb);
 
 extern int sleep_usec(usec_t usec);
 
-/*
- * When running a binary with CLOCK_BOOTTIME defined on a system with a linux kernel older than Linux 2.6.39 the
- * clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
- */
-void test_clock_boottime(void);
+extern void clocks_init(void);
 
-/*
- * When running a binary with CLOCK_MONOTONIC_COARSE defined on a system with a linux kernel older than Linux 2.6.32 the
- * clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
- */
-void test_clock_monotonic_coarse(void);
+// lower level functions - avoid using directly
+extern time_t now_sec(clockid_t clk_id);
+extern usec_t now_usec(clockid_t clk_id);
+extern int now_timeval(clockid_t clk_id, struct timeval *tv);
 
 extern collected_number uptime_msec(char *filename);
 

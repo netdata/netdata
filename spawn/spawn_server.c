@@ -312,8 +312,8 @@ void spawn_server(void)
 {
     int error;
 
-    test_clock_boottime();
-    test_clock_monotonic_coarse();
+    // initialize the system clocks
+    clocks_init();
 
     // close all open file descriptors, except the standard ones
     // the caller may have left open files (lxc-attach has this issue)

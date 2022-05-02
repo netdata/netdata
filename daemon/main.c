@@ -1087,8 +1087,9 @@ int main(int argc, char **argv) {
         if(i > 0)
             mallopt(M_ARENA_MAX, 1);
 #endif
-        test_clock_boottime();
-        test_clock_monotonic_coarse();
+
+        // initialize the system clocks
+        clocks_init();
 
         // prepare configuration environment variables for the plugins
 
