@@ -270,7 +270,7 @@ fatal() {
 }
 
 warning() {
-  printf >&2 "%s WARNING %s %s\n\n" "%{TPUT_BGYELLOW}${TPUT_BLACK}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
+  printf >&2 "%s WARNING %s %s\n\n" "${TPUT_BGYELLOW}${TPUT_BLACK}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
     SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
   fi
