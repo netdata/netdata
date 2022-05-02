@@ -68,15 +68,9 @@ typedef enum web_client_flags {
     WEB_CLIENT_CHUNKED_TRANSFER = 1 << 10, // chunked transfer (used with zlib compression)
 } WEB_CLIENT_FLAGS;
 
-//#ifdef HAVE_C___ATOMIC
-//#define web_client_flag_check(w, flag) (__atomic_load_n(&((w)->flags), __ATOMIC_SEQ_CST) & flag)
-//#define web_client_flag_set(w, flag)   __atomic_or_fetch(&((w)->flags), flag, __ATOMIC_SEQ_CST)
-//#define web_client_flag_clear(w, flag) __atomic_and_fetch(&((w)->flags), ~flag, __ATOMIC_SEQ_CST)
-//#else
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
 #define web_client_flag_set(w, flag) (w)->flags |= flag
 #define web_client_flag_clear(w, flag) (w)->flags &= ~flag
-//#endif
 
 #define WEB_CLIENT_IS_DEAD(w) web_client_flag_set(w, WEB_CLIENT_FLAG_DEAD)
 #define web_client_check_dead(w) web_client_flag_check(w, WEB_CLIENT_FLAG_DEAD)

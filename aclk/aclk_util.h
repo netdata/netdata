@@ -99,13 +99,7 @@ void free_topic_cache(void);
 
 #ifdef ACLK_LOG_CONVERSATION_DIR
 extern volatile int aclk_conversation_log_counter;
-#if defined(HAVE_C___ATOMIC)
 #define ACLK_GET_CONV_LOG_NEXT() __atomic_fetch_add(&aclk_conversation_log_counter, 1, __ATOMIC_SEQ_CST)
-#else
-extern netdata_mutex_t aclk_conversation_log_mutex;
-int aclk_get_conv_log_next();
-#define ACLK_GET_CONV_LOG_NEXT() aclk_get_conv_log_next()
-#endif
 #endif
 
 unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, unsigned long int max);

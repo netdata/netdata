@@ -37,37 +37,10 @@ static struct global_statistics {
         .rrdr_result_points_generated = 0,
 };
 
-#if defined(HAVE_C___ATOMIC)
-#else
-netdata_mutex_t global_statistics_mutex = NETDATA_MUTEX_INITIALIZER;
-
-static inline void global_statistics_lock(void) {
-    netdata_mutex_lock(&global_statistics_mutex);
-}
-
-static inline void global_statistics_unlock(void) {
-    netdata_mutex_unlock(&global_statistics_mutex);
-}
-#endif
-
-
 void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_generated) {
-#if defined(HAVE_C___ATOMIC)
     __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_SEQ_CST);
     __atomic_fetch_add(&global_statistics.rrdr_db_points_read, db_points_read, __ATOMIC_SEQ_CST);
     __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, result_points_generated, __ATOMIC_SEQ_CST);
-#else
-    #warning NOT using atomic operations - using locks for global statistics
-    if (web_server_is_multithreaded)
-        global_statistics_lock();
-
-    global_statistics.rrdr_queries_made++;
-    global_statistics.rrdr_db_points_read += db_points_read;
-    global_statistics.rrdr_result_points_generated += result_points_generated;
-
-    if (web_server_is_multithreaded)
-        global_statistics_unlock();
-#endif
 }
 
 void finished_web_request_statistics(uint64_t dt,
@@ -75,7 +48,6 @@ void finished_web_request_statistics(uint64_t dt,
                                      uint64_t bytes_sent,
                                      uint64_t content_size,
                                      uint64_t compressed_content_size) {
-#if defined(HAVE_C___ATOMIC)
     uint64_t old_web_usec_max = global_statistics.web_usec_max;
     while(dt > old_web_usec_max)
         __atomic_compare_exchange(&global_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
@@ -86,61 +58,19 @@ void finished_web_request_statistics(uint64_t dt,
     __atomic_fetch_add(&global_statistics.bytes_sent, bytes_sent, __ATOMIC_SEQ_CST);
     __atomic_fetch_add(&global_statistics.content_size, content_size, __ATOMIC_SEQ_CST);
     __atomic_fetch_add(&global_statistics.compressed_content_size, compressed_content_size, __ATOMIC_SEQ_CST);
-#else
-#warning NOT using atomic operations - using locks for global statistics
-    if (web_server_is_multithreaded)
-        global_statistics_lock();
-
-    if (dt > global_statistics.web_usec_max)
-        global_statistics.web_usec_max = dt;
-
-    global_statistics.web_requests++;
-    global_statistics.web_usec += dt;
-    global_statistics.bytes_received += bytes_received;
-    global_statistics.bytes_sent += bytes_sent;
-    global_statistics.content_size += content_size;
-    global_statistics.compressed_content_size += compressed_content_size;
-
-    if (web_server_is_multithreaded)
-        global_statistics_unlock();
-#endif
 }
 
 uint64_t web_client_connected(void) {
-#if defined(HAVE_C___ATOMIC)
     __atomic_fetch_add(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
-    uint64_t id = __atomic_fetch_add(&global_statistics.web_client_count, 1, __ATOMIC_SEQ_CST);
-#else
-    if (web_server_is_multithreaded)
-        global_statistics_lock();
-
-    global_statistics.connected_clients++;
-    uint64_t id = global_statistics.web_client_count++;
-
-    if (web_server_is_multithreaded)
-        global_statistics_unlock();
-#endif
-
-    return id;
+    return __atomic_fetch_add(&global_statistics.web_client_count, 1, __ATOMIC_SEQ_CST);
 }
 
 void web_client_disconnected(void) {
-#if defined(HAVE_C___ATOMIC)
     __atomic_fetch_sub(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
-#else
-    if (web_server_is_multithreaded)
-        global_statistics_lock();
-
-    global_statistics.connected_clients--;
-
-    if (web_server_is_multithreaded)
-        global_statistics_unlock();
-#endif
 }
 
 
 static inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
-#if defined(HAVE_C___ATOMIC)
     gs->connected_clients            = __atomic_fetch_add(&global_statistics.connected_clients, 0, __ATOMIC_SEQ_CST);
     gs->web_requests                 = __atomic_fetch_add(&global_statistics.web_requests, 0, __ATOMIC_SEQ_CST);
     gs->web_usec                     = __atomic_fetch_add(&global_statistics.web_usec, 0, __ATOMIC_SEQ_CST);
@@ -160,16 +90,6 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
         __atomic_compare_exchange(&global_statistics.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_SEQ_CST,
                                   __ATOMIC_SEQ_CST);
     }
-#else
-    global_statistics_lock();
-
-    memcpy(gs, (const void *)&global_statistics, sizeof(struct global_statistics));
-
-    if (options & GLOBAL_STATS_RESET_WEB_USEC_MAX)
-        global_statistics.web_usec_max = 0;
-
-    global_statistics_unlock();
-#endif
 }
 
 static void global_statistics_charts(void) {

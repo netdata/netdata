@@ -260,7 +260,6 @@ AC_TYPE_UINT64_T
 AC_C_INLINE
 AC_FUNC_STRERROR_R
 AC_C__GENERIC
-AC_C___ATOMIC
 # AC_C_STMT_EXPR
 AC_CANONICAL_HOST
 AC_HEADER_MAJOR
@@ -1546,14 +1545,6 @@ AC_MSG_RESULT([${enable_lto}])
 
 # -----------------------------------------------------------------------------
 
-if test "${enable_exporting_kinesis}" = "yes" -o \
-        "${enable_exporting_pubsub}" = "yes" -o \
-        "${enable_exporting_prometheus_remote_write}" = "yes" -o \
-        "${new_cloud_protocol}" = "yes" -o \
-        "${build_ml}" = "yes"; then
-    enable_cxx_linker="yes"
-fi
-
 # Try to unconditionally link with -latomic. If the compiler can satisfy
 # all the atomic ops with builtins then, the library will be left unused.
 # Otherwise, some ops will be covered by the compiler's intrinsics and some
@@ -1582,8 +1573,6 @@ fi
 AC_SUBST([OPTIONAL_ATOMIC_LIBS])
 
 AC_LANG_POP([C++])
-
-AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_cxx_linker}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 

@@ -28,7 +28,6 @@ EXTRA_DIST = \
     .eslintrc \
     .github/CODEOWNERS \
     build/m4/jemalloc.m4 \
-    build/m4/ax_c___atomic.m4 \
     build/m4/ax_check_enable_debug.m4 \
     build/m4/ax_c_mallinfo.m4 \
     build/m4/ax_gcc_func_attribute.m4 \
@@ -941,22 +940,15 @@ if ENABLE_ML_TESTS
         $(NULL)
 endif
 
-if ENABLE_CXX_LINKER
-    netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
-else
-    netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
-endif
+netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 
 sbin_PROGRAMS += netdatacli
 netdatacli_SOURCES = $(NETDATACLI_FILES)
 netdatacli_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
-if ENABLE_CXX_LINKER
-    netdatacli_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
-else
-    netdatacli_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
-endif
+
+netdatacli_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
