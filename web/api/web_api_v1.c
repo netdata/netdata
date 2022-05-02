@@ -512,6 +512,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     fix_google_param(outFileName);
 
     RRDSET *st = NULL;
+    ONEWAYALLOC *owa = onewayalloc_create(0);
 
     if((!chart || !*chart) && (!context)) {
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
@@ -519,8 +520,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     struct context_param  *context_param_list = NULL;
+
     if (context && !chart) {
         RRDSET *st1;
+
         uint32_t context_hash = simple_hash(context);
 
         rrdhost_rdlock(host);
@@ -532,14 +535,14 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                 (!chart_label_key || rrdset_contains_label_keylist(st1, chart_label_key)) &&
                 (!chart_labels_filter ||
                  rrdset_matches_label_keys(st1, chart_labels_filter, words, hash_key_list, &word_count, MAX_CHART_LABELS_FILTER)))
-                    build_context_param_list(&context_param_list, st1);
+                    build_context_param_list(owa, &context_param_list, st1);
         }
         rrdhost_unlock(host);
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
         else {
             if (!chart_label_key && !chart_labels_filter)
-                sql_build_context_param_list(&context_param_list, host, context, NULL);
+                sql_build_context_param_list(owa, &context_param_list, host, context, NULL);
         }
     }
     else {
@@ -549,14 +552,14 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         if (likely(st))
             st->last_accessed_time = now_realtime_sec();
         else
-            sql_build_context_param_list(&context_param_list, host, NULL, chart);
+            sql_build_context_param_list(owa, &context_param_list, host, NULL, chart);
     }
 
     if (!st) {
         if (likely(context_param_list && context_param_list->rd && context_param_list->rd->rrdset))
             st = context_param_list->rd->rrdset;
         else {
-            free_context_param_list(&context_param_list);
+            free_context_param_list(owa, &context_param_list);
             context_param_list = NULL;
         }
     }
@@ -630,12 +633,12 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format,
+    ret = rrdset2anything_api_v1(owa, st, w->response.data, dimensions, format,
                                  points, after, before, group, group_time,
                                  options, &last_timestamp_in_data, context_param_list,
                                  chart_label_key, max_anomaly_rates, timeout);
 
-    free_context_param_list(&context_param_list);
+    free_context_param_list(owa, &context_param_list);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)
@@ -652,7 +655,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     else if(format == DATASOURCE_JSONP)
         buffer_strcat(w->response.data, ");");
 
-    cleanup:
+cleanup:
+    onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;
 }

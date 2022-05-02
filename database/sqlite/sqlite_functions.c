@@ -1446,13 +1446,13 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
 }
 
 #ifdef ENABLE_DBENGINE
-static RRDDIM *create_rrdim_entry(RRDSET *st, char *id, char *name, uuid_t *metric_uuid)
+static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *name, uuid_t *metric_uuid)
 {
-    RRDDIM *rd = callocz(1, sizeof(*rd));
+    RRDDIM *rd = onewayalloc_callocz(owa, 1, sizeof(*rd));
     rd->rrdset = st;
     rd->last_stored_value = NAN;
     rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
-    rd->state = mallocz(sizeof(*rd->state));
+    rd->state = onewayalloc_mallocz(owa, sizeof(*rd->state));
     rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
     rd->state->query_ops.init = rrdeng_load_metric_init;
     rd->state->query_ops.next_metric = rrdeng_load_metric_next;
@@ -1460,11 +1460,11 @@ static RRDDIM *create_rrdim_entry(RRDSET *st, char *id, char *name, uuid_t *metr
     rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
     rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
     rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-    rd->state->rrdeng_uuid = mallocz(sizeof(uuid_t));
+    rd->state->rrdeng_uuid = onewayalloc_mallocz(owa, sizeof(uuid_t));
     uuid_copy(*rd->state->rrdeng_uuid, *metric_uuid);
     uuid_copy(rd->state->metric_uuid, *metric_uuid);
-    rd->id = strdupz(id);
-    rd->name = strdupz(name);
+    rd->id = onewayalloc_strdupz(owa, id);
+    rd->name = onewayalloc_strdupz(owa, name);
     return rd;
 }
 #endif
@@ -1481,7 +1481,7 @@ static RRDDIM *create_rrdim_entry(RRDSET *st, char *id, char *name, uuid_t *metr
     "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.type||'.'||c.id = @chart " \
     "order by c.chart_id asc, c.type||'.'||c.id desc;"
 
-void sql_build_context_param_list(struct context_param **param_list, RRDHOST *host, char *context, char *chart)
+void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **param_list, RRDHOST *host, char *context, char *chart)
 {
 #ifdef ENABLE_DBENGINE
     int rc;
@@ -1490,7 +1490,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         return;
 
     if (unlikely(!(*param_list))) {
-        *param_list = mallocz(sizeof(struct context_param));
+        *param_list = onewayalloc_mallocz(owa, sizeof(struct context_param));
         (*param_list)->first_entry_t = LONG_MAX;
         (*param_list)->last_entry_t = 0;
         (*param_list)->rd = NULL;
@@ -1539,21 +1539,21 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
 
         if (!st || uuid_compare(*(uuid_t *)sqlite3_column_blob(res, 7), chart_id)) {
             if (unlikely(st && !st->counter)) {
-                freez(st->context);
-                freez((char *) st->name);
-                freez(st);
+                onewayalloc_freez(owa, st->context);
+                onewayalloc_freez(owa, (char *) st->name);
+                onewayalloc_freez(owa, st);
             }
-            st = callocz(1, sizeof(*st));
+            st = onewayalloc_callocz(owa, 1, sizeof(*st));
             char n[RRD_ID_LENGTH_MAX + 1];
 
             snprintfz(
                 n, RRD_ID_LENGTH_MAX, "%s.%s", (char *)sqlite3_column_text(res, 4),
                 (char *)sqlite3_column_text(res, 3));
-            st->name = strdupz(n);
+            st->name = onewayalloc_strdupz(owa, n);
             st->update_every = sqlite3_column_int(res, 6);
             st->counter = 0;
             if (chart) {
-                st->context = strdupz((char *)sqlite3_column_text(res, 8));
+                st->context = onewayalloc_strdupz(owa, (char *)sqlite3_column_text(res, 8));
                 strncpyz(st->id, chart, RRD_ID_LENGTH_MAX);
             }
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
@@ -1569,7 +1569,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         st->counter++;
         st->last_entry_t = MAX(st->last_entry_t, (*param_list)->last_entry_t);
 
-        RRDDIM *rd = create_rrdim_entry(st, (char *)sqlite3_column_text(res, 1), (char *)sqlite3_column_text(res, 2), &rrdeng_uuid);
+        RRDDIM *rd = create_rrdim_entry(owa, st, (char *)sqlite3_column_text(res, 1), (char *)sqlite3_column_text(res, 2), &rrdeng_uuid);
         if (sqlite3_column_int(res, 9) == 1)
             rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
         rd->next = (*param_list)->rd;
@@ -1577,13 +1577,13 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
     }
     if (st) {
         if (!st->counter) {
-            freez(st->context);
-            freez((char *)st->name);
-            freez(st);
+            onewayalloc_freez(owa,st->context);
+            onewayalloc_freez(owa,(char *)st->name);
+            onewayalloc_freez(owa,st);
         }
         else
             if (!st->context && context)
-                st->context = strdupz(context);
+                st->context = onewayalloc_strdupz(owa,context);
     }
 
 failed:

@@ -17,6 +17,7 @@ SUBDIRS = \
     health \
     locks \
     log \
+    onewayalloc \
     popen \
     procfile \
     simple_pattern \

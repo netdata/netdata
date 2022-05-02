@@ -83,7 +83,7 @@ inline static void rrdr_unlock_rrdset(RRDR *r) {
     }
 }
 
-inline void rrdr_free(RRDR *r)
+inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r)
 {
     if(unlikely(!r)) {
         error("NULL value given!");
@@ -91,21 +91,21 @@ inline void rrdr_free(RRDR *r)
     }
 
     rrdr_unlock_rrdset(r);
-    freez(r->t);
-    freez(r->v);
-    freez(r->o);
-    freez(r->od);
-    freez(r);
+    onewayalloc_freez(owa, r->t);
+    onewayalloc_freez(owa, r->v);
+    onewayalloc_freez(owa, r->o);
+    onewayalloc_freez(owa, r->od);
+    onewayalloc_freez(owa, r);
 }
 
-RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param_list)
+RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_param *context_param_list)
 {
     if (unlikely(!st)) {
         error("NULL value given!");
         return NULL;
     }
 
-    RRDR *r = callocz(1, sizeof(RRDR));
+    RRDR *r = onewayalloc_callocz(owa, 1, sizeof(RRDR));
     r->st = st;
 
     if (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
@@ -126,10 +126,10 @@ RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param
 
     r->n = n;
 
-    r->t = callocz((size_t)n, sizeof(time_t));
-    r->v = mallocz(n * r->d * sizeof(calculated_number));
-    r->o = mallocz(n * r->d * sizeof(RRDR_VALUE_FLAGS));
-    r->od = mallocz(r->d * sizeof(RRDR_DIMENSION_FLAGS));
+    r->t = onewayalloc_callocz(owa, (size_t)n, sizeof(time_t));
+    r->v = onewayalloc_mallocz(owa, n * r->d * sizeof(calculated_number));
+    r->o = onewayalloc_mallocz(owa, n * r->d * sizeof(RRDR_VALUE_FLAGS));
+    r->od = onewayalloc_mallocz(owa, r->d * sizeof(RRDR_DIMENSION_FLAGS));
 
     // set the hidden flag on hidden dimensions
     int c;

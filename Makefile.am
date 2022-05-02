@@ -158,6 +158,8 @@ LIBNETDATA_FILES = \
     libnetdata/locks/locks.h \
     libnetdata/log/log.c \
     libnetdata/log/log.h \
+    libnetdata/onewayalloc/onewayalloc.c \
+    libnetdata/onewayalloc/onewayalloc.h \
     libnetdata/popen/popen.c \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \

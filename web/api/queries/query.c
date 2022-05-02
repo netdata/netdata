@@ -831,7 +831,8 @@ static int rrdr_convert_before_after_to_absolute(
 }
 
 static RRDR *rrd2rrdr_fixedstep(
-        RRDSET *st
+          ONEWAYALLOC *owa
+        , RRDSET *st
         , long points_requested
         , long long after_requested
         , long long before_requested
@@ -855,7 +856,7 @@ static RRDR *rrd2rrdr_fixedstep(
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
     if(duration <= 0 || available_points <= 0)
-        return rrdr_create(st, 1, context_param_list);
+        return rrdr_create(owa, st, 1, context_param_list);
 
     // check the number of wanted points in the result
     if(unlikely(points_requested < 0)) points_requested = -points_requested;
@@ -1013,7 +1014,7 @@ static RRDR *rrd2rrdr_fixedstep(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(st, points_wanted, context_param_list);
+    RRDR *r = rrdr_create(owa, st, points_wanted, context_param_list);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
@@ -1216,7 +1217,8 @@ static RRDR *rrd2rrdr_fixedstep(
 
 #ifdef ENABLE_DBENGINE
 static RRDR *rrd2rrdr_variablestep(
-        RRDSET *st
+        ONEWAYALLOC *owa
+        , RRDSET *st
         , long points_requested
         , long long after_requested
         , long long before_requested
@@ -1242,7 +1244,7 @@ static RRDR *rrd2rrdr_variablestep(
 
     if(duration <= 0 || available_points <= 0) {
         freez(region_info_array);
-        return rrdr_create(st, 1, context_param_list);
+        return rrdr_create(owa, st, 1, context_param_list);
     }
 
     // check the number of wanted points in the result
@@ -1401,7 +1403,7 @@ static RRDR *rrd2rrdr_variablestep(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(st, points_wanted, context_param_list);
+    RRDR *r = rrdr_create(owa, st, points_wanted, context_param_list);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
@@ -1608,7 +1610,8 @@ static RRDR *rrd2rrdr_variablestep(
 #endif //#ifdef ENABLE_DBENGINE
 
 RRDR *rrd2rrdr(
-        RRDSET *st
+          ONEWAYALLOC *owa
+        , RRDSET *st
         , long points_requested
         , long long after_requested
         , long long before_requested
@@ -1644,7 +1647,7 @@ RRDR *rrd2rrdr(
             first_entry_t = after_requested;
 
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
-        rebuild_context_param_list(context_param_list, after_requested);
+        rebuild_context_param_list(owa, context_param_list, after_requested);
         st = context_param_list->rd ? context_param_list->rd->rrdset : NULL;
         if (unlikely(!st))
             return NULL;
@@ -1669,7 +1672,7 @@ RRDR *rrd2rrdr(
                 }
                 freez(region_info_array);
             }
-            return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
+            return rrd2rrdr_fixedstep(owa, st, points_requested, after_requested, before_requested, group_method,
                                       resampling_time_requested, options, dimensions, rrd_update_every,
                                       first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
         } else {
@@ -1680,13 +1683,13 @@ RRDR *rrd2rrdr(
                                                                                   rrd_update_every, first_entry_t,
                                                                                   last_entry_t, options);
             }
-            return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
+            return rrd2rrdr_variablestep(owa, st, points_requested, after_requested, before_requested, group_method,
                                          resampling_time_requested, options, dimensions, rrd_update_every,
                                          first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list, timeout);
         }
     }
 #endif
-    return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
+    return rrd2rrdr_fixedstep(owa, st, points_requested, after_requested, before_requested, group_method,
                               resampling_time_requested, options, dimensions,
                               rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
 }
