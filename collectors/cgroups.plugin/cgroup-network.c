@@ -24,10 +24,16 @@ struct iface {
     unsigned int ifindex;
     unsigned int iflink;
 
-    unsigned int count; // total number of ifaces in the list, only the head element contains the valid number
-
     struct iface *next;
 };
+
+unsigned int calc_num_ifaces(struct iface *root) {
+    unsigned int num = 0;
+    for (h = root; h != NULL; h = h->next) {
+        num++;
+    }
+    return num;
+}
 
 unsigned int read_iface_iflink(const char *prefix, const char *iface) {
     if(!prefix) prefix = "";
@@ -81,10 +87,8 @@ struct iface *read_proc_net_dev(const char *scope __maybe_unused, const char *pr
 
     size_t lines = procfile_lines(ff), l;
     struct iface *root = NULL;
-    unsigned int count = 0;
     for(l = 2; l < lines ;l++) {
         if (unlikely(procfile_linewords(ff, l) < 1)) continue;
-        count++;
 
         struct iface *t = callocz(1, sizeof(struct iface));
         t->device = strdupz(procfile_lineword(ff, l, 0));
@@ -97,9 +101,6 @@ struct iface *read_proc_net_dev(const char *scope __maybe_unused, const char *pr
 #ifdef NETDATA_INTERNAL_CHECKS
         info("added %s interface '%s', ifindex %u, iflink %u", scope, t->device, t->ifindex, t->iflink);
 #endif
-    }
-    if (root) {
-        root->count = count;
     }
 
     procfile_close(ff);
@@ -454,19 +455,21 @@ void detect_veth_interfaces(pid_t pid) {
         goto cleanup;
     }
 
+     unsigned int host_dev_num = calc_num_ifaces(host);
+     unsigned int cgroup_dev_num = calc_num_ifaces(cgroup);
     // host ifaces == guest ifaces => we are still in the host namespace
     // and we can't really identify which ifaces belong to the cgroup (e.g. Proxmox VM).
-    if (host->count == cgroup->count) {
+    if (host_dev_num == cgroup_dev_num) {
         unsigned int m = 0;
         for (h = host; h != NULL; h = h->next) {
             for (c = cgroup; c != NULL; c = c->next) {
                 if (h->ifindex == c->ifindex && h->iflink == c->iflink) {
-                    m += 1;
+                    m++;
                     break;
                 }
             }
         }
-        if (host->count == m) {
+        if (host_dev_num == m) {
             goto cleanup;
         }
     }
