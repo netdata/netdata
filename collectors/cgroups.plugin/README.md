@@ -228,9 +228,7 @@ sudo systemctl daemon-reexec
 (`systemctl daemon-reload` does not reload the configuration of the server - so you have to
 execute `systemctl daemon-reexec`).
 
-Now, when you run `systemd-cgtop`, services will start reporting usage (if it does not, restart a service - any service
-
-- to wake it up). Refresh your Netdata dashboard, and you will have the charts too.
+Now, when you run `systemd-cgtop`, services will start reporting usage (if it does not, restart any service to wake it up). Refresh your Netdata dashboard, and you will have the charts too.
 
 In case memory accounting is missing, you will need to enable it at your kernel, by appending the following kernel boot
 options and rebooting:
