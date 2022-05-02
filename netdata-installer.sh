@@ -161,6 +161,10 @@ banner_nonroot_install() {
 
   Please set an installation prefix, like this:
 
+      $PROGRAM ${@} --install-prefix /tmp
+
+  or
+
       $PROGRAM ${@} --install /tmp
 
   or, run the installer as root:
@@ -199,7 +203,8 @@ usage() {
 USAGE: ${PROGRAM} [options]
        where options include:
 
-  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata.
+  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata, this option is deprecated and will be removed in the future version, please use --install-prefix instead.
+  --install-prefix <path>           Install netdata in <path>. Ex. --install-prefix /opt will put netdata in /opt/netdata.
   --dont-start-it            Do not (re)start netdata after installation.
   --dont-wait                Run installation in non-interactive mode.
   --stable-channel           Use packages from GitHub release pages instead of nightly updates.
@@ -367,6 +372,10 @@ while [ -n "${1}" ]; do
       NETDATA_BUILD_JUDY=1
       ;;
     "--install")
+      NETDATA_PREFIX="${2}/netdata"
+      shift 1
+      ;;
+    "--install-prefix")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
       ;;
