@@ -90,8 +90,6 @@ void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_lis
         rd->id = onewayalloc_strdupz(owa, rd1->id);
         rd->name = onewayalloc_strdupz(owa, rd1->name);
         rd->state = onewayalloc_memdupz(owa, rd1->state, sizeof(*rd->state));
-        memcpy(&rd->state->collect_ops, &rd1->state->collect_ops, sizeof(struct rrddim_collect_ops));
-        memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }
