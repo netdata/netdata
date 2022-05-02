@@ -463,7 +463,7 @@ void detect_veth_interfaces(pid_t pid) {
         unsigned int m = 0;
         for (h = host; h; h = h->next) {
             for (c = cgroup; c; c = c->next) {
-                if (h->ifndex == c->ifindex && h->iflink == c->iflink) {
+                if (h->ifindex == c->ifindex && h->iflink == c->iflink) {
                     m++;
                     break;
                 }
