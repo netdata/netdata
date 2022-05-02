@@ -871,14 +871,6 @@ RRDSET *rrdset_create_custom(
     else
         rrdset_flag_clear(st, RRDSET_FLAG_ENABLED);
 
-    rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-    rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
-    rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
 
     st->green = NAN;
