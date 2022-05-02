@@ -568,7 +568,7 @@ int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *fun
                 function, line, file,
                 end_s - start_s);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, now_monotonic_usec() - start, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
