@@ -58,7 +58,6 @@ include gearman/Makefile.inc
 include go_expvar/Makefile.inc
 include haproxy/Makefile.inc
 include hddtemp/Makefile.inc
-include httpcheck/Makefile.inc
 include hpssa/Makefile.inc
 include icecast/Makefile.inc
 include ipfs/Makefile.inc
