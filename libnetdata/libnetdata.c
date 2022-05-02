@@ -31,6 +31,8 @@ const char *program_version = VERSION;
 // routines.
 
 #ifdef NETDATA_LOG_ALLOCATIONS
+#warning NETDATA_LOG_ALLOCATIONS ENABLED - set log_thread_memory_allocations=1 on any thread to log all its allocations - or use log_allocations() to log them on demand
+
 static __thread struct memory_statistics {
     volatile ssize_t malloc_calls_made;
     volatile ssize_t calloc_calls_made;
@@ -44,23 +46,14 @@ static __thread struct memory_statistics {
 
 __thread size_t log_thread_memory_allocations = 0;
 
-static inline void print_allocations(const char *file, const char *function, const unsigned long line, const char *type, size_t size) {
+inline void log_allocations_int(const char *file, const char *function, const unsigned long line) {
     static __thread struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-    fprintf(stderr, "%s iteration %zu MEMORY TRACE: %lu@%s : %s : %s : %zu\n",
+    fprintf(stderr, "%s MEMORY ALLOCATIONS: (%04lu@%s:%s): Allocated %zd KiB (%+zd B), mmapped %zd KiB (%+zd B): : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
             netdata_thread_tag(),
-            log_thread_memory_allocations,
-            line, file, function,
-            type, size
-    );
-
-    fprintf(stderr, "%s iteration %zu MEMORY ALLOCATIONS: (%04lu@%-40.40s:%-40.40s): Allocated %zd KiB (%+zd B), mmapped %zd KiB (%+zd B): %s : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
-            netdata_thread_tag(),
-            log_thread_memory_allocations,
             line, file, function,
             (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
             (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
-            type,
             memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
             memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
             memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
@@ -79,12 +72,12 @@ static inline void mmap_accounting(size_t size) {
 }
 
 void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.malloc_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "malloc()", size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.malloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     size_t *n = (size_t *)malloc(sizeof(size_t) + size);
     if (unlikely(!n)) fatal("mallocz() cannot allocate %zu bytes of memory.", size);
@@ -95,12 +88,11 @@ void *mallocz_int(const char *file, const char *function, const unsigned long li
 void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
     size = nmemb * size;
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.calloc_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "calloc()", size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.calloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     size_t *n = (size_t *)calloc(1, sizeof(size_t) + size);
     if (unlikely(!n)) fatal("callocz() cannot allocate %zu bytes of memory.", size);
@@ -118,12 +110,11 @@ void *reallocz_int(const char *file, const char *function, const unsigned long l
     n = realloc(n, sizeof(size_t) + size);
     if (unlikely(!n)) fatal("reallocz() cannot allocate %zu bytes of memory (from %zu bytes).", size, old_size);
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.realloc_calls_made++;
-        memory_statistics.allocated_memory += (size - old_size);
-        print_allocations(file, function, line, "realloc()", size - old_size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.realloc_calls_made++;
+    memory_statistics.allocated_memory += (size - old_size);
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     *n = size;
     return (void *)&n[1];
@@ -132,12 +123,11 @@ void *reallocz_int(const char *file, const char *function, const unsigned long l
 char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s) {
     size_t size = strlen(s) + 1;
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.strdup_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "strdup()", size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.strdup_calls_made++;
+    memory_statistics.allocated_memory += size;
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     size_t *n = (size_t *)malloc(sizeof(size_t) + size);
     if (unlikely(!n)) fatal("strdupz() cannot allocate %zu bytes of memory.", size);
@@ -155,12 +145,11 @@ void freez_int(const char *file, const char *function, const unsigned long line,
     n--;
     size_t size = *n;
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.free_calls_made++;
-        memory_statistics.allocated_memory -= size;
-        print_allocations(file, function, line, "free()", size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.free_calls_made++;
+    memory_statistics.allocated_memory -= size;
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     free(n);
 }

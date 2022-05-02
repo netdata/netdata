@@ -4,9 +4,9 @@
 
 #define PF_PREFIX "PROCFILE"
 
-#define PFWORDS_INCREASE_STEP 200
-#define PFLINES_INCREASE_STEP 10
-#define PROCFILE_INCREMENT_BUFFER 512
+#define PFWORDS_INCREASE_STEP 2000
+#define PFLINES_INCREASE_STEP 200
+#define PROCFILE_INCREMENT_BUFFER 4096
 
 int procfile_open_flags = O_RDONLY;
 
@@ -48,9 +48,12 @@ static inline void pfwords_add(procfile *ff, char *str) {
     pfwords *fw = ff->words;
     if(unlikely(fw->len == fw->size)) {
         // debug(D_PROCFILE, PF_PREFIX ":   expanding words");
+        size_t minimum = PFWORDS_INCREASE_STEP;
+        size_t optimal = fw->size / 2;
+        size_t wanted = (optimal > minimum)?optimal:minimum;
 
-        ff->words = fw = reallocz(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
-        fw->size += PFWORDS_INCREASE_STEP;
+        ff->words = fw = reallocz(fw, sizeof(pfwords) + (fw->size + wanted) * sizeof(char *));
+        fw->size += wanted;
     }
 
     fw->words[fw->len++] = str;
@@ -90,9 +93,12 @@ static inline size_t *pflines_add(procfile *ff) {
     pflines *fl = ff->lines;
     if(unlikely(fl->len == fl->size)) {
         // debug(D_PROCFILE, PF_PREFIX ":   expanding lines");
+        size_t minimum = PFLINES_INCREASE_STEP;
+        size_t optimal = fl->size / 2;
+        size_t wanted = (optimal > minimum)?optimal:minimum;
 
-        ff->lines = fl = reallocz(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
-        fl->size += PFLINES_INCREASE_STEP;
+        ff->lines = fl = reallocz(fl, sizeof(pflines) + (fl->size + wanted) * sizeof(ffline));
+        fl->size += wanted;
     }
 
     ffline *ffl = &fl->lines[fl->len++];
@@ -272,9 +278,13 @@ procfile *procfile_readall(procfile *ff) {
         ssize_t x = ff->size - s;
 
         if(unlikely(!x)) {
-            debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", procfile_filename(ff));
-            ff = reallocz(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
-            ff->size += PROCFILE_INCREMENT_BUFFER;
+            size_t minimum = PROCFILE_INCREMENT_BUFFER;
+            size_t optimal = ff->size / 2;
+            size_t wanted = (optimal > minimum)?optimal:minimum;
+
+            debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s' by %zu bytes.", procfile_filename(ff), wanted);
+            ff = reallocz(ff, sizeof(procfile) + ff->size + wanted);
+            ff->size += wanted;
         }
 
         debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
