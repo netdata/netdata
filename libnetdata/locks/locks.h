@@ -23,11 +23,11 @@ typedef struct netdata_rwlock_locker {
 } netdata_rwlock_locker;
 
 typedef struct netdata_rwlock_t {
-    pthread_rwlock_t rwlock_t;
-    size_t readers;
-    size_t writers;
-    netdata_mutex_t lockers_mutex;
-    netdata_rwlock_locker *lockers;
+    pthread_rwlock_t rwlock_t;       // the lock
+    size_t readers;                  // the number of reader on the lock
+    size_t writers;                  // the number of writers on the lock
+    netdata_mutex_t lockers_mutex;   // a mutex to protect the linked list of the lock holding threads
+    netdata_rwlock_locker *lockers;  // the linked list of the lock holding threads
 } netdata_rwlock_t;
 
 #define NETDATA_RWLOCK_INITIALIZER {                \

@@ -118,29 +118,29 @@ int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
 
 int netdata_mutex_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                              const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(0x%p) from %lu@%s, %s()", mutex, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     int ret = __netdata_mutex_init(mutex);
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(0x%p) = %d, from %lu@%s, %s()", mutex, ret, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(%p) = %d, from %lu@%s, %s()", mutex, ret, line, file, function);
 
     return ret;
 }
 
 int netdata_mutex_destroy_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                              const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(0x%p) from %lu@%s, %s()", mutex, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     int ret = __netdata_mutex_destroy(mutex);
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(0x%p) = %d, from %lu@%s, %s()", mutex, ret, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(%p) = %d, from %lu@%s, %s()", mutex, ret, line, file, function);
 
     return ret;
 }
 
 int netdata_mutex_lock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                              const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(0x%p) from %lu@%s, %s()", mutex, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
     int ret = __netdata_mutex_lock(mutex);
@@ -150,14 +150,14 @@ int netdata_mutex_lock_debug(const char *file __maybe_unused, const char *functi
     (void)start_s;
     (void)end_s;
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
 
 int netdata_mutex_trylock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                 const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(0x%p) from %lu@%s, %s()", mutex, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
     int ret = __netdata_mutex_trylock(mutex);
@@ -167,14 +167,14 @@ int netdata_mutex_trylock_debug(const char *file __maybe_unused, const char *fun
     (void)start_s;
     (void)end_s;
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
 
 int netdata_mutex_unlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(0x%p) from %lu@%s, %s()", mutex, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
     int ret = __netdata_mutex_unlock(mutex);
@@ -184,7 +184,7 @@ int netdata_mutex_unlock_debug(const char *file __maybe_unused, const char *func
     (void)start_s;
     (void)end_s;
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
@@ -280,10 +280,7 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 void not_supported_by_posix_rwlocks(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, char locktype, const char *reason) {
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
-            "RW_LOCK FATAL ON LOCK 0x%p: %d '%s' (function %s() %lu@%s) attempts to acquire a '%c' lock.\n"
-            "But it is not supported by POSIX because: %s\n"
-            "At this attempt, the task is holding %zu rwlocks and %zu mutexes.\n"
-            "There are %zu readers and %zu writers are holding the lock requested now:\n",
+            "RW_LOCK FATAL ON LOCK %p: %d '%s' (function %s() %lu@%s) attempts to acquire a '%c' lock, but it is not supported by POSIX because: %s. At this attempt, the task is holding %zu rwlocks and %zu mutexes. There are %zu readers and %zu writers holding this lock:\n",
             rwlock,
             gettid(), netdata_thread_tag(),
             function, line, file,
@@ -297,8 +294,8 @@ void not_supported_by_posix_rwlocks(const char *file, const char *function, cons
     netdata_rwlock_locker *p;
     for(i = 1, p = rwlock->lockers; p ;p = p->next, i++) {
         fprintf(stderr,
-                "     => %i: RW_LOCK: process %d '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
-                i,
+                "     => %i: RW_LOCK %p: process %d '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
+                i, rwlock,
                 p->pid, p->tag,
                 p->function, p->line, p->file,
                 p->callers, p->lock,
@@ -310,8 +307,7 @@ void not_supported_by_posix_rwlocks(const char *file, const char *function, cons
 static void log_rwlock_lockers(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, const char *reason, char locktype) {
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     fprintf(stderr,
-            "RW_LOCK ON LOCK 0x%p: %d '%s' (function %s() %lu@%s) %s a '%c' lock (while holding %zu rwlocks and %zu mutexes).\n"
-            "There are %zu readers and %zu writers are holding the lock:\n",
+            "RW_LOCK ON LOCK %p: %d '%s' (function %s() %lu@%s) %s a '%c' lock (while holding %zu rwlocks and %zu mutexes). There are %zu readers and %zu writers holding this lock:\n",
             rwlock,
             gettid(), netdata_thread_tag(),
             function, line, file,
@@ -324,8 +320,8 @@ static void log_rwlock_lockers(const char *file, const char *function, const uns
     netdata_rwlock_locker *p;
     for(i = 1, p = rwlock->lockers; p ;p = p->next, i++) {
         fprintf(stderr,
-                "     => %i: RW_LOCK: process %d '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
-                i,
+                "     => %i: RW_LOCK %p: process %d '%s' (function %s() %lu@%s) is having %zu '%c' lock for %llu usec.\n",
+                i, rwlock,
                 p->pid, p->tag,
                 p->function, p->line, p->file,
                 p->callers, p->lock,
@@ -360,14 +356,14 @@ static void remove_rwlock_locker(const char *file __maybe_unused, const char *fu
 
     if(locker->callers == 0)
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) callers should be positive but it is zero\n",
+                "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) callers should be positive but it is zero\n",
                 rwlock,
                 locker->pid, locker->tag,
                 locker->function, locker->line, locker->file);
 
     if(locker->callers > 1 && locker->lock != 'R')
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) only 'R' locks support multiple holders, but here we have %zu callers holding a '%c' lock.\n",
+                "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) only 'R' locks support multiple holders, but here we have %zu callers holding a '%c' lock.\n",
                 rwlock,
                 locker->pid, locker->tag,
                 locker->function, locker->line, locker->file,
@@ -398,7 +394,7 @@ static void remove_rwlock_locker(const char *file __maybe_unused, const char *fu
 
         if(!doit) {
             fprintf(stderr,
-                    "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) with %zu x '%c' lock is not found.\n",
+                    "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) with %zu x '%c' lock is not found.\n",
                     rwlock,
                     locker->pid, locker->tag,
                     locker->function, locker->line, locker->file,
@@ -407,7 +403,7 @@ static void remove_rwlock_locker(const char *file __maybe_unused, const char *fu
         else {
             if(end_s - locker->start_s >= NETDATA_TRACE_RWLOCKS_HOLD_TIME_TO_IGNORE_USEC)
                 fprintf(stderr,
-                        "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) holded a '%c' for %llu usec.\n",
+                        "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) holded a '%c' for %llu usec.\n",
                         rwlock,
                         locker->pid, locker->tag,
                         locker->function, locker->line, locker->file,
@@ -454,7 +450,7 @@ static netdata_rwlock_locker *update_or_add_rwlock_locker(const char *file, cons
 
 int netdata_rwlock_destroy_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                  const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_destroy(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_destroy(%p) from %lu@%s, %s()", rwlock, line, file, function);
 
     if(rwlock->readers)
         error("RW_LOCK: destroying a rwlock with %zu readers in it", rwlock->readers);
@@ -472,14 +468,14 @@ int netdata_rwlock_destroy_debug(const char *file __maybe_unused, const char *fu
             error("RW_LOCK: internal error - empty rwlock with %zu writers in it", rwlock->writers);
     }
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_destroy(0x%p) = %d, from %lu@%s, %s()", rwlock, ret, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_destroy(%p) = %d, from %lu@%s, %s()", rwlock, ret, line, file, function);
 
     return ret;
 }
 
 int netdata_rwlock_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                               const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_init(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_init(%p) from %lu@%s, %s()", rwlock, line, file, function);
 
     int ret = __netdata_rwlock_init(rwlock);
     if(!ret) {
@@ -489,7 +485,7 @@ int netdata_rwlock_init_debug(const char *file __maybe_unused, const char *funct
         rwlock->writers = 0;
     }
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_init(0x%p) = %d, from %lu@%s, %s()", rwlock, ret, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_init(%p) = %d, from %lu@%s, %s()", rwlock, ret, line, file, function);
 
     return ret;
 }
@@ -497,7 +493,7 @@ int netdata_rwlock_init_debug(const char *file __maybe_unused, const char *funct
 int netdata_rwlock_rdlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                 const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_rdlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_rdlock(%p) from %lu@%s, %s()", rwlock, line, file, function);
 
     netdata_rwlock_locker *locker = find_rwlock_locker(file, function, line, rwlock);
 
@@ -525,13 +521,13 @@ int netdata_rwlock_rdlock_debug(const char *file __maybe_unused, const char *fun
 
     if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED for a READ lock for %llu usec.\n",
+                "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) WAITED for a READ lock for %llu usec.\n",
                 rwlock,
                 gettid(), netdata_thread_tag(),
                 function, line, file,
                 end_s - start_s);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_rdlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_rdlock(%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
@@ -539,7 +535,7 @@ int netdata_rwlock_rdlock_debug(const char *file __maybe_unused, const char *fun
 int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                 const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock(%p) from %lu@%s, %s()", rwlock, line, file, function);
 
     netdata_rwlock_locker *locker = find_rwlock_locker(file, function, line, rwlock);
     if(locker)
@@ -562,13 +558,13 @@ int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *fun
 
     if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED for a WRITE lock for %llu usec.\n",
+                "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) WAITED for a WRITE lock for %llu usec.\n",
                 rwlock,
                 gettid(), netdata_thread_tag(),
                 function, line, file,
                 end_s - start_s);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock(%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
@@ -576,7 +572,7 @@ int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *fun
 int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                 const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_unlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_unlock(%p) from %lu@%s, %s()", rwlock, line, file, function);
 
     netdata_rwlock_locker *locker = find_rwlock_locker(file, function, line, rwlock);
     if(unlikely(!locker))
@@ -588,7 +584,7 @@ int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *fun
 
     if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED to UNLOCK for %llu usec.\n",
+                "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) WAITED to UNLOCK for %llu usec.\n",
                 rwlock,
                 gettid(), netdata_thread_tag(),
                 function, line, file,
@@ -596,14 +592,14 @@ int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *fun
 
     if(likely(!ret && locker)) remove_rwlock_locker(file, function, line, rwlock, locker);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_unlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_unlock(%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
 
 int netdata_rwlock_tryrdlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                    const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_tryrdlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_tryrdlock(%p) from %lu@%s, %s()", rwlock, line, file, function);
 
     netdata_rwlock_locker *locker = find_rwlock_locker(file, function, line, rwlock);
     if(locker && locker->lock == 'W')
@@ -618,20 +614,20 @@ int netdata_rwlock_tryrdlock_debug(const char *file __maybe_unused, const char *
 
     if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED to TRYREAD for %llu usec.\n",
+                "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) WAITED to TRYREAD for %llu usec.\n",
                 rwlock,
                 gettid(), netdata_thread_tag(),
                 function, line, file,
                 end_s - start_s);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_tryrdlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_tryrdlock(%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
 
 int netdata_rwlock_trywrlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                    const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_trywrlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_trywrlock(%p) from %lu@%s, %s()", rwlock, line, file, function);
 
     netdata_rwlock_locker *locker = find_rwlock_locker(file, function, line, rwlock);
     if(locker)
@@ -646,13 +642,13 @@ int netdata_rwlock_trywrlock_debug(const char *file __maybe_unused, const char *
 
     if(end_s - start_s >= NETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IGNORE_USEC)
         fprintf(stderr,
-                "RW_LOCK ON LOCK 0x%p: %d, '%s' (function %s() %lu@%s) WAITED to TRYWRITE for %llu usec.\n",
+                "RW_LOCK ON LOCK %p: %d, '%s' (function %s() %lu@%s) WAITED to TRYWRITE for %llu usec.\n",
                 rwlock,
                 gettid(), netdata_thread_tag(),
                 function, line, file,
                 end_s - start_s);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_trywrlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_trywrlock(%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
