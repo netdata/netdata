@@ -51,7 +51,6 @@ include changefinder/Makefile.inc
 include chrony/Makefile.inc
 include dockerd/Makefile.inc
 include dovecot/Makefile.inc
-include elasticsearch/Makefile.inc
 include energid/Makefile.inc
 include example/Makefile.inc
 include exim/Makefile.inc
