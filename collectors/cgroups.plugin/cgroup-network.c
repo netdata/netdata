@@ -29,7 +29,7 @@ struct iface {
 
 unsigned int calc_num_ifaces(struct iface *root) {
     unsigned int num = 0;
-    for (struct iface *h = root; h != NULL; h = h->next) {
+    for (struct iface *h = root; h; h = h->next) {
         num++;
     }
     return num;
@@ -461,9 +461,9 @@ void detect_veth_interfaces(pid_t pid) {
     // and we can't really identify which ifaces belong to the cgroup (e.g. Proxmox VM).
     if (host_dev_num == cgroup_dev_num) {
         unsigned int m = 0;
-        for (h = host; h != NULL; h = h->next) {
-            for (c = cgroup; c != NULL; c = c->next) {
-                if (h->ifindex == c->ifindex && h->iflink == c->iflink) {
+        for (h = host; h; h = h->next) {
+            for (c = cgroup; c; c = c->next) {
+                if (h->ifndex == c->ifindex && h->iflink == c->iflink) {
                     m++;
                     break;
                 }
