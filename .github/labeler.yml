@@ -116,10 +116,6 @@ collectors/nfacct:
   - collectors/nfacct.plugin/*
   - collectors/nfacct.plugin/**/*
 
-collectors/node.d:
-  - collectors/node.d.plugin/*
-  - collectors/node.d.plugin/**/*
-
 collectors/perf:
   - collectors/perf.plugin/*
   - collectors/perf.plugin/**/*

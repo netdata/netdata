@@ -136,7 +136,6 @@ health/notifications/alarm-notify.sh
 claim/netdata-claim.sh
 collectors/tc.plugin/tc-qos-helper.sh
 collectors/charts.d.plugin/charts.d.plugin
-collectors/node.d.plugin/node.d.plugin
 collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
 collectors/ioping.plugin/ioping.plugin

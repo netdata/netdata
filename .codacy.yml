@@ -4,7 +4,6 @@ exclude_paths:
   - collectors/python.d.plugin/python_modules/pyyaml3/**
   - collectors/python.d.plugin/python_modules/urllib3/**
   - collectors/python.d.plugin/python_modules/third_party/**
-  - collectors/node.d.plugin/node_modules/**
   - contrib/**
   - packaging/makeself/**
   - web/gui/css/**

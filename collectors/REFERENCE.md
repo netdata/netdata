@@ -67,9 +67,6 @@ field contains `go.d`, that collector uses the Go orchestrator.
 # Python orchestrator (python.d.plugin)
 ./python.d.plugin <MODULE_NAME> debug trace
 
-# Node orchestrator (node.d.plugin)
-./node.d.plugin debug 1 <MODULE_NAME>
-
 # Bash orchestrator (bash.d.plugin)
 ./charts.d.plugin debug 1 <MODULE_NAME>
 ```
@@ -100,7 +97,6 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# slabinfo = no
 	# fping = yes
 	# ioping = yes
-	# node.d = yes
 	# python.d = yes
 	# go.d = yes
 	# apps = yes

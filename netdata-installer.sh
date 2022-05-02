@@ -1066,32 +1066,6 @@ fi
 # -----------------------------------------------------------------------------
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Netdata."
 
-progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
-
-# migrate existing configuration files
-# for node.d and charts.d
-if [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
-  # the configuration directory exists
-
-  if [ ! -d "${NETDATA_PREFIX}/etc/netdata/charts.d" ]; then
-    run mkdir "${NETDATA_PREFIX}/etc/netdata/charts.d"
-  fi
-
-  # move the charts.d config files
-  for x in apache ap cpu_apps cpufreq example exim hddtemp load_average mem_apps mysql nginx nut opensips phpfpm postfix sensors squid tomcat; do
-    for y in "" ".old" ".orig"; do
-      if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ] && [ ! -f "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}" ]; then
-        run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}"
-      fi
-    done
-  done
-
-  if [ ! -d "${NETDATA_PREFIX}/etc/netdata/node.d" ]; then
-    run mkdir "${NETDATA_PREFIX}/etc/netdata/node.d"
-  fi
-
-fi
-
 # -----------------------------------------------------------------------------
 
 # shellcheck disable=SC2230

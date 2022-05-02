@@ -15,8 +15,6 @@ collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
 collectors/charts.d.plugin/ @ilyam8 @surajnpn @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @surajnpn
 collectors/macos.plugin/ @vlvkobal @thiagoftsm  @surajnpn
-collectors/node.d.plugin/ @jacekkolasa
-collectors/node.d.plugin/snmp/ @jacekkolasa
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
