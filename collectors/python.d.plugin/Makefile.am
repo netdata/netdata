@@ -79,7 +79,6 @@ include postgres/Makefile.inc
 include proxysql/Makefile.inc
 include puppet/Makefile.inc
 include rabbitmq/Makefile.inc
-include redis/Makefile.inc
 include rethinkdbs/Makefile.inc
 include retroshare/Makefile.inc
 include riakkv/Makefile.inc
