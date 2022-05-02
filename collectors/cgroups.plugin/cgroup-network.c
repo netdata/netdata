@@ -27,6 +27,14 @@ struct iface {
     struct iface *next;
 };
 
+unsigned int calc_num_ifaces(struct iface *root) {
+    unsigned int num = 0;
+    for (struct iface *h = root; h; h = h->next) {
+        num++;
+    }
+    return num;
+}
+
 unsigned int read_iface_iflink(const char *prefix, const char *iface) {
     if(!prefix) prefix = "";
 
@@ -445,6 +453,25 @@ void detect_veth_interfaces(pid_t pid) {
         errno = 0;
         error("there are not double-linked cgroup interfaces available.");
         goto cleanup;
+    }
+
+     unsigned int host_dev_num = calc_num_ifaces(host);
+     unsigned int cgroup_dev_num = calc_num_ifaces(cgroup);
+    // host ifaces == guest ifaces => we are still in the host namespace
+    // and we can't really identify which ifaces belong to the cgroup (e.g. Proxmox VM).
+    if (host_dev_num == cgroup_dev_num) {
+        unsigned int m = 0;
+        for (h = host; h; h = h->next) {
+            for (c = cgroup; c; c = c->next) {
+                if (h->ifindex == c->ifindex && h->iflink == c->iflink) {
+                    m++;
+                    break;
+                }
+            }
+        }
+        if (host_dev_num == m) {
+            goto cleanup;
+        }
     }
 
     for(h = host; h ; h = h->next) {
