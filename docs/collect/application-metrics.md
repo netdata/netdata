@@ -36,7 +36,7 @@ Our most popular application collectors:
 -   [Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx/): Monitor web server
     status information by gathering metrics via `ngx_http_stub_status_module`.
 -   [Postgres](/collectors/python.d.plugin/postgres/README.md): Collect database health and performance metrics. 
--   [ElasticSearch](/collectors/python.d.plugin/elasticsearch/README.md): Collect search engine performance and health
+-   [ElasticSearch](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/elasticsearch): Collect search engine performance and health
     statistics. Optionally collects per-index metrics.
 -   [PHP-FPM](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application
     summary and processes health metrics by scraping the status page (`/status?full`).
