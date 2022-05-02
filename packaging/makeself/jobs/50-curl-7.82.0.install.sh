@@ -10,7 +10,7 @@
 fetch "curl-7.82.0" "https://curl.haxx.se/download/curl-7.82.0.tar.gz" \
     910cc5fe279dc36e2cca534172c94364cf3fcf7d6494ba56e6c61a390881ddce
 
-export CFLAGS="-I/openssl-static/include"
+export CFLAGS="-I/openssl-static/include -pipe"
 export LDFLAGS="-static -L/openssl-static/lib"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
