@@ -1,7 +1,7 @@
 #include "onewayalloc.h"
 
-static size_t PAGE_SIZE = 0;
-static size_t NATURAL_ALIGNMENT = sizeof(int*);
+static size_t OWA_NATURAL_PAGE_SIZE = 0;
+static size_t OWA_NATURAL_ALIGNMENT = sizeof(int*);
 
 typedef struct owa_page {
     size_t stats_pages;
@@ -17,8 +17,8 @@ typedef struct owa_page {
 // allocations need to be aligned to CPU register width
 // https://en.wikipedia.org/wiki/Data_structure_alignment
 static inline size_t natural_alignment(size_t size) {
-    if(unlikely(size % NATURAL_ALIGNMENT))
-        size = size + NATURAL_ALIGNMENT - (size % NATURAL_ALIGNMENT);
+    if(unlikely(size % OWA_NATURAL_ALIGNMENT))
+        size = size + OWA_NATURAL_ALIGNMENT - (size % OWA_NATURAL_ALIGNMENT);
 
     return size;
 }
@@ -28,10 +28,11 @@ static inline size_t natural_alignment(size_t size) {
 // any number of times, for any amount of memory.
 
 static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
-    if(unlikely(!PAGE_SIZE)) PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
+    if(unlikely(!OWA_NATURAL_PAGE_SIZE))
+        OWA_NATURAL_PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
 
     // our default page size
-    size_t size = PAGE_SIZE;
+    size_t size = OWA_NATURAL_PAGE_SIZE;
 
     // make sure the new page will fit both the requested size
     // and the OWA_PAGE structure at its beginning
@@ -47,7 +48,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     }
 
     // Make sure our allocations are always a multiple of the hardware page size
-    if(size % PAGE_SIZE) size = size + PAGE_SIZE - (size % PAGE_SIZE);
+    if(size % OWA_NATURAL_PAGE_SIZE) size = size + OWA_NATURAL_PAGE_SIZE - (size % OWA_NATURAL_PAGE_SIZE);
 
     OWA_PAGE *page = (OWA_PAGE *)netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0);
     if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
