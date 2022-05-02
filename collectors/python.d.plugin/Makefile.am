@@ -43,7 +43,6 @@ include adaptec_raid/Makefile.inc
 include alarms/Makefile.inc
 include am2320/Makefile.inc
 include anomalies/Makefile.inc
-include apache/Makefile.inc
 include beanstalk/Makefile.inc
 include bind_rndc/Makefile.inc
 include boinc/Makefile.inc
