@@ -457,7 +457,7 @@ void detect_veth_interfaces(pid_t pid) {
     // host ifaces == guest ifaces => we are still in the host namespace
     // and we can't really identify which ifaces belong to the cgroup (e.g. Proxmox VM).
     if (host->count == cgroup->count) {
-        int m = 0;
+        unsigned int m = 0;
         for (h = host; h; h = h->next) {
             for (c = cgroup; c; c = c->next) {
                 if (h->ifindex == c->ifindex && h->iflink == c->iflink) {
