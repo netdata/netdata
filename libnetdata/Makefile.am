@@ -26,6 +26,7 @@ SUBDIRS = \
     storage_number \
     threads \
     url \
+    worker_utlization \
     tests \
     $(NULL)
 

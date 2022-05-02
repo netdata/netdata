@@ -108,8 +108,10 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
 
     debug(D_WEB_CLIENT, "%llu: READING FILE ON FD %d", w->id, pi->fd);
 
+    worker_is_busy();
     worker_private->file_reads++;
     ssize_t ret = unlikely(web_client_read_file(w));
+    worker_is_idle();
 
     if(likely(web_client_has_wait_send(w))) {
         POLLJOB *p = pi->p;                                        // our POLLJOB
@@ -252,6 +254,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
         return -1;
 
     debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
+    worker_is_busy();
     web_client_process_request(w);
 
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
@@ -295,6 +298,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
         *events |= POLLOUT;
 
+    worker_is_idle();
     return web_server_check_client_status(w);
 }
 
@@ -306,7 +310,11 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 
     debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
-    if(unlikely(web_client_send(w) < 0))
+    worker_is_busy();
+    int ret = web_client_send(w);
+    worker_is_idle();
+
+    if(unlikely(ret < 0))
         return -1;
 
     if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
@@ -379,11 +387,13 @@ static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
     );
 
     worker_private->running = 0;
+    worker_unregister();
 }
 
 void *socket_listen_main_static_threaded_worker(void *ptr) {
     worker_private = (struct web_server_static_threaded_worker *)ptr;
     worker_private->running = 1;
+    worker_register("WEB");
 
     netdata_thread_cleanup_push(socket_listen_main_static_threaded_worker_cleanup, ptr);
 
