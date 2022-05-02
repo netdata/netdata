@@ -2589,6 +2589,10 @@ static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
 }
 
 static inline void discovery_process_cgroup(struct cgroup *cg) {
+    if (!cg) {
+        debug(D_CGROUP, "discovery_process_cgroup() received NULL");
+        return;
+    }
     if (!cg->available || cg->processed) {
         return;
     }
