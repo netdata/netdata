@@ -228,7 +228,7 @@ void security_start_ssl(int selector) {
             netdata_replication_client_ctx = security_initialize_openssl_client();
             //This is necessary for the stream, because it is working sometimes with nonblock socket.
             //It returns the bitmask after to change, there is not any description of errors in the documentation
-            SSL_CTX_set_mode(netdata_replication_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
+            SSL_CTX_set_mode(netdata_replication_client_ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
             break;
         }        
 

@@ -777,7 +777,9 @@ PARSER_RC pluginsd_gap_action(void *user, GAP rx_gap)
     REPLICATION_STATE *rep_state = ((PARSER_USER_OBJECT *)user)->opaque;
     //Check if there is GAP and send GAP command, otherwise send REP OFF command
     sender_gap_filling(rep_state, rx_gap);
-    debug(D_REPLICATION,"%s: Gap transmission completed - Sending REP ACK\n", REPLICATION_MSG);
+    char gap_uuid_str[UUID_STR_LEN + 1];
+    uuid_unparse(rx_gap.gap_uuid, gap_uuid_str);
+    debug(D_REPLICATION,"%s: Gap transmission completed - Sending REP ACK for GAP %s\n", REPLICATION_MSG, gap_uuid_str);
     send_message(rep_state, "REP 3\n");
 
     return PARSER_RC_OK;
