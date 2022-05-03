@@ -938,7 +938,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , wu->family
             , "netdata.workers.active"
             , "Netdata Active Workers"
-            , "%"
+            , "jobs"
             , "netdata"
             , "stats"
             , wu->priority+1
@@ -969,7 +969,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , wu->family
             , "netdata.workers.active"
             , "Netdata Active Workers"
-            , "%"
+            , "threads"
             , "netdata"
             , "stats"
             , wu->priority+2
