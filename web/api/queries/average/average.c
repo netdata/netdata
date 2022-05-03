@@ -29,7 +29,7 @@ void grouping_free_average(RRDR *r) {
 }
 
 void grouping_add_average(RRDR *r, calculated_number value) {
-    if(!isnan(value)) {
+    if(likely(!isnan(value))) {
         struct grouping_average *g = (struct grouping_average *)r->internal.grouping_data;
         g->sum += value;
         g->count++;

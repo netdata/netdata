@@ -563,6 +563,13 @@ static inline void do_dimension_fixedstep(
     size_t db_points_read = 0;
     time_t db_now = now;
     time_t first_time_t = rrddim_first_entry_t(rd);
+
+    // cache the function pointers we need in the loop
+    storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time) = rd->state->query_ops.next_metric;
+    void (*grouping_add)(struct rrdresult *r, calculated_number value) = r->internal.grouping_add;
+    calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) = r->internal.grouping_flush;
+    RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
+
     for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; points_added < points_wanted ; now += dt) {
         // make sure we return data in the proper time range
         if(unlikely(now > before_wanted)) {
@@ -571,35 +578,42 @@ static inline void do_dimension_fixedstep(
 #endif
             break;
         }
+
         if(unlikely(now < after_wanted)) {
 #ifdef NETDATA_INTERNAL_CHECKS
             r->internal.log = "skipped, because attempted to access the db before 'wanted after'";
 #endif
             continue;
         }
+
         // read the value from the database
         //storage_number n = rd->values[slot];
+
 #ifdef NETDATA_INTERNAL_CHECKS
         struct mem_query_handle* mem_handle = (struct mem_query_handle*)handle.handle;
-        if ((rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) &&
+        if ((rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) &&
             (rrdset_time2slot(st, now) != (long unsigned)(mem_handle->slot))) {
             error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)mem_handle->slot, rrdset_time2slot(st, now));
         }
 #endif
+
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
         storage_number n;
-        if (rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && now <= first_time_t)
+        if (unlikely(rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && now <= first_time_t))
             n = SN_EMPTY_SLOT;
         else
-            n = rd->state->query_ops.next_metric(&handle, &db_now);
+            n = next_metric(&handle, &db_now);
+
         if(unlikely(db_now > before_wanted)) {
 #ifdef NETDATA_INTERNAL_CHECKS
             r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
 #endif
             break;
         }
+
         for ( ; now <= db_now ; now += dt) {
             calculated_number value = NAN;
+
             if(likely(now >= db_now && does_storage_number_exist(n))) {
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(ENABLE_DBENGINE)
                 struct rrdeng_query_handle* rrd_handle = (struct rrdeng_query_handle*)handle.handle;
@@ -621,18 +635,19 @@ static inline void do_dimension_fixedstep(
             }
 
             // add this value for grouping
-            r->internal.grouping_add(r, value);
+            grouping_add(r, value);
             values_in_group++;
             db_points_read++;
 
             if(unlikely(values_in_group == group_size)) {
                 rrdr_line = rrdr_line_init(r, now, rrdr_line);
+                size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
 
                 if(unlikely(!min_date)) min_date = now;
                 max_date = now;
 
                 // find the place to store our values
-                RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_line * r->d + dim_id_in_rrdr];
+                RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_o_v_index];
 
                 // update the dimension options
                 if(likely(values_in_group_non_zero))
@@ -642,8 +657,8 @@ static inline void do_dimension_fixedstep(
                 *rrdr_value_options_ptr = group_value_flags;
 
                 // store the value
-                calculated_number value = r->internal.grouping_flush(r, rrdr_value_options_ptr);
-                r->v[rrdr_line * r->d + dim_id_in_rrdr] = value;
+                value = grouping_flush(r, rrdr_value_options_ptr);
+                r->v[rrdr_o_v_index] = value;
 
                 if(likely(points_added || dim_id_in_rrdr)) {
                     // find the min/max across all dimensions
