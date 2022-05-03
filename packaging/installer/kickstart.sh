@@ -68,28 +68,35 @@ else
 fi
 
 main() {
-  if [ "${ACTION}" = "uninstall" ]; then
-    uninstall
-    printf >&2 "Finished uninstalling the Netdata Agent."
-    deferred_warnings
-    cleanup
-    trap - EXIT
-    exit 0
-  fi
+  case "${ACTION}" in
+    uninstall)
+      uninstall
+      printf >&2 "Finished uninstalling the Netdata Agent."
+      deferred_warnings
+      cleanup
+      trap - EXIT
+      exit 0
+      ;;
+    reinstall-clean)
+      NEW_INSTALL_PREFIX="${INSTALL_PREFIX}"
+      uninstall
+      cleanup
 
-  if [ "${ACTION}" = "reinstall-clean" ]; then
-    NEW_INSTALL_PREFIX="${INSTALL_PREFIX}"
-    uninstall
-    cleanup
+      ACTION=
+      INSTALL_PREFIX="${NEW_INSTALL_PREFIX}"
+      # shellcheck disable=SC2086
+      main
 
-    ACTION=
-    INSTALL_PREFIX="${NEW_INSTALL_PREFIX}"
-    # shellcheck disable=SC2086
-    main
-
-    trap - EXIT
-    exit 0
-  fi
+      trap - EXIT
+      exit 0
+      ;;
+    prepare-offline)
+      prepare_offline_install_source "${OFFLINE_TARGET}"
+      deferred_warnings
+      trap - EXIT
+      exit 0
+      ;;
+  esac
 
   tmpdir="$(create_tmp_directory)"
   progress "Using ${tmpdir} as a temporary directory."
@@ -1723,10 +1730,6 @@ prepare_offline_install_source() {
   echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
 
   progress "Finished preparing ofline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
-  deferred_warnings
-  cleanup
-  trap - EXIT
-  exit 0
 }
 
 # ======================================================================
@@ -1987,7 +1990,9 @@ while [ -n "${1}" ]; do
       ;;
     "--prepare-offline-install-source")
       if [ -n "${2}" ]; then
-        prepare_offline_install_source "${2}"
+        ACTION="prepare-offline"
+        OFFLINE_TARGET="${2}"
+        shift 1
       else
         fatal "A target directory must be specified with the --prepare-offline-install-source option." F0500
       fi
