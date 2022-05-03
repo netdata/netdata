@@ -1075,9 +1075,11 @@ static void load_configuration_dynamic(void)
 
 void async_cb(uv_async_t *handle)
 {
+    worker_is_busy();
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
     debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
+    worker_is_idle();
 }
 
 /* Flushes dirty pages when timer expires */
@@ -1085,13 +1087,17 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
+    worker_is_busy();
+
     struct rrdengine_worker_config* wc = handle->data;
     struct rrdengine_instance *ctx = wc->ctx;
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    if (unlikely(!ctx->metalog_ctx->initialized))
+    if (unlikely(!ctx->metalog_ctx->initialized)) {
+        worker_is_idle();
         return; /* Wait for the metadata log to initialize */
+    }
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
@@ -1133,12 +1139,16 @@ void timer_cb(uv_timer_t* handle)
         debug(D_RRDENGINE, "%s", get_rrdeng_statistics(wc->ctx, buf, sizeof(buf)));
     }
 #endif
+
+    worker_is_idle();
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
 
 void rrdeng_worker(void* arg)
 {
+    worker_register("DBENGINE");
+
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
     uv_loop_t* loop;
@@ -1188,7 +1198,9 @@ void rrdeng_worker(void* arg)
     shutdown = 0;
     int set_name = 0;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
+        worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
+        worker_is_busy();
         rrdeng_cleanup_finished_threads(wc);
 
         /* wait for commands */
@@ -1281,6 +1293,7 @@ void rrdeng_worker(void* arg)
     fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
+    worker_unregister();
     return;
 
 error_after_timer_init:
@@ -1293,6 +1306,7 @@ error_after_loop_init:
     wc->error = UV_EAGAIN;
     /* wake up initialization thread */
     completion_mark_complete(&ctx->rrdengine_completion);
+    worker_unregister();
 }
 
 /* C entry point for development purposes

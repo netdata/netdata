@@ -4,7 +4,7 @@
 #define WORKER_BUSY 'B'
 
 struct worker {
-    netdata_mutex_t lock;
+    // netdata_mutex_t lock;
 
     pid_t pid;
     const char *tag;
@@ -43,7 +43,7 @@ void worker_register(const char *workname) {
     worker->last_checkpoint = now;
     worker->last_action = WORKER_IDLE;
 
-    netdata_mutex_init(&worker->lock);
+    // netdata_mutex_init(&worker->lock);
 
     netdata_mutex_lock(&base_lock);
     worker->next = base;
@@ -52,7 +52,7 @@ void worker_register(const char *workname) {
 }
 
 void worker_unregister(void) {
-    if(!worker) return;
+    if(unlikely(!worker)) return;
 
     netdata_mutex_lock(&base_lock);
     if(base == worker)
@@ -65,7 +65,7 @@ void worker_unregister(void) {
     }
     netdata_mutex_unlock(&base_lock);
 
-    netdata_mutex_destroy(&worker->lock);
+    // netdata_mutex_destroy(&worker->lock);
     freez((void *)worker->tag);
     freez((void *)worker->workname);
     freez(worker);
@@ -74,9 +74,10 @@ void worker_unregister(void) {
 }
 
 void worker_is_idle(void) {
-    if(worker->last_action != WORKER_BUSY) return;
+    if(unlikely(!worker)) return;
+    if(unlikely(worker->last_action != WORKER_BUSY)) return;
 
-    netdata_mutex_lock(&worker->lock);
+    // netdata_mutex_lock(&worker->lock);
     usec_t now = now_realtime_usec();
 
     worker->utilization += now - worker->last_action_timestamp;
@@ -84,19 +85,20 @@ void worker_is_idle(void) {
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_IDLE;
 
-    netdata_mutex_unlock(&worker->lock);
+    // netdata_mutex_unlock(&worker->lock);
 }
 
 void worker_is_busy(void) {
-    if(worker->last_action != WORKER_IDLE) return;
+    if(unlikely(!worker)) return;
+    if(unlikely(worker->last_action != WORKER_IDLE)) return;
 
-    netdata_mutex_lock(&worker->lock);
+    // netdata_mutex_lock(&worker->lock);
     usec_t now = now_realtime_usec();
 
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_BUSY;
 
-    netdata_mutex_unlock(&worker->lock);
+    // netdata_mutex_unlock(&worker->lock);
 }
 
 
@@ -105,30 +107,36 @@ void worker_is_busy(void) {
 void workers_foreach(const char *workname, void (*callback)(pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_done, size_t jobs_running)) {
     netdata_mutex_lock(&base_lock);
     uint32_t hash = simple_hash(workname);
-    usec_t util, delta;
+    usec_t util, delta, last;
     size_t jobs_done, jobs_running;
 
     struct worker *p;
     for(p = base; p ; p = p->next) {
         if(hash != p->workname_hash || strcmp(workname, p->workname)) continue;
 
-        netdata_mutex_lock(&p->lock);
+        // netdata_mutex_lock(&p->lock);
         usec_t now = now_realtime_usec();
 
         util = p->utilization;
-        if(p->last_action == WORKER_BUSY)
-            util += now - p->last_action_timestamp;
+        p->utilization = 0;
 
         jobs_done = p->jobs_done;
-        jobs_running = (p->last_action == WORKER_BUSY)?1:0;
+        p->jobs_done = 0;
+
+        last = p->last_action_timestamp;
+        p->last_action_timestamp = now;
+
+        jobs_running = 0;
+        if(p->last_action == WORKER_BUSY) {
+            util += now - last;
+            jobs_running = 1;
+        }
+
         delta = now - p->statistics_last_checkpoint;
 
         p->statistics_last_checkpoint = now;
-        p->last_action_timestamp = now;
-        p->utilization = 0;
-        p->jobs_done = 0;
 
-        netdata_mutex_unlock(&p->lock);
+        // netdata_mutex_unlock(&p->lock);
 
         callback(p->pid, p->tag, util, delta, jobs_done, jobs_running);
     }
