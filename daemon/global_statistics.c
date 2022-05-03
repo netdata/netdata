@@ -974,7 +974,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , "stats"
             , wu->priority+2
             , localhost->rrd_update_every
-            , RRDSET_TYPE_AREA
+            , RRDSET_TYPE_STACKED
         );
 
         wu->rd_workers_available = rrddim_add(wu->st_workers, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -983,7 +983,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
     else
         rrdset_next(wu->st_workers);
 
-    rrddim_set_by_pointer(wu->st_workers, wu->rd_workers_available, (collected_number)(wu->worker_count));
+    rrddim_set_by_pointer(wu->st_workers, wu->rd_workers_available, (collected_number)(wu->worker_count - wu->worker_total_jobs_running));
     rrddim_set_by_pointer(wu->st_workers, wu->rd_workers_busy, (collected_number)(wu->worker_total_jobs_running));
     rrdset_done(wu->st_workers);
 }
