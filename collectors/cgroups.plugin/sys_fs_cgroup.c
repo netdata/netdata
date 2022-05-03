@@ -907,7 +907,7 @@ static int k8s_is_container(const char *id) {
     const char *p = id;
     const char *pp = NULL;
     int i = 0;
-    size_t l = strlen("pod");
+    size_t l = 3; // pod
     while ((p = strstr(p, "pod"))) {
         i++;
         p += l;
@@ -2504,6 +2504,7 @@ static inline void discovery_find_all_cgroups_v1() {
             error("CGROUP: disabled cpu statistics.");
         }
     }
+
     if (cgroup_enable_blkio_io || cgroup_enable_blkio_ops || cgroup_enable_blkio_throttle_io ||
         cgroup_enable_blkio_throttle_ops || cgroup_enable_blkio_merged_ops || cgroup_enable_blkio_queued_ops) {
         if (discovery_find_dir_in_subdirs(cgroup_blkio_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
@@ -2513,6 +2514,7 @@ static inline void discovery_find_all_cgroups_v1() {
             error("CGROUP: disabled blkio statistics.");
         }
     }
+
     if (cgroup_enable_memory || cgroup_enable_detailed_memory || cgroup_enable_swap || cgroup_enable_memory_failcnt) {
         if (discovery_find_dir_in_subdirs(cgroup_memory_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
             cgroup_enable_memory = cgroup_enable_detailed_memory = cgroup_enable_swap = cgroup_enable_memory_failcnt =
@@ -2520,6 +2522,7 @@ static inline void discovery_find_all_cgroups_v1() {
             error("CGROUP: disabled memory statistics.");
         }
     }
+
     if (cgroup_search_in_devices) {
         if (discovery_find_dir_in_subdirs(cgroup_devices_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
             cgroup_search_in_devices = 0;
