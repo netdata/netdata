@@ -1710,7 +1710,7 @@ prepare_offline_install_source() {
   progress "Preparing install script."
   cat > "install.sh" <<-EOF
 	#!/bin/sh
-	dir=\$(CDPATH= cd -- "\$(dirname -- "$0")" && pwd)
+	dir=\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd)
 	"\${dir}/kickstart.sh --offline-install-source "\${dir}" \${@}
 	EOF
   chmod +x "install.sh"
