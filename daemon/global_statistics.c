@@ -936,7 +936,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , name
             , NULL
             , wu->family
-            , "netdata.workers.active"
+            , "netdata.workers.jobs"
             , "Netdata Active Workers"
             , "jobs"
             , "netdata"
@@ -967,7 +967,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , name
             , NULL
             , wu->family
-            , "netdata.workers.active"
+            , "netdata.workers.threads"
             , "Netdata Active Workers"
             , "threads"
             , "netdata"

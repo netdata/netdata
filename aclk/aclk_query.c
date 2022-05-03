@@ -383,16 +383,22 @@ int aclk_query_process_msgs(struct aclk_query_thread *query_thr)
  */
 void *aclk_query_main_thread(void *ptr)
 {
+    worker_register("ACLKQUERY");
+
     struct aclk_query_thread *query_thr = ptr;
 
     while (!netdata_exit) {
+        worker_is_busy();
         aclk_query_process_msgs(query_thr);
+        worker_is_idle();
 
         QUERY_THREAD_LOCK;
         if (unlikely(pthread_cond_wait(&query_cond_wait, &query_lock_wait)))
             sleep_usec(USEC_PER_SEC * 1);
         QUERY_THREAD_UNLOCK;
     }
+
+    worker_unregister();
     return NULL;
 }
 
