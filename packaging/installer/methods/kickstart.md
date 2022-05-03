@@ -50,8 +50,12 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--dont-wait`: Synonym for `--non-interactive`
 - `--dry-run`: Show what the installer would do, but don’t actually do any of it.
 - `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
-- `--nightly-channel`: Use a nightly build instead of a stable release (this is the default).
-- `--stable-channel`: Use a stable release instead of a nightly build.
+- `--release-channel`: Specify a particular release channel to install from. Currently supported release channels are:
+    - `nightly`: Installs a nightly build (this is currently the default).
+    - `stable`: Installs a stable release.
+    - `default`: Explicitly request whatever the current default is.
+- `--nightly-channel`: Synonym for `--release-channel nightly`.
+- `--stable-channel`: Synonym for `--release-channel stable`.
 - `--auto-update`: Enable automatic updates (this is the default).
 - `--no-updates`: Disable automatic updates.
 - `--disable-telemetry`: Disable anonymous statistics.

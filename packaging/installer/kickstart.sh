@@ -7,6 +7,7 @@
 
 AGENT_BUG_REPORT_URL="https://github.com/netdata/netdata/issues/new/choose"
 CLOUD_BUG_REPORT_URL="https://github.com/netdata/netdata-cloud/issues/new/choose"
+DEFAULT_RELEASE_CHANNEL="nightly"
 DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
 DISCORD_INVITE="https://discord.gg/5ygS846fR6"
 DOCS_URL="https://learn.netdata.cloud/docs/"
@@ -36,7 +37,7 @@ NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
 NETDATA_WARNINGS=""
-RELEASE_CHANNEL="nightly"
+RELEASE_CHANNEL="default"
 
 if [ -n "$DISABLE_TELEMETRY" ]; then
   NETDATA_DISABLE_TELEMETRY="${DISABLE_TELEMETRY}"
@@ -122,8 +123,9 @@ USAGE: kickstart.sh [options]
   --interactive              Prompt for user input even if there is no controlling terminal.
   --dont-start-it            Do not start the agent by default (only for static installs or local builds)
   --dry-run                  Report what we would do with the given options on this system, but don’t actually do anything.
-  --stable-channel           Install a stable version instead of a nightly build (default: install a nightly build)
-  --nightly-channel          Install a nightly build instead of a stable version
+  --release-channel          Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
+  --stable-channel           Equivalent to "--release-channel stable"
+  --nightly-channel          Equivalent to "--release-channel nightly"
   --no-updates               Do not enable automatic updates (default: enable automatic updates using the best supported scheduling method)
   --auto-update              Enable automatic updates.
   --auto-update-type         Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
@@ -1183,7 +1185,7 @@ try_package_install() {
     progress "Attempting to install using native packages..."
   fi
 
-  if [ "${RELEASE_CHANNEL}" = "nightly" ]; then
+  if [ "${SELECTED_RELEASE_CHANNEL}" = "nightly" ]; then
     release="-edge"
   else
     release=""
@@ -1370,7 +1372,7 @@ try_package_install() {
 # Static build install code
 
 set_static_archive_urls() {
-  if [ "${RELEASE_CHANNEL}" = "stable" ]; then
+  if [ "$1" = "stable" ]; then
     latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
     export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${SYSARCH}-latest.gz.run"
     export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
@@ -1381,7 +1383,7 @@ set_static_archive_urls() {
 }
 
 try_static_install() {
-  set_static_archive_urls "${RELEASE_CHANNEL}"
+  set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}"
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install using static build..."
   else
@@ -1502,7 +1504,7 @@ build_and_install() {
     opts="${opts} --dont-wait"
   fi
 
-  if [ "${RELEASE_CHANNEL}" = "stable" ]; then
+  if [ "${SELECTED_RELEASE_CHANNEL}" = "stable" ]; then
     opts="${opts} --stable-channel"
   fi
 
@@ -1544,7 +1546,7 @@ try_build_install() {
     return 1
   fi
 
-  set_source_archive_urls "${RELEASE_CHANNEL}"
+  set_source_archive_urls "${SELECTED_RELEASE_CHANNEL}"
 
   if !  download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"; then
     fatal "Failed to download source tarball for local build." F000B
@@ -1708,7 +1710,20 @@ while [ -n "${1}" ]; do
     "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
     "--interactive") INTERACTIVE=1 ;;
     "--dry-run") DRY_RUN=1 ;;
+    "--release-channel")
+      RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+      case "${RELEASE_CHANNEL}" in
+        nightly|stable|default)
+          shift 1
+          ;;
+        *)
+          echo "Unrecognized value for --release-channel. Valid release channels are: stable, nightly, default"
+          exit 1
+          ;;
+      esac
+      ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
+    "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
     "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
     "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
     "--auto-update-method")
@@ -1842,6 +1857,12 @@ if [ "${NETDATA_AUTO_UPDATES}" = "default" ] || [ "${NETDATA_AUTO_UPDATES}" = "1
   AUTO_UPDATE=1
 else
   AUTO_UPDATE=0
+fi
+
+if [ "${RELEASE_CHANNEL}" = "default" ]; then
+  SELECTED_RELEASE_CHANNEL="${DEFAULT_RELEASE_CHANNEL}"
+else
+  SELECTED_RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 fi
 
 check_claim_opts
