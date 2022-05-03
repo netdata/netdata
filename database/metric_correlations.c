@@ -134,9 +134,11 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
 
     //TODO get everything in one go, when baseline is right before highlight
     //get baseline
-    RRDR *rb = rrd2rrdr(st, max_points, baseline_after, baseline_before, group_method, group_time, options, NULL, context_param_list, 0);
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+    RRDR *rb = rrd2rrdr(owa, st, max_points, baseline_after, baseline_before, group_method, group_time, options, NULL, context_param_list, 0);
     if(!rb) {
         info("Cannot generate metric correlations output with these parameters on this chart.");
+        onewayalloc_destroy(owa);
         return 0;
     } else {
         baseline_points = rrdr_rows(rb);
@@ -156,20 +158,23 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
             }
         }
     }
-    rrdr_free(rb);
+    rrdr_free(owa, rb);
+    onewayalloc_destroy(owa);
     if (!pd)
         return 0;
 
     //get highlight
-    RRDR *rh = rrd2rrdr(st, max_points, highlight_after, highlight_before, group_method, group_time, options, NULL, context_param_list, 0);
+    owa = onewayalloc_create(0);
+    RRDR *rh = rrd2rrdr(owa, st, max_points, highlight_after, highlight_before, group_method, group_time, options, NULL, context_param_list, 0);
     if(!rh) {
         info("Cannot generate metric correlations output with these parameters on this chart.");
         freez(pd);
+        onewayalloc_destroy(owa);
         return 0;
     } else {
         if (rh->d != b_dims) {
             //TODO handle different dims
-            rrdr_free(rh);
+            rrdr_free(owa, rh);
             freez(pd);
             return 0;
         }
@@ -182,7 +187,8 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
             }
         }
     }
-    rrdr_free(rh);
+    rrdr_free(owa, rh);
+    onewayalloc_destroy(owa);
 
     for (i = 0; i < b_dims; i++) {
         fill_nan(&pd[i], highlight_points, baseline_points);
