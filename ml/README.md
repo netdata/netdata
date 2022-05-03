@@ -160,7 +160,7 @@ Below is a list of all the available configuration params and their default valu
 	# maximum num samples to train = 14400
 	# minimum num samples to train = 3600
 	# train every = 3600
-	# dbengine anomaly rate every = 60
+	# dbengine anomaly rate every = 30
 	# num samples to diff = 1
 	# num samples to smooth = 3
 	# num samples to lag = 5
@@ -225,7 +225,7 @@ This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/
 ### Descriptions (min/max)
 
 - `enabled`: `yes` to enable, `no` to disable.
-- `maximum num samples to train`: (`3600`/`21600`) This is the maximum amount of time you would like to train each model on. For example, the default of `14400` trains on the preceding 4 hours of data, assuming an `update every` of 1 second.
+- `maximum num samples to train`: (`3600`/`86400`) This is the maximum amount of time you would like to train each model on. For example, the default of `14400` trains on the preceding 4 hours of data, assuming an `update every` of 1 second.
 - `minimum num samples to train`: (`900`/`21600`) This is the minimum amount of data required to be able to train a model. For example, the default of `3600` implies that once at least 1 hour of data is available for training, a model is trained, otherwise it is skipped and checked again at the next training run.
 - `train every`: (`1800`/`21600`) This is how often each model will be retrained. For example, the default of `3600` means that each model is retrained every hour. Note: The training of all models is spread out across the `train every` period for efficiency, so in reality, it means that each model will be trained in a staggered manner within each `train every` period.
 - `dbengine anomaly rate every`: (`30`/`900`) This is how often netdata will aggregate all the anomaly bits into a single chart (`anomaly_detection.anomaly_rates`). The aggregation into a single chart allows enabling anomaly rate ranking over _all_ metrics with one API call as opposed to a call per chart.
