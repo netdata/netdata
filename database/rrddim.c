@@ -486,10 +486,10 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
         error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rd->id, st->id);
 
     // free(rd->annotations);
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-    if (!netdata_exit)
-        aclk_send_dimension_update(rd);
-#endif
+//#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+//    if (!netdata_exit)
+//        aclk_send_dimension_update(rd);
+//#endif
 
     RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
     switch(rrd_memory_mode) {
