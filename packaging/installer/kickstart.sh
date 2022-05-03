@@ -1,6 +1,8 @@
 #!/bin/sh
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Next unused error code: F0503
 
 # ======================================================================
 # Constants
@@ -8,18 +10,21 @@
 AGENT_BUG_REPORT_URL="https://github.com/netdata/netdata/issues/new/choose"
 CLOUD_BUG_REPORT_URL="https://github.com/netdata/netdata-cloud/issues/new/choose"
 DEFAULT_RELEASE_CHANNEL="nightly"
-DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
 DISCORD_INVITE="https://discord.gg/5ygS846fR6"
+DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
+DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
 DOCS_URL="https://learn.netdata.cloud/docs/"
 FORUM_URL="https://community.netdata.cloud/"
 KICKSTART_OPTIONS="${*}"
+KICKSTART_SOURCE="$(realpath "$0")"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-1"
-TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
 START_TIME="$(date +%s)"
+STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
+TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
 
 # ======================================================================
 # Defaults for environment variables
@@ -35,6 +40,7 @@ NETDATA_DISABLE_CLOUD=0
 NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
+NETDATA_OFFLINE_INSTALL_SOURCE=""
 NETDATA_REQUIRE_CLOUD=1
 NETDATA_WARNINGS=""
 RELEASE_CHANNEL="default"
@@ -1389,7 +1395,13 @@ try_package_install() {
 # Static build install code
 # shellcheck disable=SC2034,SC2086,SC2126
 set_static_archive_urls() {
-  if [ "$1" = "stable" ]; then
+  if [ -z "${2}" ]; then
+    arch="${SYSARCH}"
+  else
+    arch="${2}"
+  fi
+
+  if [ "${1}" = "stable" ]; then
     if [ -n "${INSTALL_VERSION}" ]; then
       export NETDATA_STATIC_ARCHIVE_OLD_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
       export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-${SYSARCH}-v${INSTALL_VERSION}.gz.run"
@@ -1654,6 +1666,60 @@ try_build_install() {
 }
 
 # ======================================================================
+# Offline install support code
+
+prepare_offline_install_source() {
+  if [ -e "${1}" ]; then
+    if [ ! -d "${1}" ]; then
+      fatal "${1} is not a directory, unable to prepare offline install source." F0503
+    fi
+  else
+    mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
+  fi
+
+  cd "${1}" || fatal "Failed to swtich to target directory for offline install preparation." F0505
+
+  if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
+    for arch in ${STATIC_INSTALL_ARCHES}; do
+      set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
+
+      progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
+      if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${1}/netdata-${arch}-latest.gz.run"; then
+        warning "Failed to download static installer archive for ${arch}."
+      fi
+    done
+
+    progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
+    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${1}/sha256sums.txt"; then
+      fatal "Failed to download checksum file." F0506
+    fi
+  fi
+
+  progress "Verifying checksums."
+  if ! safe_sha256sum --ignore-missing -c "${1}/sha256sums.txt"; then
+    fatal "Checksums for offline install files are incorrect. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0507
+  fi
+
+  progress "Preparing install script."
+  cat > "${1}/install.sh" <<-EOF
+	#!/bin/sh
+	dir=\$(CDPATH= cd -- "\$(dirname -- "$0")" && pwd)
+	"\${dir}/kickstart.sh --offline-install-source "\${dir}" \${@}
+	EOF
+  chmod +x "${1}/install.sh"
+
+  progress "Copying kickstart script."
+  cp "${KICKSTART_SOURCE}" "${1}/kickstart.sh"
+  chmod +x "${1}/install.sh"
+
+  progress "Finished preparing ofline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
+  deferred_warnings
+  cleanup
+  trap - EXIT
+  exit 0
+}
+
+# ======================================================================
 # Per system-type install logic
 
 install_on_linux() {
@@ -1909,6 +1975,20 @@ while [ -n "${1}" ]; do
       STATIC_INSTALL_OPTIONS="${2}"
       shift 1
       ;;
+    "--prepare-offline-install-source")
+      if [ -n "${2}" ]; then
+        prepare_offline_install_source "${2}"
+      else
+        fatal "A target directory must be specified with the --prepare-offline-install-source option." F0500
+      fi
+      ;;
+    "--offline-install-source")
+      if [ -d "${2}" ]; then
+        NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
+      else
+        fatal "A source directory must be specified with the --offline-install-source option." F0501
+      fi
+      ;;
     *)
       warning "Passing unrecognized option '${1}' to installer script. This behavior is deprecated and will be removed in the near future. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
@@ -1916,6 +1996,10 @@ while [ -n "${1}" ]; do
   esac
   shift 1
 done
+
+if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] && [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+  fatal "Native packages are not supported with offline installs." F0502
+fi
 
 if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
   if [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
