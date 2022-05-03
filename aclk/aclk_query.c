@@ -372,9 +372,7 @@ static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_que
 int aclk_query_process_msgs(struct aclk_query_thread *query_thr)
 {
     aclk_query_t query;
-    //while ((query = aclk_queue_pop()))
-    query = aclk_queue_pop();
-    if (query)
+    while ((query = aclk_queue_pop()))
         aclk_query_process_msg(query_thr, query);
 
     return 0;
