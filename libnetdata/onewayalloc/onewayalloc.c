@@ -50,8 +50,9 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     // Make sure our allocations are always a multiple of the hardware page size
     if(size % OWA_NATURAL_PAGE_SIZE) size = size + OWA_NATURAL_PAGE_SIZE - (size % OWA_NATURAL_PAGE_SIZE);
 
-    OWA_PAGE *page = (OWA_PAGE *)netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0);
-    if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
+    // OWA_PAGE *page = (OWA_PAGE *)netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0);
+    // if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
+    OWA_PAGE *page = (OWA_PAGE *)mallocz(size);
 
     page->size = size;
     page->offset = natural_alignment(sizeof(OWA_PAGE));
@@ -168,6 +169,7 @@ void onewayalloc_destroy(ONEWAYALLOC *owa) {
     while(page) {
         OWA_PAGE *p = page;
         page = page->next;
-        munmap(p, p->size);
+        // munmap(p, p->size);
+        freez(p);
     }
 }
