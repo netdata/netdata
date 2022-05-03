@@ -438,7 +438,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 "select hostname, ?1, ?2, ?3, config_hash_id, 0, ?4, strftime('%%s'), 0, 0, flags, exec_run_timestamp, " \
 "strftime('%%s'), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type " \
 "from health_log_%s where unique_id = ?5", guid, guid2
-#define SQL_INJECT_REMOVED_UPDATE(guid) "update health_log_%s set flags = flags | 0x00000002, updated_by_id = ?1 where unique_id = ?2; ", guid
+#define SQL_INJECT_REMOVED_UPDATE(guid) "update health_log_%s set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3; ", guid
 void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id)
 {
     int rc = 0;
@@ -505,13 +505,19 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
         return;
     }
 
-    rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) max_unique_id);
+    rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) HEALTH_ENTRY_FLAG_UPDATED);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind flags parameter for SQL_INJECT_REMOVED (update)");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) max_unique_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind max_unique_id parameter for SQL_INJECT_REMOVED (update)");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) unique_id);
+    rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) unique_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind unique_id parameter for SQL_INJECT_REMOVED (update)");
         goto failed;
@@ -589,7 +595,6 @@ void sql_check_removed_alerts_state(char *uuid_str)
      rc = sqlite3_finalize(res);
      if (unlikely(rc != SQLITE_OK))
          error_report("Failed to finalize the statement");
-
 }
 
 /* Health related SQL queries
