@@ -6,6 +6,17 @@
 
 **Merged pull requests:**
 
+- chore\(python.d\): remove python.d/\* announced in v1.34.0 deprecation notice [\#12796](https://github.com/netdata/netdata/pull/12796) ([ilyam8](https://github.com/ilyam8))
+- Don't use MADV\_DONTDUMP on non-linux builds [\#12795](https://github.com/netdata/netdata/pull/12795) ([vkalintiris](https://github.com/vkalintiris))
+- Speed up BUFFER increases \(minimize reallocs\) [\#12792](https://github.com/netdata/netdata/pull/12792) ([ktsaou](https://github.com/ktsaou))
+- procfile: more comfortable initial settings and faster/fewer reallocs [\#12791](https://github.com/netdata/netdata/pull/12791) ([ktsaou](https://github.com/ktsaou))
+- just a simple fix to avoid recompiling protobuf all the time [\#12790](https://github.com/netdata/netdata/pull/12790) ([ktsaou](https://github.com/ktsaou))
+- fix\(proc/net/dev\): exclude Proxmox bridge interfaces  [\#12789](https://github.com/netdata/netdata/pull/12789) ([ilyam8](https://github.com/ilyam8))
+- fix\(cgroups.plugin\): do not add network devices if cgroup proc is in the host net ns [\#12788](https://github.com/netdata/netdata/pull/12788) ([ilyam8](https://github.com/ilyam8))
+- One way allocator to double the speed of parallel context queries [\#12787](https://github.com/netdata/netdata/pull/12787) ([ktsaou](https://github.com/ktsaou))
+- fix\(installer\): non interpreted new lines when printing deferred errors [\#12786](https://github.com/netdata/netdata/pull/12786) ([ilyam8](https://github.com/ilyam8))
+- Trace rwlocks of netdata [\#12785](https://github.com/netdata/netdata/pull/12785) ([ktsaou](https://github.com/ktsaou))
+- fix: printing a warning msg in installer [\#12781](https://github.com/netdata/netdata/pull/12781) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity on receiver setsockopt [\#12772](https://github.com/netdata/netdata/pull/12772) ([MrZammler](https://github.com/MrZammler))
 - some config updates for ml [\#12771](https://github.com/netdata/netdata/pull/12771) ([andrewm4894](https://github.com/andrewm4894))
 - Fix checking of enviornment file in updater. [\#12768](https://github.com/netdata/netdata/pull/12768) ([Ferroin](https://github.com/Ferroin))
@@ -25,11 +36,14 @@
 - feat\(cgroups.plugin\): add k8s\_qos\_class label [\#12737](https://github.com/netdata/netdata/pull/12737) ([ilyam8](https://github.com/ilyam8))
 - expand on the various parent-child config options [\#12734](https://github.com/netdata/netdata/pull/12734) ([andrewm4894](https://github.com/andrewm4894))
 - Mention serial numbers in chart names in the plugins.d API documentation [\#12733](https://github.com/netdata/netdata/pull/12733) ([vlvkobal](https://github.com/vlvkobal))
+- Make atomics a hard-dep. [\#12730](https://github.com/netdata/netdata/pull/12730) ([vkalintiris](https://github.com/vkalintiris))
+- Avoid clearing already unset flags. [\#12727](https://github.com/netdata/netdata/pull/12727) ([vkalintiris](https://github.com/vkalintiris))
 - Remove commented code. [\#12726](https://github.com/netdata/netdata/pull/12726) ([vkalintiris](https://github.com/vkalintiris))
 - chore\(kickstart.sh\): remove unused `--auto-update` option when using static/build install method [\#12725](https://github.com/netdata/netdata/pull/12725) ([ilyam8](https://github.com/ilyam8))
 - \[Chore\]: Small typo in macos document [\#12724](https://github.com/netdata/netdata/pull/12724) ([MrZammler](https://github.com/MrZammler))
 - fix upgrading all currently installed packages when updating Netdata on Debian [\#12716](https://github.com/netdata/netdata/pull/12716) ([iigorkarpov](https://github.com/iigorkarpov))
 - chore\(cgroups.plugin\): reduce the CPU time required for cgroup-network-helper.sh [\#12711](https://github.com/netdata/netdata/pull/12711) ([ilyam8](https://github.com/ilyam8))
+- Add `-pipe` to CFLAGS in most cases for builds. [\#12709](https://github.com/netdata/netdata/pull/12709) ([Ferroin](https://github.com/Ferroin))
 - Tweak static build process to improve build speed and debuggability. [\#12708](https://github.com/netdata/netdata/pull/12708) ([Ferroin](https://github.com/Ferroin))
 - feat\(apps.plugin\): add proxmox-ve processes to apps\_groups.conf [\#12704](https://github.com/netdata/netdata/pull/12704) ([ilyam8](https://github.com/ilyam8))
 - chore\(ebpf.plugin\): re-enable socket module by default [\#12702](https://github.com/netdata/netdata/pull/12702) ([ilyam8](https://github.com/ilyam8))
@@ -47,6 +61,7 @@
 - Add the ability to perform a data query using an offline node id [\#12650](https://github.com/netdata/netdata/pull/12650) ([stelfrag](https://github.com/stelfrag))
 - Gotify notifications [\#12639](https://github.com/netdata/netdata/pull/12639) ([coffeegrind123](https://github.com/coffeegrind123))
 - Fix Valgrind errors [\#12619](https://github.com/netdata/netdata/pull/12619) ([vlvkobal](https://github.com/vlvkobal))
+- Reduce alert events sent to the cloud. [\#12544](https://github.com/netdata/netdata/pull/12544) ([MrZammler](https://github.com/MrZammler))
 - Docs templates [\#12466](https://github.com/netdata/netdata/pull/12466) ([kickoke](https://github.com/kickoke))
 - Store alert log entries even if alert it is repeating. [\#12226](https://github.com/netdata/netdata/pull/12226) ([MrZammler](https://github.com/MrZammler))
 
@@ -303,11 +318,6 @@
 
 - docs: rename kickstart install badges units [\#12131](https://github.com/netdata/netdata/pull/12131) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.18. [\#12117](https://github.com/netdata/netdata/pull/12117) ([netdatabot](https://github.com/netdatabot))
-- Docs: Fix paths to install boxes [\#12109](https://github.com/netdata/netdata/pull/12109) ([kickoke](https://github.com/kickoke))
-- Docs fix: Match the new install box component name [\#12106](https://github.com/netdata/netdata/pull/12106) ([kickoke](https://github.com/kickoke))
-- Add proper support for Oracle Linux native packages to installer. [\#12101](https://github.com/netdata/netdata/pull/12101) ([Ferroin](https://github.com/Ferroin))
-- Docs improvement: Added interactive kickstart scripts where possible [\#12098](https://github.com/netdata/netdata/pull/12098) ([kickoke](https://github.com/kickoke))
-- Update syntax for Caddy v2 [\#12092](https://github.com/netdata/netdata/pull/12092) ([mohammed90](https://github.com/mohammed90))
 
 ## [v1.33.0](https://github.com/netdata/netdata/tree/v1.33.0) (2022-01-26)
 
