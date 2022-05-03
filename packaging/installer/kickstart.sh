@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0503
+# Next unused error code: F050A
 
 # ======================================================================
 # Constants
@@ -1719,6 +1719,9 @@ prepare_offline_install_source() {
   cp "${KICKSTART_SOURCE}" "kickstart.sh"
   chmod +x "install.sh"
 
+  progress "Saving release channel information."
+  echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
+
   progress "Finished preparing ofline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
   deferred_warnings
   cleanup
@@ -2033,8 +2036,20 @@ else
 fi
 
 if [ "${RELEASE_CHANNEL}" = "default" ]; then
-  SELECTED_RELEASE_CHANNEL="${DEFAULT_RELEASE_CHANNEL}"
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    SELECTED_RELEASE_CHANNEL="$(cat "${NETDATA_OFFLINE_INSTALL_SOURCE}/channel")"
+
+    if [ -z "${SELECTED_RELEASE_CHANNEL}" ]; then
+      fatal "Could not find a release channel indicator in ${NETDATA_OFFLINE_INSTALL_SOURCE}." F0508
+    fi
+  else
+    SELECTED_RELEASE_CHANNEL="${DEFAULT_RELEASE_CHANNEL}"
+  fi
 else
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ] && [ "${RELEASE_CHANNEL}" != "$(cat "${NETDATA_OFFLINE_INSTALL_SOURCE}/channel")" ]; then
+    fatal "Release channal '${RELEASE_CHANNEL}' requested, but indicated offline installation source release channel is '$(cat "${NETDATA_OFFLINE_INSTALL_SOURCE}/channel")'." F0509
+  fi
+
   SELECTED_RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 fi
 
