@@ -858,46 +858,159 @@ static void global_statistics_charts(void) {
 
 struct worker_utilization {
     const char *name;
-    size_t web_worker_count;
-    usec_t web_worker_total_utilization;
-    usec_t web_worker_total_duration;
-    size_t web_worker_total_jobs_done;
-    size_t web_worker_total_jobs_running;
-    double web_worker_min_utilization;
-    double web_worker_max_utilization;
+    const char *family;
+    size_t priority;
+
+    size_t worker_count;
+    usec_t worker_total_utilization;
+    usec_t worker_total_duration;
+    size_t worker_total_jobs_done;
+    size_t worker_total_jobs_running;
+    double worker_min_utilization;
+    double worker_max_utilization;
+
+    RRDSET *st_util;
+    RRDDIM *rd_util_avg;
+    RRDDIM *rd_util_min;
+    RRDDIM *rd_util_max;
+
+    RRDSET *st_workers;
+    RRDDIM *rd_workers_available;
+    RRDDIM *rd_workers_busy;
+
+    RRDSET *st_jobs;
+    RRDDIM *rd_jobs_done;
+    RRDDIM *rd_jobs_running;
 };
 
 static void worker_utilization_update_chart(struct worker_utilization *wu) {
-    fprintf(stderr, "%-12s WORKER UTILIZATION: %-3.2f%%, %zu jobs done, %zu running, on %zu workers, min %-3.02f%%, max %-3.02f%%.\n",
-            wu->name,
-            (double)wu->web_worker_total_utilization * 100.0 / (double)wu->web_worker_total_duration,
-            wu->web_worker_total_jobs_done, wu->web_worker_total_jobs_running, wu->web_worker_count,
-            wu->web_worker_min_utilization, wu->web_worker_max_utilization);
+    if(!wu->worker_count) return;
+
+    //fprintf(stderr, "%-12s WORKER UTILIZATION: %-3.2f%%, %zu jobs done, %zu running, on %zu workers, min %-3.02f%%, max %-3.02f%%.\n",
+    //        wu->name,
+    //        (double)wu->worker_total_utilization * 100.0 / (double)wu->worker_total_duration,
+    //        wu->worker_total_jobs_done, wu->worker_total_jobs_running, wu->worker_count,
+    //        wu->worker_min_utilization, wu->worker_max_utilization);
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_util)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_utilization_%s", wu->name);
+
+        wu->st_util = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , "netdata.workers.utilization"
+            , "Netdata Workers Utilization"
+            , "%"
+            , "netdata"
+            , "stats"
+            , wu->priority
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_AREA
+        );
+
+        wu->rd_util_avg = rrddim_add(wu->st_util, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_util_min = rrddim_add(wu->st_util, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_util_max = rrddim_add(wu->st_util, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+    }
+    else
+        rrdset_next(wu->st_util);
+
+    rrddim_set_by_pointer(wu->st_util, wu->rd_util_avg, (collected_number)((double)wu->worker_total_utilization * 100.0 * 10000.0 / (double)wu->worker_total_duration));
+    rrddim_set_by_pointer(wu->st_util, wu->rd_util_min, (collected_number)((double)wu->worker_min_utilization * 10000.0));
+    rrddim_set_by_pointer(wu->st_util, wu->rd_util_max, (collected_number)((double)wu->worker_max_utilization * 10000.0));
+    rrdset_done(wu->st_util);
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_jobs)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_jobs_%s", wu->name);
+
+        wu->st_jobs = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , "netdata.workers.active"
+            , "Netdata Active Workers"
+            , "%"
+            , "netdata"
+            , "stats"
+            , wu->priority+1
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_AREA
+        );
+
+        wu->rd_jobs_done    = rrddim_add(wu->st_jobs, "finished", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_jobs_running = rrddim_add(wu->st_jobs, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+    else
+        rrdset_next(wu->st_jobs);
+
+    rrddim_set_by_pointer(wu->st_jobs, wu->rd_jobs_done, (collected_number)(wu->worker_total_jobs_done));
+    rrddim_set_by_pointer(wu->st_jobs, wu->rd_jobs_running, (collected_number)(wu->worker_total_jobs_running));
+    rrdset_done(wu->st_jobs);
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_workers)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "worker_threads_%s", wu->name);
+
+        wu->st_workers = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , "netdata.workers.active"
+            , "Netdata Active Workers"
+            , "%"
+            , "netdata"
+            , "stats"
+            , wu->priority+2
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_AREA
+        );
+
+        wu->rd_workers_available = rrddim_add(wu->st_workers, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_busy      = rrddim_add(wu->st_workers, "busy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+    else
+        rrdset_next(wu->st_workers);
+
+    rrddim_set_by_pointer(wu->st_workers, wu->rd_workers_available, (collected_number)(wu->worker_count));
+    rrddim_set_by_pointer(wu->st_workers, wu->rd_workers_busy, (collected_number)(wu->worker_total_jobs_running));
+    rrdset_done(wu->st_workers);
 }
 
 static void worker_utilization_reset_statistics(struct worker_utilization *wu) {
-    wu->web_worker_count = 0;
-    wu->web_worker_total_utilization = 0;
-    wu->web_worker_total_duration = 0;
-    wu->web_worker_total_jobs_done = 0;
-    wu->web_worker_total_jobs_running = 0;
-    wu->web_worker_min_utilization = 100.0;
-    wu->web_worker_max_utilization = 0;
+    wu->worker_count = 0;
+    wu->worker_total_utilization = 0;
+    wu->worker_total_duration = 0;
+    wu->worker_total_jobs_done = 0;
+    wu->worker_total_jobs_running = 0;
+    wu->worker_min_utilization = 100.0;
+    wu->worker_max_utilization = 0;
 }
 
 static void worker_utilization_update_statistics(struct worker_utilization *wu, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_done __maybe_unused, size_t jobs_running __maybe_unused) {
-    wu->web_worker_total_utilization += utilization_usec;
-    wu->web_worker_total_duration += duration_usec;
-    wu->web_worker_total_jobs_done += jobs_done;
-    wu->web_worker_total_jobs_running += jobs_running;
-    wu->web_worker_count++;
+    wu->worker_total_utilization += utilization_usec;
+    wu->worker_total_duration += duration_usec;
+    wu->worker_total_jobs_done += jobs_done;
+    wu->worker_total_jobs_running += jobs_running;
+    wu->worker_count++;
 
     double util = (double)utilization_usec * 100.0 / (double)duration_usec;
-    if(util > wu->web_worker_max_utilization)
-        wu->web_worker_max_utilization = util;
+    if(util > wu->worker_max_utilization)
+        wu->worker_max_utilization = util;
 
-    if(util < wu->web_worker_min_utilization)
-        wu->web_worker_min_utilization = util;
+    if(util < wu->worker_min_utilization)
+        wu->worker_min_utilization = util;
 }
 
 static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_done __maybe_unused, size_t jobs_running __maybe_unused) {
@@ -906,11 +1019,13 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
 }
 
 static struct worker_utilization all_workers_utilization[] = {
-    { .name = "WEB" },
-    { .name = "DBENGINE" },
-    { .name = "ACLKSYNC" },
-    { .name = "ACLKQUERY" },
-    { .name = NULL }
+    { .name = "WEB",       .family = "web",      .priority = 132001 },
+    { .name = "DBENGINE",  .family = "dbengine", .priority = 130501 },
+    { .name = "ACLKSYNC",  .family = "aclk",     .priority = 200000 },
+    { .name = "ACLKQUERY", .family = "aclk",     .priority = 200001 },
+
+    // has to be terminated with a NULL
+    { .name = NULL,        .family = NULL       }
 };
 
 void worker_utilization_charts(void) {
@@ -920,7 +1035,6 @@ void worker_utilization_charts(void) {
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
         worker_utilization_update_chart(&all_workers_utilization[i]);
     }
-    fprintf(stderr, "\n");
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
