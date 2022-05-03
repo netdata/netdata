@@ -646,6 +646,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 rpt->host->hostname);
         }
     }
+    rpt->host->trigger_chart_obsoletion_check = now_realtime_sec();
     rrdhost_unlock(rpt->host);
 
     // call the plugins.d processor to receive the metrics
@@ -686,6 +687,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
             if(health_enabled == CONFIG_BOOLEAN_AUTO)
                 rpt->host->health_enabled = 0;
         }
+        rpt->host->trigger_chart_obsoletion_check = 0;
         rrdhost_unlock(rpt->host);
         if (rpt->host->receiver == rpt) {
             rrdpush_sender_thread_stop(rpt->host);

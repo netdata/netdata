@@ -1528,6 +1528,16 @@ restart_after_removal:
     }
 }
 
+void rrdset_check_obsoletion(RRDHOST *host)
+{
+    RRDSET *st;
+    rrdset_foreach_write(st, host) {
+        if (rrdset_last_entry_t(st) < host->trigger_chart_obsoletion_check) {
+            rrdset_is_obsolete(st);
+        }
+    }
+}
+
 void rrd_cleanup_obsolete_charts()
 {
     rrd_rdlock();
@@ -1546,6 +1556,15 @@ void rrd_cleanup_obsolete_charts()
                 aclk_update_chart(host, "dummy-chart", 0);
 #endif
             rrdhost_unlock(host);
+        }
+
+        if (host != localhost &&
+            host->trigger_chart_obsoletion_check &&
+            host->trigger_chart_obsoletion_check + 120 < now_realtime_sec()) {
+            rrdhost_wrlock(host);
+            rrdset_check_obsoletion(host);
+            rrdhost_unlock(host);
+            host->trigger_chart_obsoletion_check = 0;
         }
     }
 

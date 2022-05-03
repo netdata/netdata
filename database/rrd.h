@@ -827,6 +827,8 @@ struct rrdhost {
 
     struct receiver_state *receiver;
     netdata_mutex_t receiver_lock;
+    time_t trigger_chart_obsoletion_check;          // set when child connects, will instruct parent to
+                                                    // trigger a check for obsoleted charts since previous connect
 
     // ------------------------------------------------------------------------
     // health monitoring options
