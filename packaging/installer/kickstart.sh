@@ -132,38 +132,39 @@ usage() {
 USAGE: kickstart.sh [options]
        where options include:
 
-  --non-interactive          Do not prompt for user input. (default: prompt if there is a controlling terminal)
-  --interactive              Prompt for user input even if there is no controlling terminal.
-  --dont-start-it            Do not start the agent by default (only for static installs or local builds)
-  --dry-run                  Report what we would do with the given options on this system, but don’t actually do anything.
-  --release-channel          Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
-  --stable-channel           Equivalent to "--release-channel stable"
-  --nightly-channel          Equivalent to "--release-channel nightly"
-  --no-updates               Do not enable automatic updates (default: enable automatic updates using the best supported scheduling method)
-  --auto-update              Enable automatic updates.
-  --auto-update-type         Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
-  --disable-telemetry        Opt-out of anonymous statistics.
-  --repositories-only        Only install appropriate repository configuration packages (only for native install).
-  --native-only              Only install if native binary packages are available.
-  --static-only              Only install if a static build is available.
-  --build-only               Only install using a local build.
-  --reinstall                Explicitly reinstall instead of updating any existing install.
-  --reinstall-even-if-unsafe Even try to reinstall if we don't think we can do so safely (implies --reinstall).
-  --disable-cloud            Disable support for Netdata Cloud (default: detect)
-  --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
-  --install <path>           This option is deprecated and will be removed in a future version, use --install-prefix instead.
-  --install-prefix <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
-  --old-install-prefix <path>       Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
-  --install-version <version>       Specify the version of Netdata to install.
-  --claim-token              Use a specified token for claiming to Netdata Cloud.
-  --claim-rooms              When claiming, add the node to the specified rooms.
-  --claim-only               If there is an existing install, only try to claim it, not update it.
-  --claim-*                  Specify other options for the claiming script.
-  --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
-  --uninstall                Uninstall an existing installation of Netdata.
-  --reinstall-clean          Clean reinstall Netdata.
-  --local-build-options      Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
-  --static-install-options   Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+  --non-interactive                Do not prompt for user input. (default: prompt if there is a controlling terminal)
+  --interactive                    Prompt for user input even if there is no controlling terminal.
+  --dont-start-it                  Do not start the agent by default (only for static installs or local builds)
+  --dry-run                        Report what we would do with the given options on this system, but don’t actually do anything.
+  --release-channel                Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
+  --stable-channel                 Equivalent to "--release-channel stable"
+  --nightly-channel                Equivalent to "--release-channel nightly"
+  --no-updates                     Do not enable automatic updates (default: enable automatic updates using the best supported scheduling method)
+  --auto-update                    Enable automatic updates.
+  --auto-update-type               Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
+  --disable-telemetry              Opt-out of anonymous statistics.
+  --repositories-only              Only install appropriate repository configuration packages (only for native install).
+  --native-only                    Only install if native binary packages are available.
+  --static-only                    Only install if a static build is available.
+  --build-only                     Only install using a local build.
+  --reinstall                      Explicitly reinstall instead of updating any existing install.
+  --reinstall-even-if-unsafe       Even try to reinstall if we don't think we can do so safely (implies --reinstall).
+  --disable-cloud                  Disable support for Netdata Cloud (default: detect)
+  --require-cloud                  Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
+  --install <path>                 This option is deprecated and will be removed in a future version, use --install-prefix instead.
+  --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
+  --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
+  --install-version <version>      Specify the version of Netdata to install.
+  --claim-token                    Use a specified token for claiming to Netdata Cloud.
+  --claim-rooms                    When claiming, add the node to the specified rooms.
+  --claim-only                     If there is an existing install, only try to claim it, not update it.
+  --claim-*                        Specify other options for the claiming script.
+  --no-cleanup                     Don't do any cleanup steps. This is intended to help with debugging the installer.
+  --uninstall                      Uninstall an existing installation of Netdata.
+  --reinstall-clean                Clean reinstall Netdata.
+  --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
+  --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+  --prepare-offline-install-source Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything.
 
 Additionally, this script may use the following environment variables:
 
