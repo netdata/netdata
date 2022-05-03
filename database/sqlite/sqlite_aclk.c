@@ -284,15 +284,21 @@ void sql_aclk_sync_init(void)
 
 static void async_cb(uv_async_t *handle)
 {
+    worker_is_busy();
+
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
     debug(D_ACLK_SYNC, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
+
+    worker_is_idle();
 }
 
 #define TIMER_PERIOD_MS (1000)
 
 static void timer_cb(uv_timer_t* handle)
 {
+    worker_is_busy();
+
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
@@ -346,12 +352,16 @@ static void timer_cb(uv_timer_t* handle)
         }
     }
 #endif
+
+    worker_is_idle();
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
 
 void aclk_database_worker(void *arg)
 {
+    worker_register("ACLKSYNC");
+
     struct aclk_database_worker_config *wc = arg;
     uv_loop_t *loop;
     int ret;
@@ -413,7 +423,9 @@ void aclk_database_worker(void *arg)
 
     debug(D_ACLK_SYNC,"Node %s reports pending message count = %u", wc->node_id, wc->chart_payload_count);
     while (likely(!netdata_exit)) {
+        worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
+        worker_is_busy();
 
         /* wait for commands */
         cmd_batch_size = 0;
@@ -577,6 +589,8 @@ void aclk_database_worker(void *arg)
         wc->host->dbsync_worker = NULL;
     freez(wc);
     rrd_unlock();
+
+    worker_unregister();
     return;
 
 error_after_timer_init:
@@ -585,6 +599,7 @@ error_after_async_init:
     fatal_assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
+    worker_unregister();
 }
 
 // -------------------------------------------------------------

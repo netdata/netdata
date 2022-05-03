@@ -104,7 +104,7 @@ void worker_is_busy(void) {
 
 // statistics interface
 
-void workers_foreach(const char *workname, void (*callback)(pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_done, size_t jobs_running)) {
+void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_done, size_t jobs_running), void *data) {
     netdata_mutex_lock(&base_lock);
     uint32_t hash = simple_hash(workname);
     usec_t util, delta, last;
@@ -138,7 +138,7 @@ void workers_foreach(const char *workname, void (*callback)(pid_t pid, const cha
 
         // netdata_mutex_unlock(&p->lock);
 
-        callback(p->pid, p->tag, util, delta, jobs_done, jobs_running);
+        callback(data, p->pid, p->tag, util, delta, jobs_done, jobs_running);
     }
 
     netdata_mutex_unlock(&base_lock);

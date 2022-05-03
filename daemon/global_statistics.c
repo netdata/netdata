@@ -853,44 +853,77 @@ static void global_statistics_charts(void) {
 
 }
 
-static size_t web_worker_count;
-static usec_t web_worker_total_utilization;
-static usec_t web_worker_total_duration;
-static size_t web_worker_total_jobs_done;
-static size_t web_worker_total_jobs_running;
-static double web_worker_min_utilization;
-static double web_worker_max_utilization;
+// ---------------------------------------------------------------------------------------------------------------------
+// worker utilization
 
-void web_worker_utilization_charts_callback(pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_done __maybe_unused, size_t jobs_running __maybe_unused) {
-    web_worker_total_utilization += utilization_usec;
-    web_worker_total_duration += duration_usec;
-    web_worker_total_jobs_done += jobs_done;
-    web_worker_total_jobs_running += jobs_running;
-    web_worker_count++;
+struct worker_utilization {
+    const char *name;
+    size_t web_worker_count;
+    usec_t web_worker_total_utilization;
+    usec_t web_worker_total_duration;
+    size_t web_worker_total_jobs_done;
+    size_t web_worker_total_jobs_running;
+    double web_worker_min_utilization;
+    double web_worker_max_utilization;
+};
+
+static void worker_utilization_update_chart(struct worker_utilization *wu) {
+    fprintf(stderr, "%-12s WORKER UTILIZATION: %-3.2f%%, %zu jobs done, %zu running, on %zu workers, min %-3.02f%%, max %-3.02f%%.\n",
+            wu->name,
+            (double)wu->web_worker_total_utilization * 100.0 / (double)wu->web_worker_total_duration,
+            wu->web_worker_total_jobs_done, wu->web_worker_total_jobs_running, wu->web_worker_count,
+            wu->web_worker_min_utilization, wu->web_worker_max_utilization);
+}
+
+static void worker_utilization_reset_statistics(struct worker_utilization *wu) {
+    wu->web_worker_count = 0;
+    wu->web_worker_total_utilization = 0;
+    wu->web_worker_total_duration = 0;
+    wu->web_worker_total_jobs_done = 0;
+    wu->web_worker_total_jobs_running = 0;
+    wu->web_worker_min_utilization = 100.0;
+    wu->web_worker_max_utilization = 0;
+}
+
+static void worker_utilization_update_statistics(struct worker_utilization *wu, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_done __maybe_unused, size_t jobs_running __maybe_unused) {
+    wu->web_worker_total_utilization += utilization_usec;
+    wu->web_worker_total_duration += duration_usec;
+    wu->web_worker_total_jobs_done += jobs_done;
+    wu->web_worker_total_jobs_running += jobs_running;
+    wu->web_worker_count++;
 
     double util = (double)utilization_usec * 100.0 / (double)duration_usec;
-    if(util > web_worker_max_utilization) web_worker_max_utilization = util;
-    if(util < web_worker_min_utilization) web_worker_min_utilization = util;
+    if(util > wu->web_worker_max_utilization)
+        wu->web_worker_max_utilization = util;
 
-    fprintf(stderr, "   ---> WEB WORKER %d:          %.2f%%, %zu jobs done, %zu running.\n",
-            pid, (double)utilization_usec * 100.0 / (double)duration_usec,
-            jobs_done, jobs_running);
+    if(util < wu->web_worker_min_utilization)
+        wu->web_worker_min_utilization = util;
 }
+
+static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_done __maybe_unused, size_t jobs_running __maybe_unused) {
+    struct worker_utilization *wu = (struct worker_utilization *)ptr;
+    worker_utilization_update_statistics(wu, pid, thread_tag, utilization_usec, duration_usec, jobs_done, jobs_running);
+}
+
+static struct worker_utilization all_workers_utilization[] = {
+    { .name = "WEB" },
+    { .name = "DBENGINE" },
+    { .name = "ACLKSYNC" },
+    { .name = "ACLKQUERY" },
+    { .name = NULL }
+};
 
 void worker_utilization_charts(void) {
-    web_worker_count = 0;
-    web_worker_total_utilization = 0;
-    web_worker_total_duration = 0;
-    web_worker_total_jobs_done = 0;
-    web_worker_total_jobs_running = 0;
-    web_worker_min_utilization = 100.0;
-    web_worker_max_utilization = 0.0;
-
-    workers_foreach("WEB", web_worker_utilization_charts_callback);
-
-    fprintf(stderr, "WEB WORKER UTILIZATION: %.2f%%, %zu jobs done, %zu running on %zu workers, min %.02f%%, max %.02f%%.\n", (double)web_worker_total_utilization * 100.0 / (double)web_worker_total_duration,
-        web_worker_total_jobs_done, web_worker_total_jobs_running, web_worker_count, web_worker_min_utilization, web_worker_max_utilization);
+    int i;
+    for(i = 0; all_workers_utilization[i].name ;i++) {
+        worker_utilization_reset_statistics(&all_workers_utilization[i]);
+        workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
+        worker_utilization_update_chart(&all_workers_utilization[i]);
+    }
+    fprintf(stderr, "\n");
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
 
 static void global_statistics_cleanup(void *ptr)
 {

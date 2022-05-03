@@ -13,6 +13,6 @@ extern void worker_is_busy(void);
 
 // statistics interface
 
-extern void workers_foreach(const char *workname, void (*callback)(pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_done, size_t jobs_running));
+extern void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_done, size_t jobs_running), void *data);
 
 #endif // WORKER_UTILIZATION_H
