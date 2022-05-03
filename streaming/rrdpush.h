@@ -217,6 +217,6 @@ size_t is_compressed_data(const char *data, size_t data_size);
 void log_replication_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 extern void evaluate_gap_onconnection(struct receiver_state *stream_recv);
 extern void evaluate_gap_ondisconnection(struct receiver_state *stream_recv);
-
+extern unsigned int is_localhost(RRDHOST* host);
 
 #endif //NETDATA_RRDPUSH_H

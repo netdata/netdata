@@ -260,6 +260,18 @@ static void enable_supported_stream_features(struct sender_state *s) {
         case STREAM_VERSION_COMPRESSION:
             default_compression_enabled = 1;
             default_rrdpush_sender_replication_enabled = 0;
+        //     default_compression_enabled = s->rrdpush_compression;
+        //     default_rrdpush_replication_enabled = s->host->replication->tx_replication->enabled;
+        //     break;
+        // case STREAM_VERSION_GAP_FILLING:
+        //     default_compression_enabled = 0;
+        //     s->rrdpush_compression = 0;
+        //     default_rrdpush_replication_enabled = s->host->replication->tx_replication->enabled;
+        //     break;
+        // case STREAM_VERSION_COMPRESSION:
+        //     default_compression_enabled = s->rrdpush_compression;
+        //     default_rrdpush_replication_enabled = 0;
+        //     s->host->replication->tx_replication->enabled = 0;
             break;
         case STREAM_VERSION_CLABELS:
         case STREAM_VERSION_CLAIM:
@@ -268,11 +280,15 @@ static void enable_supported_stream_features(struct sender_state *s) {
             default_rrdpush_sender_replication_enabled = 0;
             break;
     }
-#else
     if (s->version > STREAM_VERSION_COMPRESSION)
         default_rrdpush_sender_replication_enabled = 1;
     else
         default_rrdpush_sender_replication_enabled = 0;
+    //     default_rrdpush_replication_enabled = s->host->replication->tx_replication->enabled;
+    // else {
+    //     default_rrdpush_replication_enabled = 0;
+    //     s->host->replication->tx_replication->enabled = 0;
+    // }
 #endif
 
 #ifdef ENABLE_COMPRESSION
@@ -580,8 +596,8 @@ static void attempt_to_connect(struct sender_state *state)
     state->send_attempts = 0;
 
     if(rrdpush_sender_thread_connect_to_parent(state->host, state->default_port, state->timeout, state)) {
-        state->last_sent_t = now_monotonic_sec();
-        state->t_newest_connection = now_monotonic_sec();
+        state->last_sent_t = now_realtime_sec();
+        state->t_newest_connection = now_realtime_sec();
 
         // reset the buffer, to properly send charts and metrics
         rrdpush_sender_thread_data_flush(state->host);
@@ -597,10 +613,14 @@ static void attempt_to_connect(struct sender_state *state)
 
         // let the data collection threads know we are ready
         state->host->rrdpush_sender_connected = 1;
-        
+
         // Start replication sender thread (Tx).
-        if(state->host->replication->tx_replication->enabled && !state->host->replication->tx_replication->spawned)
+        if (state->host->replication->tx_replication->enabled && !state->host->replication->tx_replication->spawned) {
+            info("%s: Switch ON the Tx REPlication thread for host %s.",
+                REPLICATION_MSG,
+                state->host->hostname);
             replication_sender_thread_spawn(state->host);
+        }
 
     }
     else {
@@ -645,7 +665,9 @@ void attempt_to_send(struct sender_state *s) {
         s->sent_bytes_on_this_connection += ret;
         s->sent_bytes += ret;
         debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", s->host->hostname, s->connected_to, ret);
-        s->last_sent_t = now_monotonic_sec();
+        s->last_sent_t = now_realtime_sec();
+        if(!s->t_newest_connection)
+            s->t_newest_connection = now_realtime_sec();
     }
     else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
         debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", s->host->hostname, s->connected_to);

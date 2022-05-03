@@ -5,7 +5,7 @@
 #define REPLICATE_CMD "REPLICATE"
 #define REP_ACK_CMD "REP ACK"
 #define REPLICATION_RX_CMD_Q_MAX_SIZE (64)
-#define REPLICATION_GAP_TIME_MARGIN 3
+#define REPLICATION_GAP_TIME_MARGIN 0
 
 typedef struct gap GAP;
 typedef struct time_window TIME_WINDOW;
@@ -66,6 +66,8 @@ struct replication_state {
     char *program_version;
     unsigned int shutdown;    // Set it to 1 command the thread to exit
     unsigned int exited;      // Indicates that the thread has exited
+    unsigned int resume;      // Rising edge from pause 0 -> 1 (1). 1 -> 0 (0)
+    unsigned int pause;       // 0 means paused, 1 means running
     RRDDIM_PAST_DATA *dim_past_data;
 };
 
@@ -114,9 +116,10 @@ void replication_collect_past_metric_done(REPLICATION_STATE *rep_state);
 void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state);
 void replication_send_clabels(REPLICATION_STATE *rep_state, RRDSET *st);
 int save_gap(GAP *a_gap);
-int save_all_gaps(GAPS *gap_timeline);
+int save_all_host_gaps(GAPS *gap_timeline);
 int remove_gap(GAP *a_gap);
 int remove_all_gaps(void);
+int remove_all_host_gaps(RRDHOST* host);
 int load_gap(RRDHOST *host);
 
 void replication_state_destroy(REPLICATION_STATE **state);
@@ -147,4 +150,3 @@ extern void rrdeng_flush_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPL
 extern void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state);
 
 #endif
-

@@ -2213,7 +2213,6 @@ failed:
     return;
 };
 
-
 /*
  * Store a gap in the database
  */
@@ -2323,15 +2322,15 @@ int sql_load_host_gap(RRDHOST *host)
             case SQLITE_ROW:
                 if (likely(sqlite3_column_bytes(res, 0) == sizeof(uuid_t))) {
                     set_host_gap(host, res);
-                    debug(D_REPLICATION, "%s: Setting host latest gap completed!", REPLICATION_MSG);
+                    debug(D_REPLICATION, "%s: Setting %s host latest gap completed!", REPLICATION_MSG, host->hostname);
                 }
                 break;
             case SQLITE_DONE:
                 set_host_gap(host, NULL);
-                debug(D_REPLICATION, "%s: SQLite completed with NO ROWs!", REPLICATION_MSG);
+                debug(D_REPLICATION, "%s: Setting %s host gaps from SQLite completed with NO ROWs!", REPLICATION_MSG, host->hostname);
                 break;
             default:
-                debug(D_REPLICATION, "%s: SQLite returned unexpected error code!", REPLICATION_MSG);
+                debug(D_REPLICATION, "%s: Setting %s host gaps from SQLite returned unexpected error code!", REPLICATION_MSG, host->hostname);
                 break;
         }
     } while (rc == SQLITE_ROW);
@@ -2369,6 +2368,43 @@ int sql_delete_all_gaps(void)
 }
 
 /*
+ * Delete all the gaps of a host from the metadata DB.
+ */
+int sql_delete_all_host_gaps(RRDHOST *host)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    debug(D_METADATALOG,"Deleting all gaps from host %s", host->hostname);
+#endif
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, DELETE_ALL_HOST_GAPS, &res);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement to delete all gaps for host %s", host->hostname);
+            return rc;
+        }
+    }
+
+    rc = sqlite3_bind_text(res, 1, host->machine_guid, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind MGUID[%s] parameter to delete all gaps for host %s.", host->machine_guid, host->hostname);
+        goto bind_fail;
+    }     
+
+    rc = sqlite3_step(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to delete all gaps for host %s, rc = %d", host->hostname, rc);
+
+bind_fail:
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when deleting all gaps for host %s, rc = %d", host->hostname, rc);
+    return rc;
+}
+
+/*
  * Delete a gap from the database
  */
 int sql_delete_gap(uuid_t *gap_uuid)
@@ -2401,7 +2437,7 @@ int sql_delete_gap(uuid_t *gap_uuid)
 bind_fail:
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement when deleting dimension UUID, rc = %d", rc);
+        error_report("Failed to reset statement when deleting gap UUID, rc = %d", rc);
     return rc;
 }
 
@@ -2414,10 +2450,11 @@ void set_host_gap(RRDHOST *host, sqlite3_stmt *res) {
     if(!res)
     {
         if(count > 0) {
-            debug(D_REPLICATION, ":%s: Exiting loading... with count(%d) \ng_b: %p, \ng_rear: %p, \ng_count: %p", REPLICATION_MSG, count, host->gaps_timeline->gap_buffer, host->gaps_timeline->gaps->front->item, &host->gaps_timeline->gap_data[count]);
+            debug(D_REPLICATION, ":%s: Exiting loading... with count(%d) \n", REPLICATION_MSG, count);
+            // This is the top GAP that should have and oncreate status. It will go at the end of the q.
             copy_gap(host->gaps_timeline->gap_buffer, host->gaps_timeline->gaps->front->item);
-            reset_gap(host->gaps_timeline->gaps->front->item);
-            queue_pop(host->gaps_timeline->gaps);
+            GAP *the_gap = (GAP *)queue_pop(host->gaps_timeline->gaps);
+            reset_gap(the_gap);
             return;
         }
         debug(D_REPLICATION, "%s: The GAPs table in the metdata DB seems to be empty for the host %s.", REPLICATION_MSG, host->hostname);
