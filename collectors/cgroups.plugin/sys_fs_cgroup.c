@@ -1912,19 +1912,25 @@ static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
 
     // skip to the last slash
     size_t len = strlen(s);
-    while (len--)
-        if (unlikely(s[len] == '/'))
+    while (len--) {
+        if (unlikely(s[len] == '/')) {
             break;
-    if (len)
+        }
+    }
+    if (len) {
         s = &s[len + 1];
+    }
 
     // remove extension
     len = strlen(s);
-    while (len--)
-        if (unlikely(s[len] == '.'))
+    while (len--) {
+        if (unlikely(s[len] == '.')) {
             break;
-    if (len)
+        }
+    }
+    if (len) {
         s[len] = '\0';
+    }
 
     freez(cg->chart_title);
     cg->chart_title = cgroup_title_strdupz(s);
