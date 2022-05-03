@@ -1692,10 +1692,10 @@ prepare_offline_install_source() {
       fatal "${1} is not a directory, unable to prepare offline install source." F0503
     fi
   else
-    mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
+    run mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
   fi
 
-  cd "${1}" || fatal "Failed to swtich to target directory for offline install preparation." F0505
+  run cd "${1}" || fatal "Failed to swtich to target directory for offline install preparation." F0505
 
   if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
     for arch in ${STATIC_INSTALL_ARCHES}; do
@@ -1713,25 +1713,42 @@ prepare_offline_install_source() {
     fi
   fi
 
-  progress "Verifying checksums."
-  if ! safe_sha256sum --ignore-missing -c "./sha256sums.txt"; then
-    fatal "Checksums for offline install files are incorrect. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0507
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Verifying checksums."
+    if ! safe_sha256sum --ignore-missing -c "./sha256sums.txt"; then
+      fatal "Checksums for offline install files are incorrect. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0507
+    fi
+  else
+    progress "Would verify SHA256 checksums of downloaded installation files."
   fi
 
-  progress "Preparing install script."
-  cat > "install.sh" <<-EOF
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Preparing install script."
+    cat > "install.sh" <<-EOF
 	#!/bin/sh
 	dir=\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd)
 	"\${dir}/kickstart.sh" --offline-install-source "\${dir}" \${@}
 	EOF
-  chmod +x "install.sh"
+    chmod +x "install.sh"
+  else
+    progress "Would create install script"
+  fi
 
-  progress "Copying kickstart script."
-  cp "${KICKSTART_SOURCE}" "kickstart.sh"
-  chmod +x "kickstart.sh"
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Copying kickstart script."
+    cp "${KICKSTART_SOURCE}" "kickstart.sh"
+    chmod +x "kickstart.sh"
+  else
+    progress "Would copy kickstart.sh to offline install source directory"
+  fi
 
-  progress "Saving release channel information."
-  echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Saving release channel information."
+    echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
+  else
+    progress "Would save release channel information to offline install source directory"
+  fi
 
   progress "Finished preparing ofline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
 }
