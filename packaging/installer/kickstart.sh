@@ -2004,8 +2004,10 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
-if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] && [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-  fatal "Native packages are not supported with offline installs." F0502
+if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+  if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] || [ "${NETDATA_ONLY_BUILD}" ]; then
+    fatal "Offline installs are only supported for static builds currently." F0502
+  fi
 fi
 
 if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
