@@ -39,6 +39,6 @@ typedef struct netdata_ebpf_cgroup_shm {
 
 #include "../proc.plugin/plugin_proc.h"
 
-extern char *parse_k8s_data(struct label **labels, char *data);
+extern char *k8s_parse_resolved_name(struct label **labels, char *data);
 
 #endif //NETDATA_SYS_FS_CGROUP_H
