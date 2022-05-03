@@ -99,6 +99,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 // RRDDIM legacy data collection functions
 
 static void rrddim_collect_init(RRDDIM *rd) {
+    rd->state->handle = callocz(1, sizeof(struct mem_collect_handle));
     rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
 }
 static void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number) {
@@ -107,10 +108,10 @@ static void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storag
     rd->values[rd->rrdset->current_entry] = number;
 }
 static int rrddim_collect_finalize(RRDDIM *rd) {
-    (void)rd;
-
+    freez(rd->state->handle);
     return 0;
 }
+
 
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
@@ -119,34 +120,37 @@ static void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, ti
     handle->rd = rd;
     handle->start_time = start_time;
     handle->end_time = end_time;
-    handle->slotted.slot = rrdset_time2slot(rd->rrdset, start_time);
-    handle->slotted.last_slot = rrdset_time2slot(rd->rrdset, end_time);
-    handle->slotted.finished = 0;
+    struct mem_query_handle* mem_handle = callocz(1, sizeof(struct mem_query_handle));
+    mem_handle->slot = rrdset_time2slot(rd->rrdset, start_time);
+    mem_handle->last_slot = rrdset_time2slot(rd->rrdset, end_time);
+    mem_handle->finished = 0;
+    handle->handle = (STORAGE_QUERY_HANDLE *)mem_handle;
 }
 
 static storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time) {
     RRDDIM *rd = handle->rd;
+    struct mem_query_handle* mem_handle = (struct mem_query_handle*)handle->handle;
     long entries = rd->rrdset->entries;
-    long slot = handle->slotted.slot;
+    long slot = mem_handle->slot;
 
     (void)current_time;
-    if (unlikely(handle->slotted.slot == handle->slotted.last_slot))
-        handle->slotted.finished = 1;
+    if (unlikely(mem_handle->slot == mem_handle->last_slot))
+        mem_handle->finished = 1;
     storage_number n = rd->values[slot++];
 
     if(unlikely(slot >= entries)) slot = 0;
-    handle->slotted.slot = slot;
+    mem_handle->slot = slot;
 
     return n;
 }
 
 static int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
-    return handle->slotted.finished;
+    struct mem_query_handle* mem_handle = (struct mem_query_handle*)handle->handle;
+    return mem_handle->finished;
 }
 
 static void rrddim_query_finalize(struct rrddim_query_handle *handle) {
-    (void)handle;
-
+    freez(handle->handle);
     return;
 }
 

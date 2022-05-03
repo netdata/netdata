@@ -580,9 +580,10 @@ static inline void do_dimension_fixedstep(
         // read the value from the database
         //storage_number n = rd->values[slot];
 #ifdef NETDATA_INTERNAL_CHECKS
+        struct mem_query_handle* mem_handle = (struct mem_query_handle*)handle.handle;
         if ((rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) &&
-            (rrdset_time2slot(st, now) != (long unsigned)handle.slotted.slot)) {
-            error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)handle.slotted.slot, rrdset_time2slot(st, now));
+            (rrdset_time2slot(st, now) != (long unsigned)(mem_handle->slot))) {
+            error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)mem_handle->slot, rrdset_time2slot(st, now));
         }
 #endif
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
@@ -601,8 +602,9 @@ static inline void do_dimension_fixedstep(
             calculated_number value = NAN;
             if(likely(now >= db_now && does_storage_number_exist(n))) {
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(ENABLE_DBENGINE)
-                if ((rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (now != handle.rrdeng.now)) {
-                    error("INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld", rd->id, (long)handle.rrdeng.now, (long)now);
+                struct rrdeng_query_handle* rrd_handle = (struct rrdeng_query_handle*)handle.handle;
+                if ((rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (now != rrd_handle->now)) {
+                    error("INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld", rd->id, (long)rrd_handle->now, (long)now);
                 }
 #endif
                 if (options & RRDR_OPTION_ANOMALY_BIT)

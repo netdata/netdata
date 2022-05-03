@@ -40,7 +40,7 @@ public:
 private:
     RRDDIM *RD;
 
-    struct rrddim_volatile::rrddim_query_ops *Ops;
+    struct rrddim_query_ops *Ops;
     struct rrddim_query_handle Handle;
 };
 

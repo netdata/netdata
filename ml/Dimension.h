@@ -45,7 +45,7 @@ private:
     RRDDIM *RD;
     RRDDIM *AnomalyRateRD;
 
-    struct rrddim_volatile::rrddim_query_ops *Ops;
+    struct rrddim_query_ops *Ops;
 
     std::string ID;
 };

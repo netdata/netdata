@@ -326,53 +326,56 @@ struct rrddim {
 };
 
 // ----------------------------------------------------------------------------
-// iterator state for RRD dimension data collection
-union rrddim_collect_handle {
-    struct {
-        long slot;
-        long entries;
-    } slotted;                           // state the legacy code uses
-#ifdef ENABLE_DBENGINE
-    struct rrdeng_collect_handle {
-        struct rrdeng_page_descr *descr, *prev_descr;
-        unsigned long page_correlation_id;
-        struct rrdengine_instance *ctx;
-        // set to 1 when this dimension is not page aligned with the other dimensions in the chart
-        uint8_t unaligned_page;
-    } rrdeng; // state the database engine uses
-#endif
-};
+// engine-specific iterator state for dimension data collection
+typedef struct storage_collect_handle STORAGE_COLLECT_HANDLE;
+
+// ----------------------------------------------------------------------------
+// engine-specific iterator state for dimension data queries
+typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
 
 // ----------------------------------------------------------------------------
 // iterator state for RRD dimension data queries
-
-#ifdef ENABLE_DBENGINE
-struct rrdeng_query_handle {
-    struct rrdeng_page_descr *descr;
-    struct rrdengine_instance *ctx;
-    struct pg_cache_page_index *page_index;
-    time_t next_page_time;
-    time_t now;
-    unsigned position;
-};
-#endif
-
 struct rrddim_query_handle {
     RRDDIM *rd;
     time_t start_time;
     time_t end_time;
-    union {
-        struct {
-            long slot;
-            long last_slot;
-            uint8_t finished;
-        } slotted;                         // state the legacy code uses
-#ifdef ENABLE_DBENGINE
-        struct rrdeng_query_handle rrdeng; // state the database engine uses
-#endif
-    };
+    STORAGE_QUERY_HANDLE* handle;
 };
 
+// ------------------------------------------------------------------------
+// function pointers that handle data collection
+struct rrddim_collect_ops {
+    // an initialization function to run before starting collection
+    void (*init)(RRDDIM *rd);
+
+    // run this to store each metric into the database
+    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, storage_number number);
+
+    // an finalization function to run after collection is over
+    // returns 1 if it's safe to delete the dimension
+    int (*finalize)(RRDDIM *rd);
+};
+
+// function pointers that handle database queries
+struct rrddim_query_ops {
+    // run this before starting a series of next_metric() database queries
+    void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+
+    // run this to load each metric number from the database
+    storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time);
+
+    // run this to test if the series of next_metric() database queries is finished
+    int (*is_finished)(struct rrddim_query_handle *handle);
+
+    // run this after finishing a series of load_metric() database queries
+    void (*finalize)(struct rrddim_query_handle *handle);
+
+    // get the timestamp of the last entry of this metric
+    time_t (*latest_time)(RRDDIM *rd);
+
+    // get the timestamp of the first entry of this metric
+    time_t (*oldest_time)(RRDDIM *rd);
+};
 
 // ----------------------------------------------------------------------------
 // volatile state per RRD dimension
@@ -385,42 +388,9 @@ struct rrddim_volatile {
     int aclk_live_status;
 #endif
     uuid_t metric_uuid;                 // global UUID for this metric (unique_across hosts)
-    union rrddim_collect_handle handle;
-    // ------------------------------------------------------------------------
-    // function pointers that handle data collection
-    struct rrddim_collect_ops {
-        // an initialization function to run before starting collection
-        void (*init)(RRDDIM *rd);
-
-        // run this to store each metric into the database
-        void (*store_metric)(RRDDIM *rd, usec_t point_in_time, storage_number number);
-
-        // an finalization function to run after collection is over
-        // returns 1 if it's safe to delete the dimension
-        int (*finalize)(RRDDIM *rd);
-    } collect_ops;
-
-    // function pointers that handle database queries
-    struct rrddim_query_ops {
-        // run this before starting a series of next_metric() database queries
-        void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
-
-        // run this to load each metric number from the database
-        storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time);
-
-        // run this to test if the series of next_metric() database queries is finished
-        int (*is_finished)(struct rrddim_query_handle *handle);
-
-        // run this after finishing a series of load_metric() database queries
-        void (*finalize)(struct rrddim_query_handle *handle);
-
-        // get the timestamp of the last entry of this metric
-        time_t (*latest_time)(RRDDIM *rd);
-
-        // get the timestamp of the first entry of this metric
-        time_t (*oldest_time)(RRDDIM *rd);
-    } query_ops;
-
+    STORAGE_COLLECT_HANDLE* handle;
+    struct rrddim_collect_ops collect_ops;
+    struct rrddim_query_ops query_ops;
     ml_dimension_t ml_dimension;
 };
 
@@ -433,6 +403,19 @@ struct rrdset_volatile {
     struct label *new_labels;
     struct label_index labels;
     bool is_ar_chart;
+};
+
+// RRDDIM legacy data collection structures
+
+struct mem_collect_handle {
+    long slot;
+    long entries;
+};
+
+struct mem_query_handle {
+    long slot;
+    long last_slot;
+    uint8_t finished;
 };
 
 // ----------------------------------------------------------------------------
