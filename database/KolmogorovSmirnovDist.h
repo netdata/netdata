@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0
 
 #ifndef KOLMOGOROVSMIRNOVDIST_H
 #define KOLMOGOROVSMIRNOVDIST_H
