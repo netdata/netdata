@@ -135,7 +135,8 @@ USAGE: kickstart.sh [options]
   --reinstall-even-if-unsafe Even try to reinstall if we don't think we can do so safely (implies --reinstall).
   --disable-cloud            Disable support for Netdata Cloud (default: detect)
   --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
-  --install <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
+  --install <path>           This option is deprecated and will be removed in a future version, use --install-prefix instead.
+  --install-prefix <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>       Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
   --claim-token              Use a specified token for claiming to Netdata Cloud.
   --claim-rooms              When claiming, add the node to the specified rooms.
@@ -920,11 +921,11 @@ EOF
 
 confirm_install_prefix() {
   if [ -n "${INSTALL_PREFIX}" ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
-    fatal "The \`--install\` option is only supported together with the \`--build-only\` option." F0204
+    fatal "The \`--install-prefix\` and \`--install\` options are only supported together with the \`--build-only\` option." F0204
   fi
 
   if [ -n "${INSTALL_PREFIX}" ]; then
-    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install ${INSTALL_PREFIX}"
+    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install-prefix ${INSTALL_PREFIX}"
   else
     case "${SYSTYPE}" in
       Darwin)
@@ -1742,6 +1743,11 @@ while [ -n "${1}" ]; do
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
       ;;
     "--install")
+      warning "--install flag is deprecated and will be removed in a future version. Please use --install-prefix instead."
+      INSTALL_PREFIX="${2}"
+      shift 1
+      ;;
+    "--install-prefix")
       INSTALL_PREFIX="${2}"
       shift 1
       ;;
