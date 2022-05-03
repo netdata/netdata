@@ -1691,33 +1691,33 @@ prepare_offline_install_source() {
       set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
       progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
-      if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${1}/netdata-${arch}-latest.gz.run"; then
+      if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
         warning "Failed to download static installer archive for ${arch}."
       fi
     done
 
     progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
-    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${1}/sha256sums.txt"; then
+    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
       fatal "Failed to download checksum file." F0506
     fi
   fi
 
   progress "Verifying checksums."
-  if ! safe_sha256sum --ignore-missing -c "${1}/sha256sums.txt"; then
+  if ! safe_sha256sum --ignore-missing -c "./sha256sums.txt"; then
     fatal "Checksums for offline install files are incorrect. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0507
   fi
 
   progress "Preparing install script."
-  cat > "${1}/install.sh" <<-EOF
+  cat > "install.sh" <<-EOF
 	#!/bin/sh
 	dir=\$(CDPATH= cd -- "\$(dirname -- "$0")" && pwd)
 	"\${dir}/kickstart.sh --offline-install-source "\${dir}" \${@}
 	EOF
-  chmod +x "${1}/install.sh"
+  chmod +x "install.sh"
 
   progress "Copying kickstart script."
-  cp "${KICKSTART_SOURCE}" "${1}/kickstart.sh"
-  chmod +x "${1}/install.sh"
+  cp "${KICKSTART_SOURCE}" "kickstart.sh"
+  chmod +x "install.sh"
 
   progress "Finished preparing ofline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
   deferred_warnings
