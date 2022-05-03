@@ -453,9 +453,11 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
 
+    bool cleanup_excess_log_entries = host->health_log.count > host->health_log.max;
+
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-    if(host->health_log.count <= host->health_log.max)
+    if (!cleanup_excess_log_entries)
         return;
 
     // cleanup excess entries in the log
@@ -653,35 +655,34 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 // Create alarms for dimensions that have been added to charts
 // since the previous iteration.
 static void init_pending_foreach_alarms(RRDHOST *host) {
+    RRDSET *st;
+    RRDDIM *rd;
+
+    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS))
+        return;
+
     rrdhost_wrlock(host);
 
-    if (host->alarms_with_foreach || host->alarms_template_with_foreach) {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS)) {
-            RRDSET *st;
+    rrdset_foreach_write(st, host) {
+        if (!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS))
+            continue;
 
-            rrdset_foreach_read(st, host) {
-                rrdset_wrlock(st);
+        rrdset_rdlock(st);
 
-                if (rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS)) {
-                    RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            if (!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM))
+                continue;
 
-                    rrddim_foreach_write(rd, st) {
-                        if (rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM)) {
-                            rrdcalc_link_to_rrddim(rd, st, host);
-                            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
-                        }
-                    }
+            rrdcalc_link_to_rrddim(rd, st, host);
 
-                    rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-                }
-
-                rrdset_unlock(st);
-            }
-
-            rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
+            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
         }
+
+        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
+        rrdset_unlock(st);
     }
 
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
     rrdhost_unlock(host);
 }
 
