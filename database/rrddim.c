@@ -2,10 +2,10 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
-#include "database/rrddim_mem.h"
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
 #endif
+#include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
 // RRDDIM index
@@ -306,30 +306,16 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state->aclk_live_status = -1;
 #endif
     (void) find_dimension_uuid(st, rd, &(rd->state->metric_uuid));
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+
+    STORAGE_ENGINE* eng = storage_engine_get(memory_mode);
+    rd->state->collect_ops = eng->api.collect_ops;
+    rd->state->query_ops = eng->api.query_ops;
+
 #ifdef ENABLE_DBENGINE
+    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         rrdeng_metric_init(rd);
-        rd->state->collect_ops.init = rrdeng_store_metric_init;
-        rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-        rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
-        rd->state->query_ops.init = rrdeng_load_metric_init;
-        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-#endif
-    } else {
-        rd->state->collect_ops.init         = rrddim_collect_init;
-        rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
-        rd->state->collect_ops.finalize     = rrddim_collect_finalize;
-        rd->state->query_ops.init           = rrddim_query_init;
-        rd->state->query_ops.next_metric    = rrddim_query_next_metric;
-        rd->state->query_ops.is_finished    = rrddim_query_is_finished;
-        rd->state->query_ops.finalize       = rrddim_query_finalize;
-        rd->state->query_ops.latest_time    = rrddim_query_latest_time;
-        rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
     }
+#endif
     store_active_dimension(&rd->state->metric_uuid);
     rd->state->collect_ops.init(rd);
     // append this dimension
