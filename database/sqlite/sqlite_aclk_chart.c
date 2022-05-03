@@ -966,43 +966,28 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
                 live = 0;
             }
             if (!wc->host || !first_entry_t) {
-                (void)aclk_upd_dimension_event(
-                    wc,
-                    claim_id,
-                    (uuid_t *)sqlite3_column_blob(res, 0),
-                    (const char *)(const char *)sqlite3_column_text(res, 3),
-                    (const char *)(const char *)sqlite3_column_text(res, 4),
-                    (const char *)(const char *)sqlite3_column_text(res, 2),
-                    first_entry_t,
-                    live ? 0 : last_entry_t,
-                    &send_status);
-
-                if (!send_status) {
-                    if (!first_entry_t) {
-                        total_deleted++;
-                        debug(
-                            D_ACLK_SYNC,
-                            "Host %s (node %s) deleting dimension id=[%s] name=[%s] chart=[%s]",
-                            wc->host_guid,
-                            wc->node_id,
-                            (const char *)sqlite3_column_text(res, 3),
-                            (const char *)(const char *)sqlite3_column_text(res, 4),
-                            (const char *)(const char *)sqlite3_column_text(res, 2));
-                    }
-                    if (last_entry_t) {
-                        total_stopped++;
-                        debug(
-                            D_ACLK_SYNC,
-                            "Host %s (node %s) stopped collecting dimension id=[%s] name=[%s] chart=[%s] %ld seconds ago at %ld",
-                            wc->host_guid,
-                            wc->node_id,
-                            (const char *)sqlite3_column_text(res, 3),
-                            (const char *)(const char *)sqlite3_column_text(res, 4),
-                            (const char *)(const char *)sqlite3_column_text(res, 2),
-                            now_realtime_sec() - last_entry_t,
-                            last_entry_t);
-                    }
+                if (!first_entry_t) {
+                    delete_dimension_uuid((uuid_t *)sqlite3_column_blob(res, 0));
+                    total_deleted++;
                     dimension_update_count++;
+                }
+                else {
+                    (void)aclk_upd_dimension_event(
+                        wc,
+                        claim_id,
+                        (uuid_t *)sqlite3_column_blob(res, 0),
+                        (const char *)(const char *)sqlite3_column_text(res, 3),
+                        (const char *)(const char *)sqlite3_column_text(res, 4),
+                        (const char *)(const char *)sqlite3_column_text(res, 2),
+                        first_entry_t,
+                        live ? 0 : last_entry_t,
+                        &send_status);
+
+                    if (!send_status) {
+                        if (last_entry_t)
+                            total_stopped++;
+                        dimension_update_count++;
+                    }
                 }
             }
         }
