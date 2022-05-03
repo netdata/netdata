@@ -175,6 +175,7 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
         if (rh->d != b_dims) {
             //TODO handle different dims
             rrdr_free(owa, rh);
+            onewayalloc_destroy(owa);
             freez(pd);
             return 0;
         }
