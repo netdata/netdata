@@ -1580,7 +1580,6 @@ varlibdir="${localstatedir}/lib/netdata"
 registrydir="${localstatedir}/lib/netdata/registry"
 cachedir="${localstatedir}/cache/netdata"
 chartsdir="${libexecdir}/netdata/charts.d"
-nodedir="${libexecdir}/netdata/node.d"
 pythondir="${libexecdir}/netdata/python.d"
 configdir="${sysconfdir}/netdata"
 libconfigdir="${libdir}/netdata/conf.d"
@@ -1591,7 +1590,6 @@ AC_SUBST([varlibdir])
 AC_SUBST([registrydir])
 AC_SUBST([cachedir])
 AC_SUBST([chartsdir])
-AC_SUBST([nodedir])
 AC_SUBST([pythondir])
 AC_SUBST([configdir])
 AC_SUBST([libconfigdir])
@@ -1716,7 +1714,6 @@ AC_CONFIG_FILES([
     collectors/idlejitter.plugin/Makefile
     collectors/macos.plugin/Makefile
     collectors/nfacct.plugin/Makefile
-    collectors/node.d.plugin/Makefile
     collectors/plugins.d/Makefile
     collectors/proc.plugin/Makefile
     collectors/python.d.plugin/Makefile

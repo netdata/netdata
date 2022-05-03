@@ -489,11 +489,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libexecdir}/%{name}/python.d
 %dir %{_libexecdir}/%{name}/charts.d
 %dir %{_libexecdir}/%{name}/plugins.d
-%dir %{_libexecdir}/%{name}/node.d
 
 %{_libexecdir}/%{name}/python.d
 %{_libexecdir}/%{name}/plugins.d
-%{_libexecdir}/%{name}/node.d
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 

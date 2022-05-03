@@ -18,7 +18,6 @@ fi
 # These options control which packages we are going to install
 # They can be pre-set, but also can be controlled with command line options
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
-PACKAGES_NETDATA_NODEJS=${PACKAGES_NETDATA_NODEJS-0}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
 PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-1}
 PACKAGES_NETDATA_PYTHON_MYSQL=${PACKAGES_NETDATA_PYTHON_MYSQL-0}
@@ -103,10 +102,7 @@ Supported packages (you can append many of them):
                      node.js, python, sensors, etc
 
     - netdata        minimum packages required to install netdata
-                     (no mysql client, no nodejs, includes python)
-
-    - nodejs         install nodejs
-                     (required for monitoring named and SNMP)
+                     (no mysql client, includes python)
 
     - python         install python
 
@@ -930,20 +926,6 @@ declare -A pkg_nginx=(
   ['default']="nginx"
 )
 
-declare -A pkg_nodejs=(
-  ['gentoo']="net-libs/nodejs"
-  ['clearlinux']="nodejs-basic"
-  ['freebsd']="node"
-  ['default']="nodejs"
-
-  # exceptions
-  ['rhel-6']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-  ['rhel-7']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-  ['centos-6']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-  ['debian-6']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-  ['debian-7']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-)
-
 declare -A pkg_postfix=(
   ['gentoo']="mail-mta/postfix"
   ['macos']="WARNING|"
@@ -1445,13 +1427,6 @@ packages() {
   # ebpf plugin
   if [ "${PACKAGES_NETDATA_EBPF}" -ne 0 ]; then
     suitable_package libelf
-  fi
-
-  # -------------------------------------------------------------------------
-  # scripting interpreters for netdata plugins
-
-  if [ "${PACKAGES_NETDATA_NODEJS}" -ne 0 ]; then
-    require_cmd nodejs node js || suitable_package nodejs
   fi
 
   # -------------------------------------------------------------------------
@@ -2001,7 +1976,7 @@ EOF
 remote_log() {
   # log success or failure on our system
   # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&nodejs=${PACKAGES_NETDATA_NODEJS}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
+  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
 }
 
 if [ -z "${1}" ]; then
@@ -2062,7 +2037,6 @@ while [ -n "${1}" ]; do
 
     netdata-all)
       PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_NODEJS=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_MYSQL=1
@@ -2124,12 +2098,6 @@ while [ -n "${1}" ]; do
       fi
       ;;
 
-    nodejs | netdata-nodejs)
-      PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_NODEJS=1
-      PACKAGES_NETDATA_DATABASE=1
-      ;;
-
     sensors | netdata-sensors)
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_PYTHON3=1
@@ -2147,7 +2115,6 @@ while [ -n "${1}" ]; do
 
     demo | all)
       PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_NODEJS=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_MYSQL=1

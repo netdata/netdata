@@ -41,7 +41,6 @@ Depends: adduser,
 Conflicts: netdata-core,
            netdata-plugins-bash,
            netdata-plugins-python,
-           netdata-plugins-nodejs,
            netdata-web
 Pre-Depends: dpkg (>= 1.17.14)
 Description: real-time charts for system monitoring

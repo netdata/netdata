@@ -46,7 +46,7 @@ of 5 seconds.
 ```
 
 Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
-`python.d.conf`, `node.d.conf`, or `charts.d.conf` files, or in individual collector configuration files. If the `update
+`python.d.conf` or `charts.d.conf` files, or in individual collector configuration files. If the `update
 every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See the [enable
 or configure a collector](/docs/collect/enable-configure.md) doc for details.
 
@@ -55,7 +55,7 @@ or configure a collector](/docs/collect/enable-configure.md) doc for details.
 Turn off entire plugins in the [`[plugins]` section](/daemon/config/README.md#plugins-section-options) of
 `netdata.conf`.
 
-To disable specific collectors, open `go.d.conf`, `python.d.conf`, `node.d.conf`, or `charts.d.conf` and find the line
+To disable specific collectors, open `go.d.conf`, `python.d.conf` or `charts.d.conf` and find the line
 for that specific module. Uncomment the line and change its value to `no`.
 
 ## Modify alarms and notifications

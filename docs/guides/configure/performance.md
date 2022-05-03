@@ -72,7 +72,7 @@ seconds, respectively.
 ### Specific plugin or collector
 
 Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
-`python.d.conf`, `node.d.conf`, or `charts.d.conf` files, or in individual collector configuration files. If the `update
+`python.d.conf`, or `charts.d.conf` files, or in individual collector configuration files. If the `update
 every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See the [enable
 or configure a collector](/docs/collect/enable-configure.md) doc for details.
 
@@ -103,15 +103,13 @@ Keep in mind that if a plugin/collector has nothing to do, it simply shuts down 
 You will only improve the Agent's performance by disabling plugins/collectors that are actively collecting metrics.
 
 Open `netdata.conf` and scroll down to the `[plugins]` section. To disable any plugin, uncomment it and set the value to
-`no`. For example, to explicitly keep the `proc` and `go.d` plugins enabled while disabling `python.d`, `charts.d`, and
-`node.d`.
+`no`. For example, to explicitly keep the `proc` and `go.d` plugins enabled while disabling `python.d` and `charts.d`.
 
 ```conf
 [plugins]
     proc = yes
 		python.d = no
 		charts.d = no
-		node.d = no
 		go.d = yes
 ```
 
@@ -121,7 +119,6 @@ collector, and setting its value to `no`.
 ```bash
 sudo ./edit-config go.d.conf
 sudo ./edit-config python.d.conf
-sudo ./edit-config node.d.conf
 sudo ./edit-config charts.d.conf
 ```
 

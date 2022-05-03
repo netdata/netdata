@@ -34,7 +34,6 @@
     enable running new plugins = no
     check for new plugins every = 60
     go.d = no
-    node.d = no
     charts.d = no
     nfacct = no
     python.d = no

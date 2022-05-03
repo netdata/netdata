@@ -92,7 +92,7 @@ Refer to the [web server documentation](/web/server/README.md)
 
 ### [plugins] section options
 
-In this section you will see be a boolean (`yes`/`no`) option for each plugin (e.g. tc, cgroups, apps, proc etc.). Note that the configuration options in this section for the orchestrator plugins `python.d`, `charts.d` and `node.d` control **all the modules** written for that orchestrator. For instance, setting `python.d = no` means that all Python modules under `collectors/python.d.plugin` will be disabled.
+In this section you will see be a boolean (`yes`/`no`) option for each plugin (e.g. tc, cgroups, apps, proc etc.). Note that the configuration options in this section for the orchestrator plugins `python.d` and  `charts.d` control **all the modules** written for that orchestrator. For instance, setting `python.d = no` means that all Python modules under `collectors/python.d.plugin` will be disabled.
 
 Additionally, there will be the following options:
 
