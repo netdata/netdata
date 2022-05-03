@@ -1404,7 +1404,11 @@ set_static_archive_urls() {
     arch="${2}"
   fi
 
-  if [ "${1}" = "stable" ]; then
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
+    export NETDATA_STATIC_ARCHIVE_URL="file://${path}/netdata-${arch}-latest.gz.run"
+    export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="file://${path}/sha256sums.txt"
+  elif [ "${1}" = "stable" ]; then
     if [ -n "${INSTALL_VERSION}" ]; then
       export NETDATA_STATIC_ARCHIVE_OLD_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
       export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-${SYSARCH}-v${INSTALL_VERSION}.gz.run"
