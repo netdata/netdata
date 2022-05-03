@@ -490,7 +490,10 @@ create_tmp_directory() {
 
 check_for_remote_file() {
   url="${1}"
-  if command -v curl > /dev/null 2>&1; then
+
+  if echo "${url}" | grep -Eq "^file:///"; then
+    [ -e "${url#file://}" ] || return 1
+  elif command -v curl > /dev/null 2>&1; then
     curl --output /dev/null --silent --head --fail "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
@@ -504,7 +507,7 @@ download() {
   dest="${2}"
 
   if echo "${url}" | grep -Eq "^file:///"; then
-    run cp "${url%file://}" "${dest}" || return 1
+    run cp "${url#file://}" "${dest}" || return 1
   elif command -v curl > /dev/null 2>&1; then
     run curl --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
@@ -1718,13 +1721,13 @@ prepare_offline_install_source() {
   cat > "install.sh" <<-EOF
 	#!/bin/sh
 	dir=\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd)
-	"\${dir}/kickstart.sh --offline-install-source "\${dir}" \${@}
+	"\${dir}/kickstart.sh" --offline-install-source "\${dir}" \${@}
 	EOF
   chmod +x "install.sh"
 
   progress "Copying kickstart script."
   cp "${KICKSTART_SOURCE}" "kickstart.sh"
-  chmod +x "install.sh"
+  chmod +x "kickstart.sh"
 
   progress "Saving release channel information."
   echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
@@ -1736,7 +1739,7 @@ prepare_offline_install_source() {
 # Per system-type install logic
 
 install_on_linux() {
-  if [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
+  if [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ] && [ -z "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     SELECTED_INSTALL_METHOD="native"
     try_package_install
 
@@ -2000,6 +2003,7 @@ while [ -n "${1}" ]; do
     "--offline-install-source")
       if [ -d "${2}" ]; then
         NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
+        shift 1
       else
         fatal "A source directory must be specified with the --offline-install-source option." F0501
       fi
@@ -2013,7 +2017,7 @@ while [ -n "${1}" ]; do
 done
 
 if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-  if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] || [ "${NETDATA_ONLY_BUILD}" ]; then
+  if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] || [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
     fatal "Offline installs are only supported for static builds currently." F0502
   fi
 fi
