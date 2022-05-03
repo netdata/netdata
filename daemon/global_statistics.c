@@ -853,6 +853,33 @@ static void global_statistics_charts(void) {
 
 }
 
+static size_t web_worker_count = 0;
+static usec_t web_worker_total_utilization = 0;
+static usec_t web_worker_total_duration = 0;
+static size_t web_worker_total_jobs_done = 0;
+static size_t web_worker_total_jobs_running = 0;
+
+void web_worker_utilization_charts_callback(pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_done __maybe_unused, size_t jobs_running __maybe_unused) {
+    web_worker_total_utilization += utilization_usec;
+    web_worker_total_duration += duration_usec;
+    web_worker_total_jobs_done += jobs_done;
+    web_worker_total_jobs_running += jobs_running;
+    web_worker_count++;
+}
+
+void worker_utilization_charts(void) {
+    web_worker_count = 0;
+    web_worker_total_utilization = 0;
+    web_worker_total_duration = 0;
+    web_worker_total_jobs_done = 0;
+    web_worker_total_jobs_running = 0;
+
+    workers_foreach("WEB", web_worker_utilization_charts_callback);
+
+    fprintf(stderr, "WEB WORKER UTILIZATION: %.2f%%, %zu jobs done, %zu running on %zu workers.\n", (float)web_worker_total_utilization * 100.0 / (float)web_worker_total_duration,
+        web_worker_total_jobs_done, web_worker_total_jobs_running, web_worker_count);
+}
+
 static void global_statistics_cleanup(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -878,6 +905,7 @@ void *global_statistics_main(void *ptr)
     while (!netdata_exit) {
         heartbeat_next(&hb, step);
 
+        worker_utilization_charts();
         global_statistics_charts();
         registry_statistics();
     }

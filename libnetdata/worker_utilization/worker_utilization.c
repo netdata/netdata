@@ -79,11 +79,7 @@ void worker_is_idle(void) {
     netdata_mutex_lock(&worker->lock);
     usec_t now = now_realtime_usec();
 
-    if(worker->statistics_last_checkpoint > worker->last_checkpoint)
-        worker->utilization += now - worker->statistics_last_checkpoint;
-    else
-        worker->utilization += now - worker->last_action_timestamp;
-
+    worker->utilization += now - worker->last_action_timestamp;
     worker->jobs_done++;
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_IDLE;
@@ -97,11 +93,6 @@ void worker_is_busy(void) {
     netdata_mutex_lock(&worker->lock);
     usec_t now = now_realtime_usec();
 
-    if (worker->statistics_last_checkpoint > worker->last_checkpoint) {
-        worker->last_checkpoint = worker->statistics_last_checkpoint;
-        worker->utilization = 0;
-    }
-
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_BUSY;
 
@@ -111,11 +102,11 @@ void worker_is_busy(void) {
 
 // statistics interface
 
-void workers_foreach(const char *workname, void (*callback)(pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs)) {
+void workers_foreach(const char *workname, void (*callback)(pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_done, size_t jobs_running)) {
     netdata_mutex_lock(&base_lock);
     uint32_t hash = simple_hash(workname);
     usec_t util, delta;
-    size_t jobs;
+    size_t jobs_done, jobs_running;
 
     struct worker *p;
     for(p = base; p ; p = p->next) {
@@ -128,13 +119,18 @@ void workers_foreach(const char *workname, void (*callback)(pid_t pid, const cha
         if(p->last_action == WORKER_BUSY)
             util += now - p->last_action_timestamp;
 
-        jobs = p->jobs_done;
+        jobs_done = p->jobs_done;
+        jobs_running = (p->last_action == WORKER_BUSY)?1:0;
         delta = now - p->statistics_last_checkpoint;
 
         p->statistics_last_checkpoint = now;
+        p->last_action_timestamp = now;
+        p->utilization = 0;
+        p->jobs_done = 0;
+
         netdata_mutex_unlock(&p->lock);
 
-        callback(p->pid, p->tag, util, delta, jobs);
+        callback(p->pid, p->tag, util, delta, jobs_done, jobs_running);
     }
 
     netdata_mutex_unlock(&base_lock);
