@@ -630,6 +630,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
             rrdhost_unlock(host);
         } else
             error_report("ACLK synchronization thread for %s is not linked to HOST", wc->host_guid);
+        freez(hostname);
     } else {
         log_access(
             "ACLK STA [%s (%s)]: Restarting chart sync from sequence %" PRIu64,
