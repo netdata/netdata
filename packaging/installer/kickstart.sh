@@ -2038,7 +2038,13 @@ if [ -n "${STATIC_INSTALL_OPTIONS}" ]; then
   fi
 fi
 
-if [ "${NETDATA_AUTO_UPDATES}" = "default" ] || [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
+if [ "${NETDATA_AUTO_UPDATES}" = "default" ]; then
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    AUTO_UPDATE=0
+  else
+    AUTO_UPDATE=1
+  fi
+elif [ "${NETDATA_AUTO_UPDATES}" = 1 ]; then
   AUTO_UPDATE=1
 else
   AUTO_UPDATE=0
