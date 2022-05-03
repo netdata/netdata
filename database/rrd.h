@@ -436,7 +436,6 @@ struct mem_query_handle {
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_ENABLED             = 1 << 0, // enables or disables a chart
     RRDSET_FLAG_DETAIL              = 1 << 1, // if set, the data set should be considered as a detail of another
                                               // (the master data set should be the one that has the same family and is not detail)
     RRDSET_FLAG_DEBUG               = 1 << 2, // enables or disables debugging for a chart
@@ -481,7 +480,7 @@ struct rrdset {
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
 
-    char *config_section;                           // the config section for the chart
+    void *unused_ptr;                               // Unused field (previously it held the config section of the chart)
 
     char *type;                                     // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     char *family;                                   // grouping sets under the same family
@@ -1086,8 +1085,8 @@ extern void rrdset_is_obsolete(RRDSET *st);
 extern void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
-#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
-#define rrdset_is_available_for_exporting_and_alarms(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
+#define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
+#define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 #define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 
 // get the total duration in seconds of the round robin database
@@ -1305,7 +1304,7 @@ extern int alarm_compare_name(void *a, void *b);
 extern avl_tree_lock rrdhost_root_index;
 
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
-extern char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section);
+extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
 #define rrddim_free(st, rd) rrddim_free_custom(st, rd, 0)
 extern void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated);

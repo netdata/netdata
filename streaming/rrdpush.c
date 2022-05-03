@@ -136,11 +136,7 @@ static inline int should_send_chart_matching(RRDSET *st) {
     if (rrdset_flag_check(st, RRDSET_FLAG_ANOMALY_DETECTION))
         return ml_streaming_enabled();
 
-    if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED))) {
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
-        rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
-    }
-    else if(!rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE)) {
+    if(!rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE)) {
         RRDHOST *host = st->rrdhost;
 
         if(simple_pattern_matches(host->rrdpush_send_charts_matching, st->id) ||

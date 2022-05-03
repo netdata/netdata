@@ -58,7 +58,6 @@ int setup_rrdhost()
     st->rrdhost = localhost;
     strcpy(st->id, "chart_id");
     st->name = strdupz("chart_name");
-    st->flags |= RRDSET_FLAG_ENABLED;
     st->rrd_memory_mode |= RRD_MEMORY_MODE_SAVE;
     st->update_every = 1;
 

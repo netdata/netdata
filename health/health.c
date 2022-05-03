@@ -514,11 +514,6 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
-    if(unlikely(!rrdset_flag_check(rc->rrdset, RRDSET_FLAG_ENABLED))) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart is not enabled", rc->chart?rc->chart:"NOCHART", rc->name);
-        return 0;
-    }
-
     if(unlikely(rrdset_flag_check(rc->rrdset, RRDSET_FLAG_ARCHIVED))) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as archived", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;

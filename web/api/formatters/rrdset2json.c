@@ -52,7 +52,6 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         "\t\t\t\"priority\": %ld,\n"
         "\t\t\t\"plugin\": \"%s\",\n"
         "\t\t\t\"module\": \"%s\",\n"
-        "\t\t\t\"enabled\": %s,\n"
         "\t\t\t\"units\": \"%s\",\n"
         "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
         "\t\t\t\"chart_type\": \"%s\",\n",
@@ -66,7 +65,6 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         st->priority,
         st->plugin_name ? st->plugin_name : "",
         st->module_name ? st->module_name : "",
-        rrdset_flag_check(st, RRDSET_FLAG_ENABLED) ? "true" : "false",
         st->units,
         st->name,
         rrdset_type_name(st->chart_type));
