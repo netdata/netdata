@@ -221,7 +221,7 @@ function k8s_get_kubepod_name() {
   if [ -z "${KUBERNETES_SERVICE_HOST}" ] && [ -z "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
     kube_cfg=${KUBE_CONFIG:-"/etc/kubernetes/admin.conf"}
     if [ ! -r "$kube_cfg" ]; then
-      warning "cannot find the k8s name of cgroup with id '${CGROUP_PATH}': kubeconfig file '$kube_cfg' does not exist or not readable"
+      warning "${fn}: cannot find the k8s name of cgroup with id '${CGROUP_PATH}': kubeconfig file '$kube_cfg' does not exist or not readable"
       return 99
     fi
   fi
