@@ -123,7 +123,7 @@ int remove_all_host_gaps(RRDHOST* host);
 int load_gap(RRDHOST *host);
 
 void replication_state_destroy(REPLICATION_STATE **state);
-void rrdset_dump_debug_rep_state(RRDSET *st);
+// void rrdset_dump_debug_rep_state(RRDSET *st);
 void replication_rdata_to_str(GAP *a_gap, char **rdata_str, size_t *len, int block_id);
 void replication_gap_to_str(GAP *a_gap, char **gap_str, size_t *len);
 void sender_chart_gap_filling(RRDSET *st, GAP a_gap);

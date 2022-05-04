@@ -1707,7 +1707,7 @@ void sender_fill_gap_nolock(REPLICATION_STATE *rep_state, RRDSET *st, GAP a_gap)
     uuid_unparse(a_gap.gap_uuid, gap_uuid_str);
 
     // TBR: For debugging
-    rrdset_dump_debug_rep_state(st);
+    // rrdset_dump_debug_rep_state(st);
 
     size_t num_points = 0;
     rrddim_foreach_read(rd, st) {
@@ -1902,65 +1902,65 @@ void replication_rdata_to_str(GAP *a_gap, char **rdata_str, size_t *len, int blo
     info("%s: RDATA CMD details are:\nCMD: %s",REPLICATION_MSG, *rdata_str);
 }
 
-void rrdset_dump_debug_rep_state(RRDSET *st) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    if (debug_flags & D_REPLICATION) {
-        RRDDIM *rd;
-        debug(D_REPLICATION, "Chart state %s: counter=%zu counter_done=%zu current_entry=%ld usec_since_last=%llu last_updated=%ld.%ld"
-                             " last_collected=%ld.%ld collected_total=%lld last_collected_total=%lld",
-                             st->id, st->counter, st->counter_done, st->current_entry, st->usec_since_last_update,
-                             st->last_updated.tv_sec, st->last_updated.tv_usec,
-                             st->last_collected_time.tv_sec, st->last_collected_time.tv_usec,
-                             st->collected_total, st->last_collected_total);
-        netdata_rwlock_rdlock(&st->rrdset_rwlock);
-        rrddim_foreach_read(rd, st) {
-            debug(D_REPLICATION, "Dimension state %s.%s: calculated_value=" CALCULATED_NUMBER_FORMAT
-                                 " last_calculated_value=" CALCULATED_NUMBER_FORMAT
-                                 " last_stored_value=" CALCULATED_NUMBER_FORMAT
-                                 " collected_value=" COLLECTED_NUMBER_FORMAT
-                                 " last_collected_value=" COLLECTED_NUMBER_FORMAT
-                                 " col_counter=%zu"
-                                 " col_volume=" CALCULATED_NUMBER_FORMAT
-                                 " store_volume=" CALCULATED_NUMBER_FORMAT
-                                 " last_coll_time=%ld.%ld",
-                                 st->id, rd->id, rd->calculated_value, rd->last_calculated_value,
-                                 rd->last_stored_value, rd->collected_value, rd->last_collected_value,
-                                 rd->collections_counter, rd->collected_volume,
-                                 rd->stored_volume, rd->last_collected_time.tv_sec, rd->last_collected_time.tv_usec);
-            #ifdef ENABLE_DBENGINE
-            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED) &&
-                rd->state->handle.rrdeng.descr) {
-                // This is safe but do not do this from production code. (The debugging points that call this are
-                // on the collector thread and this is the hot-page so it cannot be flushed during execution).
-                uv_rwlock_rdlock(&rd->state->handle.rrdeng.ctx->pg_cache.pg_cache_rwlock);
+// void rrdset_dump_debug_rep_state(RRDSET *st) {
+// #ifdef NETDATA_INTERNAL_CHECKS
+//     if (debug_flags & D_REPLICATION) {
+//         RRDDIM *rd;
+//         debug(D_REPLICATION, "Chart state %s: counter=%zu counter_done=%zu current_entry=%ld usec_since_last=%llu last_updated=%ld.%ld"
+//                              " last_collected=%ld.%ld collected_total=%lld last_collected_total=%lld",
+//                              st->id, st->counter, st->counter_done, st->current_entry, st->usec_since_last_update,
+//                              st->last_updated.tv_sec, st->last_updated.tv_usec,
+//                              st->last_collected_time.tv_sec, st->last_collected_time.tv_usec,
+//                              st->collected_total, st->last_collected_total);
+//         netdata_rwlock_rdlock(&st->rrdset_rwlock);
+//         rrddim_foreach_read(rd, st) {
+//             debug(D_REPLICATION, "Dimension state %s.%s: calculated_value=" CALCULATED_NUMBER_FORMAT
+//                                  " last_calculated_value=" CALCULATED_NUMBER_FORMAT
+//                                  " last_stored_value=" CALCULATED_NUMBER_FORMAT
+//                                  " collected_value=" COLLECTED_NUMBER_FORMAT
+//                                  " last_collected_value=" COLLECTED_NUMBER_FORMAT
+//                                  " col_counter=%zu"
+//                                  " col_volume=" CALCULATED_NUMBER_FORMAT
+//                                  " store_volume=" CALCULATED_NUMBER_FORMAT
+//                                  " last_coll_time=%ld.%ld",
+//                                  st->id, rd->id, rd->calculated_value, rd->last_calculated_value,
+//                                  rd->last_stored_value, rd->collected_value, rd->last_collected_value,
+//                                  rd->collections_counter, rd->collected_volume,
+//                                  rd->stored_volume, rd->last_collected_time.tv_sec, rd->last_collected_time.tv_usec);
+//             #ifdef ENABLE_DBENGINE
+//             if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED) &&
+//                 rd->state->handle->rrdeng.descr) {
+//                 // This is safe but do not do this from production code. (The debugging points that call this are
+//                 // on the collector thread and this is the hot-page so it cannot be flushed during execution).
+//                 uv_rwlock_rdlock(&rd->state->handle->rrdeng.ctx->pg_cache.pg_cache_rwlock);
 
-                struct rrdeng_page_descr *descr = rd->state->handle.rrdeng.descr;
-                struct page_cache_descr *pc_descr = descr->pg_cache_descr;
-                if (pc_descr) {
-                    storage_number x;
-                    uint32_t entries = descr->page_length / sizeof(x);
-                    uint32_t start = 0;
-                    if (entries > 3)
-                        start = entries-3;
-                    char buffer[80] = {0};
-                    for(uint32_t i=start; i<entries; i++) {
-                        x = ((storage_number*)pc_descr->page)[i];
-                        sprintf(buffer + strlen(buffer), STORAGE_NUMBER_FORMAT " ", x);
-                    }
-                    debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u, last points %s", st->id, rd->id,
-                                         descr->start_time,
-                                         descr->end_time,
-                                         entries,
-                                         buffer);
-                }
-                uv_rwlock_rdunlock(&rd->state->handle.rrdeng.ctx->pg_cache.pg_cache_rwlock);
-            }
-            #endif
-        }
-        netdata_rwlock_unlock(&st->rrdset_rwlock);
-    }
-#endif
-}
+//                 struct rrdeng_page_descr *descr = rd->state->handle->rrdeng.descr;
+//                 struct page_cache_descr *pc_descr = descr->pg_cache_descr;
+//                 if (pc_descr) {
+//                     storage_number x;
+//                     uint32_t entries = descr->page_length / sizeof(x);
+//                     uint32_t start = 0;
+//                     if (entries > 3)
+//                         start = entries-3;
+//                     char buffer[80] = {0};
+//                     for(uint32_t i=start; i<entries; i++) {
+//                         x = ((storage_number*)pc_descr->page)[i];
+//                         sprintf(buffer + strlen(buffer), STORAGE_NUMBER_FORMAT " ", x);
+//                     }
+//                     debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u, last points %s", st->id, rd->id,
+//                                          descr->start_time,
+//                                          descr->end_time,
+//                                          entries,
+//                                          buffer);
+//                 }
+//                 uv_rwlock_rdunlock(&rd->state->handle->rrdeng.ctx->pg_cache.pg_cache_rwlock);
+//             }
+//             #endif
+//         }
+//         netdata_rwlock_unlock(&st->rrdset_rwlock);
+//     }
+// #endif
+// }
 
 void print_collected_metric_past_data(RRDDIM_PAST_DATA *past_data, REPLICATION_STATE *rep_state){
 
