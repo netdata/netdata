@@ -1097,6 +1097,7 @@ int main(int argc, char **argv) {
 
         // prepare configuration environment variables for the plugins
 
+        setenv("UV_THREADPOOL_SIZE", config_get(CONFIG_SECTION_GLOBAL, "libuv worker threads", "16"), 1);
         get_netdata_configured_variables();
         set_global_environment();
 

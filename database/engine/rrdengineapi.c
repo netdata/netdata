@@ -946,7 +946,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     /* wait for worker thread to initialize */
     completion_wait_for(&ctx->rrdengine_completion);
     completion_destroy(&ctx->rrdengine_completion);
-    uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
+    uv_thread_set_name_np(ctx->worker_config.thread, "LIBUV_WORKER");
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
