@@ -198,6 +198,7 @@ bind_fail:
 #else
     UNUSED(host);
     UNUSED(ae);
+    UNUSED(skip_filter);
 #endif
     return 0;
 }
