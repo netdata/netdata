@@ -1934,12 +1934,12 @@ void rrdset_dump_debug_rep_state(RRDSET *st) {
                                  rd->stored_volume, rd->last_collected_time.tv_sec, rd->last_collected_time.tv_usec);
             #ifdef ENABLE_DBENGINE
             if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED) &&
-                rd->state->handle.rrdeng.descr) {
+                ((struct rrdeng_collect_handle *)rd->state->handle)->descr) {
                 // This is safe but do not do this from production code. (The debugging points that call this are
                 // on the collector thread and this is the hot-page so it cannot be flushed during execution).
-                uv_rwlock_rdlock(&rd->state->handle.rrdeng.ctx->pg_cache.pg_cache_rwlock);
+                uv_rwlock_rdlock(&((struct rrdeng_collect_handle *)rd->state->handle)->ctx->pg_cache.pg_cache_rwlock);
 
-                struct rrdeng_page_descr *descr = rd->state->handle.rrdeng.descr;
+                struct rrdeng_page_descr *descr = ((struct rrdeng_collect_handle *)rd->state->handle)->descr;
                 struct page_cache_descr *pc_descr = descr->pg_cache_descr;
                 if (pc_descr) {
                     storage_number x;
@@ -1958,7 +1958,7 @@ void rrdset_dump_debug_rep_state(RRDSET *st) {
                                          entries,
                                          buffer);
                 }
-                uv_rwlock_rdunlock(&rd->state->handle.rrdeng.ctx->pg_cache.pg_cache_rwlock);
+                uv_rwlock_rdunlock(&((struct rrdeng_collect_handle *)rd->state->handle)->ctx->pg_cache.pg_cache_rwlock);
             }
             #endif
         }
