@@ -1763,6 +1763,11 @@ void sender_fill_gap_nolock(REPLICATION_STATE *rep_state, RRDSET *st, GAP a_gap)
                 }
 
                 storage_number n = rd->state->query_ops.next_metric(&handle, &metric_t);
+                if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE){
+                    metric_t += rd->update_every;
+                    rd->state->query_ops.init(rd, &handle, metric_t, rigth_t_gap_sample);
+                }
+                
                 if (n == SN_EMPTY_SLOT)
                     debug(D_REPLICATION, "%s.%s db empty in valid dimension range @ %ld", st->id, rd->id, metric_t);
                 else {
