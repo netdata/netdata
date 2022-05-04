@@ -656,7 +656,6 @@ update() {
     export NETDATA_PROPAGATE_WARNINGS=1
     # shellcheck disable=SC2090
     export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
-
     if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
@@ -1513,7 +1512,6 @@ set_source_archive_urls() {
     fi
   fi
 }
-
 
 install_local_build_dependencies() {
   bash="$(command -v bash 2> /dev/null)"
