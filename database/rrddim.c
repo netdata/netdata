@@ -179,7 +179,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
                         continue;
                     }
 
-                    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+                    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
                     RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, name, rd->name);
                     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
