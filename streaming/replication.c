@@ -57,13 +57,6 @@ void replication_sender_init(RRDHOST *host){
     replication_state_init(host->replication->tx_replication);
     host->replication->tx_replication->host = host;
     host->replication->tx_replication->enabled = default_rrdpush_sender_replication_enabled;
-    // Read REPlication Tx configuration
-    // default_rrdpush_replication_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable replication", default_rrdpush_replication_enabled);
-    // if (!default_rrdpush_replication_enabled || !default_rrdpush_enabled) {
-    //     error("%s [send]: Stream Replication Tx thread is disabled. Check replication and streaming settings in stream.conf.", REPLICATION_MSG);
-    //     default_rrdpush_replication_enabled = 0;
-    // }
-    // host->replication->tx_replication->enabled = default_rrdpush_replication_enabled;
 #ifdef ENABLE_HTTPS
     host->replication->tx_replication->ssl.conn = NULL;
     host->replication->tx_replication->ssl.flags = NETDATA_SSL_START;
@@ -95,10 +88,12 @@ static unsigned int replication_rd_config(RRDHOST *host, struct config *stream_c
 void replication_receiver_init(RRDHOST *image_host, struct config *stream_config, char *key)
 {
     image_host->replication->rx_replication = (REPLICATION_STATE *)callocz(1, sizeof(REPLICATION_STATE));
+    replication_state_init(image_host->replication->rx_replication);
     unsigned int rrdpush_replication_enable = replication_rd_config(image_host, stream_config, key);
     if(!rrdpush_replication_enable)
     {
-        infoerr("%s: Could not initialize Rx replication thread. Replication is disabled or not supported!", REPLICATION_MSG);
+        infoerr("%s: Could not initialize Rx replication thread. Replication is disabled!", REPLICATION_MSG);
+        image_host->replication->rx_replication->enabled = rrdpush_replication_enable; 
         return;
     }
     RRD_MEMORY_MODE mode = RRD_MEMORY_MODE_DBENGINE;
@@ -106,15 +101,11 @@ void replication_receiver_init(RRDHOST *image_host, struct config *stream_config
     if(mode != RRD_MEMORY_MODE_DBENGINE)
     {
         infoerr("%s: Could not initialize Rx replication thread. Memory mode of child is not supported!", REPLICATION_MSG);
-        rrdpush_replication_enable = 0;
+        image_host->replication->rx_replication->enabled = 0; 
         return;
     }
-
-    replication_state_init(image_host->replication->rx_replication);
-    info("%s: REP Rx state initialized", REPLICATION_MSG);    
-    image_host->replication->rx_replication->host = image_host;
     image_host->replication->rx_replication->enabled = rrdpush_replication_enable; 
-    info("%s: Initialize Rx for host %s ", REPLICATION_MSG, image_host->hostname);
+    info("%s: Initialize REP Rx thread state for replicated host %s ", REPLICATION_MSG, image_host->hostname);
     print_replication_state(image_host->replication->rx_replication);
 }
 
@@ -281,6 +272,12 @@ static int replication_sender_thread_connect_to_parent(RRDHOST *host, int defaul
     debug(D_REPLICATION, "%s: Response to sender from far end: %s", REPLICATION_MSG, http);
 
     if(unlikely(memcmp(http, REP_ACK_CMD, (size_t)strlen(REP_ACK_CMD)))) {
+        if(unlikely(memcmp(http, REP_OFF_CMD, (size_t)strlen(REP_OFF_CMD)))) {
+            error("%s %s [send to %s]: Replication Rx thread is disabled.", REPLICATION_MSG, host->hostname, rep_state->connected_to);
+            replication_thread_close_socket(rep_state);
+            rep_state->enabled = 0;
+            return 0;
+        }
         error("%s %s [send to %s]: server is not replying properly (is it a netdata?).", REPLICATION_MSG, host->hostname, rep_state->connected_to);
         replication_thread_close_socket(rep_state);
         return 0;
@@ -545,10 +542,13 @@ void *replication_sender_thread(void *ptr) {
 
         if(!rep_state->connected) {
             replication_attempt_to_connect(host);
+            if(!rep_state->enabled)
+                break;
             rep_state->not_connected_loops++;
-            rep_state->pause = 0;
+            rep_state->pause = 0;            
         }
         else {
+            sleep(10);
             send_message(rep_state, "REP 2\n"); // REP_ON
             replication_parser(rep_state, NULL, rep_state->fp);
             break;
@@ -613,7 +613,7 @@ void *replication_receiver_thread(void *ptr){
     // Respond with the REP ack text command
     info("%s %s [receive from [%s]:%s]: initializing replication communication...", REPLICATION_MSG, host->hostname, rep_state->client_ip, rep_state->client_port);
     char initial_response[HTTP_HEADER_SIZE];
-    if (rep_state->stream_version >= STREAM_VERSION_GAP_FILLING) {
+    if (rep_state->stream_version >= STREAM_VERSION_GAP_FILLING && rrdpush_replication_enabled) {
         info("%s %s [receive from [%s]:%s]: Netdata acknowledged replication over stream version %u.", REPLICATION_MSG, host->hostname, rep_state->client_ip, rep_state->client_port, rep_state->stream_version);
         sprintf(initial_response, "%s", REP_ACK_CMD);
     } 
@@ -630,6 +630,10 @@ void *replication_receiver_thread(void *ptr){
         log_replication_connection(rep_state->client_ip, rep_state->client_port, rep_state->key, host->machine_guid, host->hostname, "REPLICATION CONNECTION FAILED - THIS HOST FAILED TO REPLY");
         error("%s %s [receive from [%s]:%s]: failed to send replication acknowledgement command.", REPLICATION_MSG, host->hostname, rep_state->client_ip, rep_state->client_port);
         close(rep_state->socket);
+        return 0;
+    }
+    if(!rrdpush_replication_enabled){
+        error("%s %s [receive from [%s]:%s]: Replication receiving thread is not enabled. Closing...", REPLICATION_MSG, host->hostname, rep_state->client_ip, rep_state->client_port);
         return 0;
     }
     // Here is the first proof of connection with the sender thread.
@@ -653,8 +657,6 @@ void *replication_receiver_thread(void *ptr){
     log_replication_connection(rep_state->client_ip, rep_state->client_port, rep_state->key, host->machine_guid, host->hostname, "CONNECTED");
 
     cd.version = rep_state->stream_version;
-
-    UNUSED(rrdpush_replication_enabled);
 
     // Wait for the sender thread to send REP ON
     size_t count = replication_parser(rep_state, &cd, fp);
@@ -947,6 +949,7 @@ int replication_receiver_thread_spawn(struct web_client *w, char *url) {
     // Host exists and replication is not active
     // Initialize replication receiver structure.
     replication_receiver_init(host, &stream_config, key);
+    host->replication->rx_replication->host = host;
     host->replication->rx_replication->last_msg_t = now_realtime_sec();
     host->replication->rx_replication->socket = w->ifd;
     host->replication->rx_replication->client_ip = strdupz(w->client_ip);
