@@ -460,6 +460,10 @@ RRD_PLUGIN_FILES = \
     database/sqlite/sqlite_aclk_alert.h \
     database/sqlite/sqlite3.c \
     database/sqlite/sqlite3.h \
+    database/KolmogorovSmirnovDist.c \
+    database/KolmogorovSmirnovDist.h \
+    database/metric_correlations.c \
+    database/metric_correlations.h \
     $(NULL)
 
 if ENABLE_DBENGINE

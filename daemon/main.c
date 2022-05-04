@@ -554,6 +554,10 @@ static void get_netdata_configured_variables() {
 #endif
 
     // --------------------------------------------------------------------
+    // metric correlations
+    enable_metric_correlations = config_get_boolean(CONFIG_SECTION_GLOBAL, "enable metric correlations", enable_metric_correlations);
+
+    // --------------------------------------------------------------------
     // get various system parameters
 
     get_system_HZ();
