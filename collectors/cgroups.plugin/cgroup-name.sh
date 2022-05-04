@@ -218,6 +218,14 @@ function k8s_get_kubepod_name() {
     return 1
   fi
 
+  if [ -z "${KUBERNETES_SERVICE_HOST}" ] && [ -z "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
+    kube_cfg=${KUBE_CONFIG:-"/etc/kubernetes/admin.conf"}
+    if [ ! -r "$kube_cfg" ]; then
+      warning "cannot find the k8s name of cgroup with id '${CGROUP_PATH}': kubeconfig file '$kube_cfg' does not exist or not readable"
+      return 99
+    fi
+  fi
+
   [ -n "$pod_uid" ] && info "${fn}: cgroup '$id' is a pod(uid:$pod_uid)"
   [ -n "$cntr_id" ] && info "${fn}: cgroup '$id' is a container(id:$cntr_id)"
 
@@ -387,6 +395,9 @@ function k8s_get_name() {
     warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and asking for retry."
     NAME="${id}"
     EXIT_CODE=$EXIT_RETRY
+    ;;
+  99) 
+    # outside of k8s cluster, kubeconfig file is not readable. We don't set 'NAME' to try other name resolution methods.
     ;;
   *)
     warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
