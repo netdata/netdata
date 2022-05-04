@@ -8,6 +8,5 @@
 #include "web/server/web_client.h"
 
 extern int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url);
-int chart_is_filtered_out(RRDSET *st, SIMPLE_PATTERN *filter, const char *filter_string);
 
 #endif //NETDATA_API_ALLMETRICS_H

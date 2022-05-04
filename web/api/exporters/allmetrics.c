@@ -17,24 +17,6 @@ struct prometheus_output_options {
     { NULL, PROMETHEUS_OUTPUT_NONE },
 };
 
-/**
- * @brief Check if the chart should not be displayed
- * 
- * @param filter a simple pattern structure to check against.
- * @param filter_string a string the structure was created from.
- * @return 1 if the chart should not be displayed, 0 otherwise.
- */
-int chart_is_filtered_out(RRDSET *st, SIMPLE_PATTERN *filter, const char *filter_string)
-{
-    if (!filter_string ||
-        simple_pattern_matches(filter, st->id) ||
-        simple_pattern_matches(filter, st->name)) {
-        return 0;
-    } else {
-        return 1;
-    }
-}
-
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
     const char *filter = NULL;

@@ -27,10 +27,10 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
         return 0;
 
-    if (chart_is_filtered_out(st, filter, filter_string))
-        return 0;
-
-    if(!filter_string) {
+    if (filter_string) {
+        if (!(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
+            return 0;
+    } else {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
             // we have not checked this chart
             if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
