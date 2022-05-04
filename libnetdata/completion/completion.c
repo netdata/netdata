@@ -29,6 +29,6 @@ void completion_mark_complete(struct completion *p)
 {
     uv_mutex_lock(&p->mutex);
     p->completed = 1;
-    uv_mutex_unlock(&p->mutex);
     uv_cond_broadcast(&p->cond);
+    uv_mutex_unlock(&p->mutex);
 }
