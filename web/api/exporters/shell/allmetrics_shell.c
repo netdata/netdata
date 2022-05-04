@@ -22,13 +22,17 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 
 #define SHELL_ELEMENT_MAX 100
 
-void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
+void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_shell();
+    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
     rrdhost_rdlock(host);
 
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        if (chart_is_filtered_out(st, filter, filter_string))
+            continue;
+
         calculated_number total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(chart, st->name?st->name:st->id, SHELL_ELEMENT_MAX);
@@ -88,12 +92,14 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
     }
 
     rrdhost_unlock(host);
+    simple_pattern_free(filter);
 }
 
 // ----------------------------------------------------------------------------
 
-void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
+void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_json();
+    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
     rrdhost_rdlock(host);
 
     buffer_strcat(wb, "{");
@@ -104,6 +110,9 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        if (chart_is_filtered_out(st, filter, filter_string))
+            continue;
+
         if(rrdset_is_available_for_viewers(st)) {
             rrdset_rdlock(st);
 
@@ -160,5 +169,6 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
 
     buffer_strcat(wb, "\n}");
     rrdhost_unlock(host);
+    simple_pattern_free(filter);
 }
 

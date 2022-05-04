@@ -988,21 +988,21 @@ static void test_can_send_rrdset(void **state)
 {
     (void)*state;
 
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 1);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL, NULL), 1);
 
     rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL, NULL), 0);
     rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
 
     // TODO: test with a denying simple pattern
 
     rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL, NULL), 0);
     rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
 
     localhost->rrdset_root->rrd_memory_mode = RRD_MEMORY_MODE_NONE;
     prometheus_exporter_instance->config.options |= EXPORTING_SOURCE_DATA_AVERAGE;
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL, NULL), 0);
 }
 
 static void test_prometheus_name_copy(void **state)
@@ -1067,7 +1067,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
     will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
-    rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(localhost, buffer, "test_server", "test_prefix", 0, 0);
+    rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(localhost, NULL, buffer, "test_server", "test_prefix", 0, 0);
 
     assert_string_equal(
         buffer_tostring(buffer),
@@ -1085,7 +1085,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
     will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
     rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
-        localhost, buffer, "test_server", "test_prefix", 0, PROMETHEUS_OUTPUT_NAMES | PROMETHEUS_OUTPUT_TYPES);
+        localhost, NULL, buffer, "test_server", "test_prefix", 0, PROMETHEUS_OUTPUT_NAMES | PROMETHEUS_OUTPUT_TYPES);
 
     assert_string_equal(
         buffer_tostring(buffer),
@@ -1103,7 +1103,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
     will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
-    rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(localhost, buffer, "test_server", "test_prefix", 0, 0);
+    rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(localhost, NULL, buffer, "test_server", "test_prefix", 0, 0);
 
     assert_string_equal(
         buffer_tostring(buffer),

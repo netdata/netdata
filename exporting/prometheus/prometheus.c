@@ -14,7 +14,7 @@
  * @param st a chart.
  * @return Returns 1 if the chart can be sent, 0 otherwise.
  */
-inline int can_send_rrdset(struct instance *instance, RRDSET *st)
+inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN *filter, const char *filter_string)
 {
 #ifdef NETDATA_INTERNAL_CHECKS
     RRDHOST *host = st->rrdhost;
@@ -27,19 +27,24 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
         return 0;
 
-    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
-        // we have not checked this chart
-        if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
-            simple_pattern_matches(instance->config.charts_pattern, st->name))
-            rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
-        else {
-            rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
-            debug(
-                D_EXPORTING,
-                "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
-                st->id,
-                host->hostname);
-            return 0;
+    if (chart_is_filtered_out(st, filter, filter_string))
+        return 0;
+
+    if(!filter_string) {
+        if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
+            // we have not checked this chart
+            if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
+                simple_pattern_matches(instance->config.charts_pattern, st->name))
+                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
+            else {
+                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
+                debug(
+                    D_EXPORTING,
+                    "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
+                    st->id,
+                    host->hostname);
+                return 0;
+            }
         }
     }
 
@@ -489,12 +494,14 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     struct instance *instance,
     RRDHOST *host,
+    const char *filter_string,
     BUFFER *wb,
     const char *prefix,
     EXPORTING_OPTIONS exporting_options,
     int allhosts,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
+    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
@@ -592,7 +599,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     rrdset_foreach_read(st, host)
     {
 
-        if (likely(can_send_rrdset(instance, st))) {
+        if (likely(can_send_rrdset(instance, st, filter, filter_string))) {
             rrdset_rdlock(st);
 
             char chart[PROMETHEUS_ELEMENT_MAX + 1];
@@ -777,6 +784,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     }
 
     rrdhost_unlock(host);
+    simple_pattern_free(filter);
 }
 
 /**
@@ -784,6 +792,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
  *
  * @param instance an instance data structure.
  * @param host a data collecting host.
+ * @param filter_string a simple pattern filter.
  * @param wb the buffer to write to.
  * @param exporting_options options to configure what data is exported.
  * @param server the name of a Prometheus server..
@@ -850,6 +859,7 @@ static inline time_t prometheus_preparation(
  * Write metrics and auxiliary information for one host to a buffer.
  *
  * @param host a data collecting host.
+ * @param filter_string a simple pattern filter.
  * @param wb the buffer to write to.
  * @param server the name of a Prometheus server.
  * @param prefix a prefix for every metric.
@@ -858,6 +868,7 @@ static inline time_t prometheus_preparation(
  */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     RRDHOST *host,
+    const char *filter_string,
     BUFFER *wb,
     const char *server,
     const char *prefix,
@@ -880,13 +891,14 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
         output_options);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(
-        prometheus_exporter_instance, host, wb, prefix, exporting_options, 0, output_options);
+        prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options);
 }
 
 /**
  * Write metrics and auxiliary information for all hosts to a buffer.
  *
  * @param host a data collecting host.
+ * @param filter_string a simple pattern filter.
  * @param wb the buffer to write to.
  * @param server the name of a Prometheus server.
  * @param prefix a prefix for every metric.
@@ -895,6 +907,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
  */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     RRDHOST *host,
+    const char *filter_string,
     BUFFER *wb,
     const char *server,
     const char *prefix,
@@ -920,7 +933,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     rrdhost_foreach_read(host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
-            prometheus_exporter_instance, host, wb, prefix, exporting_options, 1, output_options);
+            prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options);
     }
     rrd_unlock();
 }

@@ -245,3 +245,12 @@ void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
 
     function_called();
 }
+
+int chart_is_filtered_out(RRDSET *st, SIMPLE_PATTERN *filter, const char *filter_string)
+{
+    (void)st;
+    (void)filter;
+    (void)filter_string;
+
+    return 0;
+}

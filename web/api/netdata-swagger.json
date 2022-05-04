@@ -712,6 +712,16 @@
             }
           },
           {
+            "name": "filter",
+            "in": "query",
+            "description": "Allows to filter charts out using simple patterns.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "any text"
+            }
+          },
+          {
             "name": "variables",
             "in": "query",
             "description": "When enabled, netdata will expose various system configuration metrics.",
