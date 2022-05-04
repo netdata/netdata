@@ -883,6 +883,24 @@ struct worker_utilization {
     RRDDIM *rd_jobs_running;
 };
 
+static kernel_uint_t read_thread_cpu_time_from_proc_stat(pid_t pid) {
+    const char filename[200];
+    snprintfz(filename, 200, "/proc/self/task/%d/stat", pid);
+
+    procfile *ff = procfile_open(filename, " ", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    if(!ff) return 0;
+
+    ff = procfile_readall(ff);
+    if(!ff) return 0;
+
+    procfile_close(ff);
+
+    kernel_uint_t utime = str2kernel_uint_t(procfile_lineword(ff, 0, 13));
+    kernel_uint_t stime = str2kernel_uint_t(procfile_lineword(ff, 0, 14));
+
+    return utime + stime;
+}
+
 static void worker_utilization_update_chart(struct worker_utilization *wu) {
     if(!wu->worker_count) return;
 
