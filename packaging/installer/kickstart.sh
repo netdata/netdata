@@ -1716,7 +1716,7 @@ prepare_offline_install_source() {
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     progress "Verifying checksums."
-    if ! safe_sha256sum --ignore-missing -c "./sha256sums.txt"; then
+    if ! grep -e "$(find . -name '*.gz.run')" sha256sums.txt | safe_sha256sum -c -; then
       fatal "Checksums for offline install files are incorrect. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0507
     fi
   else
