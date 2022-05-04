@@ -130,6 +130,7 @@ USAGE: kickstart.sh [options]
   --auto-update              Enable automatic updates.
   --auto-update-type         Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
   --disable-telemetry        Opt-out of anonymous statistics.
+  --repositories-only        Only install appropriate repository configuration packages (only for native install).
   --native-only              Only install if native binary packages are available.
   --static-only              Only install if a static build is available.
   --build-only               Only install using a local build.
@@ -1331,6 +1332,14 @@ try_package_install() {
     progress "Repository configuration is already present, attempting to install netdata."
   fi
 
+  if [ "${REPO_ACTION}" = "repositories-only" ]; then
+    progress "Successfully installed repository configuraion package."
+    deferred_warnings
+    cleanup
+    trap - EXIT
+    exit 1
+  fi
+
   if ! check_special_native_deps; then
     warning "Could not find secondary dependencies for ${DISTRO} on ${SYSARCH}."
     if [ -z "${NO_CLEANUP}" ]; then
@@ -1775,6 +1784,9 @@ while [ -n "${1}" ]; do
       ;;
     "--reinstall-clean")
       ACTION="reinstall-clean"
+      ;;
+    "--repositories-only")
+      REPO_ACTION="repositories-only"
       ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1

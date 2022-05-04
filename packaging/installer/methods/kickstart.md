@@ -59,6 +59,7 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--auto-update`: Enable automatic updates (this is the default).
 - `--no-updates`: Disable automatic updates.
 - `--disable-telemetry`: Disable anonymous statistics.
+- `--repositories-only`: Only install appropriate repository configuration packages (only for native install).
 - `--native-only`: Only install if native binary packages are available.
 - `--static-only`: Only install if a static build is available.
 - `--build-only`: Only install using a local build.
