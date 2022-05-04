@@ -56,7 +56,7 @@ connector to enable and configure for your database of choice.
 
 ### Chart filtering
 
-Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics. You can use the
+Netdata can filter metrics, to send only a subset of the collected metrics. You can use the
 configuration file
 
 ```txt
@@ -70,7 +70,7 @@ or the URL parameter `filter` in the `allmetrics` API call.
 http://localhost:19999/api/v1/allmetrics?format=shell&filter=system.*
 ```
 
-### Modes of operation
+### Operation modes
 
 Netdata supports three modes of operation for all exporting connectors:
 
