@@ -172,7 +172,7 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
         case MQTT_WSS_LOG_ERROR:
         case MQTT_WSS_LOG_FATAL:
         case MQTT_WSS_LOG_WARN:
-            error("%s", str);
+            error_report("%s", str);
             return;
         case MQTT_WSS_LOG_INFO:
             info("%s", str);
