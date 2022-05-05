@@ -215,28 +215,16 @@ static void enable_supported_stream_features(struct sender_state *s) {
 #if defined(ENABLE_COMPRESSION)
     switch (s->version) {
         case STREAM_VERSION_GAP_FILL_N_COMPRESSION:
-            default_compression_enabled = 1;
-            default_rrdpush_sender_replication_enabled = 1;
+            default_compression_enabled = s->rrdpush_compression;
+            default_rrdpush_sender_replication_enabled = s->host->replication->tx_replication->enabled;
             break;
         case STREAM_VERSION_GAP_FILLING:
             default_compression_enabled = 0;
-            default_rrdpush_sender_replication_enabled = 1;
+            default_rrdpush_sender_replication_enabled = s->host->replication->tx_replication->enabled;
             break;
         case STREAM_VERSION_COMPRESSION:
-            default_compression_enabled = 1;
+            default_compression_enabled = s->rrdpush_compression;
             default_rrdpush_sender_replication_enabled = 0;
-        //     default_compression_enabled = s->rrdpush_compression;
-        //     default_rrdpush_replication_enabled = s->host->replication->tx_replication->enabled;
-        //     break;
-        // case STREAM_VERSION_GAP_FILLING:
-        //     default_compression_enabled = 0;
-        //     s->rrdpush_compression = 0;
-        //     default_rrdpush_replication_enabled = s->host->replication->tx_replication->enabled;
-        //     break;
-        // case STREAM_VERSION_COMPRESSION:
-        //     default_compression_enabled = s->rrdpush_compression;
-        //     default_rrdpush_replication_enabled = 0;
-        //     s->host->replication->tx_replication->enabled = 0;
             break;
         case STREAM_VERSION_CLABELS:
         case STREAM_VERSION_CLAIM:
@@ -246,14 +234,9 @@ static void enable_supported_stream_features(struct sender_state *s) {
             break;
     }
     if (s->version > STREAM_VERSION_COMPRESSION)
-        default_rrdpush_sender_replication_enabled = 1;
+        default_rrdpush_sender_replication_enabled = s->host->replication->tx_replication->enabled;
     else
         default_rrdpush_sender_replication_enabled = 0;
-    //     default_rrdpush_replication_enabled = s->host->replication->tx_replication->enabled;
-    // else {
-    //     default_rrdpush_replication_enabled = 0;
-    //     s->host->replication->tx_replication->enabled = 0;
-    // }
 #endif
 
 #ifdef ENABLE_COMPRESSION
@@ -550,6 +533,7 @@ static void attempt_to_connect(struct sender_state *state)
             info("%s: Switch ON the Tx REPlication thread for host %s.",
                 REPLICATION_MSG,
                 state->host->hostname);
+            print_replication_state(state->host->replication->tx_replication);
             replication_sender_thread_spawn(state->host);
         }
 

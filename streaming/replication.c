@@ -8,10 +8,7 @@ size_t replication_parser(REPLICATION_STATE *rpt, struct plugind *cd, FILE *fp);
 
 static void replication_receiver_thread_cleanup_callback(void *ptr);
 static void replication_sender_thread_cleanup_callback(void *ptr);
-static void print_replication_state(REPLICATION_STATE *state);
-static void print_replication_gap(GAP *a_gap);
 static inline void replication_send_chart_definition_nolock(RRDSET *st);
-static void print_replication_queue_gap(GAPS *gaps_timeline);
 GAP* add_gap_data(GAPS *host_queue, GAP *gap);
 
 /********************************
@@ -25,7 +22,7 @@ static void replication_state_init(REPLICATION_STATE *state)
     state->build = buffer_create(1);
     state->socket = -1;
     state->dim_past_data = (RRDDIM_PAST_DATA *)callocz(1, sizeof(RRDDIM_PAST_DATA));
-    state->dim_past_data->page = (void *)callocz(RRDENG_BLOCK_SIZE, sizeof(char));
+    state->dim_past_data->page = (void *)callocz(MEM_PAGE_BLOCK_SIZE, sizeof(char));
     netdata_mutex_init(&state->mutex);
 }
 
@@ -1077,7 +1074,7 @@ void replication_collect_past_metric_init(REPLICATION_STATE *rep_state, char *rr
 
     RRDDIM_PAST_DATA *dim_past_data = rep_state->dim_past_data;
     if(dim_past_data->page){
-        memset(dim_past_data->page, 0, RRDENG_BLOCK_SIZE);
+        memset(dim_past_data->page, 0, MEM_PAGE_BLOCK_SIZE);
         dim_past_data->page_length = 0;
         dim_past_data->start_time = 0;
         dim_past_data->end_time = 0;
@@ -1110,14 +1107,14 @@ void replication_collect_past_metric(REPLICATION_STATE *rep_state, time_t timest
     time_t update_every = rep_state->dim_past_data->rd->update_every;
     if(!page_length)
         rep_state->dim_past_data->start_time = timestamp * USEC_PER_SEC;
-    if((page_length + sizeof(number)) < RRDENG_BLOCK_SIZE){
+    if((page_length + sizeof(number)) < MEM_PAGE_BLOCK_SIZE){
         if(page_length && rep_state->dim_past_data->rd){
             time_t current_end_time = rep_state->dim_past_data->end_time / USEC_PER_SEC;
             time_t t_sample_diff  = (timestamp -  current_end_time);
             if(t_sample_diff > update_every){
                 page_length += ((t_sample_diff - update_every)*sizeof(number));
                 error("%s: Hard gap [%ld, %ld] = %ld was detected. Need to fill it with zeros up to page index %u", REPLICATION_MSG, current_end_time, timestamp, t_sample_diff, page_length);
-                if(page_length > RRDENG_BLOCK_SIZE){
+                if(page_length > MEM_PAGE_BLOCK_SIZE){
                     infoerr("%s: Page size is not enough to fill the hard gap.", REPLICATION_MSG);
                     return;
                 }
@@ -1669,7 +1666,7 @@ void sender_fill_gap_nolock(REPLICATION_STATE *rep_state, RRDSET *st, GAP a_gap)
     RRDDIM *rd;
     struct rrddim_query_handle handle;
     // TODO: Add it in the stream.conf file
-    unsigned int block_size_in_bytes = RRDENG_BLOCK_SIZE;
+    unsigned int block_size_in_bytes = MEM_PAGE_BLOCK_SIZE;
     unsigned int sample_in_bytes = (unsigned int) sizeof(storage_number);
     unsigned int default_replication_gap_block_size = block_size_in_bytes/sample_in_bytes; // in samples
 
@@ -1683,7 +1680,7 @@ void sender_fill_gap_nolock(REPLICATION_STATE *rep_state, RRDSET *st, GAP a_gap)
     time_t newest_connection = st->rrdhost->sender->t_newest_connection;
     UNUSED(t_delta_first);
    
-    // Chop the GAP time interval to fit a RRDENG_BLOCK_SIZE(4096)
+    // Chop the GAP time interval to fit a MEM_PAGE_BLOCK_SIZE(4096)
     // window_end is more important than window start
     // window_end = MAX((t_delta_end + (t_delta_end % update_every)), newest_connection);
     window_end = MAX((t_delta_end + (update_every - (t_delta_end % update_every))), newest_connection);
@@ -1830,7 +1827,7 @@ void sender_chart_gap_filling(RRDSET *st, GAP a_gap) {
 /***************************
 * Helper and Debug functions
 ****************************/
-static void print_replication_state(REPLICATION_STATE *state)
+void print_replication_state(REPLICATION_STATE *state)
 {
     info(
         "%s: Replication State is ...\n pthread_id: %lu\n, enabled: %u\n, spawned: %u\n, socket: %d\n, connected: %u\n, connected_to: %s\n, reconnects_counter: %lu\n, resume: %u\n, pause: %u\n, shutdown: %u\n",
@@ -1847,7 +1844,7 @@ static void print_replication_state(REPLICATION_STATE *state)
         state->shutdown);
 }
 
-static void print_replication_gap(GAP *a_gap)
+void print_replication_gap(GAP *a_gap)
 {
     if(!a_gap || !a_gap->status){
         info("%s: Empty or there is no GAP", REPLICATION_MSG);
@@ -1866,7 +1863,7 @@ static void print_replication_gap(GAP *a_gap)
         gap_uuid_str);
 }
 
-static void print_replication_queue_gap(GAPS *gaps_timeline)
+void print_replication_queue_gap(GAPS *gaps_timeline)
 {
     int count = gaps_timeline->gaps->count;
     info("%s: GAPS in the queue (%d)", REPLICATION_MSG, count);

@@ -7,6 +7,11 @@
 #define REP_OFF_CMD "REP OFF"
 #define REPLICATION_RX_CMD_Q_MAX_SIZE (64)
 #define REPLICATION_GAP_TIME_MARGIN 0
+#ifdef  ENABLE_DBENGINE
+#define MEM_PAGE_BLOCK_SIZE RRDENG_BLOCK_SIZE
+#else
+#define MEM_PAGE_BLOCK_SIZE 4096
+#endif
 
 typedef struct gap GAP;
 typedef struct time_window TIME_WINDOW;
@@ -144,6 +149,11 @@ void replication_sender_thread_stop(RRDHOST *host);
 void *replication_sender_thread(void *ptr);
 void gaps_init(RRDHOST **a_host);
 void gaps_destroy(RRDHOST **a_host);
+
+// Remove these are helper functions
+void print_replication_queue_gap(GAPS *gaps_timeline);
+void print_replication_state(REPLICATION_STATE *state);
+void print_replication_gap(GAP *a_gap);
 
 extern int rrdeng_store_past_metrics_page_init(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state);
 extern void rrdeng_store_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state);
