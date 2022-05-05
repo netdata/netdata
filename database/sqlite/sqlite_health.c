@@ -447,8 +447,6 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
     if (!alarm_id || !alarm_event_id || !unique_id || !max_unique_id)
         return;
 
-    info ("Injecting a removed event for alarm_id [%u], with alarm_event_id [%u], updating unique_id [%u], with new unique_id [%u]", alarm_id, alarm_event_id + 1, unique_id, max_unique_id);
-
     sqlite3_stmt *res = NULL;
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INJECT_REMOVED(uuid_str, uuid_str));
