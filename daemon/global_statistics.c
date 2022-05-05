@@ -847,12 +847,12 @@ struct worker_utilization {
     size_t priority;
 
     size_t worker_count;
-    usec_t worker_total_utilization;
+    usec_t worker_total_busy_time;
     usec_t worker_total_duration;
     size_t worker_total_jobs_done;
     size_t worker_total_jobs_running;
-    double worker_min_utilization;
-    double worker_max_utilization;
+    double worker_min_busy_time;
+    double worker_max_busy_time;
 
 #ifdef __linux__
     size_t workers_arrays_size;
@@ -865,23 +865,23 @@ struct worker_utilization {
     usec_t *cpu_new_collected_time_array;
 #endif
 
-    RRDSET *st_util;
-    RRDDIM *rd_util_avg;
-    RRDDIM *rd_util_min;
-    RRDDIM *rd_util_max;
+    RRDSET *st_workers_time;
+    RRDDIM *rd_workers_time_avg;
+    RRDDIM *rd_workers_time_min;
+    RRDDIM *rd_workers_time_max;
 
-    RRDSET *st_workers;
-    RRDDIM *rd_workers_available;
-    RRDDIM *rd_workers_busy;
+    RRDSET *st_workers_cpu;
+    RRDDIM *rd_workers_cpu_avg;
+    RRDDIM *rd_workers_cpu_min;
+    RRDDIM *rd_workers_cpu_max;
 
-    RRDSET *st_jobs;
-    RRDDIM *rd_jobs_done;
-    RRDDIM *rd_jobs_running;
+    RRDSET *st_workers_jobs;
+    RRDDIM *rd_workers_jobs_done;
+    RRDDIM *rd_workers_jobs_running;
 
-    RRDSET *st_cpu;
-    RRDDIM *rd_cpu_avg;
-    RRDDIM *rd_cpu_min;
-    RRDDIM *rd_cpu_max;
+    RRDSET *st_workers_threads;
+    RRDDIM *rd_workers_threads_free;
+    RRDDIM *rd_workers_threads_busy;
 };
 
 static void worker_utilization_update_chart(struct worker_utilization *wu) {
@@ -889,23 +889,23 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
 
     //fprintf(stderr, "%-12s WORKER UTILIZATION: %-3.2f%%, %zu jobs done, %zu running, on %zu workers, min %-3.02f%%, max %-3.02f%%.\n",
     //        wu->name,
-    //        (double)wu->worker_total_utilization * 100.0 / (double)wu->worker_total_duration,
+    //        (double)wu->worker_total_busy_time * 100.0 / (double)wu->worker_total_duration,
     //        wu->worker_total_jobs_done, wu->worker_total_jobs_running, wu->worker_count,
-    //        wu->worker_min_utilization, wu->worker_max_utilization);
+    //        wu->worker_min_busy_time, wu->worker_max_busy_time);
 
     // ----------------------------------------------------------------------
 
-    if(unlikely(!wu->st_util)) {
+    if(unlikely(!wu->st_workers_time)) {
         char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_utilization_%s", wu->name);
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_time_%s", wu->name);
 
-        wu->st_util = rrdset_create_localhost(
+        wu->st_workers_time = rrdset_create_localhost(
             "netdata"
             , name
             , NULL
             , wu->family
-            , "netdata.workers.utilization"
-            , "Netdata Workers Utilization"
+            , "netdata.workers.time"
+            , "Netdata Workers Busy Time"
             , "%"
             , "netdata"
             , "stats"
@@ -914,32 +914,33 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_AREA
         );
 
-        wu->rd_util_avg = rrddim_add(wu->st_util, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_util_min = rrddim_add(wu->st_util, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_util_max = rrddim_add(wu->st_util, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
     }
     else
-        rrdset_next(wu->st_util);
+        rrdset_next(wu->st_workers_time);
 
-    rrddim_set_by_pointer(wu->st_util, wu->rd_util_avg, (collected_number)((double)wu->worker_total_utilization * 100.0 * 10000.0 / (double)wu->worker_total_duration));
-    rrddim_set_by_pointer(wu->st_util, wu->rd_util_min, (collected_number)((double)wu->worker_min_utilization * 10000.0));
-    rrddim_set_by_pointer(wu->st_util, wu->rd_util_max, (collected_number)((double)wu->worker_max_utilization * 10000.0));
-    rrdset_done(wu->st_util);
+    rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, (collected_number)((double)wu->worker_total_busy_time * 100.0 * 10000.0 / (double)wu->worker_total_duration));
+    rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->worker_min_busy_time * 10000.0));
+    rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_max, (collected_number)((double)wu->worker_max_busy_time * 10000.0));
+    rrdset_done(wu->st_workers_time);
 
     // ----------------------------------------------------------------------
 
-    if(unlikely(!wu->st_jobs)) {
+#ifdef __linux__
+    if(unlikely(!wu->st_workers_cpu)) {
         char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_jobs_%s", wu->name);
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_%s", wu->name);
 
-        wu->st_jobs = rrdset_create_localhost(
+        wu->st_workers_cpu = rrdset_create_localhost(
             "netdata"
             , name
             , NULL
             , wu->family
-            , "netdata.workers.jobs"
-            , "Netdata Active Workers"
-            , "jobs"
+            , "netdata.workers.cpu"
+            , "Netdata Workers CPU Utilization"
+            , "%"
             , "netdata"
             , "stats"
             , wu->priority + 1
@@ -947,74 +948,12 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_AREA
         );
 
-        wu->rd_jobs_done    = rrddim_add(wu->st_jobs, "finished", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_jobs_running = rrddim_add(wu->st_jobs, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
     }
     else
-        rrdset_next(wu->st_jobs);
-
-    rrddim_set_by_pointer(wu->st_jobs, wu->rd_jobs_done, (collected_number)(wu->worker_total_jobs_done));
-    rrddim_set_by_pointer(wu->st_jobs, wu->rd_jobs_running, (collected_number)(wu->worker_total_jobs_running));
-    rrdset_done(wu->st_jobs);
-
-    // ----------------------------------------------------------------------
-
-    if(unlikely(!wu->st_workers)) {
-        char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "worker_threads_%s", wu->name);
-
-        wu->st_workers = rrdset_create_localhost(
-            "netdata"
-            , name
-            , NULL
-            , wu->family
-            , "netdata.workers.threads"
-            , "Netdata Active Workers"
-            , "threads"
-            , "netdata"
-            , "stats"
-            , wu->priority + 2
-            , localhost->rrd_update_every
-            , RRDSET_TYPE_STACKED
-        );
-
-        wu->rd_workers_available = rrddim_add(wu->st_workers, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_workers_busy      = rrddim_add(wu->st_workers, "busy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    }
-    else
-        rrdset_next(wu->st_workers);
-
-    rrddim_set_by_pointer(wu->st_workers, wu->rd_workers_available, (collected_number)(wu->worker_count - wu->worker_total_jobs_running));
-    rrddim_set_by_pointer(wu->st_workers, wu->rd_workers_busy, (collected_number)(wu->worker_total_jobs_running));
-    rrdset_done(wu->st_workers);
-
-    // ----------------------------------------------------------------------
-#ifdef __linux__
-    if(unlikely(!wu->st_cpu)) {
-        char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_utilization_%s", wu->name);
-
-        wu->st_cpu = rrdset_create_localhost(
-            "netdata"
-            , name
-            , NULL
-            , wu->family
-            , "netdata.workers.cpu.utilization"
-            , "Netdata Workers CPU Utilization"
-            , "%"
-            , "netdata"
-            , "stats"
-            , wu->priority + 3
-            , localhost->rrd_update_every
-            , RRDSET_TYPE_AREA
-        );
-
-        wu->rd_cpu_avg = rrddim_add(wu->st_cpu, "average", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_cpu_min = rrddim_add(wu->st_cpu, "min", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_cpu_max = rrddim_add(wu->st_cpu, "max", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
-    }
-    else
-        rrdset_next(wu->st_cpu);
+        rrdset_next(wu->st_workers_cpu);
 
     size_t i;
     calculated_number min = 100.0, max = 0.0, total = 0.0;
@@ -1041,11 +980,73 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
         if(cpu_util < min) min = cpu_util;
         if(cpu_util > max) max = cpu_util;
     }
-    rrddim_set_by_pointer(wu->st_cpu, wu->rd_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)i ));
-    rrddim_set_by_pointer(wu->st_cpu, wu->rd_cpu_min, (collected_number)( min * 10000ULL));
-    rrddim_set_by_pointer(wu->st_cpu, wu->rd_cpu_max, (collected_number)( max * 10000ULL));
-    rrdset_done(wu->st_cpu);
+    rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)i ));
+    rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)( min * 10000ULL));
+    rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)( max * 10000ULL));
+    rrdset_done(wu->st_workers_cpu);
 #endif
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_workers_jobs)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_jobs_%s", wu->name);
+
+        wu->st_workers_jobs = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , "netdata.workers.jobs"
+            , "Netdata Workers Jobs"
+            , "jobs"
+            , "netdata"
+            , "stats"
+            , wu->priority + 2
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_AREA
+        );
+
+        wu->rd_workers_jobs_done = rrddim_add(wu->st_workers_jobs, "done", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_jobs_running = rrddim_add(wu->st_workers_jobs, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+    else
+        rrdset_next(wu->st_workers_jobs);
+
+    rrddim_set_by_pointer(wu->st_workers_jobs, wu->rd_workers_jobs_done, (collected_number)(wu->worker_total_jobs_done));
+    rrddim_set_by_pointer(wu->st_workers_jobs, wu->rd_workers_jobs_running, (collected_number)(wu->worker_total_jobs_running));
+    rrdset_done(wu->st_workers_jobs);
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_workers_threads)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_threads_%s", wu->name);
+
+        wu->st_workers_threads = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , "netdata.workers.threads"
+            , "Netdata Workers Threads"
+            , "threads"
+            , "netdata"
+            , "stats"
+            , wu->priority + 3
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_STACKED
+        );
+
+        wu->rd_workers_threads_free = rrddim_add(wu->st_workers_threads, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_threads_busy = rrddim_add(wu->st_workers_threads, "busy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+    else
+        rrdset_next(wu->st_workers_threads);
+
+    rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_free, (collected_number)(wu->worker_count - wu->worker_total_jobs_running));
+    rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, (collected_number)(wu->worker_total_jobs_running));
+    rrdset_done(wu->st_workers_threads);
 }
 
 #ifdef __linux__
@@ -1067,12 +1068,12 @@ static void resize_workers_arrays_if_required(struct worker_utilization *wu) {
 
 static void worker_utilization_reset_statistics(struct worker_utilization *wu) {
     wu->worker_count = 0;
-    wu->worker_total_utilization = 0;
+    wu->worker_total_busy_time = 0;
     wu->worker_total_duration = 0;
     wu->worker_total_jobs_done = 0;
     wu->worker_total_jobs_running = 0;
-    wu->worker_min_utilization = 100.0;
-    wu->worker_max_utilization = 0;
+    wu->worker_min_busy_time = 100.0;
+    wu->worker_max_busy_time = 0;
 
 #ifdef __linux__
     wu->workers_arrays_slot = 0;
@@ -1107,18 +1108,18 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid, kernel_uint_t *utime, 
 static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_done __maybe_unused, size_t jobs_running __maybe_unused) {
     struct worker_utilization *wu = (struct worker_utilization *)ptr;
 
-    wu->worker_total_utilization += utilization_usec;
+    wu->worker_total_busy_time += utilization_usec;
     wu->worker_total_duration += duration_usec;
     wu->worker_total_jobs_done += jobs_done;
     wu->worker_total_jobs_running += jobs_running;
     wu->worker_count++;
 
     double util = (double)utilization_usec * 100.0 / (double)duration_usec;
-    if(util > wu->worker_max_utilization)
-        wu->worker_max_utilization = util;
+    if(util > wu->worker_max_busy_time)
+        wu->worker_max_busy_time = util;
 
-    if(util < wu->worker_min_utilization)
-        wu->worker_min_utilization = util;
+    if(util < wu->worker_min_busy_time)
+        wu->worker_min_busy_time = util;
 
 #ifdef __linux__
     resize_workers_arrays_if_required(wu);
