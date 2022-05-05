@@ -237,10 +237,6 @@ struct collection_thread_status {
     size_t max_sockets;
 
     netdata_thread_t thread;
-    struct rusage rusage;
-    RRDSET *st_cpu;
-    RRDDIM *rd_user;
-    RRDDIM *rd_system;
 };
 
 static struct statsd {
@@ -788,6 +784,7 @@ static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)pi;
     (void)data;
 
+    worker_is_busy();
     *events = POLLIN;
 
     struct statsd_tcp *t = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
@@ -796,11 +793,14 @@ static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
     statsd.tcp_socket_connects++;
     statsd.tcp_socket_connected++;
 
+    worker_is_idle();
     return t;
 }
 
 // TCP client disconnected
 static void statsd_del_callback(POLLINFO *pi) {
+    worker_is_busy();
+
     struct statsd_tcp *t = pi->data;
 
     if(likely(t)) {
@@ -818,10 +818,15 @@ static void statsd_del_callback(POLLINFO *pi) {
 
         freez(t);
     }
+
+    worker_is_idle();
 }
 
 // Receive data
 static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
+    int retval = -1;
+    worker_is_busy();
+
     *events = POLLIN;
 
     int fd = pi->fd;
@@ -832,14 +837,16 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
             if(unlikely(!d)) {
                 error("STATSD: internal error: expected TCP data pointer is NULL");
                 statsd.socket_errors++;
-                return -1;
+                retval = -1;
+                goto cleanup;
             }
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_TCP)) {
                 error("STATSD: internal error: socket data type should be %d, but it is %d", (int)STATSD_SOCKET_DATA_TYPE_TCP, (int)d->type);
                 statsd.socket_errors++;
-                return -1;
+                retval = -1;
+                goto cleanup;
             }
 #endif
 
@@ -872,8 +879,10 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                     d->len = statsd_process(d->buffer, d->len, 1);
                 }
 
-                if(unlikely(ret == -1))
-                    return -1;
+                if(unlikely(ret == -1)) {
+                    retval = -1;
+                    goto cleanup;
+                }
 
             } while (rc != -1);
             break;
@@ -884,14 +893,16 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
             if(unlikely(!d)) {
                 error("STATSD: internal error: expected UDP data pointer is NULL");
                 statsd.socket_errors++;
-                return -1;
+                retval = -1;
+                goto cleanup;
             }
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_UDP)) {
                 error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_UDP);
                 statsd.socket_errors++;
-                return -1;
+                retval = -1;
+                goto cleanup;
             }
 #endif
 
@@ -904,7 +915,8 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
                         error("STATSD: recvmmsg() on UDP socket %d failed.", fd);
                         statsd.socket_errors++;
-                        return -1;
+                        retval = -1;
+                        goto cleanup;
                     }
                 } else if (rc) {
                     // data received
@@ -929,7 +941,8 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
                         error("STATSD: recv() on UDP socket %d failed.", fd);
                         statsd.socket_errors++;
-                        return -1;
+                        retval = -1;
+                        goto cleanup;
                     }
                 } else if (rc) {
                     // data received
@@ -947,24 +960,26 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
         default: {
             error("STATSD: internal error: unknown socktype %d on socket %d", pi->socktype, fd);
             statsd.socket_errors++;
-            return -1;
+            retval = -1;
+            goto cleanup;
         }
     }
 
-    return 0;
+    retval = 0;
+cleanup:
+    worker_is_idle();
+    return retval;
 }
 
 static int statsd_snd_callback(POLLINFO *pi, short int *events) {
     (void)pi;
     (void)events;
 
+    worker_is_busy();
     error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
-    return -1;
-}
+    worker_is_idle();
 
-static void statsd_timer_callback(void *timer_data) {
-    struct collection_thread_status *status = timer_data;
-    getrusage(RUSAGE_THREAD, &status->rusage);
+    return -1;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -986,11 +1001,14 @@ void statsd_collector_thread_cleanup(void *data) {
 #endif
 
     freez(d);
+    worker_unregister();
 }
 
 void *statsd_collector_thread(void *ptr) {
     struct collection_thread_status *status = ptr;
     status->status = 1;
+
+    worker_register("STATSD");
 
     info("STATSD collector thread started with taskid %d", gettid());
 
@@ -1019,7 +1037,7 @@ void *statsd_collector_thread(void *ptr) {
             , statsd_del_callback
             , statsd_rcv_callback
             , statsd_snd_callback
-            , statsd_timer_callback
+            , NULL
             , NULL                     // No access control pattern
             , 0                        // No dns lookups for access control pattern
             , (void *)d
@@ -2147,9 +2165,13 @@ static void statsd_main_cleanup(void *data) {
 
     info("STATSD: cleanup completed.");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    worker_unregister();
 }
 
 void *statsd_main(void *ptr) {
+    worker_register("STATSDFLUSH");
+
     netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -2420,59 +2442,16 @@ void *statsd_main(void *ptr) {
     );
     RRDDIM *rd_pcharts = rrddim_add(st_pcharts, "charts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    RRDSET *stcpu_thread = rrdset_create_localhost(
-            "netdata"
-            , "plugin_statsd_charting_cpu"
-            , NULL
-            , "statsd"
-            , "netdata.statsd_cpu"
-            , "Netdata statsd charting thread CPU usage"
-            , "milliseconds/s"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132001
-            , statsd.update_every
-            , RRDSET_TYPE_STACKED
-    );
-
-    RRDDIM *rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    struct rusage thread;
-
-    for(i = 0; i < statsd.threads ;i++) {
-        char id[100 + 1];
-        char title[100 + 1];
-
-        snprintfz(id, 100, "plugin_statsd_collector%d_cpu", i + 1);
-        snprintfz(title, 100, "Netdata statsd collector thread No %d CPU usage", i + 1);
-
-        statsd.collection_threads_status[i].st_cpu = rrdset_create_localhost(
-                "netdata"
-                , id
-                , NULL
-                , "statsd"
-                , "netdata.statsd_cpu"
-                , title
-                , "milliseconds/s"
-                , PLUGIN_STATSD_NAME
-                , "stats"
-                , 132002 + i
-                , statsd.update_every
-                , RRDSET_TYPE_STACKED
-        );
-
-        statsd.collection_threads_status[i].rd_user   = rrddim_add(statsd.collection_threads_status[i].st_cpu, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        statsd.collection_threads_status[i].rd_system = rrddim_add(statsd.collection_threads_status[i].st_cpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    }
-
-            // ----------------------------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------------------------------------
     // statsd thread to turn metrics into charts
 
     usec_t step = statsd.update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!netdata_exit) {
+        worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
+        worker_is_busy();
 
         statsd_flush_index_metrics(&statsd.gauges,     statsd_flush_gauge);
         statsd_flush_index_metrics(&statsd.counters,   statsd_flush_counter);
@@ -2482,8 +2461,6 @@ void *statsd_main(void *ptr) {
         statsd_flush_index_metrics(&statsd.sets,       statsd_flush_set);
 
         statsd_update_all_app_charts();
-
-        getrusage(RUSAGE_THREAD, &thread);
 
         if(unlikely(netdata_exit))
             break;
@@ -2498,9 +2475,6 @@ void *statsd_main(void *ptr) {
             rrdset_next(st_tcp_connects);
             rrdset_next(st_tcp_connected);
             rrdset_next(st_pcharts);
-            rrdset_next(stcpu_thread);
-            for(i = 0; i < statsd.threads ;i++)
-                rrdset_next(statsd.collection_threads_status[i].st_cpu);
         }
 
         rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
@@ -2550,16 +2524,6 @@ void *statsd_main(void *ptr) {
 
         rrddim_set_by_pointer(st_pcharts, rd_pcharts,              (collected_number)statsd.private_charts);
         rrdset_done(st_pcharts);
-
-        rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-        rrddim_set_by_pointer(stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
-        rrdset_done(stcpu_thread);
-
-        for(i = 0; i < statsd.threads ;i++) {
-            rrddim_set_by_pointer(statsd.collection_threads_status[i].st_cpu, statsd.collection_threads_status[i].rd_user, statsd.collection_threads_status[i].rusage.ru_utime.tv_sec * 1000000ULL + statsd.collection_threads_status[i].rusage.ru_utime.tv_usec);
-            rrddim_set_by_pointer(statsd.collection_threads_status[i].st_cpu, statsd.collection_threads_status[i].rd_system, statsd.collection_threads_status[i].rusage.ru_stime.tv_sec * 1000000ULL + statsd.collection_threads_status[i].rusage.ru_stime.tv_usec);
-            rrdset_done(statsd.collection_threads_status[i].st_cpu);
-        }
     }
 
 cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement

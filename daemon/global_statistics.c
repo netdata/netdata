@@ -1135,10 +1135,12 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
 }
 
 static struct worker_utilization all_workers_utilization[] = {
-    { .name = "WEB",       .family = "web",      .priority = 131990 },
-    { .name = "DBENGINE",  .family = "dbengine", .priority = 130501 },
-    { .name = "ACLKQUERY", .family = "aclk",     .priority = 200000 },
-    { .name = "ACLKSYNC",  .family = "aclk",     .priority = 200003 },
+    { .name = "WEB",         .family = "web",      .priority = 131990 },
+    { .name = "DBENGINE",    .family = "dbengine", .priority = 130501 },
+    { .name = "ACLKQUERY",   .family = "aclk",     .priority = 200000 },
+    { .name = "ACLKSYNC",    .family = "aclk",     .priority = 200003 },
+    { .name = "STATSD",      .family = "statsd",   .priority = 132001 },
+    { .name = "STATSDFLUSH", .family = "statsd",   .priority = 132005 },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }
