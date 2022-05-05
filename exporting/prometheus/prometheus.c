@@ -29,8 +29,13 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
         return 0;
 
     if (filter) {
-        if (!(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
-            return 0;
+        if (instance->config.options & EXPORTING_OPTION_SEND_NAMES) {
+            if (!simple_pattern_matches(filter, st->name))
+                return 0;
+        } else {
+            if (!simple_pattern_matches(filter, st->id))
+                return 0;
+        }
     } else {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
             // we have not checked this chart
