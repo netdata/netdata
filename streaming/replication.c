@@ -470,15 +470,16 @@ void replication_attempt_to_send(struct replication_state *replication) {
             //     sent_bytes_from_this_chunk);
             replication->last_sent_t = now_realtime_sec();
         } else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)) {
+            int error_num = errno;
             debug(
                 D_REPLICATION,
-                "%s: Host %s [send to %s]: unavailable after polling POLLOUT",
+                "%s: Host %s [send to %s]: Send failed with error %d.",
                 REPLICATION_MSG,
                 replication->host->hostname,
-                replication->connected_to);
-                sleep(1);
+                replication->connected_to,
+                error_num);
                 error(
-                    "%s: Host %s [send to %s]: unavailable after polling POLLOUT.",
+                    "%s: Host %s [send to %s]: Send failed with error.",
                     REPLICATION_MSG,
                     replication->host->hostname,
                     replication->connected_to);
@@ -498,6 +499,20 @@ void replication_attempt_to_send(struct replication_state *replication) {
     netdata_thread_enable_cancelability();
 }
 
+static int trigger_replication(RRDHOST *host){
+    time_t t_now = now_realtime_sec();
+    time_t wait_streaming = 0;
+    if(host->sender){
+        if(t_now > host->sender->t_last_exposed_chart_definition)
+            wait_streaming = (t_now - host->sender->t_last_exposed_chart_definition);
+        info("%s: Last exposed: %ld, Now: %ld, Diff: %ld", REPLICATION_MSG, host->sender->t_last_exposed_chart_definition, t_now, wait_streaming);
+        if(wait_streaming && (wait_streaming > 10))    
+            return 1;
+        return 0;
+    }
+    infoerr("%s: Streaming sender is NULL. Replication will not run.", REPLICATION_MSG);
+    return -1;
+}
 /**************************************************
 * Thread management functions
 ***************************************************/
@@ -506,6 +521,7 @@ void *replication_sender_thread(void *ptr) {
     RRDHOST *host = (RRDHOST *)ptr;
     REPLICATION_STATE *rep_state = host->replication->tx_replication;
     unsigned int rrdpush_replication_enabled = rep_state->enabled;
+    int trigger_replication_flag = 0;
     // Pause = 1 if it is a child host (!localhost) and there are gaps for replication
     rep_state->pause = (!is_localhost(host) && host->gaps_timeline->gaps->count) ? 1 : 0;
     rep_state->resume = 0;
@@ -534,7 +550,7 @@ void *replication_sender_thread(void *ptr) {
         // it starts replication for higher level hops
         if(rep_state->pause){
             info("%s: Waiting in PAUSE(%u)...", REPLICATION_MSG, rep_state->pause);
-            sleep(1);
+            sleep_usec(USEC_PER_SEC);
             continue;
         }
 
@@ -546,10 +562,16 @@ void *replication_sender_thread(void *ptr) {
             rep_state->pause = 0;            
         }
         else {
-            sleep(10);
-            send_message(rep_state, "REP 2\n"); // REP_ON
-            replication_parser(rep_state, NULL, rep_state->fp);
-            break;
+            sleep_usec(200 * USEC_PER_MS);
+            trigger_replication_flag = trigger_replication(host);
+            if(trigger_replication_flag == 1)
+            {
+                send_message(rep_state, "REP 2\n"); // REP_ON
+                replication_parser(rep_state, NULL, rep_state->fp);
+                break;
+            }
+            else if (trigger_replication_flag == -1) // Holding the case of a host->sender NULL
+              break;
         }
     }
     info("%s: REP OFF received - Terminating Tx REPlication thread", REPLICATION_MSG);
@@ -1395,7 +1417,8 @@ size_t replication_parser(REPLICATION_STATE *rpt, struct plugind *cd, FILE *fp) 
     do {
         if (receiver_read(rpt, fp)) {
             infoerr("%s: Nothing to read in the parser. Deadlocked?", REPLICATION_MSG);
-            continue;
+            // continue;
+            break;
         }
         int pos = 0;
         char *line;
