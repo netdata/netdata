@@ -154,6 +154,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     }
 
     rrdhost_unlock(host);
+    host->sender->t_last_exposed_chart_definition = 0 ;    
 }
 
 static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
