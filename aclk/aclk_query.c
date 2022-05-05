@@ -111,6 +111,15 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     w->tv_in = query->created_tv;
     now_realtime_timeval(&w->tv_ready);
 
+    if (query->timeout && (dt_usec(&query->created_tv, &w->tv_ready) / 1000.0) > query->timeout) {
+        log_access("QUERY CANCELED: QUEUE TIME EXCEEDED %0.2f ms (LIMIT %d ms)",
+                   dt_usec(&query->created_tv, &w->tv_ready) / 1000.0, query->timeout);
+        retval = 1;
+        w->response.code = HTTP_RESP_BACKEND_FETCH_FAILED;
+        aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
+        goto cleanup;
+    }
+
     RRDHOST *temp_host = NULL;
     if (!strncmp(query->data.http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
         char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);

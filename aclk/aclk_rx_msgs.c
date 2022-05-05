@@ -17,6 +17,7 @@ struct aclk_request {
     char *callback_topic;
     char *payload;
     int version;
+    int timeout;
     int min_version;
     int max_version;
 };
@@ -55,6 +56,10 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
         case JSON_NUMBER:
             if (!strcmp(e->name, "version")) {
                 data->version = e->data.number;
+                break;
+            }
+            if (!strcmp(e->name, "timeout")) {
+                data->timeout = e->data.number;
                 break;
             }
             if (!strcmp(e->name, "min-version")) {
@@ -160,6 +165,7 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
 
     // aclk_queue_query takes ownership of data pointer
     query->callback_topic = cloud_to_agent->callback_topic;
+    query->timeout = cloud_to_agent->timeout;
     // for clarity and code readability as when we process the request
     // it would be strange to get URL from `dedup_id`
     query->data.http_api_v2.query = query->dedup_id;
