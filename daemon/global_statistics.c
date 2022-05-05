@@ -883,8 +883,8 @@ struct worker_utilization {
     RRDDIM *rd_workers_cpu_min;
     RRDDIM *rd_workers_cpu_max;
 
-    RRDSET *st_workers_jobs;
-    RRDDIM *rd_workers_jobs_done;
+    // RRDSET *st_workers_jobs;
+    // RRDDIM *rd_workers_jobs_done;
 
     RRDSET *st_workers_threads;
     RRDDIM *rd_workers_threads_free;
@@ -996,7 +996,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
 #endif
 
     // ----------------------------------------------------------------------
-
+/*
     if(unlikely(!wu->st_workers_jobs)) {
         char name[RRD_ID_LENGTH_MAX + 1];
         snprintfz(name, RRD_ID_LENGTH_MAX, "workers_jobs_%s", wu->name);
@@ -1023,7 +1023,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
 
     rrddim_set_by_pointer(wu->st_workers_jobs, wu->rd_workers_jobs_done, (collected_number)(wu->workers_total_jobs_started));
     rrdset_done(wu->st_workers_jobs);
-
+*/
     // ----------------------------------------------------------------------
 
     if(unlikely(!wu->st_workers_jobs_per_job_type)) {
@@ -1192,11 +1192,11 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
 
 static struct worker_utilization all_workers_utilization[] = {
     { .name = "WEB",         .family = "web",      .priority = 131990 },
-    { .name = "DBENGINE",    .family = "dbengine", .priority = 130501 },
-    { .name = "ACLKQUERY",   .family = "aclk",     .priority = 199995 },
-    { .name = "ACLKSYNC",    .family = "aclk",     .priority = 200003 },
-    { .name = "STATSD",      .family = "statsd",   .priority = 132001 },
-    { .name = "STATSDFLUSH", .family = "statsd",   .priority = 132005 },
+    { .name = "DBENGINE",    .family = "dbengine", .priority = 130590 },
+    { .name = "ACLKQUERY",   .family = "aclk",     .priority = 199990 },
+    { .name = "ACLKSYNC",    .family = "aclk",     .priority = 199995 },
+    { .name = "STATSD",      .family = "statsd",   .priority = 131990 },
+    { .name = "STATSDFLUSH", .family = "statsd",   .priority = 131995 },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }
