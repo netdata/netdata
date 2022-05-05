@@ -10,6 +10,11 @@
 #include "../../aclk/aclk.h"
 #endif
 
+void sanity_check(void) {
+    // make sure the compiler will stop on misconfigurations
+    BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
+}
+
 const char *aclk_sync_config[] = {
     "CREATE TABLE IF NOT EXISTS dimension_delete (dimension_id blob, dimension_name text, chart_type_id text, "
     "dim_id blob, chart_id blob, host_id blob, date_created);",
@@ -284,21 +289,15 @@ void sql_aclk_sync_init(void)
 
 static void async_cb(uv_async_t *handle)
 {
-    worker_is_busy();
-
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
     debug(D_ACLK_SYNC, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
-
-    worker_is_idle();
 }
 
 #define TIMER_PERIOD_MS (1000)
 
 static void timer_cb(uv_timer_t* handle)
 {
-    worker_is_busy();
-
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
@@ -352,8 +351,6 @@ static void timer_cb(uv_timer_t* handle)
         }
     }
 #endif
-
-    worker_is_idle();
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
@@ -361,6 +358,27 @@ static void timer_cb(uv_timer_t* handle)
 void aclk_database_worker(void *arg)
 {
     worker_register("ACLKSYNC");
+    worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    worker_register_job_name(ACLK_DATABASE_ADD_CHART,            "chart add");
+    worker_register_job_name(ACLK_DATABASE_ADD_DIMENSION,        "dimension add");
+    worker_register_job_name(ACLK_DATABASE_PUSH_CHART,           "chart push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_CHART_CONFIG,    "chart conf push");
+    worker_register_job_name(ACLK_DATABASE_RESET_CHART,          "chart reset");
+    worker_register_job_name(ACLK_DATABASE_CHART_ACK,            "chart ack");
+    worker_register_job_name(ACLK_DATABASE_UPD_RETENTION,        "retention check");
+    worker_register_job_name(ACLK_DATABASE_DIM_DELETION,         "dimension delete");
+    worker_register_job_name(ACLK_DATABASE_ORPHAN_HOST,          "node orphan");
+#endif
+    worker_register_job_name(ACLK_DATABASE_ALARM_HEALTH_LOG,     "alert log");
+    worker_register_job_name(ACLK_DATABASE_CLEANUP,              "cleanup");
+    worker_register_job_name(ACLK_DATABASE_DELETE_HOST,          "node delete");
+    worker_register_job_name(ACLK_DATABASE_NODE_INFO,            "node info");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,  "alert snapshot");
+    worker_register_job_name(ACLK_DATABASE_QUEUE_REMOVED_ALERTS, "alerts check");
+    worker_register_job_name(ACLK_DATABASE_TIMER,                "timer");
 
     struct aclk_database_worker_config *wc = arg;
     uv_loop_t *loop;
@@ -425,11 +443,12 @@ void aclk_database_worker(void *arg)
     while (likely(!netdata_exit)) {
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
-        worker_is_busy();
 
         /* wait for commands */
         cmd_batch_size = 0;
         do {
+            worker_is_idle();
+
             if (unlikely(cmd_batch_size >= MAX_CMD_BATCH_SIZE))
                 break;
             cmd = aclk_database_deq_cmd(wc);
@@ -439,6 +458,10 @@ void aclk_database_worker(void *arg)
 
             opcode = cmd.opcode;
             ++cmd_batch_size;
+
+            if(likely(opcode != ACLK_DATABASE_NOOP))
+                worker_is_busy(opcode);
+
             switch (opcode) {
                 case ACLK_DATABASE_NOOP:
                     /* the command queue was empty, do nothing */
@@ -451,6 +474,7 @@ void aclk_database_worker(void *arg)
                     if (wc->host == localhost)
                         sql_check_aclk_table_list(wc);
                     break;
+
                 case ACLK_DATABASE_DELETE_HOST:
                     debug(D_ACLK_SYNC,"Cleaning ACLK tables for %s", (char *) cmd.data);
                     sql_delete_aclk_table_list(wc, cmd);

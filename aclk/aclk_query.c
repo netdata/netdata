@@ -351,6 +351,8 @@ static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_que
 {
     for (int i = 0; aclk_query_handlers[i].type != UNKNOWN; i++) {
         if (aclk_query_handlers[i].type == query->type) {
+            worker_is_busy(i);
+
             debug(D_ACLK, "Processing Queued Message of type: \"%s\"", aclk_query_handlers[i].name);
             aclk_query_handlers[i].fnc(query_thr, query);
             if (aclk_stats_enabled) {
@@ -361,6 +363,8 @@ static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_que
                 ACLK_STATS_UNLOCK;
             }
             aclk_query_free(query);
+
+            worker_is_idle();
             return;
         }
     }
@@ -378,19 +382,24 @@ int aclk_query_process_msgs(struct aclk_query_thread *query_thr)
     return 0;
 }
 
+static void aclk_worker_register(void) {
+    worker_register("ACLKQUERY");
+    for (int i = 0; aclk_query_handlers[i].type != UNKNOWN; i++) {
+        worker_register_job_name(i, aclk_query_handlers[i].name);
+    }
+}
+
 /**
  * Main query processing thread
  */
 void *aclk_query_main_thread(void *ptr)
 {
-    worker_register("ACLKQUERY");
+    aclk_worker_register();
 
     struct aclk_query_thread *query_thr = ptr;
 
     while (!netdata_exit) {
-        worker_is_busy();
         aclk_query_process_msgs(query_thr);
-        worker_is_idle();
 
         QUERY_THREAD_LOCK;
         if (unlikely(pthread_cond_wait(&query_cond_wait, &query_lock_wait)))

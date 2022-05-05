@@ -9,6 +9,15 @@
 #define STATSD_LISTEN_PORT 8125
 #define STATSD_LISTEN_BACKLOG 4096
 
+#define WORKER_JOB_TYPE_TCP_CONNECTED 0
+#define WORKER_JOB_TYPE_TCP_DISCONNECTED 1
+#define WORKER_JOB_TYPE_RCV_DATA 2
+#define WORKER_JOB_TYPE_SND_DATA 3
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 4
+#error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least 4
+#endif
+
 // --------------------------------------------------------------------------------------
 
 // #define STATSD_MULTITHREADED 1
@@ -784,7 +793,7 @@ static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)pi;
     (void)data;
 
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_TYPE_TCP_CONNECTED);
     *events = POLLIN;
 
     struct statsd_tcp *t = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
@@ -799,7 +808,7 @@ static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
 
 // TCP client disconnected
 static void statsd_del_callback(POLLINFO *pi) {
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_TYPE_TCP_DISCONNECTED);
 
     struct statsd_tcp *t = pi->data;
 
@@ -825,7 +834,7 @@ static void statsd_del_callback(POLLINFO *pi) {
 // Receive data
 static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
     int retval = -1;
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_TYPE_RCV_DATA);
 
     *events = POLLIN;
 
@@ -975,7 +984,7 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
     (void)pi;
     (void)events;
 
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_TYPE_SND_DATA);
     error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
     worker_is_idle();
 
@@ -1009,6 +1018,10 @@ void *statsd_collector_thread(void *ptr) {
     status->status = 1;
 
     worker_register("STATSD");
+    worker_register_job_name(WORKER_JOB_TYPE_TCP_CONNECTED, "tcp connect");
+    worker_register_job_name(WORKER_JOB_TYPE_TCP_DISCONNECTED, "tcp disconnect");
+    worker_register_job_name(WORKER_JOB_TYPE_RCV_DATA, "receive");
+    worker_register_job_name(WORKER_JOB_TYPE_SND_DATA, "send");
 
     info("STATSD collector thread started with taskid %d", gettid());
 
@@ -2171,6 +2184,7 @@ static void statsd_main_cleanup(void *data) {
 
 void *statsd_main(void *ptr) {
     worker_register("STATSDFLUSH");
+    worker_register_job_name(0, "run");
 
     netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
 
@@ -2451,7 +2465,7 @@ void *statsd_main(void *ptr) {
     while(!netdata_exit) {
         worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
-        worker_is_busy();
+        worker_is_busy(0);
 
         statsd_flush_index_metrics(&statsd.gauges,     statsd_flush_gauge);
         statsd_flush_index_metrics(&statsd.counters,   statsd_flush_counter);

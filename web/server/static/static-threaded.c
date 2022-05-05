@@ -7,6 +7,19 @@ int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
 long web_client_streaming_rate_t = 0L;
 
+#define WORKER_JOB_ADD_CONNECTION 0
+#define WORKER_JOB_DEL_COLLECTION 1
+#define WORKER_JOB_ADD_FILE       2
+#define WORKER_JOB_DEL_FILE       3
+#define WORKER_JOB_READ_FILE      4
+#define WORKER_JOB_WRITE_FILE     5
+#define WORKER_JOB_RCV_DATA       6
+#define WORKER_JOB_SND_DATA       7
+
+#if (WORKER_UTILIZATION_MAX_JOB_TYPES < 8)
+#error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least 8
+#endif
+
 /*
  * --------------------------------------------------------------------------------------------------------------------
  * Build web_client state from the pollinfo that describes an accepted connection.
@@ -71,7 +84,7 @@ static inline int web_server_check_client_status(struct web_client *w) {
 static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void *data) {
     struct web_client *w = (struct web_client *)data;
 
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_ADD_FILE);
 
     worker_private->files_read++;
 
@@ -87,7 +100,7 @@ static void web_server_file_del_callback(POLLINFO *pi) {
     struct web_client *w = (struct web_client *)pi->data;
     debug(D_WEB_CLIENT, "%llu: RELEASE FILE READ ON FD %d", w->id, pi->fd);
 
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_DEL_FILE);
 
     w->pollinfo_filecopy_slot = 0;
 
@@ -103,7 +116,7 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
     int retval = -1;
     struct web_client *w = (struct web_client *)pi->data;
 
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_READ_FILE);
 
     // if there is no POLLINFO linked to this, it means the client disconnected
     // stop the file reading too
@@ -150,7 +163,7 @@ static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
     (void)pi;
     (void)events;
 
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_WRITE_FILE);
     error("Writing to web files is not supported!");
     worker_is_idle();
 
@@ -163,7 +176,7 @@ static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
 static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)data;         // Suppress warning on unused argument
 
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_ADD_CONNECTION);
     worker_private->connected++;
 
     size_t concurrent = worker_private->connected - worker_private->disconnected;
@@ -246,7 +259,7 @@ cleanup:
 
 // TCP client disconnected
 static void web_server_del_callback(POLLINFO *pi) {
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_DEL_COLLECTION);
 
     worker_private->disconnected++;
 
@@ -271,7 +284,7 @@ static void web_server_del_callback(POLLINFO *pi) {
 }
 
 static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_RCV_DATA);
 
     worker_private->receptions++;
 
@@ -332,7 +345,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
 
 static int web_server_snd_callback(POLLINFO *pi, short int *events) {
     int retval = -1;
-    worker_is_busy();
+    worker_is_busy(WORKER_JOB_SND_DATA);
 
     worker_private->sends++;
 
@@ -386,6 +399,14 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
     worker_private = (struct web_server_static_threaded_worker *)ptr;
     worker_private->running = 1;
     worker_register("WEB");
+    worker_register_job_name(WORKER_JOB_ADD_CONNECTION, "connect");
+    worker_register_job_name(WORKER_JOB_DEL_COLLECTION, "disconnect");
+    worker_register_job_name(WORKER_JOB_ADD_FILE, "file start");
+    worker_register_job_name(WORKER_JOB_DEL_FILE, "file end");
+    worker_register_job_name(WORKER_JOB_READ_FILE, "file read");
+    worker_register_job_name(WORKER_JOB_WRITE_FILE, "file write");
+    worker_register_job_name(WORKER_JOB_RCV_DATA, "receive");
+    worker_register_job_name(WORKER_JOB_SND_DATA, "send");
 
     netdata_thread_cleanup_push(socket_listen_main_static_threaded_worker_cleanup, ptr);
 

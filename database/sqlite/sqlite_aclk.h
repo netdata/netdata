@@ -133,7 +133,11 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
     ACLK_DATABASE_QUEUE_REMOVED_ALERTS,
-    ACLK_DATABASE_TIMER
+    ACLK_DATABASE_TIMER,
+
+    // leave this last
+    // we need it to check for worker utilization
+    ACLK_MAX_ENUMERATIONS_DEFINED
 };
 
 struct aclk_chart_payload_t {
