@@ -71,11 +71,15 @@ static inline int web_server_check_client_status(struct web_client *w) {
 static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void *data) {
     struct web_client *w = (struct web_client *)data;
 
+    worker_is_busy();
+
     worker_private->files_read++;
 
     debug(D_WEB_CLIENT, "%llu: ADDED FILE READ ON FD %d", w->id, pi->fd);
     *events = POLLIN;
     pi->data = w;
+
+    worker_is_idle();
     return w;
 }
 
@@ -83,35 +87,42 @@ static void web_server_file_del_callback(POLLINFO *pi) {
     struct web_client *w = (struct web_client *)pi->data;
     debug(D_WEB_CLIENT, "%llu: RELEASE FILE READ ON FD %d", w->id, pi->fd);
 
+    worker_is_busy();
+
     w->pollinfo_filecopy_slot = 0;
 
     if(unlikely(!w->pollinfo_slot)) {
         debug(D_WEB_CLIENT, "%llu: CROSS WEB CLIENT CLEANUP (iFD %d, oFD %d)", w->id, pi->fd, w->ofd);
         web_client_release(w);
     }
+
+    worker_is_idle();
 }
 
 static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
+    int retval = -1;
     struct web_client *w = (struct web_client *)pi->data;
+
+    worker_is_busy();
 
     // if there is no POLLINFO linked to this, it means the client disconnected
     // stop the file reading too
     if(unlikely(!w->pollinfo_slot)) {
         debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON CLOSED WEB CLIENT", w->id, pi->fd);
-        return -1;
+        retval = -1;
+        goto cleanup;
     }
 
     if(unlikely(w->mode != WEB_CLIENT_MODE_FILECOPY || w->ifd == w->ofd)) {
         debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON NON-FILECOPY WEB CLIENT", w->id, pi->fd);
-        return -1;
+        retval = -1;
+        goto cleanup;
     }
 
     debug(D_WEB_CLIENT, "%llu: READING FILE ON FD %d", w->id, pi->fd);
 
-    worker_is_busy();
     worker_private->file_reads++;
     ssize_t ret = unlikely(web_client_read_file(w));
-    worker_is_idle();
 
     if(likely(web_client_has_wait_send(w))) {
         POLLJOB *p = pi->p;                                        // our POLLJOB
@@ -123,18 +134,25 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
 
     if(unlikely(ret <= 0 || w->ifd == w->ofd)) {
         debug(D_WEB_CLIENT, "%llu: DONE READING FILE ON FD %d", w->id, pi->fd);
-        return -1;
+        retval = -1;
+        goto cleanup;
     }
 
     *events = POLLIN;
-    return 0;
+    retval = 0;
+
+cleanup:
+    worker_is_idle();
+    return retval;
 }
 
 static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
     (void)pi;
     (void)events;
 
+    worker_is_busy();
     error("Writing to web files is not supported!");
+    worker_is_idle();
 
     return -1;
 }
@@ -145,6 +163,7 @@ static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
 static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)data;         // Suppress warning on unused argument
 
+    worker_is_busy();
     worker_private->connected++;
 
     size_t concurrent = worker_private->connected - worker_private->disconnected;
@@ -179,7 +198,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
             //this means that the mensage was not completely read, so
             //I cannot identify it yet.
             sock_setnonblock(w->ifd);
-            return w;
+            goto cleanup;
         }
 
         //The next two ifs are not together because I am reusing SSL structure
@@ -193,7 +212,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
                 if (test[0] < 0x18){
                     WEB_CLIENT_IS_DEAD(w);
                     sock_setnonblock(w->ifd);
-                    return w;
+                    goto cleanup;
                 }
             }
         }
@@ -219,11 +238,16 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 #endif
 
     debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
+
+cleanup:
+    worker_is_idle();
     return w;
 }
 
 // TCP client disconnected
 static void web_server_del_callback(POLLINFO *pi) {
+    worker_is_busy();
+
     worker_private->disconnected++;
 
     struct web_client *w = (struct web_client *)pi->data;
@@ -242,9 +266,13 @@ static void web_server_del_callback(POLLINFO *pi) {
         debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
         web_client_release(w);
     }
+
+    worker_is_idle();
 }
 
 static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
+    worker_is_busy();
+
     worker_private->receptions++;
 
     struct web_client *w = (struct web_client *)pi->data;
@@ -254,7 +282,6 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
         return -1;
 
     debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
-    worker_is_busy();
     web_client_process_request(w);
 
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
@@ -298,11 +325,15 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
         *events |= POLLOUT;
 
+    int ret = web_server_check_client_status(w);
     worker_is_idle();
-    return web_server_check_client_status(w);
+    return ret;
 }
 
 static int web_server_snd_callback(POLLINFO *pi, short int *events) {
+    int retval = -1;
+    worker_is_busy();
+
     worker_private->sends++;
 
     struct web_client *w = (struct web_client *)pi->data;
@@ -310,12 +341,12 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 
     debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
-    worker_is_busy();
     int ret = web_client_send(w);
-    worker_is_idle();
 
-    if(unlikely(ret < 0))
-        return -1;
+    if(unlikely(ret < 0)) {
+        retval = -1;
+        goto cleanup;
+    }
 
     if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
         *events |= POLLIN;
@@ -323,56 +354,11 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
     if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
         *events |= POLLOUT;
 
-    return web_server_check_client_status(w);
-}
+    retval = web_server_check_client_status(w);
 
-static void web_server_tmr_callback(void *timer_data) {
-    worker_private = (struct web_server_static_threaded_worker *)timer_data;
-
-    if(unlikely(netdata_exit)) return;
-
-/*
- * this is now monitored by worker utilization at global statistics
- * the implementation below has the problem that if the worker needs to work for more time than update_every
- * a gap appears at the charts
- * 
-    static __thread RRDSET *st = NULL;
-    static __thread RRDDIM *rd_user = NULL, *rd_system = NULL;
-
-    if(unlikely(!st)) {
-        char id[100 + 1];
-        char title[100 + 1];
-
-        snprintfz(id, 100, "web_thread%d_cpu", worker_private->id + 1);
-        snprintfz(title, 100, "Netdata web server thread CPU usage");
-
-        st = rrdset_create_localhost(
-                "netdata"
-                , id
-                , NULL
-                , "web"
-                , "netdata.web_cpu"
-                , title
-                , "milliseconds/s"
-                , "web"
-                , "stats"
-                , 132000 + worker_private->id
-                , default_rrd_update_every
-                , RRDSET_TYPE_STACKED
-        );
-
-        rd_user   = rrddim_add(st, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        rd_system = rrddim_add(st, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    }
-    else
-        rrdset_next(st);
-
-    struct rusage rusage;
-    getrusage(RUSAGE_THREAD, &rusage);
-    rrddim_set_by_pointer(st, rd_user, rusage.ru_utime.tv_sec * 1000000ULL + rusage.ru_utime.tv_usec);
-    rrddim_set_by_pointer(st, rd_system, rusage.ru_stime.tv_sec * 1000000ULL + rusage.ru_stime.tv_usec);
-    rrdset_done(st);
-*/
+cleanup:
+    worker_is_idle();
+    return retval;
 }
 
 // ----------------------------------------------------------------------------
@@ -408,7 +394,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , web_server_del_callback
                         , web_server_rcv_callback
                         , web_server_snd_callback
-                        , web_server_tmr_callback
+                        , NULL
                         , web_allow_connections_from
                         , web_allow_connections_dns
                         , NULL
