@@ -78,6 +78,15 @@ static unsigned int replication_rd_config(RRDHOST *host, struct config *stream_c
     rrdpush_receiver_replication_enable = appconfig_get_boolean(stream_config, key, "enable replication", rrdpush_receiver_replication_enable);
     rrdpush_receiver_replication_enable = appconfig_get_boolean(stream_config, host->machine_guid, "enable replication", rrdpush_receiver_replication_enable);
     
+    RRD_MEMORY_MODE mode = host->rrd_memory_mode;
+    // mode = rrd_memory_mode_id(appconfig_get(stream_config, key, "default memory mode", rrd_memory_mode_name(mode)));
+    // mode = rrd_memory_mode_id(appconfig_get(stream_config, host->machine_guid, "default memory mode", rrd_memory_mode_name(mode)));
+    if(mode != RRD_MEMORY_MODE_DBENGINE)
+    {
+        infoerr("%s: Could not initialize Rx replication thread. Memory mode %s is not supported from replication!", REPLICATION_MSG, rrd_memory_mode_name(mode));
+        rrdpush_receiver_replication_enable = 0;
+    }
+
     info("%s: Configuration applied %u ", REPLICATION_MSG, rrdpush_receiver_replication_enable);
     return rrdpush_receiver_replication_enable;
 }
@@ -91,14 +100,6 @@ void replication_receiver_init(RRDHOST *image_host, struct config *stream_config
     {
         infoerr("%s: Could not initialize Rx replication thread. Replication is disabled!", REPLICATION_MSG);
         image_host->replication->rx_replication->enabled = rrdpush_replication_enable; 
-        return;
-    }
-    RRD_MEMORY_MODE mode = RRD_MEMORY_MODE_DBENGINE;
-    mode = rrd_memory_mode_id(appconfig_get(stream_config, key, "default memory mode", rrd_memory_mode_name(mode)));
-    if(mode != RRD_MEMORY_MODE_DBENGINE)
-    {
-        infoerr("%s: Could not initialize Rx replication thread. Memory mode of child is not supported!", REPLICATION_MSG);
-        image_host->replication->rx_replication->enabled = 0; 
         return;
     }
     image_host->replication->rx_replication->enabled = rrdpush_replication_enable; 
@@ -538,9 +539,9 @@ void *replication_sender_thread(void *ptr) {
         }
 
         if(!rep_state->connected) {
-            replication_attempt_to_connect(host);
             if(!rep_state->enabled)
                 break;
+            replication_attempt_to_connect(host);
             rep_state->not_connected_loops++;
             rep_state->pause = 0;            
         }
@@ -1141,6 +1142,7 @@ void replication_collect_past_metric_done(REPLICATION_STATE *rep_state) {
 }
 
 void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
+#ifdef  ENABLE_DBENGINE
     if(rrdeng_store_past_metrics_page_init(dim_past_data, rep_state)){
         infoerr("%s: Cannot initialize db engine page: Flushing collected past data skipped!", REPLICATION_MSG);
         return;
@@ -1150,7 +1152,11 @@ void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATI
     rrdeng_store_past_metrics_page_finalize(dim_past_data, rep_state);
     info("%s: Flushed Collected Past Metric %s.%s", REPLICATION_MSG, dim_past_data->rd->rrdset->id, dim_past_data->rd->id);
     // print_collected_metric_past_data(dim_past_data, rep_state);
-};
+#else
+    UNUSED(dim_past_data);
+    infoerr("%s: Flushed Collected Past Metric is not supported for host %s. Replication Rx thread needs `dbengine` memory mode.", REPLICATION_MSG, rep_state->host->hostname);
+#endif    
+}
 
 /****************************************
  * Store GAP ops in agent metdata DB(SQLite)
