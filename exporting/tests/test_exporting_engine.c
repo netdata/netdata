@@ -988,21 +988,21 @@ static void test_can_send_rrdset(void **state)
 {
     (void)*state;
 
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL, NULL), 1);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL), 1);
 
     rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL, NULL), 0);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL), 0);
     rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
 
     // TODO: test with a denying simple pattern
 
     rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL, NULL), 0);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL), 0);
     rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
 
     localhost->rrdset_root->rrd_memory_mode = RRD_MEMORY_MODE_NONE;
     prometheus_exporter_instance->config.options |= EXPORTING_SOURCE_DATA_AVERAGE;
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL, NULL), 0);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL), 0);
 }
 
 static void test_prometheus_name_copy(void **state)
