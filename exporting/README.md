@@ -28,61 +28,82 @@ X seconds (though, it can send them per second if you need it to).
 
 ## Features
 
-1.  The exporting engine uses a number of connectors to send Netdata metrics to external time-series databases. See our
-    [list of supported databases](/docs/export/external-databases.md#supported-databases) for information on which
-    connector to enable and configure for your database of choice.
+### Integration
 
-    -   [**AWS Kinesis Data Streams**](/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`
-        format.
-    -   [**Google Cloud Pub/Sub Service**](/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
-        format.
-    -   [**Graphite**](/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
-        `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
-        also be configured). Learn more in our guide to [export and visualize Netdata metrics in
-        Graphite](/docs/guides/export/export-netdata-metrics-graphite.md).
-    -   [**JSON** document databases](/exporting/json/README.md)
-    -   [**OpenTSDB**](/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
-        OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
-    -   [**MongoDB**](/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
-    -   [**Prometheus**](/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
-        from node using the Netdata API.
-    -   [**Prometheus remote write**](/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
-        buffer encoding over HTTP. Supports many [storage
-        providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
-    -   [**TimescaleDB**](/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
-        Netdata client and writes them to a TimescaleDB table.
+The exporting engine uses a number of connectors to send Netdata metrics to external time-series databases. See our
+[list of supported databases](/docs/export/external-databases.md#supported-databases) for information on which
+connector to enable and configure for your database of choice.
 
-2.  Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.
+-   [**AWS Kinesis Data Streams**](/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`
+    format.
+-   [**Google Cloud Pub/Sub Service**](/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
+    format.
+-   [**Graphite**](/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
+    `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
+    also be configured). Learn more in our guide to [export and visualize Netdata metrics in
+    Graphite](/docs/guides/export/export-netdata-metrics-graphite.md).
+-   [**JSON** document databases](/exporting/json/README.md)
+-   [**OpenTSDB**](/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
+    OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
+-   [**MongoDB**](/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
+-   [**Prometheus**](/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
+    from node using the Netdata API.
+-   [**Prometheus remote write**](/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
+    buffer encoding over HTTP. Supports many [storage
+    providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
+-   [**TimescaleDB**](/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
+    Netdata client and writes them to a TimescaleDB table.
 
-3.  Netdata supports three modes of operation for all exporting connectors:
+### Chart filtering
 
-    -   `as-collected` sends to external databases the metrics as they are collected, in the units they are collected.
-        So, counters are sent as counters and gauges are sent as gauges, much like all data collectors do. For example,
-        to calculate CPU utilization in this format, you need to know how to convert kernel ticks to percentage.
+Netdata can filter metrics, to send only a subset of the collected metrics. You can use the
+configuration file
 
-    -   `average` sends to external databases normalized metrics from the Netdata database. In this mode, all metrics
-        are sent as gauges, in the units Netdata uses. This abstracts data collection and simplifies visualization, but
-        you will not be able to copy and paste queries from other sources to convert units. For example, CPU utilization
-        percentage is calculated by Netdata, so Netdata will convert ticks to percentage and send the average percentage
-        to the external database.
+```txt
+[prometheus:exporter]
+    send charts matching = system.*
+```
 
-    -   `sum` or `volume`: the sum of the interpolated values shown on the Netdata graphs is sent to the external
-        database. So, if Netdata is configured to send data to the database every 10 seconds, the sum of the 10 values
-        shown on the Netdata charts will be used.
+or the URL parameter `filter` in the `allmetrics` API call.
 
-    Time-series databases suggest to collect the raw values (`as-collected`). If you plan to invest on building your
-    monitoring around a time-series database and you already know (or you will invest in learning) how to convert units
-    and normalize the metrics in Grafana or other visualization tools, we suggest to use `as-collected`.
+```txt
+http://localhost:19999/api/v1/allmetrics?format=shell&filter=system.*
+```
 
-    If, on the other hand, you just need long term archiving of Netdata metrics and you plan to mainly work with
-    Netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot
-    simpler. Furthermore, if you use `average`, the charts shown in the external service will match exactly what you
-    see in Netdata, which is not necessarily true for the other modes of operation.
+### Operation modes
 
-4.  This code is smart enough, not to slow down Netdata, independently of the speed of the external database server. You
-    should keep in mind though that many exporting connector instances can consume a lot of CPU resources if they run
-    their batches at the same time. You can set different update intervals for every exporting connector instance, but
-    even in that case they can occasionally synchronize their batches for a moment.
+Netdata supports three modes of operation for all exporting connectors:
+
+-   `as-collected` sends to external databases the metrics as they are collected, in the units they are collected.
+    So, counters are sent as counters and gauges are sent as gauges, much like all data collectors do. For example,
+    to calculate CPU utilization in this format, you need to know how to convert kernel ticks to percentage.
+
+-   `average` sends to external databases normalized metrics from the Netdata database. In this mode, all metrics
+    are sent as gauges, in the units Netdata uses. This abstracts data collection and simplifies visualization, but
+    you will not be able to copy and paste queries from other sources to convert units. For example, CPU utilization
+    percentage is calculated by Netdata, so Netdata will convert ticks to percentage and send the average percentage
+    to the external database.
+
+-   `sum` or `volume`: the sum of the interpolated values shown on the Netdata graphs is sent to the external
+    database. So, if Netdata is configured to send data to the database every 10 seconds, the sum of the 10 values
+    shown on the Netdata charts will be used.
+
+Time-series databases suggest to collect the raw values (`as-collected`). If you plan to invest on building your
+monitoring around a time-series database and you already know (or you will invest in learning) how to convert units
+and normalize the metrics in Grafana or other visualization tools, we suggest to use `as-collected`.
+
+If, on the other hand, you just need long term archiving of Netdata metrics and you plan to mainly work with
+Netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot
+simpler. Furthermore, if you use `average`, the charts shown in the external service will match exactly what you
+see in Netdata, which is not necessarily true for the other modes of operation.
+
+### Independent operation
+
+This code is smart enough, not to slow down Netdata, independently of the speed of the external database server. 
+
+> ❗ You should keep in mind though that many exporting connector instances can consume a lot of CPU resources if they
+> run their batches at the same time. You can set different update intervals for every exporting connector instance,
+> but even in that case they can occasionally synchronize their batches for a moment.
 
 ## Configuration
 
@@ -252,7 +273,8 @@ Configure individual connectors and override any global settings with the follow
     within each pattern). The patterns are checked against both chart id and chart name. A pattern starting with `!`
     gives a negative match. So to match all charts named `apps.*` except charts ending in `*reads`, use `!*reads
     apps.*` (so, the order is important: the first pattern matching the chart id or the chart name will be used -
-    positive or negative).
+    positive or negative). There is also a URL parameter `filter` that can be used while querying `allmetrics`. The URL
+    parameter has a higher priority than the configuration option.
 
 -   `send names instead of ids = yes | no` controls the metric names Netdata should send to the external database.
     Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system

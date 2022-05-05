@@ -19,6 +19,7 @@ struct prometheus_output_options {
 
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
+    const char *filter = NULL;
     const char *prometheus_server = w->client_ip;
 
     uint32_t prometheus_exporting_options;
@@ -57,6 +58,9 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             else
                 format = 0;
         }
+        else if(!strcmp(name, "filter")) {
+            filter = value;
+        }
         else if(!strcmp(name, "server")) {
             prometheus_server = value;
         }
@@ -87,18 +91,19 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     switch(format) {
         case ALLMETRICS_JSON:
             w->response.data->contenttype = CT_APPLICATION_JSON;
-            rrd_stats_api_v1_charts_allmetrics_json(host, w->response.data);
+            rrd_stats_api_v1_charts_allmetrics_json(host, filter, w->response.data);
             return HTTP_RESP_OK;
 
         case ALLMETRICS_SHELL:
             w->response.data->contenttype = CT_TEXT_PLAIN;
-            rrd_stats_api_v1_charts_allmetrics_shell(host, w->response.data);
+            rrd_stats_api_v1_charts_allmetrics_shell(host, filter, w->response.data);
             return HTTP_RESP_OK;
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
             rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
                     host
+                    , filter
                     , w->response.data
                     , prometheus_server
                     , prometheus_prefix
@@ -111,6 +116,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             w->response.data->contenttype = CT_PROMETHEUS;
             rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
                     host
+                    , filter
                     , w->response.data
                     , prometheus_server
                     , prometheus_prefix

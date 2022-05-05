@@ -16,6 +16,7 @@ void free_temporary_host(RRDHOST *host)
 void *__wrap_free_temporary_host(RRDHOST *host)
 {
     (void) host;
+    return NULL;
 }
 
 
