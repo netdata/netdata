@@ -4,8 +4,6 @@
 #define WORKER_BUSY 'B'
 
 struct worker {
-    // netdata_mutex_t lock;
-
     pid_t pid;
     const char *tag;
     const char *workname;
@@ -13,13 +11,14 @@ struct worker {
 
     // only one variable is set by our statistics callers
     usec_t statistics_last_checkpoint;
+    size_t statistics_last_jobs_done;
+    usec_t statistics_last_busy_time;
 
     // the worker controlled variables
-    size_t jobs_done;
-    usec_t utilization;
-    usec_t last_checkpoint;
-    usec_t last_action_timestamp;
-    char last_action;
+    volatile size_t jobs_done;
+    volatile usec_t busy_time;
+    volatile usec_t last_action_timestamp;
+    volatile char last_action;
 
     struct worker *next;
 };
@@ -40,10 +39,7 @@ void worker_register(const char *workname) {
     usec_t now = now_realtime_usec();
     worker->statistics_last_checkpoint = now;
     worker->last_action_timestamp = now;
-    worker->last_checkpoint = now;
     worker->last_action = WORKER_IDLE;
-
-    // netdata_mutex_init(&worker->lock);
 
     netdata_mutex_lock(&base_lock);
     worker->next = base;
@@ -65,7 +61,6 @@ void worker_unregister(void) {
     }
     netdata_mutex_unlock(&base_lock);
 
-    // netdata_mutex_destroy(&worker->lock);
     freez((void *)worker->tag);
     freez((void *)worker->workname);
     freez(worker);
@@ -77,28 +72,30 @@ void worker_is_idle(void) {
     if(unlikely(!worker)) return;
     if(unlikely(worker->last_action != WORKER_BUSY)) return;
 
-    // netdata_mutex_lock(&worker->lock);
     usec_t now = now_realtime_usec();
 
-    worker->utilization += now - worker->last_action_timestamp;
+    worker->busy_time += now - worker->last_action_timestamp;
     worker->jobs_done++;
-    worker->last_action_timestamp = now;
-    worker->last_action = WORKER_IDLE;
 
-    // netdata_mutex_unlock(&worker->lock);
+    // the worker was busy
+    // set it to idle before we set the timestamp
+
+    worker->last_action = WORKER_IDLE;
+    if(worker->last_action_timestamp < now)
+        worker->last_action_timestamp = now;
 }
 
 void worker_is_busy(void) {
     if(unlikely(!worker)) return;
     if(unlikely(worker->last_action != WORKER_IDLE)) return;
 
-    // netdata_mutex_lock(&worker->lock);
     usec_t now = now_realtime_usec();
+
+    // the worker was idle
+    // set the timestamp and then set it to busy
 
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_BUSY;
-
-    // netdata_mutex_unlock(&worker->lock);
 }
 
 
@@ -107,28 +104,40 @@ void worker_is_busy(void) {
 void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_done, size_t jobs_running), void *data) {
     netdata_mutex_lock(&base_lock);
     uint32_t hash = simple_hash(workname);
-    usec_t util, delta, last;
+    usec_t busy_time, delta;
     size_t jobs_done, jobs_running;
 
     struct worker *p;
     for(p = base; p ; p = p->next) {
         if(hash != p->workname_hash || strcmp(workname, p->workname)) continue;
 
-        // netdata_mutex_lock(&p->lock);
         usec_t now = now_realtime_usec();
 
-        util = p->utilization;
-        p->utilization = 0;
+        // get a copy of the worker variables
+        usec_t worker_busy_time = p->busy_time;
+        size_t worker_jobs_done = p->jobs_done;
+        char worker_last_action = p->last_action;
+        usec_t worker_last_action_timestamp = p->last_action_timestamp;
 
-        jobs_done = p->jobs_done;
-        p->jobs_done = 0;
+        // this is the only variable both the worker thread and the statistics thread are writing
+        // we set this only when the worker is busy, so that worker will not
+        // accumulate all the busy time, but only the time after the point we collected statistics
+        if(worker_last_action == WORKER_BUSY && p->last_action_timestamp == worker_last_action_timestamp && p->last_action == WORKER_BUSY)
+            p->last_action_timestamp = now;
 
-        last = p->last_action_timestamp;
-        p->last_action_timestamp = now;
+        // calculate delta busy time
+        busy_time = worker_busy_time - p->statistics_last_busy_time;
+        p->statistics_last_busy_time = worker_busy_time;
+
+        // calculate delta jobs done
+        jobs_done = worker_jobs_done - p->statistics_last_jobs_done;
+        p->statistics_last_jobs_done = worker_jobs_done;
 
         jobs_running = 0;
-        if(p->last_action == WORKER_BUSY) {
-            util += now - last;
+        if(worker_last_action == WORKER_BUSY) {
+            // the worker is still busy with something
+            // let's add that busy time to the reported one
+            busy_time += now - worker_last_action_timestamp;
             jobs_running = 1;
         }
 
@@ -136,9 +145,7 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
 
         p->statistics_last_checkpoint = now;
 
-        // netdata_mutex_unlock(&p->lock);
-
-        callback(data, p->pid, p->tag, util, delta, jobs_done, jobs_running);
+        callback(data, p->pid, p->tag, busy_time, delta, jobs_done, jobs_running);
     }
 
     netdata_mutex_unlock(&base_lock);
