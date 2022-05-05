@@ -1434,7 +1434,7 @@ try_static_install() {
         netdata_agent="${NETDATA_STATIC_ARCHIVE_URL#"${NETDATA_TARBALL_BASEURL}/"}"
       fi
     fi
-  elif check_for_remote_file "${NETDATA_STATIC_ARCHIVE_OLD_URL}"; then
+  elif [ "${SYSARCH}" = "x86_64" ] && check_for_remote_file "${NETDATA_STATIC_ARCHIVE_OLD_URL}"; then
     netdata_agent="${NETDATA_STATIC_ARCHIVE_OLD_URL#"https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/"}"
     export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_OLD_URL}"
   else
