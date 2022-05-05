@@ -56,22 +56,22 @@ done
 if [ -n "${script_source}" ]; then
   script_name="$(basename "${script_source}")"
 else
-  script_name="netdata-updater.sh"
+  script_name="netdata-uninstaller.sh"
 fi
 
 info() {
-  echo >&3 "$(date) : INFO: ${script_name}: " "${1}"
+  echo >&2 "$(date) : INFO: ${script_name}: " "${1}"
 }
 
 error() {
-  echo >&3 "$(date) : ERROR: ${script_name}: " "${1}"
+  echo >&2 "$(date) : ERROR: ${script_name}: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
     NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
   fi
 }
 
 fatal() {
-  echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${1}"
+  echo >&2 "$(date) : FATAL: ${script_name}: FAILED TO UNINSTALL NETDATA: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
     NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
   fi
