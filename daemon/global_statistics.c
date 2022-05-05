@@ -839,12 +839,33 @@ static void global_statistics_charts(void) {
 // ---------------------------------------------------------------------------------------------------------------------
 // worker utilization
 
-#define WORKERS_THREADS_INCREASE_STEP 2
-
 struct worker_job_type {
     char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
     size_t jobs_started;
-    RRDDIM *rd;
+    usec_t busy_time;
+    RRDDIM *rd_jobs_started;
+    RRDDIM *rd_busy_time;
+};
+
+struct worker_thread {
+    pid_t pid;
+    int enabled;
+
+    int cpu_enabled;
+
+    kernel_uint_t utime;
+    kernel_uint_t stime;
+
+    kernel_uint_t utime_old;
+    kernel_uint_t stime_old;
+
+    usec_t collected_time;
+    usec_t collected_time_old;
+
+    size_t jobs_started;
+    usec_t busy_time;
+
+    struct worker_thread *next;
 };
 
 struct worker_utilization {
@@ -862,16 +883,8 @@ struct worker_utilization {
     double workers_min_busy_time;
     double workers_max_busy_time;
 
-#ifdef __linux__
-    size_t workers_arrays_size;
-    size_t workers_arrays_slot;
-    kernel_uint_t *utime_new_array;
-    kernel_uint_t *utime_old_array;
-    kernel_uint_t *stime_new_array;
-    kernel_uint_t *stime_old_array;
-    usec_t *cpu_old_collected_time_array;
-    usec_t *cpu_new_collected_time_array;
-#endif
+    size_t worker_threads_size;
+    struct worker_thread *threads;
 
     RRDSET *st_workers_time;
     RRDDIM *rd_workers_time_avg;
@@ -891,6 +904,7 @@ struct worker_utilization {
     RRDDIM *rd_workers_threads_busy;
 
     RRDSET *st_workers_jobs_per_job_type;
+    RRDSET *st_workers_busy_per_job_type;
 };
 
 static void worker_utilization_update_chart(struct worker_utilization *wu) {
@@ -923,9 +937,9 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_AREA
         );
 
-        wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
         wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
         wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
     }
     else
         rrdset_next(wu->st_workers_time);
@@ -964,32 +978,25 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
     else
         rrdset_next(wu->st_workers_cpu);
 
-    size_t i;
-    calculated_number min = 100.0, max = 0.0, total = 0.0;
-    for(i = 0; i < wu->workers_arrays_slot; i++) {
-        kernel_uint_t utime_old = wu->utime_old_array[i];
-        kernel_uint_t stime_old = wu->utime_old_array[i];
-        kernel_uint_t utime_new = wu->utime_new_array[i];
-        kernel_uint_t stime_new = wu->utime_new_array[i];
-        usec_t collected_old = wu->cpu_old_collected_time_array[i];
-        usec_t collected_new = wu->cpu_new_collected_time_array[i];
+    size_t i, count = 0;
+    calculated_number min = 1000.0, max = 0.0, total = 0.0;
+    struct worker_thread *wt;
+    for(wt = wu->threads; wt ; wt = wt->next) {
+        if(!wt->cpu_enabled) continue;
+        count++;
 
-        usec_t delta = collected_new - collected_old;
-        calculated_number utime = (calculated_number)(utime_new - utime_old) * 100.0 / system_hz * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
-        calculated_number stime = (calculated_number)(stime_new - stime_old) * 100.0 / system_hz * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
+        usec_t delta = wt->collected_time - wt->collected_time_old;
+        calculated_number utime = (calculated_number)(wt->utime - wt->utime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
+        calculated_number stime = (calculated_number)(wt->stime - wt->stime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
         calculated_number cpu_util = utime + stime;
-
-        // parsing files from /proc is not that accurate
-        // mainly because the time we collect the values
-        // vs the time we think they reflect are not right
-        // so, let's stop this from being visible to users
-        if(cpu_util > 100.0) cpu_util = 100.0;
 
         total += cpu_util;
         if(cpu_util < min) min = cpu_util;
         if(cpu_util > max) max = cpu_util;
     }
-    rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)i ));
+    if(unlikely(min == 1000.0)) min = 0.0;
+
+    rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)count ));
     rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)( min * 10000ULL));
     rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)( max * 10000ULL));
     rrdset_done(wu->st_workers_cpu);
@@ -1035,9 +1042,45 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
             , name
             , NULL
             , wu->family
-            , "netdata.workers.jobs_by_type"
+            , "netdata.workers.by_type.jobs_started"
             , "Netdata Workers Jobs Started by Type"
             , "jobs"
+            , "netdata"
+            , "stats"
+            , wu->priority + 2
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_STACKED
+        );
+
+        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            if(wu->per_job_type[i].name[0])
+                wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+    }
+    else
+        rrdset_next(wu->st_workers_jobs_per_job_type);
+
+    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        if (wu->per_job_type[i].name[0])
+            rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, (collected_number)(wu->per_job_type[i].jobs_started));
+    }
+
+    rrdset_done(wu->st_workers_jobs_per_job_type);
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_workers_busy_per_job_type)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_busy_time_by_type_%s", wu->name);
+
+        wu->st_workers_busy_per_job_type = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , "netdata.workers.by_type.busy_time"
+            , "Netdata Workers Busy Time by Type"
+            , "ms"
             , "netdata"
             , "stats"
             , wu->priority + 3
@@ -1047,18 +1090,18 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
 
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
             if(wu->per_job_type[i].name[0])
-                wu->per_job_type[i].rd = rrddim_add(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, wu->per_job_type[i].name, NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
         }
     }
     else
-        rrdset_next(wu->st_workers_jobs_per_job_type);
+        rrdset_next(wu->st_workers_busy_per_job_type);
 
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-        if (wu->per_job_type[i].rd)
-            rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd, (collected_number)(wu->per_job_type[i].jobs_started));
+        if (wu->per_job_type[i].name[0])
+            rrddim_set_by_pointer(wu->st_workers_busy_per_job_type, wu->per_job_type[i].rd_busy_time, (collected_number)(wu->per_job_type[i].busy_time));
     }
 
-    rrdset_done(wu->st_workers_jobs_per_job_type);
+    rrdset_done(wu->st_workers_busy_per_job_type);
 
     // ----------------------------------------------------------------------
 
@@ -1092,23 +1135,6 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
     rrdset_done(wu->st_workers_threads);
 }
 
-#ifdef __linux__
-static void resize_workers_arrays_if_required(struct worker_utilization *wu) {
-    if(wu->workers_arrays_slot >= wu->workers_arrays_size) {
-        size_t newsize = wu->workers_arrays_size + WORKERS_THREADS_INCREASE_STEP;
-
-        wu->utime_new_array = reallocz(wu->utime_new_array, newsize * sizeof(kernel_uint_t));
-        wu->utime_old_array = reallocz(wu->utime_old_array, newsize * sizeof(kernel_uint_t));
-        wu->stime_new_array = reallocz(wu->stime_new_array, newsize * sizeof(kernel_uint_t));
-        wu->stime_old_array = reallocz(wu->stime_old_array, newsize * sizeof(kernel_uint_t));
-        wu->cpu_old_collected_time_array = reallocz(wu->cpu_old_collected_time_array, newsize * sizeof(usec_t));
-        wu->cpu_new_collected_time_array = reallocz(wu->cpu_new_collected_time_array, newsize * sizeof(usec_t));
-
-        wu->workers_arrays_size = newsize;
-    }
-}
-#endif
-
 static void worker_utilization_reset_statistics(struct worker_utilization *wu) {
     wu->workers_registered = 0;
     wu->workers_busy = 0;
@@ -1118,23 +1144,21 @@ static void worker_utilization_reset_statistics(struct worker_utilization *wu) {
     wu->workers_min_busy_time = 100.0;
     wu->workers_max_busy_time = 0;
 
-#ifdef __linux__
-    wu->workers_arrays_slot = 0;
-    if(wu->cpu_old_collected_time_array && wu->cpu_new_collected_time_array) {
-        memcpy(wu->utime_old_array, wu->utime_new_array,wu->workers_arrays_size * sizeof(kernel_uint_t));
-        memcpy(wu->stime_old_array, wu->stime_new_array,wu->workers_arrays_size * sizeof(kernel_uint_t));
-        memcpy(wu->cpu_old_collected_time_array, wu->cpu_new_collected_time_array, wu->workers_arrays_size * sizeof(usec_t));
-    }
-#endif
-
     size_t i;
-    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++)
+    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
         wu->per_job_type[i].jobs_started = 0;
+        wu->per_job_type[i].busy_time = 0;
+    }
+
+    struct worker_thread *wt;
+    for(wt = wu->threads; wt ; wt = wt->next) {
+        wt->enabled = 0;
+        wt->cpu_enabled = 0;
+    }
 }
 
-
-#ifdef __linux__
 static int read_thread_cpu_time_from_proc_stat(pid_t pid, kernel_uint_t *utime, kernel_uint_t *stime) {
+#ifdef __linux__
     char filename[200 + 1];
     snprintfz(filename, 200, "/proc/self/task/%d/stat", pid);
 
@@ -1149,11 +1173,34 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid, kernel_uint_t *utime, 
 
     procfile_close(ff);
     return 0;
-}
+#else
+    return 1;
 #endif
+}
 
-static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_started __maybe_unused, size_t is_running __maybe_unused, const char **job_types_names __maybe_unused, size_t *job_types_jobs_started __maybe_unused) {
+static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_started __maybe_unused, size_t is_running __maybe_unused, const char **job_types_names __maybe_unused, size_t *job_types_jobs_started __maybe_unused, usec_t *job_types_busy_time __maybe_unused) {
     struct worker_utilization *wu = (struct worker_utilization *)ptr;
+
+    // find the worker_thread in the list
+    struct worker_thread *wt;
+    for(wt = wu->threads; wt && wt->pid != pid ; wt = wt->next) ;
+    if(!wt) {
+        // we have to allocate a new one
+        wt = (struct worker_thread *)callocz(1, sizeof(struct worker_thread));
+        wt->pid = pid;
+
+        // link it
+        wt->next = wu->threads;
+        wu->threads = wt;
+    }
+
+    wt->enabled = 1;
+    wt->busy_time = utilization_usec;
+    wt->jobs_started = jobs_started;
+
+    wt->utime_old = wt->utime;
+    wt->stime_old = wt->stime;
+    wt->collected_time_old = wt->collected_time;
 
     wu->workers_total_busy_time += utilization_usec;
     wu->workers_total_duration += duration_usec;
@@ -1168,26 +1215,17 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
     if(util < wu->workers_min_busy_time)
         wu->workers_min_busy_time = util;
 
-#ifdef __linux__
-    resize_workers_arrays_if_required(wu);
-    if(!read_thread_cpu_time_from_proc_stat(pid, &wu->utime_new_array[wu->workers_arrays_slot], &wu->stime_new_array[wu->workers_arrays_slot])) {
-        wu->cpu_new_collected_time_array[wu->workers_arrays_slot] = now_realtime_usec();
-
-        // kernel_uint_t utime = wu->utime_new_array[wu->workers_arrays_slot];
-        // kernel_uint_t stime = wu->stime_new_array[wu->workers_arrays_slot];
-        // fprintf(stderr, "WORKER UTILIZATION NAME %s, pid %d/%zu, SIZE %zu, utime %zu, stime %zu\n", wu->name, pid, wu->workers_arrays_slot, wu->workers_arrays_size, (size_t)utime, (size_t)stime);
-
-        wu->workers_arrays_slot++;
-    }
-#endif
-
     size_t i;
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
         wu->per_job_type[i].jobs_started += job_types_jobs_started[i];
+        wu->per_job_type[i].busy_time += job_types_busy_time[i];
 
-        if(!wu->per_job_type[i].name[0] && job_types_names[i])
+        if(unlikely(!wu->per_job_type[i].name[0] && job_types_names[i]))
             strncpyz(wu->per_job_type[i].name, job_types_names[i], WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
     }
+
+    if((wt->cpu_enabled = !read_thread_cpu_time_from_proc_stat(pid, &wt->utime, &wt->stime)))
+        wt->collected_time = now_realtime_usec();
 }
 
 static struct worker_utilization all_workers_utilization[] = {

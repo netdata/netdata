@@ -6,7 +6,10 @@
 struct worker_job_type {
     char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
     size_t worker_jobs_started;
+    usec_t worker_busy_time;
+
     size_t statistics_jobs_started;
+    usec_t statistics_busy_time;
 };
 
 struct worker {
@@ -21,6 +24,7 @@ struct worker {
     usec_t statistics_last_busy_time;
 
     // the worker controlled variables
+    size_t job_id;
     volatile size_t jobs_started;
     volatile usec_t busy_time;
     volatile usec_t last_action_timestamp;
@@ -90,10 +94,14 @@ void worker_unregister(void) {
 void worker_is_idle(void) {
     if(unlikely(!worker)) return;
     if(unlikely(worker->last_action != WORKER_BUSY)) return;
+    if(unlikely(worker->job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+        worker->job_id = 0;
 
     usec_t now = now_realtime_usec();
 
-    worker->busy_time += now - worker->last_action_timestamp;
+    usec_t delta = now - worker->last_action_timestamp;
+    worker->busy_time += delta;
+    worker->per_job_type[worker->job_id].worker_busy_time += delta;
 
     // the worker was busy
     // set it to idle before we set the timestamp
@@ -106,7 +114,6 @@ void worker_is_idle(void) {
 void worker_is_busy(size_t job_id) {
     if(unlikely(!worker)) return;
     if(unlikely(worker->last_action != WORKER_IDLE)) return;
-
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         job_id = 0;
 
@@ -115,6 +122,7 @@ void worker_is_busy(size_t job_id) {
     // the worker was idle
     // set the timestamp and then set it to busy
 
+    worker->job_id = job_id;
     worker->per_job_type[job_id].worker_jobs_started++;
     worker->jobs_started++;
     worker->last_action_timestamp = now;
@@ -124,7 +132,7 @@ void worker_is_busy(size_t job_id) {
 
 // statistics interface
 
-void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_started, size_t is_running, const char **job_types_names, size_t *job_types_jobs_started), void *data) {
+void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_started, size_t is_running, const char **job_types_names, size_t *job_types_jobs_started, usec_t *job_types_busy_time), void *data) {
     netdata_mutex_lock(&base_lock);
     uint32_t hash = simple_hash(workname);
     usec_t busy_time, delta;
@@ -139,11 +147,17 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
         // find per job type statistics
         const char *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];
         size_t per_job_type_jobs_started[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        usec_t per_job_type_busy_time[WORKER_UTILIZATION_MAX_JOB_TYPES];
         for(i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
             per_job_type_name[i] = p->per_job_type[i].name;
-            size_t tmp = p->per_job_type[i].worker_jobs_started;
-            per_job_type_jobs_started[i] = tmp - p->per_job_type[i].statistics_jobs_started;
-            p->per_job_type[i].statistics_jobs_started = tmp;
+
+            size_t tmp_jobs_started = p->per_job_type[i].worker_jobs_started;
+            per_job_type_jobs_started[i] = tmp_jobs_started - p->per_job_type[i].statistics_jobs_started;
+            p->per_job_type[i].statistics_jobs_started = tmp_jobs_started;
+
+            usec_t tmp_busy_time = p->per_job_type[i].worker_busy_time;
+            per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_busy_time;
+            p->per_job_type[i].statistics_busy_time = tmp_busy_time;
         }
 
         // get a copy of the worker variables
@@ -178,7 +192,7 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
 
         p->statistics_last_checkpoint = now;
 
-        callback(data, p->pid, p->tag, busy_time, delta, jobs_started, jobs_running, per_job_type_name, per_job_type_jobs_started);
+        callback(data, p->pid, p->tag, busy_time, delta, jobs_started, jobs_running, per_job_type_name, per_job_type_jobs_started, per_job_type_busy_time);
     }
 
     netdata_mutex_unlock(&base_lock);

@@ -15,8 +15,9 @@ long web_client_streaming_rate_t = 0L;
 #define WORKER_JOB_WRITE_FILE     5
 #define WORKER_JOB_RCV_DATA       6
 #define WORKER_JOB_SND_DATA       7
+#define WORKER_JOB_PROCESS        8
 
-#if (WORKER_UTILIZATION_MAX_JOB_TYPES < 8)
+#if (WORKER_UTILIZATION_MAX_JOB_TYPES < 9)
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least 8
 #endif
 
@@ -284,6 +285,7 @@ static void web_server_del_callback(POLLINFO *pi) {
 }
 
 static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
+    int ret = -1;
     worker_is_busy(WORKER_JOB_RCV_DATA);
 
     worker_private->receptions++;
@@ -291,10 +293,14 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
 
-    if(unlikely(web_client_receive(w) < 0))
-        return -1;
+    if(unlikely(web_client_receive(w) < 0)) {
+        ret = -1;
+        goto cleanup;
+    }
 
     debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
+    worker_is_idle();
+    worker_is_busy(WORKER_JOB_PROCESS);
     web_client_process_request(w);
 
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
@@ -325,7 +331,8 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                     w->pollinfo_filecopy_slot = fpi->slot;
                 else {
                     error("Failed to add filecopy fd. Closing client.");
-                    return -1;
+                    ret = -1;
+                    goto cleanup;
                 }
             }
         }
@@ -338,7 +345,9 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
         *events |= POLLOUT;
 
-    int ret = web_server_check_client_status(w);
+    ret = web_server_check_client_status(w);
+
+cleanup:
     worker_is_idle();
     return ret;
 }
@@ -407,6 +416,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
     worker_register_job_name(WORKER_JOB_WRITE_FILE, "file write");
     worker_register_job_name(WORKER_JOB_RCV_DATA, "receive");
     worker_register_job_name(WORKER_JOB_SND_DATA, "send");
+    worker_register_job_name(WORKER_JOB_PROCESS, "process");
 
     netdata_thread_cleanup_push(socket_listen_main_static_threaded_worker_cleanup, ptr);
 
