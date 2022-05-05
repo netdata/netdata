@@ -12,9 +12,10 @@
  *
  * @param instance an instance data structure.
  * @param st a chart.
+ * @param filter a simple pattern to match against.
  * @return Returns 1 if the chart can be sent, 0 otherwise.
  */
-inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN *filter, const char *filter_string)
+inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN *filter)
 {
 #ifdef NETDATA_INTERNAL_CHECKS
     RRDHOST *host = st->rrdhost;
@@ -27,7 +28,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
         return 0;
 
-    if (filter_string) {
+    if (filter) {
         if (!(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
             return 0;
     } else {
@@ -485,6 +486,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
  *
  * @param instance an instance data structure.
  * @param host a data collecting host.
+ * @param filter_string a simple pattern filter.
  * @param wb the buffer to fill with metrics.
  * @param prefix a prefix for every metric.
  * @param exporting_options options to configure what data is exported.
@@ -599,7 +601,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     rrdset_foreach_read(st, host)
     {
 
-        if (likely(can_send_rrdset(instance, st, filter, filter_string))) {
+        if (likely(can_send_rrdset(instance, st, filter))) {
             rrdset_rdlock(st);
 
             char chart[PROMETHEUS_ELEMENT_MAX + 1];
@@ -792,7 +794,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
  *
  * @param instance an instance data structure.
  * @param host a data collecting host.
- * @param filter_string a simple pattern filter.
  * @param wb the buffer to write to.
  * @param exporting_options options to configure what data is exported.
  * @param server the name of a Prometheus server..

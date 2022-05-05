@@ -30,7 +30,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter_string && !(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
+        if (filter && !(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
             continue;
 
         calculated_number total = 0.0;
@@ -110,7 +110,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter_string && !(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
+        if (filter && !(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
             continue;
 
         if(rrdset_is_available_for_viewers(st)) {
