@@ -329,10 +329,15 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 static void web_server_tmr_callback(void *timer_data) {
     worker_private = (struct web_server_static_threaded_worker *)timer_data;
 
+    if(unlikely(netdata_exit)) return;
+
+/*
+ * this is now monitored by worker utilization at global statistics
+ * the implementation below has the problem that if the worker needs to work for more time than update_every
+ * a gap appears at the charts
+ * 
     static __thread RRDSET *st = NULL;
     static __thread RRDDIM *rd_user = NULL, *rd_system = NULL;
-
-    if(unlikely(netdata_exit)) return;
 
     if(unlikely(!st)) {
         char id[100 + 1];
@@ -367,6 +372,7 @@ static void web_server_tmr_callback(void *timer_data) {
     rrddim_set_by_pointer(st, rd_user, rusage.ru_utime.tv_sec * 1000000ULL + rusage.ru_utime.tv_usec);
     rrddim_set_by_pointer(st, rd_system, rusage.ru_stime.tv_sec * 1000000ULL + rusage.ru_stime.tv_usec);
     rrdset_done(st);
+*/
 }
 
 // ----------------------------------------------------------------------------
