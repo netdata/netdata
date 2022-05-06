@@ -1262,6 +1262,8 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "PROC",        .family = "proc threads",                  .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
     { .name = "CGROUPS",     .family = "cgroups collect threads",       .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
     { .name = "CGROUPSDISC", .family = "cgroups discovery threads",     .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "PLUGINSD",   .family = "plugins.d threads",             .priority = 1000000, },
+    { .name = "STREAMRCV",  .family = "streaming receive threads",     .priority = 1000000, },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }

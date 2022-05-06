@@ -54,6 +54,7 @@ typedef enum parser_input_type {
 typedef PARSER_RC (*keyword_function)(char **, void *, PLUGINSD_ACTION  *plugins_action);
 
 typedef struct parser_keyword {
+    size_t      worker_job_id;
     char        *keyword;
     uint32_t    keyword_hash;
     int         func_no;
@@ -67,6 +68,7 @@ typedef struct parser_data {
 } PARSER_DATA;
 
 typedef struct parser {
+    size_t worker_job_ids;
     uint8_t version;                // Parser version
     RRDHOST *host;
     void *input;                    // Input source e.g. stream

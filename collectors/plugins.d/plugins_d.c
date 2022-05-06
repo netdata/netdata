@@ -230,6 +230,8 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
 
 void *pluginsd_worker_thread(void *arg)
 {
+    worker_register("PLUGINSD");
+
     netdata_thread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
 
     struct plugind *cd = (struct plugind *)arg;
@@ -260,6 +262,7 @@ void *pluginsd_worker_thread(void *arg)
         if (unlikely(!cd->enabled))
             break;
     }
+    worker_unregister();
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -281,6 +284,8 @@ static void pluginsd_main_cleanup(void *data)
 
     info("cleanup completed.");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    worker_unregister();
 }
 
 void *pluginsd_main(void *ptr)
