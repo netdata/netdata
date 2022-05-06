@@ -21,6 +21,7 @@ extern int aclk_stats_enabled;
 extern int aclk_alert_reloaded;
 
 extern int aclk_ng;
+extern int use_mqtt_5;
 
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr);

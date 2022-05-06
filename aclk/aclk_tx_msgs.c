@@ -49,7 +49,11 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         return 0;
     }
 
-    mqtt_wss_publish_pid(client, topic, msg, msg_len,  MQTT_WSS_PUB_QOS1, &packet_id);
+    if (use_mqtt_5)
+        mqtt_wss_publish5(client, topic, NULL, msg, NULL, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    else
+        mqtt_wss_publish_pid(client, topic, msg, msg_len,  MQTT_WSS_PUB_QOS1, &packet_id);
+
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
 #endif
@@ -149,17 +153,22 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     json_object_to_file_ext(filename, msg, JSON_C_TO_STRING_PRETTY);
 #endif */
 
-    rc = mqtt_wss_publish_pid_block(client, topic, payload_len ? full_msg : str, len,  MQTT_WSS_PUB_QOS1, &packet_id, 5000);
-    if (rc == MQTT_WSS_ERR_BLOCK_TIMEOUT) {
-        error("Timeout sending binpacked message");
-        freez(full_msg);
-        return 503;
+    if (use_mqtt_5)
+        mqtt_wss_publish5(client, topic, NULL, payload_len ? full_msg : str, NULL, len, MQTT_WSS_PUB_QOS1, &packet_id);
+    else {
+        rc = mqtt_wss_publish_pid_block(client, topic, payload_len ? full_msg : str, len,  MQTT_WSS_PUB_QOS1, &packet_id, 5000);
+        if (rc == MQTT_WSS_ERR_BLOCK_TIMEOUT) {
+            error("Timeout sending binpacked message");
+            freez(full_msg);
+            return 503;
+        }
+        if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
+            error("Message is bigger than allowed maximum");
+            freez(full_msg);
+            return 403;
+        }
     }
-    if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
-        error("Message is bigger than allowed maximum");
-        freez(full_msg);
-        return 403;
-    }
+
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
 #endif

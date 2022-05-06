@@ -16,6 +16,7 @@ int aclk_disable_runtime = 0;
 int aclk_disable_single_updates = 0;
 
 int aclk_stats_enabled;
+int use_mqtt_5 = 0;
 
 #define ACLK_IMPL_KEY_NAME "aclk implementation"
 
