@@ -382,7 +382,7 @@ int aclk_query_process_msgs(struct aclk_query_thread *query_thr)
     return 0;
 }
 
-static void aclk_worker_register(void) {
+static void worker_aclk_register(void) {
     worker_register("ACLKQUERY");
     for (int i = 0; aclk_query_handlers[i].type != UNKNOWN; i++) {
         worker_register_job_name(i, aclk_query_handlers[i].name);
@@ -394,13 +394,14 @@ static void aclk_worker_register(void) {
  */
 void *aclk_query_main_thread(void *ptr)
 {
-    aclk_worker_register();
+    worker_aclk_register();
 
     struct aclk_query_thread *query_thr = ptr;
 
     while (!netdata_exit) {
         aclk_query_process_msgs(query_thr);
 
+        worker_is_idle();
         QUERY_THREAD_LOCK;
         if (unlikely(pthread_cond_wait(&query_cond_wait, &query_lock_wait)))
             sleep_usec(USEC_PER_SEC * 1);

@@ -39,6 +39,10 @@ When you finish doing the job, call:
 void worker_is_idle(void)
 ```
 
+Calls to `worker_is_busy()` can be made one after another (without calling
+`worker_is_idle()` between them) to switch jobs without losing any time between
+them and eliminating one of the 2 clock calls involved.
+
 ## Implementation details
 
 Totally lockless, extremely fast, it should not introduce any kind of problems to the workers.

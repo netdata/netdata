@@ -120,6 +120,7 @@ void *proc_main(void *ptr)
     heartbeat_init(&hb);
 
     while (!netdata_exit) {
+        worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
 
         if (unlikely(netdata_exit))
@@ -137,7 +138,6 @@ void *proc_main(void *ptr)
 
             worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-            worker_is_idle();
         }
     }
 

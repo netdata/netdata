@@ -2182,9 +2182,27 @@ static void statsd_main_cleanup(void *data) {
     worker_unregister();
 }
 
+#define WORKER_STATSD_FLUSH_GAUGES 0
+#define WORKER_STATSD_FLUSH_COUNTERS 1
+#define WORKER_STATSD_FLUSH_METERS 2
+#define WORKER_STATSD_FLUSH_TIMERS 3
+#define WORKER_STATSD_FLUSH_HISTOGRAMS 4
+#define WORKER_STATSD_FLUSH_SETS 5
+#define WORKER_STATSD_FLUSH_STATS 6
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 7
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 6
+#endif
+
 void *statsd_main(void *ptr) {
     worker_register("STATSDFLUSH");
-    worker_register_job_name(0, "run");
+    worker_register_job_name(WORKER_STATSD_FLUSH_GAUGES, "gauges");
+    worker_register_job_name(WORKER_STATSD_FLUSH_COUNTERS, "counters");
+    worker_register_job_name(WORKER_STATSD_FLUSH_METERS, "meters");
+    worker_register_job_name(WORKER_STATSD_FLUSH_TIMERS, "timers");
+    worker_register_job_name(WORKER_STATSD_FLUSH_HISTOGRAMS, "histograms");
+    worker_register_job_name(WORKER_STATSD_FLUSH_SETS, "sets");
+    worker_register_job_name(WORKER_STATSD_FLUSH_STATS, "statistics");
 
     netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
 
@@ -2465,15 +2483,26 @@ void *statsd_main(void *ptr) {
     while(!netdata_exit) {
         worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
-        worker_is_busy(0);
 
+        worker_is_busy(WORKER_STATSD_FLUSH_GAUGES);
         statsd_flush_index_metrics(&statsd.gauges,     statsd_flush_gauge);
+
+        worker_is_busy(WORKER_STATSD_FLUSH_COUNTERS);
         statsd_flush_index_metrics(&statsd.counters,   statsd_flush_counter);
+
+        worker_is_busy(WORKER_STATSD_FLUSH_METERS);
         statsd_flush_index_metrics(&statsd.meters,     statsd_flush_meter);
+
+        worker_is_busy(WORKER_STATSD_FLUSH_TIMERS);
         statsd_flush_index_metrics(&statsd.timers,     statsd_flush_timer);
+
+        worker_is_busy(WORKER_STATSD_FLUSH_HISTOGRAMS);
         statsd_flush_index_metrics(&statsd.histograms, statsd_flush_histogram);
+
+        worker_is_busy(WORKER_STATSD_FLUSH_SETS);
         statsd_flush_index_metrics(&statsd.sets,       statsd_flush_set);
 
+        worker_is_busy(WORKER_STATSD_FLUSH_STATS);
         statsd_update_all_app_charts();
 
         if(unlikely(netdata_exit))

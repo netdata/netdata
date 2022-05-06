@@ -1220,8 +1220,6 @@ void rrdeng_worker(void* arg)
         /* wait for commands */
         cmd_batch_size = 0;
         do {
-            worker_is_idle();
-
             /*
              * Avoid starving the loop when there are too many commands coming in.
              * timer_cb will interrupt the loop again to allow serving more commands.

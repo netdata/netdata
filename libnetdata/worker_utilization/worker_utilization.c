@@ -40,7 +40,7 @@ static struct worker *base = NULL;
 static __thread struct worker *worker = NULL;
 
 void worker_register(const char *workname) {
-    if(worker) return;
+    if(unlikely(worker)) return;
 
     worker = callocz(1, sizeof(struct worker));
     worker->pid = gettid();
@@ -91,14 +91,7 @@ void worker_unregister(void) {
     worker = NULL;
 }
 
-void worker_is_idle(void) {
-    if(unlikely(!worker)) return;
-    if(unlikely(worker->last_action != WORKER_BUSY)) return;
-    if(unlikely(worker->job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
-        worker->job_id = 0;
-
-    usec_t now = now_realtime_usec();
-
+static inline void worker_is_idle_with_time(usec_t now) {
     usec_t delta = now - worker->last_action_timestamp;
     worker->busy_time += delta;
     worker->per_job_type[worker->job_id].worker_busy_time += delta;
@@ -107,17 +100,26 @@ void worker_is_idle(void) {
     // set it to idle before we set the timestamp
 
     worker->last_action = WORKER_IDLE;
-    if(worker->last_action_timestamp < now)
+    if(likely(worker->last_action_timestamp < now))
         worker->last_action_timestamp = now;
+}
+
+void worker_is_idle(void) {
+    if(unlikely(!worker)) return;
+    if(unlikely(worker->last_action != WORKER_BUSY)) return;
+
+    worker_is_idle_with_time(now_realtime_usec());
 }
 
 void worker_is_busy(size_t job_id) {
     if(unlikely(!worker)) return;
-    if(unlikely(worker->last_action != WORKER_IDLE)) return;
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         job_id = 0;
 
     usec_t now = now_realtime_usec();
+
+    if(worker->last_action == WORKER_BUSY)
+        worker_is_idle_with_time(now);
 
     // the worker was idle
     // set the timestamp and then set it to busy

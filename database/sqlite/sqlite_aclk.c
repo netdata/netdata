@@ -447,8 +447,6 @@ void aclk_database_worker(void *arg)
         /* wait for commands */
         cmd_batch_size = 0;
         do {
-            worker_is_idle();
-
             if (unlikely(cmd_batch_size >= MAX_CMD_BATCH_SIZE))
                 break;
             cmd = aclk_database_deq_cmd(wc);

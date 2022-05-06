@@ -1327,23 +1327,20 @@ void *global_statistics_main(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     while (!netdata_exit) {
+        worker_is_idle();
         heartbeat_next(&hb, step);
 
         worker_is_busy(WORKER_JOB_WORKERS);
         worker_utilization_charts();
-        worker_is_idle();
 
         worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
-        worker_is_idle();
 
         worker_is_busy(WORKER_JOB_REGISTRY);
         registry_statistics();
-        worker_is_idle();
 
         worker_is_busy(WORKER_JOB_DBENGINE);
         dbengine_statistics_charts();
-        worker_is_idle();
     }
 
     netdata_thread_cleanup_pop(1);

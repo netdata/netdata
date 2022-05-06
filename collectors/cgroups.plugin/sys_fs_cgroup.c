@@ -2646,11 +2646,26 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     read_cgroup_network_interfaces(cg);
 }
 
+#define WORKER_DISCOVERY_INIT 0
+#define WORKER_DISCOVERY_FIND 1
+#define WORKER_DISCOVERY_PROCESS 2
+#define WORKER_DISCOVERY_UPDATE 3
+#define WORKER_DISCOVERY_CLEANUP 4
+#define WORKER_DISCOVERY_COPY 5
+#define WORKER_DISCOVERY_SHARE 6
+#define WORKER_DISCOVERY_LOCK 7
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
+#endif
+
 static inline void discovery_find_all_cgroups() {
     debug(D_CGROUP, "searching for cgroups");
 
+    worker_is_busy(WORKER_DISCOVERY_INIT);
     discovery_mark_all_cgroups_as_unavailable();
 
+    worker_is_busy(WORKER_DISCOVERY_FIND);
     if (!cgroup_use_unified_cgroups) {
         discovery_find_all_cgroups_v1();
     } else {
@@ -2659,16 +2674,25 @@ static inline void discovery_find_all_cgroups() {
 
     struct cgroup *cg;
     for (cg = discovered_cgroup_root; cg; cg = cg->discovered_next) {
+        worker_is_busy(WORKER_DISCOVERY_PROCESS);
         discovery_process_cgroup(cg);
     }
 
+    worker_is_busy(WORKER_DISCOVERY_UPDATE);
     discovery_update_filenames();
 
+    worker_is_busy(WORKER_DISCOVERY_LOCK);
     uv_mutex_lock(&cgroup_root_mutex);
+
+    worker_is_busy(WORKER_DISCOVERY_CLEANUP);
     discovery_cleanup_all_cgroups();
+
+    worker_is_busy(WORKER_DISCOVERY_COPY);
     discovery_copy_discovered_cgroups_to_reader();
+
     uv_mutex_unlock(&cgroup_root_mutex);
 
+    worker_is_busy(WORKER_DISCOVERY_SHARE);
     discovery_share_cgroups_with_ebpf();
 
     debug(D_CGROUP, "done searching for cgroups");
@@ -2678,7 +2702,19 @@ void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
 
+    worker_register("CGROUPSDISC");
+    worker_register_job_name(WORKER_DISCOVERY_INIT, "init");
+    worker_register_job_name(WORKER_DISCOVERY_FIND, "find");
+    worker_register_job_name(WORKER_DISCOVERY_PROCESS, "process");
+    worker_register_job_name(WORKER_DISCOVERY_UPDATE, "update");
+    worker_register_job_name(WORKER_DISCOVERY_CLEANUP, "cleanup");
+    worker_register_job_name(WORKER_DISCOVERY_COPY, "copy");
+    worker_register_job_name(WORKER_DISCOVERY_SHARE, "share");
+    worker_register_job_name(WORKER_DISCOVERY_LOCK, "lock");
+
     while (!netdata_exit) {
+        worker_is_idle();
+
         uv_mutex_lock(&discovery_thread.mutex);
         while (!discovery_thread.start_discovery)
             uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
@@ -2692,6 +2728,7 @@ void cgroup_discovery_worker(void *ptr)
     }
 
     discovery_thread.exited = 1;
+    worker_unregister();
 } 
 
 // ----------------------------------------------------------------------------
@@ -4650,6 +4687,8 @@ void update_cgroup_charts(int update_every) {
 // cgroups main
 
 static void cgroup_main_cleanup(void *ptr) {
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -4687,23 +4726,29 @@ static void cgroup_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-void *cgroups_main(void *ptr) {
-    netdata_thread_cleanup_push(cgroup_main_cleanup, ptr);
+#define WORKER_CGROUPS_LOCK 0
+#define WORKER_CGROUPS_READ 1
+#define WORKER_CGROUPS_CHART 2
 
-    struct rusage thread;
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 3
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
+#endif
+
+void *cgroups_main(void *ptr) {
+    worker_register("CGROUPS");
+    worker_register_job_name(WORKER_CGROUPS_LOCK, "lock");
+    worker_register_job_name(WORKER_CGROUPS_READ, "read");
+    worker_register_job_name(WORKER_CGROUPS_READ, "chart");
+
+    netdata_thread_cleanup_push(cgroup_main_cleanup, ptr);
 
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
         is_inside_k8s = 1;
         cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_YES;
     }
 
-    // when ZERO, attempt to do it
-    int vdo_cpu_netdata = config_get_boolean("plugin:cgroups", "cgroups plugin resource charts", 1);
-
     read_cgroup_plugin_configuration();
     netdata_cgroup_ebpf_initialize_shm();
-
-    RRDSET *stcpu_thread = NULL;
 
     if (uv_mutex_init(&cgroup_root_mutex)) {
         error("CGROUP: cannot initialize mutex for the main cgroup list");
@@ -4736,6 +4781,8 @@ void *cgroups_main(void *ptr) {
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
     while(!netdata_exit) {
+        worker_is_idle();
+
         usec_t hb_dt = heartbeat_next(&hb, step);
         if(unlikely(netdata_exit)) break;
 
@@ -4747,46 +4794,21 @@ void *cgroups_main(void *ptr) {
             cgroups_check = 0;
         }
 
+        worker_is_busy(WORKER_CGROUPS_LOCK);
         uv_mutex_lock(&cgroup_root_mutex);
+
+        worker_is_busy(WORKER_CGROUPS_READ);
         read_all_discovered_cgroups(cgroup_root);
+
+        worker_is_busy(WORKER_CGROUPS_CHART);
         update_cgroup_charts(cgroup_update_every);
+
+        worker_is_idle();
         uv_mutex_unlock(&cgroup_root_mutex);
-
-        // --------------------------------------------------------------------
-
-        if(vdo_cpu_netdata) {
-            getrusage(RUSAGE_THREAD, &thread);
-
-            if(unlikely(!stcpu_thread)) {
-
-                stcpu_thread = rrdset_create_localhost(
-                        "netdata"
-                        , "plugin_cgroups_cpu"
-                        , NULL
-                        , "cgroups"
-                        , NULL
-                        , "Netdata CGroups Plugin CPU usage"
-                        , "milliseconds/s"
-                        , PLUGIN_CGROUPS_NAME
-                        , "stats"
-                        , 132000
-                        , cgroup_update_every
-                        , RRDSET_TYPE_STACKED
-                );
-
-                rrddim_add(stcpu_thread, "user",  NULL,  1, 1000, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else
-                rrdset_next(stcpu_thread);
-
-            rrddim_set(stcpu_thread, "user"  , thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-            rrddim_set(stcpu_thread, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
-            rrdset_done(stcpu_thread);
-        }
     }
 
 exit:
+    worker_unregister();
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
