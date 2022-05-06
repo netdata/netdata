@@ -1265,6 +1265,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "PLUGINSD",   .family = "plugins.d threads",             .priority = 1000000, },
     { .name = "STREAMRCV",  .family = "streaming receive threads",     .priority = 1000000, },
     { .name = "DISKSPACE",  .family = "diskspace thread",              .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "TC",         .family = "tc thread",                     .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }
