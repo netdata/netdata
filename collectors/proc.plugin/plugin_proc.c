@@ -9,7 +9,6 @@ static struct proc_module {
     int enabled;
 
     int (*func)(int update_every, usec_t dt);
-    usec_t duration;
 
     RRDDIM *rd;
 
@@ -66,9 +65,7 @@ static struct proc_module {
 
     // ZFS metrics
     {.name = "/proc/spl/kstat/zfs/arcstats", .dim = "zfs_arcstats", .func = do_proc_spl_kstat_zfs_arcstats},
-    {.name = "/proc/spl/kstat/zfs/pool/state",
-     .dim = "zfs_pool_state",
-     .func = do_proc_spl_kstat_zfs_pool_state},
+    {.name = "/proc/spl/kstat/zfs/pool/state",.dim = "zfs_pool_state",.func = do_proc_spl_kstat_zfs_pool_state},
 
     // BTRFS metrics
     {.name = "/sys/fs/btrfs",                .dim = "btrfs",        .func = do_sys_fs_btrfs},
@@ -83,6 +80,10 @@ static struct proc_module {
     {.name = NULL, .dim = NULL, .func = NULL}
 };
 
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 36
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 36
+#endif
+
 static void proc_main_cleanup(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -91,13 +92,15 @@ static void proc_main_cleanup(void *ptr)
     info("cleaning up...");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    worker_unregister();
 }
 
 void *proc_main(void *ptr)
 {
-    netdata_thread_cleanup_push(proc_main_cleanup, ptr);
+    worker_register("PROC");
 
-    int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", CONFIG_BOOLEAN_YES);
+    netdata_thread_cleanup_push(proc_main_cleanup, ptr);
 
     config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
 
@@ -107,128 +110,34 @@ void *proc_main(void *ptr)
         struct proc_module *pm = &proc_modules[i];
 
         pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
-        pm->duration = 0ULL;
         pm->rd = NULL;
+
+        worker_register_job_name(i, proc_modules[i].dim);
     }
 
     usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    size_t iterations = 0;
 
     while (!netdata_exit) {
-        iterations++;
-        (void)iterations;
-
         usec_t hb_dt = heartbeat_next(&hb, step);
-        usec_t duration = 0ULL;
 
         if (unlikely(netdata_exit))
             break;
 
-        // BEGIN -- the job to be done
-
         for (i = 0; proc_modules[i].name; i++) {
+            if (unlikely(netdata_exit))
+                break;
+
             struct proc_module *pm = &proc_modules[i];
             if (unlikely(!pm->enabled))
                 continue;
 
             debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
 
-//#ifdef NETDATA_LOG_ALLOCATIONS
-//            if(pm->func == do_proc_interrupts)
-//                log_thread_memory_allocations = iterations;
-//#endif
+            worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-            pm->duration = heartbeat_monotonic_dt_to_now_usec(&hb) - duration;
-            duration += pm->duration;
-
-//#ifdef NETDATA_LOG_ALLOCATIONS
-//            if(pm->func == do_proc_interrupts)
-//                log_thread_memory_allocations = 0;
-//#endif
-
-            if (unlikely(netdata_exit))
-                break;
-        }
-
-        // END -- the job is done
-
-        if (vdo_cpu_netdata) {
-            static RRDSET *st_cpu_thread = NULL, *st_duration = NULL;
-            static RRDDIM *rd_user = NULL, *rd_system = NULL;
-
-            // ----------------------------------------------------------------
-
-            struct rusage thread;
-            getrusage(RUSAGE_THREAD, &thread);
-
-            if (unlikely(!st_cpu_thread)) {
-                st_cpu_thread = rrdset_create_localhost(
-                    "netdata",
-                    "plugin_proc_cpu",
-                    NULL,
-                    "proc",
-                    NULL,
-                    "Netdata proc plugin CPU usage",
-                    "milliseconds/s",
-                    "proc",
-                    "stats",
-                    132000,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_STACKED);
-
-                rd_user = rrddim_add(st_cpu_thread,   "user",   NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
-                rd_system = rrddim_add(st_cpu_thread, "system", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
-            } else {
-                rrdset_next(st_cpu_thread);
-            }
-
-            rrddim_set_by_pointer(
-                st_cpu_thread, rd_user,   thread.ru_utime.tv_sec * USEC_PER_SEC + thread.ru_utime.tv_usec);
-            rrddim_set_by_pointer(
-                st_cpu_thread, rd_system, thread.ru_stime.tv_sec * USEC_PER_SEC + thread.ru_stime.tv_usec);
-            rrdset_done(st_cpu_thread);
-
-            // ----------------------------------------------------------------
-
-            if (unlikely(!st_duration)) {
-                st_duration = rrdset_find_active_bytype_localhost("netdata", "plugin_proc_modules");
-
-                if (!st_duration) {
-                    st_duration = rrdset_create_localhost(
-                        "netdata",
-                        "plugin_proc_modules",
-                        NULL,
-                        "proc",
-                        NULL,
-                        "Netdata proc plugin modules durations",
-                        "milliseconds/run",
-                        "proc",
-                        "stats",
-                        132001,
-                        localhost->rrd_update_every,
-                        RRDSET_TYPE_STACKED);
-
-                    for (i = 0; proc_modules[i].name; i++) {
-                        struct proc_module *pm = &proc_modules[i];
-                        if (unlikely(!pm->enabled))
-                            continue;
-
-                        pm->rd = rrddim_add(st_duration, pm->dim, NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                }
-            } else
-                rrdset_next(st_duration);
-
-            for (i = 0; proc_modules[i].name; i++) {
-                struct proc_module *pm = &proc_modules[i];
-                if (unlikely(!pm->enabled))
-                    continue;
-
-                rrddim_set_by_pointer(st_duration, pm->rd, pm->duration);
-            }
-            rrdset_done(st_duration);
+            worker_is_idle();
         }
     }
 

@@ -5,8 +5,8 @@
 
 // workers interfaces
 
-#define WORKER_UTILIZATION_MAX_JOB_TYPES 20
-#define WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH 22
+#define WORKER_UTILIZATION_MAX_JOB_TYPES 50
+#define WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH 25
 
 extern void worker_register(const char *workname);
 extern void worker_register_job_name(size_t job_id, const char *name);

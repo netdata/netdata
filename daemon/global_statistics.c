@@ -436,7 +436,9 @@ static void global_statistics_charts(void) {
     }
 
     // ----------------------------------------------------------------
+}
 
+static void dbengine_statistics_charts(void) {
 #ifdef ENABLE_DBENGINE
     if(netdata_rwlock_tryrdlock(&rrd_rwlock) == 0) {
         RRDHOST *host;
@@ -907,7 +909,7 @@ struct worker_utilization {
     RRDSET *st_workers_busy_per_job_type;
 };
 
-static void worker_utilization_update_chart(struct worker_utilization *wu) {
+static void workers_utilization_update_chart(struct worker_utilization *wu) {
     if(!wu->workers_registered) return;
 
     //fprintf(stderr, "%-12s WORKER UTILIZATION: %-3.2f%%, %zu jobs done, %zu running, on %zu workers, min %-3.02f%%, max %-3.02f%%.\n",
@@ -1135,7 +1137,7 @@ static void worker_utilization_update_chart(struct worker_utilization *wu) {
     rrdset_done(wu->st_workers_threads);
 }
 
-static void worker_utilization_reset_statistics(struct worker_utilization *wu) {
+static void workers_utilization_reset_statistics(struct worker_utilization *wu) {
     wu->workers_registered = 0;
     wu->workers_busy = 0;
     wu->workers_total_busy_time = 0;
@@ -1178,21 +1180,60 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid, kernel_uint_t *utime, 
 #endif
 }
 
+static void workers_threads_cleanup(struct worker_utilization *wu) {
+    struct worker_thread *t;
+
+    while(wu->threads && !wu->threads->enabled) {
+        t = wu->threads;
+        wu->threads = t->next;
+        t->next = NULL;
+        freez(t);
+    }
+
+    if(!wu->threads) return;
+
+    for(t = wu->threads; t && t->next ; t = t->next) {
+        if(t->next->enabled) continue;
+
+        struct worker_thread *to_remove = t->next;
+        t->next = to_remove->next;
+        to_remove->next = NULL;
+        freez(to_remove);
+    }
+}
+
+static struct worker_thread *worker_thread_find(struct worker_utilization *wu, pid_t pid) {
+    struct worker_thread *wt;
+    for(wt = wu->threads; wt && wt->pid != pid ; wt = wt->next) ;
+    return wt;
+}
+
+static struct worker_thread *worker_thread_create(struct worker_utilization *wu, pid_t pid) {
+    struct worker_thread *wt;
+
+    wt = (struct worker_thread *)callocz(1, sizeof(struct worker_thread));
+    wt->pid = pid;
+
+    // link it
+    wt->next = wu->threads;
+    wu->threads = wt;
+
+    return wt;
+}
+
+static struct worker_thread *worker_thread_find_or_create(struct worker_utilization *wu, pid_t pid) {
+    struct worker_thread *wt;
+    wt = worker_thread_find(wu, pid);
+    if(!wt) wt = worker_thread_create(wu, pid);
+
+    return wt;
+}
+
 static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_started __maybe_unused, size_t is_running __maybe_unused, const char **job_types_names __maybe_unused, size_t *job_types_jobs_started __maybe_unused, usec_t *job_types_busy_time __maybe_unused) {
     struct worker_utilization *wu = (struct worker_utilization *)ptr;
 
     // find the worker_thread in the list
-    struct worker_thread *wt;
-    for(wt = wu->threads; wt && wt->pid != pid ; wt = wt->next) ;
-    if(!wt) {
-        // we have to allocate a new one
-        wt = (struct worker_thread *)callocz(1, sizeof(struct worker_thread));
-        wt->pid = pid;
-
-        // link it
-        wt->next = wu->threads;
-        wu->threads = wt;
-    }
+    struct worker_thread *wt = worker_thread_find_or_create(wu, pid);
 
     wt->enabled = 1;
     wt->busy_time = utilization_usec;
@@ -1215,15 +1256,18 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
     if(util < wu->workers_min_busy_time)
         wu->workers_min_busy_time = util;
 
+    // accumulate per job type statistics
     size_t i;
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
         wu->per_job_type[i].jobs_started += job_types_jobs_started[i];
         wu->per_job_type[i].busy_time += job_types_busy_time[i];
 
+        // new job type found
         if(unlikely(!wu->per_job_type[i].name[0] && job_types_names[i]))
             strncpyz(wu->per_job_type[i].name, job_types_names[i], WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
     }
 
+    // find its CPU utilization
     if((wt->cpu_enabled = !read_thread_cpu_time_from_proc_stat(pid, &wt->utime, &wt->stime)))
         wt->collected_time = now_realtime_usec();
 }
@@ -1235,6 +1279,8 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "ACLKSYNC",    .family = "aclk",     .priority = 199995 },
     { .name = "STATSD",      .family = "statsd",   .priority = 131990 },
     { .name = "STATSDFLUSH", .family = "statsd",   .priority = 131995 },
+    { .name = "STATS",       .family = "stats",    .priority = 135000 },
+    { .name = "PROC",        .family = "proc",     .priority = 131995 },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }
@@ -1243,9 +1289,10 @@ static struct worker_utilization all_workers_utilization[] = {
 void worker_utilization_charts(void) {
     int i;
     for(i = 0; all_workers_utilization[i].name ;i++) {
-        worker_utilization_reset_statistics(&all_workers_utilization[i]);
+        workers_utilization_reset_statistics(&all_workers_utilization[i]);
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
-        worker_utilization_update_chart(&all_workers_utilization[i]);
+        workers_utilization_update_chart(&all_workers_utilization[i]);
+        workers_threads_cleanup(&all_workers_utilization[i]);
     }
 }
 
@@ -1258,11 +1305,27 @@ static void global_statistics_cleanup(void *ptr)
 
     info("cleaning up...");
 
+    worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+#define WORKER_JOB_GLOBAL   0
+#define WORKER_JOB_REGISTRY 1
+#define WORKER_JOB_WORKERS  2
+#define WORKER_JOB_DBENGINE 3
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 4
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 4
+#endif
+
 void *global_statistics_main(void *ptr)
 {
+    worker_register("STATS");
+    worker_register_job_name(WORKER_JOB_GLOBAL, "global");
+    worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
+    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
+    worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
+
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
     int update_every =
@@ -1276,9 +1339,21 @@ void *global_statistics_main(void *ptr)
     while (!netdata_exit) {
         heartbeat_next(&hb, step);
 
+        worker_is_busy(WORKER_JOB_WORKERS);
         worker_utilization_charts();
+        worker_is_idle();
+
+        worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
+        worker_is_idle();
+
+        worker_is_busy(WORKER_JOB_REGISTRY);
         registry_statistics();
+        worker_is_idle();
+
+        worker_is_busy(WORKER_JOB_DBENGINE);
+        dbengine_statistics_charts();
+        worker_is_idle();
     }
 
     netdata_thread_cleanup_pop(1);

@@ -20,15 +20,19 @@ inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
 }
 #endif
 
-// When running a binary with CLOCK_MONOTONIC_COARSE defined on a system with a linux kernel older than Linux 2.6.32 the
-// clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
+// Similar to CLOCK_MONOTONIC, but provides access to a raw hardware-based time that is not subject to NTP adjustments
+// or the incremental adjustments performed by adjtime(3).  This clock does not count time that the system is suspended
 
-static void test_clock_monotonic_coarse(void) {
+static void test_clock_monotonic_raw(void) {
+#ifdef CLOCK_MONOTONIC_RAW
     struct timespec ts;
-    if(clock_gettime(CLOCK_MONOTONIC_COARSE, &ts) == -1 && errno == EINVAL)
+    if(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == -1 && errno == EINVAL)
         clock_monotonic_to_use = CLOCK_MONOTONIC;
     else
-        clock_monotonic_to_use = CLOCK_MONOTONIC_COARSE;
+        clock_monotonic_to_use = CLOCK_MONOTONIC_RAW;
+#else
+    clock_monotonic_to_use = CLOCK_MONOTONIC;
+#endif
 }
 
 // When running a binary with CLOCK_BOOTTIME defined on a system with a linux kernel older than Linux 2.6.39 the
@@ -45,8 +49,8 @@ static void test_clock_boottime(void) {
 // perform any initializations required for clocks
 
 void clocks_init(void) {
-    // monotonic coarse has to be tested before boottime
-    test_clock_monotonic_coarse();
+    // monotonic raw has to be tested before boottime
+    test_clock_monotonic_raw();
 
     // boottime has to be tested after monotonic coarse
     test_clock_boottime();
