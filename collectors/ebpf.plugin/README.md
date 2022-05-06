@@ -217,7 +217,7 @@ The following options are accepted:
 The following table demonstrates a comparison between memory usage for each method on a 64 bit computer running a Linux 
 distribution that allows the maximum of `32768` PIDs (Value obtained from `/proc/sys/kernel/pid_max`). 
 
-|  Thread   | Size (bytes) | Static | Dynamic |
+| Thread  | Strcuture size | Dynamic preallocation | Static allocation |
 |-----------|--------------|--------|---------|
 | cachestat |           32 | 262144 |  1310720|
 | dcstat    |           64 | 262144 |  2359296|
