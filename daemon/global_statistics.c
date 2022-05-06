@@ -1249,6 +1249,8 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "STATSDFLUSH", .family = "statsd flush threads",          .priority = 1000000 },
     { .name = "STATS",       .family = "global statistics threads",     .priority = 1000000 },
     { .name = "PROC",        .family = "proc threads",                  .priority = 1000000 },
+    { .name = "CGROUPS",     .family = "cgroups collect threads",       .priority = 1000000 },
+    { .name = "CGROUPSDISC", .family = "cgroups discovery threads",     .priority = 1000000 },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }
