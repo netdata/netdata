@@ -1253,17 +1253,18 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
 
 static struct worker_utilization all_workers_utilization[] = {
     { .name = "WEB",         .family = "web server threads",            .priority = 1000000 },
-    { .name = "DBENGINE",    .family = "dbengine main threads",         .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "DBENGINE",    .family = "dbengine main thread",          .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
     { .name = "ACLKQUERY",   .family = "aclk query threads",            .priority = 1000000 },
     { .name = "ACLKSYNC",    .family = "aclk host sync threads",        .priority = 1000000 },
-    { .name = "STATSD",      .family = "statsd collect threads",        .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "STATSDFLUSH", .family = "statsd flush threads",          .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "STATS",       .family = "global statistics threads",     .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "PROC",        .family = "proc threads",                  .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "CGROUPS",     .family = "cgroups collect threads",       .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "CGROUPSDISC", .family = "cgroups discovery threads",     .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "STATSD",      .family = "statsd collect thread",         .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "STATSDFLUSH", .family = "statsd flush thread",           .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "STATS",       .family = "global statistics thread",      .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "PROC",        .family = "proc thread",                   .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "CGROUPS",     .family = "cgroups collect thread",        .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "CGROUPSDISC", .family = "cgroups discovery thread",      .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
     { .name = "PLUGINSD",   .family = "plugins.d threads",             .priority = 1000000, },
     { .name = "STREAMRCV",  .family = "streaming receive threads",     .priority = 1000000, },
+    { .name = "DISKSPACE",  .family = "diskspace thread",              .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }
