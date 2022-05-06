@@ -870,10 +870,13 @@ struct worker_thread {
     struct worker_thread *next;
 };
 
+#define WORKER_FLAG_ALWAYS_ONE 0x00000001
+
 struct worker_utilization {
     const char *name;
     const char *family;
     size_t priority;
+    uint32_t flags;
 
     struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
@@ -936,15 +939,19 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_AREA
         );
 
-        wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        if(!(wu->flags & WORKER_FLAG_ALWAYS_ONE)) {
+            wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        }
         wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
     }
     else
         rrdset_next(wu->st_workers_time);
 
-    rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->workers_min_busy_time * 10000.0));
-    rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_max, (collected_number)((double)wu->workers_max_busy_time * 10000.0));
+    if(!(wu->flags & WORKER_FLAG_ALWAYS_ONE)) {
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->workers_min_busy_time * 10000.0));
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_max, (collected_number)((double)wu->workers_max_busy_time * 10000.0));
+    }
     rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, (collected_number)((double)wu->workers_total_busy_time * 100.0 * 10000.0 / (double)wu->workers_total_duration));
     rrdset_done(wu->st_workers_time);
 
@@ -970,8 +977,10 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_AREA
         );
 
-        wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+        if(!(wu->flags & WORKER_FLAG_ALWAYS_ONE)) {
+            wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+        }
         wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
     }
     else
@@ -995,9 +1004,11 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     }
     if(unlikely(min == 1000.0)) min = 0.0;
 
+    if(!(wu->flags & WORKER_FLAG_ALWAYS_ONE)) {
+        rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(min * 10000ULL));
+        rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)(max * 10000ULL));
+    }
     rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)count ));
-    rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)( min * 10000ULL));
-    rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)( max * 10000ULL));
     rrdset_done(wu->st_workers_cpu);
 #endif
 
@@ -1242,26 +1253,33 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
 
 static struct worker_utilization all_workers_utilization[] = {
     { .name = "WEB",         .family = "web server threads",            .priority = 1000000 },
-    { .name = "DBENGINE",    .family = "dbengine main threads",         .priority = 1000000 },
+    { .name = "DBENGINE",    .family = "dbengine main threads",         .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
     { .name = "ACLKQUERY",   .family = "aclk query threads",            .priority = 1000000 },
     { .name = "ACLKSYNC",    .family = "aclk host sync threads",        .priority = 1000000 },
-    { .name = "STATSD",      .family = "statsd collect threads",        .priority = 1000000 },
-    { .name = "STATSDFLUSH", .family = "statsd flush threads",          .priority = 1000000 },
-    { .name = "STATS",       .family = "global statistics threads",     .priority = 1000000 },
-    { .name = "PROC",        .family = "proc threads",                  .priority = 1000000 },
-    { .name = "CGROUPS",     .family = "cgroups collect threads",       .priority = 1000000 },
-    { .name = "CGROUPSDISC", .family = "cgroups discovery threads",     .priority = 1000000 },
+    { .name = "STATSD",      .family = "statsd collect threads",        .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "STATSDFLUSH", .family = "statsd flush threads",          .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "STATS",       .family = "global statistics threads",     .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "PROC",        .family = "proc threads",                  .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "CGROUPS",     .family = "cgroups collect threads",       .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "CGROUPSDISC", .family = "cgroups discovery threads",     .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }
 };
 
 void worker_utilization_charts(void) {
+    static size_t iterations = 0;
+    iterations++;
+
     int i;
     for(i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
-        workers_utilization_update_chart(&all_workers_utilization[i]);
+
+        // skip the first iteration, so that we don't accumulate startup utilization to our charts
+        if(likely(iterations > 1))
+            workers_utilization_update_chart(&all_workers_utilization[i]);
+
         workers_threads_cleanup(&all_workers_utilization[i]);
     }
 }
