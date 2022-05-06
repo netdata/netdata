@@ -209,7 +209,7 @@ The `allocate memory` specifies how collectors will manage the memory during run
 The following options are accepted:
 
 -  `static`:  This option is preferred for high loaded or dedicated servers. It will use more memory, but it needs less
-   iteration with kernels. This is the default option.
+   interation with the kernels. This is the default option.
 -  `dynamic`:  When the plugin runs with this option, it will allocate memory for a specific PID when the PID is used, but
    it needs to use a minimum necessary for these future PIDs. Because it will allocate during runtime, it will
    need more iteration with the kernel. This is the preferred method when the host has a small amount of memory.
