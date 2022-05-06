@@ -205,7 +205,7 @@ Linux metrics:
 
 #### Allocate memory
 
-The `allocate memory` specifies how collectors will manage the memory during runtime to monitor application and cgroup. 
+The `allocate memory` specifies how collectors will manage the memory during runtime to monitor applications and cgroups. 
 The following options are accepted:
 
 -  `static`:  This option is preferred for high loaded or dedicated servers. It will use more memory, but it needs less
