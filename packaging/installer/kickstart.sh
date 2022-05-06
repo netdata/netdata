@@ -1698,14 +1698,24 @@ prepare_offline_install_source() {
   run cd "${1}" || fatal "Failed to swtich to target directory for offline install preparation." F0505
 
   if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
-    for arch in ${STATIC_INSTALL_ARCHES}; do
-      set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
+    set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
 
-      progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
-      if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
-        warning "Failed to download static installer archive for ${arch}."
+    if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+      for arch in ${STATIC_INSTALL_ARCHES}; do
+        set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
+
+        progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
+        if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
+          warning "Failed to download static installer archive for ${arch}."
+        fi
+      done
+    else
+      warning "Selected version of Netdata only provides static builds for x86_64. You will only be able to install on x86_64 systems with this offline install source."
+      progress "Fetching ${NETDATA_STATIC_ARCHIVE_OLD_URL}"
+      if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
+        warning "Failed to download static installer archive for x86_64."
       fi
-    done
+    fi
 
     progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
     if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
@@ -1939,8 +1949,6 @@ while [ -n "${1}" ]; do
       ;;
     "--install-version")
       INSTALL_VERSION="${2}"
-      # shellcheck disable=SC2034
-      AUTO_UPDATES=0
       shift 1
       ;;
     "--old-install-prefix")
@@ -2056,8 +2064,12 @@ if [ -n "${STATIC_INSTALL_OPTIONS}" ]; then
   fi
 fi
 
+if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ] && [ -n "${INSTALL_VERSION}" ]; then
+    fatal "Specifying an install version alongside an offline install source is not supported." F050A
+fi
+
 if [ "${NETDATA_AUTO_UPDATES}" = "default" ]; then
-  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ] || [ -n "${INSTALL_VERSION}" ]; then
     AUTO_UPDATE=0
   else
     AUTO_UPDATE=1
