@@ -858,6 +858,26 @@ struct btf *ebpf_parse_btf_file(const char *filename)
 
     return bf;
 }
+
+/**
+ * Set default btf file
+ *
+ * Load the default BTF file on environment.
+ *
+ * @param path     is the fullpath
+ * @param filename is the file inside BTF path.
+ */
+struct btf *ebpf_load_btf_file(char *path, char *filename)
+{
+    char fullpath[PATH_MAX + 1];
+    snprintfz(fullpath, PATH_MAX, "%s/%s", path, filename);
+    struct btf *ret = ebpf_parse_btf_file(fullpath);
+    if (!ret)
+        info("Your environment does not have BTF file %s/%s. The plugin will work with 'legacy' code.",
+             path, filename);
+
+    return ret;
+}
 #endif
 
 /**

@@ -287,6 +287,7 @@ extern void ebpf_select_host_prefix(char *output, size_t length, char *syscall, 
 #ifdef LIBBPF_MAJOR_VERSION
 extern void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
 extern struct btf *ebpf_parse_btf_file(const char *filename);
+extern struct btf *ebpf_load_btf_file(char *path, char *filename);
 #endif
 
 #endif /* NETDATA_EBPF_H */
