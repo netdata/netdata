@@ -210,9 +210,9 @@ The following options are accepted:
 
 -  `static`:  This option is preferred for high loaded or dedicated servers. It will use more memory, but it needs less
    interation with the kernels. This is the default option.
--  `dynamic`:  When the plugin runs with this option, it will allocate memory for a specific PID when the PID is used, but
-   it needs to use a minimum necessary for these future PIDs. Because it will allocate during runtime, it will
-   need more iteration with the kernel. This is the preferred method when the host has a small amount of memory.
+-  `dynamic`:  When the plugin runs with this option, it will allocate memory for a specific PID only when the PID is used, but
+   it still needs to use a minimum necessary space for every possible PID. As far as it allocates memory in runtime, it frequently
+   interacts with the kernel. This is the preferred method when the host has a small amount of memory.
 
 The following table demonstrates a comparison between memory usage for each method on a 64 bit computer running a Linux 
 distribution that allows the maximum of `32768` PIDs (Value obtained from `/proc/sys/kernel/pid_max`). 
