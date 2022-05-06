@@ -496,6 +496,11 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
         if(count++) buffer_strcat(wb, " ");
         buffer_strcat(wb, "unaligned");
     }
+
+    if(options & RRDR_OPTION_ANOMALY_BIT) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "anomaly-bit");
+    }
 }
 
 static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
