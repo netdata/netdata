@@ -275,7 +275,8 @@ extern int ebpf_enable_tracing_values(char *subsys, char *eventname);
 extern int ebpf_disable_tracing_values(char *subsys, char *eventname);
 
 // BTF Section
-#define EBPF_DEFAULT_BTF_FILE "/sys/kernel/btf"
+#define EBPF_DEFAULT_BTF_FILE "vmlinux"
+#define EBPF_DEFAULT_BTF_PATH "/sys/kernel/btf"
 #define EBPF_DEFAULT_ERROR_MSG "Cannot open or load BPF file for thread"
 
 // BTF helpers
