@@ -397,6 +397,7 @@ void DetectableHost::detectOnce() {
     size_t NumAnomalousDimensions = 0;
     size_t NumNormalDimensions = 0;
     size_t NumTrainedDimensions = 0;
+    size_t NumActiveDimensions = 0;
 
     bool CollectAnomalyRates = (++AnomalyRateTimer == Cfg.DBEngineAnomalyRateEvery);
     if (CollectAnomalyRates)
@@ -409,6 +410,13 @@ void DetectableHost::detectOnce() {
 
         for (auto &DP : DimensionsMap) {
             Dimension *D = DP.second;
+
+            if (!D->isActive()) {
+                D->updateAnomalyBitCounter(AnomalyRateRS, AnomalyRateTimer, false);
+                continue;
+            }
+
+            NumActiveDimensions++;
 
             auto P = D->detect(WindowLength, ResetBitCounter);
             bool IsAnomalous = P.first;
@@ -426,11 +434,11 @@ void DetectableHost::detectOnce() {
         }
 
         if (NumAnomalousDimensions)
-            WindowAnomalyRate = static_cast<double>(NumAnomalousDimensions) / DimensionsMap.size();
+            WindowAnomalyRate = static_cast<double>(NumAnomalousDimensions) / NumActiveDimensions;
         else
             WindowAnomalyRate = 0.0;
 
-        NumNormalDimensions = DimensionsMap.size() - NumAnomalousDimensions;
+        NumNormalDimensions = NumActiveDimensions - NumAnomalousDimensions;
     }
 
     if (CollectAnomalyRates) {
@@ -441,6 +449,7 @@ void DetectableHost::detectOnce() {
     this->NumAnomalousDimensions = NumAnomalousDimensions;
     this->NumNormalDimensions = NumNormalDimensions;
     this->NumTrainedDimensions = NumTrainedDimensions;
+    this->NumActiveDimensions = NumActiveDimensions;
 
     updateDimensionsChart(getRH(), NumTrainedDimensions, NumNormalDimensions, NumAnomalousDimensions);
     updateRateChart(getRH(), WindowAnomalyRate * 10000.0);

@@ -30,6 +30,16 @@ public:
         return SS.str();
     }
 
+    bool isActive() const {
+        if (rrdset_flag_check(RD->rrdset, RRDSET_FLAG_OBSOLETE))
+            return false;
+
+        if (rrddim_flag_check(RD, RRDDIM_FLAG_OBSOLETE))
+            return false;
+
+        return true;
+    }
+
     void setAnomalyRateRD(RRDDIM *ARRD) { AnomalyRateRD = ARRD; }
     RRDDIM *getAnomalyRateRD() const { return AnomalyRateRD; }
 
