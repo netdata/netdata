@@ -228,7 +228,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 {
     int i;
     const char *saved_name = em->thread_name;
-    sync_syscalls_index_t errors = 0;
+    int errors = 0;
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (w->enabled) {
@@ -246,12 +246,15 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                 if (!w->sync_obj) {
                     errors++;
                 } else {
-                    if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
+                    if (ebpf_is_function_inside_btf(default_btf, syscall)) {
+                        if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
+                            errors++;
+                        }
+                    } else {
                         if (ebpf_sync_load_legacy(w, em))
                             errors++;
-
-                        em->thread_name = saved_name;
                     }
+                    em->thread_name = saved_name;
                 }
             }
 #endif
@@ -263,7 +266,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     memset(sync_counter_publish_aggregated, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_publish_syscall_t));
     memset(sync_hash_values, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_idx_t));
 
-    return 0;
+    return (errors) ? -1 : 0;
 }
 
 /*****************************************************************
