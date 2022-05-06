@@ -843,9 +843,13 @@ void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file)
 }
 
 /**
+ * Parse BTF file
  *
- * @param filename
- * @return
+ * Parse a specific BTF file present on filesystem
+ *
+ * @param filename  the file that will be parsed.
+ *
+ * @return It returns a pointer for the file on success and NULL otherwise.
  */
 struct btf *ebpf_parse_btf_file(const char *filename)
 {
@@ -860,7 +864,7 @@ struct btf *ebpf_parse_btf_file(const char *filename)
 }
 
 /**
- * Set default btf file
+ * Load default btf file
  *
  * Load the default BTF file on environment.
  *
@@ -877,6 +881,51 @@ struct btf *ebpf_load_btf_file(char *path, char *filename)
              path, filename);
 
     return ret;
+}
+
+/**
+ * Find BTF attach type
+ *
+ * Search type fr current btf file.
+ *
+ * @param file     is the structure for the btf file already parsed.
+ */
+static inline const struct btf_type *ebpf_find_btf_attach_type(struct btf *file)
+{
+    int id = btf__find_by_name_kind(file, "bpf_attach_type", BTF_KIND_ENUM);
+    if (id < 0) {
+        fprintf(stderr, "Cannot find 'bpf_attach_type'");
+
+        return NULL;
+    }
+
+    return btf__type_by_id(file, id);
+}
+
+/**
+ * Is function inside BTF
+ *
+ * Look for a specific function inside the given BTF file.
+ *
+ * @param file     is the structure for the btf file already parsed.
+ * @param function is the function that we want to find.
+ */
+int ebpf_is_function_inside_btf(struct btf *file, char *function)
+{
+    const struct btf_type *type = ebpf_find_btf_attach_type(file);
+    if (!type)
+        return -1;
+
+    const struct btf_enum *e = btf_enum(type);
+    int i, id;
+    for (id = -1, i = 0; i < btf_vlen(type); i++, e++) {
+        if (!strcmp(btf__name_by_offset(file, e->name_off), "BPF_TRACE_FENTRY")) {
+            id = btf__find_by_name_kind(file, function, BTF_KIND_FUNC);
+            break;
+        }
+    }
+
+    return (id > 0) ? 1 : 0;
 }
 #endif
 
