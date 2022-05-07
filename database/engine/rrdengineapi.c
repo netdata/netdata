@@ -674,6 +674,10 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
 #endif
         pg_cache_put(ctx, descr);
     }
+
+    // whatever is allocated at rrdeng_load_metric_init() should be freed here
+    freez(handle);
+    rrdimm_handle->handle = NULL;
 }
 
 time_t rrdeng_metric_latest_time(RRDDIM *rd)
