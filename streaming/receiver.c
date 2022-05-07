@@ -210,7 +210,7 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
         ERR_clear_error();
         if (buffer != r->read_buffer + r->read_len) {
             *ret = SSL_read(r->ssl.conn, buffer, size);
-            if (*ret > 0 ) 
+            if (*ret > 0 )
                 return 0;
         } else {
             // we need to receive data with LF to parse compression header
@@ -283,15 +283,15 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     int ret = 0;
     if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret))
         return 1;
-    
+
     if (!is_compressed_data(r->read_buffer, ret)) {
         r->read_len += ret;
         return 0;
     }
 
-    if (unlikely(!r->decompressor)) 
+    if (unlikely(!r->decompressor))
         r->decompressor = create_decompressor();
-    
+
     size_t bytes_to_read = r->decompressor->start(r->decompressor,
             r->read_buffer, ret);
 
@@ -347,6 +347,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     user->opaque = rpt;
     user->cd = cd;
     user->trust_durations = 0;
+    rpt->first_msg_t = 0;
 
     PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
 
@@ -382,11 +383,15 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     do{
         if (receiver_read(rpt, fp))
             break;
-        int pos = 0;
+        int pos = 0, first = 1;
         char *line;
         while ((line = receiver_next_line(rpt, &pos))) {
             if (unlikely(netdata_exit || rpt->shutdown || parser_action(parser,  line)))
                 goto done;
+        }
+        if(unlikely(first)){
+            rpt->first_msg_t = now_realtime_sec();
+            first = 0;
         }
         rpt->last_msg_t = now_realtime_sec();
     }
