@@ -33,20 +33,12 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
-
-    if (unlikely(!parser))
-        return NULL;
-
     parser->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
-    if (unlikely(!parser->plugins_action)) {
-        freez(parser);
-        return NULL;
-    }
-
     parser->user = user;
     parser->input = input;
     parser->flags = flags;
     parser->host = host;
+
 #ifdef ENABLE_HTTPS
     parser->bytesleft = 0;
     parser->readfrom = NULL;
@@ -181,9 +173,7 @@ void parser_destroy(PARSER *parser)
     }
 
     freez(parser->plugins_action);
-
     freez(parser);
-    return;
 }
 
 

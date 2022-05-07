@@ -540,7 +540,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
 
-    handle = calloc(1, sizeof(struct rrdeng_query_handle));
+    handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
     handle->position = 0;
@@ -674,6 +674,10 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
 #endif
         pg_cache_put(ctx, descr);
     }
+
+    // whatever is allocated at rrdeng_load_metric_init() should be freed here
+    freez(handle);
+    rrdimm_handle->handle = NULL;
 }
 
 time_t rrdeng_metric_latest_time(RRDDIM *rd)
