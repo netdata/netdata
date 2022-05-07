@@ -725,11 +725,6 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
     return PARSER_RC_OK;
 }
 
-static void pluginsd_thread_cleanup(void *ptr) {
-    PARSER_USER_OBJECT *user = (PARSER_USER_OBJECT *)ptr;
-
-}
-
 static void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
     parser_destroy(parser);

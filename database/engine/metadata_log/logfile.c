@@ -424,7 +424,6 @@ static int scan_metalog_files(struct metalog_instance *ctx)
     size_t count __maybe_unused = metalog_parser_object.count;
 
     debug(D_METADATALOG, "Parsing count=%u", (unsigned)count);
-after_failed_to_parse:
 
     freez(metalogfiles);
     return matched_files;
