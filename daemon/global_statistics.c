@@ -845,6 +845,7 @@ struct worker_job_type {
     char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
     size_t jobs_started;
     usec_t busy_time;
+
     RRDDIM *rd_jobs_started;
     RRDDIM *rd_busy_time;
 };
@@ -869,8 +870,6 @@ struct worker_thread {
 
     struct worker_thread *next;
 };
-
-#define WORKER_FLAG_ALWAYS_ONE 0x00000001
 
 struct worker_utilization {
     const char *name;
@@ -1046,21 +1045,20 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , localhost->rrd_update_every
             , RRDSET_TYPE_STACKED
         );
-
-        size_t i;
-        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-            if(wu->per_job_type[i].name[0])
-                wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
     }
-    else
-        rrdset_next(wu->st_workers_jobs_per_job_type);
+
+    rrdset_next(wu->st_workers_jobs_per_job_type);
 
     {
         size_t i;
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-            if (wu->per_job_type[i].name[0])
+            if (wu->per_job_type[i].name[0]) {
+
+                if(unlikely(!wu->per_job_type[i].rd_jobs_started))
+                    wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
                 rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, (collected_number)(wu->per_job_type[i].jobs_started));
+            }
         }
     }
 
@@ -1086,21 +1084,20 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , localhost->rrd_update_every
             , RRDSET_TYPE_STACKED
         );
-
-        size_t i;
-        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-            if(wu->per_job_type[i].name[0])
-                wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, wu->per_job_type[i].name, NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
-        }
     }
-    else
-        rrdset_next(wu->st_workers_busy_per_job_type);
+
+    rrdset_next(wu->st_workers_busy_per_job_type);
 
     {
         size_t i;
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-            if (wu->per_job_type[i].name[0])
+            if (wu->per_job_type[i].name[0]) {
+
+                if(unlikely(!wu->per_job_type[i].rd_busy_time))
+                    wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, wu->per_job_type[i].name, NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
+
                 rrddim_set_by_pointer(wu->st_workers_busy_per_job_type, wu->per_job_type[i].rd_busy_time, (collected_number)(wu->per_job_type[i].busy_time));
+            }
         }
     }
 
@@ -1291,15 +1288,15 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "PROC",        .family = "proc thread",                   .priority = 1000000 },
     { .name = "CGROUPS",     .family = "cgroups collect thread",        .priority = 1000000 },
     { .name = "CGROUPSDISC", .family = "cgroups discovery thread",      .priority = 1000000 },
-    { .name = "PLUGINSD",   .family = "plugins.d threads",             .priority = 1000000 },
-    { .name = "STREAMRCV",  .family = "streaming receive threads",     .priority = 1000000 },
-    { .name = "DISKSPACE",  .family = "diskspace thread",              .priority = 1000000 },
-    { .name = "TC",         .family = "tc thread",                     .priority = 1000000 },
-    { .name = "MLTRAIN",    .family = "ML training threads",           .priority = 1000000 },
-    { .name = "MLDETECT",   .family = "ML detection threads",          .priority = 1000000 },
+    { .name = "PLUGINSD",    .family = "plugins.d threads",             .priority = 1000000 },
+    { .name = "STREAMRCV",   .family = "streaming receive threads",     .priority = 1000000 },
+    { .name = "DISKSPACE",   .family = "diskspace thread",              .priority = 1000000 },
+    { .name = "TC",          .family = "tc thread",                     .priority = 1000000 },
+    { .name = "MLTRAIN",     .family = "ML training threads",           .priority = 1000000 },
+    { .name = "MLDETECT",    .family = "ML detection threads",          .priority = 1000000 },
 
     // has to be terminated with a NULL
-    { .name = NULL,        .family = NULL       }
+    { .name = NULL,          .family = NULL       }
 };
 
 void worker_utilization_charts(void) {
