@@ -1092,13 +1092,13 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #endif  //ENABLE_COMPRESSION   
 
     buffer_strcat(wb, "\t\"stream-replication-Tx\": ");
-    if(host->replication->tx_replication)
+    if(host->replication && host->replication->tx_replication)
         buffer_strcat(wb, (host->replication->tx_replication->enabled ? "true" : "false"));
     else
         buffer_strcat(wb, "null");        
     buffer_strcat(wb, ",\n");
     buffer_strcat(wb, "\t\"stream-replication-Rx\": ");
-    if(host->replication->rx_replication)
+    if(host->replication && host->replication->rx_replication)
         buffer_strcat(wb, (host->replication->rx_replication->enabled ? "true" : "false"));
     else
         buffer_strcat(wb, "null");
