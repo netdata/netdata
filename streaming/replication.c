@@ -429,7 +429,7 @@ void replication_attempt_to_send(struct replication_state *replication) {
 
     netdata_thread_disable_cancelability();
     netdata_mutex_lock(&replication->mutex);
-    char *chunk;
+    char *chunk = NULL;
     size_t outstanding = cbuffer_next_unsafe(replication->buffer, &chunk);
     debug(D_REPLICATION, "%s: Sending data. Buffer r=%zu w=%zu s=%zu/max=%zu, next chunk=%zu", REPLICATION_MSG, cb->read, cb->write, cb->size, cb->max_size, outstanding);
     ssize_t ret;
@@ -438,10 +438,10 @@ void replication_attempt_to_send(struct replication_state *replication) {
         if(conn && !replication->ssl.flags) {
             ret = SSL_write(conn, chunk, outstanding);
         } else {
-            ret = send(replication->socket, chunk, outstanding, MSG_DONTWAIT);
+            ret = send(replication->socket, chunk, outstanding, 0);
         }
 #else
-        ret = send(replication->socket, chunk, outstanding, MSG_DONTWAIT);
+        ret = send(replication->socket, chunk, outstanding, 0);
 #endif
         if (likely(ret > 0)) {
             cbuffer_remove_unsafe(replication->buffer, ret);
