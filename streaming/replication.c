@@ -612,6 +612,17 @@ void *replication_receiver_thread(void *ptr){
     unsigned int rrdpush_replication_enabled =  rep_state->enabled;
     rep_state->exited = 0; //latch down flag on Rx thread start up.
 
+    int try_count = 0;
+    while(rep_state->host->receiver->first_msg_t == 0) {
+        sleep(REPLICATION_STREAMING_WAIT_STEP); // Wait a while until stream starts receiving metrics
+        try_count++;
+        if(try_count > REPLICATION_STREAMING_WAIT_STEP_COUNT) {
+            error("%s Failed to get first metric timestamp from streaming state.", REPLICATION_MSG);
+            close(rep_state->socket);
+            return 0;
+        }
+    }
+
     struct plugind cd = {
             .enabled = 1,
             .update_every = default_rrd_update_every,
@@ -741,6 +752,9 @@ int finish_gap_replication(RRDHOST *host, REPLICATION_STATE *rep_state) {
 void send_gap_for_replication(RRDHOST *host, REPLICATION_STATE *rep_state)
 {
     GAP *the_gap = (GAP *)host->gaps_timeline->gaps->front->item;
+    //  Assign the timestamp of first metric comes from streaming to avoid
+    // missing metrics between the disconnection and start of the streaming
+    the_gap->t_window.t_end = rep_state->host->receiver->first_msg_t;
     char *rep_msg_cmd;
     size_t len;
     replication_gap_to_str(the_gap, &rep_msg_cmd, &len);
@@ -1511,7 +1525,7 @@ int complete_new_gap(GAP *potential_gap){
         error("%s: This GAP cannot be completed. Need to create it first.", REPLICATION_MSG);
         return 1;
     }
-    potential_gap->t_window.t_end = now_realtime_sec() + REPLICATION_GAP_TIME_MARGIN;
+    //potential_gap->t_window.t_end = now_realtime_sec() + REPLICATION_GAP_TIME_MARGIN;
     potential_gap->status = "oncompletion";
     return 0;
 }

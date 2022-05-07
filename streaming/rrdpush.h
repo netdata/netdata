@@ -132,6 +132,7 @@ struct receiver_state {
     struct rrdhost_system_info *system_info;
     int update_every;
     uint32_t stream_version;
+    time_t first_msg_t;
     time_t last_msg_t;
     char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
     int read_len;
