@@ -837,7 +837,7 @@ static void dbengine_statistics_charts(void) {
 #endif
 }
 
-static void update_idlejitter_charts() {
+static void update_heartbeat_charts() {
     RRDSET *st = rrdset_create_localhost(
         "netdata"
         , "heartbeat"
@@ -1368,9 +1368,9 @@ static void global_statistics_cleanup(void *ptr)
 #define WORKER_JOB_REGISTRY   1
 #define WORKER_JOB_WORKERS    2
 #define WORKER_JOB_DBENGINE   3
-#define WORKER_JOB_IDLEJITTER 4
+#define WORKER_JOB_HEARTBEAT  4
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 4
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 5
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 4
 #endif
 
@@ -1408,8 +1408,8 @@ void *global_statistics_main(void *ptr)
         worker_is_busy(WORKER_JOB_DBENGINE);
         dbengine_statistics_charts();
 
-        worker_is_busy(WORKER_JOB_IDLEJITTER);
-        update_idlejitter_charts();
+        worker_is_busy(WORKER_JOB_HEARTBEAT);
+        update_heartbeat_charts();
     }
 
     netdata_thread_cleanup_pop(1);
