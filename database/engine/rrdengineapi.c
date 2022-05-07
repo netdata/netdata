@@ -540,7 +540,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
 
-    handle = calloc(1, sizeof(struct rrdeng_query_handle));
+    handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
     handle->position = 0;

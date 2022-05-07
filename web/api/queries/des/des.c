@@ -70,7 +70,7 @@ static inline void set_beta(RRDR *r, struct grouping_des *g) {
 }
 
 void *grouping_create_des(RRDR *r) {
-    struct grouping_des *g = (struct grouping_des *)malloc(sizeof(struct grouping_des));
+    struct grouping_des *g = (struct grouping_des *)mallocz(sizeof(struct grouping_des));
     set_alpha(r, g);
     set_beta(r, g);
     g->level = 0.0;

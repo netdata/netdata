@@ -290,7 +290,7 @@ int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
         }
     } else {
         disable_zfs_pool_state(pool);
-        struct deleted_zfs_pool *new = calloc(1, sizeof(struct deleted_zfs_pool));
+        struct deleted_zfs_pool *new = callocz(1, sizeof(struct deleted_zfs_pool));
         new->name = strdupz(name);
         new->next = deleted_zfs_pools;
         deleted_zfs_pools = new;
