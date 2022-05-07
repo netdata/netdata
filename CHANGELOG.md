@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Set a page wait timeout and retry count [\#12836](https://github.com/netdata/netdata/pull/12836) ([stelfrag](https://github.com/stelfrag))
+- feat\(plugins.d\): allow external plugins to create chart labels [\#12834](https://github.com/netdata/netdata/pull/12834) ([ilyam8](https://github.com/ilyam8))
+- fix\(exporting\)" make 'send charts matching' behave the same as 'filter' for prometheus format [\#12832](https://github.com/netdata/netdata/pull/12832) ([ilyam8](https://github.com/ilyam8))
+- Remove sync warning [\#12831](https://github.com/netdata/netdata/pull/12831) ([thiagoftsm](https://github.com/thiagoftsm))
 - Reduce the number of messages written in the error log due to out of bound timestamps [\#12829](https://github.com/netdata/netdata/pull/12829) ([stelfrag](https://github.com/stelfrag))
 - Bug fix in netdata-uninstaller.sh [\#12828](https://github.com/netdata/netdata/pull/12828) ([maneamarius](https://github.com/maneamarius))
 - Cleanup the node instance table on startup [\#12825](https://github.com/netdata/netdata/pull/12825) ([stelfrag](https://github.com/stelfrag))
@@ -315,10 +319,6 @@
 - Add warning about broken Docker hosts in container entrypoint. [\#12175](https://github.com/netdata/netdata/pull/12175) ([Ferroin](https://github.com/Ferroin))
 - tidy up the installer script usage message [\#12171](https://github.com/netdata/netdata/pull/12171) ([petecooper](https://github.com/petecooper))
 - Remove check for ACLK\_NG and PROMETHEUS\_WRITE in order to assume PROTOBUF [\#12168](https://github.com/netdata/netdata/pull/12168) ([MrZammler](https://github.com/MrZammler))
-- Bundle protobuf on CentOS 7 and earlier. [\#12167](https://github.com/netdata/netdata/pull/12167) ([Ferroin](https://github.com/Ferroin))
-- add `stress-ng` and `gremlin` to apps\_groups.conf [\#12165](https://github.com/netdata/netdata/pull/12165) ([andrewm4894](https://github.com/andrewm4894))
-- Fix alerts to raise correctly when the delay and repeat parameters are used together. [\#12164](https://github.com/netdata/netdata/pull/12164) ([erdem2000](https://github.com/erdem2000))
-- fix: claiming with wget [\#12163](https://github.com/netdata/netdata/pull/12163) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
