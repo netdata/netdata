@@ -340,23 +340,18 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
 
 size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
     size_t result;
-    PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
-    user->enabled = cd->enabled;
-    user->host = rpt->host;
-    user->opaque = rpt;
-    user->cd = cd;
-    user->trust_durations = 0;
 
-    PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
+    PARSER_USER_OBJECT user = {
+        .enabled = cd->enabled,
+        .host = rpt->host,
+        .opaque = rpt,
+        .cd = cd,
+        .trust_durations = 0
+    };
+
+    PARSER *parser = parser_init(rpt->host, &user, fp, PARSER_INPUT_SPLIT);
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
-
-    if (unlikely(!parser)) {
-        error("Failed to initialize parser");
-        cd->serial_failures++;
-        freez(user);
-        return 0;
-    }
 
     parser->plugins_action->begin_action     = &pluginsd_begin_action;
     parser->plugins_action->flush_action     = &pluginsd_flush_action;
@@ -371,12 +366,13 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
     parser->plugins_action->clabel_action    = &pluginsd_clabel_action;
 
-    user->parser = parser;
+    user.parser = parser;
 
 #ifdef ENABLE_COMPRESSION
     if (rpt->decompressor)
         rpt->decompressor->reset(rpt->decompressor);
 #endif
+
     do{
         if (receiver_read(rpt, fp))
             break;
@@ -389,9 +385,9 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         rpt->last_msg_t = now_realtime_sec();
     }
     while(!netdata_exit);
+
 done:
-    result= user->count;
-    freez(user);
+    result= user.count;
     parser_destroy(parser);
     return result;
 }

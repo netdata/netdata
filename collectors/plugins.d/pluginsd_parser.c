@@ -725,6 +725,11 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
     return PARSER_RC_OK;
 }
 
+static void pluginsd_thread_cleanup(void *ptr) {
+    PARSER_USER_OBJECT *user = (PARSER_USER_OBJECT *)ptr;
+
+}
+
 // New plugins.d parser
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
@@ -743,20 +748,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     }
     clearerr(fp);
 
-    PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
-    ((PARSER_USER_OBJECT *) user)->enabled = cd->enabled;
-    ((PARSER_USER_OBJECT *) user)->host = host;
-    ((PARSER_USER_OBJECT *) user)->cd = cd;
-    ((PARSER_USER_OBJECT *) user)->trust_durations = trust_durations;
+    PARSER_USER_OBJECT user = {
+        .enabled = cd->enabled,
+        .host = host,
+        .cd = cd,
+        .trust_durations = trust_durations
+    };
 
-    PARSER *parser = parser_init(host, user, fp, PARSER_INPUT_SPLIT);
-
-    if (unlikely(!parser)) {
-        error("Failed to initialize parser");
-        cd->serial_failures++;
-        return 0;
-    }
-
+    PARSER *parser = parser_init(host, &user, fp, PARSER_INPUT_SPLIT);
     parser->plugins_action->begin_action          = &pluginsd_begin_action;
     parser->plugins_action->flush_action          = &pluginsd_flush_action;
     parser->plugins_action->end_action            = &pluginsd_end_action;
@@ -770,7 +769,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
     parser->plugins_action->clabel_action         = &pluginsd_clabel_action;
 
-    user->parser = parser;
+    user.parser = parser;
 
     while (likely(!parser_next(parser))) {
         if (unlikely(netdata_exit || parser_action(parser,  NULL)))
@@ -780,15 +779,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
     parser_destroy(parser);
 
-    cd->enabled = ((PARSER_USER_OBJECT *) user)->enabled;
-    size_t count = ((PARSER_USER_OBJECT *) user)->count;
-
-    freez(user);
+    cd->enabled = user.enabled;
+    size_t count = user.count;
 
     if (likely(count)) {
         cd->successful_collections += count;
         cd->serial_failures = 0;
-    } else
+    }
+    else
         cd->serial_failures++;
 
     return count;
