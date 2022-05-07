@@ -888,7 +888,6 @@ struct worker_utilization {
     double workers_min_busy_time;
     double workers_max_busy_time;
 
-    size_t worker_threads_size;
     struct worker_thread *threads;
 
     RRDSET *st_workers_time;
@@ -896,6 +895,7 @@ struct worker_utilization {
     RRDDIM *rd_workers_time_min;
     RRDDIM *rd_workers_time_max;
 
+    size_t workers_cpu_enabled;
     RRDSET *st_workers_cpu;
     RRDDIM *rd_workers_cpu_avg;
     RRDDIM *rd_workers_cpu_min;
@@ -938,78 +938,92 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , localhost->rrd_update_every
             , RRDSET_TYPE_AREA
         );
+    }
 
-        if(!(wu->flags & WORKER_FLAG_ALWAYS_ONE)) {
-            wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
-            wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
-        }
+    // we add the min and max dimensions only when we have multiple workers
+
+    if(unlikely(!wu->rd_workers_time_min && wu->workers_registered > 1))
+        wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+
+    if(unlikely(!wu->rd_workers_time_max && wu->workers_registered > 1))
+        wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+
+    if(unlikely(!wu->rd_workers_time_avg))
         wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
-    }
-    else
-        rrdset_next(wu->st_workers_time);
 
-    if(!(wu->flags & WORKER_FLAG_ALWAYS_ONE)) {
+    rrdset_next(wu->st_workers_time);
+
+    if(wu->rd_workers_time_min)
         rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->workers_min_busy_time * 10000.0));
+
+    if(wu->rd_workers_time_max)
         rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_max, (collected_number)((double)wu->workers_max_busy_time * 10000.0));
-    }
+
     rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, (collected_number)((double)wu->workers_total_busy_time * 100.0 * 10000.0 / (double)wu->workers_total_duration));
     rrdset_done(wu->st_workers_time);
 
     // ----------------------------------------------------------------------
 
 #ifdef __linux__
-    if(unlikely(!wu->st_workers_cpu)) {
-        char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_%s", wu->name);
+    if(wu->workers_cpu_enabled || wu->st_workers_cpu) {
+        if(unlikely(!wu->st_workers_cpu)) {
+            char name[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_%s", wu->name);
 
-        wu->st_workers_cpu = rrdset_create_localhost(
-            "netdata"
-            , name
-            , NULL
-            , wu->family
-            , "netdata.workers.cpu"
-            , "Netdata Workers CPU Utilization (100% = all workers busy)"
-            , "%"
-            , "netdata"
-            , "stats"
-            , wu->priority + 1
-            , localhost->rrd_update_every
-            , RRDSET_TYPE_AREA
-        );
-
-        if(!(wu->flags & WORKER_FLAG_ALWAYS_ONE)) {
-            wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
-            wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+            wu->st_workers_cpu = rrdset_create_localhost(
+                "netdata"
+                , name
+                , NULL
+                , wu->family
+                , "netdata.workers.cpu"
+                , "Netdata Workers CPU Utilization (100% = all workers busy)"
+                , "%"
+                , "netdata"
+                , "stats"
+                , wu->priority + 1
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_AREA
+            );
         }
-        wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
-    }
-    else
+
+        if (unlikely(!wu->rd_workers_cpu_min && wu->workers_registered > 1))
+            wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+
+        if (unlikely(!wu->rd_workers_cpu_max && wu->workers_registered > 1))
+            wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+
+        if(unlikely(!wu->rd_workers_cpu_avg))
+            wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+
         rrdset_next(wu->st_workers_cpu);
 
-    size_t i, count = 0;
-    calculated_number min = 1000.0, max = 0.0, total = 0.0;
-    struct worker_thread *wt;
-    for(wt = wu->threads; wt ; wt = wt->next) {
-        if(!wt->cpu_enabled) continue;
-        count++;
+        size_t count = 0;
+        calculated_number min = 1000.0, max = 0.0, total = 0.0;
+        struct worker_thread *wt;
+        for(wt = wu->threads; wt ; wt = wt->next) {
+            if(!wt->cpu_enabled) continue;
+            count++;
 
-        usec_t delta = wt->collected_time - wt->collected_time_old;
-        calculated_number utime = (calculated_number)(wt->utime - wt->utime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
-        calculated_number stime = (calculated_number)(wt->stime - wt->stime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
-        calculated_number cpu_util = utime + stime;
+            usec_t delta = wt->collected_time - wt->collected_time_old;
+            calculated_number utime = (calculated_number)(wt->utime - wt->utime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
+            calculated_number stime = (calculated_number)(wt->stime - wt->stime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
+            calculated_number cpu_util = utime + stime;
 
-        total += cpu_util;
-        if(cpu_util < min) min = cpu_util;
-        if(cpu_util > max) max = cpu_util;
+            total += cpu_util;
+            if(cpu_util < min) min = cpu_util;
+            if(cpu_util > max) max = cpu_util;
+        }
+        if(unlikely(min == 1000.0)) min = 0.0;
+
+        if(wu->rd_workers_cpu_min)
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(min * 10000ULL));
+
+        if(wu->rd_workers_cpu_max)
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)(max * 10000ULL));
+
+        rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)count ));
+        rrdset_done(wu->st_workers_cpu);
     }
-    if(unlikely(min == 1000.0)) min = 0.0;
-
-    if(!(wu->flags & WORKER_FLAG_ALWAYS_ONE)) {
-        rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(min * 10000ULL));
-        rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)(max * 10000ULL));
-    }
-    rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)count ));
-    rrdset_done(wu->st_workers_cpu);
 #endif
 
     // ----------------------------------------------------------------------
@@ -1033,6 +1047,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_STACKED
         );
 
+        size_t i;
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
             if(wu->per_job_type[i].name[0])
                 wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1041,9 +1056,12 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     else
         rrdset_next(wu->st_workers_jobs_per_job_type);
 
-    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-        if (wu->per_job_type[i].name[0])
-            rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, (collected_number)(wu->per_job_type[i].jobs_started));
+    {
+        size_t i;
+        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            if (wu->per_job_type[i].name[0])
+                rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, (collected_number)(wu->per_job_type[i].jobs_started));
+        }
     }
 
     rrdset_done(wu->st_workers_jobs_per_job_type);
@@ -1069,6 +1087,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_STACKED
         );
 
+        size_t i;
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
             if(wu->per_job_type[i].name[0])
                 wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, wu->per_job_type[i].name, NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
@@ -1077,43 +1096,48 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     else
         rrdset_next(wu->st_workers_busy_per_job_type);
 
-    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-        if (wu->per_job_type[i].name[0])
-            rrddim_set_by_pointer(wu->st_workers_busy_per_job_type, wu->per_job_type[i].rd_busy_time, (collected_number)(wu->per_job_type[i].busy_time));
+    {
+        size_t i;
+        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            if (wu->per_job_type[i].name[0])
+                rrddim_set_by_pointer(wu->st_workers_busy_per_job_type, wu->per_job_type[i].rd_busy_time, (collected_number)(wu->per_job_type[i].busy_time));
+        }
     }
 
     rrdset_done(wu->st_workers_busy_per_job_type);
 
     // ----------------------------------------------------------------------
 
-    if(unlikely(!wu->st_workers_threads)) {
-        char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_threads_%s", wu->name);
+    if(wu->st_workers_threads || wu->workers_registered > 1) {
+        if(unlikely(!wu->st_workers_threads)) {
+            char name[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_threads_%s", wu->name);
 
-        wu->st_workers_threads = rrdset_create_localhost(
-            "netdata"
-            , name
-            , NULL
-            , wu->family
-            , "netdata.workers.threads"
-            , "Netdata Workers Threads"
-            , "threads"
-            , "netdata"
-            , "stats"
-            , wu->priority + 4
-            , localhost->rrd_update_every
-            , RRDSET_TYPE_STACKED
-        );
+            wu->st_workers_threads = rrdset_create_localhost(
+                "netdata"
+                , name
+                , NULL
+                , wu->family
+                , "netdata.workers.threads"
+                , "Netdata Workers Threads"
+                , "threads"
+                , "netdata"
+                , "stats"
+                , wu->priority + 4
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_STACKED
+            );
 
-        wu->rd_workers_threads_free = rrddim_add(wu->st_workers_threads, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        wu->rd_workers_threads_busy = rrddim_add(wu->st_workers_threads, "busy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_workers_threads_free = rrddim_add(wu->st_workers_threads, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_workers_threads_busy = rrddim_add(wu->st_workers_threads, "busy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(wu->st_workers_threads);
+
+        rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_free, (collected_number)(wu->workers_registered - wu->workers_busy));
+        rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, (collected_number)(wu->workers_busy));
+        rrdset_done(wu->st_workers_threads);
     }
-    else
-        rrdset_next(wu->st_workers_threads);
-
-    rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_free, (collected_number)(wu->workers_registered - wu->workers_busy));
-    rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, (collected_number)(wu->workers_busy));
-    rrdset_done(wu->st_workers_threads);
 }
 
 static void workers_utilization_reset_statistics(struct worker_utilization *wu) {
@@ -1124,6 +1148,7 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
     wu->workers_total_jobs_started = 0;
     wu->workers_min_busy_time = 100.0;
     wu->workers_max_busy_time = 0;
+    wu->workers_cpu_enabled = 0;
 
     size_t i;
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
@@ -1247,27 +1272,31 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
     }
 
     // find its CPU utilization
-    if((wt->cpu_enabled = !read_thread_cpu_time_from_proc_stat(pid, &wt->utime, &wt->stime)))
+    if((!read_thread_cpu_time_from_proc_stat(pid, &wt->utime, &wt->stime))) {
+        wt->cpu_enabled = 1;
         wt->collected_time = now_realtime_usec();
+    }
+
+    wu->workers_cpu_enabled += wt->cpu_enabled;
 }
 
 static struct worker_utilization all_workers_utilization[] = {
     { .name = "WEB",         .family = "web server threads",            .priority = 1000000 },
-    { .name = "DBENGINE",    .family = "dbengine main thread",          .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
+    { .name = "DBENGINE",    .family = "dbengine main thread",          .priority = 1000000 },
     { .name = "ACLKQUERY",   .family = "aclk query threads",            .priority = 1000000 },
     { .name = "ACLKSYNC",    .family = "aclk host sync threads",        .priority = 1000000 },
-    { .name = "STATSD",      .family = "statsd collect thread",         .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "STATSDFLUSH", .family = "statsd flush thread",           .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "STATS",       .family = "global statistics thread",      .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "PROC",        .family = "proc thread",                   .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "CGROUPS",     .family = "cgroups collect thread",        .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "CGROUPSDISC", .family = "cgroups discovery thread",      .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "PLUGINSD",   .family = "plugins.d threads",             .priority = 1000000, },
-    { .name = "STREAMRCV",  .family = "streaming receive threads",     .priority = 1000000, },
-    { .name = "DISKSPACE",  .family = "diskspace thread",              .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "TC",         .family = "tc thread",                     .priority = 1000000, .flags = WORKER_FLAG_ALWAYS_ONE },
-    { .name = "MLTRAIN",    .family = "ML training threads",           .priority = 1000000, },
-    { .name = "MLDETECT",   .family = "ML detection threads",          .priority = 1000000, },
+    { .name = "STATSD",      .family = "statsd collect thread",         .priority = 1000000 },
+    { .name = "STATSDFLUSH", .family = "statsd flush thread",           .priority = 1000000 },
+    { .name = "STATS",       .family = "global statistics thread",      .priority = 1000000 },
+    { .name = "PROC",        .family = "proc thread",                   .priority = 1000000 },
+    { .name = "CGROUPS",     .family = "cgroups collect thread",        .priority = 1000000 },
+    { .name = "CGROUPSDISC", .family = "cgroups discovery thread",      .priority = 1000000 },
+    { .name = "PLUGINSD",   .family = "plugins.d threads",             .priority = 1000000 },
+    { .name = "STREAMRCV",  .family = "streaming receive threads",     .priority = 1000000 },
+    { .name = "DISKSPACE",  .family = "diskspace thread",              .priority = 1000000 },
+    { .name = "TC",         .family = "tc thread",                     .priority = 1000000 },
+    { .name = "MLTRAIN",    .family = "ML training threads",           .priority = 1000000 },
+    { .name = "MLDETECT",   .family = "ML detection threads",          .priority = 1000000 },
 
     // has to be terminated with a NULL
     { .name = NULL,        .family = NULL       }
