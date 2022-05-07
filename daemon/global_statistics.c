@@ -835,7 +835,40 @@ static void dbengine_statistics_charts(void) {
         }
     }
 #endif
+}
 
+static void update_idlejitter_charts() {
+    RRDSET *st = rrdset_create_localhost(
+        "netdata"
+        , "heartbeat"
+        , NULL
+        , "heartbeat"
+        , NULL
+        , "System clock jitter"
+        , "microseconds"
+        , "netdata"
+        , "stats"
+        , 900000
+        , localhost->rrd_update_every
+        , RRDSET_TYPE_AREA
+    );
+
+    RRDDIM *rd_min = rrddim_add(st, "min", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_max = rrddim_add(st, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_avg = rrddim_add(st, "average", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    rrdset_next(st);
+
+    usec_t min, max, average;
+    size_t count;
+
+    heartbeat_statistics(&min, &max, &average, &count);
+
+    rrddim_set_by_pointer(st, rd_min, (collected_number)min);
+    rrddim_set_by_pointer(st, rd_max, (collected_number)max);
+    rrddim_set_by_pointer(st, rd_avg, (collected_number)average);
+
+    rrdset_done(st);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1294,6 +1327,8 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "TC",          .family = "tc thread",                     .priority = 1000000 },
     { .name = "MLTRAIN",     .family = "ML training threads",           .priority = 1000000 },
     { .name = "MLDETECT",    .family = "ML detection threads",          .priority = 1000000 },
+    { .name = "TIMEX",       .family = "timex thread",                  .priority = 1000000 },
+    { .name = "IDLEJITTER",  .family = "idlejitter thread",             .priority = 1000000 },
 
     // has to be terminated with a NULL
     { .name = NULL,          .family = NULL       }
@@ -1329,10 +1364,11 @@ static void global_statistics_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-#define WORKER_JOB_GLOBAL   0
-#define WORKER_JOB_REGISTRY 1
-#define WORKER_JOB_WORKERS  2
-#define WORKER_JOB_DBENGINE 3
+#define WORKER_JOB_GLOBAL     0
+#define WORKER_JOB_REGISTRY   1
+#define WORKER_JOB_WORKERS    2
+#define WORKER_JOB_DBENGINE   3
+#define WORKER_JOB_IDLEJITTER 4
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 4
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 4
@@ -1371,6 +1407,9 @@ void *global_statistics_main(void *ptr)
 
         worker_is_busy(WORKER_JOB_DBENGINE);
         dbengine_statistics_charts();
+
+        worker_is_busy(WORKER_JOB_IDLEJITTER);
+        update_idlejitter_charts();
     }
 
     netdata_thread_cleanup_pop(1);
