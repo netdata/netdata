@@ -38,6 +38,7 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
     parser->input = input;
     parser->flags = flags;
     parser->host = host;
+
 #ifdef ENABLE_HTTPS
     parser->bytesleft = 0;
     parser->readfrom = NULL;
@@ -173,7 +174,6 @@ void parser_destroy(PARSER *parser)
 
     freez(parser->plugins_action);
     freez(parser);
-    return;
 }
 
 

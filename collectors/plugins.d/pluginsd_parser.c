@@ -730,6 +730,11 @@ static void pluginsd_thread_cleanup(void *ptr) {
 
 }
 
+static void pluginsd_process_thread_cleanup(void *ptr) {
+    PARSER *parser = (PARSER *)ptr;
+    parser_destroy(parser);
+}
+
 // New plugins.d parser
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
@@ -756,6 +761,11 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     };
 
     PARSER *parser = parser_init(host, &user, fp, PARSER_INPUT_SPLIT);
+
+    // this keeps the parser with its current value
+    // so, parser needs to be allocated before pushing it
+    netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
+
     parser->plugins_action->begin_action          = &pluginsd_begin_action;
     parser->plugins_action->flush_action          = &pluginsd_flush_action;
     parser->plugins_action->end_action            = &pluginsd_end_action;
@@ -775,9 +785,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         if (unlikely(netdata_exit || parser_action(parser,  NULL)))
             break;
     }
-    info("PARSER ended");
 
-    parser_destroy(parser);
+    // free parser with the pop function
+    netdata_thread_cleanup_pop(1);
 
     cd->enabled = user.enabled;
     size_t count = user.count;

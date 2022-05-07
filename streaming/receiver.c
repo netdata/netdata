@@ -338,6 +338,11 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
     return NULL;
 }
 
+static void streaming_parser_thread_cleanup(void *ptr) {
+    PARSER *parser = (PARSER *)ptr;
+    parser_destroy(parser);
+}
+
 size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
     size_t result;
 
@@ -350,6 +355,11 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     };
 
     PARSER *parser = parser_init(rpt->host, &user, fp, PARSER_INPUT_SPLIT);
+
+    // this keeps the parser with its current value
+    // so, parser needs to be allocated before pushing it
+    netdata_thread_cleanup_push(streaming_parser_thread_cleanup, parser);
+
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
@@ -387,8 +397,11 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     while(!netdata_exit);
 
 done:
-    result= user.count;
-    parser_destroy(parser);
+    result = user.count;
+
+    // free parser with the pop function
+    netdata_thread_cleanup_pop(1);
+
     return result;
 }
 
