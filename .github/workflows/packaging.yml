@@ -199,6 +199,13 @@ jobs:
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+      - name: Save Packages
+        id: artifacts
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
+          path: ${{ github.workspace }}/artifacts/*
       - name: Test Packages
         id: test
         shell: bash
@@ -207,13 +214,6 @@ jobs:
                      -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
                      /netdata/.github/scripts/pkg-test.sh
-      - name: Save Packages
-        id: artifacts
-        continue-on-error: true
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
-          path: ${{ github.workspace }}/artifacts/*
       - name: Upload to PackageCloud
         id: upload
         if: github.event_name == 'workflow_dispatch'
