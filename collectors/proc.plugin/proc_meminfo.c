@@ -160,7 +160,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     unsigned long long MemCached = Cached + SReclaimable - Shmem;
     unsigned long long MemUsed = MemTotal - MemFree - MemCached - Buffers;
     // The Linux kernel doesn't report ZFS ARC usage as cache memory
-    // 'htop` has applied the same patch (https://github.com/htop-dev/htop/pull/180/files)
+    // 'htop' has applied the same patch (https://github.com/htop-dev/htop/pull/180/files)
     MemCached += (zfs_arcstats_cache_size_bytes / 1024);
     MemUsed -= (zfs_arcstats_cache_size_bytes / 1024);
 
