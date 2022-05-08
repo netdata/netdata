@@ -353,6 +353,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement when trying to send a chart update via ACLK");
             freez(claim_id);
+            freez(hostname);
             return;
         }
     }
@@ -774,7 +775,6 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         freez(chart_reset.claim_id);
                         wc->chart_reset_count = -1;
                     }
-                    return;
                 } else {
                     struct aclk_database_cmd cmd;
                     memset(&cmd, 0, sizeof(cmd));
@@ -797,12 +797,11 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         wc->chart_updates = 1;
                     }
                 }
-                freez(hostname);
             } else {
                 hostname = get_hostname_by_node_id(node_id);
                 log_access("ACLK STA [%s (%s)]: ACLK synchronization thread is not active.", node_id, hostname ? hostname : "N/A");
-                freez(hostname);
             }
+            freez(hostname);
             return;
         }
         host = host->next;
