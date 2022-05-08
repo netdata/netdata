@@ -1323,6 +1323,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "CGROUPSDISC", .family = "cgroups discovery thread",      .priority = 1000000 },
     { .name = "PLUGINSD",    .family = "plugins.d threads",             .priority = 1000000 },
     { .name = "STREAMRCV",   .family = "streaming receive threads",     .priority = 1000000 },
+    { .name = "STREAMSND",   .family = "streaming send threads",        .priority = 1000000 },
     { .name = "DISKSPACE",   .family = "diskspace thread",              .priority = 1000000 },
     { .name = "TC",          .family = "tc thread",                     .priority = 1000000 },
     { .name = "MLTRAIN",     .family = "ML training threads",           .priority = 1000000 },
