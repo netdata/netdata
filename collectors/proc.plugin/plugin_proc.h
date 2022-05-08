@@ -48,7 +48,7 @@ extern int get_numa_node_count(void);
 
 // metrics that need to be shared among data collectors
 extern unsigned long long tcpext_TCPSynRetrans;
-extern unsigned long long zfs_arcstats_cache_size_bytes;
+extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;
 
 // netdev renames
 extern void netdev_rename_device_add(
