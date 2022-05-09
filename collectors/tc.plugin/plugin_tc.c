@@ -844,6 +844,8 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
 static pid_t tc_child_pid = 0;
 
 static void tc_main_cleanup(void *ptr) {
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -864,10 +866,35 @@ static void tc_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-void *tc_main(void *ptr) {
-    netdata_thread_cleanup_push(tc_main_cleanup, ptr);
+#define WORKER_TC_CLASS          0
+#define WORKER_TC_BEGIN          1
+#define WORKER_TC_END            2
+#define WORKER_TC_SENT           3
+#define WORKER_TC_LENDED         4
+#define WORKER_TC_TOKENS         5
+#define WORKER_TC_SETDEVICENAME  6
+#define WORKER_TC_SETDEVICEGROUP 7
+#define WORKER_TC_SETCLASSNAME   8
+#define WORKER_TC_WORKTIME       9
 
-    struct rusage thread;
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
+#endif
+
+void *tc_main(void *ptr) {
+    worker_register("TC");
+    worker_register_job_name(WORKER_TC_CLASS, "class");
+    worker_register_job_name(WORKER_TC_BEGIN, "begin");
+    worker_register_job_name(WORKER_TC_END, "end");
+    worker_register_job_name(WORKER_TC_SENT, "sent");
+    worker_register_job_name(WORKER_TC_LENDED, "lended");
+    worker_register_job_name(WORKER_TC_TOKENS, "tokens");
+    worker_register_job_name(WORKER_TC_SETDEVICENAME, "devicename");
+    worker_register_job_name(WORKER_TC_SETDEVICEGROUP, "devicegroup");
+    worker_register_job_name(WORKER_TC_SETCLASSNAME, "classname");
+    worker_register_job_name(WORKER_TC_WORKTIME, "worktime");
+
+    netdata_thread_cleanup_push(tc_main_cleanup, ptr);
 
     char command[FILENAME_MAX + 1];
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -913,6 +940,7 @@ void *tc_main(void *ptr) {
 
             if(unlikely(!words[0] || !*words[0])) {
                 // debug(D_TC_LOOP, "empty line");
+                worker_is_idle();
                 continue;
             }
             // else debug(D_TC_LOOP, "First word is '%s'", words[0]);
@@ -920,6 +948,8 @@ void *tc_main(void *ptr) {
             first_hash = simple_hash(words[0]);
 
             if(unlikely(device && ((first_hash == CLASS_HASH && strcmp(words[0], "class") == 0) ||  (first_hash == QDISC_HASH && strcmp(words[0], "qdisc") == 0)))) {
+                worker_is_busy(WORKER_TC_CLASS);
+
                 // debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
 
                 char *type     = words[1];  // the class/qdisc type: htb, fq_codel, etc
@@ -949,6 +979,7 @@ void *tc_main(void *ptr) {
                             // there should be an IFB interface for this
 
                             class = NULL;
+                            worker_is_idle();
                             continue;
                         }
 
@@ -985,6 +1016,8 @@ void *tc_main(void *ptr) {
                 }
             }
             else if(unlikely(first_hash == END_HASH && strcmp(words[0], "END") == 0)) {
+                worker_is_busy(WORKER_TC_END);
+
                 // debug(D_TC_LOOP, "END line");
 
                 if(likely(device)) {
@@ -998,6 +1031,8 @@ void *tc_main(void *ptr) {
                 class = NULL;
             }
             else if(unlikely(first_hash == BEGIN_HASH && strcmp(words[0], "BEGIN") == 0)) {
+                worker_is_busy(WORKER_TC_BEGIN);
+
                 // debug(D_TC_LOOP, "BEGIN line on device '%s'", words[1]);
 
                 if(likely(words[1] && *words[1])) {
@@ -1011,6 +1046,8 @@ void *tc_main(void *ptr) {
                 class = NULL;
             }
             else if(unlikely(device && class && first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0)) {
+                worker_is_busy(WORKER_TC_SENT);
+
                 // debug(D_TC_LOOP, "SENT line '%s'", words[1]);
                 if(likely(words[1] && *words[1])) {
                     class->bytes = str2ull(words[1]);
@@ -1033,6 +1070,8 @@ void *tc_main(void *ptr) {
                     class->requeues = str2ull(words[8]);
             }
             else if(unlikely(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0)) {
+                worker_is_busy(WORKER_TC_LENDED);
+
                 // debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     class->lended = str2ull(words[1]);
@@ -1044,6 +1083,8 @@ void *tc_main(void *ptr) {
                     class->giants = str2ull(words[5]);
             }
             else if(unlikely(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0)) {
+                worker_is_busy(WORKER_TC_TOKENS);
+
                 // debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     class->tokens = str2ull(words[1]);
@@ -1052,16 +1093,22 @@ void *tc_main(void *ptr) {
                     class->ctokens = str2ull(words[3]);
             }
             else if(unlikely(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0)) {
+                worker_is_busy(WORKER_TC_SETDEVICENAME);
+
                 // debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     tc_device_set_device_name(device, words[1]);
             }
             else if(unlikely(device && first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0)) {
+                worker_is_busy(WORKER_TC_SETDEVICEGROUP);
+
                 // debug(D_TC_LOOP, "SETDEVICEGROUP line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     tc_device_set_device_family(device, words[1]);
             }
             else if(unlikely(device && first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0)) {
+                worker_is_busy(WORKER_TC_SETCLASSNAME);
+
                 // debug(D_TC_LOOP, "SETCLASSNAME line '%s' '%s'", words[1], words[2]);
                 char *id    = words[1];
                 char *path  = words[2];
@@ -1069,36 +1116,9 @@ void *tc_main(void *ptr) {
                     tc_device_set_class_name(device, id, path);
             }
             else if(unlikely(first_hash == WORKTIME_HASH && strcmp(words[0], "WORKTIME") == 0)) {
+                worker_is_busy(WORKER_TC_WORKTIME);
+
                 // debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
-                getrusage(RUSAGE_THREAD, &thread);
-
-                static RRDSET *stcpu = NULL;
-                static RRDDIM *rd_user = NULL, *rd_system = NULL;
-
-                if(unlikely(!stcpu)) {
-                    stcpu = rrdset_create_localhost(
-                            "netdata"
-                            , "plugin_tc_cpu"
-                            , NULL
-                            , "tc.helper"
-                            , NULL
-                            , "Netdata TC CPU usage"
-                            , "milliseconds/s"
-                            , PLUGIN_TC_NAME
-                            , NULL
-                            , NETDATA_CHART_PRIO_NETDATA_TC_CPU
-                            , localhost->rrd_update_every
-                            , RRDSET_TYPE_STACKED
-                    );
-                    rd_user   = rrddim_add(stcpu, "user",  NULL,  1, 1000, RRD_ALGORITHM_INCREMENTAL);
-                    rd_system = rrddim_add(stcpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(stcpu);
-
-                rrddim_set_by_pointer(stcpu, rd_user  , thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-                rrddim_set_by_pointer(stcpu, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
-                rrdset_done(stcpu);
-
                 static RRDSET *sttime = NULL;
                 static RRDDIM *rd_run_time = NULL;
 
@@ -1107,8 +1127,8 @@ void *tc_main(void *ptr) {
                             "netdata"
                             , "plugin_tc_time"
                             , NULL
-                            , "tc.helper"
-                            , NULL
+                            , "workers plugin tc"
+                            , "netdata.workers.tc.script_time"
                             , "Netdata TC script execution"
                             , "milliseconds/run"
                             , PLUGIN_TC_NAME
@@ -1128,6 +1148,8 @@ void *tc_main(void *ptr) {
             //else {
             //  debug(D_TC_LOOP, "IGNORED line");
             //}
+
+            worker_is_idle();
         }
 
         // fgets() failed or loop broke
@@ -1158,6 +1180,7 @@ void *tc_main(void *ptr) {
     }
 
 cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement
+    worker_unregister();
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -7,6 +7,9 @@
 static clockid_t clock_boottime_to_use = CLOCK_MONOTONIC;
 static clockid_t clock_monotonic_to_use = CLOCK_MONOTONIC;
 
+usec_t clock_monotonic_resolution = 1000;
+usec_t clock_realtime_resolution = 1000;
+
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
     struct timeval tv;
@@ -20,15 +23,19 @@ inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
 }
 #endif
 
-// When running a binary with CLOCK_MONOTONIC_COARSE defined on a system with a linux kernel older than Linux 2.6.32 the
-// clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
+// Similar to CLOCK_MONOTONIC, but provides access to a raw hardware-based time that is not subject to NTP adjustments
+// or the incremental adjustments performed by adjtime(3).  This clock does not count time that the system is suspended
 
-static void test_clock_monotonic_coarse(void) {
+static void test_clock_monotonic_raw(void) {
+#ifdef CLOCK_MONOTONIC_RAW
     struct timespec ts;
-    if(clock_gettime(CLOCK_MONOTONIC_COARSE, &ts) == -1 && errno == EINVAL)
+    if(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == -1 && errno == EINVAL)
         clock_monotonic_to_use = CLOCK_MONOTONIC;
     else
-        clock_monotonic_to_use = CLOCK_MONOTONIC_COARSE;
+        clock_monotonic_to_use = CLOCK_MONOTONIC_RAW;
+#else
+    clock_monotonic_to_use = CLOCK_MONOTONIC;
+#endif
 }
 
 // When running a binary with CLOCK_BOOTTIME defined on a system with a linux kernel older than Linux 2.6.39 the
@@ -42,14 +49,31 @@ static void test_clock_boottime(void) {
         clock_boottime_to_use = CLOCK_BOOTTIME;
 }
 
+static usec_t get_clock_resolution(clockid_t clock) {
+    struct timespec ts;
+    clock_getres(clock, &ts);
+    return ts.tv_sec * USEC_PER_SEC + ts.tv_nsec * NSEC_PER_USEC;
+}
+
 // perform any initializations required for clocks
 
 void clocks_init(void) {
-    // monotonic coarse has to be tested before boottime
-    test_clock_monotonic_coarse();
+    // monotonic raw has to be tested before boottime
+    test_clock_monotonic_raw();
 
     // boottime has to be tested after monotonic coarse
     test_clock_boottime();
+
+    clock_monotonic_resolution = get_clock_resolution(clock_monotonic_to_use);
+    clock_realtime_resolution = get_clock_resolution(CLOCK_REALTIME);
+
+    // if for any reason these are zero, netdata will crash
+    // since we use them as modulo to calculations
+    if(!clock_realtime_resolution)
+        clock_realtime_resolution = 1000;
+
+    if(!clock_monotonic_resolution)
+        clock_monotonic_resolution = 1000;
 }
 
 inline time_t now_sec(clockid_t clk_id) {
@@ -155,8 +179,110 @@ inline usec_t dt_usec(struct timeval *now, struct timeval *old) {
     return (ts1 > ts2) ? (ts1 - ts2) : (ts2 - ts1);
 }
 
+void sleep_to_absolute_time(usec_t usec) {
+    static int einval_printed = 0, enotsup_printed = 0, eunknown_printed = 0;
+    clockid_t clock = CLOCK_REALTIME;
+
+    struct timespec req = {
+        .tv_sec = (time_t)(usec / USEC_PER_SEC),
+        .tv_nsec = (suseconds_t)((usec % USEC_PER_SEC) * NSEC_PER_USEC)
+    };
+
+    int ret = 0;
+    while( (ret = clock_nanosleep(clock, TIMER_ABSTIME, &req, NULL)) != 0 ) {
+        if(ret == EINTR) continue;
+        else {
+            if (ret == EINVAL) {
+                if (!einval_printed) {
+                    einval_printed++;
+                    error(
+                        "Invalid time given to clock_nanosleep(): clockid = %d, tv_sec = %ld, tv_nsec = %ld",
+                        clock,
+                        req.tv_sec,
+                        req.tv_nsec);
+                }
+            } else if (ret == ENOTSUP) {
+                if (!enotsup_printed) {
+                    enotsup_printed++;
+                    error(
+                        "Invalid clock id given to clock_nanosleep(): clockid = %d, tv_sec = %ld, tv_nsec = %ld",
+                        clock,
+                        req.tv_sec,
+                        req.tv_nsec);
+                }
+            } else {
+                if (!eunknown_printed) {
+                    eunknown_printed++;
+                    error(
+                        "Unknown return value %d from clock_nanosleep(): clockid = %d, tv_sec = %ld, tv_nsec = %ld",
+                        ret,
+                        clock,
+                        req.tv_sec,
+                        req.tv_nsec);
+                }
+            }
+            sleep_usec(usec);
+        }
+    }
+};
+
+#define HEARTBEAT_ALIGNMENT_STATISTICS_SIZE 10
+netdata_mutex_t heartbeat_alignment_mutex = NETDATA_MUTEX_INITIALIZER;
+static size_t heartbeat_alignment_id = 0;
+
+struct heartbeat_thread_statistics {
+    size_t sequence;
+    usec_t dt;
+};
+static struct heartbeat_thread_statistics heartbeat_alignment_values[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE] = { 0 };
+
+void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr, size_t *count_ptr) {
+    struct heartbeat_thread_statistics current[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE];
+    static struct heartbeat_thread_statistics old[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE] = { 0 };
+
+    memcpy(current, heartbeat_alignment_values, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
+
+    usec_t min = 0, max = 0, total = 0, average = 0;
+    size_t i, count = 0;
+    for(i = 0; i < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE ;i++) {
+        if(current[i].sequence == old[i].sequence) continue;
+        usec_t value = current[i].dt - old[i].dt;
+
+        if(!count) {
+            min = max = total = value;
+            count = 1;
+        }
+        else {
+            total += value;
+            if(value < min) min = value;
+            if(value > max) max = value;
+            count++;
+        }
+    }
+    average = total / count;
+
+    if(min_ptr) *min_ptr = min;
+    if(max_ptr) *max_ptr = max;
+    if(average_ptr) *average_ptr = average;
+    if(count_ptr) *count_ptr = count;
+
+    memcpy(old, current, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
+}
+
 inline void heartbeat_init(heartbeat_t *hb) {
-    hb->monotonic = hb->realtime = 0ULL;
+    hb->realtime = 0ULL;
+    hb->randomness = 250 * USEC_PER_MS + ((now_realtime_usec() * clock_realtime_resolution) % (250 * USEC_PER_MS));
+    hb->randomness -= (hb->randomness % clock_realtime_resolution);
+
+    netdata_mutex_lock(&heartbeat_alignment_mutex);
+    hb->statistics_id = heartbeat_alignment_id;
+    heartbeat_alignment_id++;
+    netdata_mutex_unlock(&heartbeat_alignment_mutex);
+
+    if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
+        heartbeat_alignment_values[hb->statistics_id].dt = 0;
+        heartbeat_alignment_values[hb->statistics_id].sequence = 0;
+    }
 }
 
 // waits for the next heartbeat
@@ -164,96 +290,73 @@ inline void heartbeat_init(heartbeat_t *hb) {
 // it returns the dt using the realtime clock
 
 usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
-    heartbeat_t now;
-    now.monotonic = now_monotonic_usec();
-    now.realtime  = now_realtime_usec();
-
-    usec_t next_monotonic = now.monotonic - (now.monotonic % tick) + tick;
-
-    while(now.monotonic < next_monotonic) {
-        sleep_usec(next_monotonic - now.monotonic);
-        now.monotonic = now_monotonic_usec();
-        now.realtime  = now_realtime_usec();
+    if(unlikely(hb->randomness > tick / 2)) {
+        // TODO: The heartbeat tick should be specified at the heartbeat_init() function
+        usec_t tmp = (now_realtime_usec() * clock_realtime_resolution) % (tick / 2);
+        info("heartbeat randomness of %llu is too big for a tick of %llu - setting it to %llu", hb->randomness, tick, tmp);
+        hb->randomness = tmp;
     }
 
-    if(likely(hb->realtime != 0ULL)) {
-        usec_t dt_monotonic = now.monotonic - hb->monotonic;
-        usec_t dt_realtime  = now.realtime - hb->realtime;
+    usec_t dt;
+    usec_t now = now_realtime_usec();
+    usec_t next = now - (now % tick) + tick + hb->randomness;
 
-        hb->monotonic = now.monotonic;
-        hb->realtime  = now.realtime;
+    // align the next time we want to the clock resolution
+    if(next % clock_realtime_resolution)
+        next = next - (next % clock_realtime_resolution) + clock_realtime_resolution;
 
-        if(unlikely(dt_monotonic >= tick + tick / 2)) {
-            errno = 0;
-            error("heartbeat missed %llu monotonic microseconds", dt_monotonic - tick);
-        }
+    // sleep_usec() has a loop to guarantee we will sleep for at least the requested time.
+    // According the specs, when we sleep for a relative time, clock adjustments should not affect the duration
+    // we sleep.
+    sleep_usec(next - now);
+    now = now_realtime_usec();
+    dt = now - hb->realtime;
 
-        return dt_realtime;
+    if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
+        heartbeat_alignment_values[hb->statistics_id].dt += now - next;
+        heartbeat_alignment_values[hb->statistics_id].sequence++;
     }
-    else {
-        hb->monotonic = now.monotonic;
-        hb->realtime  = now.realtime;
-        return 0ULL;
+
+    if(unlikely(now < next)) {
+        errno = 0;
+        error("heartbeat clock: woke up %llu microseconds earlier than expected (can be due to the CLOCK_REALTIME set to the past).", next - now);
     }
+    else if(unlikely(now - next >  tick / 2)) {
+        errno = 0;
+        error("heartbeat clock: woke up %llu microseconds later than expected (can be due to system load or the CLOCK_REALTIME set to the future).", now - next);
+    }
+
+    if(unlikely(!hb->realtime)) {
+        // the first time return zero
+        dt = 0;
+    }
+
+    hb->realtime = now;
+    return dt;
 }
 
-// returned the elapsed time, since the last heartbeat
-// using the monotonic clock
-
-inline usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb) {
-    if(!hb || !hb->monotonic) return 0ULL;
-    return now_monotonic_usec() - hb->monotonic;
-}
-
-int sleep_usec(usec_t usec) {
-
-#ifndef NETDATA_WITH_USLEEP
+void sleep_usec(usec_t usec) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
     struct timespec rem, req = {
-            .tv_sec = (time_t) (usec / 1000000),
-            .tv_nsec = (suseconds_t) ((usec % 1000000) * 1000)
+            .tv_sec = (time_t) (usec / USEC_PER_SEC),
+            .tv_nsec = (suseconds_t) ((usec % USEC_PER_SEC) * NSEC_PER_USEC)
     };
 
-    while (nanosleep(&req, &rem) == -1) {
+    while ((errno = clock_nanosleep(CLOCK_REALTIME, 0, &req, &rem)) != 0) {
         if (likely(errno == EINTR)) {
-            debug(D_SYSTEM, "nanosleep() interrupted (while sleeping for %llu microseconds).", usec);
             req.tv_sec = rem.tv_sec;
             req.tv_nsec = rem.tv_nsec;
         } else {
-            error("Cannot nanosleep() for %llu microseconds.", usec);
+            error("Cannot clock_nanosleep(CLOCK_REALTIME) for %llu microseconds.", usec);
             break;
         }
     }
-
-    return 0;
-#else
-    int ret = usleep(usec);
-    if(unlikely(ret == -1 && errno == EINVAL)) {
-        // on certain systems, usec has to be up to 999999
-        if(usec > 999999) {
-            int counter = usec / 999999;
-            while(counter--)
-                usleep(999999);
-
-            usleep(usec % 999999);
-        }
-        else {
-            error("Cannot usleep() for %llu microseconds.", usec);
-            return ret;
-        }
-    }
-
-    if(ret != 0)
-        error("usleep() failed for %llu microseconds.", usec);
-
-    return ret;
-#endif
 }
 
 static inline collected_number uptime_from_boottime(void) {
 #ifdef CLOCK_BOOTTIME_IS_AVAILABLE
-    return now_boottime_usec() / 1000;
+    return (collected_number)(now_boottime_usec() / USEC_PER_MS);
 #else
     error("uptime cannot be read from CLOCK_BOOTTIME on this system.");
     return 0;

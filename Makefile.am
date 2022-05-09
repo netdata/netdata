@@ -187,6 +187,8 @@ LIBNETDATA_FILES = \
     libnetdata/health/health.c \
     libnetdata/health/health.h \
     libnetdata/string/utf8.h \
+    libnetdata/worker_utilization/worker_utilization.c \
+    libnetdata/worker_utilization/worker_utilization.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF

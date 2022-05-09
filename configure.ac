@@ -1767,6 +1767,7 @@ AC_CONFIG_FILES([
     libnetdata/url/Makefile
     libnetdata/json/Makefile
     libnetdata/health/Makefile
+    libnetdata/worker_utilization/Makefile
     registry/Makefile
     streaming/Makefile
     system/Makefile

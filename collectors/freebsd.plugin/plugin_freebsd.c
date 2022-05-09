@@ -9,7 +9,6 @@ static struct freebsd_module {
     int enabled;
 
     int (*func)(int update_every, usec_t dt);
-    usec_t duration;
 
     RRDDIM *rd;
 
@@ -68,8 +67,14 @@ static struct freebsd_module {
     {.name = NULL, .dim = NULL, .enabled = 0, .func = NULL}
 };
 
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 33
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 33
+#endif
+
 static void freebsd_main_cleanup(void *ptr)
 {
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -80,9 +85,9 @@ static void freebsd_main_cleanup(void *ptr)
 
 void *freebsd_main(void *ptr)
 {
-    netdata_thread_cleanup_push(freebsd_main_cleanup, ptr);
+    worker_register("FREEBSD");
 
-    int vdo_cpu_netdata = config_get_boolean("plugin:freebsd", "netdata server resources", 1);
+    netdata_thread_cleanup_push(freebsd_main_cleanup, ptr);
 
     // initialize FreeBSD plugin
     if (freebsd_plugin_init())
@@ -94,8 +99,9 @@ void *freebsd_main(void *ptr)
         struct freebsd_module *pm = &freebsd_modules[i];
 
         pm->enabled = config_get_boolean("plugin:freebsd", pm->name, pm->enabled);
-        pm->duration = 0ULL;
         pm->rd = NULL;
+
+        worker_register_job_name(i, freebsd_modules[i].dim);
     }
 
     usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
@@ -103,13 +109,12 @@ void *freebsd_main(void *ptr)
     heartbeat_init(&hb);
 
     while (!netdata_exit) {
+        worker_is_idle();
+
         usec_t hb_dt = heartbeat_next(&hb, step);
-        usec_t duration = 0ULL;
 
         if (unlikely(netdata_exit))
             break;
-
-        // BEGIN -- the job to be done
 
         for (i = 0; freebsd_modules[i].name; i++) {
             struct freebsd_module *pm = &freebsd_modules[i];
@@ -118,91 +123,11 @@ void *freebsd_main(void *ptr)
 
             debug(D_PROCNETDEV_LOOP, "FREEBSD calling %s.", pm->name);
 
+            worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-            pm->duration = heartbeat_monotonic_dt_to_now_usec(&hb) - duration;
-            duration += pm->duration;
 
             if (unlikely(netdata_exit))
                 break;
-        }
-
-        // END -- the job is done
-
-        if (vdo_cpu_netdata) {
-            static RRDSET *st_cpu_thread = NULL, *st_duration = NULL;
-            static RRDDIM *rd_user = NULL, *rd_system = NULL;
-
-            // ----------------------------------------------------------------
-
-            struct rusage thread;
-            getrusage(RUSAGE_THREAD, &thread);
-
-            if (unlikely(!st_cpu_thread)) {
-                st_cpu_thread = rrdset_create_localhost(
-                    "netdata",
-                    "plugin_freebsd_cpu",
-                    NULL,
-                    "freebsd",
-                    NULL,
-                    "Netdata FreeBSD plugin CPU usage",
-                    "milliseconds/s",
-                    "freebsd.plugin",
-                    "stats",
-                    132000,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_STACKED);
-
-                rd_user = rrddim_add(st_cpu_thread, "user", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
-                rd_system = rrddim_add(st_cpu_thread, "system", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
-            } else {
-                rrdset_next(st_cpu_thread);
-            }
-
-            rrddim_set_by_pointer(
-                st_cpu_thread, rd_user, thread.ru_utime.tv_sec * USEC_PER_SEC + thread.ru_utime.tv_usec);
-            rrddim_set_by_pointer(
-                st_cpu_thread, rd_system, thread.ru_stime.tv_sec * USEC_PER_SEC + thread.ru_stime.tv_usec);
-            rrdset_done(st_cpu_thread);
-
-            // ----------------------------------------------------------------
-
-            if (unlikely(!st_duration)) {
-                st_duration = rrdset_find_active_bytype_localhost("netdata", "plugin_freebsd_modules");
-
-                if (!st_duration) {
-                    st_duration = rrdset_create_localhost(
-                        "netdata",
-                        "plugin_freebsd_modules",
-                        NULL,
-                        "freebsd",
-                        NULL,
-                        "Netdata FreeBSD plugin modules durations",
-                        "milliseconds/run",
-                        "freebsd.plugin",
-                        "stats",
-                        132001,
-                        localhost->rrd_update_every,
-                        RRDSET_TYPE_STACKED);
-
-                    for (i = 0; freebsd_modules[i].name; i++) {
-                        struct freebsd_module *pm = &freebsd_modules[i];
-                        if (unlikely(!pm->enabled))
-                            continue;
-
-                        pm->rd = rrddim_add(st_duration, pm->dim, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                }
-            } else
-                rrdset_next(st_duration);
-
-            for (i = 0; freebsd_modules[i].name; i++) {
-                struct freebsd_module *pm = &freebsd_modules[i];
-                if (unlikely(!pm->enabled))
-                    continue;
-
-                rrddim_set_by_pointer(st_duration, pm->rd, pm->duration);
-            }
-            rrdset_done(st_duration);
         }
     }
 

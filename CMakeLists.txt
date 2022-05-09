@@ -410,6 +410,8 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/socket/security.c
         libnetdata/socket/security.h
+        libnetdata/worker_utilization/worker_utilization.c
+        libnetdata/worker_utilization/worker_utilization.h
         libnetdata/circular_buffer/circular_buffer.c
         libnetdata/circular_buffer/circular_buffer.h)
 

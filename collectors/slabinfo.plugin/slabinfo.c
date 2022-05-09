@@ -336,6 +336,7 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    clocks_init();
 
     program_name = argv[0];
     program_version = "0.1";

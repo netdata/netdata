@@ -5,6 +5,8 @@
 #define CPU_IDLEJITTER_SLEEP_TIME_MS 20
 
 static void cpuidlejitter_main_cleanup(void *ptr) {
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -14,6 +16,9 @@ static void cpuidlejitter_main_cleanup(void *ptr) {
 }
 
 void *cpuidlejitter_main(void *ptr) {
+    worker_register("IDLEJITTER");
+    worker_register_job_name(0, "measurements");
+
     netdata_thread_cleanup_push(cpuidlejitter_main_cleanup, ptr);
 
     usec_t sleep_ut = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS) * USEC_PER_MS;
@@ -55,7 +60,9 @@ void *cpuidlejitter_main(void *ptr) {
 
         while(elapsed < update_every_ut) {
             now_monotonic_high_precision_timeval(&before);
+            worker_is_idle();
             sleep_usec(sleep_ut);
+            worker_is_busy(0);
             now_monotonic_high_precision_timeval(&after);
 
             usec_t dt = dt_usec(&after, &before);

@@ -1596,6 +1596,7 @@ int host_is_local(const char *host)
 }
 
 int main (int argc, char **argv) {
+    clocks_init();
 
     // ------------------------------------------------------------------------
     // initialization of netdata plugin

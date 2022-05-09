@@ -32,6 +32,8 @@ struct status_codes {
 
 static void timex_main_cleanup(void *ptr)
 {
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -42,9 +44,10 @@ static void timex_main_cleanup(void *ptr)
 
 void *timex_main(void *ptr)
 {
-    netdata_thread_cleanup_push(timex_main_cleanup, ptr);
+    worker_register("TIMEX");
+    worker_register_job_name(0, "clock check");
 
-    int vdo_cpu_netdata = config_get_boolean(CONFIG_SECTION_TIMEX, "timex plugin resource charts", CONFIG_BOOLEAN_YES);
+    netdata_thread_cleanup_push(timex_main_cleanup, ptr);
 
     int update_every = (int)config_get_number(CONFIG_SECTION_TIMEX, "update every", 10);
     if (update_every < localhost->rrd_update_every)
@@ -62,8 +65,9 @@ void *timex_main(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     while (!netdata_exit) {
-        usec_t duration = heartbeat_monotonic_dt_to_now_usec(&hb);
+        worker_is_idle();
         heartbeat_next(&hb, step);
+        worker_is_busy(0);
 
         struct timex timex_buf = {};
         int sync_state = 0;
@@ -169,68 +173,6 @@ void *timex_main(void *ptr)
 
             rrddim_set_by_pointer(st_offset, rd_offset, timex_buf.offset);
             rrdset_done(st_offset);
-        }
-
-        if (vdo_cpu_netdata) {
-            static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
-            static RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
-
-            // ----------------------------------------------------------------
-
-            struct rusage thread;
-            getrusage(RUSAGE_THREAD, &thread);
-
-            if (unlikely(!stcpu_thread)) {
-                stcpu_thread = rrdset_create_localhost(
-                    "netdata",
-                    "plugin_timex",
-                    NULL,
-                    "timex",
-                    NULL,
-                    "Netdata Timex Plugin CPU usage",
-                    "milliseconds/s",
-                    PLUGIN_TIMEX_NAME,
-                    NULL,
-                    NETDATA_CHART_PRIO_NETDATA_TIMEX,
-                    update_every,
-                    RRDSET_TYPE_STACKED);
-
-                rd_user = rrddim_add(stcpu_thread, "user", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
-                rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
-            } else {
-                rrdset_next(stcpu_thread);
-            }
-
-            rrddim_set_by_pointer(
-                stcpu_thread, rd_user, thread.ru_utime.tv_sec * USEC_PER_SEC + thread.ru_utime.tv_usec);
-            rrddim_set_by_pointer(
-                stcpu_thread, rd_system, thread.ru_stime.tv_sec * USEC_PER_SEC + thread.ru_stime.tv_usec);
-            rrdset_done(stcpu_thread);
-
-            // ----------------------------------------------------------------
-
-            if (unlikely(!st_duration)) {
-                st_duration = rrdset_create_localhost(
-                    "netdata",
-                    "plugin_timex_dt",
-                    NULL,
-                    "timex",
-                    NULL,
-                    "Netdata Timex Plugin Duration",
-                    "milliseconds/run",
-                    PLUGIN_TIMEX_NAME,
-                    NULL,
-                    NETDATA_CHART_PRIO_NETDATA_TIMEX + 1,
-                    update_every,
-                    RRDSET_TYPE_AREA);
-
-                rd_duration = rrddim_add(st_duration, "duration", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
-            } else {
-                rrdset_next(st_duration);
-            }
-
-            rrddim_set_by_pointer(st_duration, rd_duration, duration);
-            rrdset_done(st_duration);
         }
     }
 
