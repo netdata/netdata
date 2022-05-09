@@ -237,16 +237,16 @@ struct heartbeat_thread_statistics {
 static struct heartbeat_thread_statistics heartbeat_alignment_values[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE] = { 0 };
 
 void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr, size_t *count_ptr) {
-    struct heartbeat_thread_statistics new[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE];
+    struct heartbeat_thread_statistics current[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE];
     static struct heartbeat_thread_statistics old[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE] = { 0 };
 
-    memcpy(new, heartbeat_alignment_values, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
+    memcpy(current, heartbeat_alignment_values, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
 
     usec_t min = 0, max = 0, total = 0, average = 0;
     size_t i, count = 0;
     for(i = 0; i < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE ;i++) {
-        if(new[i].sequence == old[i].sequence) continue;
-        usec_t value = new[i].dt - old[i].dt;
+        if(current[i].sequence == old[i].sequence) continue;
+        usec_t value = current[i].dt - old[i].dt;
 
         if(!count) {
             min = max = total = value;
@@ -266,7 +266,7 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
     if(average_ptr) *average_ptr = average;
     if(count_ptr) *count_ptr = count;
 
-    memcpy(old, new, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
+    memcpy(old, current, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
 }
 
 inline void heartbeat_init(heartbeat_t *hb) {
@@ -292,9 +292,9 @@ inline void heartbeat_init(heartbeat_t *hb) {
 usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     if(unlikely(hb->randomness > tick / 2)) {
         // TODO: The heartbeat tick should be specified at the heartbeat_init() function
-        usec_t new = (now_realtime_usec() * clock_realtime_resolution) % (tick / 2);
-        info("heartbeat randomness of %llu is too big for a tick of %llu - setting it to %llu", hb->randomness, tick, new);
-        hb->randomness = new;
+        usec_t tmp = (now_realtime_usec() * clock_realtime_resolution) % (tick / 2);
+        info("heartbeat randomness of %llu is too big for a tick of %llu - setting it to %llu", hb->randomness, tick, tmp);
+        hb->randomness = tmp;
     }
 
     usec_t dt;

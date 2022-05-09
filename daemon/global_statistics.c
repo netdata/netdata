@@ -1193,7 +1193,7 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
     }
 }
 
-static int read_thread_cpu_time_from_proc_stat(pid_t pid, kernel_uint_t *utime, kernel_uint_t *stime) {
+static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_uint_t *utime __maybe_unused, kernel_uint_t *stime __maybe_unused) {
 #ifdef __linux__
     char filename[200 + 1];
     snprintfz(filename, 200, "/proc/self/task/%d/stat", pid);
@@ -1210,6 +1210,9 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid, kernel_uint_t *utime, 
     procfile_close(ff);
     return 0;
 #else
+    // TODO: add here cpu time detection per thread, for FreeBSD and MacOS
+    *utime = 0;
+    *stime = 0;
     return 1;
 #endif
 }
