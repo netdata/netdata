@@ -1127,8 +1127,8 @@ void *tc_main(void *ptr) {
                             "netdata"
                             , "plugin_tc_time"
                             , NULL
-                            , "tc thread"
-                            , NULL
+                            , "workers plugin tc"
+                            , "netdata.workers.tc.script_time"
                             , "Netdata TC script execution"
                             , "milliseconds/run"
                             , PLUGIN_TC_NAME

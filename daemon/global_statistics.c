@@ -6,6 +6,16 @@
 
 #define CONFIG_SECTION_GLOBAL_STATISTICS "global statistics"
 
+#define WORKER_JOB_GLOBAL             0
+#define WORKER_JOB_REGISTRY           1
+#define WORKER_JOB_WORKERS            2
+#define WORKER_JOB_DBENGINE           3
+#define WORKER_JOB_HEARTBEAT          4
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 5
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
+#endif
+
 static struct global_statistics {
     volatile uint16_t connected_clients;
 
@@ -910,6 +920,8 @@ struct worker_utilization {
     size_t priority;
     uint32_t flags;
 
+    char *name_lowercase;
+
     struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
     size_t workers_registered;
@@ -954,14 +966,17 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     if(unlikely(!wu->st_workers_time)) {
         char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_time_%s", wu->name);
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_time_%s", wu->name_lowercase);
+
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.time", wu->name_lowercase);
 
         wu->st_workers_time = rrdset_create_localhost(
             "netdata"
             , name
             , NULL
             , wu->family
-            , "netdata.workers.time"
+            , context
             , "Netdata Workers Busy Time (100% = all workers busy)"
             , "%"
             , "netdata"
@@ -1000,14 +1015,17 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     if(wu->workers_cpu_enabled || wu->st_workers_cpu) {
         if(unlikely(!wu->st_workers_cpu)) {
             char name[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_%s", wu->name);
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_%s", wu->name_lowercase);
+
+            char context[RRD_ID_LENGTH_MAX + 1];
+            snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.cpu", wu->name_lowercase);
 
             wu->st_workers_cpu = rrdset_create_localhost(
                 "netdata"
                 , name
                 , NULL
                 , wu->family
-                , "netdata.workers.cpu"
+                , context
                 , "Netdata Workers CPU Utilization (100% = all workers busy)"
                 , "%"
                 , "netdata"
@@ -1062,14 +1080,17 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     if(unlikely(!wu->st_workers_jobs_per_job_type)) {
         char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_jobs_by_type_%s", wu->name);
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_jobs_by_type_%s", wu->name_lowercase);
+
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.jobs_started_by_type", wu->name_lowercase);
 
         wu->st_workers_jobs_per_job_type = rrdset_create_localhost(
             "netdata"
             , name
             , NULL
             , wu->family
-            , "netdata.workers.by_type.jobs_started"
+            , context
             , "Netdata Workers Jobs Started by Type"
             , "jobs"
             , "netdata"
@@ -1101,14 +1122,17 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     if(unlikely(!wu->st_workers_busy_per_job_type)) {
         char name[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_busy_time_by_type_%s", wu->name);
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_busy_time_by_type_%s", wu->name_lowercase);
+
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.time_by_type", wu->name_lowercase);
 
         wu->st_workers_busy_per_job_type = rrdset_create_localhost(
             "netdata"
             , name
             , NULL
             , wu->family
-            , "netdata.workers.by_type.busy_time"
+            , context
             , "Netdata Workers Busy Time by Type"
             , "ms"
             , "netdata"
@@ -1141,14 +1165,17 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     if(wu->st_workers_threads || wu->workers_registered > 1) {
         if(unlikely(!wu->st_workers_threads)) {
             char name[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_threads_%s", wu->name);
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_threads_%s", wu->name_lowercase);
+
+            char context[RRD_ID_LENGTH_MAX + 1];
+            snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.threads", wu->name_lowercase);
 
             wu->st_workers_threads = rrdset_create_localhost(
                 "netdata"
                 , name
                 , NULL
                 , wu->family
-                , "netdata.workers.threads"
+                , context
                 , "Netdata Workers Threads"
                 , "threads"
                 , "netdata"
@@ -1182,6 +1209,12 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
 
     size_t i;
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        if(unlikely(!wu->name_lowercase)) {
+            wu->name_lowercase = strdupz(wu->name);
+            char *s = wu->name_lowercase;
+            for( ; *s ; s++) *s = tolower(*s);
+        }
+
         wu->per_job_type[i].jobs_started = 0;
         wu->per_job_type[i].busy_time = 0;
     }
@@ -1220,6 +1253,7 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_
 static void workers_threads_cleanup(struct worker_utilization *wu) {
     struct worker_thread *t;
 
+    // free threads at the beginning of the linked list
     while(wu->threads && !wu->threads->enabled) {
         t = wu->threads;
         wu->threads = t->next;
@@ -1227,8 +1261,7 @@ static void workers_threads_cleanup(struct worker_utilization *wu) {
         freez(t);
     }
 
-    if(!wu->threads) return;
-
+    // free threads in the middle of the linked list
     for(t = wu->threads; t && t->next ; t = t->next) {
         if(t->next->enabled) continue;
 
@@ -1309,38 +1342,38 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
         wt->cpu_enabled = 1;
         wt->collected_time = now_realtime_usec();
     }
-
     wu->workers_cpu_enabled += wt->cpu_enabled;
 }
 
 static struct worker_utilization all_workers_utilization[] = {
-    { .name = "WEB",         .family = "web server threads",            .priority = 1000000 },
-    { .name = "DBENGINE",    .family = "dbengine main thread",          .priority = 1000000 },
-    { .name = "ACLKQUERY",   .family = "aclk query threads",            .priority = 1000000 },
-    { .name = "ACLKSYNC",    .family = "aclk host sync threads",        .priority = 1000000 },
-    { .name = "STATSD",      .family = "statsd collect thread",         .priority = 1000000 },
-    { .name = "STATSDFLUSH", .family = "statsd flush thread",           .priority = 1000000 },
-    { .name = "STATS",       .family = "global statistics thread",      .priority = 1000000 },
-    { .name = "PROC",        .family = "proc thread",                   .priority = 1000000 },
-    { .name = "CGROUPS",     .family = "cgroups collect thread",        .priority = 1000000 },
-    { .name = "CGROUPSDISC", .family = "cgroups discovery thread",      .priority = 1000000 },
-    { .name = "PLUGINSD",    .family = "plugins.d threads",             .priority = 1000000 },
-    { .name = "STREAMRCV",   .family = "streaming receive threads",     .priority = 1000000 },
-    { .name = "STREAMSND",   .family = "streaming send threads",        .priority = 1000000 },
-    { .name = "DISKSPACE",   .family = "diskspace thread",              .priority = 1000000 },
-    { .name = "TC",          .family = "tc thread",                     .priority = 1000000 },
-    { .name = "MLTRAIN",     .family = "ML training threads",           .priority = 1000000 },
-    { .name = "MLDETECT",    .family = "ML detection threads",          .priority = 1000000 },
-    { .name = "TIMEX",       .family = "timex thread",                  .priority = 1000000 },
-    { .name = "IDLEJITTER",  .family = "idlejitter thread",             .priority = 1000000 },
-    { .name = "FREEBSD",     .family = "freebsd thread",                .priority = 1000000 },
-    { .name = "MACOS",       .family = "macos thread",                  .priority = 1000000 },
+    { .name = "STATS",       .family = "workers global statistics",       .priority = 1000000 },
+    { .name = "HEALTH",      .family = "workers health alarms",           .priority = 1000000 },
+    { .name = "MLTRAIN",     .family = "workers ML training",             .priority = 1000000 },
+    { .name = "MLDETECT",    .family = "workers ML detection",            .priority = 1000000 },
+    { .name = "STREAMRCV",   .family = "workers streaming receive",       .priority = 1000000 },
+    { .name = "STREAMSND",   .family = "workers streaming send",          .priority = 1000000 },
+    { .name = "DBENGINE",    .family = "workers dbengine instances",      .priority = 1000000 },
+    { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
+    { .name = "ACLKQUERY",   .family = "workers aclk query",              .priority = 1000000 },
+    { .name = "ACLKSYNC",    .family = "workers aclk host sync",          .priority = 1000000 },
+    { .name = "PLUGINSD",    .family = "workers plugins.d",               .priority = 1000000 },
+    { .name = "STATSD",      .family = "workers plugin statsd",           .priority = 1000000 },
+    { .name = "STATSDFLUSH", .family = "workers plugin statsd flush",     .priority = 1000000 },
+    { .name = "PROC",        .family = "workers plugin proc",             .priority = 1000000 },
+    { .name = "FREEBSD",     .family = "workers plugin freebsd",          .priority = 1000000 },
+    { .name = "MACOS",       .family = "workers plugin macos",            .priority = 1000000 },
+    { .name = "CGROUPS",     .family = "workers plugin cgroups",          .priority = 1000000 },
+    { .name = "CGROUPSDISC", .family = "workers plugin cgroups find",     .priority = 1000000 },
+    { .name = "DISKSPACE",   .family = "workers plugin diskspace",        .priority = 1000000 },
+    { .name = "TC",          .family = "workers plugin tc",               .priority = 1000000 },
+    { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
+    { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
 
     // has to be terminated with a NULL
     { .name = NULL,          .family = NULL       }
 };
 
-void worker_utilization_charts(void) {
+static void worker_utilization_charts(void) {
     static size_t iterations = 0;
     iterations++;
 
@@ -1357,28 +1390,40 @@ void worker_utilization_charts(void) {
     }
 }
 
+static void worker_utilization_finish(void) {
+    int i;
+    for(i = 0; all_workers_utilization[i].name ;i++) {
+        struct worker_utilization *wu = &all_workers_utilization[i];
+
+        if(wu->name_lowercase) {
+            freez(wu->name_lowercase);
+            wu->name_lowercase = NULL;
+        }
+
+        // mark all threads as not enabled
+        struct worker_thread *t;
+        for(t = wu->threads; t ; t = t->next) t->enabled = 0;
+
+        // let the cleanup job free them
+        workers_threads_cleanup(wu);
+    }
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 
 static void global_statistics_cleanup(void *ptr)
 {
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     info("cleaning up...");
 
-    worker_unregister();
+    worker_utilization_finish();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
-
-#define WORKER_JOB_GLOBAL     0
-#define WORKER_JOB_REGISTRY   1
-#define WORKER_JOB_WORKERS    2
-#define WORKER_JOB_DBENGINE   3
-#define WORKER_JOB_HEARTBEAT  4
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 5
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 4
-#endif
 
 void *global_statistics_main(void *ptr)
 {

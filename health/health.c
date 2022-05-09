@@ -573,6 +573,8 @@ static inline int check_if_resumed_from_suspension(void) {
 }
 
 static void health_main_cleanup(void *ptr) {
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -695,7 +697,31 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
  *
  * @return It always returns NULL
  */
+
+#define WORKER_HEALTH_JOB_RRD_LOCK           0
+#define WORKER_HEALTH_JOB_HOST_LOCK          1
+#define WORKER_HEALTH_JOB_DB_QUERY           2
+#define WORKER_HEALTH_JOB_CALC_EVAL          3
+#define WORKER_HEALTH_JOB_WARNING_EVAL       4
+#define WORKER_HEALTH_JOB_CRITICAL_EVAL      5
+#define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY    6
+#define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS  7
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
+#endif
+
 void *health_main(void *ptr) {
+    worker_register("HEALTH");
+    worker_register_job_name(WORKER_HEALTH_JOB_RRD_LOCK, "rrd lock");
+    worker_register_job_name(WORKER_HEALTH_JOB_HOST_LOCK, "host lock");
+    worker_register_job_name(WORKER_HEALTH_JOB_DB_QUERY, "db lookup");
+    worker_register_job_name(WORKER_HEALTH_JOB_CALC_EVAL, "calc eval");
+    worker_register_job_name(WORKER_HEALTH_JOB_WARNING_EVAL, "warning eval");
+    worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
+    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alarm log entry");
+    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alarm log process");
+
     netdata_thread_cleanup_push(health_main_cleanup, ptr);
 
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
@@ -743,6 +769,7 @@ void *health_main(void *ptr) {
             marked_aclk_reload_loop = loop;
 #endif
 
+        worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
         rrd_rdlock();
 
         RRDHOST *host;
@@ -772,6 +799,7 @@ void *health_main(void *ptr) {
 
             init_pending_foreach_alarms(host);
 
+            worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
             rrdhost_rdlock(host);
 
             // the first loop is to lookup values from the db
@@ -786,6 +814,7 @@ void *health_main(void *ptr) {
                              rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE) &&
                              now > (rc->rrdset->last_collected_time.tv_sec + 60))) {
                     if (!rrdcalc_isrepeating(rc)) {
+                        worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         time_t now = now_realtime_sec();
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                             host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
@@ -820,6 +849,8 @@ void *health_main(void *ptr) {
                 // if there is database lookup, do it
 
                 if (unlikely(RRDCALC_HAS_DB_LOOKUP(rc))) {
+                    worker_is_busy(WORKER_HEALTH_JOB_DB_QUERY);
+
                     /* time_t old_db_timestamp = rc->db_before; */
                     int value_is_null = 0;
 
@@ -876,6 +907,8 @@ void *health_main(void *ptr) {
                 // if there is calculation expression, run it
 
                 if (unlikely(rc->calculation)) {
+                    worker_is_busy(WORKER_HEALTH_JOB_CALC_EVAL);
+
                     if (unlikely(!expression_evaluate(rc->calculation))) {
                         // calculation failed
                         rc->value = NAN;
@@ -924,6 +957,8 @@ void *health_main(void *ptr) {
                     // check the warning expression
 
                     if (likely(rc->warning)) {
+                        worker_is_busy(WORKER_HEALTH_JOB_WARNING_EVAL);
+
                         if (unlikely(!expression_evaluate(rc->warning))) {
                             // calculation failed
                             rc->rrdcalc_flags |= RRDCALC_FLAG_WARN_ERROR;
@@ -948,6 +983,8 @@ void *health_main(void *ptr) {
                     // check the critical expression
 
                     if (likely(rc->critical)) {
+                        worker_is_busy(WORKER_HEALTH_JOB_CRITICAL_EVAL);
+
                         if (unlikely(!expression_evaluate(rc->critical))) {
                             // calculation failed
                             rc->rrdcalc_flags |= RRDCALC_FLAG_CRIT_ERROR;
@@ -1005,6 +1042,7 @@ void *health_main(void *ptr) {
                     // check if the new status and the old differ
 
                     if (status != rc->status) {
+                        worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         int delay = 0;
 
                         // apply trigger hysteresis
@@ -1086,6 +1124,7 @@ void *health_main(void *ptr) {
                     }
 
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
+                        worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         rc->last_repeat = now;
                         if (likely(rc->times_repeat < UINT32_MAX)) rc->times_repeat++;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
@@ -1118,6 +1157,7 @@ void *health_main(void *ptr) {
 
             // execute notifications
             // and cleanup
+            worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS);
             health_alarm_log_process(host);
 
             if (unlikely(netdata_exit)) {
@@ -1156,6 +1196,7 @@ void *health_main(void *ptr) {
 
         now = now_realtime_sec();
         if(now < next_run) {
+            worker_is_idle();
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs", loop, (int) (next_run - now));
             sleep_usec(USEC_PER_SEC * (usec_t) (next_run - now));
             now = now_realtime_sec();
