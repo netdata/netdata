@@ -44,13 +44,41 @@ struct config sync_config = { .first_section = NULL,
         .rwlock = AVL_LOCK_INITIALIZER } };
 
 ebpf_sync_syscalls_t local_syscalls[] = {
-    {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = NETDATA_SYSCALLS_SYNCFS, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = NETDATA_SYSCALLS_MSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = NETDATA_SYSCALLS_FSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = NETDATA_SYSCALLS_FDATASYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
-    {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL}
+    {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+     .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_SYNCFS, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+     .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_MSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+     .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_FSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+     .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_FDATASYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+     .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+     .sync_obj = NULL
+#endif
+    },
+    {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+     .sync_obj = NULL
+#endif
+    }
 };
 
 netdata_ebpf_targets_t sync_targets[] = { {.name = NETDATA_SYSCALLS_SYNC, .mode = EBPF_LOAD_TRAMPOLINE},
@@ -228,7 +256,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 {
     int i;
     const char *saved_name = em->thread_name;
-    sync_syscalls_index_t errors = 0;
+    int errors = 0;
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (w->enabled) {
@@ -246,12 +274,15 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                 if (!w->sync_obj) {
                     errors++;
                 } else {
-                    if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
+                    if (ebpf_is_function_inside_btf(default_btf, syscall)) {
+                        if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
+                            errors++;
+                        }
+                    } else {
                         if (ebpf_sync_load_legacy(w, em))
                             errors++;
-
-                        em->thread_name = saved_name;
                     }
+                    em->thread_name = saved_name;
                 }
             }
 #endif
@@ -263,7 +294,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     memset(sync_counter_publish_aggregated, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_publish_syscall_t));
     memset(sync_hash_values, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_idx_t));
 
-    return 0;
+    return (errors) ? -1 : 0;
 }
 
 /*****************************************************************

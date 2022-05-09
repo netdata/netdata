@@ -540,7 +540,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
 
-    handle = calloc(1, sizeof(struct rrdeng_query_handle));
+    handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
     handle->position = 0;
@@ -573,7 +573,10 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         /* it's the first call */
         next_page_time = handle->next_page_time * USEC_PER_SEC;
     } else {
-        pg_cache_atomic_get_pg_info(descr, &page_end_time, &page_length);
+        // pg_cache_atomic_get_pg_info(descr, &page_end_time, &page_length);
+        page_end_time = handle->page_end_time;
+        page_length = handle->page_length;
+        page = handle->page;
     }
     position = handle->position + 1;
 
@@ -616,10 +619,16 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         } else {
             position = 0;
         }
+
+        handle->page_end_time = page_end_time;
+        handle->page_length = page_length;
+        page = handle->page = descr->pg_cache_descr->page;
     }
-    page = descr->pg_cache_descr->page;
+
+    // page = descr->pg_cache_descr->page;
     ret = page[position];
     entries = page_length / sizeof(storage_number);
+
     if (entries > 1) {
         usec_t dt;
 
@@ -665,6 +674,10 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
 #endif
         pg_cache_put(ctx, descr);
     }
+
+    // whatever is allocated at rrdeng_load_metric_init() should be freed here
+    freez(handle);
+    rrdimm_handle->handle = NULL;
 }
 
 time_t rrdeng_metric_latest_time(RRDDIM *rd)

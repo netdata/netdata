@@ -1172,23 +1172,6 @@ static inline void epbf_update_load_mode(char *str)
     ebpf_set_load_mode(load);
 }
 
-#ifdef LIBBPF_MAJOR_VERSION
-/**
- * Set default btf file
- *
- * Load the default BTF file on environment.
- */
-static void ebpf_set_default_btf_file()
-{
-    char path[PATH_MAX + 1];
-    snprintfz(path, PATH_MAX, "%s/vmlinux", btf_path);
-    default_btf = ebpf_parse_btf_file(path);
-    if (!default_btf)
-        info("Your environment does not have BTF file %s/vmlinux. The plugin will work with 'legacy' code.",
-             btf_path);
-}
-#endif
-
 /**
  * Read collector values
  *
@@ -1210,10 +1193,10 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups, int u
     how_to_load(value);
 
     btf_path = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PROGRAM_PATH,
-                             EBPF_DEFAULT_BTF_FILE);
+                             EBPF_DEFAULT_BTF_PATH);
 
 #ifdef LIBBPF_MAJOR_VERSION
-    ebpf_set_default_btf_file();
+    default_btf = ebpf_load_btf_file(btf_path, EBPF_DEFAULT_BTF_FILE);
 #endif
 
     value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, EBPF_CFG_DEFAULT_PROGRAM);

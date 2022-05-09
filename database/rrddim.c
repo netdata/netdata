@@ -38,7 +38,7 @@ inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
 // RRDDIM rename a dimension
 
 inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
-    if(unlikely(!name || !*name || !strcmp(rd->name, name)))
+    if(unlikely(!name || !*name || (rd->name && !strcmp(rd->name, name))))
         return 0;
 
     debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
@@ -169,30 +169,30 @@ static time_t rrddim_query_oldest_time(RRDDIM *rd) {
 
 void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     RRDCALC *rrdc;
+    
     for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
         if (simple_pattern_matches(rrdc->spdim, rd->id) || simple_pattern_matches(rrdc->spdim, rd->name)) {
             if (rrdc->hash_chart == st->hash_name || !strcmp(rrdc->chart, st->name) || !strcmp(rrdc->chart, st->id)) {
                 char *name = alarm_name_with_dim(rrdc->name, strlen(rrdc->name), rd->name, strlen(rd->name));
-                if (name) {
-                    if(rrdcalc_exists(host, st->name, name, 0, 0)){
-                        freez(name);
-                        continue;
-                    }
+                if(rrdcalc_exists(host, st->name, name, 0, 0)) {
+                    freez(name);
+                    continue;
+                }
 
-                    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
-                    RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, name, rd->name);
-                    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+                netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+                RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, name, rd->name);
+                netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-                    if (child) {
-                        rrdcalc_add_to_host(host, child);
-                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl_t *)child);
-                        if (rdcmp != child) {
-                            error("Cannot insert the alarm index ID %s",child->name);
-                        }
-                    } else {
-                        error("Cannot allocate a new alarm.");
-                        rrdc->foreachcounter--;
+                if (child) {
+                    rrdcalc_add_to_host(host, child);
+                    RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl_t *)child);
+                    if (rdcmp != child) {
+                        error("Cannot insert the alarm index ID %s",child->name);
                     }
+                }
+                else {
+                    error("Cannot allocate a new alarm.");
+                    rrdc->foreachcounter--;
                 }
             }
         }

@@ -7,6 +7,13 @@
 // PROMETHEUS
 // /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
 
+static int is_matches_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN *filter) {
+    if (instance->config.options & EXPORTING_OPTION_SEND_NAMES) {
+        return simple_pattern_matches(filter, st->name);
+    }
+    return simple_pattern_matches(filter, st->id);
+}
+
 /**
  * Check if a chart can be sent to Prometheus
  *
@@ -29,28 +36,21 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
         return 0;
 
     if (filter) {
-        if (instance->config.options & EXPORTING_OPTION_SEND_NAMES) {
-            if (!simple_pattern_matches(filter, st->name))
-                return 0;
-        } else {
-            if (!simple_pattern_matches(filter, st->id))
-                return 0;
+        if (!is_matches_rrdset(instance, st, filter)) {
+            return 0;
         }
-    } else {
-        if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
-            // we have not checked this chart
-            if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
-                simple_pattern_matches(instance->config.charts_pattern, st->name))
-                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
-            else {
-                rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
-                debug(
-                    D_EXPORTING,
-                    "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
-                    st->id,
-                    host->hostname);
-                return 0;
-            }
+    } else if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
+        // we have not checked this chart
+        if (is_matches_rrdset(instance, st, instance->config.charts_pattern)) {
+            rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
+        } else {
+            rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
+            debug(
+                D_EXPORTING,
+                "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
+                st->id,
+                host->hostname);
+            return 0;
         }
     }
 

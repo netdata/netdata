@@ -287,19 +287,15 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
 char *alarm_name_with_dim(char *name, size_t namelen, const char *dim, size_t dimlen) {
     char *newname,*move;
 
-    newname = malloc(namelen + dimlen + 2);
-    if(newname) {
-        move = newname;
-        memcpy(move, name, namelen);
-        move += namelen;
+    newname = mallocz(namelen + dimlen + 2);
+    move = newname;
+    memcpy(move, name, namelen);
+    move += namelen;
 
-        *move++ = '_';
-        memcpy(move, dim, dimlen);
-        move += dimlen;
-        *move = '\0';
-    } else {
-        newname = name;
-    }
+    *move++ = '_';
+    memcpy(move, dim, dimlen);
+    move += dimlen;
+    *move = '\0';
 
     return newname;
 }

@@ -339,24 +339,28 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
     return NULL;
 }
 
+static void streaming_parser_thread_cleanup(void *ptr) {
+    PARSER *parser = (PARSER *)ptr;
+    parser_destroy(parser);
+}
+
 size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
     size_t result;
-    PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
-    user->enabled = cd->enabled;
-    user->host = rpt->host;
-    user->opaque = rpt;
-    user->cd = cd;
-    user->trust_durations = 0;
+
+    PARSER_USER_OBJECT user = {
+        .enabled = cd->enabled,
+        .host = rpt->host,
+        .opaque = rpt,
+        .cd = cd,
+        .trust_durations = 0
+    };
     rpt->first_msg_t = 0;
 
-    PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
+    PARSER *parser = parser_init(rpt->host, &user, fp, PARSER_INPUT_SPLIT);
 
-    if (unlikely(!parser)) {
-        error("Failed to initialize parser");
-        cd->serial_failures++;
-        freez(user);
-        return 0;
-    }
+    // this keeps the parser with its current value
+    // so, parser needs to be allocated before pushing it
+    netdata_thread_cleanup_push(streaming_parser_thread_cleanup, parser);
 
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
@@ -374,12 +378,13 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
     parser->plugins_action->clabel_action    = &pluginsd_clabel_action;
 
-    user->parser = parser;
+    user.parser = parser;
 
 #ifdef ENABLE_COMPRESSION
     if (rpt->decompressor)
         rpt->decompressor->reset(rpt->decompressor);
 #endif
+
     do{
         if (receiver_read(rpt, fp))
             break;
@@ -396,10 +401,13 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         rpt->last_msg_t = now_realtime_sec();
     }
     while(!netdata_exit);
+
 done:
-    result= user->count;
-    freez(user);
-    parser_destroy(parser);
+    result = user.count;
+
+    // free parser with the pop function
+    netdata_thread_cleanup_pop(1);
+
     return result;
 }
 
