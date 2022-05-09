@@ -1330,6 +1330,8 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "MLDETECT",    .family = "ML detection threads",          .priority = 1000000 },
     { .name = "TIMEX",       .family = "timex thread",                  .priority = 1000000 },
     { .name = "IDLEJITTER",  .family = "idlejitter thread",             .priority = 1000000 },
+    { .name = "FREEBSD",     .family = "freebsd thread",                .priority = 1000000 },
+    { .name = "MACOS",       .family = "macos thread",                  .priority = 1000000 },
 
     // has to be terminated with a NULL
     { .name = NULL,          .family = NULL       }

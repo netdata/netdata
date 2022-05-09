@@ -85,13 +85,13 @@ static void freebsd_main_cleanup(void *ptr)
 
 void *freebsd_main(void *ptr)
 {
+    worker_register("FREEBSD");
+
     netdata_thread_cleanup_push(freebsd_main_cleanup, ptr);
 
     // initialize FreeBSD plugin
     if (freebsd_plugin_init())
         netdata_cleanup_and_exit(1);
-
-    worker_register("FREEBSD");
 
     // check the enabled status for each module
     int i;
