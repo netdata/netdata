@@ -224,6 +224,7 @@ void reset_metrics() {
 }
 
 int main(int argc, char **argv) {
+    clocks_init();
 
     // ------------------------------------------------------------------------
     // initialization of netdata plugin
