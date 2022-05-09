@@ -1864,6 +1864,8 @@ static void ebpf_manage_pid(pid_t pid)
  */
 int main(int argc, char **argv)
 {
+    clocks_init();
+
     set_global_variables();
     ebpf_parse_args(argc, argv);
     ebpf_manage_pid(getpid());

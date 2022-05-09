@@ -1283,6 +1283,7 @@ void parse_command_line(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+    clocks_init();
 
     // ------------------------------------------------------------------------
     // initialization of netdata plugin

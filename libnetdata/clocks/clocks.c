@@ -7,8 +7,8 @@
 static clockid_t clock_boottime_to_use = CLOCK_MONOTONIC;
 static clockid_t clock_monotonic_to_use = CLOCK_MONOTONIC;
 
-usec_t clock_monotonic_resolution = 0;
-usec_t clock_realtime_resolution = 0;
+usec_t clock_monotonic_resolution = 1000;
+usec_t clock_realtime_resolution = 1000;
 
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
@@ -67,7 +67,13 @@ void clocks_init(void) {
     clock_monotonic_resolution = get_clock_resolution(clock_monotonic_to_use);
     clock_realtime_resolution = get_clock_resolution(CLOCK_REALTIME);
 
-    info("system clock resolutions: monotonic = %llu usec, realtime = %llu usec", clock_monotonic_resolution, clock_realtime_resolution);
+    // if for any reason these are zero, netdata will crash
+    // since we use them as modulo to calculations
+    if(!clock_realtime_resolution)
+        clock_realtime_resolution = 1000;
+
+    if(!clock_monotonic_resolution)
+        clock_monotonic_resolution = 1000;
 }
 
 inline time_t now_sec(clockid_t clk_id) {
