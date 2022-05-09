@@ -30,6 +30,8 @@ void destroy_receiver_state(struct receiver_state *rpt) {
 }
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
+    worker_unregister();
+
     static __thread int executed = 0;
     if(!executed) {
         executed = 1;
@@ -708,7 +710,9 @@ void *rrdpush_receiver_thread(void *ptr) {
     struct receiver_state *rpt = (struct receiver_state *)ptr;
     info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
+    worker_register("STREAMRCV");
     rrdpush_receive(rpt);
+    worker_unregister();
 
     netdata_thread_cleanup_pop(1);
     return NULL;

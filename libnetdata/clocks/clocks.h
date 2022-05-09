@@ -22,8 +22,9 @@ typedef unsigned long long usec_t;
 typedef long long susec_t;
 
 typedef struct heartbeat {
-    usec_t monotonic;
     usec_t realtime;
+    usec_t randomness;
+    size_t statistics_id;
 } heartbeat_t;
 
 /* Linux value is as good as any other */
@@ -36,20 +37,14 @@ typedef struct heartbeat {
 #define CLOCK_MONOTONIC CLOCK_REALTIME
 #endif
 
-/* Prefer CLOCK_MONOTONIC_COARSE where available to reduce overhead. It has the same semantics as CLOCK_MONOTONIC */
-#ifndef CLOCK_MONOTONIC_COARSE
-/* fallback to CLOCK_MONOTONIC if not available */
-#define CLOCK_MONOTONIC_COARSE CLOCK_MONOTONIC
-#endif
-
 #ifndef CLOCK_BOOTTIME
 
 #ifdef CLOCK_UPTIME
 /* CLOCK_BOOTTIME falls back to CLOCK_UPTIME on FreeBSD */
 #define CLOCK_BOOTTIME CLOCK_UPTIME
 #else // CLOCK_UPTIME
-/* CLOCK_BOOTTIME falls back to CLOCK_MONOTONIC */
-#define CLOCK_BOOTTIME  CLOCK_MONOTONIC_COARSE
+/* CLOCK_BOOTTIME falls back to CLOCK_REALTIME */
+#define CLOCK_BOOTTIME  CLOCK_REALTIME
 #endif // CLOCK_UPTIME
 
 #else // CLOCK_BOOTTIME
@@ -115,8 +110,6 @@ extern int clock_gettime(clockid_t clk_id, struct timespec *ts);
  * All now_*_sec() functions return the time in seconds from the appropriate clock, or 0 on error.
  * All now_*_usec() functions return the time in microseconds from the appropriate clock, or 0 on error.
  *
- * Most functions will attempt to use CLOCK_MONOTONIC_COARSE if available to reduce contention overhead and improve
- * performance scaling. If high precision is required please use one of the available now_*_high_precision_* functions.
  */
 extern int now_realtime_timeval(struct timeval *tv);
 extern time_t now_realtime_sec(void);
@@ -146,10 +139,9 @@ extern void heartbeat_init(heartbeat_t *hb);
  */
 extern usec_t heartbeat_next(heartbeat_t *hb, usec_t tick);
 
-/* Returns elapsed time in microseconds since last heartbeat */
-extern usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb);
+extern void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr, size_t *count_ptr);
 
-extern int sleep_usec(usec_t usec);
+extern void sleep_usec(usec_t usec);
 
 extern void clocks_init(void);
 
@@ -159,5 +151,10 @@ extern usec_t now_usec(clockid_t clk_id);
 extern int now_timeval(clockid_t clk_id, struct timeval *tv);
 
 extern collected_number uptime_msec(char *filename);
+
+extern usec_t clock_monotonic_resolution;
+extern usec_t clock_realtime_resolution;
+
+extern void sleep_to_absolute_time(usec_t usec);
 
 #endif /* NETDATA_CLOCKS_H */

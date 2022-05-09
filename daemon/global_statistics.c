@@ -6,6 +6,16 @@
 
 #define CONFIG_SECTION_GLOBAL_STATISTICS "global statistics"
 
+#define WORKER_JOB_GLOBAL             0
+#define WORKER_JOB_REGISTRY           1
+#define WORKER_JOB_WORKERS            2
+#define WORKER_JOB_DBENGINE           3
+#define WORKER_JOB_HEARTBEAT          4
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 5
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
+#endif
+
 static struct global_statistics {
     volatile uint16_t connected_clients;
 
@@ -436,435 +446,993 @@ static void global_statistics_charts(void) {
     }
 
     // ----------------------------------------------------------------
+}
 
+static void dbengine_statistics_charts(void) {
 #ifdef ENABLE_DBENGINE
-    RRDHOST *host;
-    unsigned long long stats_array[RRDENG_NR_STATS] = {0};
-    unsigned long long local_stats_array[RRDENG_NR_STATS];
-    unsigned dbengine_contexts = 0, counted_multihost_db = 0, i;
+    if(netdata_rwlock_tryrdlock(&rrd_rwlock) == 0) {
+        RRDHOST *host;
+        unsigned long long stats_array[RRDENG_NR_STATS] = {0};
+        unsigned long long local_stats_array[RRDENG_NR_STATS];
+        unsigned dbengine_contexts = 0, counted_multihost_db = 0, i;
 
-    rrd_rdlock();
-    rrdhost_foreach_read(host) {
-        if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-            if (&multidb_ctx == host->rrdeng_ctx) {
-                if (counted_multihost_db)
-                    continue; /* Only count multi-host DB once */
-                counted_multihost_db = 1;
-            }
-            ++dbengine_contexts;
-            /* get localhost's DB engine's statistics */
-            rrdeng_get_37_statistics(host->rrdeng_ctx, local_stats_array);
-            for (i = 0 ; i < RRDENG_NR_STATS ; ++i) {
-                /* aggregate statistics across hosts */
-                stats_array[i] += local_stats_array[i];
+        rrdhost_foreach_read(host) {
+            if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+                if (&multidb_ctx == host->rrdeng_ctx) {
+                    if (counted_multihost_db)
+                        continue; /* Only count multi-host DB once */
+                    counted_multihost_db = 1;
+                }
+                ++dbengine_contexts;
+                /* get localhost's DB engine's statistics */
+                rrdeng_get_37_statistics(host->rrdeng_ctx, local_stats_array);
+                for (i = 0; i < RRDENG_NR_STATS; ++i) {
+                    /* aggregate statistics across hosts */
+                    stats_array[i] += local_stats_array[i];
+                }
             }
         }
-    }
-    rrd_unlock();
+        rrd_unlock();
 
-    if (dbengine_contexts) {
-        /* deduplicate global statistics by getting the ones from the last context */
-        stats_array[30] = local_stats_array[30];
-        stats_array[31] = local_stats_array[31];
-        stats_array[32] = local_stats_array[32];
-        stats_array[34] = local_stats_array[34];
-        stats_array[36] = local_stats_array[36];
+        if (dbengine_contexts) {
+            /* deduplicate global statistics by getting the ones from the last context */
+            stats_array[30] = local_stats_array[30];
+            stats_array[31] = local_stats_array[31];
+            stats_array[32] = local_stats_array[32];
+            stats_array[34] = local_stats_array[34];
+            stats_array[36] = local_stats_array[36];
 
-        // ----------------------------------------------------------------
+            // ----------------------------------------------------------------
 
-        {
-            static RRDSET *st_compression = NULL;
-            static RRDDIM *rd_savings = NULL;
+            {
+                static RRDSET *st_compression = NULL;
+                static RRDDIM *rd_savings = NULL;
 
-            if (unlikely(!st_compression)) {
-                st_compression = rrdset_create_localhost(
-                        "netdata"
-                        , "dbengine_compression_ratio"
-                        , NULL
-                        , "dbengine"
-                        , NULL
-                        , "Netdata DB engine data extents' compression savings ratio"
-                        , "percentage"
-                        , "netdata"
-                        , "stats"
-                        , 130502
-                        , localhost->rrd_update_every
-                        , RRDSET_TYPE_LINE
-                );
+                if (unlikely(!st_compression)) {
+                    st_compression = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_compression_ratio",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata DB engine data extents' compression savings ratio",
+                        "percentage",
+                        "netdata",
+                        "stats",
+                        130502,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
 
-                rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                    rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                } else
+                    rrdset_next(st_compression);
+
+                unsigned long long ratio;
+                unsigned long long compressed_content_size = stats_array[12];
+                unsigned long long content_size = stats_array[11];
+
+                if (content_size) {
+                    // allow negative savings
+                    ratio = ((content_size - compressed_content_size) * 100 * 1000) / content_size;
+                } else {
+                    ratio = 0;
+                }
+                rrddim_set_by_pointer(st_compression, rd_savings, ratio);
+
+                rrdset_done(st_compression);
             }
-            else
-                rrdset_next(st_compression);
 
-            unsigned long long ratio;
-            unsigned long long compressed_content_size = stats_array[12];
-            unsigned long long content_size = stats_array[11];
+            // ----------------------------------------------------------------
 
-            if (content_size) {
-                // allow negative savings
-                ratio = ((content_size - compressed_content_size) * 100 * 1000) / content_size;
-            } else {
-                ratio = 0;
+            {
+                static RRDSET *st_pg_cache_hit_ratio = NULL;
+                static RRDDIM *rd_hit_ratio = NULL;
+
+                if (unlikely(!st_pg_cache_hit_ratio)) {
+                    st_pg_cache_hit_ratio = rrdset_create_localhost(
+                        "netdata",
+                        "page_cache_hit_ratio",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata DB engine page cache hit ratio",
+                        "percentage",
+                        "netdata",
+                        "stats",
+                        130503,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
+
+                    rd_hit_ratio = rrddim_add(st_pg_cache_hit_ratio, "ratio", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                } else
+                    rrdset_next(st_pg_cache_hit_ratio);
+
+                static unsigned long long old_hits = 0;
+                static unsigned long long old_misses = 0;
+                unsigned long long hits = stats_array[7];
+                unsigned long long misses = stats_array[8];
+                unsigned long long hits_delta;
+                unsigned long long misses_delta;
+                unsigned long long ratio;
+
+                hits_delta = hits - old_hits;
+                misses_delta = misses - old_misses;
+                old_hits = hits;
+                old_misses = misses;
+
+                if (hits_delta + misses_delta) {
+                    ratio = (hits_delta * 100 * 1000) / (hits_delta + misses_delta);
+                } else {
+                    ratio = 0;
+                }
+                rrddim_set_by_pointer(st_pg_cache_hit_ratio, rd_hit_ratio, ratio);
+
+                rrdset_done(st_pg_cache_hit_ratio);
             }
-            rrddim_set_by_pointer(st_compression, rd_savings, ratio);
 
-            rrdset_done(st_compression);
-        }
+            // ----------------------------------------------------------------
 
-        // ----------------------------------------------------------------
+            {
+                static RRDSET *st_pg_cache_pages = NULL;
+                static RRDDIM *rd_descriptors = NULL;
+                static RRDDIM *rd_populated = NULL;
+                static RRDDIM *rd_dirty = NULL;
+                static RRDDIM *rd_backfills = NULL;
+                static RRDDIM *rd_evictions = NULL;
+                static RRDDIM *rd_used_by_collectors = NULL;
 
-        {
-            static RRDSET *st_pg_cache_hit_ratio = NULL;
-            static RRDDIM *rd_hit_ratio = NULL;
+                if (unlikely(!st_pg_cache_pages)) {
+                    st_pg_cache_pages = rrdset_create_localhost(
+                        "netdata",
+                        "page_cache_stats",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata dbengine page cache statistics",
+                        "pages",
+                        "netdata",
+                        "stats",
+                        130504,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
 
-            if (unlikely(!st_pg_cache_hit_ratio)) {
-                st_pg_cache_hit_ratio = rrdset_create_localhost(
-                        "netdata"
-                        , "page_cache_hit_ratio"
-                        , NULL
-                        , "dbengine"
-                        , NULL
-                        , "Netdata DB engine page cache hit ratio"
-                        , "percentage"
-                        , "netdata"
-                        , "stats"
-                        , 130503
-                        , localhost->rrd_update_every
-                        , RRDSET_TYPE_LINE
-                );
+                    rd_descriptors = rrddim_add(st_pg_cache_pages, "descriptors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rd_populated = rrddim_add(st_pg_cache_pages, "populated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rd_dirty = rrddim_add(st_pg_cache_pages, "dirty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rd_backfills = rrddim_add(st_pg_cache_pages, "backfills", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_evictions = rrddim_add(st_pg_cache_pages, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_used_by_collectors =
+                        rrddim_add(st_pg_cache_pages, "used_by_collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                } else
+                    rrdset_next(st_pg_cache_pages);
 
-                rd_hit_ratio = rrddim_add(st_pg_cache_hit_ratio, "ratio", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_set_by_pointer(st_pg_cache_pages, rd_descriptors, (collected_number)stats_array[27]);
+                rrddim_set_by_pointer(st_pg_cache_pages, rd_populated, (collected_number)stats_array[3]);
+                rrddim_set_by_pointer(st_pg_cache_pages, rd_dirty, (collected_number)stats_array[0] + stats_array[4]);
+                rrddim_set_by_pointer(st_pg_cache_pages, rd_backfills, (collected_number)stats_array[9]);
+                rrddim_set_by_pointer(st_pg_cache_pages, rd_evictions, (collected_number)stats_array[10]);
+                rrddim_set_by_pointer(st_pg_cache_pages, rd_used_by_collectors, (collected_number)stats_array[0]);
+                rrdset_done(st_pg_cache_pages);
             }
-            else
-                rrdset_next(st_pg_cache_hit_ratio);
 
-            static unsigned long long old_hits = 0;
-            static unsigned long long old_misses = 0;
-            unsigned long long hits = stats_array[7];
-            unsigned long long misses = stats_array[8];
-            unsigned long long hits_delta;
-            unsigned long long misses_delta;
-            unsigned long long ratio;
+            // ----------------------------------------------------------------
 
-            hits_delta = hits - old_hits;
-            misses_delta = misses - old_misses;
-            old_hits = hits;
-            old_misses = misses;
+            {
+                static RRDSET *st_long_term_pages = NULL;
+                static RRDDIM *rd_total = NULL;
+                static RRDDIM *rd_insertions = NULL;
+                static RRDDIM *rd_deletions = NULL;
+                static RRDDIM *rd_flushing_pressure_deletions = NULL;
 
-            if (hits_delta + misses_delta) {
-                ratio = (hits_delta * 100 * 1000) / (hits_delta + misses_delta);
-            } else {
-                ratio = 0;
+                if (unlikely(!st_long_term_pages)) {
+                    st_long_term_pages = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_long_term_page_stats",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata dbengine long-term page statistics",
+                        "pages",
+                        "netdata",
+                        "stats",
+                        130505,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
+
+                    rd_total = rrddim_add(st_long_term_pages, "total", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rd_insertions = rrddim_add(st_long_term_pages, "insertions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_deletions = rrddim_add(st_long_term_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_flushing_pressure_deletions = rrddim_add(
+                        st_long_term_pages, "flushing_pressure_deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st_long_term_pages);
+
+                rrddim_set_by_pointer(st_long_term_pages, rd_total, (collected_number)stats_array[2]);
+                rrddim_set_by_pointer(st_long_term_pages, rd_insertions, (collected_number)stats_array[5]);
+                rrddim_set_by_pointer(st_long_term_pages, rd_deletions, (collected_number)stats_array[6]);
+                rrddim_set_by_pointer(
+                    st_long_term_pages, rd_flushing_pressure_deletions, (collected_number)stats_array[36]);
+                rrdset_done(st_long_term_pages);
             }
-            rrddim_set_by_pointer(st_pg_cache_hit_ratio, rd_hit_ratio, ratio);
 
-            rrdset_done(st_pg_cache_hit_ratio);
-        }
+            // ----------------------------------------------------------------
 
-        // ----------------------------------------------------------------
+            {
+                static RRDSET *st_io_stats = NULL;
+                static RRDDIM *rd_reads = NULL;
+                static RRDDIM *rd_writes = NULL;
 
-        {
-            static RRDSET *st_pg_cache_pages = NULL;
-            static RRDDIM *rd_descriptors = NULL;
-            static RRDDIM *rd_populated = NULL;
-            static RRDDIM *rd_dirty = NULL;
-            static RRDDIM *rd_backfills = NULL;
-            static RRDDIM *rd_evictions = NULL;
-            static RRDDIM *rd_used_by_collectors = NULL;
+                if (unlikely(!st_io_stats)) {
+                    st_io_stats = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_io_throughput",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata DB engine I/O throughput",
+                        "MiB/s",
+                        "netdata",
+                        "stats",
+                        130506,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
 
-            if (unlikely(!st_pg_cache_pages)) {
-                st_pg_cache_pages = rrdset_create_localhost(
-                        "netdata"
-                        , "page_cache_stats"
-                        , NULL
-                        , "dbengine"
-                        , NULL
-                        , "Netdata dbengine page cache statistics"
-                        , "pages"
-                        , "netdata"
-                        , "stats"
-                        , 130504
-                        , localhost->rrd_update_every
-                        , RRDSET_TYPE_LINE
-                );
+                    rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+                    rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st_io_stats);
 
-                rd_descriptors = rrddim_add(st_pg_cache_pages, "descriptors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_populated = rrddim_add(st_pg_cache_pages, "populated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_dirty = rrddim_add(st_pg_cache_pages, "dirty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_backfills = rrddim_add(st_pg_cache_pages, "backfills", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_evictions = rrddim_add(st_pg_cache_pages, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_used_by_collectors = rrddim_add(st_pg_cache_pages, "used_by_collectors", NULL, 1, 1,
-                                                   RRD_ALGORITHM_ABSOLUTE);
+                rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[17]);
+                rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[15]);
+                rrdset_done(st_io_stats);
             }
-            else
-                rrdset_next(st_pg_cache_pages);
 
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_descriptors, (collected_number)stats_array[27]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_populated, (collected_number)stats_array[3]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_dirty, (collected_number)stats_array[0] + stats_array[4]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_backfills, (collected_number)stats_array[9]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_evictions, (collected_number)stats_array[10]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_used_by_collectors, (collected_number)stats_array[0]);
-            rrdset_done(st_pg_cache_pages);
-        }
+            // ----------------------------------------------------------------
 
-        // ----------------------------------------------------------------
+            {
+                static RRDSET *st_io_stats = NULL;
+                static RRDDIM *rd_reads = NULL;
+                static RRDDIM *rd_writes = NULL;
 
-        {
-            static RRDSET *st_long_term_pages = NULL;
-            static RRDDIM *rd_total = NULL;
-            static RRDDIM *rd_insertions = NULL;
-            static RRDDIM *rd_deletions = NULL;
-            static RRDDIM *rd_flushing_pressure_deletions = NULL;
+                if (unlikely(!st_io_stats)) {
+                    st_io_stats = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_io_operations",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata DB engine I/O operations",
+                        "operations/s",
+                        "netdata",
+                        "stats",
+                        130507,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
 
-            if (unlikely(!st_long_term_pages)) {
-                st_long_term_pages = rrdset_create_localhost(
-                        "netdata"
-                , "dbengine_long_term_page_stats"
-                , NULL
-                , "dbengine"
-                , NULL
-                , "Netdata dbengine long-term page statistics"
-                , "pages"
-                , "netdata"
-                , "stats"
-                , 130505
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_LINE
-                );
+                    rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st_io_stats);
 
-                rd_total = rrddim_add(st_long_term_pages, "total", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_insertions = rrddim_add(st_long_term_pages, "insertions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_deletions = rrddim_add(st_long_term_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_flushing_pressure_deletions = rrddim_add(st_long_term_pages, "flushing_pressure_deletions", NULL, -1,
-                                                            1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[18]);
+                rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[16]);
+                rrdset_done(st_io_stats);
             }
-            else
-                rrdset_next(st_long_term_pages);
 
-            rrddim_set_by_pointer(st_long_term_pages, rd_total, (collected_number)stats_array[2]);
-            rrddim_set_by_pointer(st_long_term_pages, rd_insertions, (collected_number)stats_array[5]);
-            rrddim_set_by_pointer(st_long_term_pages, rd_deletions, (collected_number)stats_array[6]);
-            rrddim_set_by_pointer(st_long_term_pages, rd_flushing_pressure_deletions,
-                                  (collected_number)stats_array[36]);
-            rrdset_done(st_long_term_pages);
-        }
+            // ----------------------------------------------------------------
 
-        // ----------------------------------------------------------------
+            {
+                static RRDSET *st_errors = NULL;
+                static RRDDIM *rd_fs_errors = NULL;
+                static RRDDIM *rd_io_errors = NULL;
+                static RRDDIM *pg_cache_over_half_dirty_events = NULL;
 
-        {
-            static RRDSET *st_io_stats = NULL;
-            static RRDDIM *rd_reads = NULL;
-            static RRDDIM *rd_writes = NULL;
+                if (unlikely(!st_errors)) {
+                    st_errors = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_global_errors",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata DB engine errors",
+                        "errors/s",
+                        "netdata",
+                        "stats",
+                        130508,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
 
-            if (unlikely(!st_io_stats)) {
-                st_io_stats = rrdset_create_localhost(
-                "netdata"
-                , "dbengine_io_throughput"
-                , NULL
-                , "dbengine"
-                , NULL
-                , "Netdata DB engine I/O throughput"
-                , "MiB/s"
-                , "netdata"
-                , "stats"
-                , 130506
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_LINE
-                );
+                    rd_io_errors = rrddim_add(st_errors, "io_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_fs_errors = rrddim_add(st_errors, "fs_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    pg_cache_over_half_dirty_events =
+                        rrddim_add(st_errors, "pg_cache_over_half_dirty_events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st_errors);
 
-                rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
-                rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
+                rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
+                rrddim_set_by_pointer(st_errors, pg_cache_over_half_dirty_events, (collected_number)stats_array[34]);
+                rrdset_done(st_errors);
             }
-            else
-                rrdset_next(st_io_stats);
 
-            rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[17]);
-            rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[15]);
-            rrdset_done(st_io_stats);
-        }
+            // ----------------------------------------------------------------
 
-        // ----------------------------------------------------------------
+            {
+                static RRDSET *st_fd = NULL;
+                static RRDDIM *rd_fd_current = NULL;
+                static RRDDIM *rd_fd_max = NULL;
 
-        {
-            static RRDSET *st_io_stats = NULL;
-            static RRDDIM *rd_reads = NULL;
-            static RRDDIM *rd_writes = NULL;
+                if (unlikely(!st_fd)) {
+                    st_fd = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_global_file_descriptors",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata DB engine File Descriptors",
+                        "descriptors",
+                        "netdata",
+                        "stats",
+                        130509,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
 
-            if (unlikely(!st_io_stats)) {
-                st_io_stats = rrdset_create_localhost(
-                        "netdata"
-                        , "dbengine_io_operations"
-                        , NULL
-                        , "dbengine"
-                        , NULL
-                        , "Netdata DB engine I/O operations"
-                        , "operations/s"
-                        , "netdata"
-                        , "stats"
-                        , 130507
-                        , localhost->rrd_update_every
-                        , RRDSET_TYPE_LINE
-                );
+                    rd_fd_current = rrddim_add(st_fd, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rd_fd_max = rrddim_add(st_fd, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                } else
+                    rrdset_next(st_fd);
 
-                rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_set_by_pointer(st_fd, rd_fd_current, (collected_number)stats_array[32]);
+                /* Careful here, modify this accordingly if the File-Descriptor budget ever changes */
+                rrddim_set_by_pointer(st_fd, rd_fd_max, (collected_number)rlimit_nofile.rlim_cur / 4);
+                rrdset_done(st_fd);
             }
-            else
-                rrdset_next(st_io_stats);
 
-            rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[18]);
-            rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[16]);
-            rrdset_done(st_io_stats);
-        }
+            // ----------------------------------------------------------------
 
-        // ----------------------------------------------------------------
+            {
+                static RRDSET *st_ram_usage = NULL;
+                static RRDDIM *rd_cached = NULL;
+                static RRDDIM *rd_pinned = NULL;
+                static RRDDIM *rd_metadata = NULL;
 
-        {
-            static RRDSET *st_errors = NULL;
-            static RRDDIM *rd_fs_errors = NULL;
-            static RRDDIM *rd_io_errors = NULL;
-            static RRDDIM *pg_cache_over_half_dirty_events = NULL;
+                collected_number cached_pages, pinned_pages, API_producers, populated_pages, metadata, pages_on_disk,
+                    page_cache_descriptors;
 
-            if (unlikely(!st_errors)) {
-                st_errors = rrdset_create_localhost(
-                        "netdata"
-                        , "dbengine_global_errors"
-                        , NULL
-                        , "dbengine"
-                        , NULL
-                        , "Netdata DB engine errors"
-                        , "errors/s"
-                        , "netdata"
-                        , "stats"
-                        , 130508
-                        , localhost->rrd_update_every
-                        , RRDSET_TYPE_LINE
-                );
+                if (unlikely(!st_ram_usage)) {
+                    st_ram_usage = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_ram",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata DB engine RAM usage",
+                        "MiB",
+                        "netdata",
+                        "stats",
+                        130510,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_STACKED);
 
-                rd_io_errors = rrddim_add(st_errors, "io_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_fs_errors = rrddim_add(st_errors, "fs_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                pg_cache_over_half_dirty_events = rrddim_add(st_errors, "pg_cache_over_half_dirty_events", NULL, 1, 1,
-                                                             RRD_ALGORITHM_INCREMENTAL);
+                    rd_cached = rrddim_add(st_ram_usage, "cache", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
+                    rd_pinned = rrddim_add(st_ram_usage, "collectors", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
+                    rd_metadata = rrddim_add(st_ram_usage, "metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
+                } else
+                    rrdset_next(st_ram_usage);
+
+                API_producers = (collected_number)stats_array[0];
+                pages_on_disk = (collected_number)stats_array[2];
+                populated_pages = (collected_number)stats_array[3];
+                page_cache_descriptors = (collected_number)stats_array[27];
+
+                if (API_producers * 2 > populated_pages) {
+                    pinned_pages = API_producers;
+                } else {
+                    pinned_pages = API_producers * 2;
+                }
+                cached_pages = populated_pages - pinned_pages;
+
+                metadata = page_cache_descriptors * sizeof(struct page_cache_descr);
+                metadata += pages_on_disk * sizeof(struct rrdeng_page_descr);
+                /* This is an empirical estimation for Judy array indexing and extent structures */
+                metadata += pages_on_disk * 58;
+
+                rrddim_set_by_pointer(st_ram_usage, rd_cached, cached_pages);
+                rrddim_set_by_pointer(st_ram_usage, rd_pinned, pinned_pages);
+                rrddim_set_by_pointer(st_ram_usage, rd_metadata, metadata);
+                rrdset_done(st_ram_usage);
             }
-            else
-                rrdset_next(st_errors);
-
-            rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
-            rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
-            rrddim_set_by_pointer(st_errors, pg_cache_over_half_dirty_events, (collected_number)stats_array[34]);
-            rrdset_done(st_errors);
-        }
-
-        // ----------------------------------------------------------------
-
-        {
-            static RRDSET *st_fd = NULL;
-            static RRDDIM *rd_fd_current = NULL;
-            static RRDDIM *rd_fd_max = NULL;
-
-            if (unlikely(!st_fd)) {
-                st_fd = rrdset_create_localhost(
-                        "netdata"
-                        , "dbengine_global_file_descriptors"
-                        , NULL
-                        , "dbengine"
-                        , NULL
-                        , "Netdata DB engine File Descriptors"
-                        , "descriptors"
-                        , "netdata"
-                        , "stats"
-                        , 130509
-                        , localhost->rrd_update_every
-                        , RRDSET_TYPE_LINE
-                );
-
-                rd_fd_current = rrddim_add(st_fd, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_fd_max = rrddim_add(st_fd, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            }
-            else
-                rrdset_next(st_fd);
-
-            rrddim_set_by_pointer(st_fd, rd_fd_current, (collected_number)stats_array[32]);
-            /* Careful here, modify this accordingly if the File-Descriptor budget ever changes */
-            rrddim_set_by_pointer(st_fd, rd_fd_max, (collected_number)rlimit_nofile.rlim_cur / 4);
-            rrdset_done(st_fd);
-        }
-
-        // ----------------------------------------------------------------
-
-        {
-            static RRDSET *st_ram_usage = NULL;
-            static RRDDIM *rd_cached = NULL;
-            static RRDDIM *rd_pinned = NULL;
-            static RRDDIM *rd_metadata = NULL;
-
-            collected_number cached_pages, pinned_pages, API_producers, populated_pages, metadata, pages_on_disk,
-            page_cache_descriptors;
-
-            if (unlikely(!st_ram_usage)) {
-                st_ram_usage = rrdset_create_localhost(
-                "netdata"
-                , "dbengine_ram"
-                , NULL
-                , "dbengine"
-                , NULL
-                , "Netdata DB engine RAM usage"
-                , "MiB"
-                , "netdata"
-                , "stats"
-                , 130510
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_STACKED
-                );
-
-                rd_cached = rrddim_add(st_ram_usage, "cache", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
-                rd_pinned = rrddim_add(st_ram_usage, "collectors", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
-                rd_metadata = rrddim_add(st_ram_usage, "metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
-            }
-            else
-                rrdset_next(st_ram_usage);
-
-            API_producers = (collected_number)stats_array[0];
-            pages_on_disk = (collected_number)stats_array[2];
-            populated_pages = (collected_number)stats_array[3];
-            page_cache_descriptors = (collected_number)stats_array[27];
-
-            if (API_producers * 2 > populated_pages) {
-                pinned_pages = API_producers;
-            } else{
-                pinned_pages = API_producers * 2;
-            }
-            cached_pages = populated_pages - pinned_pages;
-
-            metadata = page_cache_descriptors * sizeof(struct page_cache_descr);
-            metadata += pages_on_disk * sizeof(struct rrdeng_page_descr);
-            /* This is an empirical estimation for Judy array indexing and extent structures */
-            metadata += pages_on_disk * 58;
-
-            rrddim_set_by_pointer(st_ram_usage, rd_cached, cached_pages);
-            rrddim_set_by_pointer(st_ram_usage, rd_pinned, pinned_pages);
-            rrddim_set_by_pointer(st_ram_usage, rd_metadata, metadata);
-            rrdset_done(st_ram_usage);
         }
     }
 #endif
-
 }
+
+static void update_heartbeat_charts() {
+    RRDSET *st = rrdset_create_localhost(
+        "netdata"
+        , "heartbeat"
+        , NULL
+        , "heartbeat"
+        , NULL
+        , "System clock jitter"
+        , "microseconds"
+        , "netdata"
+        , "stats"
+        , 900000
+        , localhost->rrd_update_every
+        , RRDSET_TYPE_AREA
+    );
+
+    RRDDIM *rd_min = rrddim_add(st, "min", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_max = rrddim_add(st, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_avg = rrddim_add(st, "average", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    rrdset_next(st);
+
+    usec_t min, max, average;
+    size_t count;
+
+    heartbeat_statistics(&min, &max, &average, &count);
+
+    rrddim_set_by_pointer(st, rd_min, (collected_number)min);
+    rrddim_set_by_pointer(st, rd_max, (collected_number)max);
+    rrddim_set_by_pointer(st, rd_avg, (collected_number)average);
+
+    rrdset_done(st);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// worker utilization
+
+struct worker_job_type {
+    char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
+    size_t jobs_started;
+    usec_t busy_time;
+
+    RRDDIM *rd_jobs_started;
+    RRDDIM *rd_busy_time;
+};
+
+struct worker_thread {
+    pid_t pid;
+    int enabled;
+
+    int cpu_enabled;
+
+    kernel_uint_t utime;
+    kernel_uint_t stime;
+
+    kernel_uint_t utime_old;
+    kernel_uint_t stime_old;
+
+    usec_t collected_time;
+    usec_t collected_time_old;
+
+    size_t jobs_started;
+    usec_t busy_time;
+
+    struct worker_thread *next;
+};
+
+struct worker_utilization {
+    const char *name;
+    const char *family;
+    size_t priority;
+    uint32_t flags;
+
+    char *name_lowercase;
+
+    struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
+
+    size_t workers_registered;
+    size_t workers_busy;
+    usec_t workers_total_busy_time;
+    usec_t workers_total_duration;
+    size_t workers_total_jobs_started;
+    double workers_min_busy_time;
+    double workers_max_busy_time;
+
+    struct worker_thread *threads;
+
+    RRDSET *st_workers_time;
+    RRDDIM *rd_workers_time_avg;
+    RRDDIM *rd_workers_time_min;
+    RRDDIM *rd_workers_time_max;
+
+    size_t workers_cpu_enabled;
+    RRDSET *st_workers_cpu;
+    RRDDIM *rd_workers_cpu_avg;
+    RRDDIM *rd_workers_cpu_min;
+    RRDDIM *rd_workers_cpu_max;
+
+    RRDSET *st_workers_threads;
+    RRDDIM *rd_workers_threads_free;
+    RRDDIM *rd_workers_threads_busy;
+
+    RRDSET *st_workers_jobs_per_job_type;
+    RRDSET *st_workers_busy_per_job_type;
+};
+
+static void workers_utilization_update_chart(struct worker_utilization *wu) {
+    if(!wu->workers_registered) return;
+
+    //fprintf(stderr, "%-12s WORKER UTILIZATION: %-3.2f%%, %zu jobs done, %zu running, on %zu workers, min %-3.02f%%, max %-3.02f%%.\n",
+    //        wu->name,
+    //        (double)wu->workers_total_busy_time * 100.0 / (double)wu->workers_total_duration,
+    //        wu->workers_total_jobs_started, wu->workers_busy, wu->workers_registered,
+    //        wu->workers_min_busy_time, wu->workers_max_busy_time);
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_workers_time)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_time_%s", wu->name_lowercase);
+
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.time", wu->name_lowercase);
+
+        wu->st_workers_time = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , context
+            , "Netdata Workers Busy Time (100% = all workers busy)"
+            , "%"
+            , "netdata"
+            , "stats"
+            , wu->priority
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_AREA
+        );
+    }
+
+    // we add the min and max dimensions only when we have multiple workers
+
+    if(unlikely(!wu->rd_workers_time_min && wu->workers_registered > 1))
+        wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+
+    if(unlikely(!wu->rd_workers_time_max && wu->workers_registered > 1))
+        wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+
+    if(unlikely(!wu->rd_workers_time_avg))
+        wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+
+    rrdset_next(wu->st_workers_time);
+
+    if(wu->rd_workers_time_min)
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->workers_min_busy_time * 10000.0));
+
+    if(wu->rd_workers_time_max)
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_max, (collected_number)((double)wu->workers_max_busy_time * 10000.0));
+
+    rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, (collected_number)((double)wu->workers_total_busy_time * 100.0 * 10000.0 / (double)wu->workers_total_duration));
+    rrdset_done(wu->st_workers_time);
+
+    // ----------------------------------------------------------------------
+
+#ifdef __linux__
+    if(wu->workers_cpu_enabled || wu->st_workers_cpu) {
+        if(unlikely(!wu->st_workers_cpu)) {
+            char name[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_%s", wu->name_lowercase);
+
+            char context[RRD_ID_LENGTH_MAX + 1];
+            snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.cpu", wu->name_lowercase);
+
+            wu->st_workers_cpu = rrdset_create_localhost(
+                "netdata"
+                , name
+                , NULL
+                , wu->family
+                , context
+                , "Netdata Workers CPU Utilization (100% = all workers busy)"
+                , "%"
+                , "netdata"
+                , "stats"
+                , wu->priority + 1
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_AREA
+            );
+        }
+
+        if (unlikely(!wu->rd_workers_cpu_min && wu->workers_registered > 1))
+            wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+
+        if (unlikely(!wu->rd_workers_cpu_max && wu->workers_registered > 1))
+            wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+
+        if(unlikely(!wu->rd_workers_cpu_avg))
+            wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdset_next(wu->st_workers_cpu);
+
+        size_t count = 0;
+        calculated_number min = 1000.0, max = 0.0, total = 0.0;
+        struct worker_thread *wt;
+        for(wt = wu->threads; wt ; wt = wt->next) {
+            if(!wt->cpu_enabled) continue;
+            count++;
+
+            usec_t delta = wt->collected_time - wt->collected_time_old;
+            calculated_number utime = (calculated_number)(wt->utime - wt->utime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
+            calculated_number stime = (calculated_number)(wt->stime - wt->stime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
+            calculated_number cpu_util = utime + stime;
+
+            total += cpu_util;
+            if(cpu_util < min) min = cpu_util;
+            if(cpu_util > max) max = cpu_util;
+        }
+        if(unlikely(min == 1000.0)) min = 0.0;
+
+        if(wu->rd_workers_cpu_min)
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(min * 10000ULL));
+
+        if(wu->rd_workers_cpu_max)
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)(max * 10000ULL));
+
+        rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)count ));
+        rrdset_done(wu->st_workers_cpu);
+    }
+#endif
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_workers_jobs_per_job_type)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_jobs_by_type_%s", wu->name_lowercase);
+
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.jobs_started_by_type", wu->name_lowercase);
+
+        wu->st_workers_jobs_per_job_type = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , context
+            , "Netdata Workers Jobs Started by Type"
+            , "jobs"
+            , "netdata"
+            , "stats"
+            , wu->priority + 2
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_STACKED
+        );
+    }
+
+    rrdset_next(wu->st_workers_jobs_per_job_type);
+
+    {
+        size_t i;
+        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            if (wu->per_job_type[i].name[0]) {
+
+                if(unlikely(!wu->per_job_type[i].rd_jobs_started))
+                    wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, (collected_number)(wu->per_job_type[i].jobs_started));
+            }
+        }
+    }
+
+    rrdset_done(wu->st_workers_jobs_per_job_type);
+
+    // ----------------------------------------------------------------------
+
+    if(unlikely(!wu->st_workers_busy_per_job_type)) {
+        char name[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(name, RRD_ID_LENGTH_MAX, "workers_busy_time_by_type_%s", wu->name_lowercase);
+
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.time_by_type", wu->name_lowercase);
+
+        wu->st_workers_busy_per_job_type = rrdset_create_localhost(
+            "netdata"
+            , name
+            , NULL
+            , wu->family
+            , context
+            , "Netdata Workers Busy Time by Type"
+            , "ms"
+            , "netdata"
+            , "stats"
+            , wu->priority + 3
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_STACKED
+        );
+    }
+
+    rrdset_next(wu->st_workers_busy_per_job_type);
+
+    {
+        size_t i;
+        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            if (wu->per_job_type[i].name[0]) {
+
+                if(unlikely(!wu->per_job_type[i].rd_busy_time))
+                    wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, wu->per_job_type[i].name, NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
+
+                rrddim_set_by_pointer(wu->st_workers_busy_per_job_type, wu->per_job_type[i].rd_busy_time, (collected_number)(wu->per_job_type[i].busy_time));
+            }
+        }
+    }
+
+    rrdset_done(wu->st_workers_busy_per_job_type);
+
+    // ----------------------------------------------------------------------
+
+    if(wu->st_workers_threads || wu->workers_registered > 1) {
+        if(unlikely(!wu->st_workers_threads)) {
+            char name[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_threads_%s", wu->name_lowercase);
+
+            char context[RRD_ID_LENGTH_MAX + 1];
+            snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.threads", wu->name_lowercase);
+
+            wu->st_workers_threads = rrdset_create_localhost(
+                "netdata"
+                , name
+                , NULL
+                , wu->family
+                , context
+                , "Netdata Workers Threads"
+                , "threads"
+                , "netdata"
+                , "stats"
+                , wu->priority + 4
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_STACKED
+            );
+
+            wu->rd_workers_threads_free = rrddim_add(wu->st_workers_threads, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_workers_threads_busy = rrddim_add(wu->st_workers_threads, "busy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(wu->st_workers_threads);
+
+        rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_free, (collected_number)(wu->workers_registered - wu->workers_busy));
+        rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, (collected_number)(wu->workers_busy));
+        rrdset_done(wu->st_workers_threads);
+    }
+}
+
+static void workers_utilization_reset_statistics(struct worker_utilization *wu) {
+    wu->workers_registered = 0;
+    wu->workers_busy = 0;
+    wu->workers_total_busy_time = 0;
+    wu->workers_total_duration = 0;
+    wu->workers_total_jobs_started = 0;
+    wu->workers_min_busy_time = 100.0;
+    wu->workers_max_busy_time = 0;
+    wu->workers_cpu_enabled = 0;
+
+    size_t i;
+    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        if(unlikely(!wu->name_lowercase)) {
+            wu->name_lowercase = strdupz(wu->name);
+            char *s = wu->name_lowercase;
+            for( ; *s ; s++) *s = tolower(*s);
+        }
+
+        wu->per_job_type[i].jobs_started = 0;
+        wu->per_job_type[i].busy_time = 0;
+    }
+
+    struct worker_thread *wt;
+    for(wt = wu->threads; wt ; wt = wt->next) {
+        wt->enabled = 0;
+        wt->cpu_enabled = 0;
+    }
+}
+
+static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_uint_t *utime __maybe_unused, kernel_uint_t *stime __maybe_unused) {
+#ifdef __linux__
+    char filename[200 + 1];
+    snprintfz(filename, 200, "/proc/self/task/%d/stat", pid);
+
+    procfile *ff = procfile_open(filename, " ", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    if(!ff) return -1;
+
+    ff = procfile_readall(ff);
+    if(!ff) return -1;
+
+    *utime = str2kernel_uint_t(procfile_lineword(ff, 0, 13));
+    *stime = str2kernel_uint_t(procfile_lineword(ff, 0, 14));
+
+    procfile_close(ff);
+    return 0;
+#else
+    // TODO: add here cpu time detection per thread, for FreeBSD and MacOS
+    *utime = 0;
+    *stime = 0;
+    return 1;
+#endif
+}
+
+static void workers_threads_cleanup(struct worker_utilization *wu) {
+    struct worker_thread *t;
+
+    // free threads at the beginning of the linked list
+    while(wu->threads && !wu->threads->enabled) {
+        t = wu->threads;
+        wu->threads = t->next;
+        t->next = NULL;
+        freez(t);
+    }
+
+    // free threads in the middle of the linked list
+    for(t = wu->threads; t && t->next ; t = t->next) {
+        if(t->next->enabled) continue;
+
+        struct worker_thread *to_remove = t->next;
+        t->next = to_remove->next;
+        to_remove->next = NULL;
+        freez(to_remove);
+    }
+}
+
+static struct worker_thread *worker_thread_find(struct worker_utilization *wu, pid_t pid) {
+    struct worker_thread *wt;
+    for(wt = wu->threads; wt && wt->pid != pid ; wt = wt->next) ;
+    return wt;
+}
+
+static struct worker_thread *worker_thread_create(struct worker_utilization *wu, pid_t pid) {
+    struct worker_thread *wt;
+
+    wt = (struct worker_thread *)callocz(1, sizeof(struct worker_thread));
+    wt->pid = pid;
+
+    // link it
+    wt->next = wu->threads;
+    wu->threads = wt;
+
+    return wt;
+}
+
+static struct worker_thread *worker_thread_find_or_create(struct worker_utilization *wu, pid_t pid) {
+    struct worker_thread *wt;
+    wt = worker_thread_find(wu, pid);
+    if(!wt) wt = worker_thread_create(wu, pid);
+
+    return wt;
+}
+
+static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_started __maybe_unused, size_t is_running __maybe_unused, const char **job_types_names __maybe_unused, size_t *job_types_jobs_started __maybe_unused, usec_t *job_types_busy_time __maybe_unused) {
+    struct worker_utilization *wu = (struct worker_utilization *)ptr;
+
+    // find the worker_thread in the list
+    struct worker_thread *wt = worker_thread_find_or_create(wu, pid);
+
+    wt->enabled = 1;
+    wt->busy_time = utilization_usec;
+    wt->jobs_started = jobs_started;
+
+    wt->utime_old = wt->utime;
+    wt->stime_old = wt->stime;
+    wt->collected_time_old = wt->collected_time;
+
+    wu->workers_total_busy_time += utilization_usec;
+    wu->workers_total_duration += duration_usec;
+    wu->workers_total_jobs_started += jobs_started;
+    wu->workers_busy += is_running;
+    wu->workers_registered++;
+
+    double util = (double)utilization_usec * 100.0 / (double)duration_usec;
+    if(util > wu->workers_max_busy_time)
+        wu->workers_max_busy_time = util;
+
+    if(util < wu->workers_min_busy_time)
+        wu->workers_min_busy_time = util;
+
+    // accumulate per job type statistics
+    size_t i;
+    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        wu->per_job_type[i].jobs_started += job_types_jobs_started[i];
+        wu->per_job_type[i].busy_time += job_types_busy_time[i];
+
+        // new job type found
+        if(unlikely(!wu->per_job_type[i].name[0] && job_types_names[i]))
+            strncpyz(wu->per_job_type[i].name, job_types_names[i], WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
+    }
+
+    // find its CPU utilization
+    if((!read_thread_cpu_time_from_proc_stat(pid, &wt->utime, &wt->stime))) {
+        wt->cpu_enabled = 1;
+        wt->collected_time = now_realtime_usec();
+    }
+    wu->workers_cpu_enabled += wt->cpu_enabled;
+}
+
+static struct worker_utilization all_workers_utilization[] = {
+    { .name = "STATS",       .family = "workers global statistics",       .priority = 1000000 },
+    { .name = "HEALTH",      .family = "workers health alarms",           .priority = 1000000 },
+    { .name = "MLTRAIN",     .family = "workers ML training",             .priority = 1000000 },
+    { .name = "MLDETECT",    .family = "workers ML detection",            .priority = 1000000 },
+    { .name = "STREAMRCV",   .family = "workers streaming receive",       .priority = 1000000 },
+    { .name = "STREAMSND",   .family = "workers streaming send",          .priority = 1000000 },
+    { .name = "DBENGINE",    .family = "workers dbengine instances",      .priority = 1000000 },
+    { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
+    { .name = "ACLKQUERY",   .family = "workers aclk query",              .priority = 1000000 },
+    { .name = "ACLKSYNC",    .family = "workers aclk host sync",          .priority = 1000000 },
+    { .name = "PLUGINSD",    .family = "workers plugins.d",               .priority = 1000000 },
+    { .name = "STATSD",      .family = "workers plugin statsd",           .priority = 1000000 },
+    { .name = "STATSDFLUSH", .family = "workers plugin statsd flush",     .priority = 1000000 },
+    { .name = "PROC",        .family = "workers plugin proc",             .priority = 1000000 },
+    { .name = "FREEBSD",     .family = "workers plugin freebsd",          .priority = 1000000 },
+    { .name = "MACOS",       .family = "workers plugin macos",            .priority = 1000000 },
+    { .name = "CGROUPS",     .family = "workers plugin cgroups",          .priority = 1000000 },
+    { .name = "CGROUPSDISC", .family = "workers plugin cgroups find",     .priority = 1000000 },
+    { .name = "DISKSPACE",   .family = "workers plugin diskspace",        .priority = 1000000 },
+    { .name = "TC",          .family = "workers plugin tc",               .priority = 1000000 },
+    { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
+    { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
+
+    // has to be terminated with a NULL
+    { .name = NULL,          .family = NULL       }
+};
+
+static void worker_utilization_charts(void) {
+    static size_t iterations = 0;
+    iterations++;
+
+    int i;
+    for(i = 0; all_workers_utilization[i].name ;i++) {
+        workers_utilization_reset_statistics(&all_workers_utilization[i]);
+        workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
+
+        // skip the first iteration, so that we don't accumulate startup utilization to our charts
+        if(likely(iterations > 1))
+            workers_utilization_update_chart(&all_workers_utilization[i]);
+
+        workers_threads_cleanup(&all_workers_utilization[i]);
+    }
+}
+
+static void worker_utilization_finish(void) {
+    int i;
+    for(i = 0; all_workers_utilization[i].name ;i++) {
+        struct worker_utilization *wu = &all_workers_utilization[i];
+
+        if(wu->name_lowercase) {
+            freez(wu->name_lowercase);
+            wu->name_lowercase = NULL;
+        }
+
+        // mark all threads as not enabled
+        struct worker_thread *t;
+        for(t = wu->threads; t ; t = t->next) t->enabled = 0;
+
+        // let the cleanup job free them
+        workers_threads_cleanup(wu);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 
 static void global_statistics_cleanup(void *ptr)
 {
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     info("cleaning up...");
+
+    worker_utilization_finish();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *global_statistics_main(void *ptr)
 {
+    worker_register("STATS");
+    worker_register_job_name(WORKER_JOB_GLOBAL, "global");
+    worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
+    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
+    worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
+
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
     int update_every =
@@ -876,10 +1444,23 @@ void *global_statistics_main(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     while (!netdata_exit) {
+        worker_is_idle();
         heartbeat_next(&hb, step);
 
+        worker_is_busy(WORKER_JOB_WORKERS);
+        worker_utilization_charts();
+
+        worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
+
+        worker_is_busy(WORKER_JOB_REGISTRY);
         registry_statistics();
+
+        worker_is_busy(WORKER_JOB_DBENGINE);
+        dbengine_statistics_charts();
+
+        worker_is_busy(WORKER_JOB_HEARTBEAT);
+        update_heartbeat_charts();
     }
 
     netdata_thread_cleanup_pop(1);

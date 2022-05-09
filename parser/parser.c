@@ -141,9 +141,12 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
 
     tmp_keyword = callocz(1, sizeof(*tmp_keyword));
 
+    tmp_keyword->worker_job_id = parser->worker_job_ids++;
     tmp_keyword->keyword = strdupz(keyword);
     tmp_keyword->keyword_hash = keyword_hash;
     tmp_keyword->func[tmp_keyword->func_no++] = (void *) func;
+
+    worker_register_job_name(tmp_keyword->worker_job_id, tmp_keyword->keyword);
 
     tmp_keyword->next = parser->keyword;
     parser->keyword = tmp_keyword;
@@ -273,10 +276,12 @@ inline int parser_action(PARSER *parser, char *input)
 
     uint32_t command_hash = simple_hash(command);
 
+    size_t worker_job_id;
     while(tmp_keyword) {
         if (command_hash == tmp_keyword->keyword_hash &&
                 (!strcmp(command, tmp_keyword->keyword))) {
                     action_function_list = &tmp_keyword->func[0];
+                    worker_job_id = tmp_keyword->worker_job_id;
                     break;
         }
         tmp_keyword = tmp_keyword->next;
@@ -292,12 +297,14 @@ inline int parser_action(PARSER *parser, char *input)
 #endif
     }
     else {
+        worker_is_busy(worker_job_id);
         while ((action_function = *action_function_list) != NULL) {
                 rc = action_function(words, parser->user, parser->plugins_action);
                 if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
                     break;                
                 action_function_list++;
         }
+        worker_is_idle();
     }
 
     if (likely(input == parser->buffer))

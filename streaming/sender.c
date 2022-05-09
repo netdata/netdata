@@ -2,6 +2,26 @@
 
 #include "rrdpush.h"
 
+#define WORKER_SENDER_JOB_CONNECT                    0
+#define WORKER_SENDER_JOB_PIPE_READ                  1
+#define WORKER_SENDER_JOB_SOCKET_RECEIVE             2
+#define WORKER_SENDER_JOB_EXECUTE                    3
+#define WORKER_SENDER_JOB_SOCKET_SEND                4
+#define WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE   5
+#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW        6
+#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT         7
+#define WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR      8
+#define WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR    9
+#define WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR      10
+#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED  11
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR  12
+#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR     13
+#define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION 14
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 15
+#endif
+
 extern struct config stream_config;
 extern int netdata_use_ssl_on_stream;
 extern char *netdata_ssl_ca_path;
@@ -21,8 +41,8 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 * Inform the user through the error log file and 
 * deactivate compression by downgrading the stream protocol.
 */
-static inline void deactivate_compression(struct sender_state *s)
-{
+static inline void deactivate_compression(struct sender_state *s) {
+    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
     error("STREAM_COMPRESSION: Deactivating compression to avoid stream corruption");
     default_compression_enabled = 0;
     s->rrdpush_compression = 0;
@@ -436,6 +456,7 @@ s->rrdpush_compression = (default_compression_enabled && (s->version == STREAM_V
             err = SSL_get_error(host->ssl.conn, err);
             error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                 rrdpush_sender_thread_close_socket(host);
                 return 0;
             }else {
@@ -446,6 +467,7 @@ s->rrdpush_compression = (default_compression_enabled && (s->version == STREAM_V
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
                 if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
                     if ( security_test_certificate(host->ssl.conn)) {
+                        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                         error("Closing the stream connection, because the server SSL certificate is not valid.");
                         rrdpush_sender_thread_close_socket(host);
                         return 0;
@@ -458,6 +480,7 @@ s->rrdpush_compression = (default_compression_enabled && (s->version == STREAM_V
 #else
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #endif
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
         error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -473,6 +496,7 @@ s->rrdpush_compression = (default_compression_enabled && (s->version == STREAM_V
     received = recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
     if(received == -1) {
 #endif
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
         error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -482,6 +506,7 @@ s->rrdpush_compression = (default_compression_enabled && (s->version == STREAM_V
     debug(D_STREAM, "Response to sender from far end: %s", http);
     int32_t version = (int32_t)parse_stream_version(host, http);
     if(version == -1) {
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE);
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -586,9 +611,9 @@ void attempt_to_send(struct sender_state *s) {
             s->t_newest_connection = now_realtime_sec();
     }
     else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
-        debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", s->host->hostname,
-              s->connected_to);
+        debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", s->host->hostname, s->connected_to);
     else if (ret == -1) {
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
         debug(D_STREAM, "STREAM: Send failed - closing socket...");
         error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  s->host->hostname, s->connected_to, s->sent_bytes_on_this_connection);
         rrdpush_sender_thread_close_socket(s->host);
@@ -615,6 +640,8 @@ int ret;
         int sslerrno = SSL_get_error(s->host->ssl.conn, desired);
         if (sslerrno == SSL_ERROR_WANT_READ || sslerrno == SSL_ERROR_WANT_WRITE)
             return;
+
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
         u_long err;
         char buf[256];
         while ((err = ERR_get_error()) != 0) {
@@ -626,20 +653,25 @@ int ret;
         return;
     }
 #endif
-    ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,
-               MSG_DONTWAIT);
+    ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
     if (ret>0) {
         s->read_len += ret;
         return;
     }
+
     debug(D_STREAM, "Socket was POLLIN, but req %zu bytes gave %d", sizeof(s->read_buffer) - s->read_len - 1, ret);
+
     if (ret<0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
         return;
-    if (ret==0)
+
+    if (ret==0) {
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED);
         error("STREAM %s [send to %s]: connection closed by far end. Restarting connection", s->host->hostname, s->connected_to);
-    else
-        error("STREAM %s [send to %s]: error during read (%d). Restarting connection", s->host->hostname, s->connected_to,
-              ret);
+    }
+    else {
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
+        error("STREAM %s [send to %s]: error during receive (%d). Restarting connection", s->host->hostname, s->connected_to, ret);
+    }
     rrdpush_sender_thread_close_socket(s->host);
 }
 
@@ -660,6 +692,8 @@ void execute_commands(struct sender_state *s) {
 
 
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
+    worker_unregister();
+
     RRDHOST *host = (RRDHOST *)ptr;
 
     netdata_mutex_lock(&host->sender->mutex);
@@ -752,6 +786,25 @@ void *rrdpush_sender_thread(void *ptr) {
     fds[Collector].fd = s->host->rrdpush_sender_pipe[PIPE_READ];
     fds[Collector].events = POLLIN;
 
+    worker_register("STREAMSND");
+    worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");
+    worker_register_job_name(WORKER_SENDER_JOB_PIPE_READ, "pipe read");
+    worker_register_job_name(WORKER_SENDER_JOB_SOCKET_RECEIVE, "receive");
+    worker_register_job_name(WORKER_SENDER_JOB_EXECUTE, "execute");
+    worker_register_job_name(WORKER_SENDER_JOB_SOCKET_SEND, "send");
+
+    // disconnection reasons
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR, "disconnect poll error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR, "disconnect socket error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR, "disconnect ssl error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
+
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, s->host);
     for(; s->host->rrdpush_send_enabled && !netdata_exit ;) {
         // check for outstanding cancellation requests
@@ -759,6 +812,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->host->rrdpush_sender_socket == -1)) {
+            worker_is_busy(WORKER_SENDER_JOB_CONNECT);
             s->overflow = 0;
             s->read_len = 0;
             s->buffer->read = 0;
@@ -777,10 +831,13 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // If the TCP window never opened then something is wrong, restart connection
         if(unlikely(now_monotonic_sec() - s->last_sent_t > s->timeout)) {
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
             error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", s->host->hostname, s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
             rrdpush_sender_thread_close_socket(s->host);
             continue;
         }
+
+        worker_is_idle();
 
         // Wait until buffer opens in the socket or a rrdset_done_push wakes us
         fds[Collector].revents = 0;
@@ -803,16 +860,18 @@ void *rrdpush_sender_thread(void *ptr) {
         int retval = poll(fds, 2, 1000);
         debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
               fds[Collector].revents, fds[Socket].revents, outstanding);
+
         if(unlikely(netdata_exit)) break;
 
         // Spurious wake-ups without error - loop again
-        if (retval == 0 || ((retval == -1) && (errno == EAGAIN || errno == EINTR)))
-        {
+        if (retval == 0 || ((retval == -1) && (errno == EAGAIN || errno == EINTR))) {
             debug(D_STREAM, "Spurious wakeup");
             continue;
         }
+
         // Only errors from poll() are internal, but try restarting the connection
         if(unlikely(retval == -1)) {
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR);
             error("STREAM %s [send to %s]: failed to poll(). Closing socket.", s->host->hostname, s->connected_to);
             rrdpush_sender_thread_close_socket(s->host);
             continue;
@@ -820,6 +879,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // If the collector woke us up then empty the pipe to remove the signal
         if (fds[Collector].revents & POLLIN || fds[Collector].revents & POLLPRI) {
+            worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
             debug(D_STREAM, "STREAM: Data added to send buffer (current buffer chunk %zu bytes)...", outstanding);
 
             char buffer[1000 + 1];
@@ -828,13 +888,19 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // Read as much as possible to fill the buffer, split into full lines for execution.
-        // if (fds[Socket].revents & POLLIN)
-        //     attempt_read(s);
-        // execute_commands(s);
+        if (fds[Socket].revents & POLLIN) {
+            worker_is_busy(WORKER_SENDER_JOB_SOCKET_RECEIVE);
+            attempt_read(s);
+        }
+
+        worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
+        execute_commands(s);
 
         // If we have data and have seen the TCP window open then try to close it by a transmission.
-        if (outstanding && fds[Socket].revents & POLLOUT)
+        if (outstanding && fds[Socket].revents & POLLOUT) {
+            worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
             attempt_to_send(s);
+        }
 
         // TODO-GAPS - why do we only check this on the socket, not the pipe?
         if (outstanding) {
@@ -846,6 +912,7 @@ void *rrdpush_sender_thread(void *ptr) {
             else if (unlikely(fds[Socket].revents & POLLNVAL))
                 error = "connection is invalid (POLLNVAL)";
             if(unlikely(error)) {
+                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR);
                 error("STREAM %s [send to %s]: restart stream because %s - %zu bytes transmitted.", s->host->hostname,
                       s->connected_to, error, s->sent_bytes_on_this_connection);
                 rrdpush_sender_thread_close_socket(s->host);
@@ -854,6 +921,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // protection from overflow
         if (s->overflow) {
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
             errno = 0;
             error("STREAM %s [send to %s]: buffer full (%zu-bytes) after %zu bytes. Restarting connection",
                   s->host->hostname, s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);

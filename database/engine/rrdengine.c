@@ -11,6 +11,10 @@ rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
 static unsigned pages_per_extent = MAX_PAGES_PER_EXTENT;
 
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2)
+#error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
+#endif
+
 void *dbengine_page_alloc() {
     void *page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
     if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
@@ -23,6 +27,8 @@ void dbengine_page_free(void *page) {
 
 static void sanity_check(void)
 {
+    BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2));
+
     /* Magic numbers must fit in the super-blocks */
     BUILD_BUG_ON(strlen(RRDENG_DF_MAGIC) > RRDENG_MAGIC_SZ);
     BUILD_BUG_ON(strlen(RRDENG_JF_MAGIC) > RRDENG_MAGIC_SZ);
@@ -1085,13 +1091,17 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
+    worker_is_busy(RRDENG_MAX_OPCODE + 1);
+
     struct rrdengine_worker_config* wc = handle->data;
     struct rrdengine_instance *ctx = wc->ctx;
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    if (unlikely(!ctx->metalog_ctx->initialized))
+    if (unlikely(!ctx->metalog_ctx->initialized)) {
+        worker_is_idle();
         return; /* Wait for the metadata log to initialize */
+    }
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
@@ -1133,12 +1143,26 @@ void timer_cb(uv_timer_t* handle)
         debug(D_RRDENGINE, "%s", get_rrdeng_statistics(wc->ctx, buf, sizeof(buf)));
     }
 #endif
+
+    worker_is_idle();
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
 
 void rrdeng_worker(void* arg)
 {
+    worker_register("DBENGINE");
+    worker_register_job_name(RRDENG_NOOP,                          "noop");
+    worker_register_job_name(RRDENG_READ_PAGE,                     "page read");
+    worker_register_job_name(RRDENG_READ_EXTENT,                   "extent read");
+    worker_register_job_name(RRDENG_COMMIT_PAGE,                   "commit");
+    worker_register_job_name(RRDENG_FLUSH_PAGES,                   "flush");
+    worker_register_job_name(RRDENG_SHUTDOWN,                      "shutdown");
+    worker_register_job_name(RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE, "page lru");
+    worker_register_job_name(RRDENG_QUIESCE,                       "quiesce");
+    worker_register_job_name(RRDENG_MAX_OPCODE,                    "cleanup");
+    worker_register_job_name(RRDENG_MAX_OPCODE + 1,                "timer");
+
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
     uv_loop_t* loop;
@@ -1188,7 +1212,9 @@ void rrdeng_worker(void* arg)
     shutdown = 0;
     int set_name = 0;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
+        worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
+        worker_is_busy(RRDENG_MAX_OPCODE);
         rrdeng_cleanup_finished_threads(wc);
 
         /* wait for commands */
@@ -1204,6 +1230,9 @@ void rrdeng_worker(void* arg)
             cmd = rrdeng_deq_cmd(wc);
             opcode = cmd.opcode;
             ++cmd_batch_size;
+
+            if(likely(opcode != RRDENG_NOOP))
+                worker_is_busy(opcode);
 
             switch (opcode) {
             case RRDENG_NOOP:
@@ -1281,6 +1310,7 @@ void rrdeng_worker(void* arg)
     fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
+    worker_unregister();
     return;
 
 error_after_timer_init:
@@ -1293,6 +1323,7 @@ error_after_loop_init:
     wc->error = UV_EAGAIN;
     /* wake up initialization thread */
     completion_mark_complete(&ctx->rrdengine_completion);
+    worker_unregister();
 }
 
 /* C entry point for development purposes
