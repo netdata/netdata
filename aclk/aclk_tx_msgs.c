@@ -531,30 +531,6 @@ char *aclk_generate_lwt(size_t *size) {
 
     return msg;
 }
-
-void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creation_t *node_creation) {
-    size_t len;
-    char *msg = generate_node_instance_creation(&len, node_creation);
-    if (!msg) {
-        error("Error generating nodeinstance::create::v1::CreateNodeInstance");
-        return;
-    }
-
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_CREATE_NODE, "CreateNodeInstance");
-    freez(msg);
-}
-
-void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_connection_t *node_connection) {
-    size_t len;
-    char *msg = generate_node_instance_connection(&len, node_connection);
-    if (!msg) {
-        error("Error generating nodeinstance::v1::UpdateNodeInstanceConnection");
-        return;
-    }
-
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
-    freez(msg);
-}
 #endif /* ENABLE_NEW_CLOUD_PROTOCOL */
 
 #ifndef __GNUC__

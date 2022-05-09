@@ -121,16 +121,7 @@ void aclk_query_free(aclk_query_t query)
         break;
 
     case NODE_STATE_UPDATE:
-        freez((void*)query->data.node_update.claim_id);
-        freez((void*)query->data.node_update.node_id);
-        break;
-
     case REGISTER_NODE:
-        freez((void*)query->data.node_creation.claim_id);
-        freez((void*)query->data.node_creation.hostname);
-        freez((void*)query->data.node_creation.machine_guid);
-        break;
-
     case CHART_DIMS_UPDATE:
     case CHART_CONFIG_UPDATED:
     case CHART_RESET:

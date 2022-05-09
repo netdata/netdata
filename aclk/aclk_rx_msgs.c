@@ -277,32 +277,39 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     update_node_id(&host_id, &node_id);
 
     aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-    query->data.node_update.hops = 1; //TODO - real hop count instead of hardcoded
-    rrdhost_aclk_state_lock(localhost);
-    query->data.node_update.claim_id = strdupz(localhost->aclk_state.claimed_id);
-    rrdhost_aclk_state_unlock(localhost);
+    node_instance_connection_t node_state_update = {
+        .hops = 1,
+        .live = 0,
+        .queryable = 1,
+        .session_id = aclk_session_newarch,
+        .node_id = res.node_id
+    };
 
     RRDHOST *host = rrdhost_find_by_guid(res.machine_guid, 0);
-    query->data.node_update.live = 0;
-
     if (host) {
         // not all host must have RRDHOST struct created for them
         // if they never connected during runtime of agent
         if (host == localhost) {
-            query->data.node_update.live = 1;
-            query->data.node_update.hops = 0;
+            node_state_update.live = 1;
+            node_state_update.hops = 0;
         } else {
             netdata_mutex_lock(&host->receiver_lock);
-            query->data.node_update.live = (host->receiver != NULL);
+            node_state_update.live = (host->receiver != NULL);
             netdata_mutex_unlock(&host->receiver_lock);
-            query->data.node_update.hops = host->system_info->hops;
+            node_state_update.hops = host->system_info->hops;
         }
     }
 
-    query->data.node_update.node_id = res.node_id; // aclk_query_free will free it
-    query->data.node_update.queryable = 1;
-    query->data.node_update.session_id = aclk_session_newarch;
+    rrdhost_aclk_state_lock(localhost);
+    node_state_update.claim_id = localhost->aclk_state.claimed_id;
+    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+    rrdhost_aclk_state_unlock(localhost);
+
+    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
+    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
+
     aclk_queue_query(query);
+    freez(res.node_id);
     freez(res.machine_guid);
     return 0;
 }
