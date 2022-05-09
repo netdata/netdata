@@ -145,7 +145,8 @@ function k8s_gcp_get_cluster_name() {
   url="http://metadata/computeMetadata/v1"
   if id=$(curl --fail -s -m 3 --noproxy "*" -H "$header" "$url/project/project-id") &&
     loc=$(curl --fail -s -m 3 --noproxy "*" -H "$header" "$url/instance/attributes/cluster-location") &&
-    name=$(curl --fail -s -m 3 --noproxy "*" -H "$header" "$url/instance/attributes/cluster-name"); then
+    name=$(curl --fail -s -m 3 --noproxy "*" -H "$header" "$url/instance/attributes/cluster-name") &&
+    [ -n "$id" ] && [ -n "$loc" ] && [ -n "$name" ]; then
     echo "gke_${id}_${loc}_${name}"
     return 0
   fi
