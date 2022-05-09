@@ -5,11 +5,14 @@
 
 struct worker_job_type {
     char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
-    size_t worker_jobs_started;
-    usec_t worker_busy_time;
 
-    size_t statistics_jobs_started;
-    usec_t statistics_busy_time;
+    // statistics controlled variables
+    size_t statistics_last_jobs_started;
+    usec_t statistics_last_busy_time;
+
+    // worker controlled variables
+    volatile size_t worker_jobs_started;
+    volatile usec_t worker_busy_time;
 };
 
 struct worker {
@@ -18,13 +21,13 @@ struct worker {
     const char *workname;
     uint32_t workname_hash;
 
-    // only one variable is set by our statistics callers
-    usec_t statistics_last_checkpoint;
+    // statistics controlled variables
+    volatile usec_t statistics_last_checkpoint;
     size_t statistics_last_jobs_started;
     usec_t statistics_last_busy_time;
 
     // the worker controlled variables
-    size_t job_id;
+    volatile size_t job_id;
     volatile size_t jobs_started;
     volatile usec_t busy_time;
     volatile usec_t last_action_timestamp;
@@ -154,22 +157,26 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
             per_job_type_name[i] = p->per_job_type[i].name;
 
             size_t tmp_jobs_started = p->per_job_type[i].worker_jobs_started;
-            per_job_type_jobs_started[i] = tmp_jobs_started - p->per_job_type[i].statistics_jobs_started;
-            p->per_job_type[i].statistics_jobs_started = tmp_jobs_started;
+            per_job_type_jobs_started[i] = tmp_jobs_started - p->per_job_type[i].statistics_last_jobs_started;
+            p->per_job_type[i].statistics_last_jobs_started = tmp_jobs_started;
 
             usec_t tmp_busy_time = p->per_job_type[i].worker_busy_time;
-            per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_busy_time;
-            p->per_job_type[i].statistics_busy_time = tmp_busy_time;
+            per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_last_busy_time;
+            p->per_job_type[i].statistics_last_busy_time = tmp_busy_time;
         }
 
         // get a copy of the worker variables
+        size_t worker_job_id = p->job_id;
         usec_t worker_busy_time = p->busy_time;
         size_t worker_jobs_started = p->jobs_started;
         char worker_last_action = p->last_action;
         usec_t worker_last_action_timestamp = p->last_action_timestamp;
 
+        delta = now - p->statistics_last_checkpoint;
+        p->statistics_last_checkpoint = now;
+
         // this is the only variable both the worker thread and the statistics thread are writing
-        // we set this only when the worker is busy, so that worker will not
+        // we set this only when the worker is busy, so that the worker will not
         // accumulate all the busy time, but only the time after the point we collected statistics
         if(worker_last_action == WORKER_BUSY && p->last_action_timestamp == worker_last_action_timestamp && p->last_action == WORKER_BUSY)
             p->last_action_timestamp = now;
@@ -186,13 +193,12 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
         if(worker_last_action == WORKER_BUSY) {
             // the worker is still busy with something
             // let's add that busy time to the reported one
-            busy_time += now - worker_last_action_timestamp;
+            usec_t dt = now - worker_last_action_timestamp;
+            busy_time += dt;
+            per_job_type_busy_time[worker_job_id] += dt;
+            p->per_job_type[worker_job_id].statistics_last_busy_time += dt;
             jobs_running = 1;
         }
-
-        delta = now - p->statistics_last_checkpoint;
-
-        p->statistics_last_checkpoint = now;
 
         callback(data, p->pid, p->tag, busy_time, delta, jobs_started, jobs_running, per_job_type_name, per_job_type_jobs_started, per_job_type_busy_time);
     }
