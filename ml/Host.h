@@ -127,6 +127,7 @@ private:
     size_t NumAnomalousDimensions{0};
     size_t NumNormalDimensions{0};
     size_t NumTrainedDimensions{0};
+    size_t NumActiveDimensions{0};
 
     unsigned AnomalyRateTimer{0};
 
