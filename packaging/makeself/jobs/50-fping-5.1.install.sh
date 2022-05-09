@@ -4,11 +4,13 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
+version="5.1"
+
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building fping" || true
 
-fetch "fping-5.1" "https://fping.org/dist/fping-5.1.tar.gz" \
-    1ee5268c063d76646af2b4426052e7d81a42b657e6a77d8e7d3d2e60fd7409fe
+fetch "fping-${version}" "https://fping.org/dist/fping-${version}.tar.gz" \
+    1ee5268c063d76646af2b4426052e7d81a42b657e6a77d8e7d3d2e60fd7409fe fping
 
 export CFLAGS="-static -I/openssl-static/include -pipe"
 export LDFLAGS="-static -L/openssl-static/lib"
@@ -29,6 +31,8 @@ EOF
 run make clean
 run make -j "$(nproc)"
 run make install
+
+store_cache fping "${NETDATA_MAKESELF_PATH}/tmp/fping"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/fping

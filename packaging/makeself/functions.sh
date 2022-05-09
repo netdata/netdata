@@ -29,32 +29,57 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 fetch() {
-  local dir="${1}" url="${2}" sha256="${3}"
+  local dir="${1}" url="${2}" sha256="${3}" key="${4}"
   local tar="${dir}.tar.gz"
+  local cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
 
-  if [ ! -f "${NETDATA_MAKESELF_PATH}/tmp/${tar}" ]; then
-    run wget -O "${NETDATA_MAKESELF_PATH}/tmp/${tar}" "${url}"
+  if [ -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]; then
+    rm -rf "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
   fi
 
-  # Check SHA256 of gzip'd tar file (apparently alpine's sha256sum requires
-  # two empty spaces between the checksum and the file's path)
-  set +e
-  echo "${sha256}  ${NETDATA_MAKESELF_PATH}/tmp/${tar}" | sha256sum -c -s
-  local rc=$?
-  if [ ${rc} -ne 0 ]; then
-      echo >&2 "SHA256 verification of tar file ${tar} failed (rc=${rc})"
-      echo >&2 "expected: ${sha256}, got $(sha256sum "${NETDATA_MAKESELF_PATH}/tmp/${tar}")"
-      exit 1
-  fi
-  set -e
+  if [ -d "${cache}/${dir}" ]; then
+    echo "Found cached copy of build directory for ${key}, using it."
+    cp -a "${cache}/${dir}" "${NETDATA_MAKESELF_PATH}/tmp/"
+  else
+    echo "No cached copy of build directory for ${key} found, fetching sources instead."
 
-  if [ ! -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]; then
+    if [ ! -f "${NETDATA_MAKESELF_PATH}/tmp/${tar}" ]; then
+      run wget -O "${NETDATA_MAKESELF_PATH}/tmp/${tar}" "${url}"
+    fi
+
+    # Check SHA256 of gzip'd tar file (apparently alpine's sha256sum requires
+    # two empty spaces between the checksum and the file's path)
+    set +e
+    echo "${sha256}  ${NETDATA_MAKESELF_PATH}/tmp/${tar}" | sha256sum -c -s
+    local rc=$?
+    if [ ${rc} -ne 0 ]; then
+        echo >&2 "SHA256 verification of tar file ${tar} failed (rc=${rc})"
+        echo >&2 "expected: ${sha256}, got $(sha256sum "${NETDATA_MAKESELF_PATH}/tmp/${tar}")"
+        exit 1
+    fi
+    set -e
+
     cd "${NETDATA_MAKESELF_PATH}/tmp"
     run tar -zxpf "${tar}"
     cd -
   fi
 
   run cd "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
+}
+
+store_cache() {
+    key="${1}"
+    src="${2}"
+
+    cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
+
+    if [ -d "${cache}" ]; then
+        rm -rf "${cache}"
+    fi
+
+    mkdir -p "${cache}"
+
+    cp -a "${src}" "${cache}"
 }
 
 # -----------------------------------------------------------------------------

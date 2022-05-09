@@ -4,11 +4,13 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
+version="7.82.0"
+
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
 
-fetch "curl-7.82.0" "https://curl.haxx.se/download/curl-7.82.0.tar.gz" \
-    910cc5fe279dc36e2cca534172c94364cf3fcf7d6494ba56e6c61a390881ddce
+fetch "curl-${version}" "https://curl.haxx.se/download/curl-${version}.tar.gz" \
+    910cc5fe279dc36e2cca534172c94364cf3fcf7d6494ba56e6c61a390881ddce curl
 
 export CFLAGS="-I/openssl-static/include -pipe"
 export LDFLAGS="-static -L/openssl-static/lib"
@@ -46,6 +48,8 @@ run sed -i -e "s/LDFLAGS =/LDFLAGS = -all-static/" src/Makefile
 run make clean
 run make -j "$(nproc)"
 run make install
+
+store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/curl-${version}"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/curl
