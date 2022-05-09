@@ -777,17 +777,17 @@ int main(int argc, char **argv) {
                         char* stresstest_string = "stresstest=";
 #endif
                         if(strcmp(optarg, "sqlite-check") == 0) {
-                            sql_init_database(DB_CHECK_INTEGRITY);
+                            sql_init_database(DB_CHECK_INTEGRITY, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-fix") == 0) {
-                            sql_init_database(DB_CHECK_FIX_DB);
+                            sql_init_database(DB_CHECK_FIX_DB, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-compact") == 0) {
-                            sql_init_database(DB_CHECK_RECLAIM_SPACE);
+                            sql_init_database(DB_CHECK_RECLAIM_SPACE, 0);
                             return 0;
                         }
 
