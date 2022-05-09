@@ -139,6 +139,19 @@ function k8s_is_pause_container() {
   return
 }
 
+function k8s_gcp_get_cluster_name() {
+  local header url id loc name
+  header="Metadata-Flavor: Google"
+  url="http://metadata/computeMetadata/v1"
+  if id=$(curl --fail -s -m 3 --noproxy "*" -H "$header" "$url/project/project-id") &&
+    loc=$(curl --fail -s -m 3 --noproxy "*" -H "$header" "$url/instance/attributes/cluster-location") &&
+    name=$(curl --fail -s -m 3 --noproxy "*" -H "$header" "$url/instance/attributes/cluster-name"); then
+    echo "gke_${id}_${loc}_${name}"
+    return 0
+  fi
+  return 1
+}
+
 # k8s_get_kubepod_name resolves */kubepods/* cgroup name.
 # pod level cgroup name format: 'pod_<namespace>_<pod_name>'
 # container level cgroup name format: 'cntr_<namespace>_<pod_name>_<container_name>'
@@ -230,9 +243,11 @@ function k8s_get_kubepod_name() {
     return 1
   fi
 
+  local tmp_kube_cluster_name="${TMPDIR:-"/tmp"}/netdata-cgroups-k8s-cluster-name"
   local tmp_kube_system_ns_uid_file="${TMPDIR:-"/tmp"}/netdata-cgroups-kubesystem-uid"
   local tmp_kube_containers_file="${TMPDIR:-"/tmp"}/netdata-cgroups-containers"
 
+  local kube_cluster_name
   local kube_system_uid
   local labels
 
@@ -241,10 +256,14 @@ function k8s_get_kubepod_name() {
     [ -f "$tmp_kube_containers_file" ] &&
     labels=$(grep "$cntr_id" "$tmp_kube_containers_file" 2>/dev/null); then
     IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
+    IFS= read -r kube_cluster_name 2>/dev/null <"$tmp_kube_cluster_name"
   else
     IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
+    IFS= read -r kube_cluster_name 2>/dev/null <"$tmp_kube_containers_file"
+
     local kube_system_ns
     local pods
+
     if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
       local token header host url
       token="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
@@ -256,6 +275,12 @@ function k8s_get_kubepod_name() {
         # FIX: check HTTP response code
         if ! kube_system_ns=$(curl -sSk -H "$header" "$url" 2>&1); then
           warning "${fn}: error on curl '${url}': ${kube_system_ns}."
+        fi
+      fi
+
+      if [ -z "$kube_cluster_name" ]; then
+        if ! kube_cluster_name=$(k8s_gcp_get_cluster_name); then
+          kube_cluster_name="unknown"
         fi
       fi
 
@@ -308,6 +333,7 @@ function k8s_get_kubepod_name() {
       return 1
     fi
 
+    [ -n "$kube_cluster_name" ] && echo "$kube_cluster_name" >"$tmp_kube_cluster_name" 2>/dev/null
     [ -n "$kube_system_ns" ] && [ -n "$kube_system_uid" ] && echo "$kube_system_uid" >"$tmp_kube_system_ns_uid_file" 2>/dev/null
     echo "$containers" >"$tmp_kube_containers_file" 2>/dev/null
   fi
@@ -326,6 +352,7 @@ function k8s_get_kubepod_name() {
       labels+=',kind="container"'
       labels+=",qos_class=\"$qos_class\""
       [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
+      [ -n "$kube_cluster_name" ] && [ "$kube_cluster_name" != "unknown" ] && labels+=",cluster_name=\"$kube_cluster_name\""
       name="cntr"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
@@ -341,6 +368,7 @@ function k8s_get_kubepod_name() {
       labels+=',kind="pod"'
       labels+=",qos_class=\"$qos_class\""
       [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
+      [ -n "$kube_cluster_name" ] && [ "$kube_cluster_name" != "unknown" ] && labels+=",cluster_name=\"$kube_cluster_name\""
       name="pod"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
