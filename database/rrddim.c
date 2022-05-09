@@ -38,7 +38,7 @@ inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
 // RRDDIM rename a dimension
 
 inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
-    if(unlikely(!name || !*name || !strcmp(rd->name, name)))
+    if(unlikely(!name || !*name || (rd->name && !strcmp(rd->name, name))))
         return 0;
 
     debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
