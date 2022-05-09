@@ -262,8 +262,11 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , (st->plugin_name)?st->plugin_name:""
             , (st->module_name)?st->module_name:""
     );
-    if(host->sender)
+    if(host->sender){
         host->sender->t_last_exposed_chart_definition = now_realtime_sec();
+        if(!host->sender->t_first_exposed_chart_definition)
+            host->sender->t_first_exposed_chart_definition = now_realtime_sec();
+    }
 
     // send the chart labels
     if (host->sender->version >= STREAM_VERSION_CLABELS)

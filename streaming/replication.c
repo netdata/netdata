@@ -502,11 +502,14 @@ void replication_attempt_to_send(struct replication_state *replication) {
 static int trigger_replication(RRDHOST *host){
     time_t t_now = now_realtime_sec();
     time_t wait_streaming = 0;
+    time_t abs_wait_streaming = 0;
     if(host->sender){
-        if(t_now > host->sender->t_last_exposed_chart_definition)
+        if(t_now > host->sender->t_first_exposed_chart_definition){
             wait_streaming = (t_now - host->sender->t_last_exposed_chart_definition);
-        info("%s: Last exposed: %ld, Now: %ld, Diff: %ld", REPLICATION_MSG, host->sender->t_last_exposed_chart_definition, t_now, wait_streaming);
-        if(wait_streaming && (wait_streaming > 10))    
+            abs_wait_streaming = (host->sender->t_last_exposed_chart_definition - host->sender->t_first_exposed_chart_definition);
+        }
+        info("%s: First exposed: %ld, Last exposed: %ld, diff: %ld, Now: %ld, Diff: %ld", REPLICATION_MSG, host->sender->t_first_exposed_chart_definition, host->sender->t_last_exposed_chart_definition, abs_wait_streaming, t_now, wait_streaming);
+        if(wait_streaming && abs_wait_streaming && ((wait_streaming > 10) || (abs_wait_streaming + wait_streaming) > 15))
             return 1;
         return 0;
     }
@@ -758,7 +761,6 @@ void send_gap_for_replication(RRDHOST *host, REPLICATION_STATE *rep_state)
     char *rep_msg_cmd;
     size_t len;
     replication_gap_to_str(the_gap, &rep_msg_cmd, &len);
-    sleep(3);
     send_message(rep_state, rep_msg_cmd);
     the_gap->status = "ontransmit";
 }

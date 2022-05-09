@@ -155,6 +155,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
     rrdhost_unlock(host);
     host->sender->t_last_exposed_chart_definition = 0 ;    
+    host->sender->t_first_exposed_chart_definition = 0 ;    
 }
 
 static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
@@ -888,13 +889,13 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // Read as much as possible to fill the buffer, split into full lines for execution.
-        if (fds[Socket].revents & POLLIN) {
-            worker_is_busy(WORKER_SENDER_JOB_SOCKET_RECEIVE);
-            attempt_read(s);
-        }
+        // if (fds[Socket].revents & POLLIN) {
+        //     worker_is_busy(WORKER_SENDER_JOB_SOCKET_RECEIVE);
+        //     attempt_read(s);
+        // }
 
-        worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-        execute_commands(s);
+        // worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
+        // execute_commands(s);
 
         // If we have data and have seen the TCP window open then try to close it by a transmission.
         if (outstanding && fds[Socket].revents & POLLOUT) {
