@@ -164,7 +164,7 @@ USAGE: kickstart.sh [options]
   --reinstall-clean                Clean reinstall Netdata.
   --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
-  --prepare-offline-install-source Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything.
+  --prepare-offline-install-source Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything.
 
 Additionally, this script may use the following environment variables:
 
@@ -1760,7 +1760,7 @@ prepare_offline_install_source() {
     progress "Would save release channel information to offline install source directory"
   fi
 
-  progress "Finished preparing ofline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
+  progress "Finished preparing offline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
 }
 
 # ======================================================================
