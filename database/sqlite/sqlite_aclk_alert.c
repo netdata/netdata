@@ -188,6 +188,10 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     }
 
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
+    struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
+    __sync_synchronize();
+    wc->pause_alert_updates = 0;
+    __sync_synchronize();
 
 bind_fail:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
@@ -238,6 +242,9 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     UNUSED(cmd);
 #else
     int rc;
+
+    if (wc->pause_alert_updates)
+        return;
 
     if (unlikely(!wc->alert_updates)) {
         log_access("ACLK STA [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
@@ -396,6 +403,9 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
                 wc->alerts_batch_id);
         log_first_sequence_id = 0;
         log_last_sequence_id = 0;
+        __sync_synchronize();
+        wc->pause_alert_updates = 1;
+        __sync_synchronize();
     }
 
     rc = sqlite3_finalize(res);
@@ -423,6 +433,11 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
+
+    struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
+    __sync_synchronize();
+    wc->pause_alert_updates = 0;
+    __sync_synchronize();
 }
 
 void aclk_send_alarm_health_log(char *node_id)
@@ -734,6 +749,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         wc->alerts_batch_id = batch_id;
         wc->alerts_start_seq_id = start_seq_id;
         wc->alert_updates = 1;
+        wc->pause_alert_updates = 0;
         __sync_synchronize();
     }
     else
@@ -766,6 +782,10 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
     log_access("ACLK STA [%s (%s)]: Queued removed alerts.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
 
     buffer_free(sql);
+
+    __sync_synchronize();
+    wc->pause_alert_updates = 0;
+    __sync_synchronize();
 #endif
     return;
 }
