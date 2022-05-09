@@ -50,7 +50,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     }
 
     if (use_mqtt_5)
-        mqtt_wss_publish5(client, topic, NULL, msg, NULL, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+        mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
     else
         mqtt_wss_publish_pid(client, topic, msg, msg_len,  MQTT_WSS_PUB_QOS1, &packet_id);
 
@@ -499,7 +499,8 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     }
 
     pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
-    freez(msg);
+    if (!use_mqtt_5)
+        freez(msg);
     if (localhost->aclk_state.prev_claimed_id) {
         freez(localhost->aclk_state.prev_claimed_id);
         localhost->aclk_state.prev_claimed_id = NULL;
