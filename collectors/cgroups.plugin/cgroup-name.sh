@@ -252,6 +252,7 @@ function k8s_get_kubepod_name() {
   local labels
 
   if [ -n "$cntr_id" ] &&
+    [ -f "$tmp_kube_cluster_name" ] &&
     [ -f "$tmp_kube_system_ns_uid_file" ] &&
     [ -f "$tmp_kube_containers_file" ] &&
     labels=$(grep "$cntr_id" "$tmp_kube_containers_file" 2>/dev/null); then
@@ -260,6 +261,7 @@ function k8s_get_kubepod_name() {
   else
     IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
     IFS= read -r kube_cluster_name 2>/dev/null <"$tmp_kube_containers_file"
+    [ -z "$kube_cluster_name" ] && ! kube_cluster_name=$(k8s_gcp_get_cluster_name) && kube_cluster_name="unknown"
 
     local kube_system_ns
     local pods
@@ -275,12 +277,6 @@ function k8s_get_kubepod_name() {
         # FIX: check HTTP response code
         if ! kube_system_ns=$(curl -sSk -H "$header" "$url" 2>&1); then
           warning "${fn}: error on curl '${url}': ${kube_system_ns}."
-        fi
-      fi
-
-      if [ -z "$kube_cluster_name" ]; then
-        if ! kube_cluster_name=$(k8s_gcp_get_cluster_name); then
-          kube_cluster_name="unknown"
         fi
       fi
 
