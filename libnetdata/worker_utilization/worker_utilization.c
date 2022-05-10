@@ -196,7 +196,6 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
             usec_t dt = now - worker_last_action_timestamp;
             busy_time += dt;
             per_job_type_busy_time[worker_job_id] += dt;
-            p->per_job_type[worker_job_id].statistics_last_busy_time += dt;
             jobs_running = 1;
         }
 
