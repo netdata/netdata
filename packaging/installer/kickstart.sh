@@ -1451,7 +1451,9 @@ try_static_install() {
 
   # Check status code first, so that we can provide nicer fallback for dry runs.
   if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-    if [ -n "${INSTALL_VERSION}" ]; then
+    if [ -n "${OFFLINE_INSTALL_SOURCE}" ]; then
+      netdata_agent="$(basename "${NETDATA_STATIC_ARCHIVE_URL#"file://"}")"
+    elif [ -n "${INSTALL_VERSION}" ]; then
       if [ "${SELECTED_RELEASE_CHANNEL}" = "stable" ]; then
         netdata_agent="${NETDATA_STATIC_ARCHIVE_URL#"https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/"}"
       else
@@ -1709,9 +1711,12 @@ prepare_offline_install_source() {
           warning "Failed to download static installer archive for ${arch}."
         fi
       done
+      legacy=0
     else
       warning "Selected version of Netdata only provides static builds for x86_64. You will only be able to install on x86_64 systems with this offline install source."
       progress "Fetching ${NETDATA_STATIC_ARCHIVE_OLD_URL}"
+      legacy=1
+
       if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
         warning "Failed to download static installer archive for x86_64."
       fi
@@ -1723,6 +1728,10 @@ prepare_offline_install_source() {
     fi
   fi
 
+  if [ "${legacy:-0}" -eq 1 ]; then
+    sed -e 's/netdata-latest.gz.run/netdata-x86_64-latest.gz.run' sha256sums.txt > sha256sums.tmp
+    mv sha256sums.tmp sha256sums.txt
+  fi
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     progress "Verifying checksums."
