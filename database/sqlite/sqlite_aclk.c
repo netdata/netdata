@@ -339,7 +339,7 @@ static void timer_cb(uv_timer_t* handle)
             }
         }
 
-        if (wc->alert_updates) {
+        if (wc->alert_updates && !wc->pause_alert_updates) {
             cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
             cmd.count = ACLK_MAX_ALERT_UPDATES;
             aclk_database_enq_cmd_noblock(wc, &cmd);

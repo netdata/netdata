@@ -243,9 +243,6 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 #else
     int rc;
 
-    if (wc->pause_alert_updates)
-        return;
-
     if (unlikely(!wc->alert_updates)) {
         log_access("ACLK STA [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
         return;
