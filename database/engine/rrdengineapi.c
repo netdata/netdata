@@ -1155,7 +1155,6 @@ void rrdeng_flush_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION
 }
 
 void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
-    UNUSED(dim_past_data);
     UNUSED(rep_state);
     struct pg_cache_page_index* page_index;
     RRDDIM *rd = dim_past_data->rd;
@@ -1165,4 +1164,75 @@ void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, RE
     --page_index->writers;
     uv_rwlock_wrunlock(&page_index->lock);    
     debug(D_REPLICATION, "%s Finalize operation -  Dimension \"%s\".\"%s\" metrics page completed.", REPLICATION_MSG, rd->rrdset->id, rd->id);
+}
+
+int overlap_pages_new_gap(REPLICATION_STATE *rep_state)
+{
+    struct rrdengine_instance *ctx;
+    struct rrdeng_page_descr *descr_at_start;
+    struct rrdeng_page_descr *descr_at_end;
+    void *page_at_start, *page_at_end;
+
+    descr_at_start = callocz(1, sizeof(struct rrdeng_page_descr));
+    descr_at_end = callocz(1, sizeof(struct rrdeng_page_descr));
+    RRDDIM *rd = rep_state->dim_past_data->rd;
+    uuid_t *dim_id = &(rd->state->page_index->id);
+    usec_t t_delta_start = rep_state->dim_past_data->start_time;
+    usec_t t_delta_end = rep_state->dim_past_data->end_time;
+    unsigned int on_start = 1, on_end = 1;
+
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+
+    //fetch the closests page(s) from dbengine for the GAP time interval - can be - 0,1,2+
+    page_at_start = rrdeng_get_page(ctx, dim_id, t_delta_start, ( void **) &descr_at_start);
+    if (!descr_at_start || !page_at_start){
+        infoerr("%s: GAP START PAGE(%llu): doesn't overlap with any dbengine page", REPLICATION_MSG, t_delta_start/USEC_PER_SEC);
+        on_start = 0;
+    }
+    page_at_end = rrdeng_get_page(ctx, dim_id, t_delta_end, (void **) &descr_at_end);
+    if (!descr_at_end || !page_at_end){
+        infoerr("%s: GAP END PAGE(%llu): doesn't overlap with any dbengine page", REPLICATION_MSG, t_delta_end/USEC_PER_SEC);
+        on_end = 0;
+    }
+
+    //verify that the GAPs dbengine page is not overlapping
+    if(!on_start && !on_end){
+        info("%s: GAP page NO overlapping on dbengine pages.", REPLICATION_MSG);        
+        return 0;
+    }
+    
+    if (on_start && on_end)
+    {
+        if ((page_at_start == page_at_end)) {
+            info("%s: GAP is overlapping at ONE dbengine page", REPLICATION_MSG);
+            info("%s: AT_START: dbengine/gap start: %llu / %llu, end: %llu / %llu", REPLICATION_MSG, descr_at_start->start_time/USEC_PER_SEC, t_delta_start/USEC_PER_SEC, descr_at_start->end_time/USEC_PER_SEC, t_delta_end/USEC_PER_SEC);
+            info("%s: AT_END: dbengine/gap start: %llu / %llu, end: %llu / %llu", REPLICATION_MSG, descr_at_end->start_time/USEC_PER_SEC, t_delta_start/USEC_PER_SEC, descr_at_end->end_time/USEC_PER_SEC, t_delta_end/USEC_PER_SEC);             
+            //if it does merge two pages. GAPs sample should replace zero samples.
+            //confirm that everything looks good
+            //commit
+            return 1;
+        }
+        
+        if (page_at_start != page_at_end) {
+            info("%s: GAP is somewhere between TWO dbengine pages", REPLICATION_MSG);            
+            info("%s: AT_START: dbengine/gap start: %llu / %llu, end: %llu / %llu", REPLICATION_MSG, descr_at_start->start_time/USEC_PER_SEC, t_delta_start/USEC_PER_SEC, descr_at_start->end_time/USEC_PER_SEC, t_delta_end/USEC_PER_SEC);
+            info("%s: AT_END: dbengine/gap start: %llu / %llu, end: %llu / %llu", REPLICATION_MSG, descr_at_end->start_time/USEC_PER_SEC, t_delta_start/USEC_PER_SEC, descr_at_end->end_time/USEC_PER_SEC, t_delta_end/USEC_PER_SEC);        
+            //if it doesn't overlap then if it is in the past submit it.
+            //if it is in the future discard it - to be investigated
+            return 1;         
+        }  
+    }
+
+    if (!on_start && on_end) {
+        info("%s: GAP LEFT PAGE FREE and PARTIALLY OVERLAPS", REPLICATION_MSG);
+        info("%s: AT_END: dbengine/gap start: %llu / %llu, end: %llu / %llu", REPLICATION_MSG, descr_at_end->start_time/USEC_PER_SEC, t_delta_start/USEC_PER_SEC, descr_at_end->end_time/USEC_PER_SEC, t_delta_end/USEC_PER_SEC);
+        //if it doesn't overlap then if it is in the past submit it.
+        //if it is in the future discard it - to be investigated
+        return 1;
+    }
+
+    //TODO: Release the page descr
+    // pg_cache_put() 
+
+    return 0;
 }

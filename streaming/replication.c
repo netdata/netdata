@@ -1181,6 +1181,9 @@ void replication_collect_past_metric_done(REPLICATION_STATE *rep_state) {
 
 void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
 #ifdef  ENABLE_DBENGINE
+    int overlapping = overlap_pages_new_gap(rep_state);
+    if(overlapping)
+        infoerr("%s: OVERLAPPING PAGES: HAVE A LOOK!", REPLICATION_MSG);    
     if(rrdeng_store_past_metrics_page_init(dim_past_data, rep_state)){
         infoerr("%s: Cannot initialize db engine page: Flushing collected past data skipped!", REPLICATION_MSG);
         return;
@@ -1527,7 +1530,7 @@ int complete_new_gap(GAP *potential_gap){
         error("%s: This GAP cannot be completed. Need to create it first.", REPLICATION_MSG);
         return 1;
     }
-    //potential_gap->t_window.t_end = now_realtime_sec() + REPLICATION_GAP_TIME_MARGIN;
+    potential_gap->t_window.t_end = now_realtime_sec() + REPLICATION_GAP_TIME_MARGIN;
     potential_gap->status = "oncompletion";
     return 0;
 }

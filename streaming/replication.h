@@ -157,6 +157,8 @@ void print_replication_queue_gap(GAPS *gaps_timeline);
 void print_replication_state(REPLICATION_STATE *state);
 void print_replication_gap(GAP *a_gap);
 
+int overlap_pages_new_gap(REPLICATION_STATE *rep_state);
+
 #ifdef  ENABLE_DBENGINE
 extern int rrdeng_store_past_metrics_page_init(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state);
 extern void rrdeng_store_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state);
