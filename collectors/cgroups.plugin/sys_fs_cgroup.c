@@ -1848,10 +1848,6 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
             cg->pending_renames = 0;
             cg->processed = 1;
             break;
-        default:
-            if (!cg->pending_renames && is_inside_k8s) {
-                cg->processed = 1;
-            }
     }
 
     if (cg->pending_renames || cg->processed) {
