@@ -6,9 +6,14 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin version to v0.32.3 [\#12862](https://github.com/netdata/netdata/pull/12862) ([ilyam8](https://github.com/ilyam8))
+- Add a SQLite database checkpoint command [\#12859](https://github.com/netdata/netdata/pull/12859) ([stelfrag](https://github.com/stelfrag))
+- feat\(cgroups.plugin\): add k8s cluster name label \(GKE only\) [\#12858](https://github.com/netdata/netdata/pull/12858) ([ilyam8](https://github.com/ilyam8))
+- Resolve coverity related to memory and structure dereference [\#12846](https://github.com/netdata/netdata/pull/12846) ([stelfrag](https://github.com/stelfrag))
 - fix memory leaks and mismatches of the use of the z functions for allocations [\#12841](https://github.com/netdata/netdata/pull/12841) ([ktsaou](https://github.com/ktsaou))
 - Set a page wait timeout and retry count [\#12836](https://github.com/netdata/netdata/pull/12836) ([stelfrag](https://github.com/stelfrag))
 - feat\(plugins.d\): allow external plugins to create chart labels [\#12834](https://github.com/netdata/netdata/pull/12834) ([ilyam8](https://github.com/ilyam8))
+- Ignore obsolete charts/dims in prediction thread. [\#12833](https://github.com/netdata/netdata/pull/12833) ([vkalintiris](https://github.com/vkalintiris))
 - fix\(exporting\)" make 'send charts matching' behave the same as 'filter' for prometheus format [\#12832](https://github.com/netdata/netdata/pull/12832) ([ilyam8](https://github.com/ilyam8))
 - Remove sync warning [\#12831](https://github.com/netdata/netdata/pull/12831) ([thiagoftsm](https://github.com/thiagoftsm))
 - Reduce the number of messages written in the error log due to out of bound timestamps [\#12829](https://github.com/netdata/netdata/pull/12829) ([stelfrag](https://github.com/stelfrag))
@@ -23,6 +28,7 @@
 - fix!: do not replace a hyphen in the chart name with an underscore [\#12812](https://github.com/netdata/netdata/pull/12812) ([ilyam8](https://github.com/ilyam8))
 - speedup queries by providing optimization in the main loop [\#12811](https://github.com/netdata/netdata/pull/12811) ([ktsaou](https://github.com/ktsaou))
 - onewayallocator to use mallocz\(\) instead of mmap\(\) [\#12810](https://github.com/netdata/netdata/pull/12810) ([ktsaou](https://github.com/ktsaou))
+- Workers utilization charts [\#12807](https://github.com/netdata/netdata/pull/12807) ([ktsaou](https://github.com/ktsaou))
 - add --repositories-only option [\#12806](https://github.com/netdata/netdata/pull/12806) ([maneamarius](https://github.com/maneamarius))
 - Fill missing removed events after a crash [\#12803](https://github.com/netdata/netdata/pull/12803) ([MrZammler](https://github.com/MrZammler))
 - Rename --install option for kickstart.sh [\#12798](https://github.com/netdata/netdata/pull/12798) ([maneamarius](https://github.com/maneamarius))
@@ -315,10 +321,6 @@
 - docs: document the issue with seccomp and claiming [\#12192](https://github.com/netdata/netdata/pull/12192) ([ilyam8](https://github.com/ilyam8))
 - fix\(docs\): unresolved file references [\#12191](https://github.com/netdata/netdata/pull/12191) ([ilyam8](https://github.com/ilyam8))
 - Update libs code [\#12190](https://github.com/netdata/netdata/pull/12190) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix\(python.d/nvidia\_smi\): use uid when can't find the username [\#12184](https://github.com/netdata/netdata/pull/12184) ([ilyam8](https://github.com/ilyam8))
-- Fix typos [\#12183](https://github.com/netdata/netdata/pull/12183) ([rex4539](https://github.com/rex4539))
-- Revert "Overhaul handling of auto-updates in the installer code. \(\#12076 [\#12182](https://github.com/netdata/netdata/pull/12182) ([Ferroin](https://github.com/Ferroin))
-- Add warning about broken Docker hosts in container entrypoint. [\#12175](https://github.com/netdata/netdata/pull/12175) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
