@@ -1100,6 +1100,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     aclk_queue_query(query);
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_send_node_instances()
 {
     struct node_instance_list *list_head = get_node_list();
@@ -1156,6 +1157,7 @@ void aclk_send_node_instances()
     }
     freez(list_head);
 }
+#endif
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
