@@ -11,6 +11,8 @@
 
 extern struct arcstats arcstats;
 
+unsigned long long zfs_arcstats_shrinkable_cache_size_bytes = 0;
+
 int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
@@ -188,6 +190,12 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
         }
 
         if(unlikely(arl_check(arl_base, key, value))) break;
+    }
+
+    if (arcstats.size > arcstats.c_min) {
+        zfs_arcstats_shrinkable_cache_size_bytes = arcstats.size - arcstats.c_min;
+    } else {
+        zfs_arcstats_shrinkable_cache_size_bytes = 0;
     }
 
     if(unlikely(arcstats.l2exist == -1))
