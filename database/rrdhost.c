@@ -698,7 +698,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     if (gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
 
-    if (unlikely(sql_init_database(DB_CHECK_NONE))) {
+    if (unlikely(sql_init_database(DB_CHECK_NONE, 0))) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             fatal("Failed to initialize SQLite");
         info("Skipping SQLITE metadata initialization since memory mode is not db engine");

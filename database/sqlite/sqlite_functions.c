@@ -303,7 +303,7 @@ static int attempt_database_fix()
         error_report("Failed to close database, rc = %d", rc);
     info("Attempting to fix database");
     db_meta = NULL;
-    return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT);
+    return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
 }
 
 static int init_database_batch(int rebuild, int init_type, const char *batch[])
@@ -334,13 +334,17 @@ static int init_database_batch(int rebuild, int init_type, const char *batch[])
  * Initialize the SQLite database
  * Return 0 on success
  */
-int sql_init_database(db_check_action_type_t rebuild)
+int sql_init_database(db_check_action_type_t rebuild, int memory)
 {
     char *err_msg = NULL;
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
 
-    snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
+    if (likely(!memory))
+        snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
+    else
+        strcpy(sqlite_database, ":memory:");
+
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
