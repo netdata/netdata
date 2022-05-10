@@ -682,9 +682,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     cd.version = rpt->stream_version;
 
-#if defined(ENABLE_ACLK)
+#if defined(ENABLE_NEW_CLOUD_PROTOCOL)
     // in case we have cloud connection we inform cloud
-    // new slave connected
+    // new child connected
     if (netdata_cloud_setting)
         aclk_host_state_update(rpt->host, 1);
 #endif
@@ -696,9 +696,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
 
-#if defined(ENABLE_ACLK)
+#if defined(ENABLE_NEW_CLOUD_PROTOCOL)
     // in case we have cloud connection we inform cloud
-    // new slave connected
+    // new child connected
     if (netdata_cloud_setting)
         aclk_host_state_update(rpt->host, 0);
 #endif
