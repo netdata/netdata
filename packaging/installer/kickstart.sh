@@ -1451,7 +1451,7 @@ try_static_install() {
 
   # Check status code first, so that we can provide nicer fallback for dry runs.
   if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-    if [ -n "${OFFLINE_INSTALL_SOURCE}" ]; then
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
       netdata_agent="$(basename "${NETDATA_STATIC_ARCHIVE_URL#"file://"}")"
     elif [ -n "${INSTALL_VERSION}" ]; then
       if [ "${SELECTED_RELEASE_CHANNEL}" = "stable" ]; then
