@@ -26,11 +26,13 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ "$(uname -m)" = 'x86_64' ] && [ -z "
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes || exit 1
 fi
 
-if docker inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
+if [ "${USE_EXISTING_DOCKER_IMAGE}" != 'yes' ] && docker inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     docker image rm "${DOCKER_IMAGE_NAME}" || exit 1
 fi
 
-docker pull --platform "${platform}" "${DOCKER_IMAGE_NAME}"
+if ! docker inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
+    docker pull --platform "${platform}" "${DOCKER_IMAGE_NAME}"
+fi
 
 # Run the build script inside the container
 if [ -t 1 ]; then
