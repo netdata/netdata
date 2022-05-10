@@ -778,6 +778,7 @@ struct rrdhost {
     unsigned int rrdpush_send_enabled;            // 1 when this host sends metrics to another netdata
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
+    struct rrdpush_destinations *destinations;      // a linked list of possible destinations
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata

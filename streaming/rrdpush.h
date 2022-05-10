@@ -26,6 +26,10 @@
 #define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
 #define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
 
+#define START_STREAMING_ERROR_SAME_LOCALHOST "Don't hit me baby, you are trying to stream my localhost back"
+#define START_STREAMING_ERROR_ALREADY_STREAMING "This GUID is already streaming to this server"
+#define START_STREAMING_ERROR_NOT_PERMITTED "You are not permitted to access this. Check the logs for more info."
+
 #define HTTP_HEADER_SIZE 8192
 
 typedef enum {
@@ -83,6 +87,7 @@ struct sender_state {
     int timeout, default_port;
     usec_t reconnect_delay;
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
+    struct rrdpush_destinations *destination;
     size_t begin;
     size_t reconnects_counter;
     size_t sent_bytes;
@@ -149,6 +154,7 @@ extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
 extern void sender_init(struct sender_state *s, RRDHOST *parent);
+extern struct rrdpush_destinations *destinations_init(const char *destinations);
 void sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s);
 extern int rrdpush_init();

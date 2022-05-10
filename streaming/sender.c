@@ -203,6 +203,18 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
         freez(se->kernel_version);
 }
 
+static inline long int parse_stream_version_for_errors(char *http)
+{
+    if (!memcmp(http, START_STREAMING_ERROR_SAME_LOCALHOST, strlen(START_STREAMING_ERROR_SAME_LOCALHOST)))
+        return -2;
+    else if (!memcmp(http, START_STREAMING_ERROR_ALREADY_STREAMING, strlen(START_STREAMING_ERROR_ALREADY_STREAMING)))
+        return -3;
+    else if (!memcmp(http, START_STREAMING_ERROR_NOT_PERMITTED, strlen(START_STREAMING_ERROR_NOT_PERMITTED)))
+        return -4;
+    else
+        return -1;
+}
+
 static inline long int parse_stream_version(RRDHOST *host, char *http)
 {
     long int stream_version = -1;
@@ -227,6 +239,9 @@ static inline long int parse_stream_version(RRDHOST *host, char *http)
                 host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
                 host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
             }
+            else {
+                stream_version = parse_stream_version_for_errors(http);
+            }
         }
     }
     return stream_version;
@@ -246,13 +261,14 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     debug(D_STREAM, "STREAM: Attempting to connect...");
     info("STREAM %s [send to %s]: connecting...", host->hostname, host->rrdpush_send_destination);
 
-    host->rrdpush_sender_socket = connect_to_one_of(
-            host->rrdpush_send_destination
+    host->rrdpush_sender_socket = connect_to_one_of_destinations(
+            host->destinations
             , default_port
             , &tv
             , &s->reconnects_counter
             , s->connected_to
             , sizeof(s->connected_to)-1
+            , &s->destination
     );
 
     if(unlikely(host->rrdpush_sender_socket == -1)) {
@@ -462,6 +478,26 @@ if(!s->rrdpush_compression)
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE);
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);
+        //catch other reject reasons and force to check other destinations
+        s->destination->disabled_no_proper_reply = 1;
+        return 0;
+    }
+    else if(version == -2) {
+        error("STREAM %s [send to %s]: remote server is the localhost for [%s].", host->hostname, s->connected_to, host->hostname);
+        rrdpush_sender_thread_close_socket(host);
+        s->destination->disabled_because_of_localhost = 1;
+        return 0;
+    }
+    else if(version == -3) {
+        error("STREAM %s [send to %s]: remote server already receives metrics for [%s].", host->hostname, s->connected_to, host->hostname);
+        rrdpush_sender_thread_close_socket(host);
+        s->destination->disabled_already_streaming = now_realtime_sec();
+        return 0;
+    }
+    else if(version == -4) {
+        error("STREAM %s [send to %s]: remote server denied access for [%s].", host->hostname, s->connected_to, host->hostname);
+        rrdpush_sender_thread_close_socket(host);
+        s->destination->disabled_because_of_denied_access = 1;
         return 0;
     }
     s->version = version;
@@ -691,6 +727,44 @@ void sender_init(struct sender_state *s, RRDHOST *parent) {
         s->compressor = create_compressor();
 #endif
     netdata_mutex_init(&s->mutex);
+}
+
+struct rrdpush_destinations *destinations_init(const char *dests) {
+    const char *s = dests;
+    struct rrdpush_destinations *destinations = NULL;
+    while(*s) {
+        const char *e = s;
+
+        // skip path, moving both s(tart) and e(nd)
+        if(*e == '/')
+            while(!isspace(*e) && *e != ',') s = ++e;
+
+        // skip separators, moving both s(tart) and e(nd)
+        while(isspace(*e) || *e == ',') s = ++e;
+
+        // move e(nd) to the first separator
+        while(*e && !isspace(*e) && *e != ',' && *e != '/') e++;
+
+        // is there anything?
+        if(!*s || s == e) break;
+
+        char buf[e - s + 1];
+        strncpyz(buf, s, e - s);
+        struct rrdpush_destinations *destination = callocz(1, sizeof(struct rrdpush_destinations));
+        strcpy(destination->destination, buf);
+        destination->next = NULL;
+        destination->disabled_no_proper_reply = 0;
+        destination->disabled_because_of_localhost = 0;
+        destination->disabled_already_streaming = 0;
+        destination->disabled_because_of_denied_access = 0;
+        if (destinations) {
+            destination->next = destinations;
+        }
+        destinations = destination;
+
+        s = e;
+    }
+    return destinations;
 }
 
 void *rrdpush_sender_thread(void *ptr) {
