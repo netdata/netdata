@@ -25,7 +25,7 @@ static struct pressure resources[PRESSURE_NUM_RESOURCES] = {
              .total_time = {.id = "memory_some_pressure_stall_time", .title = "Memory some pressure stall time"}},
         .full =
             {.share_time = {.id = "memory_full_pressure", .title = "Memory full pressure"},
-             .total_time = {.id = "memory_full_presure_stall_time", .title = "Memory full pressure stall time"}},
+             .total_time = {.id = "memory_full_pressure_stall_time", .title = "Memory full pressure stall time"}},
     },
     {
         .some =
