@@ -1139,6 +1139,8 @@ void aclk_send_node_instances()
             };
             node_instance_creation.machine_guid = mallocz(UUID_STR_LEN);
             uuid_unparse_lower(list->host_id, (char*)node_instance_creation.machine_guid);
+            create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
+            create_query->data.bin_payload.msg_name = "CreateNodeInstance";
             rrdhost_aclk_state_lock(localhost);
             node_instance_creation.claim_id = localhost->aclk_state.claimed_id,
             create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
