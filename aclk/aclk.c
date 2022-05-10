@@ -12,6 +12,7 @@
 #include "aclk_rx_msgs.h"
 #include "aclk_collector_list.h"
 #include "https_client.h"
+#include "schema-wrappers/schema_wrappers.h"
 
 #include "aclk_proxy.h"
 
