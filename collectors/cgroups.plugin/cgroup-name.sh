@@ -290,7 +290,7 @@ function k8s_get_kubepod_name() {
       fi
     elif ps -C kubelet >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
       if [ -z "$kube_system_uid" ]; then
-        if ! kube_system_ns=$(kubectl get namespaces kube-system -o json 2>&1); then
+        if ! kube_system_ns=$(kubectl --kubeconfig="$KUBE_CONFIG" get namespaces kube-system -o json 2>&1); then
           warning "${fn}: error on 'kubectl': ${kube_system_ns}."
         fi
       fi
