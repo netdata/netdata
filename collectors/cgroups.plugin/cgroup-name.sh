@@ -229,14 +229,14 @@ function k8s_get_kubepod_name() {
 
   if [ -z "$pod_uid" ] && [ -z "$cntr_id" ]; then
     warning "${fn}: can't extract pod_uid or container_id from the cgroup '$id'."
-    return 1
+    return 3
   fi
 
   [ -n "$pod_uid" ] && info "${fn}: cgroup '$id' is a pod(uid:$pod_uid)"
   [ -n "$cntr_id" ] && info "${fn}: cgroup '$id' is a container(id:$cntr_id)"
 
   if [ -n "$cntr_id" ] && k8s_is_pause_container "$cgroup_path"; then
-    return 1
+    return 3
   fi
 
   if ! command -v jq > /dev/null 2>&1; then
@@ -276,7 +276,7 @@ function k8s_get_kubepod_name() {
       if [ -z "$kube_system_uid" ]; then
         url="https://$host/api/v1/namespaces/kube-system"
         # FIX: check HTTP response code
-        if ! kube_system_ns=$(curl -sSk -H "$header" "$url" 2>&1); then
+        if ! kube_system_ns=$(curl --fail -sSk -H "$header" "$url" 2>&1); then
           warning "${fn}: error on curl '${url}': ${kube_system_ns}."
         fi
       fi
@@ -284,13 +284,13 @@ function k8s_get_kubepod_name() {
       url="https://$host/api/v1/pods"
       [ -n "$MY_NODE_NAME" ] && url+="?fieldSelector=spec.nodeName==$MY_NODE_NAME"
       # FIX: check HTTP response code
-      if ! pods=$(curl -sSk -H "$header" "$url" 2>&1); then
+      if ! pods=$(curl --fail -sSk -H "$header" "$url" 2>&1); then
         warning "${fn}: error on curl '${url}': ${pods}."
         return 1
       fi
     elif ps -C kubelet >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
       if [ -z "$kube_system_uid" ]; then
-        if ! kube_system_ns=$(kubectl get namespaces kube-system -o json 2>&1); then
+        if ! kube_system_ns=$(kubectl --kubeconfig="$KUBE_CONFIG" get namespaces kube-system -o json 2>&1); then
           warning "${fn}: error on 'kubectl': ${kube_system_ns}."
         fi
       fi
@@ -379,7 +379,7 @@ function k8s_get_kubepod_name() {
   # jq filter nonexistent field and nonexistent label value is 'null'
   if [[ $name =~ _null(_|$) ]]; then
     warning "${fn}: invalid name: $name (cgroup '$id')"
-    name=""
+    return 1
   fi
 
   echo "$name"
@@ -408,14 +408,19 @@ function k8s_get_name() {
     fi
     EXIT_CODE=$EXIT_SUCCESS
     ;;
+  1)
+    NAME="k8s_${id}"
+    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and enabling it."
+    EXIT_CODE=$EXIT_SUCCESS
+    ;;
   2)
-    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and asking for retry."
-    NAME="${id}"
+    NAME="k8s_${id}"
+    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and asking for retry."
     EXIT_CODE=$EXIT_RETRY
     ;;
   *)
-    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
-    NAME="${id}"
+    NAME="k8s_${id}"
+    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and disabling it."
     EXIT_CODE=$EXIT_DISABLE
     ;;
   esac
