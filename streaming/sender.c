@@ -268,7 +268,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
             , &s->reconnects_counter
             , s->connected_to
             , sizeof(s->connected_to)-1
-            , &s->destination
+            , &host->destination
     );
 
     if(unlikely(host->rrdpush_sender_socket == -1)) {
@@ -479,25 +479,25 @@ if(!s->rrdpush_compression)
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         //catch other reject reasons and force to check other destinations
-        s->destination->disabled_no_proper_reply = 1;
+        host->destination->disabled_no_proper_reply = 1;
         return 0;
     }
     else if(version == -2) {
         error("STREAM %s [send to %s]: remote server is the localhost for [%s].", host->hostname, s->connected_to, host->hostname);
         rrdpush_sender_thread_close_socket(host);
-        s->destination->disabled_because_of_localhost = 1;
+        host->destination->disabled_because_of_localhost = 1;
         return 0;
     }
     else if(version == -3) {
         error("STREAM %s [send to %s]: remote server already receives metrics for [%s].", host->hostname, s->connected_to, host->hostname);
         rrdpush_sender_thread_close_socket(host);
-        s->destination->disabled_already_streaming = now_realtime_sec();
+        host->destination->disabled_already_streaming = now_realtime_sec();
         return 0;
     }
     else if(version == -4) {
         error("STREAM %s [send to %s]: remote server denied access for [%s].", host->hostname, s->connected_to, host->hostname);
         rrdpush_sender_thread_close_socket(host);
-        s->destination->disabled_because_of_denied_access = 1;
+        host->destination->disabled_because_of_denied_access = 1;
         return 0;
     }
     s->version = version;
