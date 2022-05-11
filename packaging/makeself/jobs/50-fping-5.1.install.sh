@@ -32,7 +32,7 @@ run make clean
 run make -j "$(nproc)"
 run make install
 
-store_cache fping "${NETDATA_MAKESELF_PATH}/tmp/fping"
+store_cache fping "${NETDATA_MAKESELF_PATH}/tmp/fping-${version}"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/fping
