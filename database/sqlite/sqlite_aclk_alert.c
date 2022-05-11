@@ -188,10 +188,12 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     }
 
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
-    struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
-    __sync_synchronize();
-    wc->pause_alert_updates = 0;
-    __sync_synchronize();
+    if (host->dbsync_worker) {
+        struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
+        __sync_synchronize();
+        wc->pause_alert_updates = 0;
+        __sync_synchronize();
+    }
 
 bind_fail:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
@@ -431,10 +433,12 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
     buffer_free(sql);
 
-    struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
-    __sync_synchronize();
-    wc->pause_alert_updates = 0;
-    __sync_synchronize();
+    if (host->dbsync_worker) {
+        struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
+        __sync_synchronize();
+        wc->pause_alert_updates = 0;
+        __sync_synchronize();
+    }
 }
 
 void aclk_send_alarm_health_log(char *node_id)
