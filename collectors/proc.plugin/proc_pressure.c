@@ -65,7 +65,12 @@ void update_pressure_charts(struct pressure_charts *pcs) {
     }
 }
 
-static void proc_pressure_do_resource(procfile *ff, struct pressure_charts *pcs, struct resource_info ri, int some) {
+static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
+    struct pressure_charts *pcs;
+    struct resource_info ri;
+    pcs = some ? &resources[res_idx].some : &resources[res_idx].full;
+    ri = resource_info[res_idx];
+
     if (unlikely(!pcs->share_time.st)) {
         pcs->share_time.st = rrdset_create_localhost(
             "system",
@@ -112,6 +117,14 @@ static void proc_pressure_do_resource(procfile *ff, struct pressure_charts *pcs,
         rrdset_next(pcs->total_time.st);
     }
     pcs->total_time.value_total = str2ull(procfile_lineword(ff, some ? 0 : 1, 8)) / 1000;
+}
+
+static void proc_pressure_do_resource_some(procfile *ff, int res_idx) {
+    proc_pressure_do_resource(ff, res_idx, 1);
+}
+
+static void proc_pressure_do_resource_full(procfile *ff, int res_idx) {
+    proc_pressure_do_resource(ff, res_idx, 0);
 }
 
 int do_proc_pressure(int update_every, usec_t dt) {
@@ -181,11 +194,11 @@ int do_proc_pressure(int update_every, usec_t dt) {
         }
 
         if (do_some) {
-            proc_pressure_do_resource(ff, &resources[i].some, resource_info[i], 1);
+            proc_pressure_do_resource_some(ff, i);
             update_pressure_charts(&resources[i].some);
         }
         if (do_full && lines > 2) {
-            proc_pressure_do_resource(ff, &resources[i].full, resource_info[i], 0);
+            proc_pressure_do_resource_full(ff, i);
             update_pressure_charts(&resources[i].full);
         }
     }
