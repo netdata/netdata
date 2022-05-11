@@ -729,44 +729,6 @@ void sender_init(struct sender_state *s, RRDHOST *parent) {
     netdata_mutex_init(&s->mutex);
 }
 
-struct rrdpush_destinations *destinations_init(const char *dests) {
-    const char *s = dests;
-    struct rrdpush_destinations *destinations = NULL;
-    while(*s) {
-        const char *e = s;
-
-        // skip path, moving both s(tart) and e(nd)
-        if(*e == '/')
-            while(!isspace(*e) && *e != ',') s = ++e;
-
-        // skip separators, moving both s(tart) and e(nd)
-        while(isspace(*e) || *e == ',') s = ++e;
-
-        // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',' && *e != '/') e++;
-
-        // is there anything?
-        if(!*s || s == e) break;
-
-        char buf[e - s + 1];
-        strncpyz(buf, s, e - s);
-        struct rrdpush_destinations *destination = callocz(1, sizeof(struct rrdpush_destinations));
-        strcpy(destination->destination, buf);
-        destination->next = NULL;
-        destination->disabled_no_proper_reply = 0;
-        destination->disabled_because_of_localhost = 0;
-        destination->disabled_already_streaming = 0;
-        destination->disabled_because_of_denied_access = 0;
-        if (destinations) {
-            destination->next = destinations;
-        }
-        destinations = destination;
-
-        s = e;
-    }
-    return destinations;
-}
-
 void *rrdpush_sender_thread(void *ptr) {
     struct sender_state *s = ptr;
     s->task_id = gettid();

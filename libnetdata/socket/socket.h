@@ -49,15 +49,6 @@ typedef struct listen_sockets {
     WEB_CLIENT_ACL fds_acl_flags[MAX_LISTEN_FDS];  // the acl to apply to the open sockets (dashboard, badges, streaming, netdata.conf, management)
 } LISTEN_SOCKETS;
 
-struct rrdpush_destinations {
-    char destination[100 + 1];
-    int disabled_no_proper_reply;
-    int disabled_because_of_localhost;
-    time_t disabled_already_streaming;
-    int disabled_because_of_denied_access;
-    struct rrdpush_destinations *next;
-};
-
 extern char *strdup_client_description(int family, const char *protocol, const char *ip, uint16_t port);
 
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
@@ -65,7 +56,6 @@ extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
 extern int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
-extern int connect_to_one_of_destinations(struct rrdpush_destinations *destinations, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size, struct rrdpush_destinations **destination);
 int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout);
 
 #ifdef ENABLE_HTTPS

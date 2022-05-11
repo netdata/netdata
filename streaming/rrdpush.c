@@ -417,6 +417,79 @@ void rrdpush_claimed_id(RRDHOST *host)
         error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 }
 
+int connect_to_one_of_destinations(struct rrdpush_destinations *destinations, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size, struct rrdpush_destinations **destination) {
+    int sock = -1;
+
+    for (struct rrdpush_destinations *d = destinations; d; d = d->next) {
+        if (d->disabled_no_proper_reply) {
+            d->disabled_no_proper_reply = 0;
+            continue;
+        }
+        else if (d->disabled_because_of_localhost) {
+            continue;
+        }
+        else if (d->disabled_already_streaming && (d->disabled_already_streaming + 30 > now_realtime_sec())) {
+            continue;
+        }
+        else if (d->disabled_because_of_denied_access) {
+            continue;
+        }
+
+        if(reconnects_counter) *reconnects_counter += 1;
+        sock = connect_to_this(d->destination, default_port, timeout);
+        if(sock != -1) {
+            if(connected_to && connected_to_size) {
+                strncpy(connected_to, d->destination, connected_to_size);
+                connected_to[connected_to_size - 1] = '\0';
+            }
+            *destination = d;
+            break;
+        } else {
+            d->disabled_no_proper_reply = 1;
+        }
+    }
+
+    return sock;
+}
+
+struct rrdpush_destinations *destinations_init(const char *dests) {
+    const char *s = dests;
+    struct rrdpush_destinations *destinations = NULL;
+    while(*s) {
+        const char *e = s;
+
+        // skip path, moving both s(tart) and e(nd)
+        if(*e == '/')
+            while(!isspace(*e) && *e != ',') s = ++e;
+
+        // skip separators, moving both s(tart) and e(nd)
+        while(isspace(*e) || *e == ',') s = ++e;
+
+        // move e(nd) to the first separator
+        while(*e && !isspace(*e) && *e != ',' && *e != '/') e++;
+
+        // is there anything?
+        if(!*s || s == e) break;
+
+        char buf[e - s + 1];
+        strncpyz(buf, s, e - s);
+        struct rrdpush_destinations *destination = callocz(1, sizeof(struct rrdpush_destinations));
+        strcpy(destination->destination, buf);
+        destination->next = NULL;
+        destination->disabled_no_proper_reply = 0;
+        destination->disabled_because_of_localhost = 0;
+        destination->disabled_already_streaming = 0;
+        destination->disabled_because_of_denied_access = 0;
+        if (destinations) {
+            destination->next = destinations;
+        }
+        destinations = destination;
+
+        s = e;
+    }
+    return destinations;
+}
+
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
