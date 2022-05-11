@@ -405,19 +405,6 @@ struct rrdset_volatile {
     bool is_ar_chart;
 };
 
-// RRDDIM legacy data collection structures
-
-struct mem_collect_handle {
-    long slot;
-    long entries;
-};
-
-struct mem_query_handle {
-    long slot;
-    long last_slot;
-    uint8_t finished;
-};
-
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
 

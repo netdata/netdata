@@ -3,6 +3,7 @@
 #include "query.h"
 #include "web/api/formatters/rrd2json.h"
 #include "rrdr.h"
+#include "database/ram/rrddim_mem.h"
 
 #include "average/average.h"
 #include "incremental_sum/incremental_sum.h"
