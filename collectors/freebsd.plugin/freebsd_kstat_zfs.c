@@ -5,6 +5,8 @@
 
 extern struct arcstats arcstats;
 
+unsigned long long zfs_arcstats_shrinkable_cache_size_bytes = 0;
+
 // --------------------------------------------------------------------------------------------------------------------
 // kstat.zfs.misc.arcstats
 
@@ -212,6 +214,12 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_meta_min", mibs.arc_meta_min, arcstats.arc_meta_min);
     // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_need_free", mibs.arc_need_free, arcstats.arc_need_free);
     // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_sys_free", mibs.arc_sys_free, arcstats.arc_sys_free);
+
+    if (arcstats.size > arcstats.c_min) {
+        zfs_arcstats_shrinkable_cache_size_bytes = arcstats.size - arcstats.c_min;
+    } else {
+        zfs_arcstats_shrinkable_cache_size_bytes = 0;
+    }
 
     generate_charts_arcstats("freebsd.plugin", "zfs", show_zero_charts, update_every);
     generate_charts_arc_summary("freebsd.plugin", "zfs", show_zero_charts, update_every);

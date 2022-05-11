@@ -49,4 +49,7 @@ extern int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt);
 extern int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt);
 extern int do_ipfw(int update_every, usec_t dt);
 
+// metrics that need to be shared among data collectors
+extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;
+
 #endif /* NETDATA_PLUGIN_FREEBSD_H */
