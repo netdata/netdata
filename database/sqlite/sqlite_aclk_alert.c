@@ -187,9 +187,7 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
     struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
     if (wc) {
-        __sync_synchronize();
         wc->pause_alert_updates = 0;
-        __sync_synchronize();
     }
 
 bind_fail:
@@ -432,9 +430,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
     struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
     if (wc) {
-        __sync_synchronize();
         wc->pause_alert_updates = 0;
-        __sync_synchronize();
     }
 }
 
