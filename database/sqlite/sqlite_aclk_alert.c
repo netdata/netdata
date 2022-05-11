@@ -141,9 +141,6 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     if (!claimed())
         return 0;
 
-    if (unlikely(!host->dbsync_worker))
-        return 1;
-
     if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED) {
         return 0;
     }
@@ -188,8 +185,8 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     }
 
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
-    if (host->dbsync_worker) {
-        struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
+    struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
+    if (wc) {
         __sync_synchronize();
         wc->pause_alert_updates = 0;
         __sync_synchronize();
@@ -433,8 +430,8 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
     buffer_free(sql);
 
-    if (host->dbsync_worker) {
-        struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
+    struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
+    if (wc) {
         __sync_synchronize();
         wc->pause_alert_updates = 0;
         __sync_synchronize();
@@ -1066,9 +1063,6 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 {
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!claimed())
-        return;
-
-    if (unlikely(!host->dbsync_worker))
         return;
 
     char uuid_str[GUID_LEN + 1];
