@@ -51,18 +51,20 @@ to work on these platforms with minimal user effort.
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
 | Alpine Linux | 3.15 | No | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
+| Alma Linux | 8.x | x86\_64, AArch64 | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives |
 | CentOS | 7.x | x86\_64 | |
-| CentOS | 8.x | x86\_64, AArch64 | Includes Rocky Linux 8.x support, which will be our primary platform long-term for RHEL compatiblitiy |
 | Docker | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker |
 | Debian | 11.x | x86\_64, i386, ARMv7, AArch64 | |
 | Debian | 10.x | x86\_64, i386, ARMv7, AArch64 | |
 | Debian | 9.x | x86\_64, i386, ARMv7, AArch64 | |
+| Fedora | 36 | x86\_64, ARMv7, AArch64 | |
 | Fedora | 35 | x86\_64, ARMv7, AArch64 | |
 | Fedora | 34 | x86\_64, ARMv7, AArch64 | |
 | openSUSE | Leap 15.3 | x86\_64, AArch64 | |
 | Oracle Linux | 8.x | x86\_64, AArch64 | |
 | Red Hat Enterprise Linux | 7.x | x86\_64 | |
 | Red Hat Enterprise Linux | 8.x | x86\_64, AArch64 | |
+| Ubuntu | 22.04 | x86\_64, ARMv7, AArch64 | |
 | Ubuntu | 21.10 | x86\_64, i386, ARMv7, AArch64 | |
 | Ubuntu | 20.04 | x86\_64, i386, ARMv7, AArch64 | |
 | Ubuntu | 18.04 | x86\_64, i386, ARMv7, AArch64 | |
