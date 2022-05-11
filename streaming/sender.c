@@ -205,11 +205,11 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
 
 static inline long int parse_stream_version_for_errors(char *http)
 {
-    if (!memcmp(http, START_STREAMING_ERROR_SAME_LOCALHOST, strlen(START_STREAMING_ERROR_SAME_LOCALHOST)))
+    if (!memcmp(http, START_STREAMING_ERROR_SAME_LOCALHOST, sizeof(START_STREAMING_ERROR_SAME_LOCALHOST)))
         return -2;
-    else if (!memcmp(http, START_STREAMING_ERROR_ALREADY_STREAMING, strlen(START_STREAMING_ERROR_ALREADY_STREAMING)))
+    else if (!memcmp(http, START_STREAMING_ERROR_ALREADY_STREAMING, sizeof(START_STREAMING_ERROR_ALREADY_STREAMING)))
         return -3;
-    else if (!memcmp(http, START_STREAMING_ERROR_NOT_PERMITTED, strlen(START_STREAMING_ERROR_NOT_PERMITTED)))
+    else if (!memcmp(http, START_STREAMING_ERROR_NOT_PERMITTED, sizeof(START_STREAMING_ERROR_NOT_PERMITTED)))
         return -4;
     else
         return -1;
