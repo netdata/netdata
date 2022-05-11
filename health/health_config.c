@@ -433,6 +433,9 @@ static inline int health_parse_db_lookup(
         else if(!strcasecmp(key, "unaligned")) {
             *options |= RRDR_OPTION_NOT_ALIGNED;
         }
+        else if(!strcasecmp(key, "anomaly-bit")) {
+            *options |= RRDR_OPTION_ANOMALY_BIT;
+        }
         else if(!strcasecmp(key, "match-ids") || !strcasecmp(key, "match_ids")) {
             *options |= RRDR_OPTION_MATCH_IDS;
         }
