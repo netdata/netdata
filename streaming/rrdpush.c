@@ -450,8 +450,6 @@ int connect_to_one_of_destinations(
             }
             *destination = d;
             break;
-        } else {
-            d->disabled_no_proper_reply = 1;
         }
     }
 
