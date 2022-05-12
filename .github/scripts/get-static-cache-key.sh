@@ -1,7 +1,7 @@
 #!/bin/sh
 
-platform="${1}"
-arch="${2}"
+arch="${1}"
+platform="$(packaging/makeself/uname2platform.sh "${arch}")"
 
 docker pull --platform "${platform}" netdata/static-builder
 

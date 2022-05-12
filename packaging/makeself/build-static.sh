@@ -9,16 +9,11 @@ BUILDARCH="${1}"
 
 set -e
 
-case ${BUILDARCH} in
-  x86_64) platform=linux/amd64 ;;
-  armv7l) platform=linux/arm/v7 ;;
-  aarch64) platform=linux/arm64/v8 ;;
-  ppc64le) platform=linux/ppc64le ;;
-  *)
-    echo "Unknown target architecture '${BUILDARCH}'."
+platform="$("$(dirname "${0}")/uname2platform.sh" "${BUILDARCH}")"
+
+if [ -z "${platform}" ]; then
     exit 1
-    ;;
-esac
+fi
 
 DOCKER_IMAGE_NAME="netdata/static-builder"
 

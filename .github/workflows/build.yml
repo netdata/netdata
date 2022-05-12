@@ -87,11 +87,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - {arch: 'x86_64', platform: 'linux/amd64'}
-          - {arch: 'armv7l', platform: 'linux/arm/v7'}
-          - {arch: 'aarch64', platform: 'linux/arm64/v8'}
-          - {arch: 'ppc64le', platform: 'linux/ppc64le'}
+        arch:
+          - x86_64
+          - armv7l
+          - aarch64
+          - ppc64le
     steps:
       - name: Checkout
         id: checkout
@@ -106,7 +106,7 @@ jobs:
           sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Get Cache Key
         id: cache-key
-        run: .github/scripts/get-static-cache-key.sh ${{ matrix.platform }} ${{ matrix.arch }}
+        run: .github/scripts/get-static-cache-key.sh ${{ matrix.arch }}
       - name: Cache
         id: cache
         uses: actions/cache@v3
