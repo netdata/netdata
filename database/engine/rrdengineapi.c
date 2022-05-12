@@ -1197,9 +1197,9 @@ void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_d
     }
 
     // size of the data in bytes
-    unsigned int entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
-    unsigned int entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
-    unsigned int ue_page = (page_end - page_start) / (entries_page - 1);
+    uint64_t entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
+    uint64_t entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
+    uint64_t ue_page = (entries_page > 0) ? (uint64_t)((page_end - page_start) / entries_page) : 0;
     uint64_t gap_start_offset = 0;
     uint64_t page_start_offset = 0;
 
@@ -1216,11 +1216,11 @@ void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_d
     }
 
     if (page_start > start) {
-        gap_start_offset = (uint64_t)(page_start - start) / ue_page;
+        gap_start_offset = (uint64_t)(page_start - start) / ue_page - 1;
         //TODO: creating a page and fill it with the reset of the GAP
     }
     if (page_start <= start) {
-        page_start_offset = (uint64_t)(start - page_start) / ue_page;
+        page_start_offset = (uint64_t)(start - page_start) / ue_page - 1;
     }
     info("%s: Just before memcpy", REPLICATION_MSG);
     void *dest = (void *)(page + page_start_offset);
@@ -1278,14 +1278,21 @@ int overlap_pages_new_gap(REPLICATION_STATE *rep_state)
     unsigned int on_start = 1, on_end = 1;
 
     ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+    
+    // Check active page details
     latest_descr = ((struct rrdeng_collect_handle *)rd->state->handle)->descr;
-    active_pg_cache_descr = latest_descr->pg_cache_descr;
-    if(active_pg_cache_descr){
-        storage_number *active_page = (storage_number *)active_pg_cache_descr->page;
-        time_t active_page_t_start = (latest_descr->start_time / USEC_PER_SEC);
-        time_t active_page_t_end = (latest_descr->end_time / USEC_PER_SEC);
-        uint32_t active_page_length = latest_descr->page_length;
-        info("%s: ACTIVE PAGE in MEM: [%ld, %ld](%d) - 1st sample["STORAGE_NUMBER_FORMAT"] ", REPLICATION_MSG, active_page_t_start, active_page_t_end, active_page_length, active_page[0]);        
+    if(!latest_descr)
+        infoerr("%s: No active page for the dimension %s.%s", REPLICATION_MSG, rd->rrdset->id, rd->id);
+    else
+    {
+        active_pg_cache_descr = latest_descr->pg_cache_descr;
+        if(active_pg_cache_descr){
+            storage_number *active_page = (storage_number *)active_pg_cache_descr->page;
+            time_t active_page_t_start = (latest_descr->start_time / USEC_PER_SEC);
+            time_t active_page_t_end = (latest_descr->end_time / USEC_PER_SEC);
+            uint32_t active_page_length = latest_descr->page_length;
+            info("%s: ACTIVE PAGE in MEM: [%ld, %ld](%u) - 1st sample["STORAGE_NUMBER_FORMAT"] ", REPLICATION_MSG, active_page_t_start, active_page_t_end, active_page_length, active_page[0]);
+        }
     }
 
     //fetch the closests page(s) from dbengine for the GAP time interval - can be - 0,1,2+
@@ -1311,7 +1318,8 @@ int overlap_pages_new_gap(REPLICATION_STATE *rep_state)
         if ((page_at_start == page_at_end)) {
             info("%s: GAP is overlapping at ONE dbengine page", REPLICATION_MSG);
             info("%s: AT_START: dbengine/gap start: %llu / %llu, end: %llu / %llu", REPLICATION_MSG, descr_at_start->start_time/USEC_PER_SEC, t_delta_start/USEC_PER_SEC, descr_at_start->end_time/USEC_PER_SEC, t_delta_end/USEC_PER_SEC);
-            info("%s: AT_END: dbengine/gap start: %llu / %llu, end: %llu / %llu", REPLICATION_MSG, descr_at_end->start_time/USEC_PER_SEC, t_delta_start/USEC_PER_SEC, descr_at_end->end_time/USEC_PER_SEC, t_delta_end/USEC_PER_SEC);             
+            info("%s: AT_END: dbengine/gap start: %llu / %llu, end: %llu / %llu", REPLICATION_MSG, descr_at_end->start_time/USEC_PER_SEC, t_delta_start/USEC_PER_SEC, descr_at_end->end_time/USEC_PER_SEC, t_delta_end/USEC_PER_SEC);     
+            rrdeng_store_past_metrics_realtime(rd, rep_state->dim_past_data);
             //if it does merge two pages. GAPs sample should replace zero samples.
             //confirm that everything looks good
             //commit
