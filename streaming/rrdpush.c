@@ -460,7 +460,7 @@ int connect_to_one_of_destinations(
 
 struct rrdpush_destinations *destinations_init(const char *dests) {
     const char *s = dests;
-    struct rrdpush_destinations *destinations = NULL;
+    struct rrdpush_destinations *destinations = NULL, *prev = NULL;
     while(*s) {
         const char *e = s;
 
@@ -479,17 +479,19 @@ struct rrdpush_destinations *destinations_init(const char *dests) {
 
         char buf[e - s + 1];
         strncpyz(buf, s, e - s);
-        struct rrdpush_destinations *destination = callocz(1, sizeof(struct rrdpush_destinations));
-        strcpy(destination->destination, buf);
-        destination->next = NULL;
-        destination->disabled_no_proper_reply = 0;
-        destination->disabled_because_of_localhost = 0;
-        destination->disabled_already_streaming = 0;
-        destination->disabled_because_of_denied_access = 0;
-        if (destinations) {
-            destination->next = destinations;
+        struct rrdpush_destinations *d = callocz(1, sizeof(struct rrdpush_destinations));
+        strncpyz(d->destination, buf, sizeof(d->destination)-1);
+        d->disabled_no_proper_reply = 0;
+        d->disabled_because_of_localhost = 0;
+        d->disabled_already_streaming = 0;
+        d->disabled_because_of_denied_access = 0;
+        d->next = NULL;
+        if (!destinations) {
+            destinations = d;
+        } else {
+            prev->next = d;
         }
-        destinations = destination;
+        prev = d;
 
         s = e;
     }
