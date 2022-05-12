@@ -14,8 +14,11 @@ fetch "ioping-${version}" "https://github.com/koct9i/ioping/archive/v${version}.
 
 export CFLAGS="-static -pipe"
 
-run make clean
-run make -j "$(nproc)"
+if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+    run make clean
+    run make -j "$(nproc)"
+fi
+
 run mkdir -p "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/
 run install -o root -g root -m 4750 ioping "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/
 

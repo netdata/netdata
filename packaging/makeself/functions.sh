@@ -40,6 +40,7 @@ fetch() {
   if [ -d "${cache}/${dir}" ]; then
     echo "Found cached copy of build directory for ${key}, using it."
     cp -a "${cache}/${dir}" "${NETDATA_MAKESELF_PATH}/tmp/"
+    CACHE_HIT=1
   else
     echo "No cached copy of build directory for ${key} found, fetching sources instead."
 
@@ -62,6 +63,8 @@ fetch() {
     cd "${NETDATA_MAKESELF_PATH}/tmp"
     run tar -zxpf "${tar}"
     cd -
+
+    CACHE_HIT=0
   fi
 
   run cd "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
@@ -73,13 +76,15 @@ store_cache() {
 
     cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
 
-    if [ -d "${cache}" ]; then
-        rm -rf "${cache}"
+    if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+        if [ -d "${cache}" ]; then
+            rm -rf "${cache}"
+        fi
+
+        mkdir -p "${cache}"
+
+        cp -a "${src}" "${cache}"
     fi
-
-    mkdir -p "${cache}"
-
-    cp -a "${src}" "${cache}"
 }
 
 # -----------------------------------------------------------------------------

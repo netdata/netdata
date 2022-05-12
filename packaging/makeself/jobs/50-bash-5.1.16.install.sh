@@ -15,25 +15,27 @@ fetch "bash-${version}" "http://ftp.gnu.org/gnu/bash/bash-${version}.tar.gz" \
 export CFLAGS="-pipe"
 export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 
-run ./configure \
-  --prefix="${NETDATA_INSTALL_PATH}" \
-  --without-bash-malloc \
-  --enable-static-link \
-  --enable-net-redirections \
-  --enable-array-variables \
-  --disable-progcomp \
-  --disable-profiling \
-  --disable-nls \
-  --disable-dependency-tracking
+if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+    run ./configure \
+        --prefix="${NETDATA_INSTALL_PATH}" \
+        --without-bash-malloc \
+        --enable-static-link \
+        --enable-net-redirections \
+        --enable-array-variables \
+        --disable-progcomp \
+        --disable-profiling \
+        --disable-nls \
+        --disable-dependency-tracking
 
-run make clean
-run make -j "$(nproc)"
+    run make clean
+    run make -j "$(nproc)"
 
-cat > examples/loadables/Makefile << EOF
-all:
-clean:
-install:
-EOF
+    cat > examples/loadables/Makefile <<-EOF
+	all:
+	clean:
+	install:
+	EOF
+fi
 
 run make install
 

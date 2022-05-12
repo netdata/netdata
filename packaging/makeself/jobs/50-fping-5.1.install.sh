@@ -16,20 +16,23 @@ export CFLAGS="-static -I/openssl-static/include -pipe"
 export LDFLAGS="-static -L/openssl-static/lib"
 export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 
-run ./configure \
-  --prefix="${NETDATA_INSTALL_PATH}" \
-  --enable-ipv4 \
-  --enable-ipv6 \
-  --disable-dependency-tracking
+if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+    run ./configure \
+        --prefix="${NETDATA_INSTALL_PATH}" \
+        --enable-ipv4 \
+        --enable-ipv6 \
+        --disable-dependency-tracking
 
-cat > doc/Makefile << EOF
-all:
-clean:
-install:
-EOF
+    cat > doc/Makefile <<-EOF
+	all:
+	clean:
+	install:
+	EOF
 
-run make clean
-run make -j "$(nproc)"
+    run make clean
+    run make -j "$(nproc)"
+fi
+
 run make install
 
 store_cache fping "${NETDATA_MAKESELF_PATH}/tmp/fping-${version}"
