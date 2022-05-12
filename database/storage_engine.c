@@ -6,6 +6,12 @@
 #include "engine/rrdengineapi.h"
 #endif
 
+#define engine_ops_null { \
+    .create = NULL, \
+    .exit = NULL, \
+    .destroy = NULL \
+}
+
 #define im_collect_ops { \
     .init = rrddim_collect_init,\
     .store_metric = rrddim_collect_store_metric,\
@@ -26,47 +32,62 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_NONE,
         .name = RRD_MEMORY_MODE_NONE_NAME,
         .api = {
+            .engine_ops = engine_ops_null,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
-        }
+        },
+        .context = NULL
     },
     {
         .id = RRD_MEMORY_MODE_RAM,
         .name = RRD_MEMORY_MODE_RAM_NAME,
         .api = {
+            .engine_ops = engine_ops_null,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
-        }
+        },
+        .context = NULL
     },
     {
         .id = RRD_MEMORY_MODE_MAP,
         .name = RRD_MEMORY_MODE_MAP_NAME,
         .api = {
+            .engine_ops = engine_ops_null,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
-        }
+        },
+        .context = NULL
     },
     {
         .id = RRD_MEMORY_MODE_SAVE,
         .name = RRD_MEMORY_MODE_SAVE_NAME,
         .api = {
+            .engine_ops = engine_ops_null,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
-        }
+        },
+        .context = NULL
     },
     {
         .id = RRD_MEMORY_MODE_ALLOC,
         .name = RRD_MEMORY_MODE_ALLOC_NAME,
         .api = {
+            .engine_ops = engine_ops_null,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
-        }
+        },
+        .context = NULL
     },
 #ifdef ENABLE_DBENGINE
     {
         .id = RRD_MEMORY_MODE_DBENGINE,
         .name = RRD_MEMORY_MODE_DBENGINE_NAME,
         .api = {
+            .engine_ops = {
+                .create = rrdeng_init,
+                .exit = rrdeng_prepare_exit,
+                .destroy = rrdeng_exit
+            },
             .collect_ops = {
                 .init = rrdeng_store_metric_init,
                 .store_metric = rrdeng_store_metric_next,
@@ -80,7 +101,8 @@ static STORAGE_ENGINE engines[] = {
                 .latest_time = rrdeng_metric_latest_time,
                 .oldest_time = rrdeng_metric_oldest_time
             }
-        }
+        },
+        .context = NULL
     },
 #endif
     { .id = RRD_MEMORY_MODE_NONE, .name = NULL }
@@ -117,4 +139,27 @@ STORAGE_ENGINE* storage_engine_foreach_next(STORAGE_ENGINE* it)
 
     it++;
     return it->name ? it : NULL;
+}
+
+STORAGE_ENGINE_INSTANCE* storage_engine_new(STORAGE_ENGINE* eng, RRDHOST *host)
+{
+    STORAGE_ENGINE_INSTANCE* instance = host->rrdeng_ctx;
+    if (!instance && eng) {
+        if (eng->api.engine_ops.create) {
+            instance = eng->api.engine_ops.create(eng, host);
+        }
+        if (instance) {
+            instance->engine = eng;
+        }
+    }
+    return instance;
+}
+
+void storage_engine_delete(STORAGE_ENGINE_INSTANCE* instance) {
+    if (instance) {
+        STORAGE_ENGINE* eng = instance->engine;
+        if (eng && eng->api.engine_ops.destroy) {
+            eng->api.engine_ops.destroy(instance);
+        }
+    }
 }

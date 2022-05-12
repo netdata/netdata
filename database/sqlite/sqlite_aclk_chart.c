@@ -2,6 +2,9 @@
 
 #include "sqlite_functions.h"
 #include "sqlite_aclk_chart.h"
+#ifdef ENABLE_DBENGINE
+#include "../engine/rrdengineapi.h"
+#endif
 
 #ifdef ENABLE_ACLK
 #include "../../aclk/aclk_charts_api.h"

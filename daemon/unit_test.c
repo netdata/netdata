@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengineapi.h"
+#endif
 
 static int check_number_printing(void) {
     struct {
@@ -1166,7 +1169,7 @@ int run_test(struct test *test)
     RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1
                                          , test->update_every, RRDSET_TYPE_LINE);
     RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
-    
+
     RRDDIM *rd2 = NULL;
     if(test->feed2)
         rd2 = rrddim_add(st, "dim2", NULL, test->multiplier, test->divisor, test->algorithm);

@@ -4,6 +4,9 @@
 #include "web/api/formatters/rrd2json.h"
 #include "rrdr.h"
 #include "database/ram/rrddim_mem.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengine.h"
+#endif
 
 #include "average/average.h"
 #include "countif/countif.h"
