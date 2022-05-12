@@ -233,7 +233,7 @@ int do_ipfw(int update_every, usec_t dt) {
                     break;
 
                 if (likely(do_static)) {
-                    sprintf(rule_num_str, "%d_%d", rule->rulenum, rule->id);
+                    sprintf(rule_num_str, "%"PRIu32"_%d", (uint32_t)rule->rulenum, rule->id);
 
                     rd_packets = rrddim_find_active(st_packets, rule_num_str);
                     if (unlikely(!rd_packets))

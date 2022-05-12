@@ -972,8 +972,14 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 
 int do_system_ram(int update_every, usec_t dt) {
     (void)dt;
-    static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
-               mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
+    static int mib_active_count[4] = {0, 0, 0, 0},
+               mib_inactive_count[4] = {0, 0, 0, 0},
+               mib_wire_count[4] = {0, 0, 0, 0},
+#if __FreeBSD_version < 1200016
+               mib_cache_count[4] = {0, 0, 0, 0},
+#endif
+               mib_vfs_bufspace[2] = {0, 0},
+               mib_free_count[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
     size_t vfs_bufspace_count;
 
