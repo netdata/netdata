@@ -373,9 +373,8 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 {
     ml_delete_dimension(rd);
 
-#ifndef ENABLE_ACLK
     UNUSED(db_rotated);
-#endif
+    
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {

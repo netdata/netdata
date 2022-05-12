@@ -268,7 +268,7 @@ inline int parser_action(PARSER *parser, char *input)
 
     uint32_t command_hash = simple_hash(command);
 
-    size_t worker_job_id;
+    size_t worker_job_id = 0;
     while(tmp_keyword) {
         if (command_hash == tmp_keyword->keyword_hash &&
                 (!strcmp(command, tmp_keyword->keyword))) {
