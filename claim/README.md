@@ -494,9 +494,10 @@ You will still be able to see this node in your War Rooms in an **unreachable** 
 
 If you want to reconnect this node, you need to:
 1. Ensure that the `/var/lib/netdata/cloud.d` directory doesn't exist.
-2. Ensure that the `uuidgen-runtime` package is installed. Run ```echo "$(uuidgen)"``` and validate you get back a UUID.
-3. Copy the kickstart.sh command to add a node from your space and add to the end of it `--claim-id "$(uuidgen)"` 
-4. Restart the agent
+2. Stop the agent.
+3. Ensure that the `uuidgen-runtime` package is installed. Run ```echo "$(uuidgen)"``` and validate you get back a UUID.
+4. Copy the kickstart.sh command to add a node from your space and add to the end of it `--claim-id "$(uuidgen)"`. Run the command and look for the message `Node was successfully claimed.`
+5. Start the agent
 
 
 ## Connecting reference
