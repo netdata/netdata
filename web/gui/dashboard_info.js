@@ -1309,29 +1309,61 @@ netdataDashboard.context = {
         height: 0.7
     },
 
-    'system.cpu_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
-            'identifies and quantifies the disruptions caused by resource contentions. ' +
-            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on CPU. ' +
-            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    'system.cpu_some_pressure': {
+        info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
+            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on CPU. ' +
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'system.cpu_some_pressure_stall_time': {
+        info: 'The amount of time some processes have been waiting for CPU time.'
+    },
+    'system.cpu_full_pressure': {
+        info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
+            '<b>Full</b> indicates the share of time in which <b>all non-idle tasks</b> are stalled on CPU resource simultaneously. ' +
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'system.cpu_full_pressure_stall_time': {
+        info: 'The amount of time all non-idle processes have been stalled due to CPU congestion.'
     },
 
     'system.memory_some_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
-            'identifies and quantifies the disruptions caused by resource contentions. ' +
-            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on memory. ' +
-            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on memory simultaneously. ' +
-            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
-            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
+            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on memory. ' +
+            'In this state the CPU is still doing productive work. '+
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'system.memory_some_pressure_stall_time': {
+        info: 'The amount of time some processes have been waiting due to memory congestion.'
+    },
+    'system.memory_full_pressure': {
+        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
+            '<b>Full</b> indicates the share of time in which <b>all non-idle tasks</b> are stalled on memory resource simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. '+
+            'This has severe impact on performance. '+
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'system.memory_full_pressure_stall_time': {
+        info: 'The amount of time all non-idle processes have been stalled due to memory congestion.'
     },
 
     'system.io_some_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
-            'identifies and quantifies the disruptions caused by resource contentions. ' +
-            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on I/O. ' +
-            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on I/O simultaneously. ' +
-            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
-            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
+            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on I/O. ' +
+            'In this state the CPU is still doing productive work. '+
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'system.io_some_pressure_stall_time': {
+        info: 'The amount of time some processes have been waiting due to I/O congestion.'
+    },
+    'system.io_full_pressure': {
+        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
+            '<b>Full</b> line indicates the share of time in which <b>all non-idle tasks</b> are stalled on I/O resource simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. '+
+            'This has severe impact on performance. '+
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'system.io_full_pressure_stall_time': {
+        info: 'The amount of time all non-idle processes have been stalled due to I/O congestion.'
     },
 
     'system.io': {
@@ -4037,10 +4069,22 @@ netdataDashboard.context = {
         info: 'Total CPU utilization per core within the system-wide CPU resources.'
     },
 
-    'cgroup.cpu_pressure': {
+    'cgroup.cpu_some_pressure': {
         info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
-        '<b>Some</b> indicates the share of time in which at least some tasks are stalled on CPU. '+
-        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on CPU. ' +
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'cgroup.cpu_some_pressure_stall_time': {
+        info: 'The amount of time some processes have been waiting for CPU time.'
+    },
+
+    'cgroup.cpu_full_pressure': {
+        info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
+            '<b>Full</b> indicates the share of time in which <b>all non-idle tasks</b> are stalled on CPU resource simultaneously. ' +
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'cgroup.cpu_full_pressure_stall_time': {
+        info: 'The amount of time all non-idle processes have been stalled due to CPU congestion.'
     },
 
     'cgroup.mem_utilization': {
@@ -4126,18 +4170,25 @@ netdataDashboard.context = {
         '<b>Swap</b> - major page faults.</p>'
     },
 
-    'cgroup.memory_pressure': {
+    'cgroup.memory_some_pressure': {
         info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
-        '<b>Some</b> indicates the share of time in which at least some tasks are stalled on memory. '+
-        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on memory. ' +
+            'In this state the CPU is still doing productive work. '+
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'cgroup.memory_some_pressure_stall_time': {
+        info: 'The amount of time some processes have been waiting due to memory congestion.'
     },
 
     'cgroup.memory_full_pressure': {
-        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
-        '<b>Full</b> indicates the share of time in which all non-idle tasks are stalled on memory simultaneously. '+
-        'In this state actual CPU cycles are going to waste, '+
-        'and a workload that spends extended time in this state is considered to be thrashing. '+
-        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
+            '<b>Full</b> indicates the share of time in which <b>all non-idle tasks</b> are stalled on memory resource simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. '+
+            'This has severe impact on performance. '+
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'cgroup.memory_full_pressure_stall_time': {
+        info: 'The amount of time all non-idle processes have been stalled due to memory congestion.'
     },
 
     'cgroup.io': {
@@ -4197,18 +4248,25 @@ netdataDashboard.context = {
         info: 'The number of I/O operations performed on specific devices as seen by the throttling policy.'
     },
 
-    'cgroup.io_pressure': {
+    'cgroup.io_some_pressure': {
         info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
-        '<b>Some</b> indicates the share of time in which at least some tasks are stalled on I/O. '+
-        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on I/O. ' +
+            'In this state the CPU is still doing productive work. '+
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'cgroup.io_some_pressure_stall_time': {
+        info: 'The amount of time some processes have been waiting due to I/O congestion.'
     },
 
     'cgroup.io_full_pressure': {
-        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
-        '<b>Full</b> indicates the share of time in which all non-idle tasks are stalled on I/O simultaneously. '+
-        'In this state actual CPU cycles are going to waste, '+
-        'and a workload that spends extended time in this state is considered to be thrashing. '+
-        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
+            '<b>Full</b> line indicates the share of time in which <b>all non-idle tasks</b> are stalled on I/O resource simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. '+
+            'This has severe impact on performance. '+
+            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+    'cgroup.io_full_pressure_stall_time': {
+        info: 'The amount of time all non-idle processes have been stalled due to I/O congestion.'
     },
 
     'cgroup.swap_read': {

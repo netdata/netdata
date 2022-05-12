@@ -1397,14 +1397,17 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
             return;
         }
 
-        res->some.value10 = strtod(procfile_lineword(ff, 0, 2), NULL);
-        res->some.value60 = strtod(procfile_lineword(ff, 0, 4), NULL);
-        res->some.value300 = strtod(procfile_lineword(ff, 0, 6), NULL);
+    
+        res->some.share_time.value10 = strtod(procfile_lineword(ff, 0, 2), NULL);
+        res->some.share_time.value60 = strtod(procfile_lineword(ff, 0, 4), NULL);
+        res->some.share_time.value300 = strtod(procfile_lineword(ff, 0, 6), NULL);
+        res->some.total_time.value_total = str2ull(procfile_lineword(ff, 0, 8)) / 1000; // us->ms
 
         if (lines > 2) {
-            res->full.value10 = strtod(procfile_lineword(ff, 1, 2), NULL);
-            res->full.value60 = strtod(procfile_lineword(ff, 1, 4), NULL);
-            res->full.value300 = strtod(procfile_lineword(ff, 1, 6), NULL);
+            res->full.share_time.value10 = strtod(procfile_lineword(ff, 1, 2), NULL);
+            res->full.share_time.value60 = strtod(procfile_lineword(ff, 1, 4), NULL);
+            res->full.share_time.value300 = strtod(procfile_lineword(ff, 1, 6), NULL);
+            res->full.total_time.value_total = str2ull(procfile_lineword(ff, 0, 8)) / 1000; // us->ms
         }
 
         res->updated = 1;
@@ -1740,8 +1743,10 @@ char *k8s_parse_resolved_name(struct label **labels, char *data) {
 }
 
 static inline void free_pressure(struct pressure *res) {
-    if (res->some.st)   rrdset_is_obsolete(res->some.st);
-    if (res->full.st)   rrdset_is_obsolete(res->full.st);
+    if (res->some.share_time.st)   rrdset_is_obsolete(res->some.share_time.st);
+    if (res->some.total_time.st)   rrdset_is_obsolete(res->some.total_time.st);
+    if (res->full.share_time.st)   rrdset_is_obsolete(res->full.share_time.st);
+    if (res->full.total_time.st)   rrdset_is_obsolete(res->full.total_time.st);
     freez(res->filename);
 }
 
@@ -4505,17 +4510,20 @@ void update_cgroup_charts(int update_every) {
 
         if (cg->options & CGROUP_OPTIONS_IS_UNIFIED) {
             struct pressure *res = &cg->cpu_pressure;
-            if (likely(res->updated && res->some.enabled)) {
-                if (unlikely(!res->some.st)) {
-                    RRDSET *chart;
-                    snprintfz(title, CHART_TITLE_MAX, "CPU pressure");
 
-                    chart = res->some.st = rrdset_create_localhost(
+            if (likely(res->updated && res->some.enabled)) {
+                struct pressure_charts *pcs;
+                pcs = &res->some;
+
+                if (unlikely(!pcs->share_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "CPU some pressure");
+                    chart = pcs->share_time.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
-                        , "cpu_pressure"
+                        , "cpu_some_pressure"
                         , NULL
                         , "cpu"
-                        , "cgroup.cpu_pressure"
+                        , "cgroup.cpu_some_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4524,31 +4532,105 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    
-                    rrdset_update_labels(chart = res->some.st, cg->chart_labels);
-
-                    res->some.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->some.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->some.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    pcs->share_time.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 } else {
-                    rrdset_next(res->some.st);
+                    rrdset_next(pcs->share_time.st);
                 }
+                if (unlikely(!pcs->total_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "CPU some pressure stall time");
+                    chart = pcs->total_time.st = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "cpu_some_pressure_stall_time"
+                        , NULL
+                        , "cpu"
+                        , "cgroup.cpu_some_pressure_stall_time"
+                        , title
+                        , "ms"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 2220
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else {
+                    rrdset_next(pcs->total_time.st);
+                }
+                update_pressure_charts(pcs);
+            }
+            if (likely(res->updated && res->full.enabled)) {
+                struct pressure_charts *pcs;
+                pcs = &res->full;
 
-                update_pressure_chart(&res->some);
+                if (unlikely(!pcs->share_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "CPU full pressure");
+                    chart = pcs->share_time.st = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "cpu_full_pressure"
+                        , NULL
+                        , "cpu"
+                        , "cgroup.cpu_full_pressure"
+                        , title
+                        , "percentage"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 2240
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    pcs->share_time.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                } else {
+                    rrdset_next(pcs->share_time.st);
+                }
+                if (unlikely(!pcs->total_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "CPU full pressure stall time");
+                    chart = pcs->total_time.st = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "cpu_full_pressure_stall_time"
+                        , NULL
+                        , "cpu"
+                        , "cgroup.cpu_full_pressure_stall_time"
+                        , title
+                        , "ms"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 2260
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else {
+                    rrdset_next(pcs->total_time.st);
+                }
+                update_pressure_charts(pcs);
             }
 
             res = &cg->memory_pressure;
-            if (likely(res->updated && res->some.enabled)) {
-                if (unlikely(!res->some.st)) {
-                    RRDSET *chart;
-                    snprintfz(title, CHART_TITLE_MAX, "Memory pressure");
 
-                    chart = res->some.st = rrdset_create_localhost(
+            if (likely(res->updated && res->some.enabled)) {
+                struct pressure_charts *pcs;
+                pcs = &res->some;
+
+                if (unlikely(!pcs->share_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "Memory some pressure");
+                    chart = pcs->share_time.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
-                        , "mem_pressure"
+                        , "mem_some_pressure"
                         , NULL
                         , "mem"
-                        , "cgroup.memory_pressure"
+                        , "cgroup.memory_some_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4556,26 +4638,48 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 2300
                         , update_every
                         , RRDSET_TYPE_LINE
-                        );
-                        
-                    rrdset_update_labels(chart = res->some.st, cg->chart_labels);
-
-                    res->some.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->some.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->some.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                        );         
+                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    pcs->share_time.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 } else {
-                    rrdset_next(res->some.st);
+                    rrdset_next(pcs->share_time.st);
                 }
-
-                update_pressure_chart(&res->some);
+                if (unlikely(!pcs->total_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "Memory some pressure stall time");
+                    chart = pcs->total_time.st = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "memory_some_pressure_stall_time"
+                        , NULL
+                        , "mem"
+                        , "cgroup.memory_some_pressure_stall_time"
+                        , title
+                        , "ms"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 2320
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else {
+                    rrdset_next(pcs->total_time.st);
+                }
+                update_pressure_charts(pcs);
             }
 
             if (likely(res->updated && res->full.enabled)) {
-                if (unlikely(!res->full.st)) {
+                struct pressure_charts *pcs;
+                pcs = &res->full;
+
+                if (unlikely(!pcs->share_time.st)) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "Memory full pressure");
 
-                    chart = res->full.st = rrdset_create_localhost(
+                    chart = pcs->share_time.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "mem_full_pressure"
                         , NULL
@@ -4585,35 +4689,58 @@ void update_cgroup_charts(int update_every) {
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , cgroup_containers_chart_priority + 2350
+                        , cgroup_containers_chart_priority + 2340
                         , update_every
                         , RRDSET_TYPE_LINE
                         );
                         
-                    rrdset_update_labels(chart = res->full.st, cg->chart_labels);
-
-                    res->full.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->full.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->full.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    pcs->share_time.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 } else {
-                    rrdset_next(res->full.st);
+                    rrdset_next(pcs->share_time.st);
                 }
-
-                update_pressure_chart(&res->full);
+                if (unlikely(!pcs->total_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "Memory full pressure stall time");
+                    chart = pcs->total_time.st = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "memory_full_pressure_stall_time"
+                        , NULL
+                        , "mem"
+                        , "cgroup.memory_full_pressure_stall_time"
+                        , title
+                        , "ms"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 2360
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else {
+                    rrdset_next(pcs->total_time.st);
+                }
+                update_pressure_charts(pcs);
             }
 
             res = &cg->io_pressure;
-            if (likely(res->updated && res->some.enabled)) {
-                if (unlikely(!res->some.st)) {
-                    RRDSET *chart;
-                    snprintfz(title, CHART_TITLE_MAX, "I/O pressure");
 
-                    chart = res->some.st = rrdset_create_localhost(
+            if (likely(res->updated && res->some.enabled)) {
+                struct pressure_charts *pcs;
+                pcs = &res->some;
+
+                if (unlikely(!pcs->share_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "I/O some pressure");
+                    chart = pcs->share_time.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
-                        , "io_pressure"
+                        , "io_some_pressure"
                         , NULL
                         , "disk"
-                        , "cgroup.io_pressure"
+                        , "cgroup.io_some_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4622,25 +4749,46 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                         );
-                        
-                    rrdset_update_labels(chart = res->some.st, cg->chart_labels);
-
-                    res->some.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->some.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->some.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    pcs->share_time.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 } else {
-                    rrdset_next(res->some.st);
+                    rrdset_next(pcs->share_time.st);
                 }
-
-                update_pressure_chart(&res->some);
+                if (unlikely(!pcs->total_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "I/O some pressure stall time");
+                    chart = pcs->total_time.st = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "io_some_pressure_stall_time"
+                        , NULL
+                        , "disk"
+                        , "cgroup.io_some_pressure_stall_time"
+                        , title
+                        , "ms"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 2420
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else {
+                    rrdset_next(pcs->total_time.st);
+                }
+                update_pressure_charts(pcs);
             }
 
             if (likely(res->updated && res->full.enabled)) {
-                if (unlikely(!res->full.st)) {
+                struct pressure_charts *pcs;
+                pcs = &res->full;
+
+                if (unlikely(!pcs->share_time.st)) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "I/O full pressure");
-
-                    chart = res->full.st = rrdset_create_localhost(
+                    chart = pcs->share_time.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "io_full_pressure"
                         , NULL
@@ -4650,21 +4798,40 @@ void update_cgroup_charts(int update_every) {
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , cgroup_containers_chart_priority + 2450
+                        , cgroup_containers_chart_priority + 2440
                         , update_every
                         , RRDSET_TYPE_LINE
                         );
-                        
-                    rrdset_update_labels(chart = res->full.st, cg->chart_labels);
-
-                    res->full.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->full.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                    res->full.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    pcs->share_time.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 } else {
-                    rrdset_next(res->full.st);
+                    rrdset_next(pcs->share_time.st);
                 }
-
-                update_pressure_chart(&res->full);
+                if (unlikely(!pcs->total_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "I/O full pressure stall time");
+                    chart = pcs->total_time.st = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "io_full_pressure_stall_time"
+                        , NULL
+                        , "disk"
+                        , "cgroup.io_full_pressure_stall_time"
+                        , title
+                        , "ms"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 2460
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else {
+                    rrdset_next(pcs->total_time.st);
+                }
+                update_pressure_charts(pcs);
             }
         }
     }
