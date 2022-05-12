@@ -467,8 +467,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
         error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the parent/proxy machine GUID to a child, or is this an inter-agent loop?", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->machine_guid);
-        char initial_response[HTTP_HEADER_SIZE];
-        sprintf(initial_response, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
+        char initial_response[HTTP_HEADER_SIZE + 1];
+        snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
 #ifdef ENABLE_HTTPS
         rpt->host->stream_ssl.conn = rpt->ssl.conn;
         rpt->host->stream_ssl.flags = rpt->ssl.flags;
