@@ -177,7 +177,14 @@ extern void rrdpush_sender_thread_stop(RRDHOST *host);
 
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
-extern int connect_to_one_of_destinations(struct rrdpush_destinations *destinations, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size, struct rrdpush_destinations **destination);
+extern int connect_to_one_of_destinations(
+    struct rrdpush_destinations *destinations,
+    int default_port,
+    struct timeval *timeout,
+    size_t *reconnects_counter,
+    char *connected_to,
+    size_t connected_to_size,
+    struct rrdpush_destinations **destination);
 
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
