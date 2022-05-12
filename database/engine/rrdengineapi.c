@@ -1167,3 +1167,121 @@ void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, RE
     uv_rwlock_wrunlock(&page_index->lock);    
     debug(D_REPLICATION, "%s Finalize operation -  Dimension \"%s\".\"%s\" metrics page completed.", REPLICATION_MSG, rd->rrdset->id, rd->id);
 }
+
+void modify_dim_past_data(RRDDIM_PAST_DATA *dim_past_data, usec_t start_time, usec_t end_time) 
+{
+    uint64_t start, end, new_start, new_end, new_entries;
+    start = dim_past_data->start_time / USEC_PER_SEC; //gap time start
+    end = dim_past_data->end_time / USEC_PER_SEC;     //gap time end
+    new_start = start_time / USEC_PER_SEC;
+    new_end = end_time / USEC_PER_SEC;
+    new_entries = (uint64_t)(new_end - new_start) / dim_past_data->rd->update_every + 1;
+
+    dim_past_data->page_length = new_entries * sizeof(storage_number);
+    if(new_start != start)
+        dim_past_data->page = &dim_past_data->page[((new_start - start) / dim_past_data->rd->update_every) * sizeof(storage_number)];
+    dim_past_data->start_time = new_start * USEC_PER_SEC;
+    dim_past_data->end_time = new_end * USEC_PER_SEC;
+
+    info(
+        "%s: Divided page %p - [%lu, %lu, %lu, %lu, %lu, %lu]",
+        REPLICATION_MSG,
+        dim_past_data->page,
+        dim_past_data->start_time,
+        dim_past_data->end_time,
+        start,
+        end,
+        dim_past_data->page_length,
+        ((new_start - start) / dim_past_data->rd->update_every) * sizeof(storage_number));
+}
+
+// It saves the GAP past metrics in the active page in real-time
+int rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_data)
+{
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->state->handle;
+    struct rrdeng_page_descr *descr;
+    storage_number *page, *page_gap;
+    int return_value = 0;
+
+    descr = handle->descr;
+    if(!descr || !descr->pg_cache_descr) {
+        infoerr("%s: No active descr or page for dimension %s.%s", REPLICATION_MSG, rd->rrdset->id, rd->id);
+        return 1;
+    }
+    
+    page = (storage_number *)descr->pg_cache_descr->page;
+    page_gap = (storage_number *)dim_past_data->page;
+
+    uint64_t start, end, page_start, page_end;
+    start = dim_past_data->start_time / USEC_PER_SEC; //gap time start
+    end = dim_past_data->end_time / USEC_PER_SEC;     //gap time end
+    page_start = descr->start_time / USEC_PER_SEC;    //active page time start
+    page_end = descr->end_time / USEC_PER_SEC;        //active page time start
+
+    if (!page || !page_gap || start > end) {
+        info(
+            "%s: Active page %p - [%lu, %lu] and GAP page %p - [%lu, %lu] problems",
+            REPLICATION_MSG,
+            page,
+            page_start,
+            page_end,
+            page_gap,
+            start,
+            end);
+        return 0;
+    }
+
+    if(page_end < end)
+        modify_dim_past_data(dim_past_data, start * USEC_PER_SEC, (page_end) * USEC_PER_SEC);
+
+    uint64_t entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
+    uint64_t entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
+    // uint64_t ue_page = (entries_page > 0) ? (((uint64_t)(page_end - page_start)) / entries_page) : 0;
+    // info("%s: ue_page = %lu - up_page++= %lu - dimension ue = %d", REPLICATION_MSG, ue_page, ue_page++, rd->update_every);
+    uint64_t ue_page = rd->update_every;
+    uint64_t gap_start_offset = 0;
+    uint64_t page_start_offset = 0;
+
+    if (!ue_page) {
+        info(
+            "%s: Active page %p - [%lu, %lu] has no samples(%lu) for %s.%s",
+            REPLICATION_MSG,
+            page,
+            page_start,
+            page_end,
+            entries_page,
+            rd->rrdset->id,
+            rd->id);
+        return 0;
+    }
+
+    if(end < page_start){
+        return 1;
+    }
+
+    if (page_start > start) {
+        gap_start_offset = (uint64_t)(page_start - start) / ue_page - 1;
+        return_value = 1;
+    }
+    if (page_start < start) {
+        return_value = 0;
+        page_start_offset = (uint64_t)(start - page_start) / ue_page - 1;
+    }
+    if (page_start == start) {
+        return_value = 0;
+        page_start_offset = 0;
+    }
+
+    info("%s: Just before memcpy", REPLICATION_MSG);
+    void *dest = (void *)(page + page_start_offset);
+    void *src = (void *)(page_gap + gap_start_offset);
+    size_t size = ((entries_gap - gap_start_offset) * sizeof(storage_number));
+    info("page[%lu]=%p, page_gap[%lu]=%p, size: %lu", page_start_offset, dest, gap_start_offset, src, size);
+    memcpy(dest, src, size);
+    info("%s: Successfully updated the active page for %s.%s", REPLICATION_MSG, rd->rrdset->id, rd->id);
+
+    if(return_value)
+        modify_dim_past_data(dim_past_data, start * USEC_PER_SEC, (page_start - 1) * USEC_PER_SEC);
+
+    return return_value;
+}

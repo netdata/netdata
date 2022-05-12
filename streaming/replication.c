@@ -757,7 +757,8 @@ void send_gap_for_replication(RRDHOST *host, REPLICATION_STATE *rep_state)
     GAP *the_gap = (GAP *)host->gaps_timeline->gaps->front->item;
     //  Assign the timestamp of first metric comes from streaming to avoid
     // missing metrics between the disconnection and start of the streaming
-    the_gap->t_window.t_end = rep_state->host->receiver->first_msg_t;
+    // the_gap->t_window.t_end = rep_state->host->receiver->first_msg_t - 1;
+    the_gap->t_window.t_end = rep_state->host->receiver->first_msg_t - 1;
     char *rep_msg_cmd;
     size_t len;
     replication_gap_to_str(the_gap, &rep_msg_cmd, &len);
@@ -1180,20 +1181,22 @@ void replication_collect_past_metric_done(REPLICATION_STATE *rep_state) {
 }
 
 void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
-#ifdef  ENABLE_DBENGINE
-    if(rrdeng_store_past_metrics_page_init(dim_past_data, rep_state)){
-        infoerr("%s: Cannot initialize db engine page: Flushing collected past data skipped!", REPLICATION_MSG);
-        return;
+#ifdef ENABLE_DBENGINE
+    if(rrdeng_store_past_metrics_realtime(dim_past_data->rd, dim_past_data)){    
+        if(rrdeng_store_past_metrics_page_init(dim_past_data, rep_state)){
+            infoerr("%s: Cannot initialize db engine page: Flushing collected past data skipped!", REPLICATION_MSG);
+            return;
+        }
+        rrdeng_store_past_metrics_page(dim_past_data, rep_state);
+        rrdeng_flush_past_metrics_page(dim_past_data, rep_state);
+        rrdeng_store_past_metrics_page_finalize(dim_past_data, rep_state);
+        info("%s: Flushed Collected Past Metric %s.%s", REPLICATION_MSG, dim_past_data->rd->rrdset->id, dim_past_data->rd->id);
+        // print_collected_metric_past_data(dim_past_data, rep_state);
     }
-    rrdeng_store_past_metrics_page(dim_past_data, rep_state);
-    rrdeng_flush_past_metrics_page(dim_past_data, rep_state);
-    rrdeng_store_past_metrics_page_finalize(dim_past_data, rep_state);
-    info("%s: Flushed Collected Past Metric %s.%s", REPLICATION_MSG, dim_past_data->rd->rrdset->id, dim_past_data->rd->id);
-    // print_collected_metric_past_data(dim_past_data, rep_state);
 #else
     UNUSED(dim_past_data);
     infoerr("%s: Flushed Collected Past Metric is not supported for host %s. Replication Rx thread needs `dbengine` memory mode.", REPLICATION_MSG, rep_state->host->hostname);
-#endif    
+#endif
 }
 
 /****************************************
