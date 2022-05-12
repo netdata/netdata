@@ -397,9 +397,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
                 wc->alerts_batch_id);
         log_first_sequence_id = 0;
         log_last_sequence_id = 0;
-        __sync_synchronize();
         wc->pause_alert_updates = 1;
-        __sync_synchronize();
     }
 
     rc = sqlite3_finalize(res);
@@ -777,9 +775,7 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
 
     buffer_free(sql);
 
-    __sync_synchronize();
     wc->pause_alert_updates = 0;
-    __sync_synchronize();
 #endif
     return;
 }
