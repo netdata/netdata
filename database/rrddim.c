@@ -369,11 +369,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 // ----------------------------------------------------------------------------
 // RRDDIM remove / free a dimension
 
-void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
+void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
     ml_delete_dimension(rd);
-
-    UNUSED(db_rotated);
     
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 

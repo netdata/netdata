@@ -48,7 +48,7 @@ public:
     }
 
     virtual ~RrdDimension() {
-        rrddim_free_custom(AnomalyRateRD->rrdset, AnomalyRateRD, 0);
+        rrddim_free(AnomalyRateRD->rrdset, AnomalyRateRD);
     }
 
 private:
