@@ -26,8 +26,11 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ "$(uname -m)" = 'x86_64' ] && [ -z "
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes || exit 1
 fi
 
-if [ "${USE_EXISTING_DOCKER_IMAGE}" != 'yes' ] && docker inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
-    docker image rm "${DOCKER_IMAGE_NAME}" || exit 1
+if docker inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
+    img_platform="$(docker image inspect netdata/static-builder --format '{{.Os}}/{{.Architecture}}/{{.Variant}}')"
+    if [ "${img_platform%'/'}" != "${platform}" ]; then
+        docker image rm "${DOCKER_IMAGE_NAME}" || exit 1
+    fi
 fi
 
 if ! docker inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then

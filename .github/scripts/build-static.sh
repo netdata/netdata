@@ -22,7 +22,7 @@ prepare_build() {
 build_static() {
   progress "Building static ${BUILDARCH}"
   (
-    USER="" USE_EXISTING_DOCKER_IMAGE='yes' ./packaging/makeself/build-static.sh "${BUILDARCH}"
+    USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
   ) >&2
 }
 
