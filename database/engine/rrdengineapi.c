@@ -1166,12 +1166,108 @@ void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, RE
     debug(D_REPLICATION, "%s Finalize operation -  Dimension \"%s\".\"%s\" metrics page completed.", REPLICATION_MSG, rd->rrdset->id, rd->id);
 }
 
+// It saves the GAP past metrics in the active page in real-time
+void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_data)
+{
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->state->handle;
+    struct rrdeng_page_descr *descr;
+    storage_number *page, *page_gap;
+
+    descr = handle->descr;
+    page = (storage_number *)descr->pg_cache_descr->page;
+    page_gap = (storage_number *)dim_past_data->page;
+
+    time_t start, end, page_start, page_end;
+    start = dim_past_data->start_time / USEC_PER_SEC; //gap time start
+    end = dim_past_data->end_time / USEC_PER_SEC;     //gap time end
+    page_start = descr->start_time / USEC_PER_SEC;    //active page time start
+    page_end = descr->end_time / USEC_PER_SEC;        //active page time start
+
+    if (!page || !page_gap || start > end || start < page_start || page_end < end) {
+        info(
+            "%s: Active page %p - [%ld, %ld] and GAP page %p - [%ld, %ld] problems",
+            REPLICATION_MSG,
+            page,
+            page_start,
+            page_end,
+            page_gap,
+            start,
+            end);
+        return;
+    }
+
+    // size of the data in bytes
+    unsigned int entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
+    unsigned int entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
+    unsigned int ue_page = (page_end - page_start) / (entries_page - 1);
+    uint64_t gap_start_offset = 0;
+    uint64_t page_start_offset = 0;
+
+    if (!ue_page) {
+        info(
+            "%s: Active page %p - [%ld, %ld] has no samples for %s.%s",
+            REPLICATION_MSG,
+            page,
+            page_start,
+            page_end,
+            rd->rrdset->id,
+            rd->id);
+        return;
+    }
+
+    if (page_start > start) {
+        gap_start_offset = (uint64_t)(page_start - start) / ue_page;
+        //TODO: creating a page and fill it with the reset of the GAP
+    }
+    if (page_start <= start) {
+        page_start_offset = (uint64_t)(start - page_start) / ue_page;
+    }
+    info("%s: Just before memcpy", REPLICATION_MSG);
+    void *dest = (void *)(page + page_start_offset);
+    void *src = (void *)(page + gap_start_offset);
+    size_t size = ((entries_gap - gap_start_offset) * sizeof(storage_number));
+    info("page[%lu]=%p, page_gap[%lu]=%p, size: %lu", page_start_offset, dest, gap_start_offset, src, size);
+    memcpy(dest, src, size);
+    info("%s: Successfully updated the active page for %s.%s", REPLICATION_MSG, rd->rrdset->id, rd->id);
+}
+
+// Helper functions to be removed
+void print_collected_metric_active_data(RRDDIM_PAST_DATA *past_data, REPLICATION_STATE *rep_state){
+
+    RRDSET *st = rrdset_find_byname(rep_state->host, past_data->rrdset_id);
+    if(unlikely(!st)) {
+        error("Cannot find chart with name_id '%s' on host '%s'.", past_data->rrdset_id, rep_state->host->hostname);
+        return;
+    }
+    past_data->rd = rrddim_find(st, past_data->rrddim_id);
+    if(unlikely(!past_data->rd)) {
+        error("Cannot find dimension with id '%s' in chart '%s' on host '%s'.", past_data->rrddim_id, past_data->rrdset_id, rep_state->host->hostname);
+        return;
+    }
+
+    RRDDIM *rd = past_data->rd;
+    time_t ts = past_data->start_time  / USEC_PER_SEC;
+    time_t te = past_data->end_time  / USEC_PER_SEC;
+    storage_number *page = (storage_number *)past_data->page;
+    uint32_t len = past_data->page_length / sizeof(storage_number);
+    
+    info("%s: Past Samples(%u) [%ld, %ld] for dimension %s\n", REPLICATION_MSG, len, ts, te, rd->id);
+    time_t t = ts;
+    for(uint32_t i=0; i < len ; i++){
+        info("T: %ld, V: "STORAGE_NUMBER_FORMAT" \n", t, page[i]);
+        t += rd->update_every;
+    }
+}
+
 int overlap_pages_new_gap(REPLICATION_STATE *rep_state)
 {
+    // struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->state->handle;
     struct rrdengine_instance *ctx;
     struct rrdeng_page_descr *descr_at_start;
     struct rrdeng_page_descr *descr_at_end;
     void *page_at_start, *page_at_end;
+    struct rrdeng_page_descr *latest_descr;
+    struct page_cache_descr *active_pg_cache_descr;
 
     descr_at_start = callocz(1, sizeof(struct rrdeng_page_descr));
     descr_at_end = callocz(1, sizeof(struct rrdeng_page_descr));
@@ -1182,6 +1278,15 @@ int overlap_pages_new_gap(REPLICATION_STATE *rep_state)
     unsigned int on_start = 1, on_end = 1;
 
     ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+    latest_descr = ((struct rrdeng_collect_handle *)rd->state->handle)->descr;
+    active_pg_cache_descr = latest_descr->pg_cache_descr;
+    if(active_pg_cache_descr){
+        storage_number *active_page = (storage_number *)active_pg_cache_descr->page;
+        time_t active_page_t_start = (latest_descr->start_time / USEC_PER_SEC);
+        time_t active_page_t_end = (latest_descr->end_time / USEC_PER_SEC);
+        uint32_t active_page_length = latest_descr->page_length;
+        info("%s: ACTIVE PAGE in MEM: [%ld, %ld](%d) - 1st sample["STORAGE_NUMBER_FORMAT"] ", REPLICATION_MSG, active_page_t_start, active_page_t_end, active_page_length, active_page[0]);        
+    }
 
     //fetch the closests page(s) from dbengine for the GAP time interval - can be - 0,1,2+
     page_at_start = rrdeng_get_page(ctx, dim_id, t_delta_start, ( void **) &descr_at_start);
