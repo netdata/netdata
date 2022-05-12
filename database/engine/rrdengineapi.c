@@ -1174,10 +1174,15 @@ void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_d
     storage_number *page, *page_gap;
 
     descr = handle->descr;
+    if(!descr || !descr->pg_cache_descr) {
+        infoerr("%s: No active descr or page for dimension %s.%s", REPLICATION_MSG, rd->rrdset->id, rd->id);
+        return;
+    }
+    
     page = (storage_number *)descr->pg_cache_descr->page;
     page_gap = (storage_number *)dim_past_data->page;
 
-    time_t start, end, page_start, page_end;
+    uint64_t start, end, page_start, page_end;
     start = dim_past_data->start_time / USEC_PER_SEC; //gap time start
     end = dim_past_data->end_time / USEC_PER_SEC;     //gap time end
     page_start = descr->start_time / USEC_PER_SEC;    //active page time start
@@ -1199,17 +1204,18 @@ void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_d
     // size of the data in bytes
     uint64_t entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
     uint64_t entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
-    uint64_t ue_page = (entries_page > 0) ? (uint64_t)((page_end - page_start) / entries_page) : 0;
+    uint64_t ue_page = (entries_page > 0) ? ((page_end - page_start) / entries_page) : 0;
     uint64_t gap_start_offset = 0;
     uint64_t page_start_offset = 0;
 
     if (!ue_page) {
         info(
-            "%s: Active page %p - [%ld, %ld] has no samples for %s.%s",
+            "%s: Active page %p - [%ld, %ld] has no samples(%lu) for %s.%s",
             REPLICATION_MSG,
             page,
             page_start,
             page_end,
+            entries_page,
             rd->rrdset->id,
             rd->id);
         return;
@@ -1310,6 +1316,7 @@ int overlap_pages_new_gap(REPLICATION_STATE *rep_state)
     //verify that the GAPs dbengine page is not overlapping
     if(!on_start && !on_end){
         info("%s: GAP page NO overlapping on dbengine pages.", REPLICATION_MSG);        
+        rrdeng_store_past_metrics_realtime(rd, rep_state->dim_past_data); // Does it exist in active page
         return 0;
     }
     

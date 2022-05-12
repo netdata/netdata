@@ -1180,10 +1180,10 @@ void replication_collect_past_metric_done(REPLICATION_STATE *rep_state) {
 }
 
 void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
-#ifdef  ENABLE_DBENGINE
+#ifdef ENABLE_DBENGINE
     int overlapping = overlap_pages_new_gap(rep_state);
     if(overlapping)
-        infoerr("%s: OVERLAPPING PAGES: HAVE A LOOK!", REPLICATION_MSG);    
+        infoerr("%s: OVERLAPPING PAGES: HAVE A LOOK!", REPLICATION_MSG);
     if(rrdeng_store_past_metrics_page_init(dim_past_data, rep_state)){
         infoerr("%s: Cannot initialize db engine page: Flushing collected past data skipped!", REPLICATION_MSG);
         return;
@@ -1196,7 +1196,7 @@ void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATI
 #else
     UNUSED(dim_past_data);
     infoerr("%s: Flushed Collected Past Metric is not supported for host %s. Replication Rx thread needs `dbengine` memory mode.", REPLICATION_MSG, rep_state->host->hostname);
-#endif    
+#endif
 }
 
 /****************************************
