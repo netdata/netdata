@@ -1293,8 +1293,7 @@ extern avl_tree_lock rrdhost_root_index;
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
-#define rrddim_free(st, rd) rrddim_free_custom(st, rd, 0)
-extern void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated);
+extern void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 extern int rrddim_compare(void* a, void* b);
 extern int rrdset_compare(void* a, void* b);

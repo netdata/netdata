@@ -369,13 +369,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 // ----------------------------------------------------------------------------
 // RRDDIM remove / free a dimension
 
-void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
+void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
     ml_delete_dimension(rd);
-
-#ifndef ENABLE_ACLK
-    UNUSED(db_rotated);
-#endif
+    
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
