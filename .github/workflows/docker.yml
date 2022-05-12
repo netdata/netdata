@@ -82,7 +82,7 @@ jobs:
       - name: Setup QEMU
         id: qemu
         if: matrix.platforms != 'linux/i386'
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
       - name: Setup Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
@@ -162,7 +162,7 @@ jobs:
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
       - name: Setup Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
