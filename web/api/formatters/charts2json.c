@@ -22,9 +22,8 @@ const char* get_release_channel() {
                     if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL")) {
                         if (!strcmp(procfile_lineword(ff, i, 1), "stable"))
                             use_stable = 1;
-                        else
-                            if (!strcmp(procfile_lineword(ff, i, 1), "nightly"))
-                                use_stable = 0;
+                        else if (!strcmp(procfile_lineword(ff, i, 1), "nightly"))
+                            use_stable = 0;
                         break;
                     }
                 }
