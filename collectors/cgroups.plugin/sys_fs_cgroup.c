@@ -4901,7 +4901,7 @@ void *cgroups_main(void *ptr) {
     worker_register("CGROUPS");
     worker_register_job_name(WORKER_CGROUPS_LOCK, "lock");
     worker_register_job_name(WORKER_CGROUPS_READ, "read");
-    worker_register_job_name(WORKER_CGROUPS_READ, "chart");
+    worker_register_job_name(WORKER_CGROUPS_CHART, "chart");
 
     netdata_thread_cleanup_push(cgroup_main_cleanup, ptr);
 
