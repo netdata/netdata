@@ -757,7 +757,8 @@ void send_gap_for_replication(RRDHOST *host, REPLICATION_STATE *rep_state)
     GAP *the_gap = (GAP *)host->gaps_timeline->gaps->front->item;
     //  Assign the timestamp of first metric comes from streaming to avoid
     // missing metrics between the disconnection and start of the streaming
-    the_gap->t_window.t_end = rep_state->host->receiver->first_msg_t;
+    // the_gap->t_window.t_end = rep_state->host->receiver->first_msg_t - 1;
+    the_gap->t_window.t_end = rep_state->host->receiver->first_msg_t - 1;
     char *rep_msg_cmd;
     size_t len;
     replication_gap_to_str(the_gap, &rep_msg_cmd, &len);
