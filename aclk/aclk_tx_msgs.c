@@ -452,10 +452,21 @@ int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message)
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
     size_t len;
     uint16_t pid;
+
+    struct capability agent_capabilities[] = {
+        { .name = "json",  .version = 2, .enabled = 0 },
+        { .name = "proto", .version = 1, .enabled = 1 },
+#ifdef ENABLE_ML
+        { .name = "ml",    .version = 1, .enabled = ml_enabled(localhost) },
+#endif
+        { .name = NULL,    .version = 0, .enabled = 0 }
+    };
+
     update_agent_connection_t conn = {
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
-        .session_id = aclk_session_newarch
+        .session_id = aclk_session_newarch,
+        .capabilities = agent_capabilities
     };
 
     rrdhost_aclk_state_lock(localhost);
@@ -490,7 +501,8 @@ char *aclk_generate_lwt(size_t *size) {
     update_agent_connection_t conn = {
         .reachable = 0,
         .lwt = 1,
-        .session_id = aclk_session_newarch
+        .session_id = aclk_session_newarch,
+        .capabilities = NULL
     };
 
     rrdhost_aclk_state_lock(localhost);

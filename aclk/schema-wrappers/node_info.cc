@@ -94,6 +94,24 @@ char *generate_update_node_info_message(size_t *len, struct update_node_info *in
     ml_info->set_ml_capable(info->ml_info.ml_capable);
     ml_info->set_ml_enabled(info->ml_info.ml_enabled);
 
+    struct capability *capa;
+    if (info->node_capabilities) {
+        capa = info->node_capabilities;
+        while (capa->name) {
+            aclk_lib::v1::Capability *proto_capa = msg.mutable_node_info()->add_capabilities();
+            capability_set(proto_capa, capa);
+            capa++;
+        }
+    }
+    if (info->node_instance_capabilities) {
+        capa = info->node_instance_capabilities;
+        while (capa->name) {
+            aclk_lib::v1::Capability *proto_capa = msg.mutable_node_instance_info()->add_capabilities();
+            capability_set(proto_capa, capa);
+            capa++;
+        }
+    }
+
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)malloc(*len);
     if (bin)

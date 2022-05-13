@@ -24,6 +24,14 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.child = (wc->host != localhost);
     node_info.ml_info.ml_capable = ml_capable(localhost);
     node_info.ml_info.ml_enabled = ml_enabled(wc->host);
+
+    struct capability instance_caps[] = {
+        { .name = "proto", .version = 1,                     .enabled = 1 },
+        { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(wc->host) },
+        { .name = NULL,    .version = 0,                     .enabled = 0 }
+    };
+    node_info.node_instance_capabilities = instance_caps;
+
     now_realtime_timeval(&node_info.updated_at);
 
     RRDHOST *host = wc->host;
@@ -55,6 +63,13 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.services = NULL;   // char **
     node_info.data.service_count = 0;
     node_info.data.machine_guid = wc->host_guid;
+
+    struct capability node_caps[] = {
+        { .name = "ml", .version = host->system_info->ml_capable, .enabled = host->system_info->ml_enabled },
+        { .name = NULL, .version = 0, .enabled = 0 }
+    };
+    node_info.node_capabilities = node_caps;
+
     node_info.data.ml_info.ml_capable = host->system_info->ml_capable;
     node_info.data.ml_info.ml_enabled = host->system_info->ml_enabled;
 
