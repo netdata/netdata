@@ -1176,14 +1176,21 @@ void modify_dim_past_data(RRDDIM_PAST_DATA *dim_past_data, usec_t start_time, us
     new_entries = (uint64_t)(new_end - new_start) / dim_past_data->rd->update_every + 1;
 
     dim_past_data->page_length = new_entries * sizeof(storage_number);
-    dim_past_data->page = &dim_past_data->page[(new_start - start) / dim_past_data->rd->update_every -1];
+    if(new_start != start)
+        dim_past_data->page = &dim_past_data->page[((new_start - start) / dim_past_data->rd->update_every) * sizeof(storage_number)];
+    dim_past_data->start_time = new_start * USEC_PER_SEC;
+    dim_past_data->end_time = new_end * USEC_PER_SEC;
+
     info(
-        "%s: Divided page %p - [%lu, %lu, %lu]",
+        "%s: Divided page %p - [%lu, %lu, %lu, %lu, %lu, %lu]",
         REPLICATION_MSG,
         dim_past_data->page,
         dim_past_data->start_time,
         dim_past_data->end_time,
-        dim_past_data->page_length);
+        start,
+        end,
+        dim_past_data->page_length,
+        ((new_start - start) / dim_past_data->rd->update_every) * sizeof(storage_number));
 }
 
 // It saves the GAP past metrics in the active page in real-time
@@ -1252,11 +1259,12 @@ int rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_da
         gap_start_offset = (uint64_t)(page_start - start) / ue_page - 1;
         return_value = 1;
     }
-    return_value = 0;
     if (page_start < start) {
+        return_value = 0;
         page_start_offset = (uint64_t)(start - page_start) / ue_page - 1;
     }
     if (page_start == start) {
+        return_value = 0;
         page_start_offset = 0;
     }
 
