@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix compilation warnings [\#12886](https://github.com/netdata/netdata/pull/12886) ([vlvkobal](https://github.com/vlvkobal))
+- Take into account the in queue wait time when executing a data query [\#12885](https://github.com/netdata/netdata/pull/12885) ([stelfrag](https://github.com/stelfrag))
 - Update dashboard to version v2.25.2. [\#12884](https://github.com/netdata/netdata/pull/12884) ([netdatabot](https://github.com/netdatabot))
 - Consider ZFS ARC shrinkable as cache on FreeBSD [\#12879](https://github.com/netdata/netdata/pull/12879) ([vlvkobal](https://github.com/vlvkobal))
 - fix\(health\): change duplicate health template message logging level to 'info' [\#12873](https://github.com/netdata/netdata/pull/12873) ([ilyam8](https://github.com/ilyam8))
 - docs: fix unresolved file references [\#12872](https://github.com/netdata/netdata/pull/12872) ([ilyam8](https://github.com/ilyam8))
 - Set trust durations to have data from children properly aligned [\#12870](https://github.com/netdata/netdata/pull/12870) ([stelfrag](https://github.com/stelfrag))
+- feat\(proc/cgroups.plugin\): add PSI stall time charts [\#12869](https://github.com/netdata/netdata/pull/12869) ([ilyam8](https://github.com/ilyam8))
 - Update README.md [\#12868](https://github.com/netdata/netdata/pull/12868) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix for negative per job busy time [\#12867](https://github.com/netdata/netdata/pull/12867) ([ktsaou](https://github.com/ktsaou))
 - fix\(cgroups.plugin\): do not disable K8s pod/container cgroups if can't rename them [\#12865](https://github.com/netdata/netdata/pull/12865) ([ilyam8](https://github.com/ilyam8))
@@ -19,6 +22,7 @@
 - Initialize the metadata database when performing dbengine stress test [\#12861](https://github.com/netdata/netdata/pull/12861) ([stelfrag](https://github.com/stelfrag))
 - Add a SQLite database checkpoint command [\#12859](https://github.com/netdata/netdata/pull/12859) ([stelfrag](https://github.com/stelfrag))
 - feat\(cgroups.plugin\): add k8s cluster name label \(GKE only\) [\#12858](https://github.com/netdata/netdata/pull/12858) ([ilyam8](https://github.com/ilyam8))
+- Pause alert pushes to the cloud [\#12852](https://github.com/netdata/netdata/pull/12852) ([MrZammler](https://github.com/MrZammler))
 - fix\(proc.plugin\): consider ZFS ARC as cache when collecting memory usage on Linux [\#12847](https://github.com/netdata/netdata/pull/12847) ([ilyam8](https://github.com/ilyam8))
 - Resolve coverity related to memory and structure dereference [\#12846](https://github.com/netdata/netdata/pull/12846) ([stelfrag](https://github.com/stelfrag))
 - fix memory leaks and mismatches of the use of the z functions for allocations [\#12841](https://github.com/netdata/netdata/pull/12841) ([ktsaou](https://github.com/ktsaou))
@@ -114,7 +118,6 @@
 - Metric correlations [\#12582](https://github.com/netdata/netdata/pull/12582) ([MrZammler](https://github.com/MrZammler))
 - Reduce alert events sent to the cloud. [\#12544](https://github.com/netdata/netdata/pull/12544) ([MrZammler](https://github.com/MrZammler))
 - Docs templates [\#12466](https://github.com/netdata/netdata/pull/12466) ([kickoke](https://github.com/kickoke))
-- Store alert log entries even if alert it is repeating. [\#12226](https://github.com/netdata/netdata/pull/12226) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
@@ -316,10 +319,6 @@
 - Add a fix to correctly register child nodes to the cloud via a parent [\#12241](https://github.com/netdata/netdata/pull/12241) ([stelfrag](https://github.com/stelfrag))
 - Fix builds where HAVE\_C\_\_\_ATOMIC is not defined. [\#12240](https://github.com/netdata/netdata/pull/12240) ([vkalintiris](https://github.com/vkalintiris))
 - Adds more info to aclk-state API call [\#12231](https://github.com/netdata/netdata/pull/12231) ([underhood](https://github.com/underhood))
-- minor - remove dead code [\#12230](https://github.com/netdata/netdata/pull/12230) ([underhood](https://github.com/underhood))
-- Fix node information send to the cloud for older agent versions [\#12223](https://github.com/netdata/netdata/pull/12223) ([stelfrag](https://github.com/stelfrag))
-- Fixed typo in docs/guides/monitor/anomaly-detection-python.md file [\#12220](https://github.com/netdata/netdata/pull/12220) ([MariosMarinos](https://github.com/MariosMarinos))
-- \[makeself\] Fix license URL [\#12219](https://github.com/netdata/netdata/pull/12219) ([Daniel15](https://github.com/Daniel15))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
