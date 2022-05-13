@@ -1204,7 +1204,8 @@ void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_d
     // size of the data in bytes
     uint64_t entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
     uint64_t entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
-    uint64_t ue_page = (entries_page > 0) ? ((page_end - page_start) / entries_page) : 0;
+    uint64_t ue_page = (entries_page > 0) ? (((uint64_t)(page_end - page_start) + 1) / entries_page) : 0;
+    info("%s: ue_page = %ld", REPLICATION_MSG, ue_page);
     uint64_t gap_start_offset = 0;
     uint64_t page_start_offset = 0;
 
@@ -1230,7 +1231,7 @@ void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_d
     }
     info("%s: Just before memcpy", REPLICATION_MSG);
     void *dest = (void *)(page + page_start_offset);
-    void *src = (void *)(page + gap_start_offset);
+    void *src = (void *)(page_gap + gap_start_offset);
     size_t size = ((entries_gap - gap_start_offset) * sizeof(storage_number));
     info("page[%lu]=%p, page_gap[%lu]=%p, size: %lu", page_start_offset, dest, gap_start_offset, src, size);
     memcpy(dest, src, size);
