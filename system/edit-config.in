@@ -51,7 +51,7 @@ edit() {
     exit 1
   fi
 
-  make_it_safer()
+  make_it_safer
 
   "${EDITOR}" "${1}"
   exit $?
