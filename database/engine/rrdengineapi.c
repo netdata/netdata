@@ -1204,8 +1204,9 @@ void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_d
     // size of the data in bytes
     uint64_t entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
     uint64_t entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
-    uint64_t ue_page = (entries_page > 0) ? (((uint64_t)(page_end - page_start) + 1) / entries_page) : 0;
-    info("%s: ue_page = %ld", REPLICATION_MSG, ue_page);
+    // uint64_t ue_page = (entries_page > 0) ? (((uint64_t)(page_end - page_start)) / entries_page) : 0;
+    // info("%s: ue_page = %ld - up_page++= %ld - dimension ue = %d", REPLICATION_MSG, ue_page, ue_page++, rd->update_every);
+    uint64_t ue_page = rd->update_every;
     uint64_t gap_start_offset = 0;
     uint64_t page_start_offset = 0;
 
