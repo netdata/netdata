@@ -13,6 +13,10 @@ fi
 [ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
+make_it_safer() {
+  find "${NETDATA_USER_CONFIG_DIR}"/*/ -type f ! -perm 640 -name "*.conf" -exec chmod o-rwx {} + -exec chown root:netdata {} +
+}
+
 if [ -z "${file}" ]; then
   cat << EOF
 
@@ -33,6 +37,7 @@ EOF
 
   cd "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
   ls >&2 -R ./*.conf ./*/*.conf
+  make_it_safer()
   exit 1
 
 fi
@@ -45,6 +50,8 @@ edit() {
     echo >&2 "Cannot write to ${1}! Aborting ..."
     exit 1
   fi
+
+  make_it_safer()
 
   "${EDITOR}" "${1}"
   exit $?
