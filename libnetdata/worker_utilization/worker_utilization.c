@@ -69,6 +69,10 @@ void worker_register_job_name(size_t job_id, const char *name) {
         error("WORKER_UTILIZATION: job_id %zu is too big. Max is %zu", job_id, (size_t)(WORKER_UTILIZATION_MAX_JOB_TYPES - 1));
         return;
     }
+    if (worker->per_job_type[job_id].name && *worker->per_job_type[job_id].name) {
+        error("WORKER_UTILIZATION: duplicate job registration: worker '%s', job name '%s', job id %zu", worker->workname, name, job_id);
+        return;
+    }
 
     strncpy(worker->per_job_type[job_id].name, name, WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
 }
