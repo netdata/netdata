@@ -141,9 +141,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
 
-    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
@@ -168,10 +165,20 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
             (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                                       rd->algorithm);
+
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+            rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
+            queue_dimension_to_aclk(rd);
+#endif
+            rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
         rrdset_unlock(st);
         return rd;
     }
+
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
