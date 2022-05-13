@@ -70,7 +70,7 @@ void worker_register_job_name(size_t job_id, const char *name) {
         return;
     }
     if (worker->per_job_type[job_id].name && *worker->per_job_type[job_id].name) {
-        error("WORKER_UTILIZATION: duplicate job registration: worker '%s', job name '%s', job id %zu", worker->workname, name, job_id);
+        error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring '%s'", worker->workname, job_id, worker->per_job_type[job_id].name, name);
         return;
     }
 
