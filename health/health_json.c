@@ -355,7 +355,6 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
                 continue;
             if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
                 continue;
-
             if(unlikely((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status))
                 numberOfAlarms++;
         }
