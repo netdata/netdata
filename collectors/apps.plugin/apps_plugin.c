@@ -1962,6 +1962,8 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     static char *fdsbuf;
     char *bfdsbuf, *efdsbuf;
     char fdsname[FILENAME_MAX + 1];
+#define SHM_FORMAT_LEN 31 // format: 21 + size: 10
+    char shm_name[FILENAME_MAX - SHM_FORMAT_LEN + 1];
 
     // we make all pid fds negative, so that
     // we can detect unused file descriptors
@@ -2059,12 +2061,8 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 #endif
                     break;
                 case KF_TYPE_SHM:
-                    sprintf(
-                        fdsname,
-                        "other: shm: %s size: %lu",
-                        fds->kf_path,
-                        (FILENAME_MAX < fds->kf_un.kf_file.kf_file_size) ? FILENAME_MAX :
-                                                                           fds->kf_un.kf_file.kf_file_size);
+                    strncpyz(shm_name, fds->kf_path, FILENAME_MAX - SHM_FORMAT_LEN);
+                    sprintf(fdsname, "other: shm: %s size: %lu", shm_name, fds->kf_un.kf_file.kf_file_size);
                     break;
                 case KF_TYPE_SEM:
                     sprintf(fdsname, "other: sem: %u", fds->kf_un.kf_sem.kf_sem_value);
