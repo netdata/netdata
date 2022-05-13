@@ -1227,9 +1227,14 @@ void rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_d
         gap_start_offset = (uint64_t)(page_start - start) / ue_page - 1;
         //TODO: creating a page and fill it with the reset of the GAP
     }
-    if (page_start <= start) {
+    if (page_start < start) {
         page_start_offset = (uint64_t)(start - page_start) / ue_page - 1;
     }
+    if (page_start == start) {
+        page_start_offset = 0;
+        gap_start_offset = 0;
+    }
+
     info("%s: Just before memcpy", REPLICATION_MSG);
     void *dest = (void *)(page + page_start_offset);
     void *src = (void *)(page_gap + gap_start_offset);
