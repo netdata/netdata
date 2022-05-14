@@ -1133,7 +1133,6 @@ void replication_collect_past_metric_init(REPLICATION_STATE *rep_state, char *rr
         error("Cannot find dimension with id '%s' in chart '%s' on host '%s'.", dim_past_data->rrddim_id, dim_past_data->rrdset_id, rep_state->host->hostname);
         return;
     }    
-
     debug(D_REPLICATION, "%s: Initializaton for collecting past data of dimension \"%s\".\"%s\"\n", REPLICATION_MSG, rrdset_id, rrddim_id);
 }
 
@@ -1175,9 +1174,7 @@ void replication_collect_past_metric_done(REPLICATION_STATE *rep_state) {
         infoerr("%s: Collect past metric: Dimension not found in the host", REPLICATION_MSG);
         return;
     }    
-    // netdata_mutex_lock(&rep_state->mutex);
     flush_collected_metric_past_data(dim_past_data, rep_state);
-    // netdata_mutex_unlock(&rep_state->mutex);
 }
 
 void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
@@ -1190,8 +1187,7 @@ void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATI
         rrdeng_store_past_metrics_page(dim_past_data, rep_state);
         rrdeng_flush_past_metrics_page(dim_past_data, rep_state);
         rrdeng_store_past_metrics_page_finalize(dim_past_data, rep_state);
-        info("%s: Flushed Collected Past Metric %s.%s", REPLICATION_MSG, dim_past_data->rd->rrdset->id, dim_past_data->rd->id);
-        // print_collected_metric_past_data(dim_past_data, rep_state);
+        debug(D_REPLICATION, "%s: Flushed Collected Past Metric %s.%s", REPLICATION_MSG, dim_past_data->rd->rrdset->id, dim_past_data->rd->id);
     }
 #else
     UNUSED(dim_past_data);
