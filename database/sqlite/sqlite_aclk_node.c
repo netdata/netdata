@@ -55,7 +55,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.memory = host->system_info->host_ram_total ? host->system_info->host_ram_total : "0";
     node_info.data.disk_space = host->system_info->host_disk_space ? host->system_info->host_disk_space : "0";
     node_info.data.version = host_version ? host_version : VERSION;
-    node_info.data.release_channel = "nightly";
+    node_info.data.release_channel = (char *) get_release_channel();
     node_info.data.timezone = (char *) host->abbrev_timezone;
     node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
     node_info.data.container_type = host->system_info->container ? host->system_info->container : "unknown";
