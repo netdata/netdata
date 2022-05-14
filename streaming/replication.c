@@ -59,7 +59,7 @@ void replication_sender_init(RRDHOST *host){
     host->replication->tx_replication->ssl.flags = NETDATA_SSL_START;
 #endif
     info("%s: Initialize REP Tx state during host creation %s .", REPLICATION_MSG, host->hostname);
-    print_replication_state(host->replication->tx_replication);
+    // print_replication_state(host->replication->tx_replication);
 }
 
 static unsigned int replication_rd_config(RRDHOST *host, struct config *stream_config, char *key)
@@ -104,7 +104,7 @@ void replication_receiver_init(RRDHOST *image_host, struct config *stream_config
     }
     image_host->replication->rx_replication->enabled = rrdpush_replication_enable; 
     info("%s: Initialize REP Rx thread state for replicated host %s ", REPLICATION_MSG, image_host->hostname);
-    print_replication_state(image_host->replication->rx_replication);
+    // print_replication_state(image_host->replication->rx_replication);
 }
 
 /**************************************************
@@ -508,7 +508,7 @@ static int trigger_replication(RRDHOST *host){
             wait_streaming = (t_now - host->sender->t_last_exposed_chart_definition);
             abs_wait_streaming = (host->sender->t_last_exposed_chart_definition - host->sender->t_first_exposed_chart_definition);
         }
-        info("%s: First exposed: %ld, Last exposed: %ld, diff: %ld, Now: %ld, Diff: %ld", REPLICATION_MSG, host->sender->t_first_exposed_chart_definition, host->sender->t_last_exposed_chart_definition, abs_wait_streaming, t_now, wait_streaming);
+        // info("%s: First exposed: %ld, Last exposed: %ld, diff: %ld, Now: %ld, Diff: %ld", REPLICATION_MSG, host->sender->t_first_exposed_chart_definition, host->sender->t_last_exposed_chart_definition, abs_wait_streaming, t_now, wait_streaming);
         if(wait_streaming && abs_wait_streaming && ((wait_streaming > 10) || (abs_wait_streaming + wait_streaming) > 15))
             return 1;
         return 0;
@@ -552,7 +552,7 @@ void *replication_sender_thread(void *ptr) {
         // Waiting for a proxy to replicate GAPs with lower layer hops before
         // it starts replication for higher level hops
         if(rep_state->pause){
-            info("%s: Waiting in PAUSE(%u)...", REPLICATION_MSG, rep_state->pause);
+            // info("%s: Waiting in PAUSE(%u)...", REPLICATION_MSG, rep_state->pause);
             sleep_usec(USEC_PER_SEC);
             continue;
         }
@@ -702,7 +702,7 @@ void *replication_receiver_thread(void *ptr){
     debug(D_REPLICATION, "%s: %s [receive from [%s]:%s]: disconnected (completed %zu updates).", REPLICATION_MSG, host->hostname, rep_state->client_ip, rep_state->client_port, count);
 
     // To be removed
-    print_replication_queue_gap(host->gaps_timeline);
+    // print_replication_queue_gap(host->gaps_timeline);
 
     // TODO:
     // Use this section to clean a replication sender thread in case of gparent connection.
@@ -771,10 +771,10 @@ void cleanup_after_gap_replication(GAPS *gaps_timeline)
     GAP *the_gap = (GAP *)queue_pop(gaps_timeline->gaps);
     if (the_gap) {
         info("%s: Finishing...the replication of the GAP", REPLICATION_MSG);
-        print_replication_gap(the_gap);
+        // print_replication_gap(the_gap);
         remove_gap(the_gap); // Remove it from the SQLite if it exists
         reset_gap(the_gap);  // Clean the gaps table runtime host GAPS memory
-        print_replication_queue_gap(gaps_timeline);
+        // print_replication_queue_gap(gaps_timeline);
     }
 }
 
@@ -1133,7 +1133,6 @@ void replication_collect_past_metric_init(REPLICATION_STATE *rep_state, char *rr
         error("Cannot find dimension with id '%s' in chart '%s' on host '%s'.", dim_past_data->rrddim_id, dim_past_data->rrdset_id, rep_state->host->hostname);
         return;
     }    
-
     debug(D_REPLICATION, "%s: Initializaton for collecting past data of dimension \"%s\".\"%s\"\n", REPLICATION_MSG, rrdset_id, rrddim_id);
 }
 
@@ -1175,9 +1174,7 @@ void replication_collect_past_metric_done(REPLICATION_STATE *rep_state) {
         infoerr("%s: Collect past metric: Dimension not found in the host", REPLICATION_MSG);
         return;
     }    
-    // netdata_mutex_lock(&rep_state->mutex);
     flush_collected_metric_past_data(dim_past_data, rep_state);
-    // netdata_mutex_unlock(&rep_state->mutex);
 }
 
 void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
@@ -1190,8 +1187,7 @@ void flush_collected_metric_past_data(RRDDIM_PAST_DATA *dim_past_data, REPLICATI
         rrdeng_store_past_metrics_page(dim_past_data, rep_state);
         rrdeng_flush_past_metrics_page(dim_past_data, rep_state);
         rrdeng_store_past_metrics_page_finalize(dim_past_data, rep_state);
-        info("%s: Flushed Collected Past Metric %s.%s", REPLICATION_MSG, dim_past_data->rd->rrdset->id, dim_past_data->rd->id);
-        // print_collected_metric_past_data(dim_past_data, rep_state);
+        debug(D_REPLICATION, "%s: Flushed Collected Past Metric %s.%s", REPLICATION_MSG, dim_past_data->rd->rrdset->id, dim_past_data->rd->id);
     }
 #else
     UNUSED(dim_past_data);
@@ -1491,7 +1487,7 @@ void gaps_init(RRDHOST **a_host)
     info("%s: GAPs Initialization/Loading for host %s", REPLICATION_MSG, host->hostname);
 
     // To be removed
-    print_replication_queue_gap(host->gaps_timeline);
+    // print_replication_queue_gap(host->gaps_timeline);
     return;
 }
 
@@ -1500,7 +1496,7 @@ void gaps_destroy(RRDHOST **a_host) {
 
     info("%s: GAPs Destroy", REPLICATION_MSG);
     // To be removed
-    print_replication_queue_gap(host->gaps_timeline);
+    // print_replication_queue_gap(host->gaps_timeline);
 
     if(remove_all_host_gaps(host))
         error("%s: Cannot delete all GAPs in metadata DB.", REPLICATION_MSG);
@@ -1564,7 +1560,7 @@ void evaluate_gap_onconnection(struct receiver_state *stream_recv)
     // Re-connection
     if (complete_new_gap(seed_gap)) {
         error("%s: Broken GAP sequence. GAP status is %s", REPLICATION_MSG, seed_gap->status);
-        print_replication_queue_gap(stream_recv->host->gaps_timeline);
+        // print_replication_queue_gap(stream_recv->host->gaps_timeline);
         return;
     }
     // TODO: Handle the retention check here
@@ -1573,14 +1569,14 @@ void evaluate_gap_onconnection(struct receiver_state *stream_recv)
     GAP * gap_to_push = add_gap_data(stream_recv->host->gaps_timeline, seed_gap);
     if (!queue_push(stream_recv->host->gaps_timeline->gaps, (void *)gap_to_push)) {
         infoerr("%s: Couldn't add the GAP in the queue.", REPLICATION_MSG);
-        print_replication_queue_gap(stream_recv->host->gaps_timeline);
+        // print_replication_queue_gap(stream_recv->host->gaps_timeline);
         return;
     }
     // Clean the gap buffer
     reset_gap(seed_gap);
     info("%s: New GAP added in the queue.", REPLICATION_MSG);
     // Expect that at the end of the queue
-    print_replication_queue_gap(stream_recv->host->gaps_timeline);
+    // print_replication_queue_gap(stream_recv->host->gaps_timeline);
     // print_replication_gap((GAP *)stream_recv->host->gaps_timeline->gaps->rear->item);
 }
 
@@ -1591,7 +1587,7 @@ void evaluate_gap_ondisconnection(struct receiver_state *stream_recv) {
     debug(D_REPLICATION, "%s: Evaluate GAPs on dis-connection", REPLICATION_MSG);
     if (!stream_recv->host->gaps_timeline) {
         infoerr("%s: GAP Awareness mechanism is not ready - Continue...", REPLICATION_MSG);
-        print_replication_queue_gap(stream_recv->host->gaps_timeline);
+        // print_replication_queue_gap(stream_recv->host->gaps_timeline);
         return;
     }
     // if (!stream_recv->host->replication->rx_replication->enabled) {
@@ -1602,7 +1598,7 @@ void evaluate_gap_ondisconnection(struct receiver_state *stream_recv) {
     info("%s: New GAP seed was collected in the GAPs buffer!", REPLICATION_MSG);
     // GAPS *the_gaps = stream_recv->host->gaps_timeline;
     // print_replication_gap(the_gaps->gap_buffer);
-    print_replication_queue_gap(stream_recv->host->gaps_timeline);
+    // print_replication_queue_gap(stream_recv->host->gaps_timeline);
 }
 
 /*************************************************
@@ -1841,7 +1837,7 @@ void sender_gap_filling(REPLICATION_STATE *rep_state, GAP a_gap)
 {
     if(!rep_state){
         error("%s: Cannot Send GAP replication state is NULL!", REPLICATION_MSG);
-        print_replication_gap(&a_gap);
+        // print_replication_gap(&a_gap);
         return;
     }
     RRDSET *st;

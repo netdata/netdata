@@ -1090,12 +1090,10 @@ void rrdeng_store_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION
     descr->start_time = dim_past_data->start_time;
     // Page alignment can be handled with zero values.
     // Every new past data page can reach the aligment with zeros if the values are not enough.
-    // for (page_length - rd->rrdset->rrddim_page_alignment) fill with zeros OR 
+    // for (page_length - rd->rrdset->rrddim_page_alignment) fill with zeros OR
     // simply increase the length since zeros are already there
-    // print_page_cache_descr(descr);
     rrdeng_page_descr_mutex_unlock(ctx, descr);
-    // print_page_descr(descr);    
-   
+
     debug(D_REPLICATION, "%s REP: Page correlation ID and page info updates....", REPLICATION_MSG);
     // prepare the pg descr to insert and commit the dbengine page
     dim_past_data->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
@@ -1103,7 +1101,7 @@ void rrdeng_store_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION
     debug(D_REPLICATION, "%s: Past \"%s\".\"%s\" metrics page is ready for commit in memory.", REPLICATION_MSG, rd->rrdset->id, rd->id);
 }
 
-void rrdeng_flush_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){    
+void rrdeng_flush_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
     struct rrdengine_instance *ctx;
     struct rrdeng_page_descr *descr;
     struct pg_cache_page_index *page_index;
@@ -1164,11 +1162,12 @@ void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, RE
 
     uv_rwlock_wrlock(&page_index->lock);
     --page_index->writers;
-    uv_rwlock_wrunlock(&page_index->lock);    
+    uv_rwlock_wrunlock(&page_index->lock);
     debug(D_REPLICATION, "%s Finalize operation -  Dimension \"%s\".\"%s\" metrics page completed.", REPLICATION_MSG, rd->rrdset->id, rd->id);
 }
 
-void modify_dim_past_data(RRDDIM_PAST_DATA *dim_past_data, usec_t start_time, usec_t end_time) 
+//It updates the dim_past_data according to new start and end times
+void modify_dim_past_data(RRDDIM_PAST_DATA *dim_past_data, usec_t start_time, usec_t end_time)
 {
     uint64_t start, end, new_start, new_end, new_entries;
     start = dim_past_data->start_time / USEC_PER_SEC; //gap time start
@@ -1183,8 +1182,8 @@ void modify_dim_past_data(RRDDIM_PAST_DATA *dim_past_data, usec_t start_time, us
     dim_past_data->start_time = new_start * USEC_PER_SEC;
     dim_past_data->end_time = new_end * USEC_PER_SEC;
 
-    info(
-        "%s: Divided page %p - [%lu, %lu, %lu, %lu, %lu, %lu]",
+    debug(D_REPLICATION,
+        "%s: Divided page %p - [%llu, %llu, %lu, %lu, %u, %lu]",
         REPLICATION_MSG,
         dim_past_data->page,
         dim_past_data->start_time,
@@ -1208,7 +1207,7 @@ int rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_da
         infoerr("%s: No active descr or page for dimension %s.%s", REPLICATION_MSG, rd->rrdset->id, rd->id);
         return 1;
     }
-    
+
     page = (storage_number *)descr->pg_cache_descr->page;
     page_gap = (storage_number *)dim_past_data->page;
 
@@ -1236,8 +1235,6 @@ int rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_da
 
     uint64_t entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
     uint64_t entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
-    // uint64_t ue_page = (entries_page > 0) ? (((uint64_t)(page_end - page_start)) / entries_page) : 0;
-    // info("%s: ue_page = %lu - up_page++= %lu - dimension ue = %d", REPLICATION_MSG, ue_page, ue_page++, rd->update_every);
     uint64_t ue_page = rd->update_every;
     uint64_t gap_start_offset = 0;
     uint64_t page_start_offset = 0;
@@ -1272,13 +1269,13 @@ int rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_da
         page_start_offset = 0;
     }
 
-    info("%s: Just before memcpy", REPLICATION_MSG);
+    debug(D_REPLICATION, "%s: Just before memcpy", REPLICATION_MSG);
     void *dest = (void *)(page + page_start_offset);
     void *src = (void *)(page_gap + gap_start_offset);
     size_t size = ((entries_gap - gap_start_offset) * sizeof(storage_number));
-    info("page[%lu]=%p, page_gap[%lu]=%p, size: %lu", page_start_offset, dest, gap_start_offset, src, size);
+    debug(D_REPLICATION, "page[%lu]=%p, page_gap[%lu]=%p, size: %lu", page_start_offset, dest, gap_start_offset, src, size);
     memcpy(dest, src, size);
-    info("%s: Successfully updated the active page for %s.%s", REPLICATION_MSG, rd->rrdset->id, rd->id);
+    debug(D_REPLICATION, "%s: Successfully updated the active page for %s.%s", REPLICATION_MSG, rd->rrdset->id, rd->id);
 
     if(return_value)
         modify_dim_past_data(dim_past_data, start * USEC_PER_SEC, (page_start - 1) * USEC_PER_SEC);
