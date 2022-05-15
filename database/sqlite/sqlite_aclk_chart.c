@@ -634,7 +634,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
         freez(hostname);
     } else {
         log_access(
-            "ACLK STA [%s (%s)]: Restarting chart sync from sequence %" PRIu64,
+            "ACLK STA [%s (%s)]: RESTARTING CHART SYNC FROM SEQUENCE %" PRIu64,
             wc->node_id,
             wc->host ? wc->host->hostname : "N/A",
             cmd.param1);
@@ -750,9 +750,10 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                 __sync_synchronize();
                 wc->batch_created = now_realtime_sec();
                 log_access(
-                    "ACLK REQ [%s (%s)]: CHARTS STREAM from %" PRIu64 " t=%ld resets=%d",
+                    "ACLK REQ [%s (%s)]: CHARTS STREAM from %"PRIu64" (LOCAL %"PRIu64") t=%ld resets=%d" ,
                     wc->node_id,
                     hostname ? hostname : "N/A",
+                    sequence_id + 1,
                     wc->chart_sequence_id,
                     wc->chart_timestamp,
                     wc->chart_reset_count);
@@ -785,7 +786,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                             "ACLK REQ [%s (%s)]: CHART RESET from %" PRIu64 " t=%ld batch=%" PRIu64,
                             wc->node_id,
                             hostname ? hostname : "N/A",
-                            wc->chart_sequence_id,
+                            sequence_id + 1,
                             wc->chart_timestamp,
                             wc->batch_id);
                         cmd.opcode = ACLK_DATABASE_RESET_CHART;
