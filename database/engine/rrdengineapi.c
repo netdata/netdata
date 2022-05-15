@@ -1215,7 +1215,7 @@ int rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_da
     page_start = descr->start_time / USEC_PER_SEC;    //active page time start
     page_end = descr->end_time / USEC_PER_SEC;        //active page time start
 
-    if (!page || !page_gap || start > end || page_end < end) {
+    if (!page || !page_gap || start > end) {
         info(
             "%s: Active page %p - [%lu, %lu] and GAP page %p - [%lu, %lu] problems",
             REPLICATION_MSG,
@@ -1227,6 +1227,9 @@ int rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_da
             end);
         return 0;
     }
+
+    if(page_end < end)
+        modify_dim_past_data(dim_past_data, start * USEC_PER_SEC, (page_end) * USEC_PER_SEC);
 
     uint64_t entries_gap = (dim_past_data->page_length / sizeof(storage_number)); // num of samples
     uint64_t entries_page = (descr->page_length / sizeof(storage_number));    // num of samples
