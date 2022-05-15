@@ -2567,6 +2567,10 @@ static inline void discovery_find_all_cgroups_v2() {
     }
 }
 
+// could be runc:[0:PARENT], runc:[1:CHILD], runc:[2:INIT]
+#define CGROUP_RUNC_COMM_PREFIX "runc:["
+#define CGROUP_RUNC_COMM_PREFIX_LENGTH 6
+
 static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     if (!cg->first_time_seen) {
         return;
@@ -2577,8 +2581,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
 
     if (is_inside_k8s && !k8s_get_container_first_proc_comm(cg->id, comm)) {
         // container initialization may take some time when CPU % is high
-        // TODO: not sure run-level 2 is enough (just came across this problem on an AWS K8s cluster)
-        if (!strcmp(comm, "runc:[2:INIT]")) {
+        if (!strncmp(comm, CGROUP_RUNC_COMM_PREFIX, CGROUP_RUNC_COMM_PREFIX_LENGTH)) {
             cg->first_time_seen = 1;
             return;
         }
