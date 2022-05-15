@@ -41,7 +41,7 @@ if [ -z "${VIRTUALIZATION}" ]; then
     CONTAINER=${CONTAINER:-$(systemd-detect-virt -c)}
     CONT_DETECTION="systemd-detect-virt"
   else
-    if command -v lscpu 2> /dev/null; then
+    if command -v lscpu >/dev/null 2>&1; then
       VIRTUALIZATION=$(lscpu | grep "Hypervisor vendor" | cut -d: -f 2 | awk '{$1=$1};1')
       VIRT_DETECTION="lscpu"
     elif [ -n "$(command -v dmidecode)" ] && dmidecode -s system-product-name 2> /dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
