@@ -91,6 +91,8 @@ static SIMPLE_PATTERN *search_cgroup_paths = NULL;
 static SIMPLE_PATTERN *enabled_cgroup_renames = NULL;
 static SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 
+static SIMPLE_PATTERN *entrypoint_parent_process_comm = NULL;
+
 static char *cgroups_rename_script = NULL;
 static char *cgroups_network_interface_script = NULL;
 
@@ -916,6 +918,10 @@ static inline int matches_systemd_services_cgroups(char *id) {
 
 static inline int matches_search_cgroup_paths(const char *dir) {
     return simple_pattern_matches(search_cgroup_paths, dir);
+}
+
+static inline int matches_entrypoint_parent_process_comm(const char *comm) {
+    return simple_pattern_matches(entrypoint_parent_process_comm, comm);
 }
 
 static inline int is_cgroup_systemd_service(struct cgroup *cg) {
@@ -2567,6 +2573,16 @@ static inline void discovery_find_all_cgroups_v2() {
     }
 }
 
+static int is_digits_only(const char *s) {
+  do {
+    if (!isdigit(*s++)) {
+      return 0;
+    }
+  } while (*s);
+
+  return 1;
+}
+
 static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     if (!cg->first_time_seen) {
         return;
@@ -2577,9 +2593,8 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
 
     if (is_inside_k8s && !k8s_get_container_first_proc_comm(cg->id, comm)) {
         // container initialization may take some time when CPU % is high
-        // skip processes that are parent of an entrypoint (http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
-        // 'isdigit' for 6 (before runc, seen on GKE).
-        if (isdigit(comm[0]) || !strncmp(comm, "runc:[", 6) || !strcmp(comm, "exe")) {
+        // seen on GKE: comm is '6' before 'runc:[2:INIT]' (dunno if it could be another number)
+        if (is_digits_only(comm) || matches_entrypoint_parent_process_comm(comm)) {
             cg->first_time_seen = 1;
             return;
         }
@@ -2728,6 +2743,12 @@ void cgroup_discovery_worker(void *ptr)
     worker_register_job_name(WORKER_DISCOVERY_COPY,               "copy");
     worker_register_job_name(WORKER_DISCOVERY_SHARE,              "share");
     worker_register_job_name(WORKER_DISCOVERY_LOCK,               "lock");
+
+    entrypoint_parent_process_comm = simple_pattern_create(
+        " runc:[* " // http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
+        " exe ", // https://github.com/falcosecurity/falco/blob/9d41b0a151b83693929d3a9c84f7c5c85d070d3a/rules/falco_rules.yaml#L1961
+        NULL,
+        SIMPLE_PATTERN_EXACT);
 
     while (!netdata_exit) {
         worker_is_idle();
