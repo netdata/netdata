@@ -15,16 +15,11 @@ ARCHITECTURE="$(uname -m)"
 virtualization_normalize_name() {
   vname="$1"
   case "$vname" in
-  "User-mode Linux")
-    vname="uml"
-    ;;
-  "Windows Subsystem for Linux")
-    vname="wsl"
-    ;;
+  "User-mode Linux") vname="uml" ;;
+  "Windows Subsystem for Linux") vname="wsl" ;;
   esac
 
-  vname=$(echo "$vname" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
-  echo "$vname"
+  echo "$vname" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g'
 }
 
 CONTAINER="unknown"
