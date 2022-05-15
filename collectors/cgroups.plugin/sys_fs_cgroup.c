@@ -2577,9 +2577,8 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
 
     if (is_inside_k8s && !k8s_get_container_first_proc_comm(cg->id, comm)) {
         // container initialization may take some time when CPU % is high
-        // could be:
-        //   6 (before runc, seen on GKE)
-        //   runc:[0:PARENT], runc:[1:CHILD], runc:[2:INIT]
+        // skip processes that are parent of an entrypoint (http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
+        // 'isdigit' for 6 (before runc, seen on GKE).
         if (isdigit(comm[0]) || !strncmp(comm, "runc:[", 6) || !strcmp(comm, "exe")) {
             cg->first_time_seen = 1;
             return;
