@@ -6,6 +6,28 @@
 #define PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME "systemd"
 #define PLUGIN_CGROUPS_MODULE_CGROUPS_NAME "/sys/fs/cgroup"
 
+// main cgroups thread worker jobs
+#define WORKER_CGROUPS_LOCK 0
+#define WORKER_CGROUPS_READ 1
+#define WORKER_CGROUPS_CHART 2
+
+// discovery cgroup thread worker jobs
+#define WORKER_DISCOVERY_INIT               0
+#define WORKER_DISCOVERY_FIND               1
+#define WORKER_DISCOVERY_PROCESS            2
+#define WORKER_DISCOVERY_PROCESS_RENAME     3
+#define WORKER_DISCOVERY_PROCESS_NETWORK    4
+#define WORKER_DISCOVERY_PROCESS_FIRST_TIME 5
+#define WORKER_DISCOVERY_UPDATE             6
+#define WORKER_DISCOVERY_CLEANUP            7
+#define WORKER_DISCOVERY_COPY               8
+#define WORKER_DISCOVERY_SHARE              9
+#define WORKER_DISCOVERY_LOCK              10
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 11
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 11
+#endif
+
 // ----------------------------------------------------------------------------
 // cgroup globals
 
@@ -2608,6 +2630,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     }
 
     if (cg->first_time_seen) {
+        worker_is_busy(WORKER_DISCOVERY_PROCESS_FIRST_TIME);
         discovery_process_first_time_seen_cgroup(cg);
         if (unlikely(cg->first_time_seen || cg->processed)) {
             return;
@@ -2615,6 +2638,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     }
 
     if (cg->pending_renames) {
+        worker_is_busy(WORKER_DISCOVERY_PROCESS_RENAME);
         discovery_rename_cgroup(cg);
         if (unlikely(cg->pending_renames || cg->processed)) {
             return;
@@ -2644,21 +2668,9 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
         return;
     }
 
+    worker_is_busy(WORKER_DISCOVERY_PROCESS_NETWORK);
     read_cgroup_network_interfaces(cg);
 }
-
-#define WORKER_DISCOVERY_INIT 0
-#define WORKER_DISCOVERY_FIND 1
-#define WORKER_DISCOVERY_PROCESS 2
-#define WORKER_DISCOVERY_UPDATE 3
-#define WORKER_DISCOVERY_CLEANUP 4
-#define WORKER_DISCOVERY_COPY 5
-#define WORKER_DISCOVERY_SHARE 6
-#define WORKER_DISCOVERY_LOCK 7
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
-#endif
 
 static inline void discovery_find_all_cgroups() {
     debug(D_CGROUP, "searching for cgroups");
@@ -2704,14 +2716,17 @@ void cgroup_discovery_worker(void *ptr)
     UNUSED(ptr);
 
     worker_register("CGROUPSDISC");
-    worker_register_job_name(WORKER_DISCOVERY_INIT, "init");
-    worker_register_job_name(WORKER_DISCOVERY_FIND, "find");
-    worker_register_job_name(WORKER_DISCOVERY_PROCESS, "process");
-    worker_register_job_name(WORKER_DISCOVERY_UPDATE, "update");
-    worker_register_job_name(WORKER_DISCOVERY_CLEANUP, "cleanup");
-    worker_register_job_name(WORKER_DISCOVERY_COPY, "copy");
-    worker_register_job_name(WORKER_DISCOVERY_SHARE, "share");
-    worker_register_job_name(WORKER_DISCOVERY_LOCK, "lock");
+    worker_register_job_name(WORKER_DISCOVERY_INIT,               "init");
+    worker_register_job_name(WORKER_DISCOVERY_FIND,               "find");
+    worker_register_job_name(WORKER_DISCOVERY_PROCESS,            "process");
+    worker_register_job_name(WORKER_DISCOVERY_PROCESS_RENAME,     "rename");
+    worker_register_job_name(WORKER_DISCOVERY_PROCESS_NETWORK,    "network");
+    worker_register_job_name(WORKER_DISCOVERY_PROCESS_FIRST_TIME, "new");
+    worker_register_job_name(WORKER_DISCOVERY_UPDATE,             "update");
+    worker_register_job_name(WORKER_DISCOVERY_CLEANUP,            "cleanup");
+    worker_register_job_name(WORKER_DISCOVERY_COPY,               "copy");
+    worker_register_job_name(WORKER_DISCOVERY_SHARE,              "share");
+    worker_register_job_name(WORKER_DISCOVERY_LOCK,               "lock");
 
     while (!netdata_exit) {
         worker_is_idle();
@@ -4888,14 +4903,6 @@ static void cgroup_main_cleanup(void *ptr) {
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
-
-#define WORKER_CGROUPS_LOCK 0
-#define WORKER_CGROUPS_READ 1
-#define WORKER_CGROUPS_CHART 2
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 3
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
-#endif
 
 void *cgroups_main(void *ptr) {
     worker_register("CGROUPS");
