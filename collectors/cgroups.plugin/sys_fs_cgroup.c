@@ -2580,7 +2580,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
         // could be:
         //   6 (before runc, seen on GKE)
         //   runc:[0:PARENT], runc:[1:CHILD], runc:[2:INIT]
-        if (!strncmp(comm, "runc:[", 6) || isdigit(comm[0])) {
+        if (isdigit(comm[0]) || !strncmp(comm, "runc:[", 6) || !strcmp(comm, "exe")) {
             cg->first_time_seen = 1;
             return;
         }
