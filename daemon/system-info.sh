@@ -14,8 +14,6 @@ ARCHITECTURE="$(uname -m)"
 # lscpu: https://github.com/util-linux/util-linux/blob/581b77da7aa4a5205902857184d555bed367e3e0/sys-utils/lscpu.c#L52
 virtualization_normalize_name() {
   vname="$1"
-  vname=$(echo "$vname" | tr '[:upper:]' '[:lower:]')
-
   case "$vname" in
   "User-mode Linux")
     vname="uml"
@@ -25,7 +23,7 @@ virtualization_normalize_name() {
     ;;
   esac
 
-  vname=$(echo "$vname" | sed 's/ /-/g')
+  vname=$(echo "$vname" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
   echo "$vname"
 }
 
