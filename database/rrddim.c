@@ -2,6 +2,10 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengineapi.h"
+#endif
+#include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
 // RRDDIM index
@@ -95,74 +99,6 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
-
-// ----------------------------------------------------------------------------
-// RRDDIM legacy data collection functions
-
-static void rrddim_collect_init(RRDDIM *rd) {
-    rd->state->handle = callocz(1, sizeof(struct mem_collect_handle));
-    rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
-}
-static void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number) {
-    (void)point_in_time;
-
-    rd->values[rd->rrdset->current_entry] = number;
-}
-static int rrddim_collect_finalize(RRDDIM *rd) {
-    freez(rd->state->handle);
-    return 0;
-}
-
-
-// ----------------------------------------------------------------------------
-// RRDDIM legacy database query functions
-
-static void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
-    handle->rd = rd;
-    handle->start_time = start_time;
-    handle->end_time = end_time;
-    struct mem_query_handle* mem_handle = callocz(1, sizeof(struct mem_query_handle));
-    mem_handle->slot = rrdset_time2slot(rd->rrdset, start_time);
-    mem_handle->last_slot = rrdset_time2slot(rd->rrdset, end_time);
-    mem_handle->finished = 0;
-    handle->handle = (STORAGE_QUERY_HANDLE *)mem_handle;
-}
-
-static storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time) {
-    RRDDIM *rd = handle->rd;
-    struct mem_query_handle* mem_handle = (struct mem_query_handle*)handle->handle;
-    long entries = rd->rrdset->entries;
-    long slot = mem_handle->slot;
-
-    (void)current_time;
-    if (unlikely(mem_handle->slot == mem_handle->last_slot))
-        mem_handle->finished = 1;
-    storage_number n = rd->values[slot++];
-
-    if(unlikely(slot >= entries)) slot = 0;
-    mem_handle->slot = slot;
-
-    return n;
-}
-
-static int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
-    struct mem_query_handle* mem_handle = (struct mem_query_handle*)handle->handle;
-    return mem_handle->finished;
-}
-
-static void rrddim_query_finalize(struct rrddim_query_handle *handle) {
-    freez(handle->handle);
-    return;
-}
-
-static time_t rrddim_query_latest_time(RRDDIM *rd) {
-    return rrdset_last_entry_t_nolock(rd->rrdset);
-}
-
-static time_t rrddim_query_oldest_time(RRDDIM *rd) {
-    return rrdset_first_entry_t_nolock(rd->rrdset);
-}
-
 
 // ----------------------------------------------------------------------------
 // RRDDIM create a dimension
@@ -373,30 +309,16 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state->aclk_live_status = -1;
 #endif
     (void) find_dimension_uuid(st, rd, &(rd->state->metric_uuid));
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+
+    STORAGE_ENGINE* eng = storage_engine_get(memory_mode);
+    rd->state->collect_ops = eng->api.collect_ops;
+    rd->state->query_ops = eng->api.query_ops;
+
 #ifdef ENABLE_DBENGINE
+    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         rrdeng_metric_init(rd);
-        rd->state->collect_ops.init = rrdeng_store_metric_init;
-        rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-        rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
-        rd->state->query_ops.init = rrdeng_load_metric_init;
-        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-#endif
-    } else {
-        rd->state->collect_ops.init         = rrddim_collect_init;
-        rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
-        rd->state->collect_ops.finalize     = rrddim_collect_finalize;
-        rd->state->query_ops.init           = rrddim_query_init;
-        rd->state->query_ops.next_metric    = rrddim_query_next_metric;
-        rd->state->query_ops.is_finished    = rrddim_query_is_finished;
-        rd->state->query_ops.finalize       = rrddim_query_finalize;
-        rd->state->query_ops.latest_time    = rrddim_query_latest_time;
-        rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
     }
+#endif
     store_active_dimension(&rd->state->metric_uuid);
     rd->state->collect_ops.init(rd);
     // append this dimension
@@ -447,13 +369,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 // ----------------------------------------------------------------------------
 // RRDDIM remove / free a dimension
 
-void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
+void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
     ml_delete_dimension(rd);
-
-#ifndef ENABLE_ACLK
-    UNUSED(db_rotated);
-#endif
+    
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {

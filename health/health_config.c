@@ -109,7 +109,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
                         && !strcmp(t->name, rt->name)
                         && !strcmp(t->family_match?t->family_match:"*", rt->family_match?rt->family_match:"*")
             )) {
-                error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
+                info("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
                 return 0;
             }
         }
@@ -127,7 +127,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
                         && !strcmp(t->name, rt->name)
                         && !strcmp(t->family_match?t->family_match:"*", rt->family_match?rt->family_match:"*")
             )) {
-                error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
+                info("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
                 return 0;
             }
         }
@@ -432,6 +432,9 @@ static inline int health_parse_db_lookup(
         }
         else if(!strcasecmp(key, "unaligned")) {
             *options |= RRDR_OPTION_NOT_ALIGNED;
+        }
+        else if(!strcasecmp(key, "anomaly-bit")) {
+            *options |= RRDR_OPTION_ANOMALY_BIT;
         }
         else if(!strcasecmp(key, "match-ids") || !strcasecmp(key, "match_ids")) {
             *options |= RRDR_OPTION_MATCH_IDS;

@@ -29,7 +29,7 @@ Netdata uses the following features from the Linux kernel to run eBPF programs:
 -   Tracepoints are hooks to call specific functions. Tracepoints are more stable than `kprobes` and are preferred when
     both options are available.
 -   Trampolines are bridges between kernel functions, and BPF programs. Netdata uses them by default whenever available.
--   Kprobes and return probes (`kretprobe`): Probes can insert virtually into any kernel instruction. When eBPF runs in `entry` mode, it attaches only `kprobes` for internal functions monitoring calls and some arguments every time a function is called. The user can also change configuration to use [`return`](#global) mode, and this will allow users to monitor return from these functions and detect possible failures.
+-   Kprobes and return probes (`kretprobe`): Probes can insert virtually into any kernel instruction. When eBPF runs in `entry` mode, it attaches only `kprobes` for internal functions monitoring calls and some arguments every time a function is called. The user can also change configuration to use [`return`](#global-configuration-options) mode, and this will allow users to monitor return from these functions and detect possible failures.
 
 In each case, wherever a normal kprobe, kretprobe, or tracepoint would have run its hook function, an eBPF program is run instead, performing various collection logic before letting the kernel continue its normal control flow.
 
@@ -137,7 +137,7 @@ _enable_ the integration with `cgroups.plugin`, change the `cgroups` setting to 
 
 If you do not need to monitor specific metrics for your `cgroups`, you can enable `cgroups` inside
 `ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the
-[Configuration](#configuration) section.
+[Configuration](#configuring-ebpfplugin) section.
 
 #### Integration Dashboard Elements
 
@@ -419,7 +419,7 @@ collected in the previous and current seconds.
 ### System overview
 
 Not all charts within the System Overview menu are enabled by default. Charts that rely on `kprobes` are disabled by default because they add around 100ns overhead for each function call. This is a small number from a human's perspective, but the functions are called many times and create an impact
-on host. See the [configuration](#configuration) section for details about how to enable them.
+on host. See the [configuration](#configuring-ebpfplugin) section for details about how to enable them.
 
 #### Processes
 
@@ -863,7 +863,7 @@ eBPF monitoring is complex and produces a large volume of metrics. We've discove
 significantly increases kernel memory usage by several hundred MB.
 
 If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart,
-consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuration). Next,
+consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuring-ebpfplugin). Next,
 [restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system memory
 usage (see the `system.ram` chart) has dropped significantly.
 

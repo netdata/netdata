@@ -10,9 +10,9 @@ extern "C" {
 #include "daemon/common.h"
 #include "web/api/queries/rrdr.h"
 
-// This is an internal DBEngine function redeclared here so that we can free
+// This is a DBEngine function redeclared here so that we can free
 // the anomaly rate dimension, whenever its backing dimension is freed.
-extern void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated);
+extern void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 typedef void* ml_host_t;
 typedef void* ml_dimension_t;

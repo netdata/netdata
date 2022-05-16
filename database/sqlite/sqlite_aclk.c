@@ -344,7 +344,7 @@ static void timer_cb(uv_timer_t* handle)
             }
         }
 
-        if (wc->alert_updates) {
+        if (wc->alert_updates && !wc->pause_alert_updates) {
             cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
             cmd.count = ACLK_MAX_ALERT_UPDATES;
             aclk_database_enq_cmd_noblock(wc, &cmd);
@@ -569,6 +569,8 @@ void aclk_database_worker(void *arg)
                         cmd.completion = NULL;
                         wc->node_info_send = aclk_database_enq_cmd_noblock(wc, &cmd);
                     }
+                    if (localhost == wc->host)
+                        (void) sqlite3_wal_checkpoint(db_meta, NULL);
                     break;
                 default:
                     debug(D_ACLK_SYNC, "%s: default.", __func__);

@@ -972,8 +972,14 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 
 int do_system_ram(int update_every, usec_t dt) {
     (void)dt;
-    static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
-               mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
+    static int mib_active_count[4] = {0, 0, 0, 0},
+               mib_inactive_count[4] = {0, 0, 0, 0},
+               mib_wire_count[4] = {0, 0, 0, 0},
+#if __FreeBSD_version < 1200016
+               mib_cache_count[4] = {0, 0, 0, 0},
+#endif
+               mib_vfs_bufspace[2] = {0, 0},
+               mib_free_count[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
     size_t vfs_bufspace_count;
 
@@ -1026,10 +1032,8 @@ int do_system_ram(int update_every, usec_t dt) {
             rd_free     = rrddim_add(st, "free",     NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             rd_active   = rrddim_add(st, "active",   NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             rd_inactive = rrddim_add(st, "inactive", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-            rd_wired    = rrddim_add(st, "wired",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-#if __FreeBSD_version < 1200016
-            rd_cache    = rrddim_add(st, "cache",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-#endif
+            rd_wired    = rrddim_add(st, "wired",    NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+            rd_cache    = rrddim_add(st, "cache",    NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
 #if defined(NETDATA_COLLECT_LAUNDRY)
             rd_laundry  = rrddim_add(st, "laundry",  NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
 #endif
@@ -1040,9 +1044,11 @@ int do_system_ram(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_free,     vmmeter_data.v_free_count);
         rrddim_set_by_pointer(st, rd_active,   vmmeter_data.v_active_count);
         rrddim_set_by_pointer(st, rd_inactive, vmmeter_data.v_inactive_count);
-        rrddim_set_by_pointer(st, rd_wired,    vmmeter_data.v_wire_count);
+        rrddim_set_by_pointer(st, rd_wired,    vmmeter_data.v_wire_count * system_pagesize - zfs_arcstats_shrinkable_cache_size_bytes);
 #if __FreeBSD_version < 1200016
-        rrddim_set_by_pointer(st, rd_cache,    vmmeter_data.v_cache_count);
+        rrddim_set_by_pointer(st, rd_cache,    vmmeter_data.v_cache_count * system_pagesize + zfs_arcstats_shrinkable_cache_size_bytes);
+#else
+        rrddim_set_by_pointer(st, rd_cache,    zfs_arcstats_shrinkable_cache_size_bytes);
 #endif
 #if defined(NETDATA_COLLECT_LAUNDRY)
         rrddim_set_by_pointer(st, rd_laundry,  vmmeter_data.v_laundry_count);

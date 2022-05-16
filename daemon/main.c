@@ -343,12 +343,12 @@ int help(int exitcode) {
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
-            "  -W stresstest=A,B,C,D,E,F\n"
+            "  -W stresstest=A,B,C,D,E,F,G\n"
             "                           Run a DB engine stress test for A seconds,\n"
             "                           with B writers and C readers, with a ramp up\n"
             "                           time of D seconds for writers, a page cache\n"
             "                           size of E MiB, an optional disk space limit\n"
-            "                           of F MiB and exit.\n\n"
+            "                           of F MiB, G libuv workers (default 16) and exit.\n\n"
 #endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
@@ -570,7 +570,7 @@ static void get_netdata_configured_variables() {
 
 }
 
-static int load_netdata_conf(char *filename, char overwrite_used) {
+int load_netdata_conf(char *filename, char overwrite_used) {
     errno = 0;
 
     int ret = 0;
@@ -780,17 +780,17 @@ int main(int argc, char **argv) {
                         char* stresstest_string = "stresstest=";
 #endif
                         if(strcmp(optarg, "sqlite-check") == 0) {
-                            sql_init_database(DB_CHECK_INTEGRITY);
+                            sql_init_database(DB_CHECK_INTEGRITY, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-fix") == 0) {
-                            sql_init_database(DB_CHECK_FIX_DB);
+                            sql_init_database(DB_CHECK_FIX_DB, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-compact") == 0) {
-                            sql_init_database(DB_CHECK_RECLAIM_SPACE);
+                            sql_init_database(DB_CHECK_RECLAIM_SPACE, 0);
                             return 0;
                         }
 
@@ -838,7 +838,7 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
                             char *endptr;
                             unsigned test_duration_sec = 0, dset_charts = 0, query_threads = 0, ramp_up_seconds = 0,
-                            page_cache_mb = 0, disk_space_mb = 0;
+                            page_cache_mb = 0, disk_space_mb = 0, workers = 16;
 
                             optarg += strlen(stresstest_string);
                             test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
@@ -852,7 +852,15 @@ int main(int argc, char **argv) {
                                 page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             if (',' == *endptr)
                                 disk_space_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                workers = (unsigned)strtoul(endptr + 1, &endptr, 0);
 
+                            if (workers > 1024)
+                                workers = 1024;
+
+                            char workers_str[16];
+                            snprintf(workers_str, 15, "%u", workers);
+                            setenv("UV_THREADPOOL_SIZE", workers_str, 1);
                             dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
                                                  page_cache_mb, disk_space_mb);
                             return 0;

@@ -118,6 +118,7 @@ typedef enum {
     PROC_STATUS_END, //place holder for ending enum fields
 } proc_state;
 
+#ifndef __FreeBSD__
 static proc_state proc_state_count[PROC_STATUS_END];
 static const char *proc_states[] = {
     [PROC_STATUS_RUNNING] = "running",
@@ -126,6 +127,7 @@ static const char *proc_states[] = {
     [PROC_STATUS_ZOMBIE] = "zombie",
     [PROC_STATUS_STOPPED] = "stopped",
     };
+#endif
 
 // ----------------------------------------------------------------------------
 // internal flags
@@ -1252,7 +1254,6 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
 
     aptr->p->status_rssshmem = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
-#endif // !__FreeBSD__
 
 static void update_proc_state_count(char proc_state) {
     switch (proc_state) {
@@ -1275,6 +1276,7 @@ static void update_proc_state_count(char proc_state) {
             break;
     }
 }
+#endif // !__FreeBSD__
 
 static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->status_vmsize           = 0;
@@ -1495,7 +1497,9 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
         p->cstime           = 0;
         p->cgtime           = 0;
     }
+#ifndef __FreeBSD__
     update_proc_state_count(p->state);
+#endif
     return 1;
 
 cleanup:
@@ -1640,7 +1644,7 @@ cleanup:
 }
 #else
 static inline int read_global_time() {
-    static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, ntime_raw = 0;
+    static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
     long cp_time[CPUSTATES];
 
@@ -1958,6 +1962,8 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     static char *fdsbuf;
     char *bfdsbuf, *efdsbuf;
     char fdsname[FILENAME_MAX + 1];
+#define SHM_FORMAT_LEN 31 // format: 21 + size: 10
+    char shm_name[FILENAME_MAX - SHM_FORMAT_LEN + 1];
 
     // we make all pid fds negative, so that
     // we can detect unused file descriptors
@@ -1995,7 +2001,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
         }
 
         // get file descriptors array index
-        int fdid = fds->kf_fd;
+        size_t fdid = fds->kf_fd;
 
         // check if the fds array is small
         if (unlikely(fdid >= p->fds_size)) {
@@ -2055,7 +2061,8 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 #endif
                     break;
                 case KF_TYPE_SHM:
-                    sprintf(fdsname, "other: shm: %s size: %lu", fds->kf_path, fds->kf_un.kf_file.kf_file_size);
+                    strncpyz(shm_name, fds->kf_path, FILENAME_MAX - SHM_FORMAT_LEN);
+                    sprintf(fdsname, "other: shm: %s size: %lu", shm_name, fds->kf_un.kf_file.kf_file_size);
                     break;
                 case KF_TYPE_SEM:
                     sprintf(fdsname, "other: sem: %u", fds->kf_un.kf_sem.kf_sem_value);
@@ -2575,9 +2582,10 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 static int collect_data_for_all_processes(void) {
     struct pid_stat *p = NULL;
 
+#ifndef __FreeBSD__
     // clear process state counter
     memset(proc_state_count, 0, sizeof proc_state_count);
-#ifdef __FreeBSD__
+#else
     int i, procnum;
 
     static size_t procbase_size = 0;
@@ -3849,6 +3857,8 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 }
 
+
+#ifndef __FreeBSD__
 static void send_proc_states_count(usec_t dt)
 {
     static bool chart_added = false;
@@ -3872,6 +3882,7 @@ static void send_proc_states_count(usec_t dt)
     }
     send_END();
 }
+#endif
 
 // ----------------------------------------------------------------------------
 // parse command line arguments

@@ -27,9 +27,9 @@ include:
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
 
-  - distro: rockylinux
+  - distro: almalinux
     version: "8"
-    base_image: rockylinux/rockylinux
+    base_image: almalinux
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages:

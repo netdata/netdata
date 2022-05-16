@@ -66,7 +66,7 @@ typedef enum db_check_action_type {
         return 1;                                                                                                      \
     }
 
-extern int sql_init_database(db_check_action_type_t rebuild);
+extern int sql_init_database(db_check_action_type_t rebuild, int memory);
 extern void sql_close_database(void);
 
 extern int sql_store_host(uuid_t *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os, const char *timezone, const char *tags);

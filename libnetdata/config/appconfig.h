@@ -83,6 +83,7 @@
 #define CONFIG_FILENAME "netdata.conf"
 
 #define CONFIG_SECTION_GLOBAL     "global"
+#define CONFIG_SECTION_SQLITE     "sqlite"
 #define CONFIG_SECTION_WEB        "web"
 #define CONFIG_SECTION_STATSD     "statsd"
 #define CONFIG_SECTION_PLUGINS    "plugins"
@@ -95,6 +96,7 @@
 #define CONFIG_SECTION_PROMETHEUS "prometheus:exporter"
 #define CONFIG_SECTION_HOST_LABEL "host labels"
 #define EXPORTING_CONF            "exporting.conf"
+#define CONFIG_SECTION_GLOBAL_STATISTICS "global statistics"
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)

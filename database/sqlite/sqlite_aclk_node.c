@@ -24,6 +24,14 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.child = (wc->host != localhost);
     node_info.ml_info.ml_capable = ml_capable(localhost);
     node_info.ml_info.ml_enabled = ml_enabled(wc->host);
+
+    struct capability instance_caps[] = {
+        { .name = "proto", .version = 1,                     .enabled = 1 },
+        { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(wc->host) },
+        { .name = NULL,    .version = 0,                     .enabled = 0 }
+    };
+    node_info.node_instance_capabilities = instance_caps;
+
     now_realtime_timeval(&node_info.updated_at);
 
     RRDHOST *host = wc->host;
@@ -47,7 +55,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.memory = host->system_info->host_ram_total ? host->system_info->host_ram_total : "0";
     node_info.data.disk_space = host->system_info->host_disk_space ? host->system_info->host_disk_space : "0";
     node_info.data.version = host_version ? host_version : VERSION;
-    node_info.data.release_channel = "nightly";
+    node_info.data.release_channel = (char *) get_release_channel();
     node_info.data.timezone = (char *) host->abbrev_timezone;
     node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
     node_info.data.container_type = host->system_info->container ? host->system_info->container : "unknown";
@@ -55,6 +63,13 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.services = NULL;   // char **
     node_info.data.service_count = 0;
     node_info.data.machine_guid = wc->host_guid;
+
+    struct capability node_caps[] = {
+        { .name = "ml", .version = host->system_info->ml_capable, .enabled = host->system_info->ml_enabled },
+        { .name = NULL, .version = 0, .enabled = 0 }
+    };
+    node_info.node_capabilities = node_caps;
+
     node_info.data.ml_info.ml_capable = host->system_info->ml_capable;
     node_info.data.ml_info.ml_enabled = host->system_info->ml_enabled;
 

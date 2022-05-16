@@ -641,6 +641,10 @@ set(RRD_PLUGIN_FILES
         database/rrdsetvar.h
         database/rrdvar.c
         database/rrdvar.h
+        database/storage_engine.c
+        database/storage_engine.h
+        database/ram/rrddim_mem.c
+        database/ram/rrddim_mem.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
         database/sqlite/sqlite_aclk.c
@@ -825,6 +829,8 @@ set(ACLK_FILES
         aclk/schema-wrappers/alarm_config.h
         aclk/schema-wrappers/node_info.cc
         aclk/schema-wrappers/node_info.h
+        aclk/schema-wrappers/capability.cc
+        aclk/schema-wrappers/capability.h
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
@@ -1031,7 +1037,7 @@ IF(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE)
     message(STATUS "prometheus remote write exporting: enabled")
 
     find_package(Protobuf REQUIRED)
-    
+
     function(PROTOBUF_REMOTE_WRITE_GENERATE_CPP SRCS HDRS)
         if(NOT ARGN)
             message(SEND_ERROR "Error: PROTOBUF_REMOTE_WRITE_GENERATE_CPP() called without any proto files")

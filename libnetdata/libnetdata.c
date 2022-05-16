@@ -982,6 +982,9 @@ static inline int madvise_mergeable(void *mem, size_t len) {
     if (ret != 0 && logger-- > 0) error("madvise(MADV_MERGEABLE) failed.");
     return ret;
 #else
+    UNUSED(mem);
+    UNUSED(len);
+    
     return 0;
 #endif
 }

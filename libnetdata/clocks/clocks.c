@@ -259,7 +259,8 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
             count++;
         }
     }
-    average = total / count;
+    if(count)
+        average = total / count;
 
     if(min_ptr) *min_ptr = min;
     if(max_ptr) *max_ptr = max;

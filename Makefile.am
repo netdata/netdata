@@ -450,6 +450,10 @@ RRD_PLUGIN_FILES = \
     database/rrdsetvar.h \
     database/rrdvar.c \
     database/rrdvar.h \
+    database/storage_engine.c \
+    database/storage_engine.h \
+    database/ram/rrddim_mem.c \
+    database/ram/rrddim_mem.h \
     database/sqlite/sqlite_functions.c \
     database/sqlite/sqlite_functions.h \
     database/sqlite/sqlite_aclk.c \
@@ -657,6 +661,8 @@ ACLK_FILES += \
     aclk/schema-wrappers/alarm_config.h \
     aclk/schema-wrappers/node_info.cc \
     aclk/schema-wrappers/node_info.h \
+    aclk/schema-wrappers/capability.cc \
+    aclk/schema-wrappers/capability.h \
     aclk/schema-wrappers/schema_wrappers.h \
     aclk/schema-wrappers/schema_wrapper_utils.cc \
     aclk/schema-wrappers/schema_wrapper_utils.h \

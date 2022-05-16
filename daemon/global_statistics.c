@@ -4,8 +4,6 @@
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
-#define CONFIG_SECTION_GLOBAL_STATISTICS "global statistics"
-
 #define WORKER_JOB_GLOBAL             0
 #define WORKER_JOB_REGISTRY           1
 #define WORKER_JOB_WORKERS            2
@@ -196,7 +194,7 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "clients"
                     , NULL
-                    , "netdata"
+                    , "api"
                     , NULL
                     , "Netdata Web Clients"
                     , "connected clients"
@@ -227,7 +225,7 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "requests"
                     , NULL
-                    , "netdata"
+                    , "api"
                     , NULL
                     , "Netdata Web Requests"
                     , "requests/s"
@@ -259,13 +257,13 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "net"
                     , NULL
-                    , "netdata"
+                    , "api"
                     , NULL
                     , "Netdata Network Traffic"
                     , "kilobits/s"
                     , "netdata"
                     , "stats"
-                    , 130000
+                    , 130400
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_AREA
             );
@@ -293,13 +291,13 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "response_time"
                     , NULL
-                    , "netdata"
+                    , "api"
                     , NULL
                     , "Netdata API Response Time"
                     , "milliseconds/request"
                     , "netdata"
                     , "stats"
-                    , 130400
+                    , 130500
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -342,13 +340,13 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "compression_ratio"
                     , NULL
-                    , "netdata"
+                    , "api"
                     , NULL
                     , "Netdata API Responses Compression Savings Ratio"
                     , "percentage"
                     , "netdata"
                     , "stats"
-                    , 130500
+                    , 130600
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -395,7 +393,7 @@ static void global_statistics_charts(void) {
                     , "queries/s"
                     , "netdata"
                     , "stats"
-                    , 130500
+                    , 131000
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -428,7 +426,7 @@ static void global_statistics_charts(void) {
                     , "points/s"
                     , "netdata"
                     , "stats"
-                    , 130501
+                    , 131001
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_AREA
             );
@@ -499,7 +497,7 @@ static void dbengine_statistics_charts(void) {
                         "percentage",
                         "netdata",
                         "stats",
-                        130502,
+                        132000,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -539,7 +537,7 @@ static void dbengine_statistics_charts(void) {
                         "percentage",
                         "netdata",
                         "stats",
-                        130503,
+                        132003,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -592,7 +590,7 @@ static void dbengine_statistics_charts(void) {
                         "pages",
                         "netdata",
                         "stats",
-                        130504,
+                        132004,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -635,7 +633,7 @@ static void dbengine_statistics_charts(void) {
                         "pages",
                         "netdata",
                         "stats",
-                        130505,
+                        132005,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -673,7 +671,7 @@ static void dbengine_statistics_charts(void) {
                         "MiB/s",
                         "netdata",
                         "stats",
-                        130506,
+                        132006,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -705,7 +703,7 @@ static void dbengine_statistics_charts(void) {
                         "operations/s",
                         "netdata",
                         "stats",
-                        130507,
+                        132007,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -738,7 +736,7 @@ static void dbengine_statistics_charts(void) {
                         "errors/s",
                         "netdata",
                         "stats",
-                        130508,
+                        132008,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -773,7 +771,7 @@ static void dbengine_statistics_charts(void) {
                         "descriptors",
                         "netdata",
                         "stats",
-                        130509,
+                        132009,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -810,7 +808,7 @@ static void dbengine_statistics_charts(void) {
                         "MiB",
                         "netdata",
                         "stats",
-                        130510,
+                        132010,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_STACKED);
 
@@ -884,6 +882,8 @@ static void update_heartbeat_charts() {
 // ---------------------------------------------------------------------------------------------------------------------
 // worker utilization
 
+#define WORKERS_MIN_PERCENT_DEFAULT 10000.0
+
 struct worker_job_type {
     char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
     size_t jobs_started;
@@ -898,6 +898,7 @@ struct worker_thread {
     int enabled;
 
     int cpu_enabled;
+    double cpu;
 
     kernel_uint_t utime;
     kernel_uint_t stime;
@@ -932,6 +933,11 @@ struct worker_utilization {
     double workers_min_busy_time;
     double workers_max_busy_time;
 
+    size_t workers_cpu_registered;
+    double workers_cpu_min;
+    double workers_cpu_max;
+    double workers_cpu_total;
+
     struct worker_thread *threads;
 
     RRDSET *st_workers_time;
@@ -939,7 +945,6 @@ struct worker_utilization {
     RRDDIM *rd_workers_time_min;
     RRDDIM *rd_workers_time_max;
 
-    size_t workers_cpu_enabled;
     RRDSET *st_workers_cpu;
     RRDDIM *rd_workers_cpu_avg;
     RRDDIM *rd_workers_cpu_min;
@@ -951,7 +956,77 @@ struct worker_utilization {
 
     RRDSET *st_workers_jobs_per_job_type;
     RRDSET *st_workers_busy_per_job_type;
+
+    RRDDIM *rd_total_cpu_utilizaton;
 };
+
+static struct worker_utilization all_workers_utilization[] = {
+    { .name = "STATS",       .family = "workers global statistics",       .priority = 1000000 },
+    { .name = "HEALTH",      .family = "workers health alarms",           .priority = 1000000 },
+    { .name = "MLTRAIN",     .family = "workers ML training",             .priority = 1000000 },
+    { .name = "MLDETECT",    .family = "workers ML detection",            .priority = 1000000 },
+    { .name = "STREAMRCV",   .family = "workers streaming receive",       .priority = 1000000 },
+    { .name = "STREAMSND",   .family = "workers streaming send",          .priority = 1000000 },
+    { .name = "DBENGINE",    .family = "workers dbengine instances",      .priority = 1000000 },
+    { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
+    { .name = "ACLKQUERY",   .family = "workers aclk query",              .priority = 1000000 },
+    { .name = "ACLKSYNC",    .family = "workers aclk host sync",          .priority = 1000000 },
+    { .name = "PLUGINSD",    .family = "workers plugins.d",               .priority = 1000000 },
+    { .name = "STATSD",      .family = "workers plugin statsd",           .priority = 1000000 },
+    { .name = "STATSDFLUSH", .family = "workers plugin statsd flush",     .priority = 1000000 },
+    { .name = "PROC",        .family = "workers plugin proc",             .priority = 1000000 },
+    { .name = "FREEBSD",     .family = "workers plugin freebsd",          .priority = 1000000 },
+    { .name = "MACOS",       .family = "workers plugin macos",            .priority = 1000000 },
+    { .name = "CGROUPS",     .family = "workers plugin cgroups",          .priority = 1000000 },
+    { .name = "CGROUPSDISC", .family = "workers plugin cgroups find",     .priority = 1000000 },
+    { .name = "DISKSPACE",   .family = "workers plugin diskspace",        .priority = 1000000 },
+    { .name = "TC",          .family = "workers plugin tc",               .priority = 1000000 },
+    { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
+    { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
+
+    // has to be terminated with a NULL
+    { .name = NULL,          .family = NULL       }
+};
+
+static void workers_total_cpu_utilization_chart(void) {
+    size_t i, cpu_enabled = 0;
+    for(i = 0; all_workers_utilization[i].name ;i++)
+        if(all_workers_utilization[i].workers_cpu_registered) cpu_enabled++;
+
+    if(!cpu_enabled) return;
+
+    static RRDSET *st = NULL;
+
+    if(!st) {
+        st = rrdset_create_localhost(
+            "netdata",
+            "workers_cpu",
+            NULL,
+            "workers",
+            "netdata.workers.cpu_total",
+            "Netdata Workers CPU Utilization (100% = 1 core)",
+            "%",
+            "netdata",
+            "stats",
+            999000,
+            localhost->rrd_update_every,
+            RRDSET_TYPE_STACKED);
+    }
+
+    rrdset_next(st);
+
+    for(i = 0; all_workers_utilization[i].name ;i++) {
+        struct worker_utilization *wu = &all_workers_utilization[i];
+        if(!wu->workers_cpu_registered) continue;
+
+        if(!wu->rd_total_cpu_utilizaton)
+            wu->rd_total_cpu_utilizaton = rrddim_add(st, wu->name_lowercase, NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+
+        rrddim_set_by_pointer(st, wu->rd_total_cpu_utilizaton, (collected_number)((double)wu->workers_cpu_total * 10000.0));
+    }
+
+    rrdset_done(st);
+}
 
 static void workers_utilization_update_chart(struct worker_utilization *wu) {
     if(!wu->workers_registered) return;
@@ -1000,19 +1075,25 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     rrdset_next(wu->st_workers_time);
 
+    if(unlikely(wu->workers_min_busy_time == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_min_busy_time = 0.0;
+
     if(wu->rd_workers_time_min)
         rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->workers_min_busy_time * 10000.0));
 
     if(wu->rd_workers_time_max)
         rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_max, (collected_number)((double)wu->workers_max_busy_time * 10000.0));
 
-    rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, (collected_number)((double)wu->workers_total_busy_time * 100.0 * 10000.0 / (double)wu->workers_total_duration));
+    if(wu->workers_total_duration == 0)
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, 0);
+    else
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, (collected_number)((double)wu->workers_total_busy_time * 100.0 * 10000.0 / (double)wu->workers_total_duration));
+
     rrdset_done(wu->st_workers_time);
 
     // ----------------------------------------------------------------------
 
 #ifdef __linux__
-    if(wu->workers_cpu_enabled || wu->st_workers_cpu) {
+    if(wu->workers_cpu_registered || wu->st_workers_cpu) {
         if(unlikely(!wu->st_workers_cpu)) {
             char name[RRD_ID_LENGTH_MAX + 1];
             snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_%s", wu->name_lowercase);
@@ -1047,31 +1128,19 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
         rrdset_next(wu->st_workers_cpu);
 
-        size_t count = 0;
-        calculated_number min = 1000.0, max = 0.0, total = 0.0;
-        struct worker_thread *wt;
-        for(wt = wu->threads; wt ; wt = wt->next) {
-            if(!wt->cpu_enabled) continue;
-            count++;
-
-            usec_t delta = wt->collected_time - wt->collected_time_old;
-            calculated_number utime = (calculated_number)(wt->utime - wt->utime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
-            calculated_number stime = (calculated_number)(wt->stime - wt->stime_old) / (calculated_number)system_hz * 100.0 * (calculated_number)USEC_PER_SEC / (calculated_number)delta;
-            calculated_number cpu_util = utime + stime;
-
-            total += cpu_util;
-            if(cpu_util < min) min = cpu_util;
-            if(cpu_util > max) max = cpu_util;
-        }
-        if(unlikely(min == 1000.0)) min = 0.0;
+        if(unlikely(wu->workers_cpu_min == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_cpu_min = 0.0;
 
         if(wu->rd_workers_cpu_min)
-            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(min * 10000ULL));
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(wu->workers_cpu_min * 10000ULL));
 
         if(wu->rd_workers_cpu_max)
-            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)(max * 10000ULL));
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)(wu->workers_cpu_max * 10000ULL));
 
-        rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( total * 10000ULL / (calculated_number)count ));
+        if(wu->workers_cpu_registered == 0)
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, 0);
+        else
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( wu->workers_cpu_total * 10000ULL / (calculated_number)wu->workers_cpu_registered ));
+
         rrdset_done(wu->st_workers_cpu);
     }
 #endif
@@ -1203,9 +1272,13 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
     wu->workers_total_busy_time = 0;
     wu->workers_total_duration = 0;
     wu->workers_total_jobs_started = 0;
-    wu->workers_min_busy_time = 100.0;
+    wu->workers_min_busy_time = WORKERS_MIN_PERCENT_DEFAULT;
     wu->workers_max_busy_time = 0;
-    wu->workers_cpu_enabled = 0;
+
+    wu->workers_cpu_registered = 0;
+    wu->workers_cpu_min = WORKERS_MIN_PERCENT_DEFAULT;
+    wu->workers_cpu_max = 0;
+    wu->workers_cpu_total = 0;
 
     size_t i;
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
@@ -1339,39 +1412,21 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
 
     // find its CPU utilization
     if((!read_thread_cpu_time_from_proc_stat(pid, &wt->utime, &wt->stime))) {
-        wt->cpu_enabled = 1;
         wt->collected_time = now_realtime_usec();
+        usec_t delta = wt->collected_time - wt->collected_time_old;
+
+        double utime = (double)(wt->utime - wt->utime_old) / (double)system_hz * 100.0 * (double)USEC_PER_SEC / (double)delta;
+        double stime = (double)(wt->stime - wt->stime_old) / (double)system_hz * 100.0 * (double)USEC_PER_SEC / (double)delta;
+        double cpu = utime + stime;
+        wt->cpu = cpu;
+        wt->cpu_enabled = 1;
+
+        wu->workers_cpu_total += cpu;
+        if(cpu < wu->workers_cpu_min) wu->workers_cpu_min = cpu;
+        if(cpu > wu->workers_cpu_max) wu->workers_cpu_max = cpu;
     }
-    wu->workers_cpu_enabled += wt->cpu_enabled;
+    wu->workers_cpu_registered += wt->cpu_enabled;
 }
-
-static struct worker_utilization all_workers_utilization[] = {
-    { .name = "STATS",       .family = "workers global statistics",       .priority = 1000000 },
-    { .name = "HEALTH",      .family = "workers health alarms",           .priority = 1000000 },
-    { .name = "MLTRAIN",     .family = "workers ML training",             .priority = 1000000 },
-    { .name = "MLDETECT",    .family = "workers ML detection",            .priority = 1000000 },
-    { .name = "STREAMRCV",   .family = "workers streaming receive",       .priority = 1000000 },
-    { .name = "STREAMSND",   .family = "workers streaming send",          .priority = 1000000 },
-    { .name = "DBENGINE",    .family = "workers dbengine instances",      .priority = 1000000 },
-    { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
-    { .name = "ACLKQUERY",   .family = "workers aclk query",              .priority = 1000000 },
-    { .name = "ACLKSYNC",    .family = "workers aclk host sync",          .priority = 1000000 },
-    { .name = "PLUGINSD",    .family = "workers plugins.d",               .priority = 1000000 },
-    { .name = "STATSD",      .family = "workers plugin statsd",           .priority = 1000000 },
-    { .name = "STATSDFLUSH", .family = "workers plugin statsd flush",     .priority = 1000000 },
-    { .name = "PROC",        .family = "workers plugin proc",             .priority = 1000000 },
-    { .name = "FREEBSD",     .family = "workers plugin freebsd",          .priority = 1000000 },
-    { .name = "MACOS",       .family = "workers plugin macos",            .priority = 1000000 },
-    { .name = "CGROUPS",     .family = "workers plugin cgroups",          .priority = 1000000 },
-    { .name = "CGROUPSDISC", .family = "workers plugin cgroups find",     .priority = 1000000 },
-    { .name = "DISKSPACE",   .family = "workers plugin diskspace",        .priority = 1000000 },
-    { .name = "TC",          .family = "workers plugin tc",               .priority = 1000000 },
-    { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
-    { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
-
-    // has to be terminated with a NULL
-    { .name = NULL,          .family = NULL       }
-};
 
 static void worker_utilization_charts(void) {
     static size_t iterations = 0;
@@ -1388,6 +1443,8 @@ static void worker_utilization_charts(void) {
 
         workers_threads_cleanup(&all_workers_utilization[i]);
     }
+
+    workers_total_cpu_utilization_chart();
 }
 
 static void worker_utilization_finish(void) {
@@ -1436,13 +1493,18 @@ void *global_statistics_main(void *ptr)
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
     int update_every =
-        (int)config_get_number("CONFIG_SECTION_GLOBAL_STATISTICS", "update every", localhost->rrd_update_every);
+        (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
     if (update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
+
+    // keep the randomness at zero
+    // to make sure we are not close to any other thread
+    hb.randomness = 0;
+
     while (!netdata_exit) {
         worker_is_idle();
         heartbeat_next(&hb, step);

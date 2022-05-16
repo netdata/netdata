@@ -805,49 +805,38 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
     struct section *co;
     struct config_option *cv;
 
-    for(i = 0; i < 3 ;i++) {
-        switch(i) {
-            case 0:
-                buffer_strcat(wb,
-                    "# netdata configuration\n"
-                    "#\n"
-                    "# You can download the latest version of this file, using:\n"
-                    "#\n"
-                    "#  wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
-                    "# or\n"
-                    "#  curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
-                    "#\n"
-                    "# You can uncomment and change any of the options below.\n"
-                    "# The value shown in the commented settings, is the default value.\n"
-                    "#\n"
-                    "\n# global netdata configuration\n");
-                break;
+    buffer_strcat(wb,
+                  "# netdata configuration\n"
+                  "#\n"
+                  "# You can download the latest version of this file, using:\n"
+                  "#\n"
+                  "#  wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
+                  "# or\n"
+                  "#  curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
+                  "#\n"
+                  "# You can uncomment and change any of the options below.\n"
+                  "# The value shown in the commented settings, is the default value.\n"
+                  "#\n"
+                  "\n# global netdata configuration\n");
 
-            case 1:
-                buffer_strcat(wb, "\n\n# per plugin configuration\n");
-                break;
-
-            case 2:
-                buffer_strcat(wb, "\n\n# per chart configuration\n");
-                break;
-        }
-
+    for(i = 0; i <= 13 ;i++) {
         appconfig_wrlock(root);
         for(co = root->first_section; co ; co = co->next) {
-            if(!strcmp(co->name, CONFIG_SECTION_GLOBAL)
-               || !strcmp(co->name, CONFIG_SECTION_WEB)
-               || !strcmp(co->name, CONFIG_SECTION_STATSD)
-               || !strcmp(co->name, CONFIG_SECTION_PLUGINS)
-               || !strcmp(co->name, CONFIG_SECTION_CLOUD)
-               || !strcmp(co->name, CONFIG_SECTION_REGISTRY)
-               || !strcmp(co->name, CONFIG_SECTION_HEALTH)
-               || !strcmp(co->name, CONFIG_SECTION_STREAM)
-               || !strcmp(co->name, CONFIG_SECTION_HOST_LABEL)
-               || !strcmp(co->name, CONFIG_SECTION_ML)
-                    )
-                pri = 0;
-            else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
-            else pri = 2;
+            if(!strcmp(co->name, CONFIG_SECTION_GLOBAL))                 pri = 0;
+            else if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))        pri = 1;
+            else if(!strcmp(co->name, CONFIG_SECTION_SQLITE))            pri = 2;
+            else if(!strcmp(co->name, CONFIG_SECTION_CLOUD))             pri = 3;
+            else if(!strcmp(co->name, CONFIG_SECTION_ML))                pri = 4;
+            else if(!strcmp(co->name, CONFIG_SECTION_HEALTH))            pri = 5;
+            else if(!strcmp(co->name, CONFIG_SECTION_STREAM))            pri = 6;
+            else if(!strcmp(co->name, CONFIG_SECTION_WEB))               pri = 7;
+            // by default, new sections will get pri = 8 (set at the end, below)
+            else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 9;
+            else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 10;
+            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 11;
+            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 12;
+            else if(!strncmp(co->name, "plugin:", 7))                    pri = 13; // << change the loop too if you change this
+            else pri = 8; // this is used for any new (currently unknown) sections
 
             if(i == pri) {
                 int loaded = 0;

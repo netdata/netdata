@@ -142,9 +142,9 @@ void rrdset_done(RRDSET *st)
     UNUSED(st);
 }
 
-void update_pressure_chart(struct pressure_chart *chart)
+void update_pressure_charts(struct pressure_charts *charts)
 {
-    UNUSED(chart);
+    UNUSED(charts);
 }
 
 void netdev_rename_device_add(
