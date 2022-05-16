@@ -385,17 +385,17 @@ static void security_init(){
 static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug log",  filename);
+    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error log",  filename);
+    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access log", filename);
+    stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
 
     char deffacility[8];
     snprintfz(deffacility,7,"%s","daemon");
-    facility_log = config_get(CONFIG_SECTION_LOGS, "facility log",  deffacility);
+    facility_log = config_get(CONFIG_SECTION_LOGS, "facility",  deffacility);
 
     error_log_throttle_period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", error_log_throttle_period);
     error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
@@ -476,16 +476,16 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_DIRECTORIES, "plugins directory");
 
     config_move(CONFIG_SECTION_GLOBAL, "debug log",
-                CONFIG_SECTION_LOGS,   "debug log");
+                CONFIG_SECTION_LOGS,   "debug");
 
     config_move(CONFIG_SECTION_GLOBAL, "error log",
-                CONFIG_SECTION_LOGS,   "error log");
+                CONFIG_SECTION_LOGS,   "error");
 
     config_move(CONFIG_SECTION_GLOBAL, "access log",
-                CONFIG_SECTION_LOGS,   "access log");
+                CONFIG_SECTION_LOGS,   "access");
 
     config_move(CONFIG_SECTION_GLOBAL, "facility log",
-                CONFIG_SECTION_LOGS,   "facility log");
+                CONFIG_SECTION_LOGS,   "facility");
 
     config_move(CONFIG_SECTION_GLOBAL, "errors flood protection period",
                 CONFIG_SECTION_LOGS,   "errors flood protection period");
