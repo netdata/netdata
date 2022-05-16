@@ -416,6 +416,11 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
     if(init_database_batch(rebuild, 0, list)) return 1;
 
+    // PRAGMA schema.cache_size = pages;
+    // PRAGMA schema.cache_size = -kibibytes;
+    snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
+    if(init_database_batch(rebuild, 0, list)) return 1;
+
     if (init_database_batch(rebuild, 0, &database_config[0]))
         return 1;
 
