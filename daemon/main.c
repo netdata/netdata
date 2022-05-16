@@ -495,6 +495,15 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_GLOBAL, "debug flags",
                 CONFIG_SECTION_LOGS,   "debug flags");
+
+    config_move(CONFIG_SECTION_GLOBAL,   "TZ environment variable",
+                CONFIG_SECTION_ENV_VARS, "TZ");
+
+    config_move(CONFIG_SECTION_PLUGINS,  "PATH environment variable",
+                CONFIG_SECTION_ENV_VARS, "PATH");
+
+    config_move(CONFIG_SECTION_PLUGINS,  "PYTHONPATH environment variable",
+                CONFIG_SECTION_ENV_VARS, "PYTHONPATH");
 }
 
 static void get_netdata_configured_variables() {
