@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- chore\(streaming\): bump default "buffer size bytes" to 10MB [\#12913](https://github.com/netdata/netdata/pull/12913) ([ilyam8](https://github.com/ilyam8))
+- added worker jobs for cgroup-rename, cgroup-network and cgroup-first-time [\#12910](https://github.com/netdata/netdata/pull/12910) ([ktsaou](https://github.com/ktsaou))
 - Fix release channel in the node info message [\#12905](https://github.com/netdata/netdata/pull/12905) ([stelfrag](https://github.com/stelfrag))
 - chore\(worker\_utilization\): log an error when re-registering an already registered job [\#12903](https://github.com/netdata/netdata/pull/12903) ([ilyam8](https://github.com/ilyam8))
 - fix\(cgroups.plugin\): use correct identifier when registering the main thread "chart" worker job [\#12902](https://github.com/netdata/netdata/pull/12902) ([ilyam8](https://github.com/ilyam8))
