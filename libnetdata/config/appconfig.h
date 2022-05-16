@@ -84,6 +84,7 @@
 
 #define CONFIG_SECTION_GLOBAL             "global"
 #define CONFIG_SECTION_DIRECTORIES        "directories"
+#define CONFIG_SECTION_LOGS               "logs"
 #define CONFIG_SECTION_SQLITE             "sqlite"
 #define CONFIG_SECTION_WEB                "web"
 #define CONFIG_SECTION_STATSD             "statsd"
