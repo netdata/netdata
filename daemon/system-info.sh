@@ -10,6 +10,18 @@ ARCHITECTURE="$(uname -m)"
 # -------------------------------------------------------------------------------------------------
 # detect the virtualization and possibly the container technology
 
+# systemd-detect-virt: https://github.com/systemd/systemd/blob/df423851fcc05cf02281d11aab6aee7b476c1c3b/src/basic/virt.c#L999
+# lscpu: https://github.com/util-linux/util-linux/blob/581b77da7aa4a5205902857184d555bed367e3e0/sys-utils/lscpu.c#L52
+virtualization_normalize_name() {
+  vname="$1"
+  case "$vname" in
+  "User-mode Linux") vname="uml" ;;
+  "Windows Subsystem for Linux") vname="wsl" ;;
+  esac
+
+  echo "$vname" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g'
+}
+
 CONTAINER="unknown"
 CONT_DETECTION="none"
 CONTAINER_IS_OFFICIAL_IMAGE="${NETDATA_OFFICIAL_IMAGE:-false}"
@@ -24,9 +36,9 @@ if [ -z "${VIRTUALIZATION}" ]; then
     CONTAINER=${CONTAINER:-$(systemd-detect-virt -c)}
     CONT_DETECTION="systemd-detect-virt"
   else
-    if grep -q "^flags.*hypervisor" /proc/cpuinfo 2> /dev/null; then
-      VIRTUALIZATION="hypervisor"
-      VIRT_DETECTION="/proc/cpuinfo"
+    if command -v lscpu >/dev/null 2>&1; then
+      VIRTUALIZATION=$(lscpu | grep "Hypervisor vendor" | cut -d: -f 2 | awk '{$1=$1};1')
+      VIRT_DETECTION="lscpu"
     elif [ -n "$(command -v dmidecode)" ] && dmidecode -s system-product-name 2> /dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
       VIRTUALIZATION="$(dmidecode -s system-product-name)"
       VIRT_DETECTION="dmidecode"
@@ -34,9 +46,13 @@ if [ -z "${VIRTUALIZATION}" ]; then
       VIRTUALIZATION="none"
     fi
   fi
+
   if [ -z "${VIRTUALIZATION}" ]; then
     # Output from the command is outside of spec
     VIRTUALIZATION="unknown"
+    VIRT_DETECTION="none"
+  else
+    VIRTUALIZATION=$(virtualization_normalize_name $VIRTUALIZATION)
   fi
 else
   # Passed from outside - probably in docker run
