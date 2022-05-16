@@ -427,6 +427,8 @@ if(!s->rrdpush_compression)
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                 rrdpush_sender_thread_close_socket(host);
+                if (host->destination->next)
+                    host->destination->disabled_no_proper_reply = 1;
                 return 0;
             }else {
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
@@ -439,6 +441,8 @@ if(!s->rrdpush_compression)
                         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                         error("Closing the stream connection, because the server SSL certificate is not valid.");
                         rrdpush_sender_thread_close_socket(host);
+                        if (host->destination->next)
+                            host->destination->disabled_no_proper_reply = 1;
                         return 0;
                     }
                 }
