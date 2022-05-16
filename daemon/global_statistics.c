@@ -4,8 +4,6 @@
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
-#define CONFIG_SECTION_GLOBAL_STATISTICS "global statistics"
-
 #define WORKER_JOB_GLOBAL             0
 #define WORKER_JOB_REGISTRY           1
 #define WORKER_JOB_WORKERS            2
@@ -1495,7 +1493,7 @@ void *global_statistics_main(void *ptr)
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
     int update_every =
-        (int)config_get_number("CONFIG_SECTION_GLOBAL_STATISTICS", "update every", localhost->rrd_update_every);
+        (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
     if (update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
