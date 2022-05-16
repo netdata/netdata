@@ -1495,7 +1495,7 @@ void *global_statistics_main(void *ptr)
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
     int update_every =
-        (int)config_get_number("CONFIG_SECTION_GLOBAL_STATISTICS", "update every", localhost->rrd_update_every);
+        (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
     if (update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
