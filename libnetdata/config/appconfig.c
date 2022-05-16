@@ -838,7 +838,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
             else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 13;
             else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 14;
             else if(!strncmp(co->name, "plugin:", 7))                    pri = 15; // << change the loop too if you change this
-            else pri = 8; // this is used for any new (currently unknown) sections
+            else pri = 10; // this is used for any new (currently unknown) sections
 
             if(i == pri) {
                 int loaded = 0;
