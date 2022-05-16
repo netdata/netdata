@@ -16,7 +16,7 @@ if [ "${1}" = "install" ]
     then
     [ "${UID}" != 0 ] && echo >&2 "Please run me as root. This will install a single binary file: /usr/local/bin/fping." && exit 1
 
-    [ -z "${2}" ] && fping_version="5.0" || fping_version="${2}"
+    [ -z "${2}" ] && fping_version="5.1" || fping_version="${2}"
 
     run() {
         printf >&2 " > "
