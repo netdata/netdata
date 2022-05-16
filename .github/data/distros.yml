@@ -177,11 +177,6 @@ include:
     test:
       ebpf-core: true
   - <<: *ubuntu
-    version: "21.10"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/impish
-  - <<: *ubuntu
     version: "20.04"
     packages:
       <<: *ubuntu_packages
