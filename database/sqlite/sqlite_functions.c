@@ -5,8 +5,6 @@
 #define DB_METADATA_VERSION "1"
 
 const char *database_config[] = {
-    "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA temp_store=MEMORY;",
-    "PRAGMA journal_size_limit=16777216;",
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
     "registry_hostname text, update_every int, os text, timezone text, tags text);",
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
@@ -394,6 +392,34 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
         return 1;
 
     info("SQLite database %s initialization", sqlite_database);
+
+    char buf[1024 + 1] = "";
+    const char *list[2] = { buf, NULL };
+
+    // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
+    snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
+    if(init_database_batch(rebuild, 0, list)) return 1;
+
+    // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
+    snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
+    if(init_database_batch(rebuild, 0, list)) return 1;
+
+    // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
+    snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
+    if(init_database_batch(rebuild, 0, list)) return 1;
+
+    // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
+    snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
+    if(init_database_batch(rebuild, 0, list)) return 1;
+
+    // PRAGMA schema.journal_size_limit = N ;
+    snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
+    if(init_database_batch(rebuild, 0, list)) return 1;
+
+    // PRAGMA schema.cache_size = pages;
+    // PRAGMA schema.cache_size = -kibibytes;
+    snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
+    if(init_database_batch(rebuild, 0, list)) return 1;
 
     if (init_database_batch(rebuild, 0, &database_config[0]))
         return 1;
