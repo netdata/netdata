@@ -4,8 +4,6 @@
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
-#define CONFIG_SECTION_GLOBAL_STATISTICS "global statistics"
-
 #define WORKER_JOB_GLOBAL             0
 #define WORKER_JOB_REGISTRY           1
 #define WORKER_JOB_WORKERS            2
