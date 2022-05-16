@@ -84,8 +84,6 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 
 ```conf
 [plugins]
-	# PATH environment variable = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/var/lib/snapd/snap/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
-	# PYTHONPATH environment variable = 
 	# proc = yes
 	# diskspace = yes
 	# timex = yes

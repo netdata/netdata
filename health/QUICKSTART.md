@@ -41,9 +41,9 @@ address or hostname for your Agent dashboard, looking for the `stock health conf
 here will show the correct path for your installation.
 
 ```conf
-[health]
+[directories]
  ...
- # stock health configuration directory = /usr/lib/netdata/conf.d/health.d
+ # stock health config = /usr/lib/netdata/conf.d/health.d
 ```
 
 Navigate to the health configuration directory to see all the available files and open them for reading.
