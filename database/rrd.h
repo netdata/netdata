@@ -1274,7 +1274,7 @@ extern void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
 
 extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
-
+extern time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
 extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 // ----------------------------------------------------------------------------

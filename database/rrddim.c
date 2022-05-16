@@ -135,6 +135,22 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     }
 }
 
+// Return either
+//   0 : Dimension is live
+//   last collected time : Dimension is not live
+time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
+{
+    time_t last_updated = rd->last_collected_time.tv_sec;
+    int live;
+    if (rd->state->aclk_live_status == 1)
+        live =
+            ((now - last_updated) <
+             MIN(rrdset_free_obsolete_time, RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER * rd->update_every));
+    else
+        live = ((now - last_updated) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every);
+    return live ? 0 : last_updated;
+}
+
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
                           collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode)
 {
