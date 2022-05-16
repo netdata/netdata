@@ -50,6 +50,7 @@ if [ -z "${VIRTUALIZATION}" ]; then
   if [ -z "${VIRTUALIZATION}" ]; then
     # Output from the command is outside of spec
     VIRTUALIZATION="unknown"
+    VIRT_DETECTION="none"
   else
     VIRTUALIZATION=$(virtualization_normalize_name $VIRTUALIZATION)
   fi
