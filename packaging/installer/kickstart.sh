@@ -96,11 +96,9 @@ main() {
       NEW_SELECTED_RELEASE_CHANNEL="nightly"
     fi
 
-    if [ "${NETDATA_ONLY_STATIC}" = 1 ] || [ "${NETDATA_ONLY_BUILD}" = 1 ]; then
-      if ! [ "${NEW_SELECTED_RELEASE_CHANNEL}" = "${SELECTED_RELEASE_CHANNEL}" ]; then
-          warning "Selected release channel does not match this version and it will be changed automatically."
-          SELECTED_RELEASE_CHANNEL="${NEW_SELECTED_RELEASE_CHANNEL}"
-      fi
+    if ! [ "${NEW_SELECTED_RELEASE_CHANNEL}" = "${SELECTED_RELEASE_CHANNEL}" ]; then
+        warning "Selected release channel does not match this version and it will be changed automatically."
+        SELECTED_RELEASE_CHANNEL="${NEW_SELECTED_RELEASE_CHANNEL}"
     fi
   fi
 
