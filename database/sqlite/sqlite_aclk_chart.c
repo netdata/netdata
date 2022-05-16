@@ -58,18 +58,30 @@ bind_fail:
     return send_status;
 }
 
-static int aclk_add_chart_payload(struct aclk_database_worker_config *wc, uuid_t *uuid, char *claim_id,
-                                  ACLK_PAYLOAD_TYPE payload_type, void *payload, size_t payload_size, time_t *send_status)
+static int aclk_add_chart_payload(
+    struct aclk_database_worker_config *wc,
+    uuid_t *uuid,
+    char *claim_id,
+    ACLK_PAYLOAD_TYPE payload_type,
+    void *payload,
+    size_t payload_size,
+    time_t *send_status,
+    int check_sent)
 {
     static __thread sqlite3_stmt *res_chart = NULL;
     int rc;
     time_t date_submitted;
 
-    date_submitted = payload_sent(wc->uuid_str, uuid, payload, payload_size);
-    if (send_status)
-        *send_status = date_submitted;
-    if (date_submitted)
+    if (unlikely(!payload))
         return 0;
+
+    if (check_sent) {
+        date_submitted = payload_sent(wc->uuid_str, uuid, payload, payload_size);
+        if (send_status)
+            *send_status = date_submitted;
+        if (date_submitted)
+            return 0;
+    }
 
     if (unlikely(!res_chart)) {
         char sql[ACLK_SYNC_QUERY_SIZE];
