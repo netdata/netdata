@@ -535,6 +535,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             system_info->ml_capable = strtoul(value, NULL, 0);
         else if(!strcmp(name, "ml_enabled"))
             system_info->ml_enabled = strtoul(value, NULL, 0);
+        else if(!strcmp(name, "mc_version"))
+            system_info->mc_version = strtoul(value, NULL, 0);
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver"))

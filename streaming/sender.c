@@ -319,6 +319,7 @@ if(!s->rrdpush_compression)
                  "&hops=%d"
                  "&ml_capable=%d"
                  "&ml_enabled=%d"
+                 "&mc_version=%d"
                  "&tags=%s"
                  "&ver=%d"
                  "&NETDATA_INSTANCE_CLOUD_TYPE=%s"
@@ -364,6 +365,7 @@ if(!s->rrdpush_compression)
                  , host->system_info->hops + 1
                  , host->system_info->ml_capable
                  , host->system_info->ml_enabled
+                 , host->system_info->mc_version
                  , (host->tags) ? host->tags : ""
                  , s->version
                  , (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""

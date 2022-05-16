@@ -717,6 +717,7 @@ struct rrdhost_system_info {
     char *install_type;
     char *prebuilt_arch;
     char *prebuilt_dist;
+    int mc_version;
 };
 
 struct rrdhost {
