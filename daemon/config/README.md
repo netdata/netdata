@@ -8,7 +8,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/config/RE
 
 <details>
 <summary>The daemon configuration file is read from `/etc/netdata/netdata.conf`.</summary>
-Depending on your installation method, Netdata will have been installed either directly under `/`, or under `/opt/netdata`. The paths mentioned here and in the documentation in general assume that your installation is under `/`. If it is not, you will find the exact same paths under `/opt/netdata` as well. (i.e. `/etc/netdata` will be `/opt/netdata/etc/netdata`).
+
+Depending on your installation method, Netdata will have been installed either directly under `/`, or
+under `/opt/netdata`. The paths mentioned here and in the documentation in general assume that your installation is
+under `/`. If it is not, you will find the exact same paths under `/opt/netdata` as well. (i.e. `/etc/netdata` will
+be `/opt/netdata/etc/netdata`).
+
 </details>
 
 This config file **is not needed by default**. Netdata works fine out of the box without it. But it does allow you to
