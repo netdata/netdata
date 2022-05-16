@@ -481,7 +481,6 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_HEALTH,      "stock health configuration directory",
                 CONFIG_SECTION_DIRECTORIES, "stock health config");
 
-
     config_move(CONFIG_SECTION_GLOBAL, "debug log",
                 CONFIG_SECTION_LOGS,   "debug");
 
