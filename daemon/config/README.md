@@ -33,8 +33,6 @@ private IPs, via the [web server access lists](/web/server/README.md#access-list
 6. `[statsd]` for the general settings of the [stats.d.plugin](/collectors/statsd.plugin/README.md).
 7. `[plugin:NAME]` sections for each collector plugin, under the
    comment [Per plugin configuration](#per-plugin-configuration).
-8. `[CHART_NAME]` sections for each chart defined, under the comment [Per chart configuration](#per-chart-configuration)
-   .
 
 The configuration file is a `name = value` dictionary. Netdata will not complain if you set options unknown to it. When
 you check the running configuration by accessing the URL `/netdata.conf` on your Netdata server, Netdata will add a
@@ -174,78 +172,4 @@ External plugins will have only 2 options at `netdata.conf`:
 
 External plugins that need additional configuration may support a dedicated file in `/etc/netdata`. Check their
 documentation.
-
-## Per-chart configuration
-
-In this area of `netdata.conf` you can find configuration options for individual charts. They appear in sections
-following the pattern `[NAME]`.
-
-Using the settings and values under these sections, you can control all aspects of a specific chart. You can change its
-title, make it appear higher in Netdata's [menu](/web/gui/README.md#metrics-menus), tweak its dimensions, and much more.
-
-To find the name of a given chart, and thus the name of its section in `netdata.conf`, look at the top-left corner of a
-chart:
-
-![Finding the unique ID of a
-chart](https://user-images.githubusercontent.com/1153921/67443082-43b16e80-f5b8-11e9-8d33-d6ee052c6678.png)
-
-Every per-chart configuration section has several common settings, which are listed in the table just below. Beneath
-that is information about lines that begin with `dim`, which affect a chart's dimensions.
-
-| Setting           | Function                                                                                                                                                                                                                                                   |
-|:------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `history`         | Override the `history` setting in the [[global] options](#global-section-options) for this particular chart. Should be less than or equal to the global `history` setting.                                                                                 |
-| `enabled`         | A boolean (`yes` or `no`) that explicitly enables or disables the chart in question.                                                                                                                                                                       |
-| `cache directory` | The directory where cache files for this plugin, if needed, are stored.                                                                                                                                                                                    |
-| `chart type`      | Defines what type of chart to display. It can be `line`, `area`, or `stacked`. If empty or missing, `line` will be used.                                                                                                                                   |
-| `type`            | Uniquely identify which [metrics menu](/web/gui/README.md#metrics-menus) on the Netdata dashboard this chart should appear under. Some examples include `system` (System), `disk` (Disks), `net` (Network Interfaces), and `netdata` (Netdata Monitoring). |                                                                                                                                                                                                                                                   |
-| `family`          | Change the chart's [family](/web/README.md#families) from its default. For example, you could force a disk space chart to collect metrics for family `sdb` instead of family `sda`.                                                                        |
-| `units`           | Text for the label of the vertical axis of the chart. This means all dimensions should have the same unit of measurement.                                                                                                                                  |
-| `context`         | Change the default [context](/web/README.md#contexts) of the chart. Changing this setting will affect what metrics and metrics the chart displays, and which alarms are attached to it.                                                                    |
-| `priority`        | Define where the chart should appear on the Netdata dashboard. Lower values equal higher priority, so a priority of `1` will place the chart highest, while a priority of `9999999` would place the chart at the bottom of the Netdata dashboard.          |
-| `name`            | The name of the chart that appears in the top-left corner, after the chart's title. You can also use this name when writing [health entities](/health/REFERENCE.md#health-entity-reference).                                                               |
-| `title`           | The text that appears above the chart in the Netdata dashboard.                                                                                                                                                                                            |
-
-### Dimension settings
-
-You may notice some settings that begin with `dim` beneath the ones defined in the table above. These settings determine
-which dimensions appear on the given chart and how Netdata calculates them.
-
-Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION] = [VALUE]`. The available options
-are `name`, `algorithm`, `multiplier`, and `divisor`.
-
-| Setting      | Function                                                                                                                                                                                                                                                      |
-|:-------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `name`       | The name of the dimension as it will appear in the legend of the chart. If left empty, or is missing, Netdata will use the `[DIMENSION ID]` instead.                                                                                                          |
-| `algorithm`  | Can be `absolute`, `incremental`, `percentage-of-absolute-row`, or `percentage-of-incremental-row`. If this setting is empty, invalid, or missing, Netdata will use `absolute`. See the list beneath this table for descriptions of what each algorithm does. |
-| `multiplier` | An integer value by which to multiply the collected value. If empty or missing, Netdata will use `1`. This setting is often used with the value `1024` to convert metabytes to kilobytes, kilobytes to bytes, and so on.                                      |
-| `divisor`    | An integer value by which to divide the collected value. If empty or missing, Netdata will use `1`. This setting is often used with the value `1024` to convert bytes to kilobytes, kilobytes to megabytes, and so on.                                        |
-
-Here are the options for the `algorithm` setting:
-
-- `absolute`: The value is drawn as-is (interpolated to second boundary).
-- `incremental`: To be used when the value always increases over time, such as the I/O on a disk. Netdata takes the
-  difference between the current metric and the past metric to calculate a per-second figure.
-- `percentage-of-absolute-row`: The % of this value compared to the total of all dimensions.
-- `percentage-of-incremental-row`: The % of this value compared to the incremental total of all dimensions.
-
-For example, the `system.io` chart has the following default settings:
-
-```conf
-        # dim in name = in
-        # dim in algorithm = incremental
-        # dim in multiplier = 1
-        # dim in divisor = 1
-        # dim out name = out
-        # dim out algorithm = incremental
-        # dim out multiplier = -1
-        # dim out divisor = 1
-```
-
-These `dim` settings produce two dimensions, `in` and `out`, both of which use the `incremental` algorithm. By
-multiplying the value of `out` by -1, Netdata creates the negative values seen in the following area chart:
-
-![The system.io chart on a macOS
-laptop](https://user-images.githubusercontent.com/1153921/69286708-2cfb3900-0bb1-11ea-9fcd-dd8fbb2adf11.png)
-
 
