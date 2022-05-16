@@ -1489,7 +1489,7 @@ restart_after_removal:
                         }
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
                         else
-                            queue_dimension_to_aclk(rd);
+                            queue_dimension_to_aclk(rd, rd->last_collected_time.tv_sec);
 #endif
                     }
                     last = rd;

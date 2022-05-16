@@ -181,7 +181,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
             (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                                       rd->algorithm);
-
+            queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
             rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
