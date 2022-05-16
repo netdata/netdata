@@ -20,19 +20,26 @@ This config file **is not needed by default**. Netdata works fine out of the box
 adapt the general behavior of Netdata, in great detail. You can find all these settings, with their default values, by
 accessing the URL `https://netdata.server.hostname:19999/netdata.conf`. For example check the configuration file
 of [netdata.firehol.org](http://netdata.firehol.org/netdata.conf). HTTP access to this file is limited by default to
-private IPs, via the [web server access lists](/web/server/README.md#access-lists).
+[private IPs](https://en.wikipedia.org/wiki/Private_network), via
+the [web server access lists](/web/server/README.md#access-lists).
 
 `netdata.conf` has sections stated with `[section]`. You will see the following sections:
 
 1. `[global]` to [configure](#global-section-options) the [Netdata daemon](/daemon/README.md).
-2. `[web]` to [configure the web server](/web/server/README.md).
-3. `[plugins]` to [configure](#plugins-section-options) which [collectors](/collectors/README.md) to use and PATH
-   settings.
-4. `[health]` to [configure](#health-section-options) general settings for [health monitoring](/health/README.md)
-5. `[registry]` for the [Netdata registry](/registry/README.md).
-6. `[statsd]` for the general settings of the [stats.d.plugin](/collectors/statsd.plugin/README.md).
-7. `[plugin:NAME]` sections for each collector plugin, under the
-   comment [Per plugin configuration](#per-plugin-configuration).
+2. `[directories]` to [configure](#global-section-options) the [Netdata daemon](/daemon/README.md).
+3. `[logs]` to [configure](#global-section-options) the [Netdata daemon](/daemon/README.md).
+4. `[env variables]` to [configure](#global-section-options) the [Netdata daemon](/daemon/README.md).
+5. `[sqlite]` to [configure](#global-section-options) the [Netdata daemon](/daemon/README.md).
+6. `[ml]` to [configure](#health-section-options) general settings for [health monitoring](/health/README.md)
+7. `[health]` to [configure](#health-section-options) general settings for [health monitoring](/health/README.md)
+8. `[web]` to [configure the web server](/web/server/README.md).
+9. `[registry]` for the [Netdata registry](/registry/README.md).
+10. `[global statistics]` for the [Netdata registry](/registry/README.md).
+11. `[statsd]` for the general settings of the [stats.d.plugin](/collectors/statsd.plugin/README.md).
+12. `[plugins]` to [configure](#plugins-section-options) which [collectors](/collectors/README.md) to use and PATH
+    settings.
+13. `[plugin:NAME]` sections for each collector plugin, under the
+    comment [Per plugin configuration](#per-plugin-configuration).
 
 The configuration file is a `name = value` dictionary. Netdata will not complain if you set options unknown to it. When
 you check the running configuration by accessing the URL `/netdata.conf` on your Netdata server, Netdata will add a
