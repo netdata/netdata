@@ -64,8 +64,6 @@ static int cgroup_unified_exist = CONFIG_BOOLEAN_AUTO;
 
 static int cgroup_search_in_devices = 1;
 
-static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
-
 static int cgroup_check_for_new_every = 10;
 static int cgroup_update_every = 1;
 static int cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
@@ -436,8 +434,6 @@ void read_cgroup_plugin_configuration() {
 
     cgroup_root_max = (int)config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
     cgroup_max_depth = (int)config_get_number("plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
-
-    cgroup_enable_new_cgroups_detected_at_runtime = config_get_boolean("plugin:cgroups", "enable new cgroups detected at run time", cgroup_enable_new_cgroups_detected_at_runtime);
 
     enabled_cgroup_paths = simple_pattern_create(
             config_get("plugin:cgroups", "enable by default cgroups matching",
@@ -898,9 +894,6 @@ struct discovery_thread {
 // ---------------------------------------------------------------------------------------------
 
 static inline int matches_enabled_cgroup_paths(char *id) {
-    if (!cgroup_enable_new_cgroups_detected_at_runtime) {
-        return 0;
-    }
     return simple_pattern_matches(enabled_cgroup_paths, id);
 }
 
