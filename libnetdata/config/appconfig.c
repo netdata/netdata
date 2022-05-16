@@ -819,23 +819,24 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                   "#\n"
                   "\n# global netdata configuration\n");
 
-    for(i = 0; i <= 13 ;i++) {
+    for(i = 0; i <= 14 ;i++) {
         appconfig_wrlock(root);
         for(co = root->first_section; co ; co = co->next) {
             if(!strcmp(co->name, CONFIG_SECTION_GLOBAL))                 pri = 0;
-            else if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))        pri = 1;
-            else if(!strcmp(co->name, CONFIG_SECTION_SQLITE))            pri = 2;
-            else if(!strcmp(co->name, CONFIG_SECTION_CLOUD))             pri = 3;
-            else if(!strcmp(co->name, CONFIG_SECTION_ML))                pri = 4;
-            else if(!strcmp(co->name, CONFIG_SECTION_HEALTH))            pri = 5;
-            else if(!strcmp(co->name, CONFIG_SECTION_STREAM))            pri = 6;
-            else if(!strcmp(co->name, CONFIG_SECTION_WEB))               pri = 7;
-            // by default, new sections will get pri = 8 (set at the end, below)
-            else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 9;
-            else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 10;
-            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 11;
-            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 12;
-            else if(!strncmp(co->name, "plugin:", 7))                    pri = 13; // << change the loop too if you change this
+            else if(!strcmp(co->name, CONFIG_SECTION_DIRECTORIES))       pri = 1;
+            else if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))        pri = 2;
+            else if(!strcmp(co->name, CONFIG_SECTION_SQLITE))            pri = 3;
+            else if(!strcmp(co->name, CONFIG_SECTION_CLOUD))             pri = 4;
+            else if(!strcmp(co->name, CONFIG_SECTION_ML))                pri = 5;
+            else if(!strcmp(co->name, CONFIG_SECTION_HEALTH))            pri = 6;
+            else if(!strcmp(co->name, CONFIG_SECTION_STREAM))            pri = 7;
+            else if(!strcmp(co->name, CONFIG_SECTION_WEB))               pri = 8;
+            // by default, new sections will get pri = 9 (set at the end, below)
+            else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 10;
+            else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 11;
+            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 12;
+            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 13;
+            else if(!strncmp(co->name, "plugin:", 7))                    pri = 14; // << change the loop too if you change this
             else pri = 8; // this is used for any new (currently unknown) sections
 
             if(i == pri) {

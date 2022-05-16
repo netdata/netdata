@@ -410,7 +410,7 @@ char *initialize_lock_directory_path(char *prefix)
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/lock", prefix);
 
-    return config_get(CONFIG_SECTION_GLOBAL, "lock directory", filename);
+    return config_get(CONFIG_SECTION_DIRECTORIES, "lock directory", filename);
 }
 
 static void backwards_compatible_config() {
@@ -447,6 +447,33 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_GLOBAL, "web compression level",
                 CONFIG_SECTION_WEB,    "gzip compression level");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "config directory",
+                CONFIG_SECTION_DIRECTORIES, "config directory");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "stock config directory",
+                CONFIG_SECTION_DIRECTORIES, "stock config directory");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "log directory",
+                CONFIG_SECTION_DIRECTORIES, "log directory");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "web files directory",
+                CONFIG_SECTION_DIRECTORIES, "web files directory");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "cache directory",
+                CONFIG_SECTION_DIRECTORIES, "cache directory");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "lib directory",
+                CONFIG_SECTION_DIRECTORIES, "lib directory");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "home directory",
+                CONFIG_SECTION_DIRECTORIES, "home directory");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "lock directory",
+                CONFIG_SECTION_DIRECTORIES, "lock directory");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "plugins directory",
+                CONFIG_SECTION_DIRECTORIES, "plugins directory");
 }
 
 static void get_netdata_configured_variables() {
@@ -491,14 +518,14 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get system paths
 
-    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",       netdata_configured_user_config_dir);
-    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_GLOBAL, "stock config directory", netdata_configured_stock_config_dir);
-    netdata_configured_log_dir          = config_get(CONFIG_SECTION_GLOBAL, "log directory",          netdata_configured_log_dir);
-    netdata_configured_web_dir          = config_get(CONFIG_SECTION_GLOBAL, "web files directory",    netdata_configured_web_dir);
-    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        netdata_configured_cache_dir);
-    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          netdata_configured_varlib_dir);
+    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_DIRECTORIES, "config directory",       netdata_configured_user_config_dir);
+    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_DIRECTORIES, "stock config directory", netdata_configured_stock_config_dir);
+    netdata_configured_log_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "log directory",          netdata_configured_log_dir);
+    netdata_configured_web_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "web files directory",    netdata_configured_web_dir);
+    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_DIRECTORIES, "cache directory",        netdata_configured_cache_dir);
+    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_DIRECTORIES, "lib directory",          netdata_configured_varlib_dir);
     char *env_home=getenv("HOME");
-    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         env_home?env_home:netdata_configured_home_dir);
+    netdata_configured_home_dir         = config_get(CONFIG_SECTION_DIRECTORIES, "home directory",         env_home?env_home:netdata_configured_home_dir);
 
     netdata_configured_lock_dir = initialize_lock_directory_path(netdata_configured_varlib_dir);
 
