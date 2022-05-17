@@ -58,7 +58,7 @@ static inline void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae)
 inline char *health_user_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "health configuration directory", buffer);
+    return config_get(CONFIG_SECTION_DIRECTORIES, "health config", buffer);
 }
 
 /**
@@ -71,7 +71,7 @@ inline char *health_user_config_dir(void) {
 inline char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
+    return config_get(CONFIG_SECTION_DIRECTORIES, "stock health config", buffer);
 }
 
 /**
