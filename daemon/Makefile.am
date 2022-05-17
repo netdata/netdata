@@ -14,6 +14,7 @@ dist_noinst_DATA = \
     config/README.md \
     anonymous-statistics.sh.in \
     get-kubernetes-labels.sh.in \
+    system-info.sh.in \
     $(NULL)
 
 dist_plugins_SCRIPTS = \
