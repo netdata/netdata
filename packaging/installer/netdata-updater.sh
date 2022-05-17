@@ -60,6 +60,10 @@ info() {
   echo >&3 "$(date) : INFO: ${script_name}: " "${1}"
 }
 
+warning() {
+  echo >&3 "$(date) : WARNING: ${script_name}: " "${@}"
+}
+
 error() {
   echo >&3 "$(date) : ERROR: ${script_name}: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
@@ -681,7 +685,7 @@ update_binpkg() {
       opensuse-leap)
         DISTRO_COMPAT_NAME="opensuse"
         ;;
-      rhel)
+      almalinux|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
         ;;
       *)
