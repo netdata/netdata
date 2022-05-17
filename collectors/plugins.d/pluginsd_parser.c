@@ -787,6 +787,9 @@ PARSER_RC pluginsd_gap_action(void *user, GAP rx_gap)
 
 PARSER_RC pluginsd_rdata_action(void *user, GAP meta_rx_rdata, int block_id, char *chart_id, char *dim_id)
 {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(block_id);
+#endif
     if(!user || !((PARSER_USER_OBJECT *)user)->opaque) {
         infoerr("%s: Parser user object was not set properly - user, or opaque is NULL - Exiting Parser!", REPLICATION_MSG);
         return PARSER_RC_ERROR;
@@ -936,8 +939,10 @@ PARSER_RC pluginsd_fill_end(char **words, void *user, PLUGINSD_ACTION  *plugins_
         goto disable;
     }
 
-    if(unlikely(!numofpoints)) {
+    if(unlikely(!numofpoints)) {        
+#ifdef NETDATA_INTERNAL_CHECKS
         infoerr("%s: FILLEND Zero #samples - Continue to the next dimension - host '%s'.", REPLICATION_MSG, host->hostname);
+#endif
         return PARSER_RC_OK;
     }
 

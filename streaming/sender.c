@@ -560,7 +560,6 @@ static void attempt_to_connect(struct sender_state *state)
             info("%s: Switch ON the Tx REPlication thread for host %s.",
                 REPLICATION_MSG,
                 state->host->hostname);
-            print_replication_state(state->host->replication->tx_replication);
             replication_sender_thread_spawn(state->host);
         }
 
