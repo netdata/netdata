@@ -76,6 +76,7 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--reinstall-clean`: Performs an uninstall of Netdata and clean installation.
 - `--local-build-options`: Specify additional options to pass to the installer code when building locally. Only valid if `--build-only` is also specified.
 - `--static-install-options`: Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+- `--prepare-offline-install-source`: Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):
