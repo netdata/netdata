@@ -25,8 +25,6 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.ml_info.ml_capable = ml_capable(localhost);
     node_info.ml_info.ml_enabled = ml_enabled(wc->host);
 
-    log_access("MC is [%d]", enable_metric_correlations);
-
     struct capability instance_caps[] = {
         { .name = "proto", .version = 1,                     .enabled = 1 },
         { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(wc->host) },
