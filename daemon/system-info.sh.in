@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+[ -z "${NETDATA_CACHE_DIR}" ] && NETDATA_CACHE_DIR="@cachedir_POST@"
+
 # -------------------------------------------------------------------------------------------------
 # detect the kernel
 
@@ -426,14 +428,14 @@ fi
 
 # ------------------------------------------------------------------------------------------------
 # Detect instance metadata for VMs running on cloud providers
-
 CLOUD_TYPE="unknown"
 CLOUD_INSTANCE_TYPE="unknown"
 CLOUD_INSTANCE_REGION="unknown"
 
 if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
-  if [ -f "@cachedir_POST@/sysinfo-cloud" ]; then
-    . "@cachedir_POST@/sysinfo-cloud"
+  if [ -f "$NETDATA_CACHE_DIR/sysinfo-cloud" ]; then
+    # shellcheck source=/dev/null
+    . "$NETDATA_CACHE_DIR/sysinfo-cloud"
   else
     # Try AWS IMDSv2
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
@@ -467,9 +469,9 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
     #   fi
     # fi
 
-    echo "NETDATA_INSTANCE_CLOUD_TYPE=${CLOUD_TYPE}" > "@cachedir_POST@/sysinfo-cloud"
-    echo "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=${CLOUD_INSTANCE_TYPE}" >> "@cachedir_POST@/sysinfo-cloud"
-    echo "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION}" >> "@cachedir_POST@/sysinfo-cloud"
+    echo "NETDATA_INSTANCE_CLOUD_TYPE=${CLOUD_TYPE}" > "$NETDATA_CACHE_DIR/sysinfo-cloud"
+    echo "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=${CLOUD_INSTANCE_TYPE}" >> "$NETDATA_CACHE_DIR/sysinfo-cloud"
+    echo "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION}" >> "$NETDATA_CACHE_DIR/sysinfo-cloud"
   fi
 fi
 

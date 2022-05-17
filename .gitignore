@@ -131,6 +131,7 @@ system/netdata.crontab
 
 daemon/anonymous-statistics.sh
 daemon/get-kubernetes-labels.sh
+daemon/system-info.sh
 
 health/notifications/alarm-notify.sh
 claim/netdata-claim.sh
