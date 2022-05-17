@@ -6,8 +6,17 @@
 
 **Merged pull requests:**
 
+- chore\(fping.plugin\): bump default fping version to 5.1 [\#12930](https://github.com/netdata/netdata/pull/12930) ([ilyam8](https://github.com/ilyam8))
+- Restore a broken symbolic link [\#12923](https://github.com/netdata/netdata/pull/12923) ([vlvkobal](https://github.com/vlvkobal))
+- collectors: apps.plugin: apps\_groups: update net, aws, ha groups [\#12921](https://github.com/netdata/netdata/pull/12921) ([k0ste](https://github.com/k0ste))
+- user configurable sqlite PRAGMAs [\#12917](https://github.com/netdata/netdata/pull/12917) ([ktsaou](https://github.com/ktsaou))
+- fix `[global statistics]` section in netdata.conf [\#12916](https://github.com/netdata/netdata/pull/12916) ([ilyam8](https://github.com/ilyam8))
 - chore\(streaming\): bump default "buffer size bytes" to 10MB [\#12913](https://github.com/netdata/netdata/pull/12913) ([ilyam8](https://github.com/ilyam8))
+- fix\(cgroups.plugin\): improve check for uninitialized containers in k8s [\#12912](https://github.com/netdata/netdata/pull/12912) ([ilyam8](https://github.com/ilyam8))
+- fix virtualization detection when `systemd-detect-virt` is not available [\#12911](https://github.com/netdata/netdata/pull/12911) ([ilyam8](https://github.com/ilyam8))
 - added worker jobs for cgroup-rename, cgroup-network and cgroup-first-time [\#12910](https://github.com/netdata/netdata/pull/12910) ([ktsaou](https://github.com/ktsaou))
+- Fix the log entry for incoming cloud start streaming commands [\#12908](https://github.com/netdata/netdata/pull/12908) ([stelfrag](https://github.com/stelfrag))
+- chore\(cgroups.plugin\): remove "enable new cgroups detected at run time" config option [\#12906](https://github.com/netdata/netdata/pull/12906) ([ilyam8](https://github.com/ilyam8))
 - Fix release channel in the node info message [\#12905](https://github.com/netdata/netdata/pull/12905) ([stelfrag](https://github.com/stelfrag))
 - chore\(worker\_utilization\): log an error when re-registering an already registered job [\#12903](https://github.com/netdata/netdata/pull/12903) ([ilyam8](https://github.com/ilyam8))
 - fix\(cgroups.plugin\): use correct identifier when registering the main thread "chart" worker job [\#12902](https://github.com/netdata/netdata/pull/12902) ([ilyam8](https://github.com/ilyam8))
@@ -316,12 +325,6 @@
 - Use the new error mechanism in case host not found [\#12277](https://github.com/netdata/netdata/pull/12277) ([underhood](https://github.com/underhood))
 - Add proper handling for legacy kickstart install detection. [\#12273](https://github.com/netdata/netdata/pull/12273) ([Ferroin](https://github.com/Ferroin))
 - Fixed typos in docs/Running-behind-haproxy.md [\#12272](https://github.com/netdata/netdata/pull/12272) ([RatishT](https://github.com/RatishT))
-- Change default OOM score and scheduling policy to behave more sanely. [\#12271](https://github.com/netdata/netdata/pull/12271) ([Ferroin](https://github.com/Ferroin))
-- Add Ubuntu 22.04 to CI and package builds. [\#12269](https://github.com/netdata/netdata/pull/12269) ([Ferroin](https://github.com/Ferroin))
-- Add Fedora 36 to CI and package builds. [\#12268](https://github.com/netdata/netdata/pull/12268) ([Ferroin](https://github.com/Ferroin))
-- Null terminate decoded\_query\_string if there are no url parameters. [\#12266](https://github.com/netdata/netdata/pull/12266) ([MrZammler](https://github.com/MrZammler))
-- delete package.json [\#12265](https://github.com/netdata/netdata/pull/12265) ([ilyam8](https://github.com/ilyam8))
-- Docs: Fix typo in step-10.md [\#12263](https://github.com/netdata/netdata/pull/12263) ([tnagorran](https://github.com/tnagorran))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
