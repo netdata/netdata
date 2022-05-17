@@ -513,6 +513,9 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_PLUGINS,  "PYTHONPATH environment variable",
                 CONFIG_SECTION_ENV_VARS, "PYTHONPATH");
+
+    config_move(CONFIG_SECTION_STATSD,  "enabled",
+                CONFIG_SECTION_PLUGINS, "statsd");
 }
 
 static void get_netdata_configured_variables() {
