@@ -509,7 +509,7 @@ static int trigger_replication(RRDHOST *host){
             abs_wait_streaming = (host->sender->t_last_exposed_chart_definition - host->sender->t_first_exposed_chart_definition);
         }
         // info("%s: First exposed: %ld, Last exposed: %ld, diff: %ld, Now: %ld, Diff: %ld", REPLICATION_MSG, host->sender->t_first_exposed_chart_definition, host->sender->t_last_exposed_chart_definition, abs_wait_streaming, t_now, wait_streaming);
-        if(wait_streaming && abs_wait_streaming && ((wait_streaming > 10) || (abs_wait_streaming + wait_streaming) > 15))
+        if(wait_streaming >=0 && abs_wait_streaming && ((wait_streaming > 10) || (abs_wait_streaming + wait_streaming) > 15))
             return 1;
         return 0;
     }

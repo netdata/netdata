@@ -1175,8 +1175,10 @@ void modify_dim_past_data(RRDDIM_PAST_DATA *dim_past_data, usec_t start_time, us
     new_entries = (uint64_t)(new_end - new_start) / dim_past_data->rd->update_every + 1;
 
     dim_past_data->page_length = new_entries * sizeof(storage_number);
-    if(new_start != start)
-        dim_past_data->page = &dim_past_data->page[((new_start - start) / dim_past_data->rd->update_every) * sizeof(storage_number)];
+    if(new_start != start) {
+        storage_number *sn = dim_past_data->page;
+        dim_past_data->page = &sn[((new_start - start) / dim_past_data->rd->update_every) * sizeof(storage_number)];
+    }
     dim_past_data->start_time = new_start * USEC_PER_SEC;
     dim_past_data->end_time = new_end * USEC_PER_SEC;
 
