@@ -835,8 +835,8 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
             // by default, new sections will get pri = 10 (set at the end, below)
             else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 11;
             else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 12;
-            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 13;
-            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 14;
+            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 13;
+            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 14;
             else if(!strncmp(co->name, "plugin:", 7))                    pri = 15; // << change the loop too if you change this
             else pri = 10; // this is used for any new (currently unknown) sections
 
