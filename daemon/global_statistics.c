@@ -792,10 +792,12 @@ static void dbengine_statistics_charts(void) {
                 static RRDSET *st_ram_usage = NULL;
                 static RRDDIM *rd_cached = NULL;
                 static RRDDIM *rd_pinned = NULL;
-                static RRDDIM *rd_metadata = NULL;
+                static RRDDIM *rd_cache_metadata = NULL;
+                static RRDDIM *rd_index_metadata = NULL;
+                static RRDDIM *rd_pages_metadata = NULL;
 
-                collected_number cached_pages, pinned_pages, API_producers, populated_pages, metadata, pages_on_disk,
-                    page_cache_descriptors;
+                collected_number cached_pages, pinned_pages, API_producers, populated_pages, cache_metadata, pages_on_disk,
+                    page_cache_descriptors, index_metadata, pages_metadata;
 
                 if (unlikely(!st_ram_usage)) {
                     st_ram_usage = rrdset_create_localhost(
@@ -814,7 +816,9 @@ static void dbengine_statistics_charts(void) {
 
                     rd_cached = rrddim_add(st_ram_usage, "cache", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
                     rd_pinned = rrddim_add(st_ram_usage, "collectors", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
-                    rd_metadata = rrddim_add(st_ram_usage, "metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
+                    rd_cache_metadata = rrddim_add(st_ram_usage, "cache metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
+                    rd_pages_metadata = rrddim_add(st_ram_usage, "pages metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
+                    rd_index_metadata = rrddim_add(st_ram_usage, "index metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
                 } else
                     rrdset_next(st_ram_usage);
 
@@ -830,14 +834,18 @@ static void dbengine_statistics_charts(void) {
                 }
                 cached_pages = populated_pages - pinned_pages;
 
-                metadata = page_cache_descriptors * sizeof(struct page_cache_descr);
-                metadata += pages_on_disk * sizeof(struct rrdeng_page_descr);
+                cache_metadata = page_cache_descriptors * sizeof(struct page_cache_descr);
+
+                pages_metadata = pages_on_disk * sizeof(struct rrdeng_page_descr);
+
                 /* This is an empirical estimation for Judy array indexing and extent structures */
-                metadata += pages_on_disk * 58;
+                index_metadata = pages_on_disk * 58;
 
                 rrddim_set_by_pointer(st_ram_usage, rd_cached, cached_pages);
                 rrddim_set_by_pointer(st_ram_usage, rd_pinned, pinned_pages);
-                rrddim_set_by_pointer(st_ram_usage, rd_metadata, metadata);
+                rrddim_set_by_pointer(st_ram_usage, rd_cache_metadata, cache_metadata);
+                rrddim_set_by_pointer(st_ram_usage, rd_pages_metadata, pages_metadata);
+                rrddim_set_by_pointer(st_ram_usage, rd_index_metadata, index_metadata);
                 rrdset_done(st_ram_usage);
             }
         }
