@@ -95,7 +95,7 @@ static inline void convert_argv_to_string(char *dst, size_t size, const char *sp
 static int custom_popene(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, const char *spawn_argv[]) {
     // create a string to be logged about the command we are running
     char command_to_be_logged[2048];
-    convert_argv_to_string(command_to_be_logged, sizeof(command_to_be_logged) - 1, spawn_argv);
+    convert_argv_to_string(command_to_be_logged, sizeof(command_to_be_logged), spawn_argv);
     // info("custom_popene() running command: %s", command_to_be_logged);
 
     FILE *fp = NULL;
