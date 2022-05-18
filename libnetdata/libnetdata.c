@@ -1111,14 +1111,13 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
 }
 
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
+    if(unlikely(!n)) return 0;
+
     int size = vsnprintf(dst, n, fmt, args);
+    dst[n - 1] = '\0';
 
-    if (unlikely((size_t) size > n)) {
-        // truncated
-        size = (int)n;
-    }
+    if (unlikely((size_t) size > n)) size = (int)n;
 
-    dst[size] = '\0';
     return size;
 }
 
