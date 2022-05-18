@@ -814,11 +814,11 @@ static void dbengine_statistics_charts(void) {
                         localhost->rrd_update_every,
                         RRDSET_TYPE_STACKED);
 
-                    rd_cached = rrddim_add(st_ram_usage, "cache", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
-                    rd_pinned = rrddim_add(st_ram_usage, "collectors", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
-                    rd_cache_metadata = rrddim_add(st_ram_usage, "cache metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
-                    rd_pages_metadata = rrddim_add(st_ram_usage, "pages metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
-                    rd_index_metadata = rrddim_add(st_ram_usage, "index metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
+                    rd_cached = rrddim_add(st_ram_usage, "cache", NULL, RRDENG_BLOCK_SIZE, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                    rd_pinned = rrddim_add(st_ram_usage, "collectors", NULL, RRDENG_BLOCK_SIZE, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                    rd_cache_metadata = rrddim_add(st_ram_usage, "cache metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                    rd_pages_metadata = rrddim_add(st_ram_usage, "pages metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                    rd_index_metadata = rrddim_add(st_ram_usage, "index metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                 } else
                     rrdset_next(st_ram_usage);
 
