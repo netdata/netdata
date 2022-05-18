@@ -28,6 +28,7 @@ struct aclk_chart_dimension_data {
     uuid_t uuid;
     char *payload;
     size_t payload_size;
+    uint8_t check_payload;
 };
 
 struct aclk_chart_sync_stats {
