@@ -105,6 +105,19 @@ main() {
   progress "Using ${tmpdir} as a temporary directory."
   cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
 
+  if [ -n "${INSTALL_VERSION}" ]; then
+    if echo "${INSTALL_VERSION}" | grep -E -o "^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$" > /dev/null 2>&1; then
+      NEW_SELECTED_RELEASE_CHANNEL="stable"
+    else
+      NEW_SELECTED_RELEASE_CHANNEL="nightly"
+    fi
+
+    if ! [ "${NEW_SELECTED_RELEASE_CHANNEL}" = "${SELECTED_RELEASE_CHANNEL}" ]; then
+        warning "Selected release channel does not match this version and it will be changed automatically."
+        SELECTED_RELEASE_CHANNEL="${NEW_SELECTED_RELEASE_CHANNEL}"
+    fi
+  fi
+
   case "${SYSTYPE}" in
     Linux) install_on_linux ;;
     Darwin) install_on_macos ;;
@@ -1323,6 +1336,20 @@ try_package_install() {
       return 2
       ;;
   esac
+
+  if [ -n "${INSTALL_VERSION}" ]; then
+    if echo "${INSTALL_VERSION}" | grep -q "nightly"; then
+      new_release="-edge"
+    else
+      new_release=
+    fi
+
+    if { [ -n "${new_release}" ] && [ -z "${release}" ]; } || { [ -z "${new_release}" ] && [ -n "${release}" ]; }; then
+      warning "Selected release channel does not match this version and it will be changed automatically."
+    fi
+
+    release="${new_release}"
+  fi
 
   repoconfig_name="netdata-repo${release}"
   repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_VERSION}${pkg_suffix}.${pkg_type}"
