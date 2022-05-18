@@ -125,26 +125,36 @@ PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name
     UNUSED(algorithm);
 
     RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, algorithm_type);
-    rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+    int unhide_dimension = 1;
+
     rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
     if (options && *options) {
         if (strstr(options, "obsolete") != NULL)
             rrddim_is_obsolete(st, rd);
         else
             rrddim_isnot_obsolete(st, rd);
-        if (strstr(options, "hidden") != NULL) {
-            rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
-            (void) sql_set_dimension_option(&rd->state->metric_uuid, "hidden");
-        }
-        else
-            (void) sql_set_dimension_option(&rd->state->metric_uuid, NULL);
+
+        unhide_dimension = !strstr(options, "hidden");
+
         if (strstr(options, "noreset") != NULL)
             rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
         if (strstr(options, "nooverflow") != NULL)
             rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-    } else {
-        (void) sql_set_dimension_option(&rd->state->metric_uuid, NULL);
+    } else
         rrddim_isnot_obsolete(st, rd);
+
+    if (likely(unhide_dimension)) {
+        rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+        if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
+            (void)sql_set_dimension_option(&rd->state->metric_uuid, NULL);
+            rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
+        }
+    } else {
+        rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+        if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
+           (void)sql_set_dimension_option(&rd->state->metric_uuid, "hidden");
+            rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
+        }
     }
     return PARSER_RC_OK;
 }

@@ -170,6 +170,7 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_ACLK                            = (1 << 4),
 
     RRDDIM_FLAG_PENDING_FOREACH_ALARM           = (1 << 5), // set when foreach alarm has not been initialized yet
+    RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
 } RRDDIM_FLAGS;
 
 #define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & (flag))
