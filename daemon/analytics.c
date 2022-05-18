@@ -701,7 +701,7 @@ void get_system_timezone(void)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
     const char *tz = getenv("TZ");
     if (!tz || !*tz)
-        setenv("TZ", config_get(CONFIG_SECTION_GLOBAL, "TZ environment variable", ":/etc/localtime"), 0);
+        setenv("TZ", config_get(CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
 
     char buffer[FILENAME_MAX + 1] = "";
     const char *timezone = NULL;
@@ -908,13 +908,13 @@ void set_global_environment()
     if (!p)
         p = "/bin:/usr/bin";
     snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
-    setenv("PATH", config_get(CONFIG_SECTION_PLUGINS, "PATH environment variable", path), 1);
+    setenv("PATH", config_get(CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
 
     // python options
     p = getenv("PYTHONPATH");
     if (!p)
         p = "";
-    setenv("PYTHONPATH", config_get(CONFIG_SECTION_PLUGINS, "PYTHONPATH environment variable", p), 1);
+    setenv("PYTHONPATH", config_get(CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
 
     // disable buffering for python plugins
     setenv("PYTHONUNBUFFERED", "1", 1);

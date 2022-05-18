@@ -1798,12 +1798,8 @@ after_second_database_work:
 
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
         if (likely(!st->state->is_ar_chart)) {
-            if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-                int live =
-                    ((mark - rd->last_collected_time.tv_sec) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every);
-                if (unlikely(live != rd->state->aclk_live_status))
-                    queue_dimension_to_aclk(rd);
-            }
+            if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
+                queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
         }
 #endif
         if(unlikely(!rd->updated))
@@ -1906,7 +1902,7 @@ after_second_database_work:
                         } else {
                             /* Do not delete this dimension */
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-                            queue_dimension_to_aclk(rd);
+                            queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
 #endif
                             last = rd;
                             rd = rd->next;

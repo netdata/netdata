@@ -18,7 +18,7 @@ int registry_init(void) {
 
     // pathnames
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
-    registry.pathname = config_get(CONFIG_SECTION_REGISTRY, "registry db directory", filename);
+    registry.pathname = config_get(CONFIG_SECTION_DIRECTORIES, "registry", filename);
     if(mkdir(registry.pathname, 0770) == -1 && errno != EEXIST)
         fatal("Cannot create directory '%s'.", registry.pathname);
 
