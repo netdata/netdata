@@ -118,8 +118,7 @@ void rrdsetvar_free(RRDSETVAR *rs) {
     else {
         RRDSETVAR *t;
         for (t = st->variables; t && t->next != rs; t = t->next);
-        if(!t) error("RRDSETVAR '%s' not found in chart '%s' variables linked list", rs->key_fullname, st->id);
-        else t->next = rs->next;
+            t->next = rs->next;
     }
 
     rrdsetvar_free_variables(rs);
