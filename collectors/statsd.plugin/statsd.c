@@ -601,7 +601,7 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     else {
         void *t = dictionary_get(m->set.dict, value);
         if (unlikely(!t)) {
-            dictionary_set(m->set.dict, value, NULL, 1);
+            dictionary_set(m->set.dict, value, "", 1);
             m->set.unique++;
         }
 
