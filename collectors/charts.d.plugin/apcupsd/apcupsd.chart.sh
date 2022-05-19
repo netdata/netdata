@@ -142,8 +142,8 @@ BEGIN {
 	load = 0;
 	temp = 0;
 	time = 0;
-  nompower = 0;
-  load_usage = 0;
+	nompower = 0;
+	load_usage = 0;
 }
 /^BCHARGE.*/   { battery_charge = \$3 * 100 };
 /^BATTV.*/     { battery_voltage = \$3 * 100 };
@@ -159,7 +159,7 @@ BEGIN {
 /^TIMELEFT.*/  { time = \$3 * 100 };
 /^STATUS.*/    { online=(\$3 != \"COMMLOST\" && !(\$3 == \"SHUTTING\" && \$4 == \"DOWN\"))?1:0 };
 END {
-  { load_usage = nompower * load / 100 };
+	{ load_usage = nompower * load / 100 };
 
 	print \"BEGIN apcupsd_${host}.online $1\";
 	print \"SET online = \" online;
