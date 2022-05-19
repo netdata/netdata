@@ -52,6 +52,7 @@ struct rrdeng_query_handle {
     storage_number *page;
     usec_t page_end_time;
     uint32_t page_length;
+    usec_t dt;
 };
 
 typedef enum {
