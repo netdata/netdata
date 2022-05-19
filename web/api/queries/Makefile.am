@@ -8,6 +8,7 @@ SUBDIRS = \
     des \
     incremental_sum \
     max \
+    max_s \
     min \
     sum \
     median \

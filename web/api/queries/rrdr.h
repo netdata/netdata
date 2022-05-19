@@ -70,6 +70,16 @@ typedef struct internal_s{
     size_t db_points_read;
     size_t result_points_generated;
 } internal_t;
+
+typedef struct stat_s{
+    void *(*stat_create)(struct rrdresult *r);
+    void (*stat_reset)(struct rrdresult *r, int index);
+    void (*stat_free)(struct rrdresult *r, int index);
+    void (*stat_add)(struct rrdresult *r, calculated_number value, int index);
+    calculated_number (*stat_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, int index);
+    void *stat_data;
+    char name[100];
+} stat_t;
 typedef struct rrdresult {
     struct rrdset *st;         // the chart this result refers to
 
@@ -98,8 +108,9 @@ typedef struct rrdresult {
     uint8_t st_needs_lock;  // if ST should be locked
 
     internal_t internal;
-    internal_t stats[MAX_STAT_FUNCTION_COUNT]; // Max 64 is statistic function,
-                                               // it can be handled with dynamic allocation
+    int stats_count;
+    stat_t stats[MAX_STAT_FUNCTION_COUNT]; // Max 64 is statistic function,
+                                           // it can be handled with dynamic memory allocation
 } RRDR;
 
 #define rrdr_rows(r) ((r)->rows)

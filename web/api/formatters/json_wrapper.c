@@ -13,7 +13,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     if (should_lock)
         rrdset_check_rdlock(r->st);
 
-    long rows = rrdr_rows(r);
+    long rows = rrdr_rows(r) - r->stats_count;
     long c, i;
     RRDDIM *rd;
 
@@ -211,7 +211,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-                calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
+                calculated_number *cn = &r->v[ (rrdr_rows(r) - r->stats_count - 1) * r->d ];
                 calculated_number n = cn[c];
 
                 if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
@@ -230,8 +230,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             if(i) buffer_strcat(wb, ", ");
             i++;
 
-            calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
-            RRDR_VALUE_FLAGS *co = &r->o[ (rrdr_rows(r) - 1) * r->d ];
+            calculated_number *cn = &r->v[ (rrdr_rows(r) - r->stats_count - 1) * r->d ];
+            RRDR_VALUE_FLAGS *co = &r->o[ (rrdr_rows(r) - r->stats_count - 1) * r->d ];
             calculated_number n = cn[c];
 
             if(co[c] & RRDR_VALUE_EMPTY) {

@@ -46,17 +46,9 @@ static struct {
     uint32_t hash;
     RRDR_GROUPING value;
 } api_v1_stats[] = {
-         {"average"             , 0    , RRDR_GROUPING_AVERAGE}
-        , {"min"                , 0    , RRDR_GROUPING_MIN}
-        , {"max"                , 0    , RRDR_GROUPING_MAX}
-        , {"sum"                , 0    , RRDR_GROUPING_SUM}
-        , {"incremental_sum"    , 0    , RRDR_GROUPING_INCREMENTAL_SUM}
-        , {"median"             , 0    , RRDR_GROUPING_MEDIAN}
-        , {"stddev"             , 0    , RRDR_GROUPING_STDDEV}
-        , {"cv"                 , 0    , RRDR_GROUPING_CV}
-        , {"ses"                , 0    , RRDR_GROUPING_SES}
-        , {"des"                , 0    , RRDR_GROUPING_DES}
-        , {"zscore"             , 0    , RRDR_GROUPING_ZSCORE}
+          {"min_s"                , 0    , RRDR_STATS_MIN}
+        , {"max_s"                , 0    , RRDR_STATS_MAX}
+        , {"zscore_s"             , 0    , RRDR_STATS_ZSCORE}
         , {                 NULL, 0, 0}
 };
 static struct {

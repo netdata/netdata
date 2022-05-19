@@ -5,7 +5,7 @@
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
-void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct context_param *context_param_list)
+void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct context_param *context_param_list, int is_stats)
 {
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
@@ -29,7 +29,14 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             overflow_annotation[201] = "",  // overflow row annotation
             data_begin[101] = "",           // between labels and values
             finish[101] = "",               // at the end of everything
-            object_rows_time[101] = "";
+            object_rows_time[101] = "",
+            data[10] ="";                   // data or status according to the is_stats
+
+    if(is_stats) {
+        strcpy(data,"stats");
+    } else {
+        strcpy(data,"data");
+    }
 
     if(datatable) {
         dates = JSON_DATES_JS;
@@ -87,15 +94,14 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             strcpy(post_line, "}");
         else
             strcpy(post_line, "]");
-        snprintfz(data_begin, 100, "],\n    %sdata%s:\n [\n", kq, kq);
-        strcpy(finish,             "\n]\n}");
-
-        buffer_sprintf(wb, "{\n %slabels%s: [", kq, kq);
-        buffer_sprintf(wb, "%stime%s", sq, sq);
-
+        snprintfz(data_begin, 100, "],\n    %s%s%s:\n   [\n", kq, data, kq);
+        strcpy(finish,             "\n   ]\n}");
+        if(!is_stats){
+            buffer_sprintf(wb, "{\n    %slabels%s: [", kq, kq);
+            buffer_sprintf(wb, "%stime%s", sq, sq);
+        }
         if( options & RRDR_OPTION_OBJECTSROWS )
             snprintfz(object_rows_time, 100, "%stime%s: ", kq, kq);
-
     }
 
     size_t pre_value_len = strlen(pre_value);
@@ -116,7 +122,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
     RRDDIM *rd;
 
     // print the header lines
-    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; !is_stats && rd && c < r->d ;c++, rd = rd->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -127,7 +133,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
         buffer_fast_strcat(wb, post_label, post_label_len);
         i++;
     }
-    if(!i) {
+    if(!i && !is_stats) {
         buffer_fast_strcat(wb, pre_label, pre_label_len);
         buffer_fast_strcat(wb, "no data", 7);
         buffer_fast_strcat(wb, post_label, post_label_len);
@@ -138,16 +144,29 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
     buffer_strcat(wb, data_begin);
 
     // if all dimensions are hidden, print a null
-    if(!i) {
+    if(!i && !is_stats) {
         buffer_strcat(wb, finish);
         return;
     }
 
-    long start = 0, end = rrdr_rows(r), step = 1;
-    if(!(options & RRDR_OPTION_REVERSED)) {
-        start = rrdr_rows(r) - 1;
-        end = -1;
-        step = -1;
+
+    int stats_count = r->stats_count;
+    long start, end, step;
+
+    if(!is_stats) {
+        start = 0, end = rrdr_rows(r) - stats_count, step = 1;
+        if(!(options & RRDR_OPTION_REVERSED)) {
+            start = rrdr_rows(r) - stats_count - 1;
+            end = -1;
+            step = -1;
+        }
+    } else {
+        start = rrdr_rows(r) - stats_count, end = rrdr_rows(r), step = 1;
+        if(!(options & RRDR_OPTION_REVERSED)) {
+            start = rrdr_rows(r) - 1;
+            end = rrdr_rows(r) - stats_count - 1;
+            step = -1;
+        }
     }
 
     // pre-allocate a large enough buffer for us
@@ -159,7 +178,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
 
     // for each line in the array
     calculated_number total = 1;
-    for(i = start; i != end ;i += step) {
+    for(int stat_order = 0, i = start; i != end; i += step, stat_order++) {
         calculated_number *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
 
@@ -209,11 +228,14 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_fast_strcat(wb, object_rows_time, object_rows_time_len);
 
-            buffer_rrd_value(wb, (calculated_number)r->t[i]);
-
-            // in ms
-            if(unlikely(options & RRDR_OPTION_MILLISECONDS))
-                buffer_fast_strcat(wb, "000", 3);
+            if(!is_stats) {
+                buffer_rrd_value(wb, (calculated_number)r->t[i]);
+                // in ms
+                if(unlikely(options & RRDR_OPTION_MILLISECONDS))
+                    buffer_fast_strcat(wb, "000", 3);
+            } else {
+                buffer_strcat(wb, r->stats[stat_order].name);
+            }
 
             buffer_fast_strcat(wb, post_date, post_date_len);
         }
@@ -276,7 +298,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
 
         buffer_fast_strcat(wb, post_line, post_line_len);
     }
-
-    buffer_strcat(wb, finish);
+    if(is_stats || stats_count == 0)
+        buffer_strcat(wb, finish); 
     //info("RRD2JSON(): %s: END", r->st->id);
 }

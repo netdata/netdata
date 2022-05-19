@@ -107,6 +107,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, int stats_count, 
 
     RRDR *r = onewayalloc_callocz(owa, 1, sizeof(RRDR));
     r->st = st;
+    r->stats_count = stats_count;
 
     if (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
         rrdr_lock_rrdset(r);
@@ -124,11 +125,12 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, int stats_count, 
     } else
         rrddim_foreach_read(rd, st) r->d++;
 
-    r->n = n * stats_count;
+    stats_count++; // group function (1) + stat functions
+    r->n = n + stats_count;
 
-    r->t = onewayalloc_callocz(owa, (size_t)(n * stats_count), sizeof(time_t));
-    r->v = onewayalloc_mallocz(owa, n * stats_count * r->d * sizeof(calculated_number));
-    r->o = onewayalloc_mallocz(owa, n * stats_count * r->d * sizeof(RRDR_VALUE_FLAGS));
+    r->t = onewayalloc_callocz(owa, (size_t)(n + stats_count), sizeof(time_t));
+    r->v = onewayalloc_mallocz(owa, (n + stats_count) * r->d * sizeof(calculated_number));
+    r->o = onewayalloc_mallocz(owa, (n + stats_count) * r->d * sizeof(RRDR_VALUE_FLAGS));
     r->od = onewayalloc_mallocz(owa, r->d * sizeof(RRDR_DIMENSION_FLAGS));
 
     // set the hidden flag on hidden dimensions

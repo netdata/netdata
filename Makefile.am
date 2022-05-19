@@ -517,6 +517,8 @@ API_PLUGIN_FILES = \
     web/api/queries/incremental_sum/incremental_sum.h \
     web/api/queries/max/max.c \
     web/api/queries/max/max.h \
+    web/api/queries/max_s/max_s.c \
+    web/api/queries/max_s/max_s.h \
     web/api/queries/median/median.c \
     web/api/queries/median/median.h \
     web/api/queries/min/min.c \
