@@ -294,7 +294,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
         goto cleanup;
 
     rc = aclk_add_chart_payload(wc, &aclk_cd_data->uuid, claim_id, ACLK_PAYLOAD_DIMENSION,
-              (void *) aclk_cd_data->payload, aclk_cd_data->payload_size, NULL, 0);
+              (void *) aclk_cd_data->payload, aclk_cd_data->payload_size, NULL, aclk_cd_data->check_payload);
 
     freez(claim_id);
 cleanup:
@@ -1120,16 +1120,11 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     if (unlikely(!payload))
         return;
 
-    time_t date_submitted = payload_sent(wc->uuid_str, &rd->state->metric_uuid, payload, size);
-    if (date_submitted) {
-        freez(payload);
-        return;
-    }
-
     struct aclk_chart_dimension_data *aclk_cd_data = mallocz(sizeof(*aclk_cd_data));
     uuid_copy(aclk_cd_data->uuid, rd->state->metric_uuid);
     aclk_cd_data->payload = payload;
     aclk_cd_data->payload_size = size;
+    aclk_cd_data->check_payload = 1;
 
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));

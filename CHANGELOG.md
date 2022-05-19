@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Optimize the dimensions option store to the metadata database [\#12952](https://github.com/netdata/netdata/pull/12952) ([stelfrag](https://github.com/stelfrag))
+- Defer the dimension payload check to the ACLK sync thread [\#12951](https://github.com/netdata/netdata/pull/12951) ([stelfrag](https://github.com/stelfrag))
+- detailed dbengine stats [\#12948](https://github.com/netdata/netdata/pull/12948) ([ktsaou](https://github.com/ktsaou))
+- Prevent command\_to\_be\_logged from overflowing [\#12947](https://github.com/netdata/netdata/pull/12947) ([MrZammler](https://github.com/MrZammler))
+- Update libbpf version [\#12945](https://github.com/netdata/netdata/pull/12945) ([thiagoftsm](https://github.com/thiagoftsm))
 - Reduce timeout to 1 second for getting cloud instance info [\#12941](https://github.com/netdata/netdata/pull/12941) ([MrZammler](https://github.com/MrZammler))
 - feat: move dirs, logs, and env vars config options to separate sections [\#12935](https://github.com/netdata/netdata/pull/12935) ([ilyam8](https://github.com/ilyam8))
 - Adjust the dimension liveness status check [\#12933](https://github.com/netdata/netdata/pull/12933) ([stelfrag](https://github.com/stelfrag))
@@ -45,6 +50,7 @@
 - Initialize the metadata database when performing dbengine stress test [\#12861](https://github.com/netdata/netdata/pull/12861) ([stelfrag](https://github.com/stelfrag))
 - Add a SQLite database checkpoint command [\#12859](https://github.com/netdata/netdata/pull/12859) ([stelfrag](https://github.com/stelfrag))
 - feat\(cgroups.plugin\): add k8s cluster name label \(GKE only\) [\#12858](https://github.com/netdata/netdata/pull/12858) ([ilyam8](https://github.com/ilyam8))
+- Autodetect channel for specific version [\#12856](https://github.com/netdata/netdata/pull/12856) ([maneamarius](https://github.com/maneamarius))
 - Pause alert pushes to the cloud [\#12852](https://github.com/netdata/netdata/pull/12852) ([MrZammler](https://github.com/MrZammler))
 - fix\(proc.plugin\): consider ZFS ARC as cache when collecting memory usage on Linux [\#12847](https://github.com/netdata/netdata/pull/12847) ([ilyam8](https://github.com/ilyam8))
 - Resolve coverity related to memory and structure dereference [\#12846](https://github.com/netdata/netdata/pull/12846) ([stelfrag](https://github.com/stelfrag))
@@ -315,13 +321,6 @@
 - Provide better handling of config files in Docker containers. [\#12310](https://github.com/netdata/netdata/pull/12310) ([Ferroin](https://github.com/Ferroin))
 - Replace write with read locks [\#12309](https://github.com/netdata/netdata/pull/12309) ([MrZammler](https://github.com/MrZammler))
 - adds node\_id into mirrored\_hosts list [\#12307](https://github.com/netdata/netdata/pull/12307) ([underhood](https://github.com/underhood))
-- fix: CPU frequency detection for some containers [\#12306](https://github.com/netdata/netdata/pull/12306) ([ilyam8](https://github.com/ilyam8))
-- introduce new chart for process states metrics [\#12305](https://github.com/netdata/netdata/pull/12305) ([surajnpn](https://github.com/surajnpn))
-- fix uninstall using kickstart flag [\#12304](https://github.com/netdata/netdata/pull/12304) ([maneamarius](https://github.com/maneamarius))
-- Workflow to trigger cloud regression e2e tests [\#12299](https://github.com/netdata/netdata/pull/12299) ([dimko](https://github.com/dimko))
-- Fixing stderr output when testing tmpdir [\#12298](https://github.com/netdata/netdata/pull/12298) ([godismyjudge95](https://github.com/godismyjudge95))
-- chore: remove unused variable in the system-info script [\#12297](https://github.com/netdata/netdata/pull/12297) ([ilyam8](https://github.com/ilyam8))
-- Switch to using netdata-updater.sh to toggle auto updates on and off when installing. [\#12296](https://github.com/netdata/netdata/pull/12296) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
