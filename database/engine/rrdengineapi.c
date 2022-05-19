@@ -554,7 +554,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
         handle->next_page_time = INVALID_TIME;
 }
 
-static int rrdend_load_page_next(struct rrddim_query_handle *rrdimm_handle, unsigned *position_ptr) {
+static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, unsigned *position_ptr) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdengine_instance *ctx = handle->ctx;
@@ -632,7 +632,7 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
 
     if (unlikely(!descr || position >= (handle->page_length / sizeof(storage_number)))) {
         // We need to get a new page
-        if(rrdend_load_page_next(rrdimm_handle, &position))
+        if(rrdeng_load_page_next(rrdimm_handle, &position))
             goto no_more_metrics;
 
         descr = handle->descr;
