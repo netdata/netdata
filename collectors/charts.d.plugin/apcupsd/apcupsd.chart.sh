@@ -74,10 +74,8 @@ apcupsd_check() {
 }
 
 apcupsd_create() {
-  local host src
+  local host
   for host in "${!apcupsd_sources[@]}"; do
-    src=${apcupsd_sources[${host}]}
-
     # create the charts
     cat << EOF
 CHART apcupsd_${host}.charge '' "UPS Charge" "percentage" ups apcupsd.charge area $((apcupsd_priority + 1)) $apcupsd_update_every '' '' 'apcupsd'
