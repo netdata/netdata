@@ -133,6 +133,9 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
     // so try to find it in our memory and if it is not there
     // log an error
 
+    if (unlikely(!ptr))
+        return;
+
     OWA_PAGE *head = (OWA_PAGE *)owa;
     OWA_PAGE *page;
     size_t seeking = (size_t)ptr;
