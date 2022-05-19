@@ -155,6 +155,7 @@ BEGIN {
 /^OUTPUTV.*/   { output_voltage = \$3 * 100 };
 /^NOMOUTV.*/   { output_voltage_nominal = \$3 * 100 };
 /^LOADPCT.*/   { load = \$3 * 100 };
+/^ITEMP.*/     { temp = \$3 * 100 };
 /^NOMPOWER.*/  { nompower = \$3 };
 /^TIMELEFT.*/  { time = \$3 * 100 };
 /^STATUS.*/    { online=(\$3 != \"COMMLOST\" && !(\$3 == \"SHUTTING\" && \$4 == \"DOWN\"))?1:0 };
