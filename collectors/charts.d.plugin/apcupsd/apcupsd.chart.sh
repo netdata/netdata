@@ -102,6 +102,9 @@ DIMENSION output_voltage_nominal nominal absolute 1 100
 CHART apcupsd_${host}.load '' "UPS Load for ${host} on ${src}" "percentage" ups apcupsd.load area $((apcupsd_priority)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION load load absolute 1 100
 
+CHART apcupsd_${host}.load_usage '' "UPS Load Usage for ${host} on ${src}" "Watts" ups apcupsd.load_usage area $((apcupsd_priority)) $apcupsd_update_every '' '' 'apcupsd'
+DIMENSION load_usage load absolute 1 100
+
 CHART apcupsd_${host}.temp '' "UPS Temperature for ${host} on ${src}" "Celsius" ups apcupsd.temperature line $((apcupsd_priority + 7)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION temp temp absolute 1 100
 
@@ -141,6 +144,8 @@ BEGIN {
 	load = 0;
 	temp = 0;
 	time = 0;
+  nompower = 0;
+  load_usage = 0;
 }
 /^BCHARGE.*/   { battery_charge = \$3 * 100 };
 /^BATTV.*/     { battery_voltage = \$3 * 100 };
@@ -152,10 +157,12 @@ BEGIN {
 /^OUTPUTV.*/   { output_voltage = \$3 * 100 };
 /^NOMOUTV.*/   { output_voltage_nominal = \$3 * 100 };
 /^LOADPCT.*/   { load = \$3 * 100 };
-/^ITEMP.*/     { temp = \$3 * 100 };
+/^NOMPOWER.*/  { nompower = \$3 };
 /^TIMELEFT.*/  { time = \$3 * 100 };
 /^STATUS.*/    { online=(\$3 != \"COMMLOST\" && !(\$3 == \"SHUTTING\" && \$4 == \"DOWN\"))?1:0 };
 END {
+  { load_usage = nompower * load / 100 };
+
 	print \"BEGIN apcupsd_${host}.online $1\";
 	print \"SET online = \" online;
 	print \"END\"
@@ -187,6 +194,10 @@ END {
 
 		print \"BEGIN apcupsd_${host}.load $1\";
 		print \"SET load = \" load;
+		print \"END\"
+
+		print \"BEGIN apcupsd_${host}.load_usage $1\";
+		print \"SET load_usage = \" load_usage;
 		print \"END\"
 
 		print \"BEGIN apcupsd_${host}.temp $1\";
