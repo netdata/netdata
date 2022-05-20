@@ -1404,28 +1404,44 @@ static int poll_process_error(POLLINFO *pi, struct pollfd *pf, short int revents
     return 1;
 }
 
-static inline int poll_process_send(POLLINFO *pi, struct pollfd *pf, time_t now) {
+static inline int poll_process_send(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, time_t now) {
     pi->last_sent_t = now;
     pi->send_count++;
 
     debug(D_POLLFD, "POLLFD: LISTENER: sending data to socket on slot %zu (fd %d)", pi->slot, pf->fd);
 
     pf->events = 0;
+
+    // remember the slot, in case we need to close it later
+    // the callback may manipulate the socket list and our pf and pi pointers may be invalid after that call
+    size_t slot = pi->slot;
+
     if (unlikely(pi->snd_callback(pi, &pf->events) == -1))
-        poll_close_fd(pi);
+        poll_close_fd(&p->inf[slot]);
+
+    // IMPORTANT:
+    // pf and pi may be invalid below this point, they may have been reallocated.
 
     return 1;
 }
 
-static inline int poll_process_tcp_read(POLLINFO *pi, struct pollfd *pf, time_t now) {
+static inline int poll_process_tcp_read(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, time_t now) {
     pi->last_received_t = now;
     pi->recv_count++;
 
     debug(D_POLLFD, "POLLFD: LISTENER: reading data from TCP client slot %zu (fd %d)", pi->slot, pf->fd);
 
     pf->events = 0;
+
+    // remember the slot, in case we need to close it later
+    // the callback may manipulate the socket list and our pf and pi pointers may be invalid after that call
+    size_t slot = pi->slot;
+
     if (pi->rcv_callback(pi, &pf->events) == -1)
-        poll_close_fd(pi);
+        poll_close_fd(&p->inf[slot]);
+
+    // IMPORTANT:
+    // pf and pi may be invalid below this point, they may have been reallocated.
 
     return 1;
 }
@@ -1441,7 +1457,11 @@ static inline int poll_process_udp_read(POLLINFO *pi, struct pollfd *pf, time_t 
     // performance, especially for statsd.
 
     pf->events = 0;
-    pi->rcv_callback(pi, &pf->events);
+    if(pi->rcv_callback(pi, &pf->events) == -1)
+        return 0;
+
+    // IMPORTANT:
+    // pf and pi may be invalid below this point, they may have been reallocated.
 
     return 1;
 }
@@ -1476,11 +1496,10 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
         else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
             error("POLLFD: LISTENER: accept() failed.");
 
-        return 0;
     }
     else {
         // accept ok
-        // info("POLLFD: LISTENER: client '[%s]:%s' connected to '%s' on fd %d", client_ip, client_port, sockets->fds_names[i], nfd);
+
         poll_add_fd(p
                     , nfd
                     , SOCK_STREAM
@@ -1497,10 +1516,7 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
         );
 
         // IMPORTANT:
-        // pf and pi may be invalid below this point, the may have been reallocated.
-        // Use the following to refresh them:
-        // pf = &p->fds[pi->slot];
-        // pi = &p->inf[pi->slot];
+        // pf and pi may be invalid below this point, they may have been reallocated.
 
         return 1;
     }
@@ -1722,7 +1738,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                 pi = &p.inf[i];
                 pf = &p.fds[i];
                 pf->revents = 0;
-                processed += poll_process_send(pi, pf, now);
+                processed += poll_process_send(&p, pi, pf, now);
             }
 
             // process UDP reads
@@ -1740,7 +1756,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                 pi = &p.inf[i];
                 pf = &p.fds[i];
                 pf->revents = 0;
-                processed += poll_process_tcp_read(pi, pf, now);
+                processed += poll_process_tcp_read(&p, pi, pf, now);
             }
 
             if(!processed && (!p.limit || p.used < p.limit)) {
