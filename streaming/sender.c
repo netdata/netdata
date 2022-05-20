@@ -502,7 +502,8 @@ if(!s->rrdpush_compression)
     else if(version == -4) {
         error("STREAM %s [send to %s]: remote server denied access for [%s].", host->hostname, s->connected_to, host->hostname);
         rrdpush_sender_thread_close_socket(host);
-        host->destination->disabled_because_of_denied_access = 1;
+        if (host->destination->next)
+            host->destination->disabled_because_of_denied_access = 1;
         return 0;
     }
     s->version = version;
