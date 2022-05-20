@@ -38,7 +38,7 @@ DEFAULT_STATUS_MAP = {'CLEAR': 0, 'WARNING': 1, 'CRITICAL': 2}
 DEFAULT_URL = 'http://127.0.0.1:19999/api/v1/alarms?all'
 DEFAULT_COLLECT_ALARM_VALUES = False
 DEFAULT_ALARM_STATUS_CHART_TYPE = 'line'
-
+DEFAULT_ALARM_CONTAINS_WORDS = ''
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
@@ -49,6 +49,7 @@ class Service(UrlService):
         self.url = self.configuration.get('url', DEFAULT_URL)
         self.collect_alarm_values = bool(self.configuration.get('collect_alarm_values', DEFAULT_COLLECT_ALARM_VALUES))
         self.collected_dims = {'alarms': set(), 'values': set()}
+        self.alarm_contains_words_list = self.configuration.get('alarm_contains_words', DEFAULT_ALARM_CONTAINS_WORDS).split(',')
 
     def _get_data(self):
         raw_data = self._get_raw_data()
@@ -57,6 +58,9 @@ class Service(UrlService):
 
         raw_data = loads(raw_data)
         alarms = raw_data.get('alarms', {})
+        if self.alarm_contains_words_list[0] != '':
+            alarms = {alarm_name: alarms[alarm_name] for alarm_name in alarms for alarm_contains_word in
+                      self.alarm_contains_word_list if alarm_contains_word in alarm_name}
 
         data = {a: self.sm[alarms[a]['status']] for a in alarms if alarms[a]['status'] in self.sm}
         self.update_charts('alarms', data)
