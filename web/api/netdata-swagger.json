@@ -908,7 +908,7 @@
     "/alarms_values": {
       "get": {
         "summary": "Get a list of active or raised alarms on the server",
-        "description": "The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value` and alarm `status`.",
+        "description": "The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value`, `last_updated` time and alarm `status`.",
         "parameters": [
           {
             "name": "all",
@@ -2108,6 +2108,10 @@
                 },
                 "value": {
                   "type": "integer"
+                },
+                "last_updated": {
+                  "type": "integer",
+                  "format": "int32"
                 },
                 "status": {
                   "type": "string",
