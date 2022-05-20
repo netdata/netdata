@@ -430,10 +430,24 @@ fi
 # Detect instance metadata for VMs running on cloud providers
 
 CLOUD_TYPE="unknown"
+CLOUD_PLATFORM="unknown"
 CLOUD_INSTANCE_TYPE="unknown"
 CLOUD_INSTANCE_REGION="unknown"
+CLOUD_INSTANCE_ZONE="unknown"
+CLOUD_DETECTION="none"
 
-if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
+if command -v cloud-init > /dev/null 2>&1 && cloud-init query --all > /dev/null 2>&1; then
+  CLOUD_TYPE="$(cloud-init query v1.cloud_name)"
+  CLOUD_PLATFORM="$(cloud-init query v1.platform)"
+  CLOUD_INSTANCE_REGION="$(cloud-init query v1.region)"
+  CLOUD_INSTANCE_ZONE="$(cloud-init query v1.availability_zone)"
+  CLOUD_DETECTION="cloud-init"
+
+  case "${CLOUD_TYPE}" in
+    aws) CLOUD_INSTANCE_TYPE="$(cloud-init query ds.meta_data.instance_type)" ;;
+    gcp) CLOUD_INSTANCE_TYPE="$(basename "$(cloud-init query ds.instance.machine-type)")" ;;
+  esac
+elif [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
   # Returned HTTP status codes: GCP is 200, AWS is 200, DO is 404. 
   curl --fail -s -m 1 --noproxy "*" http://169.254.169.254 >/dev/null 2>&1
   ret=$?
@@ -443,20 +457,22 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
       AWS_IMDS_TOKEN="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
       if [ -n "${AWS_IMDS_TOKEN}" ]; then
-        CLOUD_TYPE="AWS"
+        CLOUD_TYPE="aws"
         CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type" 2>/dev/null)"
         CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region" 2>/dev/null)"
+        CLOUD_DETECTION="aws-imds"
       fi
     fi
 
     # Try GCE computeMetadata v1
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
       if [ -n "$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1")" ]; then
-        CLOUD_TYPE="GCP"
+        CLOUD_TYPE="gcp"
         CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/machine-type")"
         [ -n "$CLOUD_INSTANCE_TYPE" ] && CLOUD_INSTANCE_TYPE=$(basename "$CLOUD_INSTANCE_TYPE")
         CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/zone")"
         [ -n "$CLOUD_INSTANCE_REGION" ] && CLOUD_INSTANCE_REGION=$(basename "$CLOUD_INSTANCE_REGION") && CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION%-*}
+        CLOUD_DETECTION="gcp-imds"
       fi
     fi
 
@@ -465,9 +481,10 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
     # if [ "${CLOUD_TYPE}" = "unknown" ]; then
     #   AZURE_IMDS_DATA="$(curl --fail -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?version=2021-10-01")"
     #   if [ -n "${AZURE_IMDS_DATA}" ]; then
-    #     CLOUD_TYPE="Azure"
+    #     CLOUD_TYPE="azure"
     #     CLOUD_INSTANCE_TYPE="$(curl --fail -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?version=2021-10-01&format=text")"
     #     CLOUD_INSTANCE_REGION="$(curl --fail -s -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?version=2021-10-01&format=text")"
+    #     CLOUD_DETECTION="azure-imds"
     #   fi
     # fi
   fi
@@ -504,5 +521,8 @@ echo "NETDATA_SYSTEM_RAM_DETECTION=${RAM_DETECTION}"
 echo "NETDATA_SYSTEM_TOTAL_DISK_SIZE=${DISK_SIZE}"
 echo "NETDATA_SYSTEM_DISK_DETECTION=${DISK_DETECTION}"
 echo "NETDATA_INSTANCE_CLOUD_TYPE=${CLOUD_TYPE}"
+echo "NETDATA_INSTANCE_CLOUD_PLATFORM=${CLOUD_PLATFORM}"
 echo "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=${CLOUD_INSTANCE_TYPE}"
 echo "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION}"
+echo "NETDATA_INSTANCE_CLOUD_INSTANCE_ZONE=${CLOUD_INSTANCE_ZONE}"
+echo "NETDATA_INSTANCE_CLOUD_DETECTION=${CLOUD_DETECTION}"
