@@ -165,7 +165,7 @@ static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, 
     buffer_rrd_value(wb, rc->value);
     buffer_strcat(wb, ",\n");
 
-    buffer_strcat(wb, "\t\t\t\"when\":");
+    buffer_strcat(wb, "\t\t\t\"last_updated\":");
     buffer_sprintf(wb, "%lu", (unsigned long)rc->last_updated);
     buffer_strcat(wb, ",\n");
 
