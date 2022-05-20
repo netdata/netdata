@@ -26,6 +26,10 @@
 #define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
 #define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
 
+#define START_STREAMING_ERROR_SAME_LOCALHOST "Don't hit me baby, you are trying to stream my localhost back"
+#define START_STREAMING_ERROR_ALREADY_STREAMING "This GUID is already streaming to this server"
+#define START_STREAMING_ERROR_NOT_PERMITTED "You are not permitted to access this. Check the logs for more info."
+
 #define HTTP_HEADER_SIZE 8192
 
 typedef enum {
@@ -138,6 +142,14 @@ struct receiver_state {
 #endif
 };
 
+struct rrdpush_destinations {
+    char destination[CONNECTED_TO_SIZE + 1];
+    int disabled_no_proper_reply;
+    int disabled_because_of_localhost;
+    time_t disabled_already_streaming;
+    int disabled_because_of_denied_access;
+    struct rrdpush_destinations *next;
+};
 
 extern unsigned int default_rrdpush_enabled;
 #ifdef ENABLE_COMPRESSION
@@ -149,6 +161,7 @@ extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
 extern void sender_init(struct sender_state *s, RRDHOST *parent);
+extern struct rrdpush_destinations *destinations_init(const char *destinations);
 void sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s);
 extern int rrdpush_init();
@@ -164,6 +177,14 @@ extern void rrdpush_sender_thread_stop(RRDHOST *host);
 
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
+extern int connect_to_one_of_destinations(
+    struct rrdpush_destinations *destinations,
+    int default_port,
+    struct timeval *timeout,
+    size_t *reconnects_counter,
+    char *connected_to,
+    size_t connected_to_size,
+    struct rrdpush_destinations **destination);
 
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
