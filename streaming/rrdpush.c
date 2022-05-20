@@ -437,6 +437,7 @@ int connect_to_one_of_destinations(
         } else if (d->disabled_already_streaming && (d->disabled_already_streaming + 30 > now_realtime_sec())) {
             continue;
         } else if (d->disabled_because_of_denied_access) {
+            d->disabled_because_of_denied_access = 0;
             continue;
         }
 
