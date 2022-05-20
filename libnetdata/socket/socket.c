@@ -1387,28 +1387,21 @@ static void poll_events_cleanup(void *data) {
 }
 
 static int poll_process_error(POLLINFO *pi, struct pollfd *pf, short int revents) {
-    if(unlikely(revents & POLLERR)) {
-        error("POLLFD: LISTENER: processing POLLERR events for slot %zu fd %d (events = %d, revents = %d)", pi->slot, pf->events, revents, pf->fd);
-        pf->events = 0;
-        poll_close_fd(pi);
-        return 1;
-    }
+    error("POLLFD: LISTENER: received %s %s %s on socket at slot %zu (fd %d) client '%s' port '%s' expecting %s %s %s, having %s %s %s"
+          , revents & POLLERR  ? "POLLERR" : ""
+          , revents & POLLHUP  ? "POLLHUP" : ""
+          , revents & POLLNVAL ? "POLLNVAL" : ""
+          , pi->slot
+          , pi->fd
+          , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+          , pi->client_port ? pi->client_port : "<undefined-port>"
+          , pf->events & POLLIN ? "POLLIN" : "", pf->events & POLLOUT ? "POLLOUT" : "", pf->events & POLLPRI ? "POLLPRI" : ""
+          , revents & POLLIN ? "POLLIN" : "", revents & POLLOUT ? "POLLOUT" : "", revents & POLLPRI ? "POLLPRI" : ""
+          );
 
-    if(unlikely(revents & POLLHUP)) {
-        error("POLLFD: LISTENER: processing POLLHUP events for slot %zu fd %d (events = %d, revents = %d)", pi->slot, pf->events, revents, pf->fd);
-        pf->events = 0;
-        poll_close_fd(pi);
-        return 1;
-    }
-
-    if(unlikely(revents & POLLNVAL)) {
-        error("POLLFD: LISTENER: processing POLLNVAL events for slot %zu fd %d (events = %d, revents = %d)", pi->slot, pf->events, revents, pf->fd);
-        pf->events = 0;
-        poll_close_fd(pi);
-        return 1;
-    }
-
-    return 0;
+    pf->events = 0;
+    poll_close_fd(pi);
+    return 1;
 }
 
 static inline int poll_process_send(POLLINFO *pi, struct pollfd *pf, time_t now) {
@@ -1464,8 +1457,13 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
     char client_host[NI_MAXHOST] = "";
 
     debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", pi->slot, pf->fd);
-    int nfd = accept_socket(pf->fd, SOCK_NONBLOCK, client_ip, INET6_ADDRSTRLEN, client_port, NI_MAXSERV,
-                        client_host, NI_MAXHOST, p->access_list, p->allow_dns);
+
+    int nfd = accept_socket(
+        pf->fd,SOCK_NONBLOCK,
+        client_ip, INET6_ADDRSTRLEN, client_port,NI_MAXSERV, client_host, NI_MAXHOST,
+        p->access_list, p->allow_dns
+        );
+
     if (unlikely(nfd < 0)) {
         // accept failed
 
