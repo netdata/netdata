@@ -30,28 +30,30 @@ if [ -z "${VIRTUALIZATION}" ]; then
   VIRTUALIZATION="unknown"
   VIRT_DETECTION="none"
 
-  if [ -n "$(command -v systemd-detect-virt 2> /dev/null)" ]; then
+  if command -v systemd-detect-virt >/dev/null 2>&1; then
     VIRTUALIZATION="$(systemd-detect-virt -v)"
     VIRT_DETECTION="systemd-detect-virt"
     CONTAINER=${CONTAINER:-$(systemd-detect-virt -c)}
     CONT_DETECTION="systemd-detect-virt"
-  else
-    if command -v lscpu >/dev/null 2>&1; then
-      VIRTUALIZATION=$(lscpu | grep "Hypervisor vendor" | cut -d: -f 2 | awk '{$1=$1};1')
-      VIRT_DETECTION="lscpu"
-    elif [ -n "$(command -v dmidecode)" ] && dmidecode -s system-product-name 2> /dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
-      VIRTUALIZATION="$(dmidecode -s system-product-name)"
-      VIRT_DETECTION="dmidecode"
-    else
-      VIRTUALIZATION="none"
-    fi
+  elif command -v lscpu >/dev/null 2>&1; then
+    VIRTUALIZATION=$(lscpu | grep "Hypervisor vendor:" | cut -d: -f 2 | awk '{$1=$1};1')
+    [ -n "$VIRTUALIZATION" ] && VIRT_DETECTION="lscpu"
+    [ -z "$VIRTUALIZATION" ] && lscpu | grep -q "Virtualization:" && VIRTUALIZATION="none"
+  elif command -v dmidecode >/dev/null 2>&1; then
+    VIRTUALIZATION=$(dmidecode -s system-product-name 2>/dev/null | grep "VMware\|Virtual\|KVM\|Bochs")
+    [ -n "$VIRTUALIZATION" ] && VIRT_DETECTION="dmidecode"
+  fi
+
+  if [ -z "${VIRTUALIZATION}" ] && [ "${KERNEL_NAME}" = "FreeBSD" ]; then
+    VIRTUALIZATION=$(sysctl kern.vm_guest 2>/dev/null | cut -d: -f 2 | awk '{$1=$1};1')
+    [ -n "$VIRTUALIZATION" ] && VIRT_DETECTION="sysctl"
   fi
 
   if [ -z "${VIRTUALIZATION}" ]; then
     # Output from the command is outside of spec
     VIRTUALIZATION="unknown"
     VIRT_DETECTION="none"
-  else
+  elif [ "$VIRTUALIZATION" != "none" ] && [ "$VIRTUALIZATION" != "unknown" ]; then
     VIRTUALIZATION=$(virtualization_normalize_name $VIRTUALIZATION)
   fi
 else
