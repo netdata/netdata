@@ -630,19 +630,25 @@ static inline void do_dimension_fixedstep(
         }
 
         for ( ; now <= db_now ; now += dt) {
-            if(likely(now >= db_now && does_storage_number_exist(n))) {
+            if(likely(does_storage_number_exist(n))) {
+
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(ENABLE_DBENGINE)
-                struct rrdeng_query_handle* rrd_handle = (struct rrdeng_query_handle*)handle.handle;
-                if ((rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (now != rrd_handle->now)) {
-                    error("INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld", rd->id, (long)rrd_handle->now, (long)now);
+                if(now >= db_now) {
+                    struct rrdeng_query_handle *rrd_handle = (struct rrdeng_query_handle *)handle.handle;
+                    if ((rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (now != rrd_handle->now))
+                        error(
+                            "INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld",
+                            rd->id,
+                            (long)rrd_handle->now,
+                            (long)now);
                 }
 #endif
+
                 if(likely(value != 0.0))
                     values_in_group_non_zero++;
 
                 if(unlikely(did_storage_number_reset(n)))
                     group_value_flags |= RRDR_VALUE_RESET;
-
             }
 
             // add this value for grouping
