@@ -650,6 +650,7 @@ netdata_pids() {
 
 stop_all_netdata() {
   p=''
+  stop_success=0
 
   if [ "$(id -u)" -eq 0 ]; then
     uname="$(uname 2> /dev/null)"
@@ -657,32 +658,38 @@ stop_all_netdata() {
     # Any of these may fail, but we need to not bail if they do.
     if issystemd; then
       if systemctl stop netdata; then
+        stop_success=1
         sleep 5
       fi
     elif [ "${uname}" = "Darwin" ]; then
       if launchctl stop netdata; then
+        stop_success=1
         sleep 5
       fi
     elif [ "${uname}" = "FreeBSD" ]; then
       if /etc/rc.d/netdata stop; then
+        stop_success=1
         sleep 5
       fi
     else
       if service netdata stop; then
+        stop_success=1
         sleep 5
       fi
     fi
   fi
 
-  if [ -n "$(netdata_pids)" ] && [ -n "$(command -v netdatacli)" ]; then
-    netdatacli shutdown-agent
-    sleep 20
-  fi
+  if [ "$stop_success" = "0" ]; then
+    if [ -n "$(netdata_pids)" ] && [ -n "$(command -v netdatacli)" ]; then
+      netdatacli shutdown-agent
+      sleep 20
+    fi
 
-  for p in $(netdata_pids); do
-    # shellcheck disable=SC2086
-    stop_netdata_on_pid ${p}
-  done
+    for p in $(netdata_pids); do
+      # shellcheck disable=SC2086
+      stop_netdata_on_pid ${p}
+    done
+  fi
 }
 
 trap quit_msg EXIT
