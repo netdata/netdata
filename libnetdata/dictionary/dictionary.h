@@ -36,6 +36,7 @@ typedef struct dictionary {
 #define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x00000002
 #define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x00000004
 #define DICTIONARY_FLAG_WITH_STATISTICS         0x00000008
+#define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x00000010
 
 extern DICTIONARY *dictionary_create(uint8_t flags);
 extern void dictionary_destroy(DICTIONARY *dict);

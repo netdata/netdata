@@ -623,7 +623,7 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     }
 
     if (unlikely(!m->set.dict)) {
-        m->set.dict   = dictionary_create(STATSD_DICTIONARY_OPTIONS | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
+        m->set.dict   = dictionary_create(STATSD_DICTIONARY_OPTIONS | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
         m->set.unique = 0;
     }
 
@@ -631,9 +631,16 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
         // magic loading of metric, without affecting anything
     }
     else {
-        void *t = dictionary_get(m->set.dict, value);
-        if (unlikely(!t)) {
-            dictionary_set(m->set.dict, value, "", 1);
+        char c = 'N'; // new
+        char *cptr = (char *)dictionary_set(m->set.dict, value, &c, sizeof(char));
+
+        // since we pass DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+        // the dictionary will return an existing value, if the key is already there
+        // and based on the returned value, we can know if it is New or Old.
+
+        if(*cptr == 'N') {
+            // it is a new item
+            *cptr = 'O'; // mark it as old
             m->set.unique++;
         }
 
@@ -654,7 +661,7 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
         statsd_reset_metric(m);
 
     if (unlikely(!m->dictionary.dict)) {
-        m->dictionary.dict   = dictionary_create(STATSD_DICTIONARY_OPTIONS);
+        m->dictionary.dict   = dictionary_create(STATSD_DICTIONARY_OPTIONS | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
         m->dictionary.unique = 0;
         m->dictionary.base = NULL;
     }
@@ -665,27 +672,28 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
     else {
         STATSD_METRIC_DICTIONARY_ITEM *t = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_get(m->dictionary.dict, value);
 
-        if(!t && m->dictionary.unique >= statsd.dictionary_max_unique) {
-            value = "other";
-            if(!m->dictionary.other)
-                m->dictionary.other = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_get(m->dictionary.dict, value);
-            t = m->dictionary.other;
-        }
-
         if (unlikely(!t)) {
-            STATSD_METRIC_DICTIONARY_ITEM tmp;
+            if(!t && m->dictionary.unique >= statsd.dictionary_max_unique)
+                value = "other";
+
+            STATSD_METRIC_DICTIONARY_ITEM tmp = {
+                .name = NULL,
+                .count = 0,
+                .rd = NULL,
+                .next = NULL
+            };
             char *name_ptr = NULL;
             t = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_set_with_name_ptr(m->dictionary.dict, value, &tmp, sizeof(STATSD_METRIC_DICTIONARY_ITEM), &name_ptr);
-            t->name = name_ptr;
-            t->count = 1;
-            t->rd = NULL;
-            t->next = m->dictionary.base;
-            m->dictionary.base = t;
-            m->dictionary.unique++;
+            if(!t->name) {
+                // we just added this
+                t->name = name_ptr;
+                t->next = m->dictionary.base;
+                m->dictionary.base = t;
+                m->dictionary.unique++;
+            }
         }
-        else
-            t->count++;
 
+        t->count++;
         m->events++;
         m->count++;
     }
@@ -1752,10 +1760,8 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
             , RRDSET_TYPE_STACKED
         );
 
-        // m->rd_value = rrddim_add(m->st, "dict", "dict size", 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-        // if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
-        //    m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
+            m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
     else rrdset_next(m->st);
 
@@ -1765,10 +1771,8 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
         rrddim_set_by_pointer(m->st, t->rd, (collected_number)t->count);
     }
 
-    // rrddim_set_by_pointer(m->st, m->rd_value, m->last);
-
-    // if(m->rd_count)
-    //    rrddim_set_by_pointer(m->st, m->rd_count, m->events);
+    if(m->rd_count)
+        rrddim_set_by_pointer(m->st, m->rd_count, m->events);
 
     rrdset_done(m->st);
 }
@@ -2410,7 +2414,7 @@ void *statsd_main(void *ptr) {
 
     statsd.dictionary_max_unique = config_get_number(CONFIG_SECTION_STATSD, "dictionaries max unique dimensions", statsd.dictionary_max_unique);
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "add dimension for number of events received", 1)) {
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "add dimension for number of events received", 0)) {
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
         statsd.counters.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
         statsd.meters.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;

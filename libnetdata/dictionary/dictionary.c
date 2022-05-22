@@ -185,7 +185,7 @@ void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, void *val
         if(unlikely(!nv))
             fatal("Cannot create name_value.");
     }
-    else {
+    else if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
         debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", name);
 
         if(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE) {
