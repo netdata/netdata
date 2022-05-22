@@ -32,7 +32,7 @@
 #define STATSD_FIRST_PTR_MUTEX_INIT .first_mutex = NETDATA_MUTEX_INITIALIZER
 #define STATSD_FIRST_PTR_MUTEX_LOCK(index) netdata_mutex_lock(&((index)->first_mutex))
 #define STATSD_FIRST_PTR_MUTEX_UNLOCK(index) netdata_mutex_unlock(&((index)->first_mutex))
-#define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_DEFAULT
+#define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_NONE
 #else
 #define STATSD_AVL_TREE avl_tree_type
 #define STATSD_AVL_INSERT avl_insert
@@ -92,6 +92,23 @@ typedef struct statsd_metric_set {
     size_t unique;
 } STATSD_METRIC_SET;
 
+#define STATSD_METRIC_DICTIONARY_FLAGS_DICTFULL_LOGGED 0x000001
+
+typedef struct statsd_metric_dictionary_item {
+    char *name;
+    size_t count;
+    RRDDIM *rd;
+    struct statsd_metric_dictionary_item *next;
+} STATSD_METRIC_DICTIONARY_ITEM;
+
+typedef struct statsd_metric_dictionary {
+    STATSD_METRIC_DICTIONARY_ITEM *other;
+    DICTIONARY *dict;
+    size_t unique;
+    uint32_t flags;
+    STATSD_METRIC_DICTIONARY_ITEM *base;
+} STATSD_METRIC_DICTIONARY;
+
 
 // --------------------------------------------------------------------------------------------------------------------
 // this is a metric - for all types of metrics
@@ -114,7 +131,8 @@ typedef enum statsd_metric_type {
     STATSD_METRIC_TYPE_METER,
     STATSD_METRIC_TYPE_TIMER,
     STATSD_METRIC_TYPE_HISTOGRAM,
-    STATSD_METRIC_TYPE_SET
+    STATSD_METRIC_TYPE_SET,
+    STATSD_METRIC_TYPE_DICTIONARY
 } STATSD_METRIC_TYPE;
 
 
@@ -136,6 +154,7 @@ typedef struct statsd_metric {
         STATSD_METRIC_COUNTER counter;
         STATSD_METRIC_HISTOGRAM histogram;
         STATSD_METRIC_SET set;
+        STATSD_METRIC_DICTIONARY dictionary;
     };
 
     // chart related members
@@ -255,6 +274,8 @@ static struct statsd {
     STATSD_INDEX histograms;
     STATSD_INDEX meters;
     STATSD_INDEX sets;
+    STATSD_INDEX dictionaries;
+
     size_t unknown_types;
     size_t socket_errors;
     size_t tcp_socket_connects;
@@ -285,6 +306,7 @@ static struct statsd {
     size_t histogram_increase_step;
     double histogram_percentile;
     char *histogram_percentile_str;
+    size_t dictionary_max_unique;
 
     int threads;
     struct collection_thread_status *collection_threads_status;
@@ -352,12 +374,22 @@ static struct statsd {
                 .first = NULL,
                 STATSD_FIRST_PTR_MUTEX_INIT
         },
+        .dictionaries = {
+                .name = "dictionary",
+                .events = 0,
+                .metrics = 0,
+                .index = STATSD_AVL_INDEX_INIT,
+                .default_options = STATSD_METRIC_OPTION_NONE,
+                .first = NULL,
+                STATSD_FIRST_PTR_MUTEX_INIT
+        },
 
         .tcp_idle_timeout = 600,
 
         .apps = NULL,
         .histogram_percentile = 95.0,
         .histogram_increase_step = 10,
+        .dictionary_max_unique = 200,
         .threads = 0,
         .collection_threads_status = NULL,
         .sockets = {
@@ -610,6 +642,55 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     }
 }
 
+static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value) {
+    if(!is_metric_useful_for_collection(m)) return;
+
+    if(unlikely(!value || !*value)) {
+        error("STATSD: metric of type set, with empty value is ignored.");
+        return;
+    }
+
+    if(unlikely(m->reset))
+        statsd_reset_metric(m);
+
+    if (unlikely(!m->dictionary.dict)) {
+        m->dictionary.dict   = dictionary_create(STATSD_DICTIONARY_OPTIONS);
+        m->dictionary.unique = 0;
+        m->dictionary.base = NULL;
+    }
+
+    if(unlikely(value_is_zinit(value))) {
+        // magic loading of metric, without affecting anything
+    }
+    else {
+        STATSD_METRIC_DICTIONARY_ITEM *t = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_get(m->dictionary.dict, value);
+
+        if(!t && m->dictionary.unique >= statsd.dictionary_max_unique) {
+            value = "other";
+            if(!m->dictionary.other)
+                m->dictionary.other = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_get(m->dictionary.dict, value);
+            t = m->dictionary.other;
+        }
+
+        if (unlikely(!t)) {
+            STATSD_METRIC_DICTIONARY_ITEM tmp;
+            char *name_ptr = NULL;
+            t = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_set_with_name_ptr(m->dictionary.dict, value, &tmp, sizeof(STATSD_METRIC_DICTIONARY_ITEM), &name_ptr);
+            t->name = name_ptr;
+            t->count = 1;
+            t->rd = NULL;
+            t->next = m->dictionary.base;
+            m->dictionary.base = t;
+            m->dictionary.unique++;
+        }
+        else
+            t->count++;
+
+        m->events++;
+        m->count++;
+    }
+}
+
 
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing
@@ -648,8 +729,13 @@ static void statsd_process_metric(const char *name, const char *value, const cha
     }
     else if(unlikely(t0 == 's' && t1 == '\0')) {
         statsd_process_set(
-                statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
-                value);
+            statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
+            value);
+    }
+    else if(unlikely(t0 == 'd' && t1 == '\0')) {
+        statsd_process_dictionary(
+            statsd_find_or_add_metric(&statsd.dictionaries, name, STATSD_METRIC_TYPE_DICTIONARY),
+            value);
     }
     else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
         statsd_process_timer(
@@ -1639,6 +1725,54 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
     rrdset_done(m->st);
 }
 
+static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
+    debug(D_STATSD, "updating private chart for dictionary metric '%s'", m->name);
+
+    if(unlikely(!m->st)) {
+        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
+        statsd_get_metric_type_and_id(m, type, id, "dictionary", RRD_ID_LENGTH_MAX);
+
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_dictionary.%s", m->name);
+
+        char title[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for dictionary %s", m->name);
+
+        m->st = statsd_private_rrdset_create(
+            m
+            , type
+            , id
+            , NULL          // name
+            , "dictionaries" // family (submenu)
+            , context       // context
+            , title         // title
+            , "events/s"     // units
+            , NETDATA_CHART_PRIO_STATSD_PRIVATE
+            , statsd.update_every
+            , RRDSET_TYPE_STACKED
+        );
+
+        // m->rd_value = rrddim_add(m->st, "dict", "dict size", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        // if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
+        //    m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+    else rrdset_next(m->st);
+
+    STATSD_METRIC_DICTIONARY_ITEM *t;
+    for(t = m->dictionary.base; t ;t = t->next) {
+        if(!t->rd) t->rd = rrddim_add(m->st, t->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_set_by_pointer(m->st, t->rd, (collected_number)t->count);
+    }
+
+    // rrddim_set_by_pointer(m->st, m->rd_value, m->last);
+
+    // if(m->rd_count)
+    //    rrddim_set_by_pointer(m->st, m->rd_count, m->events);
+
+    rrdset_done(m->st);
+}
+
 static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
@@ -1752,6 +1886,34 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
         statsd_private_chart_set(m);
 }
 
+static inline void statsd_flush_dictionary(STATSD_METRIC *m) {
+    debug(D_STATSD, "flushing dictionary metric '%s'", m->name);
+
+    int updated = 0;
+    if(unlikely(!m->reset && m->count)) {
+        m->last = (collected_number)m->dictionary.unique;
+
+        m->reset = 1;
+        updated = 1;
+    }
+    else {
+        m->last = 0;
+    }
+
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
+        statsd_private_chart_dictionary(m);
+
+    if(m->dictionary.unique >= statsd.dictionary_max_unique) {
+        if(!(m->dictionary.flags & STATSD_METRIC_DICTIONARY_FLAGS_DICTFULL_LOGGED)) {
+            m->dictionary.flags |= STATSD_METRIC_DICTIONARY_FLAGS_DICTFULL_LOGGED;
+            info(
+                "STATSD dictionary '%s' reach max of %zu items - try increasing 'dictionaries max unique dimensions' in netdata.conf",
+                m->name,
+                m->dictionary.unique);
+        }
+    }
+}
+
 static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
@@ -1824,6 +1986,7 @@ static inline RRD_ALGORITHM statsd_algorithm_for_metric(STATSD_METRIC *m) {
 
         case STATSD_METRIC_TYPE_METER:
         case STATSD_METRIC_TYPE_COUNTER:
+        case STATSD_METRIC_TYPE_DICTIONARY:
             return RRD_ALGORITHM_INCREMENTAL;
     }
 }
@@ -2090,6 +2253,7 @@ const char *statsd_metric_type_string(STATSD_METRIC_TYPE type) {
         case STATSD_METRIC_TYPE_HISTOGRAM: return "histogram";
         case STATSD_METRIC_TYPE_METER: return "meter";
         case STATSD_METRIC_TYPE_SET: return "set";
+        case STATSD_METRIC_TYPE_DICTIONARY: return "dictionary";
         case STATSD_METRIC_TYPE_TIMER: return "timer";
         default: return "unknown";
     }
@@ -2188,10 +2352,11 @@ static void statsd_main_cleanup(void *data) {
 #define WORKER_STATSD_FLUSH_TIMERS 3
 #define WORKER_STATSD_FLUSH_HISTOGRAMS 4
 #define WORKER_STATSD_FLUSH_SETS 5
-#define WORKER_STATSD_FLUSH_STATS 6
+#define WORKER_STATSD_FLUSH_DICTIONARIES 6
+#define WORKER_STATSD_FLUSH_STATS 7
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 7
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 6
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
 #endif
 
 void *statsd_main(void *ptr) {
@@ -2202,6 +2367,7 @@ void *statsd_main(void *ptr) {
     worker_register_job_name(WORKER_STATSD_FLUSH_TIMERS, "timers");
     worker_register_job_name(WORKER_STATSD_FLUSH_HISTOGRAMS, "histograms");
     worker_register_job_name(WORKER_STATSD_FLUSH_SETS, "sets");
+    worker_register_job_name(WORKER_STATSD_FLUSH_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_STATSD_FLUSH_STATS, "statistics");
 
     netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
@@ -2242,6 +2408,8 @@ void *statsd_main(void *ptr) {
         statsd.histogram_percentile_str = strdupz(buffer);
     }
 
+    statsd.dictionary_max_unique = config_get_number(CONFIG_SECTION_STATSD, "dictionaries max unique dimensions", statsd.dictionary_max_unique);
+
     if(config_get_boolean(CONFIG_SECTION_STATSD, "add dimension for number of events received", 1)) {
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
         statsd.counters.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
@@ -2249,6 +2417,7 @@ void *statsd_main(void *ptr) {
         statsd.sets.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
         statsd.histograms.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
         statsd.timers.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
+        statsd.dictionaries.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
     }
 
     if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on gauges (deleteGauges)", 0))
@@ -2268,6 +2437,9 @@ void *statsd_main(void *ptr) {
 
     if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on timers (deleteTimers)", 0))
         statsd.timers.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
+
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on dictionaries (deleteDictionaries)", 0))
+        statsd.dictionaries.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
     size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_STATSD, "statsd server max TCP sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
 
@@ -2329,6 +2501,7 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_metrics_meter     = rrddim_add(st_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_metrics_histogram = rrddim_add(st_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_metrics_set       = rrddim_add(st_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_metrics_dictionary= rrddim_add(st_metrics, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     RRDSET *st_useful_metrics = rrdset_create_localhost(
             "netdata"
@@ -2350,6 +2523,7 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_useful_metrics_meter     = rrddim_add(st_useful_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_useful_metrics_histogram = rrddim_add(st_useful_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_useful_metrics_set       = rrddim_add(st_useful_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_dictionary= rrddim_add(st_useful_metrics, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     RRDSET *st_events = rrdset_create_localhost(
             "netdata"
@@ -2371,6 +2545,7 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_events_meter     = rrddim_add(st_events, "meters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_histogram = rrddim_add(st_events, "histograms", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_set       = rrddim_add(st_events, "sets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_events_dictionary= rrddim_add(st_events, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_unknown   = rrddim_add(st_events, "unknown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_errors    = rrddim_add(st_events, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -2502,6 +2677,9 @@ void *statsd_main(void *ptr) {
         worker_is_busy(WORKER_STATSD_FLUSH_SETS);
         statsd_flush_index_metrics(&statsd.sets,       statsd_flush_set);
 
+        worker_is_busy(WORKER_STATSD_FLUSH_DICTIONARIES);
+        statsd_flush_index_metrics(&statsd.dictionaries,statsd_flush_dictionary);
+
         worker_is_busy(WORKER_STATSD_FLUSH_STATS);
         statsd_update_all_app_charts();
 
@@ -2526,6 +2704,7 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_metrics, rd_metrics_meter,        (collected_number)statsd.meters.metrics);
         rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)statsd.histograms.metrics);
         rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)statsd.sets.metrics);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_dictionary,   (collected_number)statsd.dictionaries.metrics);
         rrdset_done(st_metrics);
 
         rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_gauge,        (collected_number)statsd.gauges.useful);
@@ -2534,6 +2713,7 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_meter,        (collected_number)statsd.meters.useful);
         rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_histogram,    (collected_number)statsd.histograms.useful);
         rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_set,          (collected_number)statsd.sets.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_dictionary,   (collected_number)statsd.dictionaries.useful);
         rrdset_done(st_useful_metrics);
 
         rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)statsd.gauges.events);
@@ -2542,6 +2722,7 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_events,  rd_events_meter,         (collected_number)statsd.meters.events);
         rrddim_set_by_pointer(st_events,  rd_events_histogram,     (collected_number)statsd.histograms.events);
         rrddim_set_by_pointer(st_events,  rd_events_set,           (collected_number)statsd.sets.events);
+        rrddim_set_by_pointer(st_events,  rd_events_dictionary,    (collected_number)statsd.dictionaries.events);
         rrddim_set_by_pointer(st_events,  rd_events_unknown,       (collected_number)statsd.unknown_types);
         rrddim_set_by_pointer(st_events,  rd_events_errors,        (collected_number)statsd.socket_errors);
         rrdset_done(st_events);

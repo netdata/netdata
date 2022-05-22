@@ -170,7 +170,7 @@ void dictionary_destroy(DICTIONARY *dict) {
 
 // ----------------------------------------------------------------------------
 
-void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr) {
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
     uint32_t hash = simple_hash(name);
@@ -210,6 +210,7 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 
     dictionary_unlock(dict);
 
+    if(name_ptr) *name_ptr = nv->name;
     return nv->value;
 }
 

@@ -31,7 +31,7 @@ typedef struct dictionary {
     netdata_rwlock_t *rwlock;
 } DICTIONARY;
 
-#define DICTIONARY_FLAG_DEFAULT                 0x00000000
+#define DICTIONARY_FLAG_NONE                    0x00000000
 #define DICTIONARY_FLAG_SINGLE_THREADED         0x00000001
 #define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x00000002
 #define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x00000004
@@ -39,7 +39,8 @@ typedef struct dictionary {
 
 extern DICTIONARY *dictionary_create(uint8_t flags);
 extern void dictionary_destroy(DICTIONARY *dict);
-extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) NEVERNULL;
+extern void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr) NEVERNULL;
+#define dictionary_set(dict, name, value, value_len) dictionary_set_with_name_ptr(dict, name, value, value_len, NULL)
 extern void *dictionary_get(DICTIONARY *dict, const char *name);
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
