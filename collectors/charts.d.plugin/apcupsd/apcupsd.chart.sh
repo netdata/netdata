@@ -74,41 +74,42 @@ apcupsd_check() {
 }
 
 apcupsd_create() {
-  local host src
+  local host
   for host in "${!apcupsd_sources[@]}"; do
-    src=${apcupsd_sources[${host}]}
-
     # create the charts
     cat << EOF
-CHART apcupsd_${host}.charge '' "UPS Charge for ${host} on ${src}" "percentage" ups apcupsd.charge area $((apcupsd_priority + 1)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.charge '' "UPS Charge" "percentage" ups apcupsd.charge area $((apcupsd_priority + 2)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION battery_charge charge absolute 1 100
 
-CHART apcupsd_${host}.battery_voltage '' "UPS Battery Voltage for ${host} on ${src}" "Volts" ups apcupsd.battery.voltage line $((apcupsd_priority + 3)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.battery_voltage '' "UPS Battery Voltage" "Volts" ups apcupsd.battery.voltage line $((apcupsd_priority + 4)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION battery_voltage voltage absolute 1 100
 DIMENSION battery_voltage_nominal nominal absolute 1 100
 
-CHART apcupsd_${host}.input_voltage '' "UPS Input Voltage for ${host} on ${src}" "Volts" input apcupsd.input.voltage line $((apcupsd_priority + 4)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.input_voltage '' "UPS Input Voltage" "Volts" input apcupsd.input.voltage line $((apcupsd_priority + 5)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION input_voltage voltage absolute 1 100
 DIMENSION input_voltage_min min absolute 1 100
 DIMENSION input_voltage_max max absolute 1 100
 
-CHART apcupsd_${host}.input_frequency '' "UPS Input Frequency for ${host} on ${src}" "Hz" input apcupsd.input.frequency line $((apcupsd_priority + 5)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.input_frequency '' "UPS Input Frequency" "Hz" input apcupsd.input.frequency line $((apcupsd_priority + 6)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION input_frequency frequency absolute 1 100
 
-CHART apcupsd_${host}.output_voltage '' "UPS Output Voltage for ${host} on ${src}" "Volts" output apcupsd.output.voltage line $((apcupsd_priority + 6)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.output_voltage '' "UPS Output Voltage" "Volts" output apcupsd.output.voltage line $((apcupsd_priority + 7)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION output_voltage voltage absolute 1 100
 DIMENSION output_voltage_nominal nominal absolute 1 100
 
-CHART apcupsd_${host}.load '' "UPS Load for ${host} on ${src}" "percentage" ups apcupsd.load area $((apcupsd_priority)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.load '' "UPS Load" "percentage" ups apcupsd.load area $((apcupsd_priority)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION load load absolute 1 100
 
-CHART apcupsd_${host}.temp '' "UPS Temperature for ${host} on ${src}" "Celsius" ups apcupsd.temperature line $((apcupsd_priority + 7)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.load_usage '' "UPS Load Usage" "Watts" ups apcupsd.load_usage area $((apcupsd_priority + 1)) $apcupsd_update_every '' '' 'apcupsd'
+DIMENSION load_usage load absolute 1 100
+
+CHART apcupsd_${host}.temp '' "UPS Temperature" "Celsius" ups apcupsd.temperature line $((apcupsd_priority + 8)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION temp temp absolute 1 100
 
-CHART apcupsd_${host}.time '' "UPS Time Remaining for ${host} on ${src}" "Minutes" ups apcupsd.time area $((apcupsd_priority + 2)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.time '' "UPS Time Remaining" "Minutes" ups apcupsd.time area $((apcupsd_priority + 3)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION time time absolute 1 100
 
-CHART apcupsd_${host}.online '' "UPS ONLINE flag for ${host} on ${src}" "boolean" ups apcupsd.online line $((apcupsd_priority + 8)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.online '' "UPS ONLINE flag" "boolean" ups apcupsd.online line $((apcupsd_priority + 9)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION online online absolute 0 1
 
 EOF
@@ -141,6 +142,8 @@ BEGIN {
 	load = 0;
 	temp = 0;
 	time = 0;
+	nompower = 0;
+	load_usage = 0;
 }
 /^BCHARGE.*/   { battery_charge = \$3 * 100 };
 /^BATTV.*/     { battery_voltage = \$3 * 100 };
@@ -153,9 +156,12 @@ BEGIN {
 /^NOMOUTV.*/   { output_voltage_nominal = \$3 * 100 };
 /^LOADPCT.*/   { load = \$3 * 100 };
 /^ITEMP.*/     { temp = \$3 * 100 };
+/^NOMPOWER.*/  { nompower = \$3 };
 /^TIMELEFT.*/  { time = \$3 * 100 };
 /^STATUS.*/    { online=(\$3 != \"COMMLOST\" && !(\$3 == \"SHUTTING\" && \$4 == \"DOWN\"))?1:0 };
 END {
+	{ load_usage = nompower * load / 100 };
+
 	print \"BEGIN apcupsd_${host}.online $1\";
 	print \"SET online = \" online;
 	print \"END\"
@@ -187,6 +193,10 @@ END {
 
 		print \"BEGIN apcupsd_${host}.load $1\";
 		print \"SET load = \" load;
+		print \"END\"
+
+		print \"BEGIN apcupsd_${host}.load_usage $1\";
+		print \"SET load_usage = \" load_usage;
 		print \"END\"
 
 		print \"BEGIN apcupsd_${host}.temp $1\";

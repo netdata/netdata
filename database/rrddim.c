@@ -135,14 +135,30 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     }
 }
 
+// Return either
+//   0 : Dimension is live
+//   last collected time : Dimension is not live
+
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
+{
+    time_t last_updated = rd->last_collected_time.tv_sec;
+    int live;
+    if (rd->state->aclk_live_status == 1)
+        live =
+            ((now - last_updated) <
+             MIN(rrdset_free_obsolete_time, RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER * rd->update_every));
+    else
+        live = ((now - last_updated) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every);
+    return live ? 0 : last_updated;
+}
+#endif
+
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
                           collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode)
 {
     RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
-
-    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {
@@ -168,10 +184,18 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
             (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                                       rd->algorithm);
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+            queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
+#endif
+            rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
         rrdset_unlock(st);
         return rd;
     }
+
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
@@ -448,9 +472,11 @@ int rrddim_hide(RRDSET *st, const char *id) {
         error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
         return 1;
     }
-    (void) sql_set_dimension_option(&rd->state->metric_uuid, "hidden");
+    if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
+        (void)sql_set_dimension_option(&rd->state->metric_uuid, "hidden");
 
     rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+    rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
     return 0;
 }
 
@@ -463,9 +489,11 @@ int rrddim_unhide(RRDSET *st, const char *id) {
         error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
         return 1;
     }
-    (void) sql_set_dimension_option(&rd->state->metric_uuid, NULL);
+    if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
+        (void)sql_set_dimension_option(&rd->state->metric_uuid, NULL);
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+    rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
     return 0;
 }
 

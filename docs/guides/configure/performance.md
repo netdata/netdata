@@ -108,9 +108,9 @@ Open `netdata.conf` and scroll down to the `[plugins]` section. To disable any p
 ```conf
 [plugins]
     proc = yes
-		python.d = no
-		charts.d = no
-		go.d = yes
+	python.d = no
+	charts.d = no
+	go.d = yes
 ```
 
 Disable specific collectors by opening their respective plugin configuration files, uncommenting the line for the
@@ -183,7 +183,6 @@ Finally, edit `netdata.conf` with the following settings:
 ```conf
 [global]
     bind socket to IP = 127.0.0.1
-    access log = none
     disconnect idle web clients after seconds = 3600
     enable web responses gzip compression = no
 ```
@@ -215,7 +214,7 @@ If you installation is working correctly, and you're not actively auditing Netda
 `netdata.conf`.
 
 ```conf
-[global]
+[logs]
     debug log = none
     error log = none
     access log = none

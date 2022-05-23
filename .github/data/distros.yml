@@ -19,8 +19,6 @@ include:
     version: "3.14"
   - <<: *alpine
     version: "3.13"
-  - <<: *alpine
-    version: "3.12"
 
   - distro: archlinux
     version: latest

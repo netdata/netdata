@@ -52,12 +52,14 @@ Description: real-time charts for system monitoring
 Package: netdata-plugin-cups
 Architecture: any
 Depends: cups,
+         ${shlibs:Depends},
          netdata (>= ${source:Version})
 Description: The Common Unix Printing System plugin for metrics collection from cupsd
 
 Package: netdata-plugin-freeipmi
 Architecture: any
 Depends: freeipmi,
+         ${shlibs:Depends},
          netdata (= ${source:Version})
 Description: FreeIPMI - The Intelligent Platform Management System.
  The IPMI specification defines a set of interfaces for platform management.

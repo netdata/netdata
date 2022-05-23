@@ -64,6 +64,8 @@ const char *database_cleanup[] = {
     "delete from chart where chart_id not in (select chart_id from dimension);",
     "delete from host where host_id not in (select host_id from chart);",
     "delete from chart_label where chart_id not in (select chart_id from chart);",
+    "DELETE FROM chart_hash_map WHERE chart_id NOT IN (SELECT chart_id FROM chart);",
+    "DELETE FROM chart_hash WHERE hash_id NOT IN (SELECT hash_id FROM chart_hash_map);",
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
     NULL
 };

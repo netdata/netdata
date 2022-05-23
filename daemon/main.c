@@ -388,24 +388,24 @@ static void security_init(){
 static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    stdout_filename    = config_get(CONFIG_SECTION_GLOBAL, "debug log",  filename);
+    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-    stderr_filename    = config_get(CONFIG_SECTION_GLOBAL, "error log",  filename);
+    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    stdaccess_filename = config_get(CONFIG_SECTION_GLOBAL, "access log", filename);
+    stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
 
     char deffacility[8];
     snprintfz(deffacility,7,"%s","daemon");
-    facility_log = config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility);
+    facility_log = config_get(CONFIG_SECTION_LOGS, "facility",  deffacility);
 
-    error_log_throttle_period = config_get_number(CONFIG_SECTION_GLOBAL, "errors flood protection period", error_log_throttle_period);
-    error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
+    error_log_throttle_period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", error_log_throttle_period);
+    error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
     error_log_errors_per_period_backup = error_log_errors_per_period;
 
-    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_GLOBAL, "errors flood protection period"    , ""), 1);
-    setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", ""), 1);
+    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
+    setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
 }
 
 char *initialize_lock_directory_path(char *prefix)
@@ -413,7 +413,7 @@ char *initialize_lock_directory_path(char *prefix)
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/lock", prefix);
 
-    return config_get(CONFIG_SECTION_GLOBAL, "lock directory", filename);
+    return config_get(CONFIG_SECTION_DIRECTORIES, "lock", filename);
 }
 
 static void backwards_compatible_config() {
@@ -450,6 +450,75 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_GLOBAL, "web compression level",
                 CONFIG_SECTION_WEB,    "gzip compression level");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "config directory",
+                CONFIG_SECTION_DIRECTORIES, "config");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "stock config directory",
+                CONFIG_SECTION_DIRECTORIES, "stock config");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "log directory",
+                CONFIG_SECTION_DIRECTORIES, "log");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "web files directory",
+                CONFIG_SECTION_DIRECTORIES, "web");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "cache directory",
+                CONFIG_SECTION_DIRECTORIES, "cache");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "lib directory",
+                CONFIG_SECTION_DIRECTORIES, "lib");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "home directory",
+                CONFIG_SECTION_DIRECTORIES, "home");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "lock directory",
+                CONFIG_SECTION_DIRECTORIES, "lock");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "plugins directory",
+                CONFIG_SECTION_DIRECTORIES, "plugins");
+
+    config_move(CONFIG_SECTION_HEALTH,      "health configuration directory",
+                CONFIG_SECTION_DIRECTORIES, "health config");
+
+    config_move(CONFIG_SECTION_HEALTH,      "stock health configuration directory",
+                CONFIG_SECTION_DIRECTORIES, "stock health config");
+
+    config_move(CONFIG_SECTION_REGISTRY,    "registry db directory",
+                CONFIG_SECTION_DIRECTORIES, "registry");
+
+    config_move(CONFIG_SECTION_GLOBAL, "debug log",
+                CONFIG_SECTION_LOGS,   "debug");
+
+    config_move(CONFIG_SECTION_GLOBAL, "error log",
+                CONFIG_SECTION_LOGS,   "error");
+
+    config_move(CONFIG_SECTION_GLOBAL, "access log",
+                CONFIG_SECTION_LOGS,   "access");
+
+    config_move(CONFIG_SECTION_GLOBAL, "facility log",
+                CONFIG_SECTION_LOGS,   "facility");
+
+    config_move(CONFIG_SECTION_GLOBAL, "errors flood protection period",
+                CONFIG_SECTION_LOGS,   "errors flood protection period");
+
+    config_move(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection",
+                CONFIG_SECTION_LOGS,   "errors to trigger flood protection");
+
+    config_move(CONFIG_SECTION_GLOBAL, "debug flags",
+                CONFIG_SECTION_LOGS,   "debug flags");
+
+    config_move(CONFIG_SECTION_GLOBAL,   "TZ environment variable",
+                CONFIG_SECTION_ENV_VARS, "TZ");
+
+    config_move(CONFIG_SECTION_PLUGINS,  "PATH environment variable",
+                CONFIG_SECTION_ENV_VARS, "PATH");
+
+    config_move(CONFIG_SECTION_PLUGINS,  "PYTHONPATH environment variable",
+                CONFIG_SECTION_ENV_VARS, "PYTHONPATH");
+
+    config_move(CONFIG_SECTION_STATSD,  "enabled",
+                CONFIG_SECTION_PLUGINS, "statsd");
 }
 
 static void get_netdata_configured_variables() {
@@ -494,14 +563,14 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get system paths
 
-    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",       netdata_configured_user_config_dir);
-    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_GLOBAL, "stock config directory", netdata_configured_stock_config_dir);
-    netdata_configured_log_dir          = config_get(CONFIG_SECTION_GLOBAL, "log directory",          netdata_configured_log_dir);
-    netdata_configured_web_dir          = config_get(CONFIG_SECTION_GLOBAL, "web files directory",    netdata_configured_web_dir);
-    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        netdata_configured_cache_dir);
-    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          netdata_configured_varlib_dir);
+    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_DIRECTORIES, "config",       netdata_configured_user_config_dir);
+    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_DIRECTORIES, "stock config", netdata_configured_stock_config_dir);
+    netdata_configured_log_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "log",          netdata_configured_log_dir);
+    netdata_configured_web_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "web",          netdata_configured_web_dir);
+    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_DIRECTORIES, "cache",        netdata_configured_cache_dir);
+    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_DIRECTORIES, "lib",          netdata_configured_varlib_dir);
     char *env_home=getenv("HOME");
-    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         env_home?env_home:netdata_configured_home_dir);
+    netdata_configured_home_dir         = config_get(CONFIG_SECTION_DIRECTORIES, "home",         env_home?env_home:netdata_configured_home_dir);
 
     netdata_configured_lock_dir = initialize_lock_directory_path(netdata_configured_varlib_dir);
 
@@ -915,7 +984,7 @@ int main(int argc, char **argv) {
                         }
                         else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
                             optarg += strlen(debug_flags_string);
-                            config_set(CONFIG_SECTION_GLOBAL, "debug flags",  optarg);
+                            config_set(CONFIG_SECTION_LOGS, "debug flags",  optarg);
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
                         else if(strcmp(optarg, "set") == 0) {
@@ -1126,7 +1195,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get the debugging flags from the configuration file
 
-        char *flags = config_get(CONFIG_SECTION_GLOBAL, "debug flags",  "0x0000000000000000");
+        char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
         setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
         debug_flags = strtoull(flags, NULL, 0);

@@ -16,9 +16,20 @@ extern sqlite3 *db_meta;
 #define RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER   (3)
 #endif
 
+#ifndef RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER
+#define RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER (30)
+#endif
+
 #ifndef ACLK_MAX_DIMENSION_CLEANUP
 #define ACLK_MAX_DIMENSION_CLEANUP (500)
 #endif
+
+struct aclk_chart_dimension_data {
+    uuid_t uuid;
+    char *payload;
+    size_t payload_size;
+    uint8_t check_payload;
+};
 
 struct aclk_chart_sync_stats {
     int        updates;
@@ -37,7 +48,7 @@ struct aclk_chart_sync_stats {
 };
 
 extern int queue_chart_to_aclk(RRDSET *st);
-extern void queue_dimension_to_aclk(RRDDIM *rd);
+extern void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated);
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

@@ -1,6 +1,8 @@
 #!/bin/sh
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Next unused error code: F050A
 
 # ======================================================================
 # Constants
@@ -8,18 +10,21 @@
 AGENT_BUG_REPORT_URL="https://github.com/netdata/netdata/issues/new/choose"
 CLOUD_BUG_REPORT_URL="https://github.com/netdata/netdata-cloud/issues/new/choose"
 DEFAULT_RELEASE_CHANNEL="nightly"
-DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
 DISCORD_INVITE="https://discord.gg/5ygS846fR6"
+DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
+DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
 DOCS_URL="https://learn.netdata.cloud/docs/"
 FORUM_URL="https://community.netdata.cloud/"
 KICKSTART_OPTIONS="${*}"
+KICKSTART_SOURCE="$(realpath "$0")"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-1"
-TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
 START_TIME="$(date +%s)"
+STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
+TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
 
 # ======================================================================
 # Defaults for environment variables
@@ -35,6 +40,7 @@ NETDATA_DISABLE_CLOUD=0
 NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
+NETDATA_OFFLINE_INSTALL_SOURCE=""
 NETDATA_REQUIRE_CLOUD=1
 NETDATA_WARNINGS=""
 RELEASE_CHANNEL="default"
@@ -61,33 +67,56 @@ else
   INTERACTIVE=1
 fi
 
+# ======================================================================
+# Core program logic
+
 main() {
-  if [ "${ACTION}" = "uninstall" ]; then
-    uninstall
-    printf >&2 "Finished uninstalling the Netdata Agent."
-    deferred_warnings
-    cleanup
-    trap - EXIT
-    exit 0
-  fi
+  case "${ACTION}" in
+    uninstall)
+      uninstall
+      printf >&2 "Finished uninstalling the Netdata Agent."
+      deferred_warnings
+      cleanup
+      trap - EXIT
+      exit 0
+      ;;
+    reinstall-clean)
+      NEW_INSTALL_PREFIX="${INSTALL_PREFIX}"
+      uninstall
+      cleanup
 
-  if [ "${ACTION}" = "reinstall-clean" ]; then
-    NEW_INSTALL_PREFIX="${INSTALL_PREFIX}"
-    uninstall
-    cleanup
+      ACTION=
+      INSTALL_PREFIX="${NEW_INSTALL_PREFIX}"
+      # shellcheck disable=SC2086
+      main
 
-    ACTION=
-    INSTALL_PREFIX="${NEW_INSTALL_PREFIX}"
-    # shellcheck disable=SC2086
-    main
-
-    trap - EXIT
-    exit 0
-  fi
+      trap - EXIT
+      exit 0
+      ;;
+    prepare-offline)
+      prepare_offline_install_source "${OFFLINE_TARGET}"
+      deferred_warnings
+      trap - EXIT
+      exit 0
+      ;;
+  esac
 
   tmpdir="$(create_tmp_directory)"
   progress "Using ${tmpdir} as a temporary directory."
   cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
+
+  if [ -n "${INSTALL_VERSION}" ]; then
+    if echo "${INSTALL_VERSION}" | grep -E -o "^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$" > /dev/null 2>&1; then
+      NEW_SELECTED_RELEASE_CHANNEL="stable"
+    else
+      NEW_SELECTED_RELEASE_CHANNEL="nightly"
+    fi
+
+    if ! [ "${NEW_SELECTED_RELEASE_CHANNEL}" = "${SELECTED_RELEASE_CHANNEL}" ]; then
+        warning "Selected release channel does not match this version and it will be changed automatically."
+        SELECTED_RELEASE_CHANNEL="${NEW_SELECTED_RELEASE_CHANNEL}"
+    fi
+  fi
 
   case "${SYSTYPE}" in
     Linux) install_on_linux ;;
@@ -119,38 +148,39 @@ usage() {
 USAGE: kickstart.sh [options]
        where options include:
 
-  --non-interactive          Do not prompt for user input. (default: prompt if there is a controlling terminal)
-  --interactive              Prompt for user input even if there is no controlling terminal.
-  --dont-start-it            Do not start the agent by default (only for static installs or local builds)
-  --dry-run                  Report what we would do with the given options on this system, but don’t actually do anything.
-  --release-channel          Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
-  --stable-channel           Equivalent to "--release-channel stable"
-  --nightly-channel          Equivalent to "--release-channel nightly"
-  --no-updates               Do not enable automatic updates (default: enable automatic updates using the best supported scheduling method)
-  --auto-update              Enable automatic updates.
-  --auto-update-type         Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
-  --disable-telemetry        Opt-out of anonymous statistics.
-  --repositories-only        Only install appropriate repository configuration packages (only for native install).
-  --native-only              Only install if native binary packages are available.
-  --static-only              Only install if a static build is available.
-  --build-only               Only install using a local build.
-  --reinstall                Explicitly reinstall instead of updating any existing install.
-  --reinstall-even-if-unsafe Even try to reinstall if we don't think we can do so safely (implies --reinstall).
-  --disable-cloud            Disable support for Netdata Cloud (default: detect)
-  --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
-  --install <path>           This option is deprecated and will be removed in a future version, use --install-prefix instead.
-  --install-prefix <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
-  --old-install-prefix <path>       Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
-  --install-version <version>       Specify the version of Netdata to install.
-  --claim-token              Use a specified token for claiming to Netdata Cloud.
-  --claim-rooms              When claiming, add the node to the specified rooms.
-  --claim-only               If there is an existing install, only try to claim it, not update it.
-  --claim-*                  Specify other options for the claiming script.
-  --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
-  --uninstall                Uninstall an existing installation of Netdata.
-  --reinstall-clean          Clean reinstall Netdata.
-  --local-build-options      Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
-  --static-install-options   Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+  --non-interactive                Do not prompt for user input. (default: prompt if there is a controlling terminal)
+  --interactive                    Prompt for user input even if there is no controlling terminal.
+  --dont-start-it                  Do not start the agent by default (only for static installs or local builds)
+  --dry-run                        Report what we would do with the given options on this system, but don’t actually do anything.
+  --release-channel                Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
+  --stable-channel                 Equivalent to "--release-channel stable"
+  --nightly-channel                Equivalent to "--release-channel nightly"
+  --no-updates                     Do not enable automatic updates (default: enable automatic updates using the best supported scheduling method)
+  --auto-update                    Enable automatic updates.
+  --auto-update-type               Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
+  --disable-telemetry              Opt-out of anonymous statistics.
+  --repositories-only              Only install appropriate repository configuration packages (only for native install).
+  --native-only                    Only install if native binary packages are available.
+  --static-only                    Only install if a static build is available.
+  --build-only                     Only install using a local build.
+  --reinstall                      Explicitly reinstall instead of updating any existing install.
+  --reinstall-even-if-unsafe       Even try to reinstall if we don't think we can do so safely (implies --reinstall).
+  --disable-cloud                  Disable support for Netdata Cloud (default: detect)
+  --require-cloud                  Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
+  --install <path>                 This option is deprecated and will be removed in a future version, use --install-prefix instead.
+  --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
+  --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
+  --install-version <version>      Specify the version of Netdata to install.
+  --claim-token                    Use a specified token for claiming to Netdata Cloud.
+  --claim-rooms                    When claiming, add the node to the specified rooms.
+  --claim-only                     If there is an existing install, only try to claim it, not update it.
+  --claim-*                        Specify other options for the claiming script.
+  --no-cleanup                     Don't do any cleanup steps. This is intended to help with debugging the installer.
+  --uninstall                      Uninstall an existing installation of Netdata.
+  --reinstall-clean                Clean reinstall Netdata.
+  --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
+  --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+  --prepare-offline-install-source Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything.
 
 Additionally, this script may use the following environment variables:
 
@@ -477,7 +507,10 @@ create_tmp_directory() {
 
 check_for_remote_file() {
   url="${1}"
-  if command -v curl > /dev/null 2>&1; then
+
+  if echo "${url}" | grep -Eq "^file:///"; then
+    [ -e "${url#file://}" ] || return 1
+  elif command -v curl > /dev/null 2>&1; then
     curl --output /dev/null --silent --head --fail "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
@@ -489,7 +522,10 @@ check_for_remote_file() {
 download() {
   url="${1}"
   dest="${2}"
-  if command -v curl > /dev/null 2>&1; then
+
+  if echo "${url}" | grep -Eq "^file:///"; then
+    run cp "${url#file://}" "${dest}" || return 1
+  elif command -v curl > /dev/null 2>&1; then
     run curl --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     run wget -T 15 -O "${dest}" "${url}" || return 1
@@ -1301,6 +1337,20 @@ try_package_install() {
       ;;
   esac
 
+  if [ -n "${INSTALL_VERSION}" ]; then
+    if echo "${INSTALL_VERSION}" | grep -q "nightly"; then
+      new_release="-edge"
+    else
+      new_release=
+    fi
+
+    if { [ -n "${new_release}" ] && [ -z "${release}" ]; } || { [ -z "${new_release}" ] && [ -n "${release}" ]; }; then
+      warning "Selected release channel does not match this version and it will be changed automatically."
+    fi
+
+    release="${new_release}"
+  fi
+
   repoconfig_name="netdata-repo${release}"
   repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_VERSION}${pkg_suffix}.${pkg_type}"
   repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
@@ -1389,23 +1439,33 @@ try_package_install() {
 # Static build install code
 # shellcheck disable=SC2034,SC2086,SC2126
 set_static_archive_urls() {
-  if [ "$1" = "stable" ]; then
+  if [ -z "${2}" ]; then
+    arch="${SYSARCH}"
+  else
+    arch="${2}"
+  fi
+
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
+    export NETDATA_STATIC_ARCHIVE_URL="file://${path}/netdata-${arch}-latest.gz.run"
+    export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="file://${path}/sha256sums.txt"
+  elif [ "${1}" = "stable" ]; then
     if [ -n "${INSTALL_VERSION}" ]; then
       export NETDATA_STATIC_ARCHIVE_OLD_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-${SYSARCH}-v${INSTALL_VERSION}.gz.run"
+      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-${arch}-v${INSTALL_VERSION}.gz.run"
       export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
     else
       latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${SYSARCH}-latest.gz.run"
+      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${arch}-latest.gz.run"
       export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
     fi
   else
     if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/netdata-${SYSARCH}-v${INSTALL_VERSION}.gz.run"
+      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/netdata-${arch}-v${INSTALL_VERSION}.gz.run"
       export NETDATA_STATIC_ARCHIVE_OLD_URL="${NETDATA_TARBALL_BASEURL}/netdata-v${INSTALL_VERSION}.gz.run"
       export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/sha256sums.txt"
     else
-      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/netdata-${SYSARCH}-latest.gz.run"
+      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/netdata-${arch}-latest.gz.run"
       export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/sha256sums.txt"
     fi
   fi
@@ -1421,7 +1481,9 @@ try_static_install() {
 
   # Check status code first, so that we can provide nicer fallback for dry runs.
   if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-    if [ -n "${INSTALL_VERSION}" ]; then
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      netdata_agent="$(basename "${NETDATA_STATIC_ARCHIVE_URL#"file://"}")"
+    elif [ -n "${INSTALL_VERSION}" ]; then
       if [ "${SELECTED_RELEASE_CHANNEL}" = "stable" ]; then
         netdata_agent="${NETDATA_STATIC_ARCHIVE_URL#"https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/"}"
       else
@@ -1654,10 +1716,97 @@ try_build_install() {
 }
 
 # ======================================================================
+# Offline install support code
+
+prepare_offline_install_source() {
+  if [ -e "${1}" ]; then
+    if [ ! -d "${1}" ]; then
+      fatal "${1} is not a directory, unable to prepare offline install source." F0503
+    fi
+  else
+    run mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
+  fi
+
+  run cd "${1}" || fatal "Failed to swtich to target directory for offline install preparation." F0505
+
+  if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
+    set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
+
+    if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+      for arch in ${STATIC_INSTALL_ARCHES}; do
+        set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
+
+        progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
+        if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
+          warning "Failed to download static installer archive for ${arch}."
+        fi
+      done
+      legacy=0
+    else
+      warning "Selected version of Netdata only provides static builds for x86_64. You will only be able to install on x86_64 systems with this offline install source."
+      progress "Fetching ${NETDATA_STATIC_ARCHIVE_OLD_URL}"
+      legacy=1
+
+      if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
+        warning "Failed to download static installer archive for x86_64."
+      fi
+    fi
+
+    progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
+    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
+      fatal "Failed to download checksum file." F0506
+    fi
+  fi
+
+  if [ "${legacy:-0}" -eq 1 ]; then
+    sed -e 's/netdata-latest.gz.run/netdata-x86_64-latest.gz.run' sha256sums.txt > sha256sums.tmp
+    mv sha256sums.tmp sha256sums.txt
+  fi
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Verifying checksums."
+    if ! grep -e "$(find . -name '*.gz.run')" sha256sums.txt | safe_sha256sum -c -; then
+      fatal "Checksums for offline install files are incorrect. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour." F0507
+    fi
+  else
+    progress "Would verify SHA256 checksums of downloaded installation files."
+  fi
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Preparing install script."
+    cat > "install.sh" <<-EOF
+	#!/bin/sh
+	dir=\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd)
+	"\${dir}/kickstart.sh" --offline-install-source "\${dir}" \${@}
+	EOF
+    chmod +x "install.sh"
+  else
+    progress "Would create install script"
+  fi
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Copying kickstart script."
+    cp "${KICKSTART_SOURCE}" "kickstart.sh"
+    chmod +x "kickstart.sh"
+  else
+    progress "Would copy kickstart.sh to offline install source directory"
+  fi
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Saving release channel information."
+    echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
+  else
+    progress "Would save release channel information to offline install source directory"
+  fi
+
+  progress "Finished preparing offline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
+}
+
+# ======================================================================
 # Per system-type install logic
 
 install_on_linux() {
-  if [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
+  if [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ] && [ -z "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     SELECTED_INSTALL_METHOD="native"
     try_package_install
 
@@ -1761,191 +1910,235 @@ install_on_freebsd() {
 }
 
 # ======================================================================
+# Argument parsing code
+
+validate_args() {
+  check_claim_opts
+
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] || [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
+      fatal "Offline installs are only supported for static builds currently." F0502
+    fi
+  fi
+
+  if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
+    if [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${LOCAL_BUILD_OPTIONS}"
+    else
+      fatal "Specifying local build options is only supported when the --build-only option is also specified." F0401
+    fi
+  fi
+
+  if [ -n "${STATIC_INSTALL_OPTIONS}" ]; then
+    if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${STATIC_INSTALL_OPTIONS}"
+    else
+      fatal "Specifying installer options options is only supported when the --static-only option is also specified." F0402
+    fi
+  fi
+
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ] && [ -n "${INSTALL_VERSION}" ]; then
+      fatal "Specifying an install version alongside an offline install source is not supported." F050A
+  fi
+
+  if [ "${NETDATA_AUTO_UPDATES}" = "default" ]; then
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ] || [ -n "${INSTALL_VERSION}" ]; then
+      AUTO_UPDATE=0
+    else
+      AUTO_UPDATE=1
+    fi
+  elif [ "${NETDATA_AUTO_UPDATES}" = 1 ]; then
+    AUTO_UPDATE=1
+  else
+    AUTO_UPDATE=0
+  fi
+
+  if [ "${RELEASE_CHANNEL}" = "default" ]; then
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      SELECTED_RELEASE_CHANNEL="$(cat "${NETDATA_OFFLINE_INSTALL_SOURCE}/channel")"
+
+      if [ -z "${SELECTED_RELEASE_CHANNEL}" ]; then
+        fatal "Could not find a release channel indicator in ${NETDATA_OFFLINE_INSTALL_SOURCE}." F0508
+      fi
+    else
+      SELECTED_RELEASE_CHANNEL="${DEFAULT_RELEASE_CHANNEL}"
+    fi
+  else
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ] && [ "${RELEASE_CHANNEL}" != "$(cat "${NETDATA_OFFLINE_INSTALL_SOURCE}/channel")" ]; then
+      fatal "Release channal '${RELEASE_CHANNEL}' requested, but indicated offline installation source release channel is '$(cat "${NETDATA_OFFLINE_INSTALL_SOURCE}/channel")'." F0509
+    fi
+
+    SELECTED_RELEASE_CHANNEL="${RELEASE_CHANNEL}"
+  fi
+}
+
+parse_args() {
+  if [ -n "${NETDATA_INSTALLER_OPTIONS}" ]; then
+      warning "Explicitly specifying additional installer options with NETDATA_INSTALLER_OPTIONS is deprecated. Please instead pass the options to the script using either --local-build-options or --static-install-options as appropriate."
+  fi
+
+  while [ -n "${1}" ]; do
+    case "${1}" in
+      "--help")
+        usage
+        cleanup
+        trap - EXIT
+        exit 0
+        ;;
+      "--no-cleanup") NO_CLEANUP=1 ;;
+      "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
+      "--interactive") INTERACTIVE=1 ;;
+      "--dry-run") DRY_RUN=1 ;;
+      "--stable-channel") RELEASE_CHANNEL="stable" ;;
+      "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
+      "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
+      "--auto-update-method")
+        NETDATA_AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        case "${NETDATA_AUTO_UPDATE_TYPE}" in
+          systemd|interval|crontab)
+            shift 1
+            ;;
+          *)
+            echo "Unrecognized value for --auto-update-type. Valid values are: systemd, interval, crontab"
+            exit 1
+            ;;
+        esac
+        ;;
+      "--reinstall") NETDATA_REINSTALL=1 ;;
+      "--reinstall-even-if-unsafe") NETDATA_UNSAFE_REINSTALL=1 ;;
+      "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
+      "--disable-cloud")
+        NETDATA_DISABLE_CLOUD=1
+        NETDATA_REQUIRE_CLOUD=0
+        ;;
+      "--require-cloud")
+        NETDATA_DISABLE_CLOUD=0
+        NETDATA_REQUIRE_CLOUD=1
+        ;;
+      "--dont-start-it")
+        NETDATA_NO_START=1
+        NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
+        ;;
+      "--disable-telemetry")
+        NETDATA_DISABLE_TELEMETRY="1"
+        NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
+        ;;
+      "--install")
+        warning "--install flag is deprecated and will be removed in a future version. Please use --install-prefix instead."
+        INSTALL_PREFIX="${2}"
+        shift 1
+        ;;
+      "--install-prefix")
+        INSTALL_PREFIX="${2}"
+        shift 1
+        ;;
+      "--old-install-prefix")
+        OLD_INSTALL_PREFIX="${2}"
+        shift 1
+        ;;
+      "--install-version")
+        INSTALL_VERSION="${2}"
+        AUTO_UPDATE=0
+        shift 1
+        ;;
+      "--uninstall")
+        ACTION="uninstall"
+        ;;
+      "--reinstall-clean")
+        ACTION="reinstall-clean"
+        ;;
+      "--repositories-only")
+        REPO_ACTION="repositories-only"
+        ;;
+      "--native-only")
+        NETDATA_ONLY_NATIVE=1
+        NETDATA_ONLY_STATIC=0
+        NETDATA_ONLY_BUILD=0
+        SELECTED_INSTALL_METHOD="native"
+        ;;
+      "--static-only")
+        NETDATA_ONLY_STATIC=1
+        NETDATA_ONLY_NATIVE=0
+        NETDATA_ONLY_BUILD=0
+        SELECTED_INSTALL_METHOD="static"
+        ;;
+      "--build-only")
+        NETDATA_ONLY_BUILD=1
+        NETDATA_ONLY_NATIVE=0
+        NETDATA_ONLY_STATIC=0
+        SELECTED_INSTALL_METHOD="build"
+        ;;
+      "--claim-token")
+        NETDATA_CLAIM_TOKEN="${2}"
+        shift 1
+        ;;
+      "--claim-rooms")
+        NETDATA_CLAIM_ROOMS="${2}"
+        shift 1
+        ;;
+      "--claim-url")
+        NETDATA_CLAIM_URL="${2}"
+        shift 1
+        ;;
+      "--claim-"*)
+        optname="$(echo "${1}" | cut -d '-' -f 4-)"
+        case "${optname}" in
+          id|proxy|user|hostname)
+            NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=${2}"
+            shift 1
+            ;;
+          verbose|insecure|noproxy|noreload|daemon-not-running)
+            NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}"
+            ;;
+          *)
+            warning "Ignoring unrecognized claiming option ${optname}"
+            ;;
+        esac
+        ;;
+      "--local-build-options")
+        LOCAL_BUILD_OPTIONS="${2}"
+        shift 1
+        ;;
+      "--static-install-options")
+        STATIC_INSTALL_OPTIONS="${2}"
+        shift 1
+        ;;
+      "--prepare-offline-install-source")
+        if [ -n "${2}" ]; then
+          ACTION="prepare-offline"
+          OFFLINE_TARGET="${2}"
+          shift 1
+        else
+          fatal "A target directory must be specified with the --prepare-offline-install-source option." F0500
+        fi
+        ;;
+      "--offline-install-source")
+        if [ -d "${2}" ]; then
+          NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
+          shift 1
+        else
+          fatal "A source directory must be specified with the --offline-install-source option." F0501
+        fi
+        ;;
+      *)
+        warning "Passing unrecognized option '${1}' to installer script. This behavior is deprecated and will be removed in the near future. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
+        NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
+        ;;
+    esac
+    shift 1
+  done
+
+  validate_args
+}
+
+# ======================================================================
 # Main program
 
 setup_terminal || echo > /dev/null
 
-if [ -n "${NETDATA_INSTALLER_OPTIONS}" ]; then
-    warning "Explicitly specifying additional installer options with NETDATA_INSTALLER_OPTIONS is deprecated. Please instead pass the options to the script using either --local-build-options or --static-install-options as appropriate."
-fi
+# shellcheck disable=SC2068
+parse_args $@
 
-while [ -n "${1}" ]; do
-  case "${1}" in
-    "--help")
-      usage
-      cleanup
-      trap - EXIT
-      exit 0
-      ;;
-    "--no-cleanup") NO_CLEANUP=1 ;;
-    "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
-    "--interactive") INTERACTIVE=1 ;;
-    "--dry-run") DRY_RUN=1 ;;
-    "--release-channel")
-      RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
-      case "${RELEASE_CHANNEL}" in
-        nightly|stable|default)
-          shift 1
-          ;;
-        *)
-          echo "Unrecognized value for --release-channel. Valid release channels are: stable, nightly, default"
-          exit 1
-          ;;
-      esac
-      ;;
-    "--stable-channel") RELEASE_CHANNEL="stable" ;;
-    "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
-    "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
-    "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
-    "--auto-update-method")
-      NETDATA_AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
-      case "${NETDATA_AUTO_UPDATE_TYPE}" in
-        systemd|interval|crontab)
-          shift 1
-          ;;
-        *)
-          echo "Unrecognized value for --auto-update-type. Valid values are: systemd, interval, crontab"
-          exit 1
-          ;;
-      esac
-      ;;
-    "--reinstall") NETDATA_REINSTALL=1 ;;
-    "--reinstall-even-if-unsafe") NETDATA_UNSAFE_REINSTALL=1 ;;
-    "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
-    "--disable-cloud")
-      NETDATA_DISABLE_CLOUD=1
-      NETDATA_REQUIRE_CLOUD=0
-      ;;
-    "--require-cloud")
-      NETDATA_DISABLE_CLOUD=0
-      NETDATA_REQUIRE_CLOUD=1
-      ;;
-    "--dont-start-it")
-      NETDATA_NO_START=1
-      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
-      ;;
-    "--disable-telemetry")
-      NETDATA_DISABLE_TELEMETRY="1"
-      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
-      ;;
-    "--install")
-      warning "--install flag is deprecated and will be removed in a future version. Please use --install-prefix instead."
-      INSTALL_PREFIX="${2}"
-      shift 1
-      ;;
-    "--install-prefix")
-      INSTALL_PREFIX="${2}"
-      shift 1
-      ;;
-    "--install-version")
-      INSTALL_VERSION="${2}"
-      # shellcheck disable=SC2034
-      AUTO_UPDATES=0
-      shift 1
-      ;;
-    "--old-install-prefix")
-      OLD_INSTALL_PREFIX="${2}"
-      shift 1
-      ;;
-    "--uninstall")
-      ACTION="uninstall"
-      ;;
-    "--reinstall-clean")
-      ACTION="reinstall-clean"
-      ;;
-    "--repositories-only")
-      REPO_ACTION="repositories-only"
-      ;;
-    "--native-only")
-      NETDATA_ONLY_NATIVE=1
-      NETDATA_ONLY_STATIC=0
-      NETDATA_ONLY_BUILD=0
-      SELECTED_INSTALL_METHOD="native"
-      ;;
-    "--static-only")
-      NETDATA_ONLY_STATIC=1
-      NETDATA_ONLY_NATIVE=0
-      NETDATA_ONLY_BUILD=0
-      SELECTED_INSTALL_METHOD="static"
-      ;;
-    "--build-only")
-      NETDATA_ONLY_BUILD=1
-      NETDATA_ONLY_NATIVE=0
-      NETDATA_ONLY_STATIC=0
-      SELECTED_INSTALL_METHOD="build"
-      ;;
-    "--claim-token")
-      NETDATA_CLAIM_TOKEN="${2}"
-      shift 1
-      ;;
-    "--claim-rooms")
-      NETDATA_CLAIM_ROOMS="${2}"
-      shift 1
-      ;;
-    "--claim-url")
-      NETDATA_CLAIM_URL="${2}"
-      shift 1
-      ;;
-    "--claim-"*)
-      optname="$(echo "${1}" | cut -d '-' -f 4-)"
-      case "${optname}" in
-        id|proxy|user|hostname)
-          NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=${2}"
-          shift 1
-          ;;
-        verbose|insecure|noproxy|noreload|daemon-not-running)
-          NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}"
-          ;;
-        *)
-          warning "Ignoring unrecognized claiming option ${optname}"
-          ;;
-      esac
-      ;;
-    "--local-build-options")
-      LOCAL_BUILD_OPTIONS="${2}"
-      shift 1
-      ;;
-    "--static-install-options")
-      STATIC_INSTALL_OPTIONS="${2}"
-      shift 1
-      ;;
-    *)
-      warning "Passing unrecognized option '${1}' to installer script. This behavior is deprecated and will be removed in the near future. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
-      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
-      ;;
-  esac
-  shift 1
-done
-
-if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
-  if [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
-    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${LOCAL_BUILD_OPTIONS}"
-  else
-    fatal "Specifying local build options is only supported when the --build-only option is also specified." F0401
-  fi
-fi
-
-if [ -n "${STATIC_INSTALL_OPTIONS}" ]; then
-  if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${STATIC_INSTALL_OPTIONS}"
-  else
-    fatal "Specifying installer options options is only supported when the --static-only option is also specified." F0402
-  fi
-fi
-
-if [ "${NETDATA_AUTO_UPDATES}" = "default" ] || [ "${NETDATA_AUTO_UPDATES}" = "1" ]; then
-  AUTO_UPDATE=1
-else
-  AUTO_UPDATE=0
-fi
-
-if [ "${RELEASE_CHANNEL}" = "default" ]; then
-  SELECTED_RELEASE_CHANNEL="${DEFAULT_RELEASE_CHANNEL}"
-else
-  SELECTED_RELEASE_CHANNEL="${RELEASE_CHANNEL}"
-fi
-
-check_claim_opts
 confirm_root_support
 get_system_info
 confirm_install_prefix

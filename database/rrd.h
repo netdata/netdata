@@ -171,6 +171,7 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_ACLK                            = (1 << 4),
 
     RRDDIM_FLAG_PENDING_FOREACH_ALARM           = (1 << 5), // set when foreach alarm has not been initialized yet
+    RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
 } RRDDIM_FLAGS;
 
 #define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -766,6 +767,8 @@ struct rrdhost {
     unsigned int rrdpush_send_enabled;            // 1 when this host sends metrics to another netdata
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
+    struct rrdpush_destinations *destinations;      // a linked list of possible destinations
+    struct rrdpush_destinations *destination;       // the current destination from the above list
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
@@ -1279,7 +1282,9 @@ extern void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
 
 extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
-
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+extern time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
+#endif
 extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 // ----------------------------------------------------------------------------

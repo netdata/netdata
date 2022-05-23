@@ -601,7 +601,7 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     else {
         void *t = dictionary_get(m->set.dict, value);
         if (unlikely(!t)) {
-            dictionary_set(m->set.dict, value, NULL, 1);
+            dictionary_set(m->set.dict, value, "", 1);
             m->set.unique++;
         }
 
@@ -2209,7 +2209,7 @@ void *statsd_main(void *ptr) {
     // ----------------------------------------------------------------------------------------------------------------
     // statsd configuration
 
-    statsd.enabled = config_get_boolean(CONFIG_SECTION_STATSD, "enabled", statsd.enabled);
+    statsd.enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, "statsd", statsd.enabled);
 
     statsd.update_every = default_rrd_update_every;
     statsd.update_every = (int)config_get_number(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
