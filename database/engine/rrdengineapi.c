@@ -554,7 +554,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
         handle->next_page_time = INVALID_TIME;
 }
 
-static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, unsigned *position_ptr) {
+static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdengine_instance *ctx = handle->ctx;
@@ -576,13 +576,13 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, unsi
         handle->next_page_time = (handle->page_end_time / USEC_PER_SEC) + 1;
 
         if (unlikely(handle->next_page_time > rrdimm_handle->end_time))
-            goto no_more_metrics;
+            return 1;
     }
 
     usec_t next_page_time = handle->next_page_time * USEC_PER_SEC;
     descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id, next_page_time, rrdimm_handle->end_time * USEC_PER_SEC);
     if (NULL == descr)
-        goto no_more_metrics;
+        return 1;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, 1);
@@ -591,7 +591,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, unsi
     handle->descr = descr;
     pg_cache_atomic_get_pg_info(descr, &page_end_time, &page_length);
     if (unlikely(INVALID_TIME == descr->start_time || INVALID_TIME == page_end_time))
-        goto no_more_metrics;
+        return 1;
 
     if (unlikely(descr->start_time != page_end_time && next_page_time > descr->start_time)) {
         // we're in the middle of the page somewhere
@@ -605,17 +605,16 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, unsi
     handle->page_end_time = page_end_time;
     handle->page_length = page_length;
     handle->page = descr->pg_cache_descr->page;
-    usec_t entries = page_length / sizeof(storage_number);
+    usec_t entries = handle->entries = page_length / sizeof(storage_number);
     if (likely(entries > 1))
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
     else
         handle->dt = 0;
 
-    *position_ptr = position;
-    return 0;
+    handle->dt_sec = handle->dt / USEC_PER_SEC;
+    handle->position = position;
 
-no_more_metrics:
-    return 1;
+    return 0;
 }
 
 /* Returns the metric and sets its timestamp into current_time */
@@ -626,22 +625,25 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         return SN_EMPTY_SLOT;
 
     struct rrdeng_page_descr *descr = handle->descr;
-
-    storage_number *page = handle->page;
     unsigned position = handle->position + 1;
+    time_t now = handle->now + handle->dt_sec;
 
-    if (unlikely(!descr || position >= (handle->page_length / sizeof(storage_number)))) {
+    if (unlikely(!descr || position >= handle->entries)) {
         // We need to get a new page
-        if(rrdeng_load_page_next(rrdimm_handle, &position))
-            goto no_more_metrics;
+        if(rrdeng_load_page_next(rrdimm_handle)) {
+            // next calls will not load any more metrics
+            handle->next_page_time = INVALID_TIME;
+            return SN_EMPTY_SLOT;
+        }
 
         descr = handle->descr;
-        page = handle->page;
+        position = handle->position;
+        now = (descr->start_time + position * handle->dt) / USEC_PER_SEC;
     }
 
-    storage_number ret = page[position];
+    storage_number ret = handle->page[position];
     handle->position = position;
-    time_t now = handle->now = (descr->start_time + position * handle->dt) / USEC_PER_SEC;
+    handle->now = now;
 
     if (unlikely(now >= rrdimm_handle->end_time)) {
         // next calls will not load any more metrics
@@ -650,10 +652,6 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
 
     *current_time = now;
     return ret;
-
-no_more_metrics:
-    handle->next_page_time = INVALID_TIME;
-    return SN_EMPTY_SLOT;
 }
 
 int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)

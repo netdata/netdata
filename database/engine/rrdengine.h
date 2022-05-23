@@ -49,10 +49,12 @@ struct rrdeng_query_handle {
     time_t next_page_time;
     time_t now;
     unsigned position;
+    unsigned entries;
     storage_number *page;
     usec_t page_end_time;
     uint32_t page_length;
     usec_t dt;
+    time_t dt_sec;
 };
 
 typedef enum {
