@@ -1384,3 +1384,39 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
     return 0;
 }
+
+static void netdev_main_cleanup(void *ptr)
+{
+    UNUSED(ptr);
+
+    info("cleaning up...");
+
+    worker_unregister();
+}
+
+void *netdev_main(void *ptr)
+{
+    worker_register("NETDEV");
+    worker_register_job_name(0, "netdev");
+
+    netdata_thread_cleanup_push(netdev_main_cleanup, ptr);
+
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    while (!netdata_exit) {
+        worker_is_idle();
+        usec_t hb_dt = heartbeat_next(&hb, step);
+
+        if (unlikely(netdata_exit))
+            break;
+
+        worker_is_busy(0);
+        if(do_proc_net_dev(localhost->rrd_update_every, hb_dt))
+            break;
+    }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}

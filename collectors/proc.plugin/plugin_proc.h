@@ -8,7 +8,9 @@
 #define PLUGIN_PROC_CONFIG_NAME "proc"
 #define PLUGIN_PROC_NAME PLUGIN_PROC_CONFIG_NAME ".plugin"
 
-extern int do_proc_net_dev(int update_every, usec_t dt);
+#define THREAD_NETDEV_NAME "PLUGIN[proc netdev]"
+extern void *netdev_main(void *ptr);
+
 extern int do_proc_net_wireless(int update_every, usec_t dt);
 extern int do_proc_diskstats(int update_every, usec_t dt);
 extern int do_proc_mdstat(int update_every, usec_t dt);
