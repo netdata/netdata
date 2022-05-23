@@ -80,7 +80,7 @@ typedef uint32_t storage_number;
 #define did_storage_number_reset(value)  ((((storage_number) (value)) & SN_EXISTS_RESET) != 0)
 
 storage_number pack_storage_number(calculated_number value, uint32_t flags);
-calculated_number unpack_storage_number(storage_number value);
+static inline calculated_number unpack_storage_number(storage_number value) __attribute__((const));
 
 int print_calculated_number(char *str, calculated_number value);
 
@@ -97,5 +97,42 @@ int print_calculated_number(char *str, calculated_number value);
 // Maximum acceptable rate of increase for counters. With a rate of 10% netdata can safely detect overflows with a
 // period of at least every other 10 samples.
 #define MAX_INCREMENTAL_PERCENT_RATE 10
+
+
+static inline calculated_number unpack_storage_number(storage_number value) {
+    extern calculated_number unpack_storage_number_lut10x[4 * 8];
+
+    if(!value) return 0;
+
+    int sign = 1, exp = 0;
+    int factor = 0;
+
+    // bit 32 = 0:positive, 1:negative
+    if(unlikely(value & (1 << 31)))
+        sign = -1;
+
+    // bit 31 = 0:divide, 1:multiply
+    if(unlikely(value & (1 << 30)))
+        exp = 1;
+
+    // bit 27 SN_EXISTS_100
+    if(unlikely(value & (1 << 26)))
+        factor = 1;
+
+    // bit 26 SN_EXISTS_RESET
+    // bit 25 SN_ANOMALY_BIT
+
+    // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
+    int mul = (value & ((1<<29)|(1<<28)|(1<<27))) >> 27;
+
+    // bit 24 to bit 1 = the value, so remove all other bits
+    value ^= value & ((1<<31)|(1<<30)|(1<<29)|(1<<28)|(1<<27)|(1<<26)|(1<<25)|(1<<24));
+
+    calculated_number n = value;
+
+    // fprintf(stderr, "UNPACK: %08X, sign = %d, exp = %d, mul = %d, factor = %d, n = " CALCULATED_NUMBER_FORMAT "\n", value, sign, exp, mul, factor, n);
+
+    return sign * unpack_storage_number_lut10x[(factor * 16) + (exp * 8) + mul] * n;
+}
 
 #endif /* NETDATA_STORAGE_NUMBER_H */
