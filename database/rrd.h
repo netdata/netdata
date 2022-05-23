@@ -166,7 +166,6 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
     RRDDIM_FLAG_ACLK                            = (1 << 4),
 
     RRDDIM_FLAG_PENDING_FOREACH_ALARM           = (1 << 5), // set when foreach alarm has not been initialized yet
@@ -441,7 +440,6 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14, // this is marked by the collector/module when a chart has obsolete dimensions
     // No new values have been collected for this chart since agent start or it was marked RRDSET_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDSET_FLAG_ARCHIVED            = 1 << 15,
     RRDSET_FLAG_ACLK                = 1 << 16,
     RRDSET_FLAG_PENDING_FOREACH_ALARMS = 1 << 17, // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION   = 1 << 18 // flag to identify anomaly detection charts.
@@ -1038,8 +1036,6 @@ extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
 {
     RRDSET *st = rrdset_find_localhost(id);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
     return st;
 }
 
@@ -1049,8 +1045,6 @@ extern RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *i
 static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id)
 {
     RRDSET *st = rrdset_find_bytype_localhost(type, id);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
     return st;
 }
 
@@ -1060,8 +1054,6 @@ extern RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
 static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
 {
     RRDSET *st = rrdset_find_byname_localhost(name);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
     return st;
 }
 
@@ -1075,9 +1067,8 @@ extern void rrdset_is_obsolete(RRDSET *st);
 extern void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
-#define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
-#define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
-#define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
+#define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
+#define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions)
 
 // get the total duration in seconds of the round robin database
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
@@ -1263,8 +1254,8 @@ extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
 static inline RRDDIM *rrddim_find_active(RRDSET *st, const char *id)
 {
     RRDDIM *rd = rrddim_find(st, id);
-    if (unlikely(rd && rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)))
-        return NULL;
+//    if (unlikely(rd && rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)))
+//        return NULL;
     return rd;
 }
 
