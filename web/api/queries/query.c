@@ -28,7 +28,7 @@ static struct {
 
     // Allocate all required structures for a query.
     // This is called once for each netdata query.
-    void *(*create)(struct rrdresult *r);
+    void (*create)(struct rrdresult *r);
 
     // Cleanup collected values, but don't destroy the structures.
     // This is called when the query engine switches dimensions,
@@ -1115,7 +1115,7 @@ static RRDR *rrd2rrdr_fixedstep(
     }
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_data = r->internal.grouping_create(r);
+    r->internal.grouping_create(r);
 
 
     // -------------------------------------------------------------------------
@@ -1507,7 +1507,7 @@ static RRDR *rrd2rrdr_variablestep(
     }
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_data = r->internal.grouping_create(r);
+    r->internal.grouping_create(r);
 
 
     // -------------------------------------------------------------------------

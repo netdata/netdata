@@ -10,9 +10,8 @@ struct grouping_min {
     size_t count;
 };
 
-void *grouping_create_min(RRDR *r) {
-    (void)r;
-    return callocz(1, sizeof(struct grouping_min));
+void grouping_create_min(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_min));
 }
 
 // resets when switches dimensions

@@ -13,14 +13,14 @@ struct grouping_median {
     LONG_DOUBLE series[];
 };
 
-void *grouping_create_median(RRDR *r) {
+void grouping_create_median(RRDR *r) {
     long entries = r->group;
     if(entries < 0) entries = 0;
 
     struct grouping_median *g = (struct grouping_median *)callocz(1, sizeof(struct grouping_median) + entries * sizeof(LONG_DOUBLE));
     g->series_size = (size_t)entries;
 
-    return g;
+    r->internal.grouping_data = g;
 }
 
 // resets when switches dimensions

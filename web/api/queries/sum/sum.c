@@ -10,9 +10,8 @@ struct grouping_sum {
     size_t count;
 };
 
-void *grouping_create_sum(RRDR *r) {
-    (void)r;
-    return callocz(1, sizeof(struct grouping_sum));
+void grouping_create_sum(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_sum));
 }
 
 // resets when switches dimensions

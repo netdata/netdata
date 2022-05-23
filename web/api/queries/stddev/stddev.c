@@ -14,9 +14,8 @@ struct grouping_stddev {
     calculated_number m_oldM, m_newM, m_oldS, m_newS;
 };
 
-void *grouping_create_stddev(RRDR *r) {
-    UNUSED (r);
-    return callocz(1, sizeof(struct grouping_stddev));
+void grouping_create_stddev(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_stddev));
 }
 
 // resets when switches dimensions
