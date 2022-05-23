@@ -493,7 +493,7 @@ This node no longer has access to the credentials it was used when connecting to
 You will still be able to see this node in your War Rooms in an **unreachable** state.
 
 If you want to reconnect this node, you need to:
-1. Ensure that the `/var/lib/netdata/cloud.d` directory doesn't exist.
+1. Ensure that the `/var/lib/netdata/cloud.d` directory doesn't exist. In some installations, the path is `/opt/netdata/var/lib/netdata/cloud.d`.
 2. Stop the agent.
 3. Ensure that the `uuidgen-runtime` package is installed. Run ```echo "$(uuidgen)"``` and validate you get back a UUID.
 4. Copy the kickstart.sh command to add a node from your space and add to the end of it `--claim-id "$(uuidgen)"`. Run the command and look for the message `Node was successfully claimed.`
