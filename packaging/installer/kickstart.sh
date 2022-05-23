@@ -339,7 +339,7 @@ setup_terminal() {
   test -t 2 || return 1
 
   if command -v tput > /dev/null 2>&1; then
-    if [ $(($(tput colors 2> /dev/null))) -ge 8 ]; then
+    if num_colors=$(tput colors 2> /dev/null) && [ "${num_colors:-0}" -ge 8 ]; then
       # Enable colors
       TPUT_RESET="$(tput sgr 0)"
       TPUT_WHITE="$(tput setaf 7)"
