@@ -1789,7 +1789,7 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
     time_t mark = now_realtime_sec();
 #endif
     rrddim_foreach_read(rd, st) {
