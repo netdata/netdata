@@ -1846,52 +1846,28 @@ after_second_database_work:
             rrdset_unlock(st);
             rrdset_wrlock(st);
 
-            for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-                if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) &&  !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)
-                             && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
+            for (rd = st->dimensions, last = NULL; likely(rd);) {
+                if (unlikely(
+                        rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) &&
+                        (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
                     info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
-                    if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+                    if (unlikely(
+                            rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
+                            rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
                         info("Deleting dimension file '%s'.", rd->cache_filename);
-                        if(unlikely(unlink(rd->cache_filename) == -1))
+                        if (unlikely(unlink(rd->cache_filename) == -1))
                             error("Cannot delete dimension file '%s'", rd->cache_filename);
                     }
 
-#ifdef ENABLE_DBENGINE
-                    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                        rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-                        while(rd->variables)
-                            rrddimvar_free(rd->variables);
+                    rrddim_free(st, rd);
 
-                        rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
-                        /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
-                        if (can_delete_metric) {
-                            /* This metric has no data and no references */
-                            delete_dimension_uuid(&rd->state->metric_uuid);
-                        } else {
-                            /* Do not delete this dimension */
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-                            queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
-#endif
-                            last = rd;
-                            rd = rd->next;
-                            continue;
-                        }
-                    }
-#endif
-                    if(unlikely(!last)) {
-                        rrddim_free(st, rd);
+                    if (unlikely(!last))
                         rd = st->dimensions;
-                        continue;
-                    }
-                    else {
-                        rrddim_free(st, rd);
+                    else
                         rd = last->next;
-                        continue;
-                    }
+                    continue;
                 }
-
                 last = rd;
                 rd = rd->next;
             }
