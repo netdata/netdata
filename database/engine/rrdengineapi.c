@@ -1077,6 +1077,9 @@ void rrdeng_store_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION
     struct rrdeng_page_descr *descr;
     RRDDIM *rd = dim_past_data->rd;
     UNUSED(rep_state);
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(rd);
+#endif
 
     descr = dim_past_data->descr;
     ctx = dim_past_data->ctx;
@@ -1107,6 +1110,9 @@ void rrdeng_flush_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION
     struct pg_cache_page_index *page_index;
     UNUSED(rep_state);
     RRDDIM *rd;
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(rd);
+#endif
 
     descr = dim_past_data->descr;
     ctx = dim_past_data->ctx;
@@ -1154,11 +1160,13 @@ void rrdeng_flush_past_metrics_page(RRDDIM_PAST_DATA *dim_past_data, REPLICATION
 }
 
 void rrdeng_store_past_metrics_page_finalize(RRDDIM_PAST_DATA *dim_past_data, REPLICATION_STATE *rep_state){
-    UNUSED(dim_past_data);
     UNUSED(rep_state);
     struct pg_cache_page_index* page_index;
     RRDDIM *rd = dim_past_data->rd;
     page_index = dim_past_data->rd->state->page_index;
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(rd);
+#endif
 
     uv_rwlock_wrlock(&page_index->lock);
     --page_index->writers;
@@ -1175,10 +1183,15 @@ void modify_dim_past_data(RRDDIM_PAST_DATA *dim_past_data, usec_t start_time, us
     new_start = start_time / USEC_PER_SEC;
     new_end = end_time / USEC_PER_SEC;
     new_entries = (uint64_t)(new_end - new_start) / dim_past_data->rd->update_every + 1;
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(end);
+#endif
 
     dim_past_data->page_length = new_entries * sizeof(storage_number);
-    if(new_start != start)
-        dim_past_data->page = &dim_past_data->page[((new_start - start) / dim_past_data->rd->update_every) * sizeof(storage_number)];
+    if(new_start != start) {
+        storage_number *sn = dim_past_data->page;
+        dim_past_data->page = &sn[((new_start - start) / dim_past_data->rd->update_every) * sizeof(storage_number)];
+    }
     dim_past_data->start_time = new_start * USEC_PER_SEC;
     dim_past_data->end_time = new_end * USEC_PER_SEC;
 

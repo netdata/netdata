@@ -118,7 +118,7 @@ int rrdpush_init() {
     default_rrdpush_sender_replication_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable replication", default_rrdpush_sender_replication_enabled);
     
     if (!default_rrdpush_sender_replication_enabled || !default_rrdpush_enabled) {
-        error("%s [send]: Stream Replication to higher hops is disabled. Check replication and streaming settings in stream.conf.", REPLICATION_MSG);
+        error("%s [send]: Stream Replication to higher hops is disabled. Check replication settings in [stream] section of the stream.conf file.", REPLICATION_MSG);
         default_rrdpush_sender_replication_enabled = 0;
     }
 

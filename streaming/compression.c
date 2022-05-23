@@ -281,6 +281,10 @@ static size_t lz4_decompressor_decompress(struct decompressor_state *state)
     size_t avg_saving = saving_percent(state->total_compressed, state->total_uncompressed);
     size_t avg_size = state->total_uncompressed / state->packet_count;
 
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(saving);
+#endif
+
     if (old_avg_saving != avg_saving || old_avg_size != avg_size){
         debug(D_STREAM, "%s: Saving: %lu%% (avg. %lu%%), avg.size: %lu", STREAM_COMPRESSION_MSG, saving, avg_saving, avg_size);
     }

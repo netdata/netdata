@@ -356,6 +356,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         .cd = cd,
         .trust_durations = 1
     };
+    rpt->first_msg_t = 0;
 
     PARSER *parser = parser_init(rpt->host, &user, fp, PARSER_INPUT_SPLIT);
 

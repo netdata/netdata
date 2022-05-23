@@ -204,13 +204,6 @@ extern int connect_to_one_of_destinations(
     size_t connected_to_size,
     struct rrdpush_destinations **destination);
 
-void log_replication_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
-extern void evaluate_gap_onconnection(struct receiver_state *stream_recv);
-extern void evaluate_gap_ondisconnection(struct receiver_state *stream_recv);
-
-extern int should_send_chart_matching(RRDSET *st);
-extern int need_to_send_chart_definition(RRDSET *st);
-
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
