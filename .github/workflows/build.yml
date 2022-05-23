@@ -105,8 +105,16 @@ jobs:
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Build
-        id: build
+        if: github.event_name != 'workflow_dispatch' # Don’t use retries on PRs.
         run: .github/scripts/build-static.sh ${{ matrix.arch }}
+      - name: Build
+        if: github.event_name == 'workflow_dispatch'
+        id: build
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 180
+          retries: 3
+          command: .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         id: store
         uses: actions/upload-artifact@v3
