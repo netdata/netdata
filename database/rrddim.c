@@ -168,18 +168,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_algorithm(st, rd, algorithm);
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            store_active_dimension(&rd->state->metric_uuid);
-            rd->state->collect_ops.init(rd);
-            rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-            rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-
-            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
-            rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-            rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-        }
         if (unlikely(rc)) {
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
             (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
@@ -399,13 +387,15 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
-    if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
-        if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            /* This metric has no data and no references */
-            delete_dimension_uuid(&rd->state->metric_uuid);
-        }
+    uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
+    if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        /* This metric has no data and no references */
+        delete_dimension_uuid(&rd->state->metric_uuid);
     }
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    else
+        queue_dimension_to_aclk(rd, rd->last_collected_time.tv_sec);
+#endif
 
     if(rd == st->dimensions)
         st->dimensions = rd->next;
@@ -500,10 +490,6 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", st->name, rd->name);
 
-    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))) {
-        info("Cannot obsolete already archived dimension %s from chart %s", rd->name, st->name);
-        return;
-    }
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 }

@@ -1090,8 +1090,6 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
         char id[512];
         sprintf(id, "%s.%s", sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 1));
         RRDSET *st = rrdset_find(host, id);
-        if (st && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
-            continue;
 
         if (c)
             buffer_strcat(wb, ",\n\t\t\"");

@@ -197,8 +197,6 @@ static void health_reload_host(RRDHOST *host) {
     // link the loaded alarms to their charts
     RRDDIM *rd;
     rrdset_foreach_write(st, host) {
-        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
-            continue;
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
 
@@ -513,11 +511,6 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
 
     if(unlikely(rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE))) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as obsolete", rc->chart?rc->chart:"NOCHART", rc->name);
-        return 0;
-    }
-
-    if(unlikely(rrdset_flag_check(rc->rrdset, RRDSET_FLAG_ARCHIVED))) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as archived", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
 
