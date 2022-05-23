@@ -29,11 +29,9 @@ void grouping_free_sum(RRDR *r) {
 }
 
 void grouping_add_sum(RRDR *r, calculated_number value) {
-    if(!isnan(value)) {
-        struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
-        g->sum += value;
-        g->count++;
-    }
+    struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
+    g->sum += value;
+    g->count++;
 }
 
 calculated_number grouping_flush_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {

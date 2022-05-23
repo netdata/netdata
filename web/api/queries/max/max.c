@@ -29,13 +29,11 @@ void grouping_free_max(RRDR *r) {
 }
 
 void grouping_add_max(RRDR *r, calculated_number value) {
-    if(!isnan(value)) {
-        struct grouping_max *g = (struct grouping_max *)r->internal.grouping_data;
+    struct grouping_max *g = (struct grouping_max *)r->internal.grouping_data;
 
-        if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->max)) {
-            g->max = value;
-            g->count++;
-        }
+    if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->max)) {
+        g->max = value;
+        g->count++;
     }
 }
 

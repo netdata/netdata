@@ -465,7 +465,9 @@ static inline void do_dimension_variablestep(
                 }
             }
             // add this value to grouping
-            r->internal.grouping_add(r, value);
+            if(likely(!isnan(value)))
+                r->internal.grouping_add(r, value);
+
             values_in_group++;
             db_points_read++;
         }
@@ -649,10 +651,11 @@ static inline void do_dimension_fixedstep(
 
                 if(unlikely(did_storage_number_reset(n)))
                     group_value_flags |= RRDR_VALUE_RESET;
+
+                grouping_add(r, value);
             }
 
             // add this value for grouping
-            grouping_add(r, value);
             values_in_group++;
             db_points_read++;
 
