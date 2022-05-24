@@ -11,17 +11,17 @@ If you want to learn more about the StatsD protocol, we have written a [blog pos
 
 Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards and store them in it's database for long-term retention.
 
-Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports both tcp and udp packets at the same time. 
+Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports both TCP and UDP packets at the same time. 
 
 Since statsd is embedded in Netdata, it means you now have a statsd server embedded on all your servers. 
 
-Netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
+Netdata statsd is fast. It can collect several millions of metrics per second on modern hardware, using just 1 CPU core. The implementation uses two threads: one thread collects metrics, another thread updates the charts from the collected data.
 
-## Available StatsD collectors
+## Available StatsD synthetic application charts
 
-Netdata ships with collectors implemented using the StatsD collector. They are configuration files (as you will read below), but they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
+Netdata ships with a few synthetic chart definitions to automatically present application metrics into a more uniform way. These synthetic charts are configuration files (you can create your own) that re-arrange statsd metrics into a more meaningful way.
 
-On these charts, we can have alarms as with any metric and chart.
+On synthetic charts, we can have alarms as with any metric and chart.
 
 - [K6 load testing tool](https://k6.io)
   - **Description:** k6 is a developer-centric, free and open-source load testing tool built for making performance testing a productive and enjoyable experience.
@@ -34,7 +34,7 @@ On these charts, we can have alarms as with any metric and chart.
 
 ## Metrics supported by Netdata
 
-Netdata fully supports the StatsD protocol. All StatsD client libraries can be used with Netdata too.
+Netdata fully supports the StatsD protocol and also extends it to support more advanced Netdata specific use cases. All StatsD client libraries can be used with Netdata too.
 
 -   **Gauges**
 
@@ -43,6 +43,7 @@ Netdata fully supports the StatsD protocol. All StatsD client libraries can be u
      The application may increment or decrement a previous value, by setting the first character of the value to `+` or `-` (so, the only way to set a gauge to an absolute negative value, is to first set it to zero). 
 
      [Sampling rate](#sampling-rates) is supported.
+     [Tags](#tags) are supported for changing chart units and dimension name.
 
      When a gauge is not collected and the setting is not to show gaps on the charts (the default), the last value will be shown, until a data collection event changes it.
 
@@ -50,18 +51,19 @@ Netdata fully supports the StatsD protocol. All StatsD client libraries can be u
 
      The application sends `name:value|c`, `name:value|C` or `name:value|m`, where `value` is a positive or negative **integer** number of events occurred, StatsD reports the **rate** and the number of times it was updated (events).
 
-     `:value` can be omitted and StatsD will assume it is `1`. `|c`, `|C` and `|m` can be omitted an StatsD will assume it is `|m`. So, the application may send just `name` and StatsD will parse it as `name:1|m`.
+     `:value` can be omitted and StatsD will assume it is `1`. `|c`, `|C` and `|m` can be omitted and StatsD will assume it is `|m`. So, the application may send just `name` and StatsD will parse it as `name:1|m`.
 
      - Counters use `|c` (etsy/StatsD compatible) or `|C` (brubeck compatible)
      - Meters use `|m`
 
      [Sampling rate](#sampling-rates) is supported.
+     [Tags](#tags) are supported for changing chart units and dimension name.
 
-     When a counter or meter is not collected, Netdata **defaults** to showing a zero value, until a data collection event changes the value.
+     When a counter or meter is not collected, StatsD **defaults** to showing a zero value, until a data collection event changes the value.
      
 -   **Timers** and **Histograms**
 
-     The application sends `name:value|ms` or `name:value|h`, where `value` is any **decimal/fractional** number, StatsD reports **min**, **max**, **average**, **sum**, **95th percentile**, **median** and **standard deviation** and the total number of times it was updated (events).
+     The application sends `name:value|ms` or `name:value|h`, where `value` is any **decimal/fractional** number, StatsD reports **min**, **max**, **average**, **95th percentile**, **median** and **standard deviation** and the total number of times it was updated (events). Internally it also calculates the **sum**, which is available for synthetic charts.
 
      - Timers use `|ms`
      - Histograms use `|h`
@@ -69,20 +71,42 @@ Netdata fully supports the StatsD protocol. All StatsD client libraries can be u
      The only difference between the two, is the `units` of the charts, as timers report *milliseconds*.
 
      [Sampling rate](#sampling-rates) is supported.
+     [Tags](#tags) are supported for changing chart units.
 
-     When a counter or meter is not collected, Netdata **defaults** to showing a zero value, until a data collection event changes the value.
+     When a counter or meter is not collected, StatsD **defaults** to showing a zero value, until a data collection event changes the value.
 
 -   **Sets**
 
       The application sends `name:value|s`, where `value` is anything (**number or text**, leading and trailing spaces are removed), StatsD reports the number of unique values sent and the number of times it was updated (events).
 
-     Sampling rate is **not** supported for Sets. `value` is always considered text.
+     Sampling rate is **not** supported for Sets. `value` is always considered text (so `01` and `1` are considered different).
 
-     When a counter or meter is not collected, Netdata **defaults** to showing a zero value, until a data collection event changes the value.
+     When a set is not collected, Netdata **defaults** to showing a zero value, until a data collection event changes the value.
+
+-   **Dictionaries**
+
+    The application sends `name:value|d`, where `value` is anything (**number or text**, leading and trailing spaces are removed), StatsD reports the number of events sent for each `value` and the total times `name` was updated (events).
+
+    Sampling rate is **not** supported for Dictionaries. `value` is always considered text (so `01` and `1` are considered different).
+
+    When a set is not collected, Netdata **defaults** to showing a zero value, until a data collection event changes the value.
 
 #### Sampling Rates
 
 The application may append `|@sampling_rate`, where `sampling_rate` is a number from `0.0` to `1.0` in order for StatD to extrapolate the value and predict the total for the entire period. If the application reports to StatsD a value for 1/10th of the time, it can append `|@0.1` to the metrics it sends to statsd.
+
+#### Tags
+
+The application may append `|#tag1:value1,tag2:value2,tag3:value3` etc, where `tagX` and `valueX` are strings. `:valueX` can be omitted.
+
+Currently, Netdata uses only 2 tags:
+
+ * `units=string` which sets the units of the chart that is automatically generated
+ * `name=string` which sets the name of the dimension of the chart that is automatically generated
+
+Other tags are parsed, but currently are ignored.
+
+Charts are not updated to change units or dimension names once they are created. So, either send the tags on every event, or use the special `zinit` value to initiaze the charts at the beginning. `zinit` is a special value that can be used on any chart, to have netdata initialize the charts, without actually setting any values to them. So, instead of sending `my.metric:VALUE|c|#units=bytes,name=size` every time, the application can send at the beginning `my.metric:zinit|c|#units=bytes,name=size` and then `my.metric:VALUE|c`.
 
 #### Overlapping metrics
 
@@ -90,17 +114,16 @@ Netdata's StatsD server maintains different indexes for each of the types suppor
 
 #### Multiple metrics per packet
 
-Netdata accepts multiple metrics per packet if each is terminated with `\n`.
+Netdata accepts multiple metrics per packet if each is terminated with a newline (`\n`) at the end.
 
 #### TCP packets
 
 Netdata listens for both TCP and UDP packets. For TCP, is it important to always append `\n` on each metric, as Netdata will use the newline character to detect if a metric is split into multiple TCP packets. 
 
-On disconnect, Netdata will process the entire buffer, even if it is not terminated with a `\n`.
 
 #### UDP packets
 
-When sending multiple packets over UDP, it is important not to exceed the network MTU, which is usually 1500 bytes.
+When sending multiple metrics over a single UDP message, it is important not to exceed the network MTU, which is usually 1500 bytes.
 
 Netdata will accept UDP packets up to 9000 bytes, but the underlying network will not exceed MTU. 
 
@@ -122,7 +145,7 @@ You can find the configuration at `/etc/netdata/netdata.conf`:
 	# private charts memory mode = save
 	# private charts history = 3996
 	# histograms and timers percentile (percentThreshold) = 95.00000
-	# add dimension for number of events received = yes
+	# add dimension for number of events received = no
 	# gaps on gauges (deleteGauges) = no
 	# gaps on counters (deleteCounters) = no
 	# gaps on meters (deleteMeters) = no
@@ -150,7 +173,7 @@ You can find the configuration at `/etc/netdata/netdata.conf`:
 
 -   `update every (flushInterval) = 1` seconds, controls the frequency StatsD will push the collected metrics to Netdata charts.
 
--   `decimal detail = 1000` controls the number of fractional digits in gauges and histograms. Netdata collects metrics using signed 64 bit integers and their fractional detail is controlled using multipliers and divisors. This setting is used to multiply all collected values to convert them to integers and is also set as the divisors, so that the final data will be a floating point number with this fractional detail (1000 = X.0 - X.999, 10000 = X.0 - X.9999, etc).
+-   `decimal detail = 1000` controls the number of fractional digits in gauges and histograms. Netdata collects metrics using signed 64-bit integers and their fractional detail is controlled using multipliers and divisors. This setting is used to multiply all collected values to convert them to integers and is also set as the divisors, so that the final data will be a floating point number with this fractional detail (1000 = X.0 - X.999, 10000 = X.0 - X.9999, etc).
 
 The rest of the settings are discussed below.
 
@@ -180,10 +203,9 @@ The default behavior is to use the same settings as the rest of the Netdata Agen
 
 ### Optimize private metric charts visualization and storage
 
-
 If you have thousands of metrics, each with its own private chart, you may notice that your web browser becomes slow when you view the Netdata dashboard (this is a web browser issue we need to address at the Netdata UI). So, Netdata has a protection to stop creating charts when `max private charts allowed = 200` (soft limit) is reached.
 
-The metrics above this soft limit are still processed by Netdata and will be available to be sent to backend time-series databases, up to `max private charts hard limit = 1000`. So, between 200 and 1000 charts, Netdata will still generate charts, but they will automatically be created with `memory mode = none` (Netdata will not maintain a database for them). These metrics will be sent to backend time series databases, if the backend configuration is set to `as collected`.
+The metrics above this soft limit are still processed by Netdata, can be used in synthetic charts and will be available to be sent to backend time-series databases, up to `max private charts hard limit = 1000`. So, between 200 and 1000 charts, Netdata will still generate charts, but they will automatically be created with `memory mode = none` (Netdata will not maintain a database for them). These metrics will be sent to backend time series databases, if the backend configuration is set to `as collected`.
 
 Metrics above the hard limit are still collected, but they can only be used in synthetic charts (once a metric is added to chart, it will be sent to backend servers too).
 
@@ -240,9 +262,6 @@ This is identical to `counter`.
 -   Format: `name:FLOAT|ms`
 -   StatsD maintains a list of all the values supplied and provides statistics on them.
 
-![image](https://cloud.githubusercontent.com/assets/2662304/26131620/acbea6a4-3aa3-11e7-8bdd-4a8996847767.png)
-
-The same chart with the `sum` unselected:
 ![image](https://cloud.githubusercontent.com/assets/2662304/26131629/bc34f2d2-3aa3-11e7-8a07-f2fc94ba4352.png)
 
 ### Synthetic StatsD charts
@@ -369,7 +388,7 @@ Synthetic chart:
 
 ![screenshot from 2017-08-03 23-29-14](https://user-images.githubusercontent.com/2662304/28942317-958a2c68-78a3-11e7-853f-32850141dd36.png)
 
-#### Renaming StatsD metrics
+#### Renaming StatsD synthetic charts' metrics
 
 You can define a dictionary to rename metrics sent by StatsD clients. This enables you to send response `"200"` and Netdata visualize it as `succesful connection`
 
@@ -438,7 +457,7 @@ You can rename the dimensions with this:
 
 Note that we added a `NAME` to the dimension line with `get.`. This is prefixed to the wildcarded part of the metric name, to compose the key for looking up the dictionary. So `500` became `get.500` which was looked up to the dictionary to find value `500 cannot connect to db`. This way we can have different dimension names, for each of the API methods (i.e. `get.500 = 500 cannot connect to db` while `post.500 = 500 cannot write to disk`).
 
-To add all API methods to a chart, you can do this:
+To add all 200s across all API methods to a chart, you can do this:
 
 ```
 [ok_by_method]
@@ -539,44 +558,77 @@ You can also use StatsD with:
 
 ### Shell
 
-Getting the proper support for a programming language is not always easy, but the Unix shell is available on most Unix systems. You can use shell and `nc` to instrument your systems and send metric data to Netdata's StatsD implementation. Here's how:
+Getting the proper support for a programming language is not always easy, but the Unix shell is available on most Unix systems. You can use shell and `nc` to instrument your systems and send metric data to Netdata's StatsD implementation.
 
-The command you need to run is:
+Using the method you can send metrics from any script. You can generate events like: backup.started, backup.ended, backup.time, or even tail logs and convert them to metrics.
+
+**IMPORTANT**
+To send StatsD messages you need from the `netcat` package, the `nc` command.
+
+There are multiple versions of this package. Please try to experiment with the `nc` command you have available on your right system, to find the right parameters.
+
+If you plan to send short StatsD events at sporadic occasions, use UDP. The messages should not be too long (remember, most networks support up to 1500 bytes MTU, which is also the limit for StatsD messages over UDP). The good thing is that using UDP will not block your script, even if the StatsD server is not there (UDP messages are "fire-and-forget").
+
+In the examples below, we assume the `openbsd-netcat` is available.
+
+For UDP use this:
 
 ```sh
-echo "NAME:VALUE|TYPE" | nc -u --send-only localhost 8125
+echo "METRIC:VALUE|TYPE" | nc -u -w 0 localhost 8125
 ```
 
-Where:
+`-u` turns on UDP, `-w 0` tells `nc` not to wait for a response from StatsD (idle time to close the connection).
 
--   `NAME` is the metric name
--   `VALUE` is the value for that metric (**gauges** `|g`, **timers** `|ms` and **histograms** `|h` accept decimal/fractional numbers, **counters** `|c` and **meters** `|m` accept integers, **sets** `|s` accept anything)
--   `TYPE` is one of `g`, `ms`, `h`, `c`, `m`, `s` to select the metric type.
+where:
 
-So, to set `metric1` as gauge to value `10`, use:
+-   `METRIC` is the metric name
+-   `VALUE` is the value for that metric (**gauges** `|g`, **timers** `|ms` and **histograms** `|h` accept decimal/fractional numbers, **counters** `|c` and **meters** `|m` accept integers, **sets** `|s` accept anything, **dictionaries** `|d` accept anything)
+-   `TYPE` is one of `g`, `ms`, `h`, `c`, `m`, `s`, `d` to select the metric type.
+
+For tailing a log and converting it to metrics, do something like this:
 
 ```sh
-echo "metric1:10|g" | nc -u --send-only localhost 8125
+tail -f some.log | awk 'awk commands to parse the log and format statsd metrics' | nc -N -w 120 localhost 8125
+```
+
+`-N` tells `nc` to close the socket once it receives EOF on its input. `-w 120` tells `nc` to stop if the connection is idle for 120 seconds. The timeout is needed to stop the `nc` command if you restart Netdata while `nc` is connected to it. Without it, `nc` will sit idle forever.
+
+When you embed the above commands to a script, you may notice that all the metrics are sent to StatsD with a delay. They are buffered in the pipes `|`. You can turn them to real-time by prepending each command with `stdbuf -i0 -oL -eL command to be run`, like this:
+
+```sh
+stdbuf -i0 -oL -eL tail -f some.log |\
+ stdbuf -i0 -oL -eL awk 'awk commands to parse the log and format statsd metrics' |\
+  stdbuf -i0 -oL -eL nc -N -w 120 localhost 8125
+```
+
+If you use `mawk` you also need to run awk with `-W interactive`.
+
+Examples:
+
+To set `metric1` as gauge to value `10`, use:
+
+```sh
+echo "metric1:10|g" | nc -u -w 0 localhost 8125
 ```
 
 To increment `metric2` by `10`, as a counter, use:
 
 ```sh
-echo "metric2:10|c" | nc -u --send-only localhost 8125
+echo "metric2:10|c" | nc -u  -w 0 localhost 8125
 ```
 
 You can send multiple metrics like this:
 
 ```sh
 # send multiple metrics via UDP
-printf "metric1:10|g\nmetric2:10|c\n" | nc -u --send-only localhost 8125
+printf "metric1:10|g\nmetric2:10|c\n" | nc -u  -w 0 localhost 8125
 ```
 
 Remember, for UDP communication each packet should not exceed the MTU. So, if you plan to push too many metrics at once, prefer TCP communication:
 
 ```sh
 # send multiple metrics via TCP
-printf "metric1:10|g\nmetric2:10|c\n" | nc --send-only localhost 8125
+cat /tmp/statsd.metrics.txt | nc -N -w 120 localhost 8125
 ```
 
 You can also use this little function to take care of all the details:
@@ -587,16 +639,16 @@ You can also use this little function to take care of all the details:
 STATSD_HOST="localhost"
 STATSD_PORT="8125"
 statsd() {
-	local udp="-u" all="${*}"
+        local options="-u -w 0" all="${*}"
+        
+        # replace all spaces with newlines
+        all="${all// /\\n}"
 
         # if the string length of all parameters given is above 1000, use TCP
-        [ "${#all}" -gt 1000 ] && udp=
+        [ "${#all}" -gt 1000 ] && options="-N -w 0"
 
-        while [ ! -z "${1}" ]
-        do
-          	printf "${1}\n"
-                shift
-        done | nc ${udp} --send-only ${STATSD_HOST} ${STATSD_PORT} || return 1
+        # send the metrics to statsd
+        printf "${all}\n" | nc ${options} ${STATSD_HOST} ${STATSD_PORT} || return 1
 
         return 0
 }
@@ -614,5 +666,3 @@ StatsD "metric1:10|g" "metric2:10|c" ...
 The function is smart enough to call `nc` just once and pass all the metrics to it. It will also automatically switch to TCP if the metrics to send are above 1000 bytes.
 
 If you have gotten thus far, make sure to check out our [community forums](https://community.netdata.cloud) to share your experience using Netdata with StatsD.
-
-
