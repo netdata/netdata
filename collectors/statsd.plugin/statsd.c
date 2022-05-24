@@ -756,10 +756,10 @@ static void statsd_process_metric(const char *name, const char *value, const cha
     }
 }
 
-static inline const char *statsd_parse_skip_up_to(const char *s, char d1, char d2) {
+static inline const char *statsd_parse_skip_up_to(const char *s, char d1, char d2, char d3) {
     char c;
 
-    for(c = *s; c && c != d1 && c != d2 && c != '\r' && c != '\n'; c = *++s) ;
+    for(c = *s; c && c != d1 && c != d2 && c != d3 && c != '\r' && c != '\n'; c = *++s) ;
 
     return s;
 }
@@ -808,18 +808,18 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
         }
 
         if(likely(*s == ':'))
-            s = value_end = (char *) statsd_parse_skip_up_to(value = ++s, '|', '\0');
+            s = value_end = (char *) statsd_parse_skip_up_to(value = ++s, '|', '\0', '\0');
 
         if(likely(*s == '|'))
-            s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '@', '#');
+            s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '|', '@', '#');
 
-        if(unlikely(*s == '@')) {
-            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '#', '#');
+        if(unlikely(*s == '|' || *s == '@')) {
+            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '|', '#', '\0');
             if(*sampling == '@') sampling++;
         }
 
-        if(unlikely(*s == '#')) {
-            s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '\0', '\0');
+        if(unlikely(*s == '|' || *s == '#')) {
+            s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '\0', '\0', '\0');
             if(*tags == '#') tags++;
         }
 
