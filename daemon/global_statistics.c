@@ -988,6 +988,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "STATSD",      .family = "workers plugin statsd",           .priority = 1000000 },
     { .name = "STATSDFLUSH", .family = "workers plugin statsd flush",     .priority = 1000000 },
     { .name = "PROC",        .family = "workers plugin proc",             .priority = 1000000 },
+    { .name = "NETDEV",      .family = "workers plugin proc netdev",      .priority = 1000000 },
     { .name = "FREEBSD",     .family = "workers plugin freebsd",          .priority = 1000000 },
     { .name = "MACOS",       .family = "workers plugin macos",            .priority = 1000000 },
     { .name = "CGROUPS",     .family = "workers plugin cgroups",          .priority = 1000000 },
