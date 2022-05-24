@@ -814,8 +814,6 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             statsd_parse_field_trim(tagkey, tagkey_end);
             statsd_parse_field_trim(tagvalue, tagvalue_end);
 
-            fprintf(stderr, "metric '%s', tag '%s', tagvalue '%s'", name, tagkey, tagvalue?tagvalue:"");
-
             if(!m->units[0] && tagkey && *tagkey && tagvalue && *tagvalue && strcmp(tagkey, "units") == 0)
                 strncpyz(m->units, tagvalue, STATSD_MAX_UNITS_LENGTH);
         }
