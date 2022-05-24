@@ -76,7 +76,7 @@ typedef struct statsd_histogram_extensions {
     RRDDIM *rd_percentile;
     RRDDIM *rd_median;
     RRDDIM *rd_stddev;
-    RRDDIM *rd_sum;
+    //RRDDIM *rd_sum;
 
     size_t size;
     size_t used;
@@ -773,7 +773,7 @@ const char *statsd_parse_skip_spaces(const char *s) {
 }
 
 static inline const char *statsd_parse_field_trim(const char *start, char *end) {
-    if(unlikely(!start)) {
+    if(unlikely(!start || !*start)) {
         start = end;
         return start;
     }
@@ -798,7 +798,7 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
         const char *name = NULL, *value = NULL, *type = NULL, *sampling = NULL, *tags = NULL;
         char *name_end = NULL, *value_end = NULL, *type_end = NULL, *sampling_end = NULL, *tags_end = NULL;
 
-        s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '|', '\0');
+        s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '=', '|');
         if(name == name_end) {
             if (*s) {
                 s++;
@@ -807,20 +807,27 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
             continue;
         }
 
-        if(likely(*s == ':'))
-            s = value_end = (char *) statsd_parse_skip_up_to(value = ++s, '|', '\0', '\0');
+        if(likely(*s == ':' || *s == '='))
+            s = value_end = (char *) statsd_parse_skip_up_to(value = ++s, '|', '@', '#');
 
         if(likely(*s == '|'))
             s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '|', '@', '#');
 
-        if(unlikely((*s == '|' && s[1] == '@') || *s == '@')) {
-            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '|', '#', '\0');
-            if(*sampling == '@') sampling++;
-        }
+        while(*s == '|' || *s == '@' || *s == '#') {
+            // parse all the fields that may be appended
 
-        if(unlikely((*s == '|' && s[1] == '#') || *s == '#')) {
-            s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '|', '\0', '\0');
-            if(*tags == '#') tags++;
+            if ((*s == '|' && s[1] == '@') || *s == '@') {
+                s = sampling_end = (char *)statsd_parse_skip_up_to(sampling = ++s, '|', '@', '#');
+                if (*sampling == '@') sampling++;
+            }
+            else if ((*s == '|' && s[1] == '#') || *s == '#') {
+                s = tags_end = (char *)statsd_parse_skip_up_to(tags = ++s, '|', '@', '#');
+                if (*tags == '#') tags++;
+            }
+            else {
+                // unknown field, skip it
+                s = (char *)statsd_parse_skip_up_to(++s, '|', '@', '#');
+            }
         }
 
         // skip everything until the end of the line
@@ -1810,7 +1817,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
         m->histogram.ext->rd_percentile = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
         m->histogram.ext->rd_median = rrddim_add(m->st, "median", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
         m->histogram.ext->rd_stddev = rrddim_add(m->st, "stddev", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_sum = rrddim_add(m->st, "sum", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        //m->histogram.ext->rd_sum = rrddim_add(m->st, "sum", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1822,7 +1829,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_percentile, m->histogram.ext->last_percentile);
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_median, m->histogram.ext->last_median);
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_stddev, m->histogram.ext->last_stddev);
-    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_sum, m->histogram.ext->last_sum);
+    //rrddim_set_by_pointer(m->st, m->histogram.ext->rd_sum, m->histogram.ext->last_sum);
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
     if(m->rd_count)
