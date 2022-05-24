@@ -6,14 +6,21 @@
 
 **Merged pull requests:**
 
+- Improve reconnect node instructions [\#12987](https://github.com/netdata/netdata/pull/12987) ([cakrit](https://github.com/cakrit))
+- Make heartbeat a static chart [\#12986](https://github.com/netdata/netdata/pull/12986) ([MrZammler](https://github.com/MrZammler))
+- chore\(apps.plugin\): change cpu\_guest chart context [\#12983](https://github.com/netdata/netdata/pull/12983) ([ilyam8](https://github.com/ilyam8))
+- fix: don't kill Netdata PIDs if successfully stopped Netdata [\#12982](https://github.com/netdata/netdata/pull/12982) ([ilyam8](https://github.com/ilyam8))
+- fix\(kickstart.sh\): handle the case when `tput colors` doesn't return a number [\#12979](https://github.com/netdata/netdata/pull/12979) ([ilyam8](https://github.com/ilyam8))
 - query engine optimizations and cleanup [\#12978](https://github.com/netdata/netdata/pull/12978) ([ktsaou](https://github.com/ktsaou))
 - optimize poll\_events\(\) to spread the work over the threads more evenly [\#12975](https://github.com/netdata/netdata/pull/12975) ([ktsaou](https://github.com/ktsaou))
 - chore: check link local address before querying cloud instance metadata [\#12973](https://github.com/netdata/netdata/pull/12973) ([ilyam8](https://github.com/ilyam8))
 - Don't permanetly disable a destination because of denied access [\#12971](https://github.com/netdata/netdata/pull/12971) ([MrZammler](https://github.com/MrZammler))
+- modify code to resolve compile warning issue [\#12969](https://github.com/netdata/netdata/pull/12969) ([kklionz](https://github.com/kklionz))
 - cleanup and optimize rrdeng\_load\_metric\_next\(\) [\#12966](https://github.com/netdata/netdata/pull/12966) ([ktsaou](https://github.com/ktsaou))
 - feat\(charts.d/apcupds\): add load usage chart \(Watts\) [\#12965](https://github.com/netdata/netdata/pull/12965) ([ilyam8](https://github.com/ilyam8))
 - fix: keep virtualization unknown if all used commands are not available [\#12964](https://github.com/netdata/netdata/pull/12964) ([ilyam8](https://github.com/ilyam8))
 - statsd sets should count unique values [\#12963](https://github.com/netdata/netdata/pull/12963) ([ktsaou](https://github.com/ktsaou))
+- Add automatic retries fo static builds during nightly and release builds. [\#12961](https://github.com/netdata/netdata/pull/12961) ([Ferroin](https://github.com/Ferroin))
 - Cleanup chart hash and map tables on startup [\#12956](https://github.com/netdata/netdata/pull/12956) ([stelfrag](https://github.com/stelfrag))
 - Suppress warning when freeing a NULL pointer in onewayalloc\_freez [\#12955](https://github.com/netdata/netdata/pull/12955) ([stelfrag](https://github.com/stelfrag))
 - Optimize the dimensions option store to the metadata database [\#12952](https://github.com/netdata/netdata/pull/12952) ([stelfrag](https://github.com/stelfrag))
@@ -315,12 +322,6 @@
 - Improve agent to cloud synchronization performance [\#12348](https://github.com/netdata/netdata/pull/12348) ([stelfrag](https://github.com/stelfrag))
 - Prepend context in anomaly rate dimension id. [\#12342](https://github.com/netdata/netdata/pull/12342) ([vkalintiris](https://github.com/vkalintiris))
 - Redirect dependency handling script output to logfile when running from the updater. [\#12341](https://github.com/netdata/netdata/pull/12341) ([Ferroin](https://github.com/Ferroin))
-- Remove owner check from webserver [\#12339](https://github.com/netdata/netdata/pull/12339) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix: container virtualization detection with systemd-detect-virt [\#12338](https://github.com/netdata/netdata/pull/12338) ([ilyam8](https://github.com/ilyam8))
-- fix: use default "bind to" in native packages [\#12336](https://github.com/netdata/netdata/pull/12336) ([ilyam8](https://github.com/ilyam8))
-- Use the built agent version for Netdata static build archive name. [\#12335](https://github.com/netdata/netdata/pull/12335) ([Ferroin](https://github.com/Ferroin))
-- Set repo priority in YUM/DNF repository configuration. [\#12332](https://github.com/netdata/netdata/pull/12332) ([Ferroin](https://github.com/Ferroin))
-- Add latency dimension [\#12329](https://github.com/netdata/netdata/pull/12329) ([Steve8291](https://github.com/Steve8291))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
