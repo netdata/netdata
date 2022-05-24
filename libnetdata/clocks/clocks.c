@@ -179,6 +179,7 @@ inline usec_t dt_usec(struct timeval *now, struct timeval *old) {
     return (ts1 > ts2) ? (ts1 - ts2) : (ts2 - ts1);
 }
 
+#ifdef __linux__
 void sleep_to_absolute_time(usec_t usec) {
     static int einval_printed = 0, enotsup_printed = 0, eunknown_printed = 0;
     clockid_t clock = CLOCK_REALTIME;
@@ -225,6 +226,7 @@ void sleep_to_absolute_time(usec_t usec) {
         }
     }
 };
+#endif
 
 #define HEARTBEAT_ALIGNMENT_STATISTICS_SIZE 10
 netdata_mutex_t heartbeat_alignment_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -344,12 +346,20 @@ void sleep_usec(usec_t usec) {
             .tv_nsec = (suseconds_t) ((usec % USEC_PER_SEC) * NSEC_PER_USEC)
     };
 
+#ifdef __linux__
     while ((errno = clock_nanosleep(CLOCK_REALTIME, 0, &req, &rem)) != 0) {
+#else
+    while ((errno = nanosleep(&req, &rem)) != 0) {
+#endif
         if (likely(errno == EINTR)) {
             req.tv_sec = rem.tv_sec;
             req.tv_nsec = rem.tv_nsec;
         } else {
+#ifdef __linux__
             error("Cannot clock_nanosleep(CLOCK_REALTIME) for %llu microseconds.", usec);
+#else
+            error("Cannot nanosleep() for %llu microseconds.", usec);
+#endif
             break;
         }
     }
