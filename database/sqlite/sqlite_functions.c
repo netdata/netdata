@@ -1159,7 +1159,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
         size_t found = 0;
         RRDHOST *h;
         rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now) && !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED)) {
+            if(!rrdhost_should_be_removed(h, host, now)) {
                 buffer_sprintf(wb
                     , "%s\n\t\t{"
                       "\n\t\t\t\"hostname\": \"%s\""
@@ -1269,7 +1269,6 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     uuid_copy(host->host_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
 
     host->system_info = callocz(1, sizeof(*host->system_info));;
-    rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
 #ifdef ENABLE_DBENGINE
     host->rrdeng_ctx = &multidb_ctx;
 #endif
