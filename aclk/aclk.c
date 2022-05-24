@@ -1237,7 +1237,7 @@ char *ng_aclk_state(void)
         "Protocols Supported: Legacy\n"
 #endif
     );
-    buffer_sprintf(wb, "Protocol Used: %s\nClaimed: ", aclk_use_new_cloud_arch ? "Protobuf" : "Legacy");
+    buffer_sprintf(wb, "Protocol Used: %s\nMQTT Version: %d\nClaimed: ", aclk_use_new_cloud_arch ? "Protobuf" : "Legacy", use_mqtt_5 ? 5 : 3);
 
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
@@ -1436,6 +1436,9 @@ char *ng_aclk_state_json(void)
 
     tmp = json_object_new_string(aclk_use_new_cloud_arch ? "Protobuf" : "Legacy");
     json_object_object_add(msg, "used-cloud-protocol", tmp);
+
+    tmp = json_object_new_int(use_mqtt_5 ? 5 : 3);
+    json_object_object_add(msg, "mqtt-version", tmp);
 
     tmp = json_object_new_int(aclk_rcvd_cloud_msgs);
     json_object_object_add(msg, "received-app-layer-msgs", tmp);

@@ -69,6 +69,8 @@ struct label *add_aclk_host_labels(struct label *label) {
             break;
     }
 
+    int mqtt5 = config_get_boolean(CONFIG_SECTION_CLOUD, "mqtt5", CONFIG_BOOLEAN_NO);
+    label = add_label_to_list(label, "_mqtt_version", mqtt5 ? "5" : "3", LABEL_SOURCE_AUTO);
     label = add_label_to_list(label, "_aclk_impl", "Next Generation", LABEL_SOURCE_AUTO);
     label = add_label_to_list(label, "_aclk_proxy", proxy_str, LABEL_SOURCE_AUTO);
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
