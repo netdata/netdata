@@ -813,12 +813,12 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
         if(likely(*s == '|'))
             s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '|', '@', '#');
 
-        if(unlikely(*s == '|' || *s == '@')) {
+        if(unlikely((*s == '|' && s[1] == '@') || *s == '@')) {
             s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '|', '#', '\0');
             if(*sampling == '@') sampling++;
         }
 
-        if(unlikely(*s == '|' || *s == '#')) {
+        if(unlikely((*s == '|' && s[1] == '#') || *s == '#')) {
             s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '|', '\0', '\0');
             if(*tags == '#') tags++;
         }
