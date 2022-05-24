@@ -50,7 +50,7 @@ to work on these platforms with minimal user effort.
 
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
-| Alpine Linux | 3.15 | No | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
+| Alpine Linux | 3.16 | No | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
 | Alma Linux | 8.x | x86\_64, AArch64 | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives |
 | CentOS | 7.x | x86\_64 | |
 | Docker | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker |
@@ -80,6 +80,7 @@ with minimal user effort.
 
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
+| Alpine Linux | 3.15 | No | |
 | Alpine Linux | 3.14 | No | |
 | Alpine Linux | 3.13 | No | |
 | Arch Linux | Latest | No | We officially recommend the community packages available for Arch Linux |
