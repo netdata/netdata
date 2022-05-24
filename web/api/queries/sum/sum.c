@@ -10,9 +10,8 @@ struct grouping_sum {
     size_t count;
 };
 
-void *grouping_create_sum(RRDR *r) {
-    (void)r;
-    return callocz(1, sizeof(struct grouping_sum));
+void grouping_create_sum(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_sum));
 }
 
 // resets when switches dimensions
@@ -29,11 +28,9 @@ void grouping_free_sum(RRDR *r) {
 }
 
 void grouping_add_sum(RRDR *r, calculated_number value) {
-    if(!isnan(value)) {
-        struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
-        g->sum += value;
-        g->count++;
-    }
+    struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
+    g->sum += value;
+    g->count++;
 }
 
 calculated_number grouping_flush_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {

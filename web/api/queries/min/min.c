@@ -10,9 +10,8 @@ struct grouping_min {
     size_t count;
 };
 
-void *grouping_create_min(RRDR *r) {
-    (void)r;
-    return callocz(1, sizeof(struct grouping_min));
+void grouping_create_min(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_min));
 }
 
 // resets when switches dimensions
@@ -29,13 +28,11 @@ void grouping_free_min(RRDR *r) {
 }
 
 void grouping_add_min(RRDR *r, calculated_number value) {
-    if(!isnan(value)) {
-        struct grouping_min *g = (struct grouping_min *)r->internal.grouping_data;
+    struct grouping_min *g = (struct grouping_min *)r->internal.grouping_data;
 
-        if(!g->count || calculated_number_fabs(value) < calculated_number_fabs(g->min)) {
-            g->min = value;
-            g->count++;
-        }
+    if(!g->count || calculated_number_fabs(value) < calculated_number_fabs(g->min)) {
+        g->min = value;
+        g->count++;
     }
 }
 

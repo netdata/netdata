@@ -8,7 +8,7 @@
 
 extern void grouping_init_ses(void);
 
-extern void *grouping_create_ses(RRDR *r);
+extern void grouping_create_ses(RRDR *r);
 extern void grouping_reset_ses(RRDR *r);
 extern void grouping_free_ses(RRDR *r);
 extern void grouping_add_ses(RRDR *r, calculated_number value);

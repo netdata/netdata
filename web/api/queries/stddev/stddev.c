@@ -14,9 +14,8 @@ struct grouping_stddev {
     calculated_number m_oldM, m_newM, m_oldS, m_newS;
 };
 
-void *grouping_create_stddev(RRDR *r) {
-    UNUSED (r);
-    return callocz(1, sizeof(struct grouping_stddev));
+void grouping_create_stddev(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_stddev));
 }
 
 // resets when switches dimensions
@@ -34,22 +33,20 @@ void grouping_free_stddev(RRDR *r) {
 void grouping_add_stddev(RRDR *r, calculated_number value) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
-    if(calculated_number_isnumber(value)) {
-        g->count++;
+    g->count++;
 
-        // See Knuth TAOCP vol 2, 3rd edition, page 232
-        if (g->count == 1) {
-            g->m_oldM = g->m_newM = value;
-            g->m_oldS = 0.0;
-        }
-        else {
-            g->m_newM = g->m_oldM + (value - g->m_oldM) / g->count;
-            g->m_newS = g->m_oldS + (value - g->m_oldM) * (value - g->m_newM);
+    // See Knuth TAOCP vol 2, 3rd edition, page 232
+    if (g->count == 1) {
+        g->m_oldM = g->m_newM = value;
+        g->m_oldS = 0.0;
+    }
+    else {
+        g->m_newM = g->m_oldM + (value - g->m_oldM) / g->count;
+        g->m_newS = g->m_oldS + (value - g->m_oldM) * (value - g->m_newM);
 
-            // set up for next iteration
-            g->m_oldM = g->m_newM;
-            g->m_oldS = g->m_newS;
-        }
+        // set up for next iteration
+        g->m_oldM = g->m_newM;
+        g->m_oldS = g->m_newS;
     }
 }
 

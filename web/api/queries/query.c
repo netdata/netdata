@@ -28,7 +28,7 @@ static struct {
 
     // Allocate all required structures for a query.
     // This is called once for each netdata query.
-    void *(*create)(struct rrdresult *r);
+    void (*create)(struct rrdresult *r);
 
     // Cleanup collected values, but don't destroy the structures.
     // This is called when the query engine switches dimensions,
@@ -465,7 +465,9 @@ static inline void do_dimension_variablestep(
                 }
             }
             // add this value to grouping
-            r->internal.grouping_add(r, value);
+            if(likely(!isnan(value)))
+                r->internal.grouping_add(r, value);
+
             values_in_group++;
             db_points_read++;
         }
@@ -649,10 +651,11 @@ static inline void do_dimension_fixedstep(
 
                 if(unlikely(did_storage_number_reset(n)))
                     group_value_flags |= RRDR_VALUE_RESET;
+
+                grouping_add(r, value);
             }
 
             // add this value for grouping
-            grouping_add(r, value);
             values_in_group++;
             db_points_read++;
 
@@ -1112,7 +1115,7 @@ static RRDR *rrd2rrdr_fixedstep(
     }
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_data = r->internal.grouping_create(r);
+    r->internal.grouping_create(r);
 
 
     // -------------------------------------------------------------------------
@@ -1504,7 +1507,7 @@ static RRDR *rrd2rrdr_variablestep(
     }
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_data = r->internal.grouping_create(r);
+    r->internal.grouping_create(r);
 
 
     // -------------------------------------------------------------------------

@@ -11,9 +11,8 @@ struct grouping_incremental_sum {
     size_t count;
 };
 
-void *grouping_create_incremental_sum(RRDR *r) {
-    (void)r;
-    return callocz(1, sizeof(struct grouping_incremental_sum));
+void grouping_create_incremental_sum(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_incremental_sum));
 }
 
 // resets when switches dimensions
@@ -31,17 +30,15 @@ void grouping_free_incremental_sum(RRDR *r) {
 }
 
 void grouping_add_incremental_sum(RRDR *r, calculated_number value) {
-    if(!isnan(value)) {
-        struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
+    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
 
-        if(unlikely(!g->count)) {
-            g->first = value;
-            g->count++;
-        }
-        else {
-            g->last = value;
-            g->count++;
-        }
+    if(unlikely(!g->count)) {
+        g->first = value;
+        g->count++;
+    }
+    else {
+        g->last = value;
+        g->count++;
     }
 }
 

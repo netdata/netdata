@@ -10,9 +10,8 @@ struct grouping_average {
     size_t count;
 };
 
-void *grouping_create_average(RRDR *r) {
-    (void)r;
-    return callocz(1, sizeof(struct grouping_average));
+void grouping_create_average(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_average));
 }
 
 // resets when switches dimensions
@@ -29,11 +28,9 @@ void grouping_free_average(RRDR *r) {
 }
 
 void grouping_add_average(RRDR *r, calculated_number value) {
-    if(likely(!isnan(value))) {
-        struct grouping_average *g = (struct grouping_average *)r->internal.grouping_data;
-        g->sum += value;
-        g->count++;
-    }
+    struct grouping_average *g = (struct grouping_average *)r->internal.grouping_data;
+    g->sum += value;
+    g->count++;
 }
 
 calculated_number grouping_flush_average(RRDR *r,  RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {

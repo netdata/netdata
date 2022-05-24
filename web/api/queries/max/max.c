@@ -10,9 +10,8 @@ struct grouping_max {
     size_t count;
 };
 
-void *grouping_create_max(RRDR *r) {
-    (void)r;
-    return callocz(1, sizeof(struct grouping_max));
+void grouping_create_max(RRDR *r) {
+    r->internal.grouping_data = callocz(1, sizeof(struct grouping_max));
 }
 
 // resets when switches dimensions
@@ -29,13 +28,11 @@ void grouping_free_max(RRDR *r) {
 }
 
 void grouping_add_max(RRDR *r, calculated_number value) {
-    if(!isnan(value)) {
-        struct grouping_max *g = (struct grouping_max *)r->internal.grouping_data;
+    struct grouping_max *g = (struct grouping_max *)r->internal.grouping_data;
 
-        if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->max)) {
-            g->max = value;
-            g->count++;
-        }
+    if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->max)) {
+        g->max = value;
+        g->count++;
     }
 }
 

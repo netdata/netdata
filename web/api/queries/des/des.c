@@ -69,14 +69,14 @@ static inline void set_beta(RRDR *r, struct grouping_des *g) {
     //info("beta for chart '%s' is " CALCULATED_NUMBER_FORMAT, r->st->name, g->beta);
 }
 
-void *grouping_create_des(RRDR *r) {
+void grouping_create_des(RRDR *r) {
     struct grouping_des *g = (struct grouping_des *)mallocz(sizeof(struct grouping_des));
     set_alpha(r, g);
     set_beta(r, g);
     g->level = 0.0;
     g->trend = 0.0;
     g->count = 0;
-    return g;
+    r->internal.grouping_data = g;
 }
 
 // resets when switches dimensions
@@ -99,28 +99,26 @@ void grouping_free_des(RRDR *r) {
 void grouping_add_des(RRDR *r, calculated_number value) {
     struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
 
-    if(calculated_number_isnumber(value)) {
-        if(likely(g->count > 0)) {
-            // we have at least a number so far
+    if(likely(g->count > 0)) {
+        // we have at least a number so far
 
-            if(unlikely(g->count == 1)) {
-                // the second value we got
-                g->trend = value - g->trend;
-                g->level = value;
-            }
-
-            // for the values, except the first
-            calculated_number last_level = g->level;
-            g->level = (g->alpha * value) + (g->alpha_other * (g->level + g->trend));
-            g->trend = (g->beta * (g->level - last_level)) + (g->beta_other * g->trend);
-        }
-        else {
-            // the first value we got
-            g->level = g->trend = value;
+        if(unlikely(g->count == 1)) {
+            // the second value we got
+            g->trend = value - g->trend;
+            g->level = value;
         }
 
-        g->count++;
+        // for the values, except the first
+        calculated_number last_level = g->level;
+        g->level = (g->alpha * value) + (g->alpha_other * (g->level + g->trend));
+        g->trend = (g->beta * (g->level - last_level)) + (g->beta_other * g->trend);
     }
+    else {
+        // the first value we got
+        g->level = g->trend = value;
+    }
+
+    g->count++;
 
     //fprintf(stderr, "value: " CALCULATED_NUMBER_FORMAT ", level: " CALCULATED_NUMBER_FORMAT ", trend: " CALCULATED_NUMBER_FORMAT "\n", value, g->level, g->trend);
 }
