@@ -590,16 +590,17 @@ If you plan to send short StatsD events at sporadic occasions, use UDP. The mess
 For UDP use this:
 
 ```sh
-echo "METRIC:VALUE|TYPE" | nc -u -w 0 localhost 8125
+echo "APPLICATION.METRIC:VALUE|TYPE" | nc -u -w 0 localhost 8125
 ```
 
 `-u` turns on UDP, `-w 0` tells `nc` not to wait for a response from StatsD (idle time to close the connection).
 
 where:
 
--   `METRIC` is the metric name
--   `VALUE` is the value for that metric (**gauges** `|g`, **timers** `|ms` and **histograms** `|h` accept decimal/fractional numbers, **counters** `|c` and **meters** `|m` accept integers, **sets** `|s` accept anything, **dictionaries** `|d` accept anything)
--   `TYPE` is one of `g`, `ms`, `h`, `c`, `m`, `s`, `d` to select the metric type.
+- `APPLICATION` is any name for your application
+- `METRIC` is the name for the specific metric
+- `VALUE` is the value for that metric (**meters**, **counters**, **gauges**, **timers** and **histograms** accept integer/decimal/fractional numbers, **sets** and **dictionaries** accept strings)
+- `TYPE` is one of `m`, `c`, `g`, `ms`, `h`, `s`, `d` to define the metric type.
 
 For tailing a log and converting it to metrics, do something like this:
 
@@ -621,23 +622,23 @@ If you use `mawk` you also need to run awk with `-W interactive`.
 
 Examples:
 
-To set `metric1` as gauge to value `10`, use:
+To set `myapp.used_memory` as gauge to value `123456`, use:
 
 ```sh
-echo "metric1:10|g" | nc -u -w 0 localhost 8125
+echo "myapp.used_memory:123456|g|#units:bytes" | nc -u -w 0 localhost 8125
 ```
 
-To increment `metric2` by `10`, as a counter, use:
+To increment `myapp.files_sent` by `10`, as a counter, use:
 
 ```sh
-echo "metric2:10|c" | nc -u  -w 0 localhost 8125
+echo "myapp.files_sent:10|c|#units:files" | nc -u  -w 0 localhost 8125
 ```
 
 You can send multiple metrics like this:
 
 ```sh
 # send multiple metrics via UDP
-printf "metric1:10|g\nmetric2:10|c\n" | nc -u  -w 0 localhost 8125
+printf "myapp.used_memory:123456|g|#units:bytes\nmyapp.files_sent:10|c|#units:files\n" | nc -u  -w 0 localhost 8125
 ```
 
 Remember, for UDP communication each packet should not exceed the MTU. So, if you plan to push too many metrics at once, prefer TCP communication:
@@ -651,6 +652,8 @@ You can also use this little function to take care of all the details:
 
 ```sh
 #!/usr/bin/env bash
+
+# we assume nc is from the openbsd-netcat package
 
 STATSD_HOST="localhost"
 STATSD_PORT="8125"
@@ -668,6 +671,11 @@ statsd() {
 
         return 0
 }
+
+if [ ! -z "${*}" ]
+then
+  statsd "${@}"
+fi
 ```
 
 You can use it like this:
@@ -677,8 +685,15 @@ You can use it like this:
 source statsd.sh
 
 # then, at any point:
-StatsD "metric1:10|g" "metric2:10|c" ...
+statsd "myapp.used_memory:123456|g|#units:bytes" "myapp.files_sent:10|c|#units:files" ...
 ```
+
+or even at a terminal prompt, like this:
+
+```sh
+./statsd.sh "myapp.used_memory:123456|g|#units:bytes" "myapp.files_sent:10|c|#units:files" ...
+```
+
 The function is smart enough to call `nc` just once and pass all the metrics to it. It will also automatically switch to TCP if the metrics to send are above 1000 bytes.
 
 If you have gotten thus far, make sure to check out our [community forums](https://community.netdata.cloud) to share your experience using Netdata with StatsD.
