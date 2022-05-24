@@ -18,6 +18,8 @@
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least 4
 #endif
 
+#define STATSD_MAX_UNITS_LENGTH 20
+
 // --------------------------------------------------------------------------------------
 
 // #define STATSD_MULTITHREADED 1
@@ -156,6 +158,8 @@ typedef struct statsd_metric {
         STATSD_METRIC_SET set;
         STATSD_METRIC_DICTIONARY dictionary;
     };
+
+    char units[STATSD_MAX_UNITS_LENGTH+1];
 
     // chart related members
     STATS_METRIC_OPTIONS options;   // STATSD_METRIC_OPTION_* (bitfield)
@@ -703,59 +707,6 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing
 
-static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling, const char *tags) {
-    (void)tags;
-
-    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', sampling '%s', tags '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)", tags?tags:"(null)");
-
-    if(unlikely(!name || !*name)) return;
-    if(unlikely(!type || !*type)) type = "m";
-
-    char t0 = type[0], t1 = type[1];
-
-    if(unlikely(t0 == 'g' && t1 == '\0')) {
-        statsd_process_gauge(
-                statsd_find_or_add_metric(&statsd.gauges, name, STATSD_METRIC_TYPE_GAUGE),
-                value, sampling);
-    }
-    else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0')) {
-        // etsy/statsd uses 'c'
-        // brubeck     uses 'C'
-        statsd_process_counter(
-                statsd_find_or_add_metric(&statsd.counters, name, STATSD_METRIC_TYPE_COUNTER),
-                value, sampling);
-    }
-    else if(unlikely(t0 == 'm' && t1 == '\0')) {
-        statsd_process_meter(
-                statsd_find_or_add_metric(&statsd.meters, name, STATSD_METRIC_TYPE_METER),
-                value, sampling);
-    }
-    else if(unlikely(t0 == 'h' && t1 == '\0')) {
-        statsd_process_histogram(
-                statsd_find_or_add_metric(&statsd.histograms, name, STATSD_METRIC_TYPE_HISTOGRAM),
-                value, sampling);
-    }
-    else if(unlikely(t0 == 's' && t1 == '\0')) {
-        statsd_process_set(
-            statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
-            value);
-    }
-    else if(unlikely(t0 == 'd' && t1 == '\0')) {
-        statsd_process_dictionary(
-            statsd_find_or_add_metric(&statsd.dictionaries, name, STATSD_METRIC_TYPE_DICTIONARY),
-            value);
-    }
-    else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
-        statsd_process_timer(
-                statsd_find_or_add_metric(&statsd.timers, name, STATSD_METRIC_TYPE_TIMER),
-                value, sampling);
-    }
-    else {
-        statsd.unknown_types++;
-        error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
-    }
-}
-
 static inline const char *statsd_parse_skip_up_to(const char *s, char d1, char d2, char d3) {
     char c;
 
@@ -787,6 +738,88 @@ static inline const char *statsd_parse_field_trim(const char *start, char *end) 
         *end-- = '\0';
 
     return start;
+}
+
+static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling, const char *tags) {
+    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', sampling '%s', tags '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)", tags?tags:"(null)");
+
+    if(unlikely(!name || !*name)) return;
+    if(unlikely(!type || !*type)) type = "m";
+
+    STATSD_METRIC *m = NULL;
+
+    char t0 = type[0], t1 = type[1];
+    if(unlikely(t0 == 'g' && t1 == '\0')) {
+        statsd_process_gauge(
+            m = statsd_find_or_add_metric(&statsd.gauges, name, STATSD_METRIC_TYPE_GAUGE),
+            value, sampling);
+    }
+    else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0')) {
+        // etsy/statsd uses 'c'
+        // brubeck     uses 'C'
+        statsd_process_counter(
+            m = statsd_find_or_add_metric(&statsd.counters, name, STATSD_METRIC_TYPE_COUNTER),
+            value, sampling);
+    }
+    else if(unlikely(t0 == 'm' && t1 == '\0')) {
+        statsd_process_meter(
+            m = statsd_find_or_add_metric(&statsd.meters, name, STATSD_METRIC_TYPE_METER),
+            value, sampling);
+    }
+    else if(unlikely(t0 == 'h' && t1 == '\0')) {
+        statsd_process_histogram(
+            m = statsd_find_or_add_metric(&statsd.histograms, name, STATSD_METRIC_TYPE_HISTOGRAM),
+            value, sampling);
+    }
+    else if(unlikely(t0 == 's' && t1 == '\0')) {
+        statsd_process_set(
+            m = statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
+            value);
+    }
+    else if(unlikely(t0 == 'd' && t1 == '\0')) {
+        statsd_process_dictionary(
+            m = statsd_find_or_add_metric(&statsd.dictionaries, name, STATSD_METRIC_TYPE_DICTIONARY),
+            value);
+    }
+    else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
+        statsd_process_timer(
+            m = statsd_find_or_add_metric(&statsd.timers, name, STATSD_METRIC_TYPE_TIMER),
+            value, sampling);
+    }
+    else {
+        statsd.unknown_types++;
+        error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
+    }
+
+    if(m && tags && *tags) {
+        const char *s = tags;
+        while(*s) {
+            const char *tagkey = NULL, *tagvalue = NULL;
+            char *tagkey_end = NULL, *tagvalue_end = NULL;
+
+            s = tagkey_end = (char *)statsd_parse_skip_up_to(tagkey = s, ':', '=', ',');
+            if(tagkey == tagkey_end) {
+                if (*s) {
+                    s++;
+                    s = statsd_parse_skip_spaces(s);
+                }
+                continue;
+            }
+
+            if(likely(*s == ':' || *s == '='))
+                s = tagvalue_end = (char *) statsd_parse_skip_up_to(tagvalue = ++s, ',', '\0', '\0');
+
+            if(*s == ',') s++;
+
+            statsd_parse_field_trim(tagkey, tagkey_end);
+            statsd_parse_field_trim(tagvalue, tagvalue_end);
+
+            fprintf(stderr, "metric '%s', tag '%s', tagvalue '%s'", name, tagkey, tagvalue?tagvalue:"");
+
+            if(!m->units[0] && tagkey && *tagkey && tagvalue && *tagvalue && strcmp(tagkey, "units") == 0)
+                strncpyz(m->units, tagvalue, STATSD_MAX_UNITS_LENGTH);
+        }
+    }
 }
 
 static inline size_t statsd_process(char *buffer, size_t size, int require_newlines) {
@@ -1635,7 +1668,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
                 , "gauges"      // family (submenu)
                 , context       // context
                 , title         // title
-                , "value"       // units
+                , m->units[0]?m->units:"value"       // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_LINE
@@ -1677,7 +1710,7 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
                 , family        // family (submenu)
                 , context       // context
                 , title         // title
-                , "events/s"    // units
+                , m->units[0]?m->units:"events/s"    // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_AREA
@@ -1719,7 +1752,7 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
                 , "sets"        // family (submenu)
                 , context       // context
                 , title         // title
-                , "entries"     // units
+                , m->units[0]?m->units:"entries"     // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_LINE
@@ -1761,7 +1794,7 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
             , "dictionaries" // family (submenu)
             , context       // context
             , title         // title
-            , "events/s"     // units
+            , m->units[0]?m->units:"events/s"     // units
             , NETDATA_CHART_PRIO_STATSD_PRIVATE
             , statsd.update_every
             , RRDSET_TYPE_STACKED
@@ -1805,7 +1838,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
                 , family        // family (submenu)
                 , context       // context
                 , title         // title
-                , units         // units
+                , m->units[0]?m->units:units         // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_AREA
