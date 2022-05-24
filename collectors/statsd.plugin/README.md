@@ -36,18 +36,18 @@ On synthetic charts, we can have alarms as with any metric and chart.
 
 Netdata fully supports the StatsD protocol and also extends it to support more advanced Netdata specific use cases. All StatsD client libraries can be used with Netdata too.
 
--   **Gauges**
+- **Gauges**
 
      The application sends `name:value|g`, where `value` is any **decimal/fractional** number, StatsD reports the latest value collected and the number of times it was updated (events).
 
      The application may increment or decrement a previous value, by setting the first character of the value to `+` or `-` (so, the only way to set a gauge to an absolute negative value, is to first set it to zero). 
 
      [Sampling rate](#sampling-rates) is supported.
-     [Tags](#tags) are supported for changing chart units and dimension name.
+     [Tags](#tags) are supported for changing chart units, family and dimension name.
 
      When a gauge is not collected and the setting is not to show gaps on the charts (the default), the last value will be shown, until a data collection event changes it.
 
--   **Counters** and **Meters**
+- **Counters** and **Meters**
 
      The application sends `name:value|c`, `name:value|C` or `name:value|m`, where `value` is a positive or negative **integer** number of events occurred, StatsD reports the **rate** and the number of times it was updated (events).
 
@@ -57,11 +57,11 @@ Netdata fully supports the StatsD protocol and also extends it to support more a
      - Meters use `|m`
 
      [Sampling rate](#sampling-rates) is supported.
-     [Tags](#tags) are supported for changing chart units and dimension name.
+     [Tags](#tags) are supported for changing chart units, family and dimension name.
 
      When a counter or meter is not collected, StatsD **defaults** to showing a zero value, until a data collection event changes the value.
      
--   **Timers** and **Histograms**
+- **Timers** and **Histograms**
 
      The application sends `name:value|ms` or `name:value|h`, where `value` is any **decimal/fractional** number, StatsD reports **min**, **max**, **average**, **95th percentile**, **median** and **standard deviation** and the total number of times it was updated (events). Internally it also calculates the **sum**, which is available for synthetic charts.
 
@@ -71,23 +71,27 @@ Netdata fully supports the StatsD protocol and also extends it to support more a
      The only difference between the two, is the `units` of the charts, as timers report *milliseconds*.
 
      [Sampling rate](#sampling-rates) is supported.
-     [Tags](#tags) are supported for changing chart units.
+     [Tags](#tags) are supported for changing chart units and family.
 
      When a counter or meter is not collected, StatsD **defaults** to showing a zero value, until a data collection event changes the value.
 
--   **Sets**
+- **Sets**
 
       The application sends `name:value|s`, where `value` is anything (**number or text**, leading and trailing spaces are removed), StatsD reports the number of unique values sent and the number of times it was updated (events).
 
      Sampling rate is **not** supported for Sets. `value` is always considered text (so `01` and `1` are considered different).
 
+     [Tags](#tags) are supported for changing chart units and family.
+
      When a set is not collected, Netdata **defaults** to showing a zero value, until a data collection event changes the value.
 
--   **Dictionaries**
+- **Dictionaries**
 
     The application sends `name:value|d`, where `value` is anything (**number or text**, leading and trailing spaces are removed), StatsD reports the number of events sent for each `value` and the total times `name` was updated (events).
 
     Sampling rate is **not** supported for Dictionaries. `value` is always considered text (so `01` and `1` are considered different).
+
+    [Tags](#tags) are supported for changing chart units and family.
 
     When a set is not collected, Netdata **defaults** to showing a zero value, until a data collection event changes the value.
 
@@ -102,7 +106,8 @@ The application may append `|#tag1:value1,tag2:value2,tag3:value3` etc, where `t
 Currently, Netdata uses only 2 tags:
 
  * `units=string` which sets the units of the chart that is automatically generated
- * `name=string` which sets the name of the dimension of the chart that is automatically generated
+ * `family=string` which sets the family of the chart that is automatically generated (the family is the submenu of the dashboard)
+ * `name=string` which sets the name of the dimension of the chart that is automatically generated (only for counters, meters, gauges)
 
 Other tags are parsed, but currently are ignored.
 
@@ -110,7 +115,17 @@ Charts are not updated to change units or dimension names once they are created.
 
 #### Overlapping metrics
 
-Netdata's StatsD server maintains different indexes for each of the types supported. This means the same metric `name` may exist under different types concurrently.
+Netdata's StatsD server maintains different indexes for each of the metric types supported. This means the same metric `name` may exist under different types concurrently.
+
+#### How to name your metrics
+
+A good practice is to name your metrics like `application.operation.metric`, where:
+
+- `application` is the application name - Netdata will automatically create a dashboard section based on the first keyword of the metrics, so you can have all your applications in different sections.
+- `operation` is the operation your application is executing, like `dbquery`, `request`, `response`, etc.
+- `metric` is anything you want to name your metric as. Netdata will automatically append the metric type (meter, counter, gauge, set, dictionary, timer, histogram) to the generated chart.
+
+Using [Tags](#tags) you can also change the submenus of the dashboard, the units of the charts and for meters, counters and gauges, the name of dimension. So, you can have a usable default view without using [Synthetic StatsD charts](#synthetic-statsd-charts)
 
 #### Multiple metrics per packet
 
@@ -562,14 +577,15 @@ Getting the proper support for a programming language is not always easy, but th
 
 Using the method you can send metrics from any script. You can generate events like: backup.started, backup.ended, backup.time, or even tail logs and convert them to metrics.
 
-**IMPORTANT**
-To send StatsD messages you need from the `netcat` package, the `nc` command.
-
-There are multiple versions of this package. Please try to experiment with the `nc` command you have available on your right system, to find the right parameters.
+> **IMPORTANT**:
+> 
+> To send StatsD messages you need from the `netcat` package, the `nc` command.
+> There are multiple versions of this package. Please try to experiment with the `nc` command you have available on your right system, to find the right parameters.
+>
+> In the examples below, we assume the `openbsd-netcat` is installed.
 
 If you plan to send short StatsD events at sporadic occasions, use UDP. The messages should not be too long (remember, most networks support up to 1500 bytes MTU, which is also the limit for StatsD messages over UDP). The good thing is that using UDP will not block your script, even if the StatsD server is not there (UDP messages are "fire-and-forget").
 
-In the examples below, we assume the `openbsd-netcat` is available.
 
 For UDP use this:
 

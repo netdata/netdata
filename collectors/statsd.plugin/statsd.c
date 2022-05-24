@@ -20,6 +20,7 @@
 
 #define STATSD_MAX_UNITS_LENGTH 20
 #define STATSD_MAX_DIMNAME_LENGTH 20
+#define STATSD_MAX_FAMILY_LENGTH 20
 
 // --------------------------------------------------------------------------------------
 
@@ -162,6 +163,7 @@ typedef struct statsd_metric {
 
     char units[STATSD_MAX_UNITS_LENGTH+1];
     char dimname[STATSD_MAX_DIMNAME_LENGTH+1];
+    char family[STATSD_MAX_FAMILY_LENGTH+1];
 
     // chart related members
     STATS_METRIC_OPTIONS options;   // STATSD_METRIC_OPTION_* (bitfield)
@@ -822,6 +824,9 @@ static void statsd_process_metric(const char *name, const char *value, const cha
 
                 if (!m->dimname[0] && strcmp(tagkey, "name") == 0)
                     strncpyz(m->dimname, tagvalue, STATSD_MAX_DIMNAME_LENGTH);
+
+                if (!m->family[0] && strcmp(tagkey, "family") == 0)
+                    strncpyz(m->family, tagvalue, STATSD_MAX_FAMILY_LENGTH);
             }
         }
     }
@@ -1583,23 +1588,27 @@ static inline void statsd_readdir(const char *user_path, const char *stock_path,
 // send metrics to netdata - in private charts - called from the main thread
 
 // extract chart type and chart id from metric name
-static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, char *id, const char *defid, size_t len) {
+static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, char *id, char *context, const char *metrictype, size_t len) {
     char *s;
 
-    snprintfz(type, len, "%s_%s_%s", STATSD_CHART_PREFIX, defid, m->name);
-    for(s = type; *s ;s++)
-        if(unlikely(*s == '.')) break;
+    snprintfz(type, len, "%s_%s", STATSD_CHART_PREFIX, m->name);
+    if(sizeof(STATSD_CHART_PREFIX) + 2 < len)
+        for(s = &type[sizeof(STATSD_CHART_PREFIX) + 2]; *s ;s++)
+            if(unlikely(*s == '.' || *s == '_')) break;
 
-    if(*s == '.') {
+    if(*s == '.' || *s == '_') {
         *s++ = '\0';
-        strncpyz(id, s, len);
+        snprintfz(id, len, "%s_%s", s, metrictype);
     }
     else {
-        strncpyz(id, defid, len);
+        snprintfz(id, len, "%s", metrictype);
     }
+
+    snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_%s.%s", metrictype, m->name);
 
     netdata_fix_chart_id(type);
     netdata_fix_chart_id(id);
+    netdata_fix_chart_id(context);
 }
 
 static inline RRDSET *statsd_private_rrdset_create(
@@ -1656,11 +1665,8 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
     debug(D_STATSD, "updating private chart for gauge metric '%s'", m->name);
 
     if(unlikely(!m->st)) {
-        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
-        statsd_get_metric_type_and_id(m, type, id, "gauge", RRD_ID_LENGTH_MAX);
-
-        char context[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_gauge.%s", m->name);
+        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
+        statsd_get_metric_type_and_id(m, type, id, context, "gauge", RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
         snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for gauge %s", m->name);
@@ -1670,7 +1676,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
                 , type
                 , id
                 , NULL          // name
-                , "gauges"      // family (submenu)
+                , m->family[0]?m->family:"gauges"      // family (submenu)
                 , context       // context
                 , title         // title
                 , m->units[0]?m->units:"value"       // units
@@ -1698,11 +1704,8 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
     debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
     if(unlikely(!m->st)) {
-        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
-        statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
-
-        char context[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_%s.%s", dim, m->name);
+        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
+        statsd_get_metric_type_and_id(m, type, id, context, dim, RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
         snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for %s %s", dim, m->name);
@@ -1712,7 +1715,7 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
                 , type
                 , id
                 , NULL          // name
-                , family        // family (submenu)
+                , m->family[0]?m->family:family        // family (submenu)
                 , context       // context
                 , title         // title
                 , m->units[0]?m->units:"events/s"    // units
@@ -1740,11 +1743,8 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
     debug(D_STATSD, "updating private chart for set metric '%s'", m->name);
 
     if(unlikely(!m->st)) {
-        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
-        statsd_get_metric_type_and_id(m, type, id, "set", RRD_ID_LENGTH_MAX);
-
-        char context[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_set.%s", m->name);
+        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
+        statsd_get_metric_type_and_id(m, type, id, context, "set", RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
         snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for set %s", m->name);
@@ -1754,7 +1754,7 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
                 , type
                 , id
                 , NULL          // name
-                , "sets"        // family (submenu)
+                , m->family[0]?m->family:"sets"        // family (submenu)
                 , context       // context
                 , title         // title
                 , m->units[0]?m->units:"entries"     // units
@@ -1782,11 +1782,8 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
     debug(D_STATSD, "updating private chart for dictionary metric '%s'", m->name);
 
     if(unlikely(!m->st)) {
-        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
-        statsd_get_metric_type_and_id(m, type, id, "dictionary", RRD_ID_LENGTH_MAX);
-
-        char context[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_dictionary.%s", m->name);
+        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
+        statsd_get_metric_type_and_id(m, type, id, context, "dictionary", RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
         snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for dictionary %s", m->name);
@@ -1796,7 +1793,7 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
             , type
             , id
             , NULL          // name
-            , "dictionaries" // family (submenu)
+            , m->family[0]?m->family:"dictionaries" // family (submenu)
             , context       // context
             , title         // title
             , m->units[0]?m->units:"events/s"     // units
@@ -1826,11 +1823,8 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
     debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
     if(unlikely(!m->st)) {
-        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
-        statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
-
-        char context[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_%s.%s", dim, m->name);
+        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
+        statsd_get_metric_type_and_id(m, type, id, context, dim, RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
         snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for %s %s", dim, m->name);
@@ -1840,7 +1834,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
                 , type
                 , id
                 , NULL          // name
-                , family        // family (submenu)
+                , m->family[0]?m->family:family        // family (submenu)
                 , context       // context
                 , title         // title
                 , m->units[0]?m->units:units         // units
