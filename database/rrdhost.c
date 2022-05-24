@@ -392,6 +392,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     if (is_localhost && host->system_info) {
         host->system_info->ml_capable = ml_capable();
         host->system_info->ml_enabled = ml_enabled(host);
+        host->system_info->mc_version = enable_metric_correlations ? metric_correlations_version : 0;
     }
 
     ml_new_host(host);
