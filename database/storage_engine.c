@@ -83,6 +83,7 @@ static STORAGE_ENGINE engines[] = {
         }
     },
 #endif
+    // End-of-list identified by name = NULL
     { .id = RRD_MEMORY_MODE_NONE, .name = NULL }
 };
 
