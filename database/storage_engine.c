@@ -172,7 +172,7 @@ STORAGE_ENGINE_INSTANCE* storage_engine_new(STORAGE_ENGINE* eng, RRDHOST *host)
 void storage_engine_delete(STORAGE_ENGINE_INSTANCE* instance) {
     if (instance) {
         STORAGE_ENGINE* eng = instance->engine;
-        if (eng && eng->api.engine_ops.destroy) {
+        if (eng) {
             eng->api.engine_ops.destroy(instance);
         }
     }

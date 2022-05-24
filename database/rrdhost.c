@@ -715,12 +715,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     }
 
     for (STORAGE_ENGINE* eng = storage_engine_foreach_init(); eng; eng = storage_engine_foreach_next(eng)) {
-        STORAGE_ENGINE_INSTANCE* ret = storage_engine_new(eng, localhost);
-        if (!ret) {
-            error(
-                "Host '%s' with machine guid '%s' failed to initialize multi-host storage engine instance at '%s'.",
-                localhost->hostname, localhost->machine_guid, localhost->cache_dir);
-        }
+        storage_engine_new(eng, localhost);
     }
     if (likely(system_info))
        migrate_localhost(&localhost->host_uuid);
