@@ -1532,8 +1532,10 @@ restart_after_removal:
 void rrdset_check_obsoletion(RRDHOST *host)
 {
     RRDSET *st;
+    time_t last_entry_t;
     rrdset_foreach_write(st, host) {
-        if (rrdset_last_entry_t(st) < host->trigger_chart_obsoletion_check) {
+        last_entry_t = rrdset_last_entry_t(st);
+        if (last_entry_t && last_entry_t < host->senders_connect_time) {
             rrdset_is_obsolete(st);
         }
     }
@@ -1561,7 +1563,8 @@ void rrd_cleanup_obsolete_charts()
 
         if (host != localhost &&
             host->trigger_chart_obsoletion_check &&
-            host->trigger_chart_obsoletion_check + 120 < now_realtime_sec()) {
+            host->senders_last_chart_command &&
+            host->senders_last_chart_command + 120 < now_realtime_sec()) {
             rrdhost_wrlock(host);
             rrdset_check_obsoletion(host);
             rrdhost_unlock(host);

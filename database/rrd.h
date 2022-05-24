@@ -795,11 +795,13 @@ struct rrdhost {
     volatile size_t connected_senders;              // when remote hosts are streaming to this
                                                     // host, this is the counter of connected clients
 
+    time_t senders_connect_time;                    // the time the last sender was connected
+    time_t senders_last_chart_command;              // the time of the last CHART streaming command
     time_t senders_disconnected_time;               // the time the last sender was disconnected
 
     struct receiver_state *receiver;
     netdata_mutex_t receiver_lock;
-    time_t trigger_chart_obsoletion_check;          // set when child connects, will instruct parent to
+    int trigger_chart_obsoletion_check;             // set when child connects, will instruct parent to
                                                     // trigger a check for obsoleted charts since previous connect
 
     // ------------------------------------------------------------------------

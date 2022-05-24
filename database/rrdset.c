@@ -551,6 +551,10 @@ RRDSET *rrdset_create_custom(
         return NULL;
     }
 
+    if (host != localhost) {
+        host->senders_last_chart_command = now_realtime_sec();
+    }
+
     // ------------------------------------------------------------------------
     // check if it already exists
 
