@@ -798,7 +798,7 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
         const char *name = NULL, *value = NULL, *type = NULL, *sampling = NULL, *tags = NULL;
         char *name_end = NULL, *value_end = NULL, *type_end = NULL, *sampling_end = NULL, *tags_end = NULL;
 
-        s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '|');
+        s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '\0');
         if(name == name_end) {
             if (*s) {
                 s++;
@@ -808,18 +808,18 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
         }
 
         if(likely(*s == ':'))
-            s = value_end = (char *) statsd_parse_skip_up_to(value = ++s, '|', '|');
+            s = value_end = (char *) statsd_parse_skip_up_to(value = ++s, '|', '\0');
 
         if(likely(*s == '|'))
-            s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '|', '@');
+            s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '@', '#');
 
-        if(likely(*s == '|' || *s == '@')) {
-            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '|', '#');
+        if(unlikely(*s == '@')) {
+            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '#', '#');
             if(*sampling == '@') sampling++;
         }
 
-        if(likely(*s == '|' || *s == '#')) {
-            s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '|', '|');
+        if(unlikely(*s == '#')) {
+            s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '\0', '\0');
             if(*tags == '#') tags++;
         }
 
