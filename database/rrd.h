@@ -399,6 +399,7 @@ struct rrddim_volatile {
 // volatile state per chart
 struct rrdset_volatile {
     char *old_title;
+    char *old_units;
     char *old_context;
     uuid_t hash_id;
     struct label *new_labels;
