@@ -2267,9 +2267,8 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         stored_metrics_nr += chart_threads[i]->stored_metrics_nr;
     }
-    unsigned long queries_nr = 0, queried_metrics_nr = 0;
+    unsigned long queried_metrics_nr = 0;
     for (i = 0 ; i < QUERY_THREADS ; ++i) {
-        queries_nr += query_threads[i]->queries_nr;
         queried_metrics_nr += query_threads[i]->queried_metrics_nr;
     }
     fprintf(stderr, "%u metrics were stored (dataset size of %lu MiB) in %u charts by 1 writer thread per chart.\n",

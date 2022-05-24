@@ -45,18 +45,18 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
 #endif
 
     if (unlikely(!(flags & PARSER_NO_PARSE_INIT))) {
-        int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
-        rc += parser_add_keyword(parser, "CLABEL_COMMIT", pluginsd_clabel_commit);
-        rc += parser_add_keyword(parser, "CLABEL", pluginsd_clabel);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
-        rc += parser_add_keyword(parser, "SET", pluginsd_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
+        parser_add_keyword(parser, "CLABEL_COMMIT", pluginsd_clabel_commit);
+        parser_add_keyword(parser, "CLABEL", pluginsd_clabel);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
+        parser_add_keyword(parser, "SET", pluginsd_set);
     }
 
     return parser;
