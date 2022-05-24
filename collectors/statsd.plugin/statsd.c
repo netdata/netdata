@@ -798,7 +798,7 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
         const char *name = NULL, *value = NULL, *type = NULL, *sampling = NULL, *tags = NULL;
         char *name_end = NULL, *value_end = NULL, *type_end = NULL, *sampling_end = NULL, *tags_end = NULL;
 
-        s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '\0', '\0');
+        s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '|', '\0');
         if(name == name_end) {
             if (*s) {
                 s++;
@@ -819,7 +819,7 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
         }
 
         if(unlikely(*s == '|' || *s == '#')) {
-            s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '\0', '\0', '\0');
+            s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '|', '\0', '\0');
             if(*tags == '#') tags++;
         }
 
