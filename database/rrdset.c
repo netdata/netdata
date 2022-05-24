@@ -400,6 +400,7 @@ void rrdset_free(RRDSET *st) {
     freez(st->plugin_name);
     freez(st->module_name);
     freez(st->state->old_title);
+    freez(st->state->old_units);
     freez(st->state->old_context);
     free_label_list(st->state->labels.head);
     freez(st->state);
@@ -561,15 +562,13 @@ RRDSET *rrdset_create_custom(
     RRDSET *st = rrdset_find_on_create(host, fullid);
     if (st) {
         int mark_rebuild = 0;
-        rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
             changed_from_archived_to_active = 1;
             mark_rebuild |= META_CHART_ACTIVATED;
         }
         char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_context = NULL,
-             *old_title_v = NULL, *old_context_v = NULL;
+             *old_title_v = NULL, *old_context_v = NULL, *old_units_v = NULL, *old_units = NULL;
         int rc;
 
         if(unlikely(name))
@@ -629,6 +628,17 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_UPDATED;
         }
 
+        if (unlikely(units && st->state->old_units && strcmp(st->state->old_units, units))) {
+            char *new_units = strdupz(units);
+            old_units_v = st->state->old_units;
+            st->state->old_units = strdupz(units);
+            json_fix_string(new_units);
+            old_units= st->units;
+            st->units = new_units;
+            mark_rebuild |= META_CHART_UPDATED;
+        }
+
+
         if (st->chart_type != chart_type) {
             st->chart_type = chart_type;
             mark_rebuild |= META_CHART_UPDATED;
@@ -665,8 +675,10 @@ RRDSET *rrdset_create_custom(
             freez(old_plugin);
             freez(old_module);
             freez(old_title);
+            freez(old_units);
             freez(old_context);
             freez(old_title_v);
+            freez(old_units_v);
             freez(old_context_v);
             if (mark_rebuild != META_CHART_ACTIVATED) {
                 info("Collector updated metadata for chart %s", st->id);
@@ -678,6 +690,11 @@ RRDSET *rrdset_create_custom(
             int rc = update_chart_metadata(st->chart_uuid, st, id, name);
             if (unlikely(rc))
                 error_report("Failed to update chart metadata in the database");
+
+            if (!changed_from_archived_to_active) {
+                rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+                rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+            }
         }
         /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
         if (!changed_from_archived_to_active)
@@ -838,6 +855,7 @@ RRDSET *rrdset_create_custom(
     st->state->is_ar_chart = strcmp(st->id, ML_ANOMALY_RATES_CHART_ID) == 0;
 
     st->units = units ? strdupz(units) : strdupz("");
+    st->state->old_units = strdupz(st->units);
     json_fix_string(st->units);
 
     st->context = context ? strdupz(context) : strdupz(st->id);
