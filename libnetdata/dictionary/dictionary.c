@@ -170,7 +170,7 @@ void dictionary_destroy(DICTIONARY *dict) {
 
 // ----------------------------------------------------------------------------
 
-void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr) {
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
     uint32_t hash = simple_hash(name);
@@ -185,7 +185,7 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
         if(unlikely(!nv))
             fatal("Cannot create name_value.");
     }
-    else {
+    else if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
         debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", name);
 
         if(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE) {
@@ -210,6 +210,7 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 
     dictionary_unlock(dict);
 
+    if(name_ptr) *name_ptr = nv->name;
     return nv->value;
 }
 
