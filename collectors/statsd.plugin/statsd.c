@@ -19,6 +19,7 @@
 #endif
 
 #define STATSD_MAX_UNITS_LENGTH 20
+#define STATSD_MAX_DIMNAME_LENGTH 20
 
 // --------------------------------------------------------------------------------------
 
@@ -160,6 +161,7 @@ typedef struct statsd_metric {
     };
 
     char units[STATSD_MAX_UNITS_LENGTH+1];
+    char dimname[STATSD_MAX_DIMNAME_LENGTH+1];
 
     // chart related members
     STATS_METRIC_OPTIONS options;   // STATSD_METRIC_OPTION_* (bitfield)
@@ -814,8 +816,13 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             statsd_parse_field_trim(tagkey, tagkey_end);
             statsd_parse_field_trim(tagvalue, tagvalue_end);
 
-            if(!m->units[0] && tagkey && *tagkey && tagvalue && *tagvalue && strcmp(tagkey, "units") == 0)
-                strncpyz(m->units, tagvalue, STATSD_MAX_UNITS_LENGTH);
+            if(tagkey && tagkey && tagvalue && *tagvalue) {
+                if (!m->units[0] && strcmp(tagkey, "units") == 0)
+                    strncpyz(m->units, tagvalue, STATSD_MAX_UNITS_LENGTH);
+
+                if (!m->dimname[0] && strcmp(tagkey, "name") == 0)
+                    strncpyz(m->dimname, tagvalue, STATSD_MAX_DIMNAME_LENGTH);
+            }
         }
     }
 }
@@ -1672,7 +1679,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
                 , RRDSET_TYPE_LINE
         );
 
-        m->rd_value = rrddim_add(m->st, "gauge",  NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value = rrddim_add(m->st, "gauge",  m->dimname[0]?m->dimname:NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1,    RRD_ALGORITHM_INCREMENTAL);
@@ -1714,7 +1721,7 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
                 , RRDSET_TYPE_AREA
         );
 
-        m->rd_value = rrddim_add(m->st, dim, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        m->rd_value = rrddim_add(m->st, dim, m->dimname[0]?m->dimname:NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1756,7 +1763,7 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
                 , RRDSET_TYPE_LINE
         );
 
-        m->rd_value = rrddim_add(m->st, "set", "set size", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value = rrddim_add(m->st, "set", m->dimname[0]?m->dimname:"unique", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
