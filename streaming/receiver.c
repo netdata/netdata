@@ -671,7 +671,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 rpt->host->hostname);
         }
     }
-    rpt->host->trigger_chart_obsoletion_check = now_realtime_sec();
+    rpt->host->senders_connect_time = now_realtime_sec();
+    rpt->host->senders_last_chart_command = 0;
+    rpt->host->trigger_chart_obsoletion_check = 1;
     rrdhost_unlock(rpt->host);
 
     // call the plugins.d processor to receive the metrics
@@ -707,12 +709,13 @@ static int rrdpush_receive(struct receiver_state *rpt)
         rrdhost_wrlock(rpt->host);
         netdata_mutex_lock(&rpt->host->receiver_lock);
         if (rpt->host->receiver == rpt) {
+            rpt->host->senders_connect_time = 0;
+            rpt->host->trigger_chart_obsoletion_check = 0;
             rpt->host->senders_disconnected_time = now_realtime_sec();
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_ORPHAN);
             if(health_enabled == CONFIG_BOOLEAN_AUTO)
                 rpt->host->health_enabled = 0;
         }
-        rpt->host->trigger_chart_obsoletion_check = 0;
         rrdhost_unlock(rpt->host);
         if (rpt->host->receiver == rpt) {
             rrdpush_sender_thread_stop(rpt->host);
