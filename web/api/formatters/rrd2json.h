@@ -4,6 +4,17 @@
 #define NETDATA_RRD2JSON_H 1
 
 #include "web/api/web_api_v1.h"
+
+typedef struct rrdset_query_data {
+    struct context_param *context_param_list;
+    BUFFER *wb;
+    char *chart_label_key;
+    int max_anomaly_rates;
+    int timeout;
+    int show_dimensions;
+} RRDSET_QUERY_DATA;
+
+
 #include "web/api/exporters/allmetrics.h"
 #include "web/api/queries/rrdr.h"
 
