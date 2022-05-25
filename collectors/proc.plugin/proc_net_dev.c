@@ -835,9 +835,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if (d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
             if (read_single_number_file(d->filename_mtu, &d->mtu)) {
-                error("Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
-                freez(d->filename_carrier);
-                d->filename_carrier = NULL;
+                error("Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_mtu);
+                freez(d->filename_mtu);
+                d->filename_mtu = NULL;
             }
         }
 
