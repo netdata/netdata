@@ -381,8 +381,9 @@ cleanup() {
 deferred_warnings() {
   if [ -n "${NETDATA_WARNINGS}" ]; then
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
-    echo >&2 "${NETDATA_WARNINGS}"
-    printf >&2 "\n"
+    # shellcheck disable=SC2059
+    printf >&2 "${NETDATA_WARNINGS}"
+    printf >&2 "\n\n"
   fi
 }
 
