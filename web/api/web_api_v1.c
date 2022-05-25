@@ -647,10 +647,15 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrdset2anything_api_v1(owa, st, w->response.data, dimensions, format,
-                                 points, after, before, group, group_time,
-                                 options, &last_timestamp_in_data, context_param_list,
-                                 chart_label_key, max_anomaly_rates, timeout);
+    QUERY_PARAMS query_params = {
+        .context_param_list = context_param_list,
+        .timeout = timeout,
+        .max_anomaly_rates = max_anomaly_rates,
+        .show_dimensions = show_dimensions,
+        .wb = w->response.data};
+
+    ret = rrdset2anything_api_v1(owa, st, &query_params, dimensions, format,
+            points, after, before, group, group_time, options, &last_timestamp_in_data);
 
     free_context_param_list(owa, &context_param_list);
 

@@ -5,14 +5,14 @@
 
 #include "web/api/web_api_v1.h"
 
-typedef struct rrdset_query_data {
+typedef struct query_params {
     struct context_param *context_param_list;
     BUFFER *wb;
     char *chart_label_key;
     int max_anomaly_rates;
     int timeout;
     int show_dimensions;
-} RRDSET_QUERY_DATA;
+} QUERY_PARAMS;
 
 
 #include "web/api/exporters/allmetrics.h"
@@ -67,8 +67,8 @@ extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 extern int rrdset2anything_api_v1(
           ONEWAYALLOC *owa
         , RRDSET *st
-        , BUFFER *wb
-        , BUFFER *dimensions
+        ,
+    QUERY_PARAMS *query_params, BUFFER *dimensions
         , uint32_t format
         , long points
         , long long after
@@ -77,10 +77,6 @@ extern int rrdset2anything_api_v1(
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
-        , struct context_param *context_param_list
-        , char *chart_label_key
-        , int max_anomaly_rates
-        , int timeout
 );
 
 extern int rrdset2value_api_v1(
