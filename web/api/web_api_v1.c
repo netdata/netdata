@@ -422,6 +422,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart_labels_filter = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
+    int show_dimensions = 0;
     uint32_t format = DATASOURCE_JSON;
     uint32_t options = 0x00000000;
 
@@ -447,6 +448,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
+        else if(!strcmp(name, "show_dimensions")) show_dimensions = 1;
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
