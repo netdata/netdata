@@ -792,6 +792,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
         }
 
+        if (d->do_carrier != CONFIG_BOOLEAN_NO && d->filename_carrier) {
+            if (read_single_number_file(d->filename_carrier, &d->carrier)) {
+                error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
+                freez(d->filename_carrier);
+                d->filename_carrier = NULL;
+            }
+        }
+
         if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex) {
             char buffer[STATE_LENGTH_MAX + 1];
 
@@ -822,14 +830,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             } else {
                 trimmed_buffer = trim(buffer);
                 d->operstate = get_operstate(trimmed_buffer);
-            }
-        }
-
-        if (d->do_carrier != CONFIG_BOOLEAN_NO && d->filename_carrier) {
-            if (read_single_number_file(d->filename_carrier, &d->carrier)) {
-                error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
-                freez(d->filename_carrier);
-                d->filename_carrier = NULL;
             }
         }
 
