@@ -49,8 +49,8 @@ struct aclk_node_info {
 
     char *custom_info;
 
-    char **services;
-    size_t service_count;
+    char **collectors;
+    size_t collector_count;
 
     char *machine_guid;
 

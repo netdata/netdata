@@ -56,8 +56,8 @@ static int generate_node_info(nodeinstance::info::v1::NodeInfo *info, struct acl
     if (data->custom_info)
         info->set_custom_info(data->custom_info);
 
-    for (size_t i = 0; i < data->service_count; i++)
-        info->add_services(data->services[i]);
+    for (size_t i = 0; i < data->collector_count; i++)
+        info->add_collectors(data->collectors[i]);
 
     if (data->machine_guid)
         info->set_machine_guid(data->machine_guid);

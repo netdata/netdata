@@ -60,8 +60,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
     node_info.data.container_type = host->system_info->container ? host->system_info->container : "unknown";
     node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
-    node_info.data.services = NULL;   // char **
-    node_info.data.service_count = 0;
+    node_info.data.collectors = NULL;   // char **
+    node_info.data.collector_count = 0;
     node_info.data.machine_guid = wc->host_guid;
 
     struct capability node_caps[] = {
