@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- Use printf instead of echo for printing collected warnings in kickstart.sh. [\#13002](https://github.com/netdata/netdata/pull/13002) ([Ferroin](https://github.com/Ferroin))
 - Update dashboard to version v2.25.4. [\#13000](https://github.com/netdata/netdata/pull/13000) ([netdatabot](https://github.com/netdatabot))
 - Run the /net/dev module of the proc plugin in a separate thread [\#12996](https://github.com/netdata/netdata/pull/12996) ([vlvkobal](https://github.com/vlvkobal))
+- Autodetect coverity install path to increase robustness [\#12995](https://github.com/netdata/netdata/pull/12995) ([maneamarius](https://github.com/maneamarius))
 - Fix compilation warnings [\#12993](https://github.com/netdata/netdata/pull/12993) ([vlvkobal](https://github.com/vlvkobal))
+- Delay children chart obsoletion check [\#12992](https://github.com/netdata/netdata/pull/12992) ([MrZammler](https://github.com/MrZammler))
 - Fix nanosleep on platforms other than Linux [\#12991](https://github.com/netdata/netdata/pull/12991) ([vlvkobal](https://github.com/vlvkobal))
 - Don't expose the chart definition to streaming if there is no metadata change [\#12990](https://github.com/netdata/netdata/pull/12990) ([stelfrag](https://github.com/stelfrag))
 - Faster queries [\#12988](https://github.com/netdata/netdata/pull/12988) ([ktsaou](https://github.com/ktsaou))
@@ -320,8 +323,6 @@
 - fix: shellcheck warnings in docker run.sh [\#12377](https://github.com/netdata/netdata/pull/12377) ([ilyam8](https://github.com/ilyam8))
 - Fix version handling issues in release workflow. [\#12375](https://github.com/netdata/netdata/pull/12375) ([Ferroin](https://github.com/Ferroin))
 - Update Agent version in the Swagger API [\#12374](https://github.com/netdata/netdata/pull/12374) ([tkatsoulas](https://github.com/tkatsoulas))
-- Fix handling of checks for newer updater script on update. [\#12367](https://github.com/netdata/netdata/pull/12367) ([Ferroin](https://github.com/Ferroin))
-- configure.ac: Unconditionally link against libatomic [\#12366](https://github.com/netdata/netdata/pull/12366) ([AlexGhiti](https://github.com/AlexGhiti))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
