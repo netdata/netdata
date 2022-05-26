@@ -415,7 +415,7 @@ int aclk_send_otp_response(const char *agent_id, const unsigned char *response, 
     buffer_sprintf(url, "%s/node/%s/password", target->path, agent_id);
     buffer_sprintf(resp_json, "{\"response\":\"%s\"}", base64);
 
-    req.url = buffer_tostring(url);
+    req.url = (char *)buffer_tostring(url);
     req.payload = (char *)buffer_tostring(resp_json);
     req.payload_size = strlen(req.payload);
 
