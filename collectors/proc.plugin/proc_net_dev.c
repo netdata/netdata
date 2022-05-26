@@ -800,7 +800,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
         }
 
-        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex) {
+        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex && d->carrier) {
             char buffer[STATE_LENGTH_MAX + 1];
 
             if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
@@ -816,6 +816,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 else
                     d->duplex = 0;
             }
+        } else {
+            d->duplex = 0;
         }
 
         if(d->do_operstate != CONFIG_BOOLEAN_NO && d->filename_operstate) {
