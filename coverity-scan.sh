@@ -87,8 +87,8 @@ debugrun() {
 
 scanit() {
   progress "Scanning using coverity"
-  COVERITY_PATH=$(find /opt/ -maxdepth 1 -name 'cov*linux*')
-  export PATH=${PATH}:${INSTALL_DIR}/${COVERITY_PATH}/bin/
+  COVERITY_PATH=$(find "${INSTALL_DIR}" -maxdepth 1 -name 'cov*linux*')
+  export PATH=${PATH}:${COVERITY_PATH}/bin/
   covbuild="${COVERITY_BUILD_PATH}"
   [ -z "${covbuild}" ] && covbuild="$(which cov-build 2> /dev/null || command -v cov-build 2> /dev/null)"
 
@@ -147,8 +147,8 @@ installit() {
 
     run sudo tar -z -x -f "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz" || exit 1
     rm "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz"
-    COVERITY_PATH=$(find /opt/ -maxdepth 1 -name 'cov*linux*')
-    export PATH=${PATH}:${INSTALL_DIR}/${COVERITY_PATH}/bin/
+    COVERITY_PATH=$(find "${INSTALL_DIR}" -maxdepth 1 -name 'cov*linux*')
+    export PATH=${PATH}:${COVERITY_PATH}/bin/
   elif find . -name "*.tar.gz" > /dev/null 2>&1; then
     fatal "Downloaded coverity tool tarball does not appear to be the version we were expecting, exiting."
   else
