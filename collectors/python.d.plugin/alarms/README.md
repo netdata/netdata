@@ -53,6 +53,11 @@ local:
     CRITICAL: 2
   # set to true to include a chart with calculated alarm values over time
   collect_alarm_values: false
+  # define the type of chart for plotting status over time e.g. 'line' or 'stacked'
+  alarm_status_chart_type: 'line'
+  # a "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only
+  # alarms with "cpu" or "load" in alarm name. Default includes all.
+  alarm_contains_words: ''
 ```
 
 It will default to pulling all alarms at each time step from the Netdata rest api at `http://127.0.0.1:19999/api/v1/alarms?all`
