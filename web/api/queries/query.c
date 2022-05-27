@@ -601,28 +601,11 @@ static inline void do_dimension_fixedstep(
 #endif
 
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
-
         storage_number n;
-        calculated_number value;
-
-        if (unlikely(rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && now <= first_time_t)) {
+        if (unlikely(rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && now <= first_time_t))
             n = SN_EMPTY_SLOT;
-            value = NAN;
-        }
-        else {
-            // load the metric value
+        else
             n = next_metric(&handle, &db_now);
-
-            // and unpack it
-            if(likely(does_storage_number_exist(n))) {
-                if (options & RRDR_OPTION_ANOMALY_BIT)
-                    value = (n & SN_ANOMALY_BIT) ? 0.0 : 100.0;
-                else
-                    value = unpack_storage_number(n);
-            }
-            else
-                value = NAN;
-        }
 
         if(unlikely(db_now > before_wanted)) {
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -632,19 +615,19 @@ static inline void do_dimension_fixedstep(
         }
 
         for ( ; now <= db_now ; now += dt) {
-            if(likely(does_storage_number_exist(n))) {
+            calculated_number value = NAN;
 
+            if(likely(now >= db_now && does_storage_number_exist(n))) {
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(ENABLE_DBENGINE)
-                if(now >= db_now) {
-                    struct rrdeng_query_handle *rrd_handle = (struct rrdeng_query_handle *)handle.handle;
-                    if ((rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (now != rrd_handle->now))
-                        error(
-                            "INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld",
-                            rd->id,
-                            (long)rrd_handle->now,
-                            (long)now);
+                struct rrdeng_query_handle* rrd_handle = (struct rrdeng_query_handle*)handle.handle;
+                if ((rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (now != rrd_handle->now)) {
+                    error("INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld", rd->id, (long)rrd_handle->now, (long)now);
                 }
 #endif
+                if (options & RRDR_OPTION_ANOMALY_BIT)
+                    value = (n & SN_ANOMALY_BIT) ? 0.0 : 100.0;
+                else
+                    value = unpack_storage_number(n);
 
                 if(likely(value != 0.0))
                     values_in_group_non_zero++;
@@ -676,21 +659,21 @@ static inline void do_dimension_fixedstep(
                 // store the specific point options
                 *rrdr_value_options_ptr = group_value_flags;
 
-                // store the group value
-                calculated_number group_value = grouping_flush(r, rrdr_value_options_ptr);
-                r->v[rrdr_o_v_index] = group_value;
+                // store the value
+                value = grouping_flush(r, rrdr_value_options_ptr);
+                r->v[rrdr_o_v_index] = value;
 
                 if(likely(points_added || dim_id_in_rrdr)) {
                     // find the min/max across all dimensions
 
-                    if(unlikely(group_value < min)) min = group_value;
-                    if(unlikely(group_value > max)) max = group_value;
+                    if(unlikely(value < min)) min = value;
+                    if(unlikely(value > max)) max = value;
 
                 }
                 else {
                     // runs only when dim_id_in_rrdr == 0 && points_added == 0
                     // so, on the first point added for the query.
-                    min = max = group_value;
+                    min = max = value;
                 }
 
                 points_added++;
