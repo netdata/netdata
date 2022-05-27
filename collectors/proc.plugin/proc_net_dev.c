@@ -909,7 +909,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 }
 
                 if(d->filename_speed && d->chart_var_speed) {
-                    if(read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed)) {
+                    int ret = 0;
+
+                    if (d->carrier) {
+                        ret = read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed);
+                    } else {
+                        d->speed = 0;
+                    }
+
+                    if(ret) {
                         error("Cannot refresh interface %s speed by reading '%s'. Will not update its speed anymore.", d->name, d->filename_speed);
                         freez(d->filename_speed);
                         d->filename_speed = NULL;
