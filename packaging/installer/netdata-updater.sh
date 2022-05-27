@@ -772,7 +772,9 @@ update_binpkg() {
       # shellcheck disable=SC2086
       env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} ${repopkg} || fatal "Failed to update Netdata repository config." U000D
       # shellcheck disable=SC2086
-      env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata." U000E
+      if [ -n "${repo_subcmd}" ]; then
+        env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata." U000E
+      fi
     fi
   done
 
