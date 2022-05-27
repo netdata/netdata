@@ -28,8 +28,12 @@ static inline size_t natural_alignment(size_t size) {
 // any number of times, for any amount of memory.
 
 static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
-    if(unlikely(!OWA_NATURAL_PAGE_SIZE))
-        OWA_NATURAL_PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
+    if(unlikely(!OWA_NATURAL_PAGE_SIZE)) {
+        long int page_size = sysconf(_SC_PAGE_SIZE);
+        if (page_size == -1)
+            fatal("Cannot allocate onewayalloc buffer, sysconf failed.");
+        OWA_NATURAL_PAGE_SIZE = page_size;
+    }
 
     // our default page size
     size_t size = OWA_NATURAL_PAGE_SIZE;
