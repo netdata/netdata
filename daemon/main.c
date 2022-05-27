@@ -59,13 +59,13 @@ void netdata_cleanup_and_exit(int ret) {
         // free the database
         info("EXIT: freeing database memory...");
         for (STORAGE_ENGINE* eng = storage_engine_foreach_init(); eng; eng = storage_engine_foreach_next(eng)) {
-            if (eng->context && eng->api.engine_ops.exit)
+            if (eng->context)
                 eng->api.engine_ops.exit(eng->context);
         }
 
         rrdhost_free_all();
         for (STORAGE_ENGINE* eng = storage_engine_foreach_init(); eng; eng = storage_engine_foreach_next(eng)) {
-            if (eng->context && eng->api.engine_ops.exit) {
+            if (eng->context) {
                 eng->api.engine_ops.destroy(eng->context);
                 eng->context = NULL;
             }

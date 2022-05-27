@@ -710,13 +710,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     }
 
     for (STORAGE_ENGINE* eng = storage_engine_foreach_init(); eng; eng = storage_engine_foreach_next(eng)) {
-        if (eng->api.engine_ops.create) {
-            STORAGE_ENGINE_INSTANCE* ret = storage_engine_new(eng, localhost);
-            if (!ret) {
-                error(
-                    "Host '%s' with machine guid '%s' failed to initialize multi-host storage engine instance at '%s'.",
-                    localhost->hostname, localhost->machine_guid, localhost->cache_dir);
-            }
+        STORAGE_ENGINE_INSTANCE* ret = storage_engine_new(eng, localhost);
+        if (!ret) {
+            error(
+                "Host '%s' with machine guid '%s' failed to initialize multi-host storage engine instance at '%s'.",
+                localhost->hostname, localhost->machine_guid, localhost->cache_dir);
         }
     }
 
@@ -901,7 +899,7 @@ void rrdhost_free(RRDHOST *host) {
     health_alarm_log_free(host);
 
     if (host->rrdeng_ctx != eng->context) {
-        if (eng && eng->api.engine_ops.destroy)
+        if (eng)
             eng->api.engine_ops.destroy(host->rrdeng_ctx);
         host->rrdeng_ctx = NULL;
     }
