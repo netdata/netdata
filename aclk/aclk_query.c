@@ -112,7 +112,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     now_realtime_timeval(&w->tv_ready);
 
     if (query->timeout) {
-        double in_queue = (int)dt_usec(&w->tv_in, &w->tv_ready) / 1000;
+        double in_queue = ((int) dt_usec(&w->tv_in, &w->tv_ready)) / 1000.0;
         if (in_queue > query->timeout) {
             log_access("QUERY CANCELED: QUEUE TIME EXCEEDED %0.2f ms (LIMIT %d ms)", in_queue, query->timeout);
             retval = 1;
