@@ -9,16 +9,11 @@ BUILDARCH="${1}"
 
 set -e
 
-case ${BUILDARCH} in
-  x86_64) platform=linux/amd64 ;;
-  armv7l) platform=linux/arm/v7 ;;
-  aarch64) platform=linux/arm64/v8 ;;
-  ppc64le) platform=linux/ppc64le ;;
-  *)
-    echo "Unknown target architecture '${BUILDARCH}'."
+platform="$("$(dirname "${0}")/uname2platform.sh" "${BUILDARCH}")"
+
+if [ -z "${platform}" ]; then
     exit 1
-    ;;
-esac
+fi
 
 DOCKER_IMAGE_NAME="netdata/static-builder"
 
@@ -27,18 +22,23 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ "$(uname -m)" = 'x86_64' ] && [ -z "
 fi
 
 if docker inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
-    docker image rm "${DOCKER_IMAGE_NAME}" || exit 1
+    img_platform="$(docker image inspect netdata/static-builder --format '{{.Os}}/{{.Architecture}}/{{.Variant}}')"
+    if [ "${img_platform%'/'}" != "${platform}" ]; then
+        docker image rm "${DOCKER_IMAGE_NAME}" || exit 1
+    fi
 fi
 
-docker pull --platform "${platform}" "${DOCKER_IMAGE_NAME}"
+if ! docker inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
+    docker pull --platform "${platform}" "${DOCKER_IMAGE_NAME}"
+fi
 
 # Run the build script inside the container
 if [ -t 1 ]; then
-  run docker run -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
+  run docker run --rm -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
     "${DOCKER_IMAGE_NAME}" \
     /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 else
-  run docker run -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/netdata:rw \
+  run docker run --rm -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/netdata:rw \
     -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" "${DOCKER_IMAGE_NAME}" \
     /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 fi
