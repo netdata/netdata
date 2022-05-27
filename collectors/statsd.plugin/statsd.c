@@ -699,9 +699,9 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
                 m->dictionary.base = t;
                 m->dictionary.unique++;
             }
+            t->count++;
         }
 
-        t->count++;
         m->events++;
         m->count++;
     }
@@ -818,7 +818,7 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             statsd_parse_field_trim(tagkey, tagkey_end);
             statsd_parse_field_trim(tagvalue, tagvalue_end);
 
-            if(tagkey && tagkey && tagvalue && *tagvalue) {
+            if(tagvalue && *tagkey && *tagvalue) {
                 if (!m->units[0] && strcmp(tagkey, "units") == 0)
                     strncpyz(m->units, tagvalue, STATSD_MAX_UNITS_LENGTH);
 
@@ -1590,14 +1590,14 @@ static inline void statsd_readdir(const char *user_path, const char *stock_path,
 // extract chart type and chart id from metric name
 static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, char *id, char *context, const char *metrictype, size_t len) {
     char *s;
-
+    info("DES Haha");
     snprintfz(type, len, "%s_%s", STATSD_CHART_PREFIX, m->name);
-    if(sizeof(STATSD_CHART_PREFIX) + 2 < len)
+    if(sizeof(STATSD_CHART_PREFIX) + 2 < len) {
         for(s = &type[sizeof(STATSD_CHART_PREFIX) + 2]; *s ;s++)
-            if(unlikely(*s == '.' || *s == '_')) break;
-
-    if(*s == '.' || *s == '_') {
-        *s++ = '\0';
+            if(unlikely(*s == '.' || *s == '_')) {
+                *s++ = '\0';
+                break;
+            }
         snprintfz(id, len, "%s_%s", s, metrictype);
     }
     else {
