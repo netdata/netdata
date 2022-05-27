@@ -9,164 +9,6 @@
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
-struct dictionary_singleton {
-    char *key;
-    char *result;
-};
-
-static int json_extract_singleton(JSON_ENTRY *e)
-{
-    struct dictionary_singleton *data = e->callback_data;
-
-    switch (e->type) {
-        case JSON_OBJECT:
-        case JSON_ARRAY:
-            break;
-        case JSON_STRING:
-            if (!strcmp(e->name, data->key)) {
-                data->result = strdupz(e->data.string);
-                break;
-            }
-            break;
-        case JSON_NUMBER:
-        case JSON_BOOLEAN:
-        case JSON_NULL:
-            break;
-    }
-    return 0;
-}
-
-// Base-64 decoder.
-// Note: This is non-validating, invalid input will be decoded without an error.
-//       Challenges are packed into json strings so we don't skip newlines.
-//       Size errors (i.e. invalid input size or insufficient output space) are caught.
-static size_t base64_decode(unsigned char *input, size_t input_size, unsigned char *output, size_t output_size)
-{
-    static char lookup[256];
-    static int first_time=1;
-    if (first_time)
-    {
-        first_time = 0;
-        for(int i=0; i<256; i++)
-            lookup[i] = -1;
-        for(int i='A'; i<='Z'; i++)
-            lookup[i] = i-'A';
-        for(int i='a'; i<='z'; i++)
-            lookup[i] = i-'a' + 26;
-        for(int i='0'; i<='9'; i++)
-            lookup[i] = i-'0' + 52;
-        lookup['+'] = 62;
-        lookup['/'] = 63;
-    }
-    if ((input_size & 3) != 0)
-    {
-        error("Can't decode base-64 input length %zu", input_size);
-        return 0;
-    }
-    size_t unpadded_size = (input_size/4) * 3;
-    if ( unpadded_size > output_size )
-    {
-        error("Output buffer size %zu is too small to decode %zu into", output_size, input_size);
-        return 0;
-    }
-    // Don't check padding within full quantums
-    for (size_t i = 0 ; i < input_size-4 ; i+=4 )
-    {
-        uint32_t value = (lookup[input[0]] << 18) + (lookup[input[1]] << 12) + (lookup[input[2]] << 6) + lookup[input[3]];
-        output[0] = value >> 16;
-        output[1] = value >> 8;
-        output[2] = value;
-        //error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
-        output += 3;
-        input += 4;
-    }
-    // Handle padding only in last quantum
-    if (input[2] == '=') {
-        uint32_t value = (lookup[input[0]] << 6) + lookup[input[1]];
-        output[0] = value >> 4;
-        //error("Decoded %c %c %c %c -> %02x", input[0], input[1], input[2], input[3], output[0]);
-        return unpadded_size-2;
-    }
-    else if (input[3] == '=') {
-        uint32_t value = (lookup[input[0]] << 12) + (lookup[input[1]] << 6) + lookup[input[2]];
-        output[0] = value >> 10;
-        output[1] = value >> 2;
-        //error("Decoded %c %c %c %c -> %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1]);
-        return unpadded_size-1;
-    }
-    else
-    {
-        uint32_t value = (input[0] << 18) + (input[1] << 12) + (input[2]<<6) + input[3];
-        output[0] = value >> 16;
-        output[1] = value >> 8;
-        output[2] = value;
-        //error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
-        return unpadded_size;
-    }
-}
-
-static size_t base64_encode(unsigned char *input, size_t input_size, char *output, size_t output_size)
-{
-    uint32_t value;
-    static char lookup[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                           "abcdefghijklmnopqrstuvwxyz"
-                           "0123456789+/";
-    if ((input_size/3+1)*4 >= output_size)
-    {
-        error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input", output_size, input_size);
-        return 0;
-    }
-    size_t count = 0;
-    while (input_size>3)
-    {
-        value = ((input[0] << 16) + (input[1] << 8) + input[2]) & 0xffffff;
-        output[0] = lookup[value >> 18];
-        output[1] = lookup[(value >> 12) & 0x3f];
-        output[2] = lookup[(value >> 6) & 0x3f];
-        output[3] = lookup[value & 0x3f];
-        //error("Base-64 encode (%04x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]);
-        output += 4;
-        input += 3;
-        input_size -= 3;
-        count += 4;
-    }
-    switch (input_size)
-    {
-        case 2:
-            value = (input[0] << 10) + (input[1] << 2);
-            output[0] = lookup[(value >> 12) & 0x3f];
-            output[1] = lookup[(value >> 6) & 0x3f];
-            output[2] = lookup[value & 0x3f];
-            output[3] = '=';
-            //error("Base-64 encode (%06x) -> %c %c %c %c\n", (value>>2)&0xffff, output[0], output[1], output[2], output[3]); 
-            count += 4;
-            break;
-        case 1:
-            value = input[0] << 4;
-            output[0] = lookup[(value >> 6) & 0x3f];
-            output[1] = lookup[value & 0x3f];
-            output[2] = '=';
-            output[3] = '=';
-            //error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
-            count += 4;
-            break;
-        case 0:
-            break;
-    }
-    return count;
-}
-
-static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, unsigned char *decrypted)
-{
-    int  result = RSA_private_decrypt( data_len, enc_data, decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
-    if (result == -1) {
-        char err[512];
-        ERR_error_string_n(ERR_get_error(), err, sizeof(err));
-        error("Decryption of the challenge failed: %s", err);
-    }
-    return result;
-}
-
 static int aclk_https_request(https_req_t *request, https_req_response_t *response) {
     int rc;
     // wrapper for ACLK only which loads ACLK specific proxy settings
@@ -426,112 +268,242 @@ exit:
 }
 #endif
 
-#define OTP_URL_PREFIX "/api/v1/auth/node/"
-int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target) {
-    // TODO this fnc will be rewritten and simplified in following PRs
-    // still carries lot of baggage from ACLK Legacy
-    int rc = 1;
-    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
+{
+	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
 
+	if (ctx != NULL) {
+		memset(ctx, 0, sizeof(*ctx));
+	}
+	return ctx;
+}
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+	return;
+}
+#endif
+
+#define CHALLENGE_LEN 256
+#define CHALLENGE_LEN_BASE64 344
+inline static int base64_decode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
+{
+    unsigned char remaining_data[CHALLENGE_LEN];
+    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
+    EVP_DecodeInit(ctx);
+    EVP_DecodeUpdate(ctx, out, outl, in, in_len);
+    int remainder = 0;
+    EVP_DecodeFinal(ctx, remaining_data, &remainder);
+    EVP_ENCODE_CTX_free(ctx);
+    if (remainder) {
+        error("Unexpected data at EVP_DecodeFinal");
+        return 1;
+    }
+    return 0;
+}
+
+inline static int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
+{
+    int len;
+    unsigned char *str = out;
+    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
+    EVP_EncodeInit(ctx);
+    EVP_EncodeUpdate(ctx, str, outl, in, in_len);
+    str += *outl;
+    EVP_EncodeFinal(ctx, str, &len);
+    *outl += len;
+    // if we ever expect longer output than what OpenSSL would pack into single line
+    // we would have to skip the endlines, until then we can just cut the string short
+    str = (unsigned char*)strchr((char*)out, '\n');
+    if (str)
+        *str = 0;
+    EVP_ENCODE_CTX_free(ctx);
+    return 0;
+}
+
+#define OTP_URL_PREFIX "/api/v1/auth/node/"
+int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **challenge, int *challenge_bytes)
+{
+    int rc = 1;
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
 
-    char *agent_id = is_agent_claimed();
-    if (agent_id == NULL)
-    {
-        error("Agent was not claimed - cannot perform challenge/response");
-        goto cleanup;
-    }
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
 
-    // GET Challenge
     req.host = target->host;
     req.port = target->port;
     buffer_sprintf(url, "%s/node/%s/challenge", target->path, agent_id);
-    req.url = url->buffer;
+    req.url = (char *)buffer_tostring(url);
 
     if (aclk_https_request(&req, &resp)) {
         error ("ACLK_OTP Challenge failed");
-        goto cleanup;
+        buffer_free(url);
+        return 1;
     }
     if (resp.http_code != 200) {
         error ("ACLK_OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
+        buffer_free(url);
         if (resp.payload_size)
             aclk_parse_otp_error(resp.payload);
         goto cleanup_resp;
     }
+    buffer_free(url);
+
     info ("ACLK_OTP Got Challenge from Cloud");
 
-    struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
-
-    if (json_parse(resp.payload, &challenge, json_extract_singleton) != JSON_OK)
-    {
-        freez(challenge.result);
-        error("Could not parse the the challenge");
+    json_object *json = json_tokener_parse(resp.payload);
+    if (!json) {
+        error ("Couldn't parse HTTP GET challenge payload");
         goto cleanup_resp;
     }
-    if (challenge.result == NULL) {
-        error("Could not retrieve challenge JSON key from challenge response");
-        goto cleanup_resp;
+    json_object *challenge_json;
+    if (!json_object_object_get_ex(json, "challenge", &challenge_json)) {
+        error ("No key named \"challenge\" in the returned JSON");
+        goto cleanup_json;
+    }
+    if (!json_object_is_type(challenge_json, json_type_string)) {
+        error ("\"challenge\" is not a string JSON type");
+        goto cleanup_json;
+    }
+    const char *challenge_base64;
+    if (!(challenge_base64 = json_object_get_string(challenge_json))) {
+        error("Failed to extract challenge from JSON object");
+        goto cleanup_json;
+    }
+    if (strlen(challenge_base64) != CHALLENGE_LEN_BASE64) {
+        error("Received Challenge has unexpected length of %zu (expected %d)", strlen(challenge_base64), CHALLENGE_LEN_BASE64);
+        goto cleanup_json;
     }
 
-    // Decrypt the Challenge and Calculate Response
-    size_t challenge_len = strlen(challenge.result);
-    unsigned char decoded[512];
-    size_t decoded_len = base64_decode((unsigned char*)challenge.result, challenge_len, decoded, sizeof(decoded));
-    freez(challenge.result);
+    *challenge = mallocz((CHALLENGE_LEN_BASE64 / 4) * 3);
+    base64_decode_helper(*challenge, challenge_bytes, (const unsigned char*)challenge_base64, strlen(challenge_base64));
+    if (*challenge_bytes != CHALLENGE_LEN) {
+        error("Unexpected challenge length of %d instead of %d", *challenge_bytes, CHALLENGE_LEN);
+        freez(challenge);
+        *challenge = NULL;
+        goto cleanup_json;
+    }
+    rc = 0;
 
-    unsigned char plaintext[4096]={};
-    int decrypted_length = private_decrypt(p_key, decoded, decoded_len, plaintext);
-    char encoded[512];
-    size_t encoded_len = base64_encode(plaintext, decrypted_length, encoded, sizeof(encoded));
-    encoded[encoded_len] = 0;
-    debug(D_ACLK, "Encoded len=%zu Decryption len=%d: '%s'", encoded_len, decrypted_length, encoded);
-
-    char response_json[4096]={};
-    sprintf(response_json, "{\"response\":\"%s\"}", encoded);
-    debug(D_ACLK, "Password phase: %s",response_json);
-
+cleanup_json:
+    json_object_put(json);
+cleanup_resp:
     https_req_response_free(&resp);
-    https_req_response_init(&resp);
+    return rc;
+}
 
-    // POST password
+int aclk_send_otp_response(const char *agent_id, const unsigned char *response, int response_bytes, url_t *target, struct auth_data *mqtt_auth)
+{
+    int len;
+    int rc = 1;
+    https_req_t req = HTTPS_REQ_T_INITIALIZER;
+    https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
+
+    req.host = target->host;
+    req.port = target->port;
     req.request_type = HTTP_REQ_POST;
-    buffer_flush(url);
+
+    unsigned char base64[CHALLENGE_LEN_BASE64 + 1];
+    memset(base64, 0, CHALLENGE_LEN_BASE64 + 1);
+
+    base64_encode_helper(base64, &len, response, response_bytes);
+
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+    BUFFER *resp_json = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+
     buffer_sprintf(url, "%s/node/%s/password", target->path, agent_id);
-    req.url = url->buffer;
-    req.payload = response_json;
-    req.payload_size = strlen(response_json);
+    buffer_sprintf(resp_json, "{\"response\":\"%s\"}", base64);
+
+    req.url = (char *)buffer_tostring(url);
+    req.payload = (char *)buffer_tostring(resp_json);
+    req.payload_size = strlen(req.payload);
 
     if (aclk_https_request(&req, &resp)) {
         error ("ACLK_OTP Password error trying to post result to password");
-        goto cleanup;
+        goto cleanup_buffers;
     }
     if (resp.http_code != 201) {
         error ("ACLK_OTP Password HTTP code not 201 Created (got %d)", resp.http_code);
         if (resp.payload_size)
             aclk_parse_otp_error(resp.payload);
-        goto cleanup_resp;
+        goto cleanup_response;
     }
     info ("ACLK_OTP Got Password from Cloud");
 
-    struct auth_data data = { .client_id = NULL, .passwd = NULL, .username = NULL };
-    
-    if (parse_passwd_response(resp.payload, &data)){
+    if (parse_passwd_response(resp.payload, mqtt_auth)){
         error("Error parsing response of password endpoint");
-        goto cleanup_resp;
+        goto cleanup_response;
+    }
+
+    rc = 0;
+
+cleanup_response:
+    https_req_response_free(&resp);
+cleanup_buffers:
+    buffer_free(resp_json);
+    buffer_free(url);
+    return rc;
+}
+
+static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, unsigned char **decrypted)
+{
+    *decrypted = mallocz(RSA_size(p_key));
+    int result = RSA_private_decrypt(data_len, enc_data, *decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
+    if (result == -1) {
+        char err[512];
+        ERR_error_string_n(ERR_get_error(), err, sizeof(err));
+        error("Decryption of the challenge failed: %s", err);
+    }
+    return result;
+}
+
+int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
+{
+    unsigned char *challenge;
+    int challenge_bytes;
+
+    char *agent_id = is_agent_claimed();
+    if (agent_id == NULL) {
+        error("Agent was not claimed - cannot perform challenge/response");
+        return 1;
+    }
+
+    // Get Challenge
+    if (aclk_get_otp_challenge(target, agent_id, &challenge, &challenge_bytes)) {
+        error("Error getting challenge");
+        freez(agent_id);
+        return 1;
+    }
+
+    // Decrypt Challenge / Get response
+    unsigned char *response_plaintext;
+    int response_plaintext_bytes = private_decrypt(p_key, challenge, challenge_bytes, &response_plaintext);
+    if (response_plaintext_bytes < 0) {
+        error ("Couldn't decrypt the challenge received");
+        freez(response_plaintext);
+        freez(challenge);
+        freez(agent_id);
+        return 1;
+    }
+    freez(challenge);
+
+    // Encode and Send Challenge
+    struct auth_data data = { .client_id = NULL, .passwd = NULL, .username = NULL };
+    if (aclk_send_otp_response(agent_id, response_plaintext, response_plaintext_bytes, target, &data)) {
+        error("Error getting response");
+        freez(response_plaintext);
+        freez(agent_id);
+        return 1;
     }
 
     *mqtt_pass = data.passwd;
     *mqtt_usr = data.username;
     *mqtt_id = data.client_id;
 
-    rc = 0;
-cleanup_resp:
-    https_req_response_free(&resp);
-cleanup:
+    freez(response_plaintext);
     freez(agent_id);
-    buffer_free(url);
-    return rc;
+    return 0;
 }
 
 #define JSON_KEY_ENC "encoding"
