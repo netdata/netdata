@@ -540,25 +540,18 @@ static inline void do_dimension_fixedstep(
         , time_t before_wanted
         , uint32_t options
 ){
-#ifdef NETDATA_INTERNAL_CHECKS
-    RRDSET *st = r->st;
-#endif
-
-    time_t
-            now = after_wanted,
+    time_t  now = after_wanted,
             dt = r->update_every / r->group, /* usually is st->update_every */
             max_date = 0,
             min_date = 0;
 
-    long
-            group_size = r->group,
+    long    group_size = r->group,
             points_added = 0,
             values_in_group = 0,
             values_in_group_non_zero = 0,
             rrdr_line = -1;
 
-    RRDR_VALUE_FLAGS
-            group_value_flags = RRDR_VALUE_NOTHING;
+    RRDR_VALUE_FLAGS group_value_flags = RRDR_VALUE_NOTHING;
 
     struct rrddim_query_handle handle;
 
@@ -595,8 +588,8 @@ static inline void do_dimension_fixedstep(
 #ifdef NETDATA_INTERNAL_CHECKS
         struct mem_query_handle* mem_handle = (struct mem_query_handle*)handle.handle;
         if ((rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) &&
-            (rrdset_time2slot(st, now) != (long unsigned)(mem_handle->slot))) {
-            error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)mem_handle->slot, rrdset_time2slot(st, now));
+            (rrdset_time2slot(r->st, now) != (long unsigned)(mem_handle->slot))) {
+            error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)mem_handle->slot, rrdset_time2slot(r->st, now));
         }
 #endif
 
@@ -612,6 +605,7 @@ static inline void do_dimension_fixedstep(
         else {
             // load the metric value
             n = next_metric(&handle, &db_now);
+            db_points_read++;
 
             // and unpack it
             if(likely(does_storage_number_exist(n))) {
@@ -631,7 +625,10 @@ static inline void do_dimension_fixedstep(
             break;
         }
 
-        for ( ; now <= db_now ; now += dt) {
+        // this loop exists only to fill nulls
+        // so, if there is a value already, we use it for the first iteration
+        // but the following iterations will just fill nulls to the destination
+        for ( ; now <= db_now ; now += dt, value = NAN, n = SN_EMPTY_SLOT) {
             if(likely(does_storage_number_exist(n))) {
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(ENABLE_DBENGINE)
@@ -657,7 +654,6 @@ static inline void do_dimension_fixedstep(
 
             // add this value for grouping
             values_in_group++;
-            db_points_read++;
 
             if(unlikely(values_in_group == group_size)) {
                 rrdr_line = rrdr_line_init(r, now, rrdr_line);
