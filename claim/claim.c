@@ -134,6 +134,10 @@ void load_claiming_state(void)
     netdata_cloud_setting = 0;
 #else
     uuid_t uuid;
+
+    // Propagate into aclk and registry. Be kind of atomic...
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+
     rrdhost_aclk_state_lock(localhost);
     if (localhost->aclk_state.claimed_id) {
         if (aclk_connected)
@@ -147,9 +151,6 @@ void load_claiming_state(void)
         aclk_kill_link = 1;
     }
     aclk_disable_runtime = 0;
-
-    // Propagate into aclk and registry. Be kind of atomic...
-    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/cloud.d/claimed_id", netdata_configured_varlib_dir);
