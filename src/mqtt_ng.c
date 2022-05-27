@@ -565,8 +565,10 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
     if (client == NULL)
         return NULL;
 
-    if (transaction_buffer_init(&client->main_buffer, HEADER_BUFFER_SIZE))
+    if (transaction_buffer_init(&client->main_buffer, HEADER_BUFFER_SIZE)) {
+        free(client);
         return NULL;
+    }
 
     // TODO just embed the struct into mqtt_ng_client
     client->parser.received_data = settings->data_in;
@@ -1178,7 +1180,7 @@ int mqtt_ng_ping(struct mqtt_ng_client *client)
 
 static int vbi_parser_parse(struct mqtt_vbi_parser_ctx *ctx, rbuf_t data, mqtt_wss_log_ctx_t log)
 {
-    if (ctx->bytes > MQTT_VBI_MAXBYTES) {
+    if (ctx->bytes > MQTT_VBI_MAXBYTES - 1) {
         mws_error(log, "MQTT Variable Byte Integer can't be longer than %d bytes", MQTT_VBI_MAXBYTES);
         return MQTT_NG_CLIENT_PROTOCOL_ERROR;
     }

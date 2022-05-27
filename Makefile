@@ -12,7 +12,7 @@
 # If not, see <https://www.gnu.org/licenses/>.
 
 CC = gcc -std=gnu99
-CFLAGS = -Wextra -Wall `pkg-config --cflags openssl` `pkg-config --cflags libcrypto` -ggdb
+CFLAGS = -Wextra -Wall `pkg-config --cflags openssl` `pkg-config --cflags libcrypto`
 BUILD_DIR = build
 
 # dir having our version of mqtt_pal.h must preceede dir of MQTT-C to override this hdr
@@ -45,7 +45,7 @@ libmqttwebsockets.a: $(BUILD_DIR)/mqtt_wss_client.o $(BUILD_DIR)/ws_client.o c-r
 	ar rcs libmqttwebsockets.a $(BUILD_DIR)/mqtt_wss_client.o $(BUILD_DIR)/ws_client.o c-rbuf/build/ringbuffer.o $(BUILD_DIR)/mqtt.o $(BUILD_DIR)/mqtt_wss_log.o $(BUILD_DIR)/mqtt_ng.o $(BUILD_DIR)/common_public.o
 
 test: $(BUILD_DIR)/test.o libmqttwebsockets.a
-	$(CC) -o test $(BUILD_DIR)/test.o libmqttwebsockets.a `pkg-config --libs openssl` -lpthread
+	$(CC) -o test $(BUILD_DIR)/test.o libmqttwebsockets.a `pkg-config --libs openssl` -lpthread $(CFLAGS)
 
 $(BUILD_DIR)/mqtt.o: MQTT-C/src/mqtt.c MQTT-C/include/mqtt.h src/include/mqtt_pal.h
 	$(CC) -o $(BUILD_DIR)/mqtt.o -c MQTT-C/src/mqtt.c $(CFLAGS) $(INCLUDES)
