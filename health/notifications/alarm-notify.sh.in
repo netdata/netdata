@@ -244,6 +244,7 @@ else
   total_crit_alarms="${26}"  # List of alarms in critical state
   classification="${27}"     # The class field from .conf files
   edit_command_line="${28}"  # The command to edit the alarm, with the line number
+  child_machine_guid="${29}" # If populated, the notification is sent for a child
 fi
 
 # -----------------------------------------------------------------------------
@@ -2361,7 +2362,11 @@ if [ ${GOTOCLOUD} -eq 0 ]; then
 else
     # Temporarily disable alarm redirection, as the cloud endpoint no longer exists. This functionality will be restored after discussion on #9487. For now, just lead to netdata.cloud
     # Re-allow alarm redirection, for alarms 2.0, new template
-  goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentId=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
+  if [ -z "${child_machine_guid}" ]; then
+      goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentId=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
+  else
+      goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentId=${NETDATA_REGISTRY_UNIQUE_ID}&childId=${child_machine_guid}&${redirect_params}"
+  fi
 fi
 
 # the severity of the alarm
