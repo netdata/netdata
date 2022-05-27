@@ -1590,7 +1590,6 @@ static inline void statsd_readdir(const char *user_path, const char *stock_path,
 // extract chart type and chart id from metric name
 static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, char *id, char *context, const char *metrictype, size_t len) {
     char *s;
-    info("DES Haha");
     snprintfz(type, len, "%s_%s", STATSD_CHART_PREFIX, m->name);
     if(sizeof(STATSD_CHART_PREFIX) + 2 < len) {
         for(s = &type[sizeof(STATSD_CHART_PREFIX) + 2]; *s ;s++)
