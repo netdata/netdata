@@ -6,10 +6,26 @@
 #include "engine/rrdengineapi.h"
 #endif
 
+/** Empty create op for engines not using a context */
+STORAGE_ENGINE_INSTANCE* create_op_null(STORAGE_ENGINE* engine, RRDHOST *host) {
+    (void)engine; (void)host;
+    return NULL;
+}
+
+/** Empty exit op for engines not using a context */
+void exit_op_null(STORAGE_ENGINE_INSTANCE* context) {
+    (void)context;
+}
+
+/** Empty destroy op for engines not using a context */
+void destroy_op_null(STORAGE_ENGINE_INSTANCE* context) {
+    (void)context;
+}
+
 #define engine_ops_null { \
-    .create = NULL, \
-    .exit = NULL, \
-    .destroy = NULL \
+    .create = create_op_null, \
+    .exit = exit_op_null, \
+    .destroy = destroy_op_null \
 }
 
 #define im_collect_ops { \
@@ -145,9 +161,7 @@ STORAGE_ENGINE_INSTANCE* storage_engine_new(STORAGE_ENGINE* eng, RRDHOST *host)
 {
     STORAGE_ENGINE_INSTANCE* instance = host->rrdeng_ctx;
     if (!instance && eng) {
-        if (eng->api.engine_ops.create) {
-            instance = eng->api.engine_ops.create(eng, host);
-        }
+        instance = eng->api.engine_ops.create(eng, host);
         if (instance) {
             instance->engine = eng;
         }
