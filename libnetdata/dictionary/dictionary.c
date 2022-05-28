@@ -148,7 +148,7 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
 
     // index it
     if(unlikely(avl_insert(&((dict)->values_index), (avl_t *)(nv)) != (avl_t *)nv))
-        error("dictionary: INTERNAL ERROR: duplicate insertion to dictionary.");
+        error("DICTIONARY: INTERNAL ERROR: duplicate insertion of key '%s' to dictionary.", name);
 
     DICTIONARY_STATS_ENTRIES_PLUS1(dict, sizeof(NAME_VALUE) + nv->name_len + nv->value_len);
 
@@ -182,7 +182,7 @@ static void dictionary_name_value_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
 DICTIONARY *dictionary_create(uint8_t flags) {
     debug(D_DICTIONARY, "Creating dictionary.");
 
-    DICT *dict = mallocz(sizeof(DICTIONARY));
+    DICT *dict = mallocz(sizeof(DICT));
     dict->flags = flags;
 
     if(!(flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
@@ -194,7 +194,7 @@ DICTIONARY *dictionary_create(uint8_t flags) {
 
     if(flags & DICTIONARY_FLAG_WITH_STATISTICS) {
         dict->stats = callocz(1, sizeof(struct dictionary_stats));
-        dict->stats->memory = sizeof(DICTIONARY) + sizeof(struct dictionary_stats) + (flags & DICTIONARY_FLAG_SINGLE_THREADED)?sizeof(netdata_rwlock_t):0;
+        dict->stats->memory = sizeof(DICT) + sizeof(struct dictionary_stats) + (flags & DICTIONARY_FLAG_SINGLE_THREADED)?sizeof(netdata_rwlock_t):0;
     }
     else
         dict->stats = NULL;
