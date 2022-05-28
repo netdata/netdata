@@ -7,12 +7,12 @@
 
 typedef void DICTIONARY;
 
-#define DICTIONARY_FLAG_NONE                    0x00000000
-#define DICTIONARY_FLAG_SINGLE_THREADED         0x00000001
-#define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x00000002
-#define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x00000004
-#define DICTIONARY_FLAG_WITH_STATISTICS         0x00000008
-#define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x00000010
+#define DICTIONARY_FLAG_NONE                    0x00
+#define DICTIONARY_FLAG_SINGLE_THREADED         0x01
+#define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x02
+#define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x04
+#define DICTIONARY_FLAG_WITH_STATISTICS         0x08
+#define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x10
 
 extern DICTIONARY *dictionary_create(uint8_t flags);
 extern void dictionary_destroy(DICTIONARY *dict);
@@ -25,5 +25,7 @@ extern int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(void *entry,
 extern int dictionary_walkthrough_with_name(DICTIONARY *dict, int (*callback)(char *name, void *entry, void *d), void *data);
 
 extern size_t dictionary_allocated_memory(DICTIONARY *dict);
+
+extern int dictionary_unittest(size_t entries);
 
 #endif /* NETDATA_DICTIONARY_H */

@@ -402,3 +402,69 @@ int dictionary_walkthrough_with_name(DICTIONARY *ptr, int (*callback)(char *name
 
     return ret;
 }
+
+// ----------------------------------------------------------------------------
+// unit test
+
+int verify_name_and_value_of_cloning_dictionary(char *name, void *value, void *data) {
+    (void)data;
+
+    int ret = 0;
+
+    if(name == value) {
+        fprintf(stderr, "ERROR: name and value should not use the same memory\n");
+        ret++;
+    }
+
+    if(strcmp(name, (char *)value) != 0) {
+        fprintf(stderr, "ERROR: expected '%s', got '%s'\n", name, (char *)value);
+        ret++;
+    }
+
+    return ret;
+}
+
+int dictionary_unittest(size_t entries) {
+    char buf[1024];
+
+    clocks_init();
+
+    usec_t started = now_realtime_usec();
+    DICTIONARY *d = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS);
+    fprintf(stderr, "Creating dictionary of %zu entries...\n", entries);
+    size_t i, errors = 0;
+    for(i = 0; i < entries ;i++) {
+        size_t len = snprintfz(buf, 1024, "string %zu", i);
+        if(len != strlen(buf)) fprintf(stderr, "Expected length %zu, got %zu\n", strlen(buf), len);
+
+        dictionary_set(d, buf, buf, len + 1);
+    }
+
+    usec_t checking = now_realtime_usec();
+
+    fprintf(stderr, "Checking index of %zu entries...\n", entries);
+    for(i = 0; i < entries ;i++) {
+        snprintfz(buf, 1024, "string %zu", i);
+        char *s = dictionary_get(d, buf);
+        if(strcmp(s, buf) != 0) {
+            fprintf(stderr, "ERROR: expected '%s', got '%s'\n", buf, s);
+            errors++;
+        }
+    }
+
+    usec_t walking = now_realtime_usec();
+
+    fprintf(stderr, "Walking %zu entries and checking name-value pairs...\n", entries);
+    errors += dictionary_walkthrough_with_name(d, verify_name_and_value_of_cloning_dictionary, NULL);
+
+    fprintf(stderr, "Created and checked %zu entries, found %zu errors - used %zu KB of memory\n", i, errors, dictionary_allocated_memory(d)/ 1024);
+
+    usec_t destroying = now_realtime_usec();
+    fprintf(stderr, "Destroying dictionary of %zu entries...\n", entries);
+    dictionary_destroy(d);
+
+    fprintf(stderr, "create %llu usec, check %llu usec, walk %llu usec, destroy %llu usec\n",
+            checking - started, walking - checking, destroying - walking, now_realtime_usec() - destroying);
+
+    return (int)errors;
+}
