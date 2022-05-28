@@ -272,7 +272,7 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 
     buffer_strcat(w->response.data, ",\n\t\"urls\": [");
     struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
-    dictionary_get_all(m->machine_urls, registry_json_machine_url_callback, &c);
+    dictionary_walkthrough(m->machine_urls, registry_json_machine_url_callback, &c);
     buffer_strcat(w->response.data, "\n\t]\n");
 
     registry_json_footer(w);
@@ -441,10 +441,10 @@ void registry_statistics(void) {
     }
     else rrdset_next(stm);
 
-    rrddim_set(stm, "persons",       registry.persons_memory + registry.persons_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
-    rrddim_set(stm, "machines",      registry.machines_memory + registry.machines_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
+    rrddim_set(stm, "persons",       registry.persons_memory + dictionary_allocated_memory(registry.persons));
+    rrddim_set(stm, "machines",      registry.machines_memory + dictionary_allocated_memory(registry.machines));
     rrddim_set(stm, "urls",          registry.urls_memory);
     rrddim_set(stm, "persons_urls",  registry.persons_urls_memory);
-    rrddim_set(stm, "machines_urls", registry.machines_urls_memory + registry.machines_count * sizeof(DICTIONARY) + registry.machines_urls_count * sizeof(NAME_VALUE));
+    rrddim_set(stm, "machines_urls", registry.machines_urls_memory);
     rrdset_done(stm);
 }

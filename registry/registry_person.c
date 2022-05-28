@@ -199,19 +199,6 @@ REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when) {
     return p;
 }
 
-void registry_person_del(REGISTRY_PERSON *p) {
-    debug(D_REGISTRY, "Registry: registry_person_del('%s'): creating dictionary of urls", p->guid);
-
-    while(p->person_urls.root)
-        registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls.root);
-
-    debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
-    dictionary_del(registry.persons, p->guid);
-
-    debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
-    freez(p);
-}
-
 // ----------------------------------------------------------------------------
 // LINKING OF OBJECTS
 
