@@ -915,23 +915,27 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
         netdata_mutex_lock(&host->receiver_lock);
         buffer_sprintf(
-            wb, "\t\t{ \"guid\": \"%s\", \"reachable\": %s, \"hops\": %d, \"claim_id\": ", host->machine_guid,
-            (host->receiver || host == localhost) ? "true" : "false", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+            wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\", \"reachable\": %s, \"hops\": %d"
+            , host->machine_guid
+            , host->hostname
+            , (host->receiver || host == localhost) ? "true" : "false"
+            , host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1
+            );
         netdata_mutex_unlock(&host->receiver_lock);
 
         rrdhost_aclk_state_lock(host);
         if (host->aclk_state.claimed_id)
-            buffer_sprintf(wb, "\"%s\", ", host->aclk_state.claimed_id);
+            buffer_sprintf(wb, ", \"claim_id\": \"%s\"", host->aclk_state.claimed_id);
         else
-            buffer_strcat(wb, "null, ");
+            buffer_strcat(wb, ", \"claim_id\": null");
         rrdhost_aclk_state_unlock(host);
 
         if (host->node_id) {
             char node_id_str[GUID_LEN + 1];
             uuid_unparse_lower(*host->node_id, node_id_str);
-            buffer_sprintf(wb, "\"node_id\": \"%s\" }", node_id_str);
+            buffer_sprintf(wb, ", \"node_id\": \"%s\" }", node_id_str);
         } else
-            buffer_strcat(wb, "\"node_id\": null }");
+            buffer_strcat(wb, ", \"node_id\": null }");
 
         count++;
     }
