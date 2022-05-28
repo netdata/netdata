@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Update dashboard to version v2.25.6. [\#13028](https://github.com/netdata/netdata/pull/13028) ([netdatabot](https://github.com/netdatabot))
+- prevent gap filling on dbengine gaps [\#13027](https://github.com/netdata/netdata/pull/13027) ([ktsaou](https://github.com/ktsaou))
+- Initialize a pointer and add a check for it [\#13023](https://github.com/netdata/netdata/pull/13023) ([vlvkobal](https://github.com/vlvkobal))
+- Fix coverity issue 378598 [\#13022](https://github.com/netdata/netdata/pull/13022) ([MrZammler](https://github.com/MrZammler))
+- fix COVERITY\_PATH added with INSTALL\_DIR into PATH [\#13014](https://github.com/netdata/netdata/pull/13014) ([maneamarius](https://github.com/maneamarius))
+- Only try to update repo metadata in updater script if needed. [\#13009](https://github.com/netdata/netdata/pull/13009) ([Ferroin](https://github.com/Ferroin))
 - Use printf instead of echo for printing collected warnings in kickstart.sh. [\#13002](https://github.com/netdata/netdata/pull/13002) ([Ferroin](https://github.com/Ferroin))
 - Update dashboard to version v2.25.4. [\#13000](https://github.com/netdata/netdata/pull/13000) ([netdatabot](https://github.com/netdatabot))
 - Run the /net/dev module of the proc plugin in a separate thread [\#12996](https://github.com/netdata/netdata/pull/12996) ([vlvkobal](https://github.com/vlvkobal))
@@ -24,6 +30,7 @@
 - query engine optimizations and cleanup [\#12978](https://github.com/netdata/netdata/pull/12978) ([ktsaou](https://github.com/ktsaou))
 - optimize poll\_events\(\) to spread the work over the threads more evenly [\#12975](https://github.com/netdata/netdata/pull/12975) ([ktsaou](https://github.com/ktsaou))
 - chore: check link local address before querying cloud instance metadata [\#12973](https://github.com/netdata/netdata/pull/12973) ([ilyam8](https://github.com/ilyam8))
+- Alarms py collector add filtering [\#12972](https://github.com/netdata/netdata/pull/12972) ([andrewm4894](https://github.com/andrewm4894))
 - Don't permanetly disable a destination because of denied access [\#12971](https://github.com/netdata/netdata/pull/12971) ([MrZammler](https://github.com/MrZammler))
 - modify code to resolve compile warning issue [\#12969](https://github.com/netdata/netdata/pull/12969) ([kklionz](https://github.com/kklionz))
 - Return rc-\>last\_update from alarms\_values api [\#12968](https://github.com/netdata/netdata/pull/12968) ([MrZammler](https://github.com/MrZammler))
@@ -177,6 +184,7 @@
 - Gotify notifications [\#12639](https://github.com/netdata/netdata/pull/12639) ([coffeegrind123](https://github.com/coffeegrind123))
 - Improve handling of release channel selection in kickstart.sh. [\#12635](https://github.com/netdata/netdata/pull/12635) ([Ferroin](https://github.com/Ferroin))
 - Fix Valgrind errors [\#12619](https://github.com/netdata/netdata/pull/12619) ([vlvkobal](https://github.com/vlvkobal))
+- Pass the child machine's guid to the goto\_url link [\#12609](https://github.com/netdata/netdata/pull/12609) ([MrZammler](https://github.com/MrZammler))
 - Implements new capability fields in aclk\_schemas [\#12602](https://github.com/netdata/netdata/pull/12602) ([underhood](https://github.com/underhood))
 - Metric correlations [\#12582](https://github.com/netdata/netdata/pull/12582) ([MrZammler](https://github.com/MrZammler))
 - Reduce alert events sent to the cloud. [\#12544](https://github.com/netdata/netdata/pull/12544) ([MrZammler](https://github.com/MrZammler))
@@ -316,13 +324,6 @@
 - Dont check host health enabled if host is null [\#12392](https://github.com/netdata/netdata/pull/12392) ([MrZammler](https://github.com/MrZammler))
 - Update build/m4/ax\_pthread.m4 [\#12390](https://github.com/netdata/netdata/pull/12390) ([vkalintiris](https://github.com/vkalintiris))
 - Delay removed event for 60 seconds after the chart's last collected time [\#12388](https://github.com/netdata/netdata/pull/12388) ([MrZammler](https://github.com/MrZammler))
-- Remove unecessary error report for proc and sys files [\#12385](https://github.com/netdata/netdata/pull/12385) ([thiagoftsm](https://github.com/thiagoftsm))
-- feat\(statsd.plugin\): add Asterisk configuration file with synthetic charts [\#12381](https://github.com/netdata/netdata/pull/12381) ([ilyam8](https://github.com/ilyam8))
-- fix: handle double host prefix when Netdata running in a podman container [\#12380](https://github.com/netdata/netdata/pull/12380) ([ilyam8](https://github.com/ilyam8))
-- fix\(ebpf.plugin\): remove pid file on exit [\#12379](https://github.com/netdata/netdata/pull/12379) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix: shellcheck warnings in docker run.sh [\#12377](https://github.com/netdata/netdata/pull/12377) ([ilyam8](https://github.com/ilyam8))
-- Fix version handling issues in release workflow. [\#12375](https://github.com/netdata/netdata/pull/12375) ([Ferroin](https://github.com/Ferroin))
-- Update Agent version in the Swagger API [\#12374](https://github.com/netdata/netdata/pull/12374) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
