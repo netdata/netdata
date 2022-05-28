@@ -169,30 +169,10 @@ static inline NAME_VALUE *dictionary_index_get_unsafe(DICT *dict, const char *na
         return NULL;
 }
 
-static inline NAME_VALUE *dictionary_index_get_first_unsafe(DICT *dict) {
-    if(unlikely(!dict->JudyArray)) return NULL;
-
-    char Index[dict->JudyArrayMaxNameLen]; Index[0] = '\0';
-
-    JError_t J_Error;
-    Pvoid_t *Rc;
-
-    Rc = JudySLFirst(dict->JudyArray, (uint8_t *)&Index, &J_Error);
-    if(unlikely(Rc == PJERR)) {
-        error("DICTIONARY: Cannot find the first entry of JudySL, JU_ERRNO_* == %u, ID == %d",
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
-        return NULL;
-    }
-    else if(likely(Rc))
-        return (NAME_VALUE *)*Rc;
-    else
-        return NULL;
-}
-
 static inline int dictionary_index_walkthrough_unsafe(DICT *dict, int (*callback)(const char *name, void *value, void *data), void *data) {
     if(unlikely(!dict->JudyArray)) return 0;
 
-    char Index[dict->JudyArrayMaxNameLen]; Index[0] = '\0';
+    char Index[dict->JudyArrayMaxNameLen + 1]; Index[0] = '\0';
 
     JError_t J_Error;
     Pvoid_t *Rc;
@@ -220,6 +200,34 @@ static inline int dictionary_index_walkthrough_unsafe(DICT *dict, int (*callback
         }
     }
     return ret;
+}
+
+static inline int dictionary_index_helper_to_delete_all_unsafe(DICT *dict, void (*callback)(DICT *dict, NAME_VALUE *nv)) {
+    if(unlikely(!dict->JudyArray)) return 0;
+
+    char Index[dict->JudyArrayMaxNameLen + 1];
+
+    JError_t J_Error;
+    Pvoid_t *Rc;
+
+    int deleted = 0;
+    while(1) {
+        Index[0] = '\0';
+        Rc = JudySLFirst(dict->JudyArray, (uint8_t *)&Index, &J_Error);
+        if (unlikely(Rc == PJERR)) {
+            error("DICTIONARY: Cannot find the first entry of JudySL, JU_ERRNO_* == %u, ID == %d",
+                  JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+            return 0;
+        }
+
+        if(!Rc || !*Rc) break;
+
+        NAME_VALUE *nv = *Rc;
+        callback(dict, nv);
+        deleted++;
+    }
+
+    return deleted;
 }
 
 
@@ -317,9 +325,8 @@ void dictionary_destroy(DICTIONARY *ptr) {
         dict->stats = NULL;
     }
 
-    NAME_VALUE *nv;
-    while((nv = dictionary_index_get_first_unsafe(dict)))
-        dictionary_name_value_destroy_unsafe(dict, nv);
+    int deleted = dictionary_index_helper_to_delete_all_unsafe(dict, dictionary_name_value_destroy_unsafe);
+    fprintf(stderr, "Deleted %d entries\n", deleted);
 
     dictionary_index_destroy_unsafe(dict);
 
