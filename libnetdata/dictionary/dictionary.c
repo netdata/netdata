@@ -21,8 +21,8 @@ typedef struct name_value {
 } NAME_VALUE;
 
 typedef struct dictionary {
-    Pvoid_t JudyArray;
-    size_t JudyArrayMaxNameLen;
+    Pvoid_t JudySLArray;
+    size_t JudySLArrayMaxNameLen;
 
     uint8_t flags;
 
@@ -98,21 +98,21 @@ static inline void dictionary_unlock(DICT *dict) {
 // dictionary index
 
 static void dictionary_index_init_unsafe(DICT *dict) {
-    dict->JudyArray = NULL;
-    dict->JudyArrayMaxNameLen = 0;
+    dict->JudySLArray = NULL;
+    dict->JudySLArrayMaxNameLen = 0;
 }
 
 static void dictionary_index_destroy_unsafe(DICT *dict) {
-    if(unlikely(!dict->JudyArray)) return;
+    if(unlikely(!dict->JudySLArray)) return;
 
     JError_t J_Error;
-    Word_t ret = JudySLFreeArray(&dict->JudyArray, &J_Error);
+    Word_t ret = JudySLFreeArray(&dict->JudySLArray, &J_Error);
     if(unlikely(ret == (Word_t) JERR)) {
         error("DICTIONARY: Cannot destroy JudySL, JU_ERRNO_* == %u, ID == %d",
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
-    dict->JudyArray = NULL;
-    dict->JudyArrayMaxNameLen = 0;
+    dict->JudySLArray = NULL;
+    dict->JudySLArrayMaxNameLen = 0;
 }
 
 static inline void dictionary_index_insert_unsafe(DICT *dict, NAME_VALUE *nv) {
@@ -121,7 +121,7 @@ static inline void dictionary_index_insert_unsafe(DICT *dict, NAME_VALUE *nv) {
 
     const char *name = nv->name;
 
-    Rc = JudySLIns(&dict->JudyArray, (const uint8_t *)name, &J_Error);
+    Rc = JudySLIns(&dict->JudySLArray, (const uint8_t *)name, &J_Error);
     if(unlikely(Rc == PJERR)) {
         error("DICTIONARY: Cannot insert entry with name '%s' to JudySL, JU_ERRNO_* == %u, ID == %d", name,
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -130,17 +130,17 @@ static inline void dictionary_index_insert_unsafe(DICT *dict, NAME_VALUE *nv) {
         *Rc = nv;
 
         size_t name_len = (nv->name_len)?nv->name_len:strlen(name) + 1;
-        if(dict->JudyArrayMaxNameLen < name_len) dict->JudyArrayMaxNameLen = name_len;
+        if(dict->JudySLArrayMaxNameLen < name_len) dict->JudySLArrayMaxNameLen = name_len;
     }
 }
 
 static inline void dictionary_index_delete_unsafe(DICT *dict, const char *name) {
-    if(unlikely(!dict->JudyArray)) return;
+    if(unlikely(!dict->JudySLArray)) return;
 
     JError_t J_Error;
     int ret;
 
-    ret = JudySLDel(&dict->JudyArray, (const uint8_t *)name, &J_Error);
+    ret = JudySLDel(&dict->JudySLArray, (const uint8_t *)name, &J_Error);
     if(unlikely(ret == JERR)) {
         error("DICTIONARY: Cannot delete entry with name '%s' from JudySL, JU_ERRNO_* == %u, ID == %d", name,
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -152,12 +152,12 @@ static inline void dictionary_index_delete_unsafe(DICT *dict, const char *name) 
 }
 
 static inline NAME_VALUE *dictionary_index_get_unsafe(DICT *dict, const char *name) {
-    if(unlikely(!dict->JudyArray)) return NULL;
+    if(unlikely(!dict->JudySLArray)) return NULL;
 
     JError_t J_Error;
     Pvoid_t *Rc;
 
-    Rc = JudySLGet(dict->JudyArray, (const uint8_t *)name, &J_Error);
+    Rc = JudySLGet(dict->JudySLArray, (const uint8_t *)name, &J_Error);
     if(unlikely(Rc == PJERR)) {
         error("DICTIONARY: Cannot get entry with name '%s' to JudySL, JU_ERRNO_* == %u, ID == %d", name,
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -170,14 +170,14 @@ static inline NAME_VALUE *dictionary_index_get_unsafe(DICT *dict, const char *na
 }
 
 static inline int dictionary_index_walkthrough_unsafe(DICT *dict, int (*callback)(const char *name, void *value, void *data), void *data) {
-    if(unlikely(!dict->JudyArray)) return 0;
+    if(unlikely(!dict->JudySLArray)) return 0;
 
-    char Index[dict->JudyArrayMaxNameLen + 1]; Index[0] = '\0';
+    char Index[dict->JudySLArrayMaxNameLen + 1]; Index[0] = '\0';
 
     JError_t J_Error;
     Pvoid_t *Rc;
 
-    Rc = JudySLFirst(dict->JudyArray, (uint8_t *)&Index, &J_Error);
+    Rc = JudySLFirst(dict->JudySLArray, (uint8_t *)&Index, &J_Error);
     if(unlikely(Rc == PJERR)) {
         error("DICTIONARY: Cannot find the first entry of JudySL, JU_ERRNO_* == %u, ID == %d",
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -192,7 +192,7 @@ static inline int dictionary_index_walkthrough_unsafe(DICT *dict, int (*callback
 
         ret += r;
 
-        Rc = JudySLNext(dict->JudyArray, (uint8_t *)&Index, &J_Error);
+        Rc = JudySLNext(dict->JudySLArray, (uint8_t *)&Index, &J_Error);
         if(unlikely(Rc == PJERR)) {
             error("DICTIONARY: Cannot find next entry of JudySL, JU_ERRNO_* == %u, ID == %d",
                   JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -203,9 +203,9 @@ static inline int dictionary_index_walkthrough_unsafe(DICT *dict, int (*callback
 }
 
 static inline int dictionary_index_helper_to_delete_all_unsafe(DICT *dict, void (*callback)(DICT *dict, NAME_VALUE *nv)) {
-    if(unlikely(!dict->JudyArray)) return 0;
+    if(unlikely(!dict->JudySLArray)) return 0;
 
-    char Index[dict->JudyArrayMaxNameLen + 1];
+    char Index[dict->JudySLArrayMaxNameLen + 1];
 
     JError_t J_Error;
     Pvoid_t *Rc;
@@ -213,7 +213,7 @@ static inline int dictionary_index_helper_to_delete_all_unsafe(DICT *dict, void 
     int deleted = 0;
     while(1) {
         Index[0] = '\0';
-        Rc = JudySLFirst(dict->JudyArray, (uint8_t *)&Index, &J_Error);
+        Rc = JudySLFirst(dict->JudySLArray, (uint8_t *)&Index, &J_Error);
         if (unlikely(Rc == PJERR)) {
             error("DICTIONARY: Cannot find the first entry of JudySL, JU_ERRNO_* == %u, ID == %d",
                   JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
