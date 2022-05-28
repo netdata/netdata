@@ -217,10 +217,10 @@ static inline int dictionary_index_walkthrough_unsafe(DICT *dict, int (*callback
     return ret;
 }
 
-static inline int dictionary_index_helper_to_delete_all_unsafe(DICT *dict, void (*callback)(DICT *dict, NAME_VALUE *nv)) {
+static inline int dictionary_index_helper_to_delete_all_unsafe(DICT *dict, void (*callback)(DICT *dict, NAME_VALUE *nv, int unindex)) {
     int deleted = 0;
     while(dict->first_item) {
-        callback(dict, dict->first_item);
+        callback(dict, dict->first_item, 0);
         deleted++;
     }
     return deleted;
@@ -277,10 +277,11 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
     return nv;
 }
 
-static void dictionary_name_value_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
+static void dictionary_name_value_destroy_unsafe(DICT *dict, NAME_VALUE *nv, int unindex) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
 
-    dictionary_index_delete_unsafe(dict, nv);
+    if(unindex)
+        dictionary_index_delete_unsafe(dict, nv);
 
     if(nv->next) nv->next->prev = nv->prev;
     if(nv->prev) nv->prev->next = nv->next;
@@ -347,8 +348,7 @@ void dictionary_destroy(DICTIONARY *ptr) {
         dict->stats = NULL;
     }
 
-    int deleted = dictionary_index_helper_to_delete_all_unsafe(dict, dictionary_name_value_destroy_unsafe);
-    fprintf(stderr, "Deleted %d entries\n", deleted);
+    dictionary_index_helper_to_delete_all_unsafe(dict, dictionary_name_value_destroy_unsafe);
 
     dictionary_index_destroy_unsafe(dict);
 
@@ -446,7 +446,7 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
     }
     else {
         debug(D_DICTIONARY, "Found dictionary entry with name '%s'.", name);
-        dictionary_name_value_destroy_unsafe(dict, nv);
+        dictionary_name_value_destroy_unsafe(dict, nv, 1);
         ret = 0;
     }
 
@@ -520,19 +520,21 @@ int verify_name_and_value_of_cloning_dictionary(const char *name, void *value, v
 
 int dictionary_unittest(size_t entries) {
     char buf[1024];
+    size_t i, errors = 0;
 
     clocks_init();
 
     usec_t creating = now_realtime_usec();
 
     DICTIONARY *d = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS);
-    fprintf(stderr, "Creating dictionary of %zu entries...\n", entries);
-    size_t i, errors = 0;
+    fprintf(stderr, "Adding %zu entries...\n", entries);
     for(i = 0; i < entries ;i++) {
         size_t len = snprintfz(buf, 1024, "string %zu", i);
-        if(len != strlen(buf)) fprintf(stderr, "Expected length %zu, got %zu\n", strlen(buf), len);
-
-        dictionary_set(d, buf, buf, len + 1);
+        char *s = dictionary_set(d, buf, buf, len + 1);
+        if(strcmp(s, buf) != 0) {
+            fprintf(stderr, "ERROR: expected to add '%s', got '%s'\n", buf, s);
+            errors++;
+        }
     }
 
     usec_t creating_end = now_realtime_usec();
@@ -567,9 +569,33 @@ int dictionary_unittest(size_t entries) {
     fprintf(stderr, "Walking %zu entries and positive_checking name-value pairs...\n", entries);
     errors += dictionary_walkthrough_with_name(d, verify_name_and_value_of_cloning_dictionary, NULL);
 
-    fprintf(stderr, "\nCreated and checked %zu entries, found %zu errors - used %zu KB of memory\n\n", i, errors, dictionary_allocated_memory(d)/ 1024);
-
     usec_t walking_end = now_realtime_usec();
+    usec_t deleting = now_realtime_usec();
+
+    fprintf(stderr, "Deleting %zu entries...\n", entries);
+    for(i = 0; i < entries ;i++) {
+        snprintfz(buf, 1024, "string %zu", i);
+        int ret = dictionary_del(d, buf);
+        if(ret == -1) {
+            fprintf(stderr, "ERROR: expected to delete '%s' but it failed\n", buf);
+            errors++;
+        }
+    }
+
+    usec_t deleting_end = now_realtime_usec();
+
+    fprintf(stderr, "\nCreated, checked and deleted %zu entries, found %zu errors - used %zu KB of memory\n\n", i, errors, dictionary_allocated_memory(d)/ 1024);
+
+    fprintf(stderr, "Adding again %zu entries...\n", entries);
+    for(i = 0; i < entries ;i++) {
+        size_t len = snprintfz(buf, 1024, "string %zu", i);
+        char *s = dictionary_set(d, buf, buf, len + 1);
+        if(strcmp(s, buf) != 0) {
+            fprintf(stderr, "ERROR: expected to add '%s', got '%s'\n", buf, s);
+            errors++;
+        }
+    }
+
     usec_t destroying = now_realtime_usec();
 
     fprintf(stderr, "Destroying dictionary of %zu entries...\n", entries);
@@ -577,11 +603,12 @@ int dictionary_unittest(size_t entries) {
 
     usec_t destroying_end = now_realtime_usec();
 
-    fprintf(stderr, "\nTIMINGS:\ncreate %llu usec, positive get %llu usec, negative get %llu, walk through %llu usec, destroy %llu usec\n",
+    fprintf(stderr, "\nTIMINGS:\ncreate %llu usec, positive get %llu usec, negative get %llu, walk through %llu usec, deleting %llu, destroy %llu usec\n",
             creating_end - creating,
-        positive_checking_end - positive_checking,
-        negative_checking_end - negative_checking,
+            positive_checking_end - positive_checking,
+            negative_checking_end - negative_checking,
             walking_end - walking,
+            deleting_end - deleting,
             destroying_end - destroying);
 
     return (int)errors;
