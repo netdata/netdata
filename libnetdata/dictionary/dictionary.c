@@ -3,6 +3,37 @@
 #include "../libnetdata.h"
 #include "Judy.h"
 
+/*
+ * This version uses JudySL arrays to index the dictionary
+ *
+ * The following output is from the unit test, at the end of this file:
+ *
+ * Creating dictionary of 1000000 entries...
+ * Checking index of 1000000 entries...
+ * Walking 1000000 entries and checking name-value pairs...
+ * Created and checked 1000000 entries, found 0 errors - used 58376 KB of memory
+ * Destroying dictionary of 1000000 entries...
+ * Deleted 1000000 entries
+ * create 338975 usec, check 156080 usec, walk 80764 usec, destroy 444569 usec
+ *
+ * The AVL version had these timings:
+ * Creating dictionary of 1000000 entries...
+ * Checking index of 1000000 entries...
+ * Walking 1000000 entries and checking name-value pairs...
+ * Created and checked 1000000 entries, found 0 errors - used 89626 KB of memory
+ * Destroying dictionary of 1000000 entries...
+ * create 413892 usec, check 220006 usec, walk 34247 usec, destroy 98062 usec
+ *
+ * So, the JudySL is a lot slower to WALK and DESTROY (DESTROY does a WALK)
+ * It is slower, because for every item, JudySL copies the KEY/NAME to a
+ * caller supplied buffer (Index). So, by just walking over 1 million items,
+ * JudySL does 1 million strcpy() !!!
+ *
+ * It also seems that somehow JudySLDel() is unbelievably slow too!
+ *
+ */
+
+
 struct dictionary_stats {
     size_t inserts;
     size_t deletes;
