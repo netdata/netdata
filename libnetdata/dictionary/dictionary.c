@@ -45,31 +45,25 @@ size_t dictionary_allocated_memory(DICTIONARY *ptr) {
     return 0;
 }
 
-static inline void NETDATA_DICTIONARY_STATS_INSERTS_PLUS1(DICT *dict) {
-    if(likely(dict->stats))
-        dict->stats->inserts++;
-}
-static inline void NETDATA_DICTIONARY_STATS_DELETES_PLUS1(DICT *dict) {
-    if(likely(dict->stats))
-        dict->stats->deletes++;
-}
-static inline void NETDATA_DICTIONARY_STATS_SEARCHES_PLUS1(DICT *dict) {
+static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICT *dict) {
     if(likely(dict->stats))
         dict->stats->searches++;
 }
-static inline void NETDATA_DICTIONARY_STATS_ENTRIES_PLUS1(DICT *dict, size_t size) {
+static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICT *dict, size_t size) {
     if(likely(dict->stats)) {
+        dict->stats->inserts++;
         dict->stats->entries++;
         dict->stats->memory += size;
     }
 }
-static inline void NETDATA_DICTIONARY_STATS_ENTRIES_MINUS1(DICT *dict, size_t size) {
+static inline void DICTIONARY_STATS_ENTRIES_MINUS1(DICT *dict, size_t size) {
     if(likely(dict->stats)) {
+        dict->stats->deletes++;
         dict->stats->entries--;
         dict->stats->memory -= size;
     }
 }
-static inline void NETDATA_DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICT *dict, size_t oldsize, size_t newsize) {
+static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICT *dict, size_t oldsize, size_t newsize) {
     if(likely(dict->stats)) {
         dict->stats->resets++;
         dict->stats->memory += newsize;
@@ -117,7 +111,7 @@ static inline NAME_VALUE *dictionary_name_value_index_find_unsafe(DICT *dict, co
     tmp.hash = (hash)?hash:simple_hash(name);
     tmp.name = (char *)name;
 
-    NETDATA_DICTIONARY_STATS_SEARCHES_PLUS1(dict);
+    DICTIONARY_STATS_SEARCHES_PLUS1(dict);
     return (NAME_VALUE *)avl_search(&(dict->values_index), (avl_t *) &tmp);
 }
 
@@ -128,7 +122,7 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
     debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
     NAME_VALUE *nv = mallocz(sizeof(NAME_VALUE));
-    memset(&nv->avl_node, 0, sizeof(nv->avl_node));
+    memset(&nv->avl_node, 0, sizeof(avl_t));
 
     if(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE) {
         nv->name_len = 0;
@@ -153,12 +147,10 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
     }
 
     // index it
-    NETDATA_DICTIONARY_STATS_INSERTS_PLUS1(dict);
-
     if(unlikely(avl_insert(&((dict)->values_index), (avl_t *)(nv)) != (avl_t *)nv))
         error("dictionary: INTERNAL ERROR: duplicate insertion to dictionary.");
 
-    NETDATA_DICTIONARY_STATS_ENTRIES_PLUS1(dict, sizeof(NAME_VALUE) + nv->name_len + nv->value_len);
+    DICTIONARY_STATS_ENTRIES_PLUS1(dict, sizeof(NAME_VALUE) + nv->name_len + nv->value_len);
 
     return nv;
 }
@@ -166,22 +158,20 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
 static void dictionary_name_value_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
 
-    NETDATA_DICTIONARY_STATS_DELETES_PLUS1(dict);
-
     if(unlikely(avl_remove(&(dict->values_index), (avl_t *)(nv)) != (avl_t *)nv))
-        error("dictionary: INTERNAL ERROR: dictionary invalid removal of node.");
+        error("DICTIONARY: INTERNAL ERROR: removal of node '%s' but it is not in the dictionary", nv->name);
 
     if(!(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE)) {
-        debug(D_REGISTRY, "Dictionary freeing value of '%s'", nv->name);
+        debug(D_DICTIONARY, "Dictionary freeing value of '%s'", nv->name);
         freez(nv->value);
     }
 
     if(!(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE)) {
-        debug(D_REGISTRY, "Dictionary freeing name '%s'", nv->name);
+        debug(D_DICTIONARY, "Dictionary freeing name '%s'", nv->name);
         freez(nv->name);
     }
 
-    NETDATA_DICTIONARY_STATS_ENTRIES_MINUS1(dict, sizeof(NAME_VALUE) + nv->name_len + nv->value_len);
+    DICTIONARY_STATS_ENTRIES_MINUS1(dict, sizeof(NAME_VALUE) + nv->name_len + nv->value_len);
 
     freez(nv);
 }
@@ -192,20 +182,24 @@ static void dictionary_name_value_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
 DICTIONARY *dictionary_create(uint8_t flags) {
     debug(D_DICTIONARY, "Creating dictionary.");
 
-    DICT *dict = callocz(1, sizeof(DICTIONARY));
+    DICT *dict = mallocz(sizeof(DICTIONARY));
+    dict->flags = flags;
 
     if(!(flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
-        dict->rwlock = callocz(1, sizeof(netdata_rwlock_t));
+        dict->rwlock = mallocz(sizeof(netdata_rwlock_t));
         netdata_rwlock_init(dict->rwlock);
     }
+    else
+        dict->rwlock = NULL;
 
     if(flags & DICTIONARY_FLAG_WITH_STATISTICS) {
         dict->stats = callocz(1, sizeof(struct dictionary_stats));
         dict->stats->memory = sizeof(DICTIONARY) + sizeof(struct dictionary_stats) + (flags & DICTIONARY_FLAG_SINGLE_THREADED)?sizeof(netdata_rwlock_t):0;
     }
+    else
+        dict->stats = NULL;
 
     avl_init(&dict->values_index, name_value_compare);
-    dict->flags = flags;
 
     return (DICTIONARY *)dict;
 }
@@ -217,11 +211,13 @@ void dictionary_destroy(DICTIONARY *ptr) {
 
     dictionary_write_lock(dict);
 
+    if(dict->stats) {
+        freez(dict->stats);
+        dict->stats = NULL;
+    }
+
     while(dict->values_index.root)
         dictionary_name_value_destroy_unsafe(dict, (NAME_VALUE *)dict->values_index.root);
-
-    if(dict->stats)
-        freez(dict->stats);
 
     dictionary_unlock(dict);
 
@@ -260,7 +256,7 @@ void *dictionary_set_with_name_ptr(DICTIONARY *ptr, const char *name, void *valu
             nv->value = value;
         }
         else {
-            NETDATA_DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
+            DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
 
             debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", name);
 
