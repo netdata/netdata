@@ -137,7 +137,8 @@ getIntegerOption(
   return ((int)intvalue);
 }
 
-int reset_job_metrics(void *entry, void *data) {
+static int reset_job_metrics(const char *name, void *entry, void *data) {
+    (void)name;
     (void)data;
 
     struct job_metrics *jm = (struct job_metrics *)entry;
@@ -158,7 +159,7 @@ struct job_metrics *get_job_metrics(char *dest) {
 
     if (unlikely(!jm)) {
         struct job_metrics new_job_metrics;
-        reset_job_metrics(&new_job_metrics, NULL);
+        reset_job_metrics(NULL, &new_job_metrics, NULL);
         jm = dictionary_set(dict_dest_job_metrics, dest, &new_job_metrics, sizeof(struct job_metrics));
 
         printf("CHART cups.job_num_%s '' 'Active job number of destination %s' jobs '%s' cups.job_num stacked %i %i\n", dest, dest, dest, netdata_priority++, netdata_update_every);
@@ -174,7 +175,7 @@ struct job_metrics *get_job_metrics(char *dest) {
     return jm;
 }
 
-int collect_job_metrics(char *name, void *entry, void *data) {
+int collect_job_metrics(const char *name, void *entry, void *data) {
     (void)data;
 
     struct job_metrics *jm = (struct job_metrics *)entry;
@@ -219,8 +220,8 @@ void reset_metrics() {
     num_dest_printing = 0;
     num_dest_stopped = 0;
 
-    reset_job_metrics(&global_job_metrics, NULL);
-    dictionary_walkthrough(dict_dest_job_metrics, reset_job_metrics, NULL);
+    reset_job_metrics(NULL, &global_job_metrics, NULL);
+    dictionary_walkthrough_with_name(dict_dest_job_metrics, reset_job_metrics, NULL);
 }
 
 int main(int argc, char **argv) {

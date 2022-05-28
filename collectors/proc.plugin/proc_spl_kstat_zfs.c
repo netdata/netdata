@@ -252,7 +252,7 @@ void disable_zfs_pool_state(struct zfs_pool *pool)
     pool->disabled = 1;
 }
 
-int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
+int update_zfs_pool_state_chart(const char *name, void *pool_p, void *update_every_p)
 {
     struct zfs_pool *pool = (struct zfs_pool *)pool_p;
     int update_every = *(int *)update_every_p;

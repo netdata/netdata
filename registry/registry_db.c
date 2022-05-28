@@ -11,7 +11,9 @@ int registry_db_should_be_saved(void) {
 // ----------------------------------------------------------------------------
 // INTERNAL FUNCTIONS FOR SAVING REGISTRY OBJECTS
 
-static int registry_machine_save_url(void *entry, void *file) {
+static int registry_machine_save_url(const char *name, void *entry, void *file) {
+    (void)name;
+
     REGISTRY_MACHINE_URL *mu = entry;
     FILE *fp = file;
 
@@ -30,7 +32,9 @@ static int registry_machine_save_url(void *entry, void *file) {
     return ret;
 }
 
-static int registry_machine_save(void *entry, void *file) {
+static int registry_machine_save(const char *name, void *entry, void *file) {
+    (void)name;
+
     REGISTRY_MACHINE *m = entry;
     FILE *fp = file;
 
@@ -44,7 +48,7 @@ static int registry_machine_save(void *entry, void *file) {
     );
 
     if(ret >= 0) {
-        int ret2 = dictionary_walkthrough(m->machine_urls, registry_machine_save_url, fp);
+        int ret2 = dictionary_walkthrough_with_name(m->machine_urls, registry_machine_save_url, fp);
         if(ret2 < 0) return ret2;
         ret += ret2;
     }
@@ -75,7 +79,9 @@ static inline int registry_person_save_url(void *entry, void *file) {
     return ret;
 }
 
-static inline int registry_person_save(void *entry, void *file) {
+static inline int registry_person_save(const char *name, void *entry, void *file) {
+    (void)name;
+
     REGISTRY_PERSON *p = entry;
     FILE *fp = file;
 
@@ -129,7 +135,7 @@ int registry_db_save(void) {
     // dictionary_walkthrough() has its own locking, so this is safe to do
 
     debug(D_REGISTRY, "Saving all machines");
-    int bytes1 = dictionary_walkthrough(registry.machines, registry_machine_save, fp);
+    int bytes1 = dictionary_walkthrough_with_name(registry.machines, registry_machine_save, fp);
     if(bytes1 < 0) {
         error("Registry: Cannot save registry machines - return value %d", bytes1);
         fclose(fp);
@@ -139,7 +145,7 @@ int registry_db_save(void) {
     debug(D_REGISTRY, "Registry: saving machines took %d bytes", bytes1);
 
     debug(D_REGISTRY, "Saving all persons");
-    int bytes2 = dictionary_walkthrough(registry.persons, registry_person_save, fp);
+    int bytes2 = dictionary_walkthrough_with_name(registry.persons, registry_person_save, fp);
     if(bytes2 < 0) {
         error("Registry: Cannot save registry persons - return value %d", bytes2);
         fclose(fp);

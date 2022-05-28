@@ -21,8 +21,8 @@ extern void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, vo
 extern void *dictionary_get(DICTIONARY *dict, const char *name);
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
-extern int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(void *entry, void *d), void *data);
-extern int dictionary_walkthrough_with_name(DICTIONARY *dict, int (*callback)(char *name, void *entry, void *d), void *data);
+extern int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(void *value, void *data), void *data);
+extern int dictionary_walkthrough_with_name(DICTIONARY *dict, int (*callback)(const char *name, void *value, void *data), void *data);
 
 extern size_t dictionary_allocated_memory(DICTIONARY *dict);
 

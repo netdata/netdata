@@ -93,7 +93,9 @@ int registry_init(void) {
     return 0;
 }
 
-static int machine_urls_delete_callback(void *entry, void *data) {
+static int machine_urls_delete_callback(const char *name, void *entry, void *data) {
+    (void)name;
+
     REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)data;
     (void)m;
 
@@ -108,18 +110,20 @@ static int machine_urls_delete_callback(void *entry, void *data) {
     return 1;
 }
 
-static int machine_delete_callback(void *entry, void *data) {
+static int machine_delete_callback(const char *name, void *entry, void *data) {
+    (void)name;
     (void)data;
 
     REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)entry;
-    int ret = dictionary_walkthrough(m->machine_urls, machine_urls_delete_callback, m);
+    int ret = dictionary_walkthrough_with_name(m->machine_urls, machine_urls_delete_callback, m);
 
     dictionary_destroy(m->machine_urls);
     freez(m);
 
     return ret + 1;
 }
-static int registry_person_del_callback(void *entry, void *d) {
+static int registry_person_del_callback(const char *name, void *entry, void *d) {
+    (void)name;
     (void)d;
 
     REGISTRY_PERSON *p = (REGISTRY_PERSON *)entry;
@@ -142,10 +146,10 @@ void registry_free(void) {
     if(!registry.enabled) return;
 
     debug(D_REGISTRY, "Registry: destroying persons dictionary");
-    dictionary_walkthrough(registry.persons, registry_person_del_callback, NULL);
+    dictionary_walkthrough_with_name(registry.persons, registry_person_del_callback, NULL);
     dictionary_destroy(registry.persons);
 
     debug(D_REGISTRY, "Registry: destroying machines dictionary");
-    dictionary_walkthrough(registry.machines, machine_delete_callback, NULL);
+    dictionary_walkthrough_with_name(registry.machines, machine_delete_callback, NULL);
     dictionary_destroy(registry.machines);
 }

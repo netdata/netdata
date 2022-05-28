@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
+#include "Judy.h"
 
 struct dictionary_stats {
     size_t inserts;
@@ -12,20 +13,16 @@ struct dictionary_stats {
 };
 
 typedef struct name_value {
-    avl_t avl_node;         // the index - this has to be first!
-
-    uint32_t hash;          // a simple hash to speed up searching
-                   // we first compare hashes, and only if the hashes are equal we do string comparisons
-
     char *name;
-    size_t name_len;
-
     void *value;
+
+    size_t name_len;
     size_t value_len;
 } NAME_VALUE;
 
 typedef struct dictionary {
-    avl_tree_type values_index;
+    Pvoid_t JudyArray;
+    size_t JudyArrayMaxNameLen;
 
     uint8_t flags;
 
@@ -98,31 +95,141 @@ static inline void dictionary_unlock(DICT *dict) {
 
 
 // ----------------------------------------------------------------------------
-// avl index
+// dictionary index
 
-static int name_value_compare(void* a, void* b) {
-    if(((NAME_VALUE *)a)->hash < ((NAME_VALUE *)b)->hash) return -1;
-    else if(((NAME_VALUE *)a)->hash > ((NAME_VALUE *)b)->hash) return 1;
-    else return strcmp(((NAME_VALUE *)a)->name, ((NAME_VALUE *)b)->name);
+static void dictionary_index_init_unsafe(DICT *dict) {
+    dict->JudyArray = NULL;
+    dict->JudyArrayMaxNameLen = 0;
 }
 
-static inline NAME_VALUE *dictionary_name_value_index_find_unsafe(DICT *dict, const char *name, uint32_t hash) {
-    NAME_VALUE tmp;
-    tmp.hash = (hash)?hash:simple_hash(name);
-    tmp.name = (char *)name;
+static void dictionary_index_destroy_unsafe(DICT *dict) {
+    if(unlikely(!dict->JudyArray)) return;
 
-    DICTIONARY_STATS_SEARCHES_PLUS1(dict);
-    return (NAME_VALUE *)avl_search(&(dict->values_index), (avl_t *) &tmp);
+    JError_t J_Error;
+    Word_t ret = JudySLFreeArray(&dict->JudyArray, &J_Error);
+    if(unlikely(ret == (Word_t) JERR)) {
+        error("DICTIONARY: Cannot destroy JudySL, JU_ERRNO_* == %u, ID == %d",
+              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+    }
+    dict->JudyArray = NULL;
+    dict->JudyArrayMaxNameLen = 0;
 }
+
+static inline void dictionary_index_insert_unsafe(DICT *dict, NAME_VALUE *nv) {
+    JError_t J_Error;
+    Pvoid_t *Rc;
+
+    const char *name = nv->name;
+
+    Rc = JudySLIns(&dict->JudyArray, (const uint8_t *)name, &J_Error);
+    if(unlikely(Rc == PJERR)) {
+        error("DICTIONARY: Cannot insert entry with name '%s' to JudySL, JU_ERRNO_* == %u, ID == %d", name,
+              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+    }
+    else {
+        *Rc = nv;
+
+        size_t name_len = (nv->name_len)?nv->name_len:strlen(name) + 1;
+        if(dict->JudyArrayMaxNameLen < name_len) dict->JudyArrayMaxNameLen = name_len;
+    }
+}
+
+static inline void dictionary_index_delete_unsafe(DICT *dict, const char *name) {
+    if(unlikely(!dict->JudyArray)) return;
+
+    JError_t J_Error;
+    int ret;
+
+    ret = JudySLDel(&dict->JudyArray, (const uint8_t *)name, &J_Error);
+    if(unlikely(ret == JERR)) {
+        error("DICTIONARY: Cannot delete entry with name '%s' from JudySL, JU_ERRNO_* == %u, ID == %d", name,
+              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        return;
+    }
+
+    if(ret == 0)
+        error("DICTIONARY: Attempted to delete entry with name '%s', but it was not found in the index", name);
+}
+
+static inline NAME_VALUE *dictionary_index_get_unsafe(DICT *dict, const char *name) {
+    if(unlikely(!dict->JudyArray)) return NULL;
+
+    JError_t J_Error;
+    Pvoid_t *Rc;
+
+    Rc = JudySLGet(dict->JudyArray, (const uint8_t *)name, &J_Error);
+    if(unlikely(Rc == PJERR)) {
+        error("DICTIONARY: Cannot get entry with name '%s' to JudySL, JU_ERRNO_* == %u, ID == %d", name,
+              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        return NULL;
+    }
+    else if(likely(Rc))
+        return (NAME_VALUE *)*Rc;
+    else
+        return NULL;
+}
+
+static inline NAME_VALUE *dictionary_index_get_first_unsafe(DICT *dict) {
+    if(unlikely(!dict->JudyArray)) return NULL;
+
+    char Index[dict->JudyArrayMaxNameLen]; Index[0] = '\0';
+
+    JError_t J_Error;
+    Pvoid_t *Rc;
+
+    Rc = JudySLFirst(dict->JudyArray, (uint8_t *)&Index, &J_Error);
+    if(unlikely(Rc == PJERR)) {
+        error("DICTIONARY: Cannot find the first entry of JudySL, JU_ERRNO_* == %u, ID == %d",
+              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        return NULL;
+    }
+    else if(likely(Rc))
+        return (NAME_VALUE *)*Rc;
+    else
+        return NULL;
+}
+
+static inline int dictionary_index_walkthrough_unsafe(DICT *dict, int (*callback)(const char *name, void *value, void *data), void *data) {
+    if(unlikely(!dict->JudyArray)) return 0;
+
+    char Index[dict->JudyArrayMaxNameLen]; Index[0] = '\0';
+
+    JError_t J_Error;
+    Pvoid_t *Rc;
+
+    Rc = JudySLFirst(dict->JudyArray, (uint8_t *)&Index, &J_Error);
+    if(unlikely(Rc == PJERR)) {
+        error("DICTIONARY: Cannot find the first entry of JudySL, JU_ERRNO_* == %u, ID == %d",
+              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        return 0;
+    }
+
+    int ret = 0;
+    while(Rc && *Rc) {
+        NAME_VALUE *nv = *Rc;
+        int r = callback(nv->name, nv->value, data);
+        if(unlikely(r < 0)) return r;
+
+        ret += r;
+
+        Rc = JudySLNext(dict->JudyArray, (uint8_t *)&Index, &J_Error);
+        if(unlikely(Rc == PJERR)) {
+            error("DICTIONARY: Cannot find next entry of JudySL, JU_ERRNO_* == %u, ID == %d",
+                  JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+            break;
+        }
+    }
+    return ret;
+}
+
 
 // ----------------------------------------------------------------------------
-// internal methods
+// NAME_VALUE methods
 
-static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *name, void *value, size_t value_len, uint32_t hash) {
+static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *name, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
     NAME_VALUE *nv = mallocz(sizeof(NAME_VALUE));
-    memset(&nv->avl_node, 0, sizeof(avl_t));
 
     if(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE) {
         nv->name_len = 0;
@@ -133,8 +240,6 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
         nv->name = mallocz(nv->name_len);
         memcpy(nv->name, name, nv->name_len);
     }
-
-    nv->hash = (hash)?hash:simple_hash(nv->name);
 
     if(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE) {
         nv->value_len = 0;
@@ -147,9 +252,7 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
     }
 
     // index it
-    if(unlikely(avl_insert(&((dict)->values_index), (avl_t *)(nv)) != (avl_t *)nv))
-        error("DICTIONARY: INTERNAL ERROR: duplicate insertion of key '%s' to dictionary.", name);
-
+    dictionary_index_insert_unsafe(dict, nv);
     DICTIONARY_STATS_ENTRIES_PLUS1(dict, sizeof(NAME_VALUE) + nv->name_len + nv->value_len);
 
     return nv;
@@ -158,8 +261,7 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
 static void dictionary_name_value_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
 
-    if(unlikely(avl_remove(&(dict->values_index), (avl_t *)(nv)) != (avl_t *)nv))
-        error("DICTIONARY: INTERNAL ERROR: removal of node '%s' but it is not in the dictionary", nv->name);
+    dictionary_index_delete_unsafe(dict, nv->name);
 
     if(!(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE)) {
         debug(D_DICTIONARY, "Dictionary freeing value of '%s'", nv->name);
@@ -199,8 +301,7 @@ DICTIONARY *dictionary_create(uint8_t flags) {
     else
         dict->stats = NULL;
 
-    avl_init(&dict->values_index, name_value_compare);
-
+    dictionary_index_init_unsafe(dict);
     return (DICTIONARY *)dict;
 }
 
@@ -216,8 +317,11 @@ void dictionary_destroy(DICTIONARY *ptr) {
         dict->stats = NULL;
     }
 
-    while(dict->values_index.root)
-        dictionary_name_value_destroy_unsafe(dict, (NAME_VALUE *)dict->values_index.root);
+    NAME_VALUE *nv;
+    while((nv = dictionary_index_get_first_unsafe(dict)))
+        dictionary_name_value_destroy_unsafe(dict, nv);
+
+    dictionary_index_destroy_unsafe(dict);
 
     dictionary_unlock(dict);
 
@@ -236,15 +340,13 @@ void *dictionary_set_with_name_ptr(DICTIONARY *ptr, const char *name, void *valu
 
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
-    uint32_t hash = simple_hash(name);
-
     dictionary_write_lock(dict);
 
-    NAME_VALUE *nv = dictionary_name_value_index_find_unsafe(dict, name, hash);
+    NAME_VALUE *nv = dictionary_index_get_unsafe(dict, name);
     if(unlikely(!nv)) {
         debug(D_DICTIONARY, "Dictionary entry with name '%s' not found. Creating a new one.", name);
 
-        nv = dictionary_name_value_create_unsafe(dict, name, value, value_len, hash);
+        nv = dictionary_name_value_create_unsafe(dict, name, value, value_len);
         if(unlikely(!nv))
             fatal("Cannot create name_value.");
     }
@@ -286,7 +388,7 @@ void *dictionary_get(DICTIONARY *ptr, const char *name) {
     debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
 
     dictionary_read_lock(dict);
-    NAME_VALUE *nv = dictionary_name_value_index_find_unsafe(dict, name, 0);
+    NAME_VALUE *nv = dictionary_index_get_unsafe(dict, name);
     dictionary_unlock(dict);
 
     if(unlikely(!nv)) {
@@ -307,7 +409,7 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
 
     dictionary_write_lock(dict);
 
-    NAME_VALUE *nv = dictionary_name_value_index_find_unsafe(dict, name, 0);
+    NAME_VALUE *nv = dictionary_index_get_unsafe(dict, name);
     if(unlikely(!nv)) {
         debug(D_DICTIONARY, "Not found dictionary entry with name '%s'.", name);
         ret = -1;
@@ -329,75 +431,37 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
 // the dictionary is locked for reading while this happens
 // do not user other dictionary calls while walking the dictionary - deadlock!
 
-static int dictionary_walker(avl_t *a, int (*callback)(void *entry, void *data), void *data) {
-    int total = 0, ret = 0;
+struct drop_name_callback_data {
+    int (*callback)(void *entry, void *data);
+    void *callback_data;
+};
 
-    if(a->avl_link[0]) {
-        ret = dictionary_walker(a->avl_link[0], callback, data);
-        if(ret < 0) return ret;
-        total += ret;
-    }
-
-    ret = callback(((NAME_VALUE *)a)->value, data);
-    if(ret < 0) return ret;
-    total += ret;
-
-    if(a->avl_link[1]) {
-        ret = dictionary_walker(a->avl_link[1], callback, data);
-        if (ret < 0) return ret;
-        total += ret;
-    }
-
-    return total;
+int drop_name_callback(const char *name, void *value, void *data) {
+    (void)name;
+    struct drop_name_callback_data *mydata = (struct drop_name_callback_data *)data;
+    return mydata->callback(value, mydata->callback_data);
 }
 
 int dictionary_walkthrough(DICTIONARY *ptr, int (*callback)(void *entry, void *data), void *data) {
     DICT *dict = (DICT *)ptr;
 
-    int ret = 0;
+    struct drop_name_callback_data mydata = {
+        .callback = callback,
+        .callback_data = data
+    };
 
     dictionary_read_lock(dict);
-
-    if(likely(dict->values_index.root))
-        ret = dictionary_walker(dict->values_index.root, callback, data);
-
+    int ret = dictionary_index_walkthrough_unsafe(dict, drop_name_callback, &mydata);
     dictionary_unlock(dict);
 
     return ret;
 }
 
-static int dictionary_walker_name_value(avl_t *a, int (*callback)(char *name, void *entry, void *data), void *data) {
-    int total = 0, ret = 0;
-
-    if(a->avl_link[0]) {
-        ret = dictionary_walker_name_value(a->avl_link[0], callback, data);
-        if(ret < 0) return ret;
-        total += ret;
-    }
-
-    ret = callback(((NAME_VALUE *)a)->name, ((NAME_VALUE *)a)->value, data);
-    if(ret < 0) return ret;
-    total += ret;
-
-    if(a->avl_link[1]) {
-        ret = dictionary_walker_name_value(a->avl_link[1], callback, data);
-        if (ret < 0) return ret;
-        total += ret;
-    }
-
-    return total;
-}
-
-int dictionary_walkthrough_with_name(DICTIONARY *ptr, int (*callback)(char *name, void *entry, void *data), void *data) {
+int dictionary_walkthrough_with_name(DICTIONARY *ptr, int (*callback)(const char *name, void *entry, void *data), void *data) {
     DICT *dict = (DICT *)ptr;
 
-    int ret = 0;
-
     dictionary_read_lock(dict);
-
-    if(likely(dict->values_index.root))
-        ret = dictionary_walker_name_value(dict->values_index.root, callback, data);
-
+    int ret = dictionary_index_walkthrough_unsafe(dict, callback, data);
     dictionary_unlock(dict);
 
     return ret;
@@ -406,7 +470,7 @@ int dictionary_walkthrough_with_name(DICTIONARY *ptr, int (*callback)(char *name
 // ----------------------------------------------------------------------------
 // unit test
 
-int verify_name_and_value_of_cloning_dictionary(char *name, void *value, void *data) {
+int verify_name_and_value_of_cloning_dictionary(const char *name, void *value, void *data) {
     (void)data;
 
     int ret = 0;

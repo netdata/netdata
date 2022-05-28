@@ -165,7 +165,7 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
     return count;
 }
 
-static void free_device(DICTIONARY *dict, char *name)
+static void free_device(DICTIONARY *dict, const char *name)
 {
     ZRAM_DEVICE *d = (ZRAM_DEVICE*)dictionary_get(dict, name);
     info("ZRAM : Disabling monitoring of device %s", name);
@@ -200,7 +200,7 @@ static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
     return 0;
 }
 
-static inline int _collect_zram_metrics(char* name, ZRAM_DEVICE *d, int advance, DICTIONARY* dict) {
+static inline int _collect_zram_metrics(const char* name, ZRAM_DEVICE *d, int advance, DICTIONARY* dict) {
     MM_STAT mm;
     int value;
     if (unlikely(read_mm_stat(d->file, &mm) < 0))
@@ -235,12 +235,12 @@ static inline int _collect_zram_metrics(char* name, ZRAM_DEVICE *d, int advance,
     return 0;
 }
 
-static int collect_first_zram_metrics(char *name, void *entry, void *data) {
+static int collect_first_zram_metrics(const char *name, void *entry, void *data) {
     // collect without calling rrdset_next (init only)
     return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 0, (DICTIONARY *)data);
 }
 
-static int collect_zram_metrics(char *name, void *entry, void *data) {
+static int collect_zram_metrics(const char *name, void *entry, void *data) {
     (void)name;
     // collect with calling rrdset_next
     return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 1, (DICTIONARY *)data);

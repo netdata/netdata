@@ -753,6 +753,8 @@ void post_conf_load(char **user)
 }
 
 int main(int argc, char **argv) {
+    exit(dictionary_unittest(100000));
+
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
