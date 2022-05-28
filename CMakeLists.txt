@@ -491,6 +491,10 @@ set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
         )
 
+set(CUPS_PLUGIN_FILES
+        collectors/cups.plugin/cups_plugin.c
+        )
+
 set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf.plugin/ebpf.c
         collectors/ebpf.plugin/ebpf.h
@@ -1177,6 +1181,7 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
     SET(ENABLE_PLUGIN_SLABINFO True)
+    SET(ENABLE_PLUGIN_CUPS True)
 
 ELSEIF(FREEBSD)
     list(APPEND NETDATA_FILES daemon/static_threads_freebsd.c)
@@ -1189,6 +1194,7 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
+    SET(ENABLE_PLUGIN_CUPS True)
     SET(ENABLE_PLUGIN_EBPF False)
 
 ELSEIF(MACOS)
@@ -1202,6 +1208,7 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_APPS False)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
+    SET(ENABLE_PLUGIN_CUPS True)
     SET(ENABLE_PLUGIN_EBPF False)
 
 ENDIF()
@@ -1334,6 +1341,20 @@ IF(ENABLE_PLUGIN_SLABINFO)
     target_compile_options(slabinfo.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "slabinfo.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# cups.plugin
+
+IF(ENABLE_PLUGIN_CUPS)
+    message(STATUS "cups.plugin: enabled")
+    add_executable(cups.plugin config.h ${CUPS_PLUGIN_FILES})
+    target_link_libraries (cups.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(cups.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(cups.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+ELSE()
+    message(STATUS "cups.plugin: disabled")
 ENDIF()
 
 

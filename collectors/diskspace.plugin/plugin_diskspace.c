@@ -439,7 +439,7 @@ void *diskspace_main(void *ptr) {
 
         if(dict_mountpoints) {
             worker_is_busy(WORKER_JOB_CLEANUP);
-            dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
+            dictionary_walkthrough(dict_mountpoints, mount_point_cleanup, NULL);
         }
 
     }

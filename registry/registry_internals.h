@@ -8,7 +8,8 @@
 #define REGISTRY_URL_FLAGS_DEFAULT 0x00
 #define REGISTRY_URL_FLAGS_EXPIRED 0x01
 
-#define DICTIONARY_FLAGS (DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE | DICTIONARY_FLAG_NAME_LINK_DONT_CLONE | DICTIONARY_FLAG_SINGLE_THREADED)
+#define REGISTRY_DICTIONARY_FLAGS                                                                                      \
+    (DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE | DICTIONARY_FLAG_NAME_LINK_DONT_CLONE | DICTIONARY_FLAG_SINGLE_THREADED)
 
 // ----------------------------------------------------------------------------
 // COMMON structures

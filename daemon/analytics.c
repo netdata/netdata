@@ -296,7 +296,7 @@ void analytics_collectors(void)
     ap.c = 0;
     ap.both = bt;
 
-    dictionary_get_all(dict, collector_counter_callb, &ap);
+    dictionary_walkthrough(dict, collector_counter_callb, &ap);
     dictionary_destroy(dict);
 
     analytics_set_data(&analytics_data.netdata_collectors, (char *)buffer_tostring(ap.both));
