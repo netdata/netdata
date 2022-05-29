@@ -91,6 +91,15 @@ size_t dictionary_allocated_memory(DICTIONARY *ptr) {
     return 0;
 }
 
+size_t dictionary_entries(DICTIONARY *ptr) {
+    DICT *dict = (DICT *)ptr;
+
+    if(dict->stats)
+        return dict->stats->entries;
+
+    return 0;
+}
+
 static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICT *dict) {
     if(likely(dict->stats))
         dict->stats->searches++;
@@ -159,21 +168,10 @@ static void dictionary_index_destroy_unsafe(DICT *dict) {
         error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
+
+    // fprintf(stderr, "JudyHS freed %lu KB\n", ret / 1024);
+
     dict->JudyHSArray = NULL;
-}
-
-static inline void dictionary_index_insert_unsafe(DICT *dict, NAME_VALUE *nv) {
-    JError_t J_Error;
-    Pvoid_t *Rc;
-
-    Rc = JudyHSIns(&dict->JudyHSArray, nv->name, nv->name_len, &J_Error);
-    if(unlikely(Rc == PJERR)) {
-        error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d", nv->name,
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
-    }
-    else if(likely(Rc)) {
-        *Rc = nv;
-    }
 }
 
 static inline void dictionary_index_delete_unsafe(DICT *dict, NAME_VALUE *nv) {
@@ -196,8 +194,9 @@ static inline void dictionary_index_delete_unsafe(DICT *dict, NAME_VALUE *nv) {
 static inline NAME_VALUE *dictionary_index_get_unsafe(DICT *dict, const char *name) {
     if(unlikely(!dict->JudyHSArray)) return NULL;
 
-    Pvoid_t *Rc;
+    DICTIONARY_STATS_SEARCHES_PLUS1(dict);
 
+    Pvoid_t *Rc;
     Rc = JudyHSGet(dict->JudyHSArray, (void *)name, strlen(name) + 1);
     if(likely(Rc))
         return (NAME_VALUE *)*Rc;
@@ -217,32 +216,22 @@ static inline int dictionary_index_walkthrough_unsafe(DICT *dict, int (*callback
     return ret;
 }
 
-static inline int dictionary_index_helper_to_delete_all_unsafe(DICT *dict, void (*callback)(DICT *dict, NAME_VALUE *nv, int unindex)) {
-    int deleted = 0;
-    while(dict->first_item) {
-        callback(dict, dict->first_item, 0);
-        deleted++;
-    }
-    return deleted;
-}
-
-
 // ----------------------------------------------------------------------------
 // NAME_VALUE methods
 
-static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *name, void *value, size_t value_len) {
+static NAME_VALUE *name_value_create_unsafe(DICT *dict, const char *name, size_t name_len, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
     NAME_VALUE *nv = mallocz(sizeof(NAME_VALUE));
     size_t allocated = sizeof(NAME_VALUE);
 
-    nv->name_len = strlen(name) + 1;
+    nv->name_len = name_len;
     if(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE)
         nv->name = (char *)name;
     else {
-        nv->name = mallocz(nv->name_len);
-        memcpy(nv->name, name, nv->name_len);
-        allocated += nv->name_len;
+        nv->name = mallocz(name_len);
+        memcpy(nv->name, name, name_len);
+        allocated += name_len;
     }
 
     nv->value_len = value_len;
@@ -254,9 +243,7 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
         allocated += value_len;
     }
 
-    // index it
-    dictionary_index_insert_unsafe(dict, nv);
-
+    // link it
     if(unlikely(!dict->first_item)) {
         // we are the only ones here
         nv->next = NULL;
@@ -272,16 +259,13 @@ static NAME_VALUE *dictionary_name_value_create_unsafe(DICT *dict, const char *n
         dict->last_item = nv;
     }
 
-    DICTIONARY_STATS_ENTRIES_PLUS1(dict, sizeof(NAME_VALUE) + allocated);
+    DICTIONARY_STATS_ENTRIES_PLUS1(dict, allocated);
 
     return nv;
 }
 
-static void dictionary_name_value_destroy_unsafe(DICT *dict, NAME_VALUE *nv, int unindex) {
+static void name_value_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
-
-    if(unindex)
-        dictionary_index_delete_unsafe(dict, nv);
 
     if(nv->next) nv->next->prev = nv->prev;
     if(nv->prev) nv->prev->next = nv->next;
@@ -315,11 +299,14 @@ DICTIONARY *dictionary_create(uint8_t flags) {
     debug(D_DICTIONARY, "Creating dictionary.");
 
     DICT *dict = mallocz(sizeof(DICT));
+    size_t allocated = sizeof(DICT);
+
     dict->flags = flags;
     dict->first_item = dict->last_item = NULL;
 
     if(!(flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
         dict->rwlock = mallocz(sizeof(netdata_rwlock_t));
+        allocated += sizeof(netdata_rwlock_t);
         netdata_rwlock_init(dict->rwlock);
     }
     else
@@ -327,7 +314,8 @@ DICTIONARY *dictionary_create(uint8_t flags) {
 
     if(flags & DICTIONARY_FLAG_WITH_STATISTICS) {
         dict->stats = callocz(1, sizeof(struct dictionary_stats));
-        dict->stats->memory = sizeof(DICT) + sizeof(struct dictionary_stats) + (flags & DICTIONARY_FLAG_SINGLE_THREADED)?sizeof(netdata_rwlock_t):0;
+        allocated += sizeof(struct dictionary_stats);
+        dict->stats->memory = allocated;
     }
     else
         dict->stats = NULL;
@@ -343,13 +331,14 @@ void dictionary_destroy(DICTIONARY *ptr) {
 
     dictionary_write_lock(dict);
 
-    if(dict->stats) {
-        freez(dict->stats);
-        dict->stats = NULL;
+    // remove all NAME_VALUE pairs
+    while(dict->first_item) {
+        name_value_destroy_unsafe(dict, dict->first_item);
     }
+    dict->first_item = NULL;
+    dict->last_item = NULL;
 
-    dictionary_index_helper_to_delete_all_unsafe(dict, dictionary_name_value_destroy_unsafe);
-
+    // destroy the dictionary
     dictionary_index_destroy_unsafe(dict);
 
     dictionary_unlock(dict);
@@ -357,6 +346,11 @@ void dictionary_destroy(DICTIONARY *ptr) {
     if(dict->rwlock) {
         netdata_rwlock_destroy(dict->rwlock);
         freez(dict->rwlock);
+    }
+
+    if(dict->stats) {
+        freez(dict->stats);
+        dict->stats = NULL;
     }
 
     freez(dict);
@@ -369,40 +363,54 @@ void *dictionary_set_with_name_ptr(DICTIONARY *ptr, const char *name, void *valu
 
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
+    size_t name_len = strlen(name) + 1;
     dictionary_write_lock(dict);
 
-    NAME_VALUE *nv = dictionary_index_get_unsafe(dict, name);
-    if(unlikely(!nv)) {
-        debug(D_DICTIONARY, "Dictionary entry with name '%s' not found. Creating a new one.", name);
-
-        nv = dictionary_name_value_create_unsafe(dict, name, value, value_len);
-        if(unlikely(!nv))
-            fatal("Cannot create name_value.");
-    }
-    else if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
-        debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", name);
-
-        if(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE) {
-            debug(D_DICTIONARY, "Dictionary: linking value to '%s'", name);
-            nv->value = value;
-            nv->value_len = value_len;
+    Pvoid_t *Rc;
+    {
+        JError_t J_Error;
+        Rc = JudyHSIns(&dict->JudyHSArray, (void *)name, name_len, &J_Error);
+        if (unlikely(Rc == PJERR)) {
+            fatal("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
+                  name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
         }
-        else {
-            DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
+    }
 
-            debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", name);
+    NAME_VALUE *nv;
+    if(likely(*Rc == 0)) {
+        // a new item added to the index
+        nv = *Rc = name_value_create_unsafe(dict, name, name_len, value, value_len);
+    }
+    else {
+        // the item is already in the index
+        // so, either we will return the old one
+        // or overwrite the value, depending on dictionary flags
 
-            // copy the new value without breaking
-            // any other thread accessing the same entry
-            void *old = nv->value;
+        nv = *Rc;
+        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
+            debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", name);
 
-            void *new = mallocz(value_len);
-            memcpy(new, value, value_len);
-            nv->value = new;
-            nv->value_len = value_len;
+            if(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE) {
+                debug(D_DICTIONARY, "Dictionary: linking value to '%s'", name);
+                nv->value = value;
+                nv->value_len = value_len;
+            }
+            else {
+                debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", name);
+                DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
 
-            debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", name);
-            freez(old);
+                // copy the new value without breaking
+                // any other thread accessing the same entry
+                void *old = nv->value;
+
+                void *new = mallocz(value_len);
+                memcpy(new, value, value_len);
+                nv->value = new;
+                nv->value_len = value_len;
+
+                debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", name);
+                freez(old);
+            }
         }
     }
 
@@ -446,7 +454,8 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
     }
     else {
         debug(D_DICTIONARY, "Found dictionary entry with name '%s'.", name);
-        dictionary_name_value_destroy_unsafe(dict, nv, 1);
+        dictionary_index_delete_unsafe(dict, nv);
+        name_value_destroy_unsafe(dict, nv);
         ret = 0;
     }
 
@@ -527,7 +536,7 @@ int dictionary_unittest(size_t entries) {
     usec_t creating = now_realtime_usec();
 
     DICTIONARY *d = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS);
-    fprintf(stderr, "Adding %zu entries...\n", entries);
+    fprintf(stderr, "%zu x dictionary_set() (dictionary size %zu entries, %zu KB)...\n", entries, dictionary_entries(d), dictionary_allocated_memory(d) / 1024);
     for(i = 0; i < entries ;i++) {
         size_t len = snprintfz(buf, 1024, "string %zu", i);
         char *s = dictionary_set(d, buf, buf, len + 1);
@@ -540,7 +549,7 @@ int dictionary_unittest(size_t entries) {
     usec_t creating_end = now_realtime_usec();
     usec_t positive_checking = now_realtime_usec();
 
-    fprintf(stderr, "Positive GET index of %zu entries...\n", entries);
+    fprintf(stderr, "%zu x dictionary_get(existing) (dictionary size %zu entries, %zu KB)...\n", entries, dictionary_entries(d), dictionary_allocated_memory(d) / 1024);
     for(i = 0; i < entries ;i++) {
         snprintfz(buf, 1024, "string %zu", i);
         char *s = dictionary_get(d, buf);
@@ -553,7 +562,7 @@ int dictionary_unittest(size_t entries) {
     usec_t positive_checking_end = now_realtime_usec();
     usec_t negative_checking = now_realtime_usec();
 
-    fprintf(stderr, "Negative GET of %zu entries...\n", entries);
+    fprintf(stderr, "%zu x dictionary_get(non-existing) (dictionary size %zu entries, %zu KB)...\n", entries, dictionary_entries(d), dictionary_allocated_memory(d) / 1024);
     for(i = 0; i < entries ;i++) {
         snprintfz(buf, 1024, "string %zu not matching anything", i);
         char *s = dictionary_get(d, buf);
@@ -566,13 +575,13 @@ int dictionary_unittest(size_t entries) {
     usec_t negative_checking_end = now_realtime_usec();
     usec_t walking = now_realtime_usec();
 
-    fprintf(stderr, "Walking %zu entries and positive_checking name-value pairs...\n", entries);
+    fprintf(stderr, "Walking through the dictionary (dictionary size %zu entries, %zu KB)...\n", dictionary_entries(d), dictionary_allocated_memory(d) / 1024);
     errors += dictionary_walkthrough_with_name(d, verify_name_and_value_of_cloning_dictionary, NULL);
 
     usec_t walking_end = now_realtime_usec();
     usec_t deleting = now_realtime_usec();
 
-    fprintf(stderr, "Deleting %zu entries...\n", entries);
+    fprintf(stderr, "%zu x dictionary_del(existing) (dictionary size %zu entries, %zu KB)...\n", entries, dictionary_entries(d), dictionary_allocated_memory(d) / 1024);
     for(i = 0; i < entries ;i++) {
         snprintfz(buf, 1024, "string %zu", i);
         int ret = dictionary_del(d, buf);
@@ -584,9 +593,7 @@ int dictionary_unittest(size_t entries) {
 
     usec_t deleting_end = now_realtime_usec();
 
-    fprintf(stderr, "\nCreated, checked and deleted %zu entries, found %zu errors - used %zu KB of memory\n\n", i, errors, dictionary_allocated_memory(d)/ 1024);
-
-    fprintf(stderr, "Adding again %zu entries...\n", entries);
+    fprintf(stderr, "%zu x dictionary_set() (dictionary size %zu entries, %zu KB)...\n", entries, dictionary_entries(d), dictionary_allocated_memory(d) / 1024);
     for(i = 0; i < entries ;i++) {
         size_t len = snprintfz(buf, 1024, "string %zu", i);
         char *s = dictionary_set(d, buf, buf, len + 1);
@@ -598,12 +605,12 @@ int dictionary_unittest(size_t entries) {
 
     usec_t destroying = now_realtime_usec();
 
-    fprintf(stderr, "Destroying dictionary of %zu entries...\n", entries);
+    fprintf(stderr, "Destroying dictionary (dictionary size %zu entries, %zu KB)...\n", dictionary_entries(d), dictionary_allocated_memory(d) / 1024);
     dictionary_destroy(d);
 
     usec_t destroying_end = now_realtime_usec();
 
-    fprintf(stderr, "\nTIMINGS:\ncreate %llu usec, positive get %llu usec, negative get %llu, walk through %llu usec, deleting %llu, destroy %llu usec\n",
+    fprintf(stderr, "\nTIMINGS:\nadding %llu usec, positive search %llu usec, negative search %llu, walk through %llu usec, deleting %llu, destroy %llu usec\n",
             creating_end - creating,
             positive_checking_end - positive_checking,
             negative_checking_end - negative_checking,

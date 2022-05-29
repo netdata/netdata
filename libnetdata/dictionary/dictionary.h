@@ -25,6 +25,7 @@ extern int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(void *value,
 extern int dictionary_walkthrough_with_name(DICTIONARY *dict, int (*callback)(const char *name, void *value, void *data), void *data);
 
 extern size_t dictionary_allocated_memory(DICTIONARY *dict);
+extern size_t dictionary_entries(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
 
