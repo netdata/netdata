@@ -9,19 +9,20 @@
 typedef void DICTIONARY;
 #endif
 
-#define DICTIONARY_FLAG_NONE                    0x00 // the default is the opposite of all below
-#define DICTIONARY_FLAG_SINGLE_THREADED         0x01 // don't use any locks (default: use locks)
-#define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x02 // don't copy the value, just point to the one provided (default: copy)
-#define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x04 // don't copy the name, just point to the one provided (default: copy)
-#define DICTIONARY_FLAG_WITH_STATISTICS         0x08 // maintain statistics about dictionary operations (default: disabled)
-#define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x10 // don't overwrite values of dictionary items (default: overwrite)
-#define DICTIONARY_FLAG_ADD_IN_FRONT            0x20 // add dictionary items at the front of the linked list (default: at the end)
+#define DICTIONARY_FLAG_NONE                    0x0000 // the default is the opposite of all below
+#define DICTIONARY_FLAG_SINGLE_THREADED         0x0001 // don't use any locks (default: use locks)
+#define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x0002 // don't copy the value, just point to the one provided (default: copy)
+#define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x0004 // don't copy the name, just point to the one provided (default: copy)
+#define DICTIONARY_FLAG_WITH_STATISTICS         0x0008 // maintain statistics about dictionary operations (default: disabled)
+#define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x0010 // don't overwrite values of dictionary items (default: overwrite)
+#define DICTIONARY_FLAG_ADD_IN_FRONT            0x0020 // add dictionary items at the front of the linked list (default: at the end)
 
 // Create a dictionary
-extern DICTIONARY *dictionary_create(uint8_t flags);
+extern DICTIONARY *dictionary_create(uint16_t flags);
 
 // Destroy a dictionary
 // returns the number of bytes freed
+// the returned value will not include name and value sizes if DICTIONARY_FLAG_WITH_STATISTICS is not set
 extern size_t dictionary_destroy(DICTIONARY *dict);
 
 // Set an item in the dictionary

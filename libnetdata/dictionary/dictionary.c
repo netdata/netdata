@@ -86,15 +86,16 @@ struct dictionary_stats {
 };
 
 struct dictionary {
-    uint8_t flags;                      // the flags of the dictionary
+    uint16_t flags;                     // the flags of the dictionary
 
     NAME_VALUE *first_item;             // the double linked list base pointers
     NAME_VALUE *last_item;
 
     Pvoid_t JudyHSArray;                // the hash table
 
-    netdata_rwlock_t *rwlock;
-    struct dictionary_stats *stats;
+    netdata_rwlock_t *rwlock;           // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
+
+    struct dictionary_stats *stats;     // the statistics when DICTIONARY_FLAG_WITH_STATISTICS is set
 };
 
 // ----------------------------------------------------------------------------
@@ -428,7 +429,7 @@ static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
 // ----------------------------------------------------------------------------
 // API - dictionary management
 
-DICTIONARY *dictionary_create(uint8_t flags) {
+DICTIONARY *dictionary_create(uint16_t flags) {
     debug(D_DICTIONARY, "Creating dictionary.");
 
     DICTIONARY *dict = mallocz(sizeof(DICTIONARY));
