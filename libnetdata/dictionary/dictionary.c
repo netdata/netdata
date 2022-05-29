@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
-#include "Judy.h"
+#include <Judy.h>
 
 /*
  * This version uses JudyHS arrays to index the dictionary
