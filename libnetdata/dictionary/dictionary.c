@@ -184,7 +184,7 @@ static void hashtable_destroy_unsafe(DICT *dict) {
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
-    // fprintf(stderr, "JudyHS freed %lu KB\n", ret / 1024);
+    debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
 
     dict->JudyHSArray = NULL;
 }
@@ -201,21 +201,28 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICT *dict, const char *name,
     return (NAME_VALUE **)Rc;
 }
 
-static inline void hashtable_delete_unsafe(DICT *dict, const char *name, size_t name_len) {
-    if(unlikely(!dict->JudyHSArray)) return;
+static inline int hashtable_delete_unsafe(DICT *dict, const char *name, size_t name_len) {
+    if(unlikely(!dict->JudyHSArray)) return 0;
 
     JError_t J_Error;
-    int ret;
-
-    ret = JudyHSDel(&dict->JudyHSArray, (void *)name, name_len, &J_Error);
+    int ret = JudyHSDel(&dict->JudyHSArray, (void *)name, name_len, &J_Error);
     if(unlikely(ret == JERR)) {
         error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d", name,
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
-        return;
+        return 0;
     }
 
-    if(unlikely(ret == 0))
-        error("DICTIONARY: Attempted to delete entry with name '%s', but it was not found in the index", name);
+    // Hey, this is problematic! We need the value back, not just an int with a status!
+    // https://sourceforge.net/p/judy/feature-requests/23/
+
+    if(unlikely(ret == 0)) {
+        // not found in the dictionary
+        return 0;
+    }
+    else {
+        // found and deleted from the dictionary
+        return 1;
+    }
 }
 
 static inline NAME_VALUE *hashtable_get_unsafe(DICT *dict, const char *name, size_t name_len) {
@@ -225,10 +232,14 @@ static inline NAME_VALUE *hashtable_get_unsafe(DICT *dict, const char *name, siz
 
     Pvoid_t *Rc;
     Rc = JudyHSGet(dict->JudyHSArray, (void *)name, name_len);
-    if(likely(Rc))
+    if(likely(Rc)) {
+        // found in the hash table
         return (NAME_VALUE *)*Rc;
-    else
+    }
+    else {
+        // not found in the hash table
         return NULL;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -516,6 +527,10 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
 
     dictionary_write_lock(dict);
 
+    // Unfortunately, the JudyHSDel() does not return the value of the
+    // item that was deleted, so we have to find it before we delete it,
+    // since we need to release our structures too.
+
     NAME_VALUE *nv = hashtable_get_unsafe(dict, name, name_len);
     if(unlikely(!nv)) {
         debug(D_DICTIONARY, "Not found dictionary entry with name '%s'.", name);
@@ -523,8 +538,8 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
     }
     else {
         debug(D_DICTIONARY, "Found dictionary entry with name '%s'.", name);
+        hashtable_delete_unsafe(dict, name, name_len);
         linkedlist_namevalue_unlink(dict, nv);
-        hashtable_delete_unsafe(dict, nv->name, name_len);
         namevalue_destroy_unsafe(dict, nv);
         ret = 0;
     }

@@ -12,7 +12,7 @@ typedef void DICTIONARY;
 #define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x02 // don't copy the value, just point to the one provided
 #define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x04 // don't copy the name, just point to the one provided
 #define DICTIONARY_FLAG_WITH_STATISTICS         0x08 // maintain statistics about dictionary operations
-#define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x10 // don't overwrite a value of an item in the dictionary
+#define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x10 // don't overwrite values of dictionary items
 
 // Create a dictionary
 extern DICTIONARY *dictionary_create(uint8_t flags);
