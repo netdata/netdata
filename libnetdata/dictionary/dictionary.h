@@ -67,7 +67,7 @@ extern int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(const char *
 //  for(MY_ITEM *item = dfe_start(&dfe, dict); item ; item = dfe_next(&dfe)) {
 //     // do things with the item and its dfe.name
 //  }
-//  dfe_done(&dictfe);
+//  dfe_done(&dfe);
 //
 
 #ifdef DICTIONARY_INTERNALS
