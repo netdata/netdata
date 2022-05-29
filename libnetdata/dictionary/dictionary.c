@@ -553,7 +553,7 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
 // do not user other dictionary calls while walking the dictionary - deadlock!
 
 int dictionary_walkthrough(DICTIONARY *ptr, int (*callback)(const char *name, void *entry, void *data), void *data) {
-    DICT *dict = (DICT *)dict;
+    DICT *dict = (DICT *)ptr;
 
     dictionary_read_lock(dict);
     int ret = linkedlist_namevalue_walkthrough_unsafe(dict, callback, data);
