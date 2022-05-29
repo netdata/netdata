@@ -280,13 +280,13 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         device_count = init_devices(devices, (unsigned int)zram_id, update_every);
         if (device_count < 1)
             return 1;
-        dictionary_walkthrough_with_name(devices, collect_first_zram_metrics, devices);
+        dictionary_walkthrough(devices, collect_first_zram_metrics, devices);
     }
     else
     {
         if (unlikely(device_count < 1))
             return 1;
-        dictionary_walkthrough_with_name(devices, collect_zram_metrics, devices);
+        dictionary_walkthrough(devices, collect_zram_metrics, devices);
     }
     return 0;
 }

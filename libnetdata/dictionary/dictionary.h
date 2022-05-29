@@ -43,8 +43,16 @@ extern void *dictionary_get(DICTIONARY *dict, const char *name);
 // returns -1 if the item was not found in the index
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
-extern int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(void *value, void *data), void *data);
-extern int dictionary_walkthrough_with_name(DICTIONARY *dict, int (*callback)(const char *name, void *value, void *data), void *data);
+// Traverse (walk through) the items of the dictionary.
+// The order of traversal is currently the order of insertion.
+//
+// The callback function may return a negative number to stop the traversal,
+// in which case that negative value is returned to the caller.
+//
+// If all callback calls return zero or positive numbers, the sum of all of
+// them is returned to the caller.
+//
+extern int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(const char *name, void *value, void *data), void *data);
 
 // Get statistics about the dictionary
 // If DICTIONARY_FLAG_WITH_STATISTICS is not set, these return zero

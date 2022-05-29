@@ -274,7 +274,7 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 
     buffer_strcat(w->response.data, ",\n\t\"urls\": [");
     struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
-    dictionary_walkthrough_with_name(m->machine_urls, registry_json_machine_url_callback, &c);
+    dictionary_walkthrough(m->machine_urls, registry_json_machine_url_callback, &c);
     buffer_strcat(w->response.data, "\n\t]\n");
 
     registry_json_footer(w);

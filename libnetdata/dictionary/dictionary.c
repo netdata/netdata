@@ -358,10 +358,7 @@ static void namevalue_reset_unsafe(DICT *dict, NAME_VALUE *nv, void *value, size
         debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", nv->name);
         DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, namevalue_get_valuelen(dict, nv), value_len);
 
-        // copy the new value without breaking
-        // any other thread accessing the same entry
         void *old = nv->value;
-
         void *new = mallocz(value_len);
         memcpy(new, value, value_len);
         nv->value = new;
@@ -555,34 +552,8 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
 // the dictionary is locked for reading while this happens
 // do not user other dictionary calls while walking the dictionary - deadlock!
 
-struct drop_name_callback_data {
-    int (*callback)(void *entry, void *data);
-    void *callback_data;
-};
-
-int drop_name_callback(const char *name, void *value, void *data) {
-    (void)name;
-    struct drop_name_callback_data *mydata = (struct drop_name_callback_data *)data;
-    return mydata->callback(value, mydata->callback_data);
-}
-
-int dictionary_walkthrough(DICTIONARY *ptr, int (*callback)(void *entry, void *data), void *data) {
-    DICT *dict = (DICT *)ptr;
-
-    struct drop_name_callback_data mydata = {
-        .callback = callback,
-        .callback_data = data
-    };
-
-    dictionary_read_lock(dict);
-    int ret = linkedlist_namevalue_walkthrough_unsafe(dict, drop_name_callback, &mydata);
-    dictionary_unlock(dict);
-
-    return ret;
-}
-
-int dictionary_walkthrough_with_name(DICTIONARY *ptr, int (*callback)(const char *name, void *entry, void *data), void *data) {
-    DICT *dict = (DICT *)ptr;
+int dictionary_walkthrough(DICTIONARY *ptr, int (*callback)(const char *name, void *entry, void *data), void *data) {
+    DICT *dict = (DICT *)dict;
 
     dictionary_read_lock(dict);
     int ret = linkedlist_namevalue_walkthrough_unsafe(dict, callback, data);
@@ -661,7 +632,7 @@ int dictionary_unittest(size_t entries) {
     usec_t walking = now_realtime_usec();
 
     fprintf(stderr, "Walking through the dictionary (dictionary size %zu entries, %zu KB)...\n", dictionary_entries(d), dictionary_allocated_memory(d) / 1024);
-    errors += dictionary_walkthrough_with_name(d, verify_name_and_value_of_cloning_dictionary, NULL);
+    errors += dictionary_walkthrough(d, verify_name_and_value_of_cloning_dictionary, NULL);
 
     usec_t walking_end = now_realtime_usec();
     usec_t deleting = now_realtime_usec();
