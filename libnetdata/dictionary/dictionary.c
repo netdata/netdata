@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+typedef struct dictionary DICTIONARY;
+#define DICTIONARY_INTERNALS
+
 #include "../libnetdata.h"
 #include <Judy.h>
 
@@ -82,7 +85,7 @@ struct dictionary_stats {
     size_t memory;
 };
 
-typedef struct dictionary {
+struct dictionary {
     uint8_t flags;                      // the flags of the dictionary
 
     NAME_VALUE *first_item;             // the double linked list base pointers
@@ -92,48 +95,44 @@ typedef struct dictionary {
 
     netdata_rwlock_t *rwlock;
     struct dictionary_stats *stats;
-} DICT;
+};
 
 // ----------------------------------------------------------------------------
 // dictionary statistics maintenance
 
-size_t dictionary_allocated_memory(DICTIONARY *ptr) {
-    DICT *dict = (DICT *)ptr;
-
+size_t dictionary_allocated_memory(DICTIONARY *dict) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
         return dict->stats->memory;
 
     return 0;
 }
 
-size_t dictionary_entries(DICTIONARY *ptr) {
-    DICT *dict = (DICT *)ptr;
-
+size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
         return dict->stats->entries;
 
     return 0;
 }
 
-static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICT *dict) {
+static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
         dict->stats->searches++;
 }
-static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICT *dict, size_t size) {
+static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICTIONARY *dict, size_t size) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
         dict->stats->inserts++;
         dict->stats->entries++;
         dict->stats->memory += size;
     }
 }
-static inline void DICTIONARY_STATS_ENTRIES_MINUS1(DICT *dict, size_t size) {
+static inline void DICTIONARY_STATS_ENTRIES_MINUS1(DICTIONARY *dict, size_t size) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
         dict->stats->deletes++;
         dict->stats->entries--;
         dict->stats->memory -= size;
     }
 }
-static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICT *dict, size_t oldsize, size_t newsize) {
+static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t oldsize, size_t newsize) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
         dict->stats->resets++;
         dict->stats->memory += newsize;
@@ -141,26 +140,44 @@ static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICT *dict, size_t oldsiz
     }
 }
 
-
 // ----------------------------------------------------------------------------
 // dictionary locks
 
-static inline void dictionary_read_lock(DICT *dict) {
-    if(likely(dict->rwlock)) {
+static inline size_t dictionary_init_lock(DICTIONARY *dict) {
+    if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+            dict->rwlock = mallocz(sizeof(netdata_rwlock_t));
+            netdata_rwlock_init(dict->rwlock);
+            return sizeof(netdata_rwlock_t);
+    }
+    dict->rwlock = NULL;
+    return 0;
+}
+
+static inline size_t dictionary_free_lock(DICTIONARY *dict) {
+    if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+        netdata_rwlock_destroy(dict->rwlock);
+        freez(dict->rwlock);
+        return sizeof(netdata_rwlock_t);
+    }
+    return 0;
+}
+
+static inline void dictionary_read_lock(DICTIONARY *dict) {
+    if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
         // debug(D_DICTIONARY, "Dictionary READ lock");
         netdata_rwlock_rdlock(dict->rwlock);
     }
 }
 
-static inline void dictionary_write_lock(DICT *dict) {
-    if(likely(dict->rwlock)) {
+static inline void dictionary_write_lock(DICTIONARY *dict) {
+    if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
         // debug(D_DICTIONARY, "Dictionary WRITE lock");
         netdata_rwlock_wrlock(dict->rwlock);
     }
 }
 
-static inline void dictionary_unlock(DICT *dict) {
-    if(likely(dict->rwlock)) {
+static inline void dictionary_unlock(DICTIONARY *dict) {
+    if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
         // debug(D_DICTIONARY, "Dictionary UNLOCK lock");
         netdata_rwlock_unlock(dict->rwlock);
     }
@@ -170,12 +187,12 @@ static inline void dictionary_unlock(DICT *dict) {
 // ----------------------------------------------------------------------------
 // hash table
 
-static void hashtable_init_unsafe(DICT *dict) {
+static void hashtable_init_unsafe(DICTIONARY *dict) {
     dict->JudyHSArray = NULL;
 }
 
-static void hashtable_destroy_unsafe(DICT *dict) {
-    if(unlikely(!dict->JudyHSArray)) return;
+static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
+    if(unlikely(!dict->JudyHSArray)) return 0;
 
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&dict->JudyHSArray, &J_Error);
@@ -187,12 +204,12 @@ static void hashtable_destroy_unsafe(DICT *dict) {
     debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
 
     dict->JudyHSArray = NULL;
+    return (size_t)ret;
 }
 
-static inline NAME_VALUE **hashtable_insert_unsafe(DICT *dict, const char *name, size_t name_len) {
-    Pvoid_t *Rc;
+static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
     JError_t J_Error;
-    Rc = JudyHSIns(&dict->JudyHSArray, (void *)name, name_len, &J_Error);
+    Pvoid_t *Rc = JudyHSIns(&dict->JudyHSArray, (void *)name, name_len, &J_Error);
     if (unlikely(Rc == PJERR)) {
         fatal("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
               name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -205,7 +222,7 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICT *dict, const char *name,
     return (NAME_VALUE **)Rc;
 }
 
-static inline int hashtable_delete_unsafe(DICT *dict, const char *name, size_t name_len) {
+static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
     if(unlikely(!dict->JudyHSArray)) return 0;
 
     JError_t J_Error;
@@ -229,7 +246,7 @@ static inline int hashtable_delete_unsafe(DICT *dict, const char *name, size_t n
     }
 }
 
-static inline NAME_VALUE *hashtable_get_unsafe(DICT *dict, const char *name, size_t name_len) {
+static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
     if(unlikely(!dict->JudyHSArray)) return NULL;
 
     DICTIONARY_STATS_SEARCHES_PLUS1(dict);
@@ -249,31 +266,41 @@ static inline NAME_VALUE *hashtable_get_unsafe(DICT *dict, const char *name, siz
 // ----------------------------------------------------------------------------
 // linked list management
 
-static inline void linkedlist_namevalue_link_last(DICT *dict, NAME_VALUE *nv) {
-    if(unlikely(!dict->first_item)) {
+static inline void linkedlist_namevalue_link(DICTIONARY *dict, NAME_VALUE *nv) {
+    if (unlikely(!dict->first_item)) {
         // we are the only ones here
         nv->next = NULL;
         nv->prev = NULL;
         dict->first_item = dict->last_item = nv;
+        return;
+    }
+
+    if(dict->flags & DICTIONARY_FLAG_ADD_IN_FRONT) {
+        // add it at the beginning
+        nv->prev = NULL;
+        nv->next = dict->first_item;
+
+        if (likely(nv->next)) nv->next->prev = nv;
+        dict->first_item = nv;
     }
     else {
         // add it at the end
         nv->prev = dict->last_item;
         nv->next = NULL;
 
-        if(likely(nv->prev)) nv->prev->next = nv;
+        if (likely(nv->prev)) nv->prev->next = nv;
         dict->last_item = nv;
     }
 }
 
-static inline void linkedlist_namevalue_unlink(DICT *dict, NAME_VALUE *nv) {
+static inline void linkedlist_namevalue_unlink(DICTIONARY *dict, NAME_VALUE *nv) {
     if(nv->next) nv->next->prev = nv->prev;
     if(nv->prev) nv->prev->next = nv->next;
     if(dict->first_item == nv) dict->first_item = nv->next;
     if(dict->last_item == nv) dict->last_item = nv->prev;
 }
 
-static inline int linkedlist_namevalue_walkthrough_unsafe(DICT *dict, int (*callback)(const char *name, void *value, void *data), void *data) {
+static inline int linkedlist_namevalue_walkthrough_unsafe(DICTIONARY *dict, int (*callback)(const char *name, void *value, void *data), void *data) {
     int ret = 0;
     NAME_VALUE *nv;
     for(nv = dict->first_item; nv ; nv = nv->next) {
@@ -288,31 +315,31 @@ static inline int linkedlist_namevalue_walkthrough_unsafe(DICT *dict, int (*call
 // ----------------------------------------------------------------------------
 // NAME_VALUE methods
 
-static inline size_t namevalue_alloc_size(DICT *dict) {
+static inline size_t namevalue_alloc_size(DICTIONARY *dict) {
     return (dict->flags & DICTIONARY_FLAG_WITH_STATISTICS) ? sizeof(NAME_VALUE_WITH_STATS) : sizeof(NAME_VALUE);
 }
 
-static inline size_t namevalue_get_namelen(DICT *dict, NAME_VALUE *nv) {
+static inline size_t namevalue_get_namelen(DICTIONARY *dict, NAME_VALUE *nv) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
         NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
         return nvs->name_len;
     }
     return 0;
 }
-static inline size_t namevalue_get_valuelen(DICT *dict, NAME_VALUE *nv) {
+static inline size_t namevalue_get_valuelen(DICTIONARY *dict, NAME_VALUE *nv) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
         NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
         return nvs->value_len;
     }
     return 0;
 }
-static inline void namevalue_set_valuelen(DICT *dict, NAME_VALUE *nv, size_t value_len) {
+static inline void namevalue_set_valuelen(DICTIONARY *dict, NAME_VALUE *nv, size_t value_len) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
         NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
         nvs->value_len = value_len;
     }
 }
-static inline void namevalue_set_namevaluelen(DICT *dict, NAME_VALUE *nv, size_t name_len, size_t value_len) {
+static inline void namevalue_set_namevaluelen(DICTIONARY *dict, NAME_VALUE *nv, size_t name_len, size_t value_len) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
         NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
         nvs->name_len = name_len;
@@ -320,7 +347,7 @@ static inline void namevalue_set_namevaluelen(DICT *dict, NAME_VALUE *nv, size_t
     }
 }
 
-static NAME_VALUE *namevalue_create_unsafe(DICT *dict, const char *name, size_t name_len, void *value, size_t value_len) {
+static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
     size_t size = namevalue_alloc_size(dict);
@@ -350,7 +377,7 @@ static NAME_VALUE *namevalue_create_unsafe(DICT *dict, const char *name, size_t 
     return nv;
 }
 
-static void namevalue_reset_unsafe(DICT *dict, NAME_VALUE *nv, void *value, size_t value_len) {
+static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", nv->name);
 
     if(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE) {
@@ -373,7 +400,7 @@ static void namevalue_reset_unsafe(DICT *dict, NAME_VALUE *nv, void *value, size
     }
 }
 
-static void namevalue_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
+static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
 
     size_t freed = 0;
@@ -394,6 +421,8 @@ static void namevalue_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
     freed += namevalue_alloc_size(dict);
 
     DICTIONARY_STATS_ENTRIES_MINUS1(dict, freed);
+
+    return freed;
 }
 
 // ----------------------------------------------------------------------------
@@ -402,19 +431,13 @@ static void namevalue_destroy_unsafe(DICT *dict, NAME_VALUE *nv) {
 DICTIONARY *dictionary_create(uint8_t flags) {
     debug(D_DICTIONARY, "Creating dictionary.");
 
-    DICT *dict = mallocz(sizeof(DICT));
-    size_t allocated = sizeof(DICT);
+    DICTIONARY *dict = mallocz(sizeof(DICTIONARY));
+    size_t allocated = sizeof(DICTIONARY);
 
     dict->flags = flags;
     dict->first_item = dict->last_item = NULL;
 
-    if(!(flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
-        dict->rwlock = mallocz(sizeof(netdata_rwlock_t));
-        allocated += sizeof(netdata_rwlock_t);
-        netdata_rwlock_init(dict->rwlock);
-    }
-    else
-        dict->rwlock = NULL;
+    allocated += dictionary_init_lock(dict);
 
     if(flags & DICTIONARY_FLAG_WITH_STATISTICS) {
         dict->stats = callocz(1, sizeof(struct dictionary_stats));
@@ -428,19 +451,18 @@ DICTIONARY *dictionary_create(uint8_t flags) {
     return (DICTIONARY *)dict;
 }
 
-void dictionary_destroy(DICTIONARY *ptr) {
-    DICT *dict = (DICT *)ptr;
-
+size_t dictionary_destroy(DICTIONARY *dict) {
     debug(D_DICTIONARY, "Destroying dictionary.");
 
     dictionary_write_lock(dict);
 
+    size_t freed = 0;
     NAME_VALUE *nv = dict->first_item;
     while (nv) {
         // cache nv->next
         // because we are going to free nv
         NAME_VALUE *nvnext = nv->next;
-        namevalue_destroy_unsafe(dict, nv);
+        freed += namevalue_destroy_unsafe(dict, nv);
         nv = nvnext;
         // to speed up destruction, we don't
         // unlink nv from the linked-list here
@@ -450,28 +472,27 @@ void dictionary_destroy(DICTIONARY *ptr) {
     dict->last_item = NULL;
 
     // destroy the dictionary
-    hashtable_destroy_unsafe(dict);
+    freed += hashtable_destroy_unsafe(dict);
 
     dictionary_unlock(dict);
-
-    if(dict->rwlock) {
-        netdata_rwlock_destroy(dict->rwlock);
-        freez(dict->rwlock);
-    }
+    freed += dictionary_free_lock(dict);
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
         freez(dict->stats);
         dict->stats = NULL;
+        freed += sizeof(struct dictionary_stats);
     }
 
     freez(dict);
+    freed += sizeof(DICTIONARY);
+
+    return freed;
 }
 
 // ----------------------------------------------------------------------------
 // API - items management
 
-void *dictionary_set_with_name_ptr(DICTIONARY *ptr, const char *name, void *value, size_t value_len, char **name_ptr) {
-    DICT *dict = (DICT *)ptr;
+void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr) {
     size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
@@ -493,7 +514,7 @@ void *dictionary_set_with_name_ptr(DICTIONARY *ptr, const char *name, void *valu
     if(likely(*pnv == 0)) {
         // a new item added to the index
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
-        linkedlist_namevalue_link_last(dict, nv);
+        linkedlist_namevalue_link(dict, nv);
     }
     else {
         // the item is already in the index
@@ -511,8 +532,7 @@ void *dictionary_set_with_name_ptr(DICTIONARY *ptr, const char *name, void *valu
     return nv->value;
 }
 
-void *dictionary_get(DICTIONARY *ptr, const char *name) {
-    DICT *dict = (DICT *)ptr;
+void *dictionary_get(DICTIONARY *dict, const char *name) {
     size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
@@ -530,8 +550,7 @@ void *dictionary_get(DICTIONARY *ptr, const char *name) {
     return nv->value;
 }
 
-int dictionary_del(DICTIONARY *ptr, const char *name) {
-    DICT *dict = (DICT *)ptr;
+int dictionary_del(DICTIONARY *dict, const char *name) {
     size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     int ret;
@@ -562,15 +581,87 @@ int dictionary_del(DICTIONARY *ptr, const char *name) {
     return ret;
 }
 
+// ----------------------------------------------------------------------------
+// traversal with loop
+
+void *dictionary_foreach_start(DICTFE *dfe, DICTIONARY *dict) {
+    if(unlikely(!dfe || !dict)) return NULL;
+
+    dfe->dict = dict;
+    dfe->started_ut = now_realtime_usec();
+
+    dictionary_read_lock(dict);
+
+    NAME_VALUE *nv = dict->first_item;
+    dfe->last_position_index = (void *)nv;
+
+    if(likely(nv)) {
+        dfe->name = nv->name;
+        dfe->value = (void *)nv->value;
+
+        // TODO: increment reference counter on nv;
+    }
+    else {
+        dfe->name = NULL;
+        dfe->value = NULL;
+    }
+
+    return dfe->value;
+}
+
+void *dictionary_foreach_next(DICTFE *dfe) {
+    if(unlikely(!dfe || !dfe->dict)) return NULL;
+
+    NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
+    if(likely(nv)) {
+        // TODO: decrement reference counter on nv
+
+        // get the next item
+        nv = nv->next;
+    }
+    dfe->last_position_index = (void *)nv;
+
+    if(likely(nv)) {
+        dfe->name = nv->name;
+        dfe->value = (void *)nv->value;
+
+        // TODO: increment reference counter on nv->next;
+    }
+    else {
+        dfe->name = NULL;
+        dfe->value = NULL;
+    }
+
+    return dfe->value;
+}
+
+usec_t dictionary_foreach_done(DICTFE *dfe) {
+    if(unlikely(!dfe || !dfe->dict)) return 0;
+
+    NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
+    if(nv) {
+        // TODO: decrement reference counter on nv
+        ;
+    }
+
+    dictionary_unlock((DICTIONARY *)dfe->dict);
+    dfe->dict = NULL;
+    dfe->last_position_index = NULL;
+    dfe->name = NULL;
+    dfe->value = NULL;
+
+    usec_t usec = now_realtime_usec() - dfe->started_ut;
+    dfe->started_ut = 0;
+
+    return usec;
+}
 
 // ----------------------------------------------------------------------------
 // API - walk through the dictionary
 // the dictionary is locked for reading while this happens
 // do not user other dictionary calls while walking the dictionary - deadlock!
 
-int dictionary_walkthrough(DICTIONARY *ptr, int (*callback)(const char *name, void *entry, void *data), void *data) {
-    DICT *dict = (DICT *)ptr;
-
+int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(const char *name, void *entry, void *data), void *data) {
     dictionary_read_lock(dict);
     int ret = linkedlist_namevalue_walkthrough_unsafe(dict, callback, data);
     dictionary_unlock(dict);
