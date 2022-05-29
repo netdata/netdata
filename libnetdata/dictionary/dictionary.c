@@ -198,6 +198,10 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICT *dict, const char *name,
               name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
+    // we return a pointer to a pointer, so that the caller can
+    // put anything needed at the value of the index.
+    // The pointer to pointer we return has to be used before
+    // any other operation that may change the index (insert/delete).
     return (NAME_VALUE **)Rc;
 }
 
@@ -468,10 +472,21 @@ void dictionary_destroy(DICTIONARY *ptr) {
 
 void *dictionary_set_with_name_ptr(DICTIONARY *ptr, const char *name, void *value, size_t value_len, char **name_ptr) {
     DICT *dict = (DICT *)ptr;
+    size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
-    size_t name_len = strlen(name) + 1;
+    // DISCUSSION:
+    // Is it better to gain a read-lock and do a hashtable_get_unsafe()
+    // before we write lock to do hashtable_insert_unsafe()?
+    //
+    // Probably this depends on the use case.
+    // For statsd for example that does dictionary_set() to update received values,
+    // it could be beneficial to do a get() before we insert().
+    //
+    // But the caller has the option to do this on his/her own.
+    // So, let's do the fastest here and let the caller decide the flow of calls.
+
     dictionary_write_lock(dict);
 
     NAME_VALUE *nv, **pnv = hashtable_insert_unsafe(dict, name, name_len);
@@ -498,11 +513,12 @@ void *dictionary_set_with_name_ptr(DICTIONARY *ptr, const char *name, void *valu
 
 void *dictionary_get(DICTIONARY *ptr, const char *name) {
     DICT *dict = (DICT *)ptr;
+    size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
 
     dictionary_read_lock(dict);
-    NAME_VALUE *nv = hashtable_get_unsafe(dict, name, strlen(name) + 1);
+    NAME_VALUE *nv = hashtable_get_unsafe(dict, name, name_len);
     dictionary_unlock(dict);
 
     if(unlikely(!nv)) {
@@ -516,7 +532,7 @@ void *dictionary_get(DICTIONARY *ptr, const char *name) {
 
 int dictionary_del(DICTIONARY *ptr, const char *name) {
     DICT *dict = (DICT *)ptr;
-    size_t name_len = strlen(name) + 1;
+    size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     int ret;
 
