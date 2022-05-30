@@ -231,6 +231,15 @@ pkg_check_modules(CURL libcurl)
 # ${CURL_INCLUDE_DIRS}
 
 # -----------------------------------------------------------------------------
+# Detect libcups
+
+pkg_check_modules(CURL libcups)
+# later we use:
+# ${CUPS_LIBRARIES}
+# ${CUPS_CFLAGS_OTHER}
+# ${CUPS_INCLUDE_DIRS}
+
+# -----------------------------------------------------------------------------
 # Detect libaws-c-common
 
 find_library(HAVE_AWS_CHECKSUMS aws-checksums)
@@ -1181,7 +1190,6 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
     SET(ENABLE_PLUGIN_SLABINFO True)
-    SET(ENABLE_PLUGIN_CUPS True)
 
 ELSEIF(FREEBSD)
     list(APPEND NETDATA_FILES daemon/static_threads_freebsd.c)
@@ -1194,7 +1202,6 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
-    SET(ENABLE_PLUGIN_CUPS False)
     SET(ENABLE_PLUGIN_EBPF False)
 
 ELSEIF(MACOS)
@@ -1208,7 +1215,6 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_APPS False)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
-    SET(ENABLE_PLUGIN_CUPS False)
     SET(ENABLE_PLUGIN_EBPF False)
 
 ENDIF()
@@ -1234,6 +1240,12 @@ IF(XENSTAT_LIBRARIES)
     SET(ENABLE_PLUGIN_XENSTAT True)
 ELSE()
     SET(ENABLE_PLUGIN_XENSTAT False)
+ENDIF()
+
+IF(CUPS_LIBRARIES)
+    SET(ENABLE_PLUGIN_CUPS True)
+ELSE()
+    SET(ENABLE_PLUGIN_CUPS False)
 ENDIF()
 
 
@@ -1350,9 +1362,9 @@ ENDIF()
 IF(ENABLE_PLUGIN_CUPS)
     message(STATUS "cups.plugin: enabled")
     add_executable(cups.plugin config.h ${CUPS_PLUGIN_FILES})
-    target_link_libraries (cups.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
-    target_include_directories(cups.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
-    target_compile_options(cups.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+    target_link_libraries (cups.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${CUPS_LIBRARIES})
+    target_include_directories(cups.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CUPS_INCLUDE_DIRS})
+    target_compile_options(cups.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CUPS_CFLAGS_OTHER})
 ELSE()
     message(STATUS "cups.plugin: disabled")
 ENDIF()
