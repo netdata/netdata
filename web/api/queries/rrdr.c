@@ -67,8 +67,8 @@ inline static void rrdr_lock_rrdset(RRDR *r) {
         return;
     }
 
-    r->has_st_lock = 1;
     rrdset_rdlock(r->st);
+    r->has_st_lock = 1;
 }
 
 inline static void rrdr_unlock_rrdset(RRDR *r) {
@@ -78,8 +78,8 @@ inline static void rrdr_unlock_rrdset(RRDR *r) {
     }
 
     if(likely(r->has_st_lock)) {
-        rrdset_unlock(r->st);
         r->has_st_lock = 0;
+        rrdset_unlock(r->st);
     }
 }
 
