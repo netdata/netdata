@@ -81,6 +81,22 @@ extern void *dictionary_get(DICTIONARY *dict, const char *name);
 // returns -1 if the item was not found in the index
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
+// UNSAFE functions, without locks
+// to be used when the user is traversing with the right lock type
+// Read lock is acquired by dictionary_walktrhough_read() and dfe_start_read()
+// Write lock is acquired by dictionary_walktrhough_write() and dfe_start_write()
+// For code readability, please use these macros:
+#define dictionary_get_having_read_lock(dict, name) dictionary_get_unsafe(dict, name)
+#define dictionary_get_having_write_lock(dict, name) dictionary_get_unsafe(dict, name)
+#define dictionary_set_having_write_lock(dict, name, value, value_len) dictionary_set_unsafe(dict, name, value, value_len)
+#define dictionary_set_with_name_ptr_having_write_lock(dict, name, value, value_len, name_ptr) dictionary_set_unsafe(dict, name, value, value_len, name_ptr)
+#define dictionary_del_having_write_lock(dict, name) dictionary_del_unsafe(dict, name)
+
+extern void *dictionary_get_unsafe(DICTIONARY *dict, const char *name);
+#define dictionary_set_unsafe(dict, name, value, value_len) dictionary_set_with_name_ptr_unsafe(dict, name, value, value_len, NULL)
+extern void *dictionary_set_with_name_ptr_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr);
+extern int dictionary_del_unsafe(DICTIONARY *dict, const char *name);
+
 // Traverse (walk through) the items of the dictionary.
 // The order of traversal is currently the order of insertion.
 //
@@ -142,12 +158,12 @@ extern usec_t dictionary_foreach_done(DICTFE *dfe);
 
 // Get statistics about the dictionary
 // If DICTIONARY_FLAG_WITH_STATISTICS is not set, these return zero
-extern size_t dictionary_allocated_memory(DICTIONARY *dict);
-extern size_t dictionary_entries(DICTIONARY *dict);
-extern size_t dictionary_inserts(DICTIONARY *dict);
-extern size_t dictionary_searches(DICTIONARY *dict);
-extern size_t dictionary_deletes(DICTIONARY *dict);
-extern size_t dictionary_resets(DICTIONARY *dict);
+extern size_t dictionary_stats_allocated_memory(DICTIONARY *dict);
+extern size_t dictionary_stats_entries(DICTIONARY *dict);
+extern size_t dictionary_stats_inserts(DICTIONARY *dict);
+extern size_t dictionary_stats_searches(DICTIONARY *dict);
+extern size_t dictionary_stats_deletes(DICTIONARY *dict);
+extern size_t dictionary_stats_resets(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
 

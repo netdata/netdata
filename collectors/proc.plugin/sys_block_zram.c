@@ -173,7 +173,7 @@ static void free_device(DICTIONARY *dict, const char *name)
     rrdset_obsolete_and_pointer_null(d->st_savings);
     rrdset_obsolete_and_pointer_null(d->st_alloc_efficiency);
     rrdset_obsolete_and_pointer_null(d->st_comp_ratio);
-    dictionary_del(dict, name);
+    dictionary_del_having_write_lock(dict, name);
 }
     // --------------------------------------------------------------------
 
@@ -280,13 +280,13 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         device_count = init_devices(devices, (unsigned int)zram_id, update_every);
         if (device_count < 1)
             return 1;
-        dictionary_walkthrough_read(devices, collect_first_zram_metrics, devices);
+        dictionary_walkthrough_write(devices, collect_first_zram_metrics, devices);
     }
     else
     {
         if (unlikely(device_count < 1))
             return 1;
-        dictionary_walkthrough_read(devices, collect_zram_metrics, devices);
+        dictionary_walkthrough_write(devices, collect_zram_metrics, devices);
     }
     return 0;
 }

@@ -443,8 +443,8 @@ void registry_statistics(void) {
     }
     else rrdset_next(stm);
 
-    rrddim_set(stm, "persons",       registry.persons_memory + dictionary_allocated_memory(registry.persons));
-    rrddim_set(stm, "machines",      registry.machines_memory + dictionary_allocated_memory(registry.machines));
+    rrddim_set(stm, "persons",       registry.persons_memory + dictionary_stats_allocated_memory(registry.persons));
+    rrddim_set(stm, "machines",      registry.machines_memory + dictionary_stats_allocated_memory(registry.machines));
     rrddim_set(stm, "urls",          registry.urls_memory);
     rrddim_set(stm, "persons_urls",  registry.persons_urls_memory);
     rrddim_set(stm, "machines_urls", registry.machines_urls_memory);
