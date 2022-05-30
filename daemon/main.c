@@ -895,6 +895,9 @@ int main(int argc, char **argv) {
                         }
 #endif
 #ifdef ENABLE_DBENGINE
+                        else if(strcmp(optarg, "dicttest") == 0) {
+                            return dictionary_unittest(10000);
+                        }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);

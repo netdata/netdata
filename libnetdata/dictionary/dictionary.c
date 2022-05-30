@@ -826,10 +826,26 @@ static size_t dictionary_unittest_del_nonexisting(DICTIONARY *dict, char **names
 static size_t dictionary_unittest_del_existing(DICTIONARY *dict, char **names, char **values, size_t entries) {
     (void)values;
     size_t errors = 0;
-    for(size_t i = 0; i < entries ;i++) {
+
+    size_t forward_from = 0, forward_to = entries / 3;
+    size_t middle_from = forward_to, middle_to = entries * 2 / 3;
+    size_t backward_from = middle_to, backward_to = entries;
+
+    for(size_t i = forward_from; i < forward_to ;i++) {
         int ret = dictionary_del(dict, names[i]);
-        if(ret == -1) { fprintf(stderr, ">>> %s() didn't delete existing item\n", __FUNCTION__); errors++; }
+        if(ret == -1) { fprintf(stderr, ">>> %s() didn't delete (forward) existing item\n", __FUNCTION__); errors++; }
     }
+
+    for(size_t i = middle_to - 1; i >= middle_from ;i--) {
+        int ret = dictionary_del(dict, names[i]);
+        if(ret == -1) { fprintf(stderr, ">>> %s() didn't delete (middle) existing item\n", __FUNCTION__); errors++; }
+    }
+
+    for(size_t i = backward_to - 1; i >= backward_from ;i--) {
+        int ret = dictionary_del(dict, names[i]);
+        if(ret == -1) { fprintf(stderr, ">>> %s() didn't delete (backward) existing item\n", __FUNCTION__); errors++; }
+    }
+
     return errors;
 }
 
@@ -947,6 +963,8 @@ static usec_t dictionary_unittest_run_and_measure_time(DICTIONARY *dict, char *m
 }
 
 int dictionary_unittest(size_t entries) {
+    if(entries < 10) entries = 10;
+
     DICTIONARY *dict;
     size_t errors = 0;
 
@@ -961,24 +979,24 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, &errors, dictionary_unittest_get_nonexisting);
     dictionary_unittest_run_and_measure_time(dict, "resetting entries", names, values, entries, &errors, dictionary_unittest_reset_clone);
     dictionary_unittest_run_and_measure_time(dict, "deleting non-existing entries", names, values, entries, &errors, dictionary_unittest_del_nonexisting);
-    dictionary_unittest_run_and_measure_time(dict, "traverse foreach", names, values, entries, &errors, dictionary_unittest_foreach);
-    dictionary_unittest_run_and_measure_time(dict, "walking through", names, values, entries, &errors, dictionary_unittest_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "walking through stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach loop", names, values, entries, &errors, dictionary_unittest_foreach);
+    dictionary_unittest_run_and_measure_time(dict, "walking through callback", names, values, entries, &errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "walking through callback stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
     dictionary_unittest_run_and_measure_time(dict, "deleting existing entries", names, values, entries, &errors, dictionary_unittest_del_existing);
     dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, &errors, dictionary_unittest_walkthrough);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
 
-    fprintf(stderr, "\nCreating dictionary with non-clone options, %zu items\n", entries);
-    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
+    fprintf(stderr, "\nCreating dictionary with non-clone and add-in-front options, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_ADD_IN_FRONT);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, &errors, dictionary_unittest_get_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, &errors, dictionary_unittest_get_nonexisting);
     dictionary_unittest_run_and_measure_time(dict, "resetting entries", names, values, entries, &errors, dictionary_unittest_reset_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "deleting non-existing entries", names, values, entries, &errors, dictionary_unittest_del_nonexisting);
-    dictionary_unittest_run_and_measure_time(dict, "traverse foreach", names, values, entries, &errors, dictionary_unittest_foreach);
-    dictionary_unittest_run_and_measure_time(dict, "walking through", names, values, entries, &errors, dictionary_unittest_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "walking through stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach loop", names, values, entries, &errors, dictionary_unittest_foreach);
+    dictionary_unittest_run_and_measure_time(dict, "walking through callback", names, values, entries, &errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "walking through callback stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
     dictionary_unittest_run_and_measure_time(dict, "deleting existing entries", names, values, entries, &errors, dictionary_unittest_del_existing);
     dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, &errors, dictionary_unittest_walkthrough);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
@@ -987,9 +1005,9 @@ int dictionary_unittest(size_t entries) {
     dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "resetting non-overwrite entries", names, values, entries, &errors, dictionary_unittest_reset_dont_overwrite_nonclone);
-    dictionary_unittest_run_and_measure_time(dict, "traverse foreach", names, values, entries, &errors, dictionary_unittest_foreach);
-    dictionary_unittest_run_and_measure_time(dict, "walking through", names, values, entries, &errors, dictionary_unittest_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "walking through stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach loop", names, values, entries, &errors, dictionary_unittest_foreach);
+    dictionary_unittest_run_and_measure_time(dict, "walking through callback", names, values, entries, &errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "walking through callback stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
     dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     dictionary_unittest_free_char_pp(names, entries);
