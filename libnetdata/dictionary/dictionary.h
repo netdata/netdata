@@ -86,7 +86,7 @@ extern int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 #endif
 
 typedef DICTFE_CONST struct dictionary_foreach {
-    char *name;                 // the dictionary name of the last item used
+    DICTFE_CONST char *name;    // the dictionary name of the last item used
     void *value;                // the dictionary value of the last item used
                                 // same as the return value of dictfe_start() and dictfe_next()
 
