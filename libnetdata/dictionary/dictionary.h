@@ -5,6 +5,36 @@
 
 #include "../libnetdata.h"
 
+
+/*
+ * Netdata DICTIONARY features:
+ *
+ * CLONE or LINK
+ * Names and Values in the dictionary can be cloned or linked.
+ * In clone mode, the dictionary does all the memory management.
+ * The default is clone for both names and values.
+ * Set DICTIONARY_FLAG_NAME_LINK_DONT_CLONE to link names.
+ * Set DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE to link names.
+ *
+ * ORDERED
+ * Items are ordered in the order they are added (new items are appended at the end).
+ * You may reverse the order by setting the flag DICTIONARY_FLAG_ADD_IN_FRONT.
+ *
+ * LOOKUP
+ * The dictionary uses JudyHS to maintain a very fast randomly accessible hash table.
+ *
+ * MULTI-THREADED and SINGLE-THREADED
+ * Each dictionary may be single threaded (no locks), or multi-threaded (multiple readers or one writer).
+ * The default is multi-threaded. Add the flag DICTIONARY_FLAG_SINGLE_THREADED for single-threaded.
+ *
+ * WALK-THROUGH and FOREACH traversal
+ * The dictionary can be traversed on read or write mode, either with a callback (walkthrough) or with
+ * a loop (foreach).
+ *
+ * In write mode traversal, the caller may delete only the current item, but may add as many items as needed.
+ *
+ */
+
 #ifndef DICTIONARY_INTERNALS
 typedef void DICTIONARY;
 #endif
@@ -60,8 +90,8 @@ extern int dictionary_del(DICTIONARY *dict, const char *name);
 // If all callback calls return zero or positive numbers, the sum of all of
 // them is returned to the caller.
 //
-// You cannot alter the dictionary with dictionary_walkthrough_read() - deadlock!
-// You can only delete the current item with dictionary_walkthrough_write() - you can add as many as you want.
+// You cannot alter the dictionary from inside a dictionary_walkthrough_read() - deadlock!
+// You can only delete the current item from inside a dictionary_walkthrough_write() - you can add as many as you want.
 //
 #define dictionary_walkthrough_read(dict, callback, data) dictionary_walkthrough_rw(dict, 'r', callback, data)
 #define dictionary_walkthrough_write(dict, callback, data) dictionary_walkthrough_rw(dict, 'w', callback, data)
@@ -77,8 +107,8 @@ extern int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 //  }
 //  dfe_done(&dfe);
 //
-// You cannot alter the dictionary with dfe_read_start() - deadlock!
-// You can only delete the current item with dfe_start_write() - you can add as many as you want.
+// You cannot alter the dictionary from within a dfe_read_start() - deadlock!
+// You can only delete the current item from inside a dfe_start_write() - you can add as many as you want.
 //
 
 #ifdef DICTIONARY_INTERNALS

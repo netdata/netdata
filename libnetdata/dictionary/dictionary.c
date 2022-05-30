@@ -791,8 +791,8 @@ static size_t dictionary_unittest_set_clone(DICTIONARY *dict, char **names, char
         char *val = (char *)dictionary_set_with_name_ptr(dict, names[i], values[i], vallen, &nam);
         if(nam == names[i])  { fprintf(stderr, ">>> %s() returns reference to name\n", __FUNCTION__); errors++; }
         if(val == values[i]) { fprintf(stderr, ">>> %s() returns reference to value\n", __FUNCTION__); errors++; }
-        if(strcmp(nam, names[i]) != 0)  { fprintf(stderr, ">>> %s() returns invalid name\n", __FUNCTION__); errors++; }
-        if(memcmp(val, values[i], vallen) != 0)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
+        if(!nam || strcmp(nam, names[i]) != 0)  { fprintf(stderr, ">>> %s() returns invalid name\n", __FUNCTION__); errors++; }
+        if(!val || memcmp(val, values[i], vallen) != 0)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
     }
     return errors;
 }
@@ -815,7 +815,7 @@ static size_t dictionary_unittest_get_clone(DICTIONARY *dict, char **names, char
         size_t vallen = strlen(values[i]) + 1;
         char *val = (char *)dictionary_get(dict, names[i]);
         if(val == values[i]) { fprintf(stderr, ">>> %s() returns reference to value\n", __FUNCTION__); errors++; }
-        if(memcmp(val, values[i], vallen) != 0)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
+        if(!val || memcmp(val, values[i], vallen) != 0)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
     }
     return errors;
 }
@@ -885,8 +885,8 @@ static size_t dictionary_unittest_reset_clone(DICTIONARY *dict, char **names, ch
         char *val = (char *)dictionary_set_with_name_ptr(dict, names[i], names[i], vallen, &nam);
         if(nam == names[i]) { fprintf(stderr, ">>> %s() returns reference to name\n", __FUNCTION__); errors++; }
         if(val == names[i]) { fprintf(stderr, ">>> %s() returns reference to value\n", __FUNCTION__); errors++; }
-        if(strcmp(nam, names[i]) != 0)  { fprintf(stderr, ">>> %s() returns invalid name\n", __FUNCTION__); errors++; }
-        if(memcmp(val, names[i], vallen) != 0)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
+        if(!nam || strcmp(nam, names[i]) != 0)  { fprintf(stderr, ">>> %s() returns invalid name\n", __FUNCTION__); errors++; }
+        if(!val || memcmp(val, names[i], vallen) != 0)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
     }
     return errors;
 }
@@ -901,6 +901,8 @@ static size_t dictionary_unittest_reset_nonclone(DICTIONARY *dict, char **names,
         char *val = (char *)dictionary_set_with_name_ptr(dict, names[i], names[i], vallen, &nam);
         if(nam != names[i]) { fprintf(stderr, ">>> %s() returns invalid pointer to name\n", __FUNCTION__); errors++; }
         if(val != names[i]) { fprintf(stderr, ">>> %s() returns invalid pointer to value\n", __FUNCTION__); errors++; }
+        if(!nam)  { fprintf(stderr, ">>> %s() returns invalid name\n", __FUNCTION__); errors++; }
+        if(!val)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
     }
     return errors;
 }
@@ -1031,6 +1033,7 @@ void dictionary_unittest_clone(DICTIONARY *dict, char **names, char **values, si
     dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback stop", names, values, entries, errors, dictionary_unittest_walkthrough_stop);
     dictionary_unittest_run_and_measure_time(dict, "deleting existing entries", names, values, entries, errors, dictionary_unittest_del_existing);
     dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach empty", names, values, 0, errors, dictionary_unittest_foreach);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, errors, dictionary_unittest_destroy);
 }
 
@@ -1045,6 +1048,7 @@ void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **values,
     dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback stop", names, values, entries, errors, dictionary_unittest_walkthrough_stop);
     dictionary_unittest_run_and_measure_time(dict, "deleting existing entries", names, values, entries, errors, dictionary_unittest_del_existing);
     dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach empty", names, values, 0, errors, dictionary_unittest_foreach);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, errors, dictionary_unittest_destroy);
 }
 
