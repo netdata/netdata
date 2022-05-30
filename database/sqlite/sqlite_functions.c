@@ -94,8 +94,12 @@ static void add_stmt_to_list(sqlite3_stmt *res)
     static sqlite3_stmt *statements[MAX_OPEN_STATEMENTS];
 
     if (unlikely(!res)) {
-        while (idx > 0)
-            sqlite3_finalize(statements[--idx]);
+        while (idx > 0) {
+            int rc;
+            rc = sqlite3_finalize(statements[--idx]);
+            if (unlikely(rc != SQLITE_OK))
+                error_report("Failed to finalize statement during shutdown, rc = %d", rc);
+        }
         return;
     }
 
