@@ -112,9 +112,9 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     now_realtime_timeval(&w->tv_ready);
 
     if (query->timeout) {
-        double in_queue = ((int) dt_usec(&w->tv_in, &w->tv_ready)) / 1000.0;
+        int in_queue = (int) (dt_usec(&w->tv_in, &w->tv_ready) / 1000);
         if (in_queue > query->timeout) {
-            log_access("QUERY CANCELED: QUEUE TIME EXCEEDED %0.2f ms (LIMIT %d ms)", in_queue, query->timeout);
+            log_access("QUERY CANCELED: QUEUE TIME EXCEEDED %d ms (LIMIT %d ms)", in_queue, query->timeout);
             retval = 1;
             w->response.code = HTTP_RESP_BACKEND_FETCH_FAILED;
             aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
