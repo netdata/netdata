@@ -189,6 +189,6 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
             .c = 0,
             .wb = wb
     };
-    dictionary_walkthrough(dict, print_collector_callback, &ap);
+    dictionary_walkthrough_read(dict, print_collector_callback, &ap);
     dictionary_destroy(dict);
 }

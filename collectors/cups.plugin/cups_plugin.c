@@ -221,7 +221,7 @@ void reset_metrics() {
     num_dest_stopped = 0;
 
     reset_job_metrics(NULL, &global_job_metrics, NULL);
-    dictionary_walkthrough(dict_dest_job_metrics, reset_job_metrics, NULL);
+    dictionary_walkthrough_write(dict_dest_job_metrics, reset_job_metrics, NULL);
 }
 
 int main(int argc, char **argv) {
@@ -371,7 +371,7 @@ int main(int argc, char **argv) {
         }
         cupsFreeJobs(num_jobs, jobs);
 
-        dictionary_walkthrough(dict_dest_job_metrics, collect_job_metrics, NULL);
+        dictionary_walkthrough_write(dict_dest_job_metrics, collect_job_metrics, NULL);
 
         static int cups_printer_by_option_created = 0;
         if (unlikely(!cups_printer_by_option_created))

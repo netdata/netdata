@@ -408,7 +408,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
     }
 
     if (do_zfs_pool_state)
-        dictionary_walkthrough(zfs_pools, update_zfs_pool_state_chart, &update_every);
+        dictionary_walkthrough_read(zfs_pools, update_zfs_pool_state_chart, &update_every);
 
     while (deleted_zfs_pools) {
         struct deleted_zfs_pool *current_pool = deleted_zfs_pools;

@@ -115,7 +115,7 @@ static int machine_delete_callback(const char *name, void *entry, void *data) {
     (void)data;
 
     REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)entry;
-    int ret = dictionary_walkthrough(m->machine_urls, machine_urls_delete_callback, m);
+    int ret = dictionary_walkthrough_read(m->machine_urls, machine_urls_delete_callback, m);
 
     dictionary_destroy(m->machine_urls);
     freez(m);
@@ -146,10 +146,10 @@ void registry_free(void) {
     if(!registry.enabled) return;
 
     debug(D_REGISTRY, "Registry: destroying persons dictionary");
-    dictionary_walkthrough(registry.persons, registry_person_del_callback, NULL);
+    dictionary_walkthrough_read(registry.persons, registry_person_del_callback, NULL);
     dictionary_destroy(registry.persons);
 
     debug(D_REGISTRY, "Registry: destroying machines dictionary");
-    dictionary_walkthrough(registry.machines, machine_delete_callback, NULL);
+    dictionary_walkthrough_read(registry.machines, machine_delete_callback, NULL);
     dictionary_destroy(registry.machines);
 }

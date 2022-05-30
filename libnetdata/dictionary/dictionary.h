@@ -16,7 +16,7 @@ typedef void DICTIONARY;
 #define DICTIONARY_FLAG_WITH_STATISTICS         0x0008 // maintain statistics about dictionary operations (default: disabled)
 #define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x0010 // don't overwrite values of dictionary items (default: overwrite)
 #define DICTIONARY_FLAG_ADD_IN_FRONT            0x0020 // add dictionary items at the front of the linked list (default: at the end)
-#define DICTIONARY_FLAG_REFERENCE_COUNTERS      0x0040 // maintain reference counter in walkthrough and foreach
+#define DICTIONARY_FLAG_RESERVED1               0x0040 // this is reserved for DICTIONARY_FLAG_REFERENCE_COUNTERS
 
 // Create a dictionary
 extern DICTIONARY *dictionary_create(uint16_t flags);
@@ -58,17 +58,25 @@ extern int dictionary_del(DICTIONARY *dict, const char *name);
 // If all callback calls return zero or positive numbers, the sum of all of
 // them is returned to the caller.
 //
-extern int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(const char *name, void *value, void *data), void *data);
+// You cannot alter the dictionary with dictionary_walkthrough_read() - deadlock!
+// You can only delete the current item with dictionary_walkthrough_write() - you can add as many as you want.
+//
+#define dictionary_walkthrough_read(dict, callback, data) dictionary_walkthrough_rw(dict, 'r', callback, data)
+#define dictionary_walkthrough_write(dict, callback, data) dictionary_walkthrough_rw(dict, 'w', callback, data)
+extern int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *value, void *data), void *data);
 
 // Traverse with foreach
 //
 // Use like this:
 //
 //  DICTFE dfe;
-//  for(MY_ITEM *item = dfe_start(&dfe, dict); item ; item = dfe_next(&dfe)) {
+//  for(MY_ITEM *item = dfe_start_read(&dfe, dict); item ; item = dfe_next(&dfe)) {
 //     // do things with the item and its dfe.name
 //  }
 //  dfe_done(&dfe);
+//
+// You cannot alter the dictionary with dfe_read_start() - deadlock!
+// You can only delete the current item with dfe_start_write() - you can add as many as you want.
 //
 
 #ifdef DICTIONARY_INTERNALS
@@ -86,15 +94,17 @@ typedef DICTFE_CONST struct dictionary_foreach {
     // the following are for internal use only - to keep track of the point we are
     DICTIONARY *dict;           // the dictionary upon we work
     void *last_position_index;  // the internal position index, to remember the position we are at
+    void *next_position_index;  // the internal position index, of the next item
 } DICTFE;
 
 #define dfe_name(dfe) (dfe)->name
 #define dfe_value(dfe) (dfe)->value
-#define dfe_start(dfe, dict) dictionary_foreach_start(dfe, dict)
+#define dfe_start_read(dfe, dict) dictionary_foreach_start_rw(dfe, dict, 'r')
+#define dfe_start_write(dfe, dict) dictionary_foreach_start_rw(dfe, dict, 'w')
 #define dfe_next(dfe) dictionary_foreach_next(dfe)
 #define dfe_done(dfe) dictionary_foreach_done(dfe)
 
-extern void * dictionary_foreach_start(DICTFE *dfe, DICTIONARY *dict);
+extern void * dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw);
 extern void * dictionary_foreach_next(DICTFE *dfe);
 extern usec_t dictionary_foreach_done(DICTFE *dfe);
 

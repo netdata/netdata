@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// NOT TO BE USED BY USERS YET
+#define DICTIONARY_FLAG_REFERENCE_COUNTERS      0x0040 // maintain reference counter in walkthrough and foreach
+
 typedef struct dictionary DICTIONARY;
 #define DICTIONARY_INTERNALS
 
@@ -347,20 +350,6 @@ static inline void linkedlist_namevalue_unlink(DICTIONARY *dict, NAME_VALUE *nv)
     if(dict->last_item == nv) dict->last_item = nv->prev;
 }
 
-static inline int linkedlist_namevalue_walkthrough_unsafe(DICTIONARY *dict, int (*callback)(const char *name, void *value, void *data), void *data) {
-    int ret = 0;
-    NAME_VALUE *nv;
-    for(nv = dict->first_item; nv ; nv = nv->next) {
-        reference_counter_acquire(dict, nv);
-        int r = callback(nv->name, nv->value, data);
-        reference_counter_release(dict, nv);
-        if(unlikely(r < 0)) return r;
-
-        ret += r;
-    }
-    return ret;
-}
-
 // ----------------------------------------------------------------------------
 // NAME_VALUE methods
 
@@ -645,23 +634,28 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
 // ----------------------------------------------------------------------------
 // traversal with loop
 
-void *dictionary_foreach_start(DICTFE *dfe, DICTIONARY *dict) {
+void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
     if(unlikely(!dfe || !dict)) return NULL;
 
     dfe->dict = dict;
     dfe->started_ut = now_realtime_usec();
 
-    dictionary_lock_rlock(dict);
+    if(rw == 'r' || rw == 'R')
+        dictionary_lock_rlock(dict);
+    else
+        dictionary_lock_wlock(dict);
 
     NAME_VALUE *nv = dict->first_item;
     dfe->last_position_index = (void *)nv;
 
     if(likely(nv)) {
+        dfe->next_position_index = (void *)nv->next;
         dfe->name = nv->name;
         dfe->value = (void *)nv->value;
         reference_counter_acquire(dict, nv);
     }
     else {
+        dfe->next_position_index = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
     }
@@ -673,21 +667,20 @@ void *dictionary_foreach_next(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return NULL;
 
     NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
-    if(likely(nv)) {
+    if(likely(nv))
         reference_counter_release(dfe->dict, nv);
 
-        // get the next item
-        nv = nv->next;
-    }
-    dfe->last_position_index = (void *)nv;
+    nv = dfe->last_position_index = dfe->next_position_index;
 
     if(likely(nv)) {
+        dfe->next_position_index = (void *)nv->next;
         dfe->name = nv->name;
         dfe->value = (void *)nv->value;
 
         reference_counter_acquire(dfe->dict, nv);
     }
     else {
+        dfe->next_position_index = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
     }
@@ -705,6 +698,7 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
     dictionary_unlock((DICTIONARY *)dfe->dict);
     dfe->dict = NULL;
     dfe->last_position_index = NULL;
+    dfe->next_position_index = NULL;
     dfe->name = NULL;
     dfe->value = NULL;
 
@@ -719,9 +713,32 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
 // the dictionary is locked for reading while this happens
 // do not use other dictionary calls while walking the dictionary - deadlock!
 
-int dictionary_walkthrough(DICTIONARY *dict, int (*callback)(const char *name, void *entry, void *data), void *data) {
-    dictionary_lock_rlock(dict);
-    int ret = linkedlist_namevalue_walkthrough_unsafe(dict, callback, data);
+int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
+    if(rw == 'r' || rw == 'R')
+        dictionary_lock_rlock(dict);
+    else
+        dictionary_lock_wlock(dict);
+
+    // written in such a way, that the callback can delete the active element
+
+    int ret = 0;
+    NAME_VALUE *nv = dict->first_item, *nv_next = nv->next;
+    while(nv) {
+        nv_next = nv->next;
+
+        reference_counter_acquire(dict, nv);
+        int r = callback(nv->name, nv->value, data);
+        reference_counter_release(dict, nv);
+        if(unlikely(r < 0)) {
+            ret = r;
+            break;
+        }
+
+        ret += r;
+
+        nv = nv_next;
+    }
+
     dictionary_unlock(dict);
 
     return ret;
@@ -902,7 +919,24 @@ static int dictionary_unittest_walkthrough_callback(const char *name, void *valu
 static size_t dictionary_unittest_walkthrough(DICTIONARY *dict, char **names, char **values, size_t entries) {
     (void)names;
     (void)values;
-    int sum = dictionary_walkthrough(dict, dictionary_unittest_walkthrough_callback, NULL);
+    int sum = dictionary_walkthrough_read(dict, dictionary_unittest_walkthrough_callback, NULL);
+    if(sum < (int)entries) return entries - sum;
+    else return sum - entries;
+}
+
+static int dictionary_unittest_walkthrough_delete_this_callback(const char *name, void *value, void *data) {
+    (void)value;
+
+    if(dictionary_del((DICTIONARY *)data, name) == -1)
+        return 0;
+
+    return 1;
+}
+
+static size_t dictionary_unittest_walkthrough_delete_this(DICTIONARY *dict, char **names, char **values, size_t entries) {
+    (void)names;
+    (void)values;
+    int sum = dictionary_walkthrough_write(dict, dictionary_unittest_walkthrough_delete_this_callback, dict);
     if(sum < (int)entries) return entries - sum;
     else return sum - entries;
 }
@@ -918,7 +952,7 @@ static size_t dictionary_unittest_walkthrough_stop(DICTIONARY *dict, char **name
     (void)names;
     (void)values;
     (void)entries;
-    int sum = dictionary_walkthrough(dict, dictionary_unittest_walkthrough_stop_callback, NULL);
+    int sum = dictionary_walkthrough_read(dict, dictionary_unittest_walkthrough_stop_callback, NULL);
     if(sum != -1) return 1;
     return 0;
 }
@@ -929,8 +963,23 @@ static size_t dictionary_unittest_foreach(DICTIONARY *dict, char **names, char *
     (void)entries;
     size_t count = 0;
     DICTFE dfe;
-    for(char *item = dfe_start(&dfe, dict); item ; item = dfe_next(&dfe)) {
+    for(char *item = dfe_start_read(&dfe, dict); item ; item = dfe_next(&dfe)) {
        count++;
+    }
+    dfe_done(&dfe);
+
+    if(count > entries) return count - entries;
+    return entries - count;
+}
+
+static size_t dictionary_unittest_foreach_delete_this(DICTIONARY *dict, char **names, char **values, size_t entries) {
+    (void)names;
+    (void)values;
+    (void)entries;
+    size_t count = 0;
+    DICTFE dfe;
+    for(char *item = dfe_start_read(&dfe, dict); item ; item = dfe_next(&dfe)) {
+        if(dictionary_del(dict, dfe.name) != -1) count++;
     }
     dfe_done(&dfe);
 
@@ -962,6 +1011,34 @@ static usec_t dictionary_unittest_run_and_measure_time(DICTIONARY *dict, char *m
     return dt;
 }
 
+void dictionary_unittest_clone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+    dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_clone);
+    dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, errors, dictionary_unittest_get_clone);
+    dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, errors, dictionary_unittest_get_nonexisting);
+    dictionary_unittest_run_and_measure_time(dict, "resetting entries", names, values, entries, errors, dictionary_unittest_reset_clone);
+    dictionary_unittest_run_and_measure_time(dict, "deleting non-existing entries", names, values, entries, errors, dictionary_unittest_del_nonexisting);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop", names, values, entries, errors, dictionary_unittest_foreach);
+    dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback", names, values, entries, errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback stop", names, values, entries, errors, dictionary_unittest_walkthrough_stop);
+    dictionary_unittest_run_and_measure_time(dict, "deleting existing entries", names, values, entries, errors, dictionary_unittest_del_existing);
+    dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, errors, dictionary_unittest_destroy);
+}
+
+void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+    dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_nonclone);
+    dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, errors, dictionary_unittest_get_nonclone);
+    dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, errors, dictionary_unittest_get_nonexisting);
+    dictionary_unittest_run_and_measure_time(dict, "resetting entries", names, values, entries, errors, dictionary_unittest_reset_nonclone);
+    dictionary_unittest_run_and_measure_time(dict, "deleting non-existing entries", names, values, entries, errors, dictionary_unittest_del_nonexisting);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop", names, values, entries, errors, dictionary_unittest_foreach);
+    dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback", names, values, entries, errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback stop", names, values, entries, errors, dictionary_unittest_walkthrough_stop);
+    dictionary_unittest_run_and_measure_time(dict, "deleting existing entries", names, values, entries, errors, dictionary_unittest_del_existing);
+    dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, errors, dictionary_unittest_destroy);
+}
+
 int dictionary_unittest(size_t entries) {
     if(entries < 10) entries = 10;
 
@@ -972,43 +1049,42 @@ int dictionary_unittest(size_t entries) {
     char **names = dictionary_unittest_generate_names(entries);
     char **values = dictionary_unittest_generate_values(entries);
 
-    fprintf(stderr, "\nCreating dictionary with default options, %zu items\n", entries);
+    fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
     dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS);
-    dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_clone);
-    dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, &errors, dictionary_unittest_get_clone);
-    dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, &errors, dictionary_unittest_get_nonexisting);
-    dictionary_unittest_run_and_measure_time(dict, "resetting entries", names, values, entries, &errors, dictionary_unittest_reset_clone);
-    dictionary_unittest_run_and_measure_time(dict, "deleting non-existing entries", names, values, entries, &errors, dictionary_unittest_del_nonexisting);
-    dictionary_unittest_run_and_measure_time(dict, "traverse foreach loop", names, values, entries, &errors, dictionary_unittest_foreach);
-    dictionary_unittest_run_and_measure_time(dict, "walking through callback", names, values, entries, &errors, dictionary_unittest_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "walking through callback stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
-    dictionary_unittest_run_and_measure_time(dict, "deleting existing entries", names, values, entries, &errors, dictionary_unittest_del_existing);
-    dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, &errors, dictionary_unittest_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+    dictionary_unittest_clone(dict, names, values, entries, &errors);
 
+    fprintf(stderr, "\nCreating dictionary multi threaded, clone, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS);
+    dictionary_unittest_clone(dict, names, values, entries, &errors);
 
-    fprintf(stderr, "\nCreating dictionary with non-clone and add-in-front options, %zu items\n", entries);
+    fprintf(stderr, "\nCreating dictionary single threaded, non-clone, add-in-front options, %zu items\n", entries);
     dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_ADD_IN_FRONT);
-    dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
-    dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, &errors, dictionary_unittest_get_nonclone);
-    dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, &errors, dictionary_unittest_get_nonexisting);
-    dictionary_unittest_run_and_measure_time(dict, "resetting entries", names, values, entries, &errors, dictionary_unittest_reset_nonclone);
-    dictionary_unittest_run_and_measure_time(dict, "deleting non-existing entries", names, values, entries, &errors, dictionary_unittest_del_nonexisting);
-    dictionary_unittest_run_and_measure_time(dict, "traverse foreach loop", names, values, entries, &errors, dictionary_unittest_foreach);
-    dictionary_unittest_run_and_measure_time(dict, "walking through callback", names, values, entries, &errors, dictionary_unittest_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "walking through callback stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
-    dictionary_unittest_run_and_measure_time(dict, "deleting existing entries", names, values, entries, &errors, dictionary_unittest_del_existing);
-    dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, &errors, dictionary_unittest_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+    dictionary_unittest_nonclone(dict, names, values, entries, &errors);
+
+    fprintf(stderr, "\nCreating dictionary multi threaded, non-clone, add-in-front options, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_ADD_IN_FRONT);
+    dictionary_unittest_nonclone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary with non-clone and don't overwrite options, %zu items\n", entries);
     dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "resetting non-overwrite entries", names, values, entries, &errors, dictionary_unittest_reset_dont_overwrite_nonclone);
-    dictionary_unittest_run_and_measure_time(dict, "traverse foreach loop", names, values, entries, &errors, dictionary_unittest_foreach);
-    dictionary_unittest_run_and_measure_time(dict, "walking through callback", names, values, entries, &errors, dictionary_unittest_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "walking through callback stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop", names, values, entries, &errors, dictionary_unittest_foreach);
+    dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback", names, values, entries, &errors, dictionary_unittest_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback stop", names, values, entries, &errors, dictionary_unittest_walkthrough_stop);
     dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+
+    fprintf(stderr, "\nCreating dictionary with non-clone and don't overwrite options, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
+    dictionary_unittest_run_and_measure_time(dict, "walkthrough write delete this", names, values, entries, &errors, dictionary_unittest_walkthrough_delete_this);
+    dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+
+    fprintf(stderr, "\nCreating dictionary with non-clone and don't overwrite options, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
+    dictionary_unittest_run_and_measure_time(dict, "foreach write delete this", names, values, entries, &errors, dictionary_unittest_foreach_delete_this);
+    dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
