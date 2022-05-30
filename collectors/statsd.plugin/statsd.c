@@ -699,9 +699,9 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
                 m->dictionary.base = t;
                 m->dictionary.unique++;
             }
-            t->count++;
         }
 
+        t->count++;
         m->events++;
         m->count++;
     }
@@ -818,7 +818,7 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             statsd_parse_field_trim(tagkey, tagkey_end);
             statsd_parse_field_trim(tagvalue, tagvalue_end);
 
-            if(tagvalue && *tagkey && *tagvalue) {
+            if(tagkey && tagvalue && *tagkey && *tagvalue) {
                 if (!m->units[0] && strcmp(tagkey, "units") == 0)
                     strncpyz(m->units, tagvalue, STATSD_MAX_UNITS_LENGTH);
 
