@@ -107,8 +107,16 @@ struct dictionary {
 
     netdata_rwlock_t *rwlock;           // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
 
+    void (*del_callback)(const char *name, void *value, void *data);
+    void *del_callback_data;
+
     struct dictionary_stats *stats;     // the statistics when DICTIONARY_FLAG_WITH_STATISTICS is set
 };
+
+void dictionary_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data) {
+    dict->del_callback = del_callback;
+    dict->del_callback_data = data;
+}
 
 // ----------------------------------------------------------------------------
 // dictionary statistics maintenance
@@ -503,7 +511,7 @@ DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
         flags |= DICTIONARY_FLAG_WITH_STATISTICS;
     }
 
-    DICTIONARY *dict = mallocz(sizeof(DICTIONARY));
+    DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
     size_t allocated = sizeof(DICTIONARY);
 
     dict->flags = flags;
@@ -654,6 +662,10 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
 
         if(!reference_counter_mark_deleted(dict, nv)) {
             linkedlist_namevalue_unlink_unsafe(dict, nv);
+
+            if(dict->del_callback)
+                dict->del_callback(nv->name, nv->value, dict->del_callback_data);
+
             namevalue_destroy_unsafe(dict, nv);
         }
         ret = 0;

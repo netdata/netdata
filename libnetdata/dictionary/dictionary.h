@@ -53,6 +53,9 @@ typedef enum dictionary_flags {
 // Create a dictionary
 extern DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags);
 
+// a delete callback to be called just before an item is deleted forever
+extern void dictionary_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data);
+
 // Destroy a dictionary
 // returns the number of bytes freed
 // the returned value will not include name and value sizes if DICTIONARY_FLAG_WITH_STATISTICS is not set
@@ -117,7 +120,7 @@ extern int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 //
 // Use like this:
 //
-//  DICTFE dfe;
+//  DICTFE dfe = {};
 //  for(MY_ITEM *item = dfe_start_read(&dfe, dict); item ; item = dfe_next(&dfe)) {
 //     // do things with the item and its dfe.name
 //  }
