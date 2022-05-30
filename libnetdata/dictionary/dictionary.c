@@ -110,14 +110,31 @@ struct dictionary {
 size_t dictionary_allocated_memory(DICTIONARY *dict) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
         return dict->stats->memory;
-
     return 0;
 }
-
 size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
         return dict->stats->entries;
-
+    return 0;
+}
+size_t dictionary_searches(DICTIONARY *dict) {
+    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
+        return dict->stats->searches;
+    return 0;
+}
+size_t dictionary_inserts(DICTIONARY *dict) {
+    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
+        return dict->stats->inserts;
+    return 0;
+}
+size_t dictionary_deletes(DICTIONARY *dict) {
+    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
+        return dict->stats->deletes;
+    return 0;
+}
+size_t dictionary_resets(DICTIONARY *dict) {
+    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
+        return dict->stats->resets;
     return 0;
 }
 

@@ -112,6 +112,10 @@ extern usec_t dictionary_foreach_done(DICTFE *dfe);
 // If DICTIONARY_FLAG_WITH_STATISTICS is not set, these return zero
 extern size_t dictionary_allocated_memory(DICTIONARY *dict);
 extern size_t dictionary_entries(DICTIONARY *dict);
+extern size_t dictionary_inserts(DICTIONARY *dict);
+extern size_t dictionary_searches(DICTIONARY *dict);
+extern size_t dictionary_deletes(DICTIONARY *dict);
+extern size_t dictionary_resets(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
 
