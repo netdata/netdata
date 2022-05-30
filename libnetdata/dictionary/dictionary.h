@@ -16,6 +16,7 @@ typedef void DICTIONARY;
 #define DICTIONARY_FLAG_WITH_STATISTICS         0x0008 // maintain statistics about dictionary operations (default: disabled)
 #define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x0010 // don't overwrite values of dictionary items (default: overwrite)
 #define DICTIONARY_FLAG_ADD_IN_FRONT            0x0020 // add dictionary items at the front of the linked list (default: at the end)
+#define DICTIONARY_FLAG_REFERENCE_COUNTERS      0x0040 // maintain reference counter in walkthrough and foreach
 
 // Create a dictionary
 extern DICTIONARY *dictionary_create(uint16_t flags);
