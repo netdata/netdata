@@ -792,7 +792,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
         }
 
-        if (d->do_carrier != CONFIG_BOOLEAN_NO && d->filename_carrier) {
+        if ((d->do_carrier != CONFIG_BOOLEAN_NO ||
+             d->do_duplex != CONFIG_BOOLEAN_NO ||
+             d->do_speed != CONFIG_BOOLEAN_NO) &&
+            d->filename_carrier) {
             if (read_single_number_file(d->filename_carrier, &d->carrier)) {
                 error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
                 freez(d->filename_carrier);
@@ -800,7 +803,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
         }
 
-        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex && d->carrier) {
+        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex && (d->carrier || !d->filename_carrier)) {
             char buffer[STATE_LENGTH_MAX + 1];
 
             if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
@@ -911,7 +914,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 if(d->filename_speed && d->chart_var_speed) {
                     int ret = 0;
 
-                    if (d->carrier) {
+                    if (d->carrier || !d->filename_carrier) {
                         ret = read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed);
                     } else {
                         d->speed = 0;
