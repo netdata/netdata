@@ -1093,6 +1093,11 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     if (likely(rd->state->aclk_live_status == live))
         return;
 
+    time_t created_at = rd->state->query_ops.oldest_time(rd);
+
+    if (unlikely(!created_at && rd->updated))
+       created_at = rd->last_collected_time.tv_sec;
+
     rd->state->aclk_live_status = live;
 
     struct aclk_database_worker_config *wc = rd->rrdset->rrdhost->dbsync_worker;
@@ -1110,7 +1115,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     dim_payload.name = rd->name;
     dim_payload.id = rd->id;
     dim_payload.chart_id = rd->rrdset->id;
-    dim_payload.created_at.tv_sec = rd->state->query_ops.oldest_time(rd);
+    dim_payload.created_at.tv_sec = created_at;
     dim_payload.last_timestamp.tv_sec = last_updated;
 
     size_t size = 0;
