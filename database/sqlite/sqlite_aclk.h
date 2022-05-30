@@ -17,6 +17,7 @@
 #define ACLK_MAX_ALERT_UPDATES  (5)
 #define ACLK_DATABASE_CLEANUP_FIRST  (60)
 #define ACLK_DATABASE_ROTATION_DELAY  (180)
+#define ACLK_DATABASE_RETENTION_RETRY (60)
 #define ACLK_DATABASE_CLEANUP_INTERVAL (3600)
 #define ACLK_DATABASE_ROTATION_INTERVAL (3600)
 #define ACLK_DELETE_ACK_INTERNAL (600)
@@ -197,6 +198,7 @@ struct aclk_database_worker_config {
     int node_info_send;
     int chart_pending;
     int chart_reset_count;
+    int retention_running;
     volatile unsigned is_shutting_down;
     volatile unsigned is_orphan;
     struct aclk_database_worker_config  *next;

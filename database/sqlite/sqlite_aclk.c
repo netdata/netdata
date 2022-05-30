@@ -34,6 +34,26 @@ const char *aclk_sync_config[] = {
 
 uv_mutex_t aclk_async_lock;
 struct aclk_database_worker_config  *aclk_thread_head = NULL;
+int retention_running = 0;
+
+static void stop_retention_run()
+{
+    uv_mutex_lock(&aclk_async_lock);
+    retention_running = 0;
+    uv_mutex_unlock(&aclk_async_lock);
+}
+
+static int request_retention_run()
+{
+    int rc = 0;
+    uv_mutex_lock(&aclk_async_lock);
+    if (unlikely(retention_running))
+        rc = 1;
+    else
+        retention_running = 1;
+    uv_mutex_unlock(&aclk_async_lock);
+    return rc;
+}
 
 int claimed()
 {
@@ -318,9 +338,6 @@ static void timer_cb(uv_timer_t* handle)
 
     if (aclk_use_new_cloud_arch && aclk_connected) {
         if (wc->rotation_after && wc->rotation_after < now) {
-            cmd.opcode = ACLK_DATABASE_NODE_INFO;
-            aclk_database_enq_cmd_noblock(wc, &cmd);
-
             cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
             if (!aclk_database_enq_cmd_noblock(wc, &cmd))
                 wc->rotation_after += ACLK_DATABASE_ROTATION_INTERVAL;
@@ -352,6 +369,38 @@ static void timer_cb(uv_timer_t* handle)
     }
 #endif
 }
+
+
+
+void after_send_retention(uv_work_t *req, int status)
+{
+    struct aclk_database_worker_config *wc = req->data;
+    (void)status;
+    stop_retention_run();
+    wc->retention_running = 0;
+
+    struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.opcode = ACLK_DATABASE_DIM_DELETION;
+    if (aclk_database_enq_cmd_noblock(wc, &cmd))
+        info("Failed to queue a dimension deletion message");
+
+    cmd.opcode = ACLK_DATABASE_NODE_INFO;
+    if (aclk_database_enq_cmd_noblock(wc, &cmd))
+        info("Failed to queue a node update info message");
+}
+
+
+static void send_retention(uv_work_t *req)
+{
+    struct aclk_database_worker_config *wc = req->data;
+
+    if (unlikely(wc->is_shutting_down))
+        return;
+
+    aclk_update_retention(wc);
+}
+
 
 #define MAX_CMD_BATCH_SIZE (256)
 
@@ -440,6 +489,8 @@ void aclk_database_worker(void *arg)
     wc->rotation_after = wc->startup_time + ACLK_DATABASE_ROTATION_DELAY;
 
     debug(D_ACLK_SYNC,"Node %s reports pending message count = %u", wc->node_id, wc->chart_payload_count);
+    uv_work_t retention_work;
+
     while (likely(!netdata_exit)) {
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -538,9 +589,21 @@ void aclk_database_worker(void *arg)
                     aclk_process_dimension_deletion(wc, cmd);
                     break;
                 case ACLK_DATABASE_UPD_RETENTION:
+                    if (unlikely(wc->retention_running))
+                        break;
+
+                    if (unlikely(request_retention_run())) {
+                        wc->rotation_after = now_realtime_sec() + ACLK_DATABASE_RETENTION_RETRY;
+                        break;
+                    }
+
                     debug(D_ACLK_SYNC,"Sending retention info for %s", wc->uuid_str);
-                    aclk_update_retention(wc, cmd);
-                    aclk_process_dimension_deletion(wc, cmd);
+                    retention_work.data = wc;
+                    wc->retention_running = 1;
+                    if (unlikely(uv_queue_work(loop, &retention_work, send_retention, after_send_retention))) {
+                        wc->retention_running = 0;
+                        stop_retention_run();
+                    }
                     break;
 
 // NODE_INSTANCE DETECTION
