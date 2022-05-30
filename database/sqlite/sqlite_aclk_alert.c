@@ -557,6 +557,8 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 
     freez(claim_id);
     buffer_free(sql);
+
+    aclk_alert_reloaded = 1;
 #endif
 
     return;
