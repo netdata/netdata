@@ -9,17 +9,19 @@
 typedef void DICTIONARY;
 #endif
 
-#define DICTIONARY_FLAG_NONE                    0x0000 // the default is the opposite of all below
-#define DICTIONARY_FLAG_SINGLE_THREADED         0x0001 // don't use any locks (default: use locks)
-#define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x0002 // don't copy the value, just point to the one provided (default: copy)
-#define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x0004 // don't copy the name, just point to the one provided (default: copy)
-#define DICTIONARY_FLAG_WITH_STATISTICS         0x0008 // maintain statistics about dictionary operations (default: disabled)
-#define DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    0x0010 // don't overwrite values of dictionary items (default: overwrite)
-#define DICTIONARY_FLAG_ADD_IN_FRONT            0x0020 // add dictionary items at the front of the linked list (default: at the end)
-#define DICTIONARY_FLAG_RESERVED1               0x0040 // this is reserved for DICTIONARY_FLAG_REFERENCE_COUNTERS
+typedef enum dictionary_flags {
+    DICTIONARY_FLAG_NONE                   = 0,        // the default is the opposite of all below
+    DICTIONARY_FLAG_SINGLE_THREADED        = (1 << 0), // don't use any locks (default: use locks)
+    DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE  = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
+    DICTIONARY_FLAG_NAME_LINK_DONT_CLONE   = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
+    DICTIONARY_FLAG_WITH_STATISTICS        = (1 << 3), // maintain statistics about dictionary operations (default: disabled)
+    DICTIONARY_FLAG_DONT_OVERWRITE_VALUE   = (1 << 4), // don't overwrite values of dictionary items (default: overwrite)
+    DICTIONARY_FLAG_ADD_IN_FRONT           = (1 << 5), // add dictionary items at the front of the linked list (default: at the end)
+    DICTIONARY_FLAG_RESERVED1              = (1 << 6), // this is reserved for DICTIONARY_FLAG_REFERENCE_COUNTERS
+} DICTIONARY_FLAGS;
 
 // Create a dictionary
-extern DICTIONARY *dictionary_create(uint16_t flags);
+extern DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags);
 
 // Destroy a dictionary
 // returns the number of bytes freed

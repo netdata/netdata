@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // NOT TO BE USED BY USERS YET
-#define DICTIONARY_FLAG_REFERENCE_COUNTERS      0x0040 // maintain reference counter in walkthrough and foreach
+#define DICTIONARY_FLAG_REFERENCE_COUNTERS (1 << 6) // maintain reference counter in walkthrough and foreach
 
 typedef struct dictionary DICTIONARY;
 #define DICTIONARY_INTERNALS
@@ -91,14 +91,13 @@ struct dictionary_stats {
 };
 
 struct dictionary {
-    uint16_t flags;                     // the flags of the dictionary
+    DICTIONARY_FLAGS flags;             // the flags of the dictionary
 
     NAME_VALUE *first_item;             // the double linked list base pointers
     NAME_VALUE *last_item;
 
     Pvoid_t JudyHSArray;                // the hash table
 
-    netdata_mutex_t *refcount_mutex;    // the mutex to update NAME_VALUE refcount;
     netdata_rwlock_t *rwlock;           // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
 
     struct dictionary_stats *stats;     // the statistics when DICTIONARY_FLAG_WITH_STATISTICS is set
@@ -211,39 +210,32 @@ static inline void dictionary_unlock(DICTIONARY *dict) {
 // reference counters
 
 static inline size_t reference_counter_init(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
-        dict->refcount_mutex = mallocz(sizeof(netdata_mutex_t));
-        netdata_mutex_init(dict->refcount_mutex);
-        return sizeof(netdata_mutex_t);
-    }
-    dict->refcount_mutex = NULL;
+    (void)dict;
+
+    // allocate memory required for reference counters
+    // return number of bytes
     return 0;
 }
 
 static inline size_t reference_counter_free(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
-        netdata_mutex_destroy(dict->refcount_mutex);
-        freez(dict->refcount_mutex);
-        return sizeof(netdata_mutex_t);
-    }
+    (void)dict;
+
+    // free memory required for reference counters
+    // return number of bytes
     return 0;
 }
 
 static void reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
         NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
-        netdata_mutex_lock(dict->refcount_mutex);
-        nvs->refcount++;
-        netdata_mutex_unlock(dict->refcount_mutex);
+        __atomic_fetch_add(&nvs->refcount, 1, __ATOMIC_SEQ_CST);
     }
 }
 
 static void reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
         NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
-        netdata_mutex_lock(dict->refcount_mutex);
-        nvs->refcount--;
-        netdata_mutex_unlock(dict->refcount_mutex);
+        __atomic_fetch_sub(&nvs->refcount, 1, __ATOMIC_SEQ_CST);
     }
 }
 
@@ -333,7 +325,7 @@ static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *nam
 // ----------------------------------------------------------------------------
 // linked list management
 
-static inline void linkedlist_namevalue_link(DICTIONARY *dict, NAME_VALUE *nv) {
+static inline void linkedlist_namevalue_link_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
     if (unlikely(!dict->first_item)) {
         // we are the only ones here
         nv->next = NULL;
@@ -360,7 +352,7 @@ static inline void linkedlist_namevalue_link(DICTIONARY *dict, NAME_VALUE *nv) {
     }
 }
 
-static inline void linkedlist_namevalue_unlink(DICTIONARY *dict, NAME_VALUE *nv) {
+static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
     if(nv->next) nv->next->prev = nv->prev;
     if(nv->prev) nv->prev->next = nv->next;
     if(dict->first_item == nv) dict->first_item = nv->next;
@@ -483,7 +475,7 @@ static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
 // ----------------------------------------------------------------------------
 // API - dictionary management
 
-DICTIONARY *dictionary_create(uint16_t flags) {
+DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
     debug(D_DICTIONARY, "Creating dictionary.");
 
     if((flags & DICTIONARY_FLAG_REFERENCE_COUNTERS) && (flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
@@ -581,7 +573,7 @@ void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, void *val
     if(likely(*pnv == 0)) {
         // a new item added to the index
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
-        linkedlist_namevalue_link(dict, nv);
+        linkedlist_namevalue_link_unsafe(dict, nv);
     }
     else {
         // the item is already in the index
@@ -638,7 +630,7 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
     else {
         debug(D_DICTIONARY, "Found dictionary entry with name '%s'.", name);
         hashtable_delete_unsafe(dict, name, name_len);
-        linkedlist_namevalue_unlink(dict, nv);
+        linkedlist_namevalue_unlink_unsafe(dict, nv);
         namevalue_destroy_unsafe(dict, nv);
         ret = 0;
     }
