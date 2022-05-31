@@ -792,7 +792,18 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
         }
 
-        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex) {
+        if ((d->do_carrier != CONFIG_BOOLEAN_NO ||
+             d->do_duplex != CONFIG_BOOLEAN_NO ||
+             d->do_speed != CONFIG_BOOLEAN_NO) &&
+            d->filename_carrier) {
+            if (read_single_number_file(d->filename_carrier, &d->carrier)) {
+                error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
+                freez(d->filename_carrier);
+                d->filename_carrier = NULL;
+            }
+        }
+
+        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex && (d->carrier || !d->filename_carrier)) {
             char buffer[STATE_LENGTH_MAX + 1];
 
             if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
@@ -808,6 +819,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 else
                     d->duplex = 0;
             }
+        } else {
+            d->duplex = 0;
         }
 
         if(d->do_operstate != CONFIG_BOOLEAN_NO && d->filename_operstate) {
@@ -825,19 +838,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
         }
 
-        if (d->do_carrier != CONFIG_BOOLEAN_NO && d->filename_carrier) {
-            if (read_single_number_file(d->filename_carrier, &d->carrier)) {
-                error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
-                freez(d->filename_carrier);
-                d->filename_carrier = NULL;
-            }
-        }
-
         if (d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
             if (read_single_number_file(d->filename_mtu, &d->mtu)) {
-                error("Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
-                freez(d->filename_carrier);
-                d->filename_carrier = NULL;
+                error("Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_mtu);
+                freez(d->filename_mtu);
+                d->filename_mtu = NULL;
             }
         }
 
@@ -907,7 +912,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 }
 
                 if(d->filename_speed && d->chart_var_speed) {
-                    if(read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed)) {
+                    int ret = 0;
+
+                    if (d->carrier || !d->filename_carrier) {
+                        ret = read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed);
+                    } else {
+                        d->speed = 0;
+                    }
+
+                    if(ret) {
                         error("Cannot refresh interface %s speed by reading '%s'. Will not update its speed anymore.", d->name, d->filename_speed);
                         freez(d->filename_speed);
                         d->filename_speed = NULL;
