@@ -109,18 +109,18 @@ int mount_point_is_protected(char *mount_point)
 static void calculate_values_and_show_charts(
     struct mountinfo *mi,
     struct mount_point_metadata *m,
-    struct statvfs buff_statvfs,
+    struct statvfs *buff_statvfs,
     int update_every)
 {
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
 
     // logic found at get_fs_usage() in coreutils
-    unsigned long bsize = (buff_statvfs.f_frsize) ? buff_statvfs.f_frsize : buff_statvfs.f_bsize;
+    unsigned long bsize = (buff_statvfs->f_frsize) ? buff_statvfs->f_frsize : buff_statvfs->f_bsize;
 
-    fsblkcnt_t bavail         = buff_statvfs.f_bavail;
-    fsblkcnt_t btotal         = buff_statvfs.f_blocks;
-    fsblkcnt_t bavail_root    = buff_statvfs.f_bfree;
+    fsblkcnt_t bavail         = buff_statvfs->f_bavail;
+    fsblkcnt_t btotal         = buff_statvfs->f_blocks;
+    fsblkcnt_t bavail_root    = buff_statvfs->f_bfree;
     fsblkcnt_t breserved_root = bavail_root - bavail;
     fsblkcnt_t bused;
     if(likely(btotal >= bavail_root))
@@ -135,9 +135,9 @@ static void calculate_values_and_show_charts(
 
     // --------------------------------------------------------------------------
 
-    fsfilcnt_t favail         = buff_statvfs.f_favail;
-    fsfilcnt_t ftotal         = buff_statvfs.f_files;
-    fsfilcnt_t favail_root    = buff_statvfs.f_ffree;
+    fsfilcnt_t favail         = buff_statvfs->f_favail;
+    fsfilcnt_t ftotal         = buff_statvfs->f_files;
+    fsfilcnt_t favail_root    = buff_statvfs->f_ffree;
     fsfilcnt_t freserved_root = favail_root - favail;
     fsfilcnt_t fused          = ftotal - favail_root;
 
@@ -374,7 +374,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     }
     m->shown_error = 0;
 
-    calculate_values_and_show_charts(mi, m, buff_statvfs, update_every);
+    calculate_values_and_show_charts(mi, m, &buff_statvfs, update_every);
 }
 
 static void diskspace_main_cleanup(void *ptr) {
