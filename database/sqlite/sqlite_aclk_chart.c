@@ -566,7 +566,7 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
         error_report("Failed to ACK sequence id, rc = %d", rc);
     else
         log_access(
-            "ACLK STA [%s (%s)]: CHARTS ACKNOWLEDGED in the database upto %" PRIu64,
+            "ACLK STA [%s (%s)]: CHARTS ACKNOWLEDGED IN THE DATABASE UP TO %" PRIu64,
             wc->node_id,
             wc->host ? wc->host->hostname : "N/A",
             cmd.param1);
