@@ -18,6 +18,17 @@ static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
 static int cleanup_mount_points = 1;
 
+struct basic_mountinfo {
+    char *persistent_id;    // a calculated persistent id for the mount point
+    char *root;             // root: root of the mount within the filesystem.
+    char *mount_point;      // mount point: mount point relative to the process's root.
+    char *filesystem;       // filesystem type: name of filesystem in the form "type[.subtype]".
+
+    struct basic_mountinfo *next;
+};
+
+static struct basic_mountinfo *disk_slow_mountinfo_tmp_root = NULL;
+
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
     time_t now = now_realtime_sec();
@@ -113,7 +124,7 @@ int mount_point_is_protected(char *mount_point)
 }
 
 static void calculate_values_and_show_charts(
-    struct mountinfo *mi,
+    struct basic_mountinfo *mi,
     struct mount_point_metadata *m,
     struct statvfs *buff_statvfs,
     int update_every)
@@ -380,16 +391,37 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     }
     m->shown_error = 0;
 
-    calculate_values_and_show_charts(mi, m, &buff_statvfs, update_every);
+    struct basic_mountinfo bmi;
+    bmi.mount_point = mi->mount_point;
+    bmi.persistent_id = mi->persistent_id;
+    bmi.filesystem = mi->filesystem;
+    bmi.root = mi->root;
+
+    calculate_values_and_show_charts(&bmi, m, &buff_statvfs, update_every);
 }
 
-#define WORKER_JOB_MOUNTINFO 0
-#define WORKER_JOB_MOUNTPOINT 1
-#define WORKER_JOB_CLEANUP 2
+static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int update_every) {
+    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 3
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
-#endif
+    m->updated = 1;
+
+    struct statvfs buff_statvfs;
+    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+        if(!m->shown_error) {
+            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
+                  , mi->mount_point
+                  , mi->persistent_id
+                  , mi->filesystem?mi->filesystem:""
+                  , mi->root?mi->root:""
+            );
+            m->shown_error = 1;
+        }
+        return;
+    }
+    m->shown_error = 0;
+
+    calculate_values_and_show_charts(mi, m, &buff_statvfs, update_every);
+}
 
 static void diskspace_slow_worker_cleanup(void *ptr)
 {
@@ -400,26 +432,45 @@ static void diskspace_slow_worker_cleanup(void *ptr)
     worker_unregister();
 }
 
+#define WORKER_JOB_SLOW_MOUNTPOINT 0
+#define WORKER_JOB_SLOW_CLEANUP 1
+
 void *diskspace_slow_worker(void *ptr)
 {
-    worker_register("DISKSPACE");
-    worker_register_job_name(0, "slow");
+    worker_register("DISKSPACE_SLOW");
+    worker_register_job_name(WORKER_JOB_SLOW_MOUNTPOINT, "mountpoint");
+    worker_register_job_name(WORKER_JOB_SLOW_CLEANUP, "cleanup");
 
     netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, ptr);
 
-    usec_t step = localhost->rrd_update_every * USEC_PER_SEC * SLOW_UPDATE_EVERY;
+    usec_t step = (update_every > SLOW_UPDATE_EVERY ? update_every : SLOW_UPDATE_EVERY) * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while (!netdata_exit) {
+    while(!netdata_exit) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 
-        if (unlikely(netdata_exit))
-            break;
+        if(unlikely(netdata_exit)) break;
 
-        worker_is_busy(0);
-        // do_slow_disk_space_stats()
+        // --------------------------------------------------------------------------
+        // disk space metrics
+
+        struct basic_mountinfo *bmi;
+        for(bmi = disk_slow_mountinfo_tmp_root; bmi; bmi = bmi->next) {
+
+            worker_is_busy(WORKER_JOB_SLOW_MOUNTPOINT);
+            do_slow_disk_space_stats(bmi, update_every);
+            if(unlikely(netdata_exit)) break;
+        }
+
+        if(unlikely(netdata_exit)) break;
+
+        if(dict_mountpoints) {
+            worker_is_busy(WORKER_JOB_SLOW_CLEANUP);
+            dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
+        }
+
     }
 
     netdata_thread_cleanup_pop(1);
@@ -441,6 +492,14 @@ static void diskspace_main_cleanup(void *ptr) {
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
+
+#define WORKER_JOB_MOUNTINFO 0
+#define WORKER_JOB_MOUNTPOINT 1
+#define WORKER_JOB_CLEANUP 2
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 3
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
+#endif
 
 void *diskspace_main(void *ptr) {
     worker_register("DISKSPACE");
