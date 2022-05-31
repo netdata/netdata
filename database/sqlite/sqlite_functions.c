@@ -73,10 +73,12 @@ static uv_mutex_t sqlite_transaction_lock;
 int execute_insert(sqlite3_stmt *res)
 {
     int rc;
-
-    while ((rc = sqlite3_step(res)) != SQLITE_DONE && unlikely(netdata_exit)) {
-        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED))
+    int cnt = 0;
+    while ((rc = sqlite3_step(res)) != SQLITE_DONE && ++cnt < SQL_MAX_RETRY && likely(!netdata_exit)) {
+        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
             usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+            error_report("Failed to insert/update, rc = %d -- attempt %d", rc, cnt);
+        }
         else {
             error_report("SQLite error %d", rc);
             break;
@@ -1287,8 +1289,6 @@ failed:
 
     return host;
 }
-
-#define SQL_MAX_RETRY 100
 
 void db_execute(const char *cmd)
 {
