@@ -106,135 +106,14 @@ int mount_point_is_protected(char *mount_point)
     return 0;
 }
 
-static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+static void calculate_values_and_show_charts(
+    struct mountinfo *mi,
+    struct mount_point_metadata *m,
+    struct statvfs buff_statvfs,
+    int update_every)
+{
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
-
-    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
-    static SIMPLE_PATTERN *excluded_filesystems = NULL;
-    int do_space, do_inodes;
-
-    if(unlikely(!dict_mountpoints)) {
-        SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
-
-        if(config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
-            // old configuration, enable backwards compatibility
-            mode = SIMPLE_PATTERN_PREFIX;
-        }
-
-        excluded_mountpoints = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS)
-                , NULL
-                , mode
-        );
-
-        excluded_filesystems = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
-
-        dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
-    }
-
-    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
-    if(unlikely(!m)) {
-        char var_name[4096 + 1];
-        snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
-
-        int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
-        int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
-
-        if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
-            def_space = CONFIG_BOOLEAN_NO;
-            def_inodes = CONFIG_BOOLEAN_NO;
-        }
-
-        if(unlikely(simple_pattern_matches(excluded_filesystems, mi->filesystem))) {
-            def_space = CONFIG_BOOLEAN_NO;
-            def_inodes = CONFIG_BOOLEAN_NO;
-        }
-
-        // check if the mount point is a directory #2407
-        // but only when it is enabled by default #4491
-        if(def_space != CONFIG_BOOLEAN_NO || def_inodes != CONFIG_BOOLEAN_NO) {
-            struct stat bs;
-            if(stat(mi->mount_point, &bs) == -1) {
-                error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
-                      , mi->mount_point
-                      , disk
-                      , mi->filesystem?mi->filesystem:""
-                      , mi->root?mi->root:""
-                );
-                def_space = CONFIG_BOOLEAN_NO;
-                def_inodes = CONFIG_BOOLEAN_NO;
-            }
-            else {
-                if((bs.st_mode & S_IFMT) != S_IFDIR) {
-                    error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
-                          , mi->mount_point
-                          , disk
-                          , mi->filesystem?mi->filesystem:""
-                          , mi->root?mi->root:""
-                    );
-                    def_space = CONFIG_BOOLEAN_NO;
-                    def_inodes = CONFIG_BOOLEAN_NO;
-                }
-            }
-        }
-
-        do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
-        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
-
-        struct mount_point_metadata mp = {
-                .do_space = do_space,
-                .do_inodes = do_inodes,
-                .shown_error = 0,
-                .updated = 0,
-
-                .collected = 0,
-
-                .st_space = NULL,
-                .rd_space_avail = NULL,
-                .rd_space_used = NULL,
-                .rd_space_reserved = NULL,
-
-                .st_inodes = NULL,
-                .rd_inodes_avail = NULL,
-                .rd_inodes_used = NULL,
-                .rd_inodes_reserved = NULL
-        };
-
-        m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
-    }
-
-    m->updated = 1;
-
-    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
-        return;
-
-    if (unlikely(
-            mi->flags & MOUNTINFO_READONLY &&
-            !mount_point_is_protected(mi->mount_point) &&
-            !m->collected &&
-            m->do_space != CONFIG_BOOLEAN_YES &&
-            m->do_inodes != CONFIG_BOOLEAN_YES))
-        return;
-
-    struct statvfs buff_statvfs;
-    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
-        if(!m->shown_error) {
-            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
-                  , mi->mount_point
-                  , disk
-                  , mi->filesystem?mi->filesystem:""
-                  , mi->root?mi->root:""
-            );
-            m->shown_error = 1;
-        }
-        return;
-    }
-    m->shown_error = 0;
 
     // logic found at get_fs_usage() in coreutils
     unsigned long bsize = (buff_statvfs.f_frsize) ? buff_statvfs.f_frsize : buff_statvfs.f_bsize;
@@ -363,6 +242,139 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     if(likely(rendered))
         m->collected++;
+}
+
+static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+    const char *disk = mi->persistent_id;
+
+    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
+    static SIMPLE_PATTERN *excluded_filesystems = NULL;
+    int do_space, do_inodes;
+
+    if(unlikely(!dict_mountpoints)) {
+        SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
+
+        if(config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
+            // old configuration, enable backwards compatibility
+            mode = SIMPLE_PATTERN_PREFIX;
+        }
+
+        excluded_mountpoints = simple_pattern_create(
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS)
+                , NULL
+                , mode
+        );
+
+        excluded_filesystems = simple_pattern_create(
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
+        );
+
+        dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    }
+
+    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
+    if(unlikely(!m)) {
+        char var_name[4096 + 1];
+        snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
+
+        int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
+        int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
+
+        if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
+            def_space = CONFIG_BOOLEAN_NO;
+            def_inodes = CONFIG_BOOLEAN_NO;
+        }
+
+        if(unlikely(simple_pattern_matches(excluded_filesystems, mi->filesystem))) {
+            def_space = CONFIG_BOOLEAN_NO;
+            def_inodes = CONFIG_BOOLEAN_NO;
+        }
+
+        // check if the mount point is a directory #2407
+        // but only when it is enabled by default #4491
+        if(def_space != CONFIG_BOOLEAN_NO || def_inodes != CONFIG_BOOLEAN_NO) {
+            struct stat bs;
+            if(stat(mi->mount_point, &bs) == -1) {
+                error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
+                      , mi->mount_point
+                      , disk
+                      , mi->filesystem?mi->filesystem:""
+                      , mi->root?mi->root:""
+                );
+                def_space = CONFIG_BOOLEAN_NO;
+                def_inodes = CONFIG_BOOLEAN_NO;
+            }
+            else {
+                if((bs.st_mode & S_IFMT) != S_IFDIR) {
+                    error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                          , mi->mount_point
+                          , disk
+                          , mi->filesystem?mi->filesystem:""
+                          , mi->root?mi->root:""
+                    );
+                    def_space = CONFIG_BOOLEAN_NO;
+                    def_inodes = CONFIG_BOOLEAN_NO;
+                }
+            }
+        }
+
+        do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
+        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
+
+        struct mount_point_metadata mp = {
+                .do_space = do_space,
+                .do_inodes = do_inodes,
+                .shown_error = 0,
+                .updated = 0,
+
+                .collected = 0,
+
+                .st_space = NULL,
+                .rd_space_avail = NULL,
+                .rd_space_used = NULL,
+                .rd_space_reserved = NULL,
+
+                .st_inodes = NULL,
+                .rd_inodes_avail = NULL,
+                .rd_inodes_used = NULL,
+                .rd_inodes_reserved = NULL
+        };
+
+        m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
+    }
+
+    m->updated = 1;
+
+    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
+        return;
+
+    if (unlikely(
+            mi->flags & MOUNTINFO_READONLY &&
+            !mount_point_is_protected(mi->mount_point) &&
+            !m->collected &&
+            m->do_space != CONFIG_BOOLEAN_YES &&
+            m->do_inodes != CONFIG_BOOLEAN_YES))
+        return;
+
+    
+    struct statvfs buff_statvfs;
+    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+        if(!m->shown_error) {
+            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
+                  , mi->mount_point
+                  , disk
+                  , mi->filesystem?mi->filesystem:""
+                  , mi->root?mi->root:""
+            );
+            m->shown_error = 1;
+        }
+        return;
+    }
+    m->shown_error = 0;
+
+    calculate_values_and_show_charts(mi, m, buff_statvfs, update_every);
 }
 
 static void diskspace_main_cleanup(void *ptr) {
