@@ -24,6 +24,7 @@ typedef enum db_check_action_type {
     DB_CHECK_CONT = 0x00008
 } db_check_action_type_t;
 
+#define SQL_MAX_RETRY (100)
 #define SQLITE_INSERT_DELAY (50)        // Insert delay in case of lock
 
 #define SQL_STORE_HOST "insert or replace into host (host_id,hostname,registry_hostname,update_every,os,timezone,tags) values (?1,?2,?3,?4,?5,?6,?7);"
