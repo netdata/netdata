@@ -161,8 +161,10 @@ void PredictableDimension::addValue(CalculatedNumber Value, bool Exists) {
 
 std::pair<MLResult, bool> PredictableDimension::predict() {
     unsigned N = Cfg.DiffN + Cfg.SmoothN + Cfg.LagN;
-    if (CNs.size() != N)
+    if (CNs.size() != N) {
+        AnomalyBit = false;
         return { MLResult::MissingData, AnomalyBit };
+    }
 
     CalculatedNumber *TmpCNs = new CalculatedNumber[N * (Cfg.LagN + 1)]();
     std::memcpy(TmpCNs, CNs.data(), N * sizeof(CalculatedNumber));
@@ -172,8 +174,10 @@ std::pair<MLResult, bool> PredictableDimension::predict() {
     AnomalyScore = computeAnomalyScore(SB);
     delete[] TmpCNs;
 
-    if (AnomalyScore == std::numeric_limits<CalculatedNumber>::quiet_NaN())
+    if (AnomalyScore == std::numeric_limits<CalculatedNumber>::quiet_NaN()) {
+        AnomalyBit = false;
         return { MLResult::NaN, AnomalyBit };
+    }
 
     AnomalyBit = AnomalyScore >= (100 * Cfg.DimensionAnomalyScoreThreshold);
     return { MLResult::Success, AnomalyBit };
