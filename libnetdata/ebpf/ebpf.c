@@ -971,6 +971,9 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
     modules->apps_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
                                                  modules->apps_charts);
 
+    modules->cgroup_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CGROUP,
+                                                   modules->cgroup_charts);
+
     modules->pid_map_size = (uint32_t)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
                                                            modules->pid_map_size);
 
