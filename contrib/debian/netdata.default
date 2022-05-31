@@ -1,7 +1,3 @@
 # Extra arguments to pass to netdata
 #
-#EXTRA_OPTS=""
-#
-# Location of pidfile. Only used on SysV init based systems.
-#
-#PIDFILE="/var/run/netdata/netdata.pid"
+EXTRA_OPTS="-P /var/run/netdata/netdata.pid"
