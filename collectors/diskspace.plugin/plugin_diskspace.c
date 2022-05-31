@@ -18,11 +18,12 @@ static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
 static int cleanup_mount_points = 1;
 
+// a copy of basic mountinfo fields
 struct basic_mountinfo {
-    char *persistent_id;    // a calculated persistent id for the mount point
-    char *root;             // root: root of the mount within the filesystem.
-    char *mount_point;      // mount point: mount point relative to the process's root.
-    char *filesystem;       // filesystem type: name of filesystem in the form "type[.subtype]".
+    char *persistent_id;    
+    char *root;             
+    char *mount_point;      
+    char *filesystem;       
 
     struct basic_mountinfo *next;
 };
