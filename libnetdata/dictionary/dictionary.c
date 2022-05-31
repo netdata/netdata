@@ -7,7 +7,18 @@ typedef struct dictionary DICTIONARY;
 #define DICTIONARY_INTERNALS
 
 #include "../libnetdata.h"
+
+// #undef ENABLE_DBENGINE
+
+#ifndef ENABLE_DBENGINE
+#define DICTIONARY_WITH_AVL
+#else
+#define DICTIONARY_WITH_JUDYHS
+#endif
+
+#ifdef DICTIONARY_WITH_JUDYHS
 #include <Judy.h>
+#endif
 
 /*
  * This version uses JudyHS arrays to index the dictionary
@@ -60,6 +71,11 @@ typedef struct dictionary DICTIONARY;
  * Every item in the dictionary has the following structure.
  */
 typedef struct name_value {
+#ifdef DICTIONARY_WITH_AVL
+    avl_t avl_node;
+    uint32_t hash;
+#endif
+
     struct name_value *next;    // a double linked list to allow fast insertions and deletions
     struct name_value *prev;
 
@@ -103,7 +119,14 @@ struct dictionary {
     NAME_VALUE *first_item;             // the double linked list base pointers
     NAME_VALUE *last_item;
 
+#ifdef DICTIONARY_WITH_AVL
+    avl_tree_type values_index;
+    NAME_VALUE *hash_base;
+#endif
+
+#ifdef DICTIONARY_WITH_JUDYHS
     Pvoid_t JudyHSArray;                // the hash table
+#endif
 
     netdata_rwlock_t *rwlock;           // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
 
@@ -266,6 +289,58 @@ static int reference_counter_mark_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
 // ----------------------------------------------------------------------------
 // hash table
 
+#ifdef DICTIONARY_WITH_AVL
+static int name_value_compare(void* a, void* b) {
+    if(((NAME_VALUE *)a)->hash < ((NAME_VALUE *)b)->hash) return -1;
+    else if(((NAME_VALUE *)a)->hash > ((NAME_VALUE *)b)->hash) return 1;
+    else return strcmp(((NAME_VALUE *)a)->name, ((NAME_VALUE *)b)->name);
+}
+
+static void hashtable_init_unsafe(DICTIONARY *dict) {
+    avl_init(&dict->values_index, name_value_compare);
+}
+
+static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
+    (void)dict;
+    return 0;
+}
+
+static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+    (void)name;
+    (void)name_len;
+
+    if(unlikely(avl_remove(&(dict->values_index), (avl_t *)(nv)) != (avl_t *)nv))
+        return 0;
+
+    return 1;
+}
+
+static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
+    (void)name_len;
+    uint32_t hash = simple_hash(name);
+
+    NAME_VALUE tmp;
+    tmp.hash = (hash)?hash:simple_hash(name);
+    tmp.name = (char *)name;
+    return (NAME_VALUE *)avl_search(&(dict->values_index), (avl_t *) &tmp);
+}
+
+static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
+    dict->hash_base = hashtable_get_unsafe(dict, name, name_len);
+    return &dict->hash_base;
+}
+
+static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+    (void)name;
+    (void)name_len;
+    nv->hash = simple_hash(nv->name);
+
+    if(unlikely(avl_insert(&((dict)->values_index), (avl_t *)(nv)) != (avl_t *)nv))
+        error("dictionary: INTERNAL ERROR: duplicate insertion to dictionary.");
+}
+#endif
+
+#ifdef DICTIONARY_WITH_JUDYHS
 static void hashtable_init_unsafe(DICTIONARY *dict) {
     dict->JudyHSArray = NULL;
 }
@@ -304,7 +379,9 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char 
     return (NAME_VALUE **)Rc;
 }
 
-static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
+static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+    (void)nv;
+
     if(unlikely(!dict->JudyHSArray)) return 0;
 
     JError_t J_Error;
@@ -344,6 +421,16 @@ static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *nam
         return NULL;
     }
 }
+
+static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+    (void)dict;
+    (void)name;
+    (void)name_len;
+    (void)nv;
+    ;
+}
+
+#endif // DICTIONARY_WITH_JUDYHS
 
 // ----------------------------------------------------------------------------
 // linked list management
@@ -594,6 +681,7 @@ void *dictionary_set_with_name_ptr_unsafe(DICTIONARY *dict, const char *name, vo
     if(likely(*pnv == 0)) {
         // a new item added to the index
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
+        hashtable_inserted_name_value_unsafe(dict, name, name_len, nv);
         linkedlist_namevalue_link_unsafe(dict, nv);
     }
     else {
@@ -657,7 +745,7 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
     else {
         debug(D_DICTIONARY, "Found dictionary entry with name '%s'.", name);
 
-        if(hashtable_delete_unsafe(dict, name, name_len) == 0)
+        if(hashtable_delete_unsafe(dict, name, name_len, nv) == 0)
             error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s' that is not in the index", name);
 
         if(!reference_counter_mark_deleted(dict, nv)) {
