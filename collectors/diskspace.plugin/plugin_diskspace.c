@@ -8,6 +8,7 @@
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
+#define MAX_STAT_USEC 10000
 #define SLOW_UPDATE_EVERY 5
 
 static int update_every;
@@ -17,18 +18,6 @@ static netdata_thread_t *diskspace_slow_thread = NULL;
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
 static int cleanup_mount_points = 1;
-
-// a copy of basic mountinfo fields
-struct basic_mountinfo {
-    char *persistent_id;    
-    char *root;             
-    char *mount_point;      
-    char *filesystem;       
-
-    struct basic_mountinfo *next;
-};
-
-static struct basic_mountinfo *disk_slow_mountinfo_tmp_root = NULL;
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
@@ -132,6 +121,43 @@ int mount_point_is_protected(char *mount_point)
 
     return 0;
 }
+
+// a copy of basic mountinfo fields
+struct basic_mountinfo {
+    char *persistent_id;    
+    char *root;             
+    char *mount_point;      
+    char *filesystem;       
+
+    struct basic_mountinfo *next;
+};
+
+static struct basic_mountinfo *slow_mountinfo_tmp_root = NULL;
+
+static struct basic_mountinfo *basic_mountinfo_create_and_copy(struct mountinfo* mi)
+{
+    struct basic_mountinfo *bmi = callocz(1, sizeof(struct basic_mountinfo));
+    
+    if (mi) {
+        bmi->persistent_id = strdupz(mi->persistent_id);
+        bmi->root          = strdupz(mi->root);
+        bmi->mount_point   = strdupz(mi->mount_point);
+        bmi->filesystem    = strdupz(mi->filesystem);
+    }
+
+    return bmi;
+}
+
+static void add_basic_mountinfo(struct basic_mountinfo **root, struct mountinfo *mi)
+{
+    if (!root)
+        return;
+
+    struct basic_mountinfo *bmi = basic_mountinfo_create_and_copy(mi);
+
+    bmi->next = *root;
+    *root = bmi;
+};
 
 static void calculate_values_and_show_charts(
     struct basic_mountinfo *mi,
@@ -322,7 +348,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         // check if the mount point is a directory #2407
         // but only when it is enabled by default #4491
         if(def_space != CONFIG_BOOLEAN_NO || def_inodes != CONFIG_BOOLEAN_NO) {
+            usec_t start_time = now_monotonic_high_precision_usec();
             struct stat bs;
+
             if(stat(mi->mount_point, &bs) == -1) {
                 error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
                       , mi->mount_point
@@ -345,6 +373,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                     def_inodes = CONFIG_BOOLEAN_NO;
                 }
             }
+
+            if ((now_monotonic_high_precision_usec() - start_time) > MAX_STAT_USEC)
+                m->slow = 1;
         }
 
         do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
@@ -372,6 +403,11 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
 
+    if (m->slow) {
+        add_basic_mountinfo(&slow_mountinfo_tmp_root, mi);
+        return;
+    }
+
     m->updated = 1;
 
     if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
@@ -385,8 +421,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             m->do_inodes != CONFIG_BOOLEAN_YES))
         return;
 
-    
+    usec_t start_time = now_monotonic_high_precision_usec();
     struct statvfs buff_statvfs;
+
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
         if(!m->shown_error) {
             error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
@@ -399,6 +436,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         }
         return;
     }
+
+    if ((now_monotonic_high_precision_usec() - start_time) > MAX_STAT_USEC)
+        m->slow = 1;
+
     m->shown_error = 0;
 
     struct basic_mountinfo bmi;
@@ -467,7 +508,7 @@ void *diskspace_slow_worker(void *ptr)
         // disk space metrics
 
         struct basic_mountinfo *bmi;
-        for(bmi = disk_slow_mountinfo_tmp_root; bmi; bmi = bmi->next) {
+        for(bmi = slow_mountinfo_tmp_root; bmi; bmi = bmi->next) {
 
             worker_is_busy(WORKER_JOB_SLOW_MOUNTPOINT);
             do_slow_disk_space_stats(bmi, update_every);
