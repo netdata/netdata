@@ -8,6 +8,12 @@
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
+#define SLOW_UPDATE_EVERY 5
+
+static int update_every;
+
+static netdata_thread_t *diskspace_slow_thread = NULL;
+
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
 static int cleanup_mount_points = 1;
@@ -377,6 +383,49 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     calculate_values_and_show_charts(mi, m, &buff_statvfs, update_every);
 }
 
+#define WORKER_JOB_MOUNTINFO 0
+#define WORKER_JOB_MOUNTPOINT 1
+#define WORKER_JOB_CLEANUP 2
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 3
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
+#endif
+
+static void diskspace_slow_worker_cleanup(void *ptr)
+{
+    UNUSED(ptr);
+
+    info("cleaning up...");
+
+    worker_unregister();
+}
+
+void *diskspace_slow_worker(void *ptr)
+{
+    worker_register("DISKSPACE");
+    worker_register_job_name(0, "slow");
+
+    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, ptr);
+
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC * SLOW_UPDATE_EVERY;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    while (!netdata_exit) {
+        worker_is_idle();
+        heartbeat_next(&hb, step);
+
+        if (unlikely(netdata_exit))
+            break;
+
+        worker_is_busy(0);
+        // do_slow_disk_space_stats()
+    }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}
+
 static void diskspace_main_cleanup(void *ptr) {
     worker_unregister();
 
@@ -385,16 +434,13 @@ static void diskspace_main_cleanup(void *ptr) {
 
     info("cleaning up...");
 
+    if (diskspace_slow_thread) {
+        netdata_thread_join(*diskspace_slow_thread, NULL);
+        freez(diskspace_slow_thread);
+    }
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
-
-#define WORKER_JOB_MOUNTINFO 0
-#define WORKER_JOB_MOUNTPOINT 1
-#define WORKER_JOB_CLEANUP 2
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 3
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
-#endif
 
 void *diskspace_main(void *ptr) {
     worker_register("DISKSPACE");
@@ -406,7 +452,7 @@ void *diskspace_main(void *ptr) {
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
-    int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
+    update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
@@ -414,6 +460,10 @@ void *diskspace_main(void *ptr) {
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
+    diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(
+        diskspace_slow_thread, THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, diskspace_slow_worker, diskspace_slow_thread);
+        
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
