@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Check return value and log an error on failure [\#13037](https://github.com/netdata/netdata/pull/13037) ([stelfrag](https://github.com/stelfrag))
+- Update apps\_groups.conf [\#13033](https://github.com/netdata/netdata/pull/13033) ([fqx](https://github.com/fqx))
 - add hostname to mirrored hosts [\#13030](https://github.com/netdata/netdata/pull/13030) ([ktsaou](https://github.com/ktsaou))
 - Update dashboard to version v2.25.6. [\#13028](https://github.com/netdata/netdata/pull/13028) ([netdatabot](https://github.com/netdatabot))
 - prevent gap filling on dbengine gaps [\#13027](https://github.com/netdata/netdata/pull/13027) ([ktsaou](https://github.com/ktsaou))
@@ -42,6 +44,7 @@
 - Add automatic retries fo static builds during nightly and release builds. [\#12961](https://github.com/netdata/netdata/pull/12961) ([Ferroin](https://github.com/Ferroin))
 - Cleanup chart hash and map tables on startup [\#12956](https://github.com/netdata/netdata/pull/12956) ([stelfrag](https://github.com/stelfrag))
 - Suppress warning when freeing a NULL pointer in onewayalloc\_freez [\#12955](https://github.com/netdata/netdata/pull/12955) ([stelfrag](https://github.com/stelfrag))
+- Trigger queue removed alerts on health log exchange with cloud [\#12954](https://github.com/netdata/netdata/pull/12954) ([MrZammler](https://github.com/MrZammler))
 - Optimize the dimensions option store to the metadata database [\#12952](https://github.com/netdata/netdata/pull/12952) ([stelfrag](https://github.com/stelfrag))
 - Defer the dimension payload check to the ACLK sync thread [\#12951](https://github.com/netdata/netdata/pull/12951) ([stelfrag](https://github.com/stelfrag))
 - detailed dbengine stats [\#12948](https://github.com/netdata/netdata/pull/12948) ([ktsaou](https://github.com/ktsaou))
@@ -323,8 +326,6 @@
 - Reorder functions properly in updater script. [\#12399](https://github.com/netdata/netdata/pull/12399) ([Ferroin](https://github.com/Ferroin))
 - Fix crash when netdatacli command output too long [\#12393](https://github.com/netdata/netdata/pull/12393) ([underhood](https://github.com/underhood))
 - Dont check host health enabled if host is null [\#12392](https://github.com/netdata/netdata/pull/12392) ([MrZammler](https://github.com/MrZammler))
-- Update build/m4/ax\_pthread.m4 [\#12390](https://github.com/netdata/netdata/pull/12390) ([vkalintiris](https://github.com/vkalintiris))
-- Delay removed event for 60 seconds after the chart's last collected time [\#12388](https://github.com/netdata/netdata/pull/12388) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
