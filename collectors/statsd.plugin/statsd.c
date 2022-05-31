@@ -2375,13 +2375,13 @@ void *statsd_main(void *ptr) {
     statsd.sets.dict = dictionary_create(STATSD_DICTIONARY_OPTIONS);
     statsd.timers.dict = dictionary_create(STATSD_DICTIONARY_OPTIONS);
 
-    dictionary_delete_callback(statsd.gauges.dict, dictionary_extensions_delete_callback, &statsd.gauges);
-    dictionary_delete_callback(statsd.meters.dict, dictionary_extensions_delete_callback, &statsd.meters);
-    dictionary_delete_callback(statsd.counters.dict, dictionary_extensions_delete_callback, &statsd.counters);
-    dictionary_delete_callback(statsd.histograms.dict, dictionary_extensions_delete_callback, &statsd.histograms);
-    dictionary_delete_callback(statsd.dictionaries.dict, dictionary_extensions_delete_callback, &statsd.dictionaries);
-    dictionary_delete_callback(statsd.sets.dict, dictionary_extensions_delete_callback, &statsd.sets);
-    dictionary_delete_callback(statsd.timers.dict, dictionary_extensions_delete_callback, &statsd.timers);
+    dictionary_register_delete_callback(statsd.gauges.dict, dictionary_extensions_delete_callback, &statsd.gauges);
+    dictionary_register_delete_callback(statsd.meters.dict, dictionary_extensions_delete_callback, &statsd.meters);
+    dictionary_register_delete_callback(statsd.counters.dict, dictionary_extensions_delete_callback, &statsd.counters);
+    dictionary_register_delete_callback(statsd.histograms.dict, dictionary_extensions_delete_callback, &statsd.histograms);
+    dictionary_register_delete_callback(statsd.dictionaries.dict, dictionary_extensions_delete_callback, &statsd.dictionaries);
+    dictionary_register_delete_callback(statsd.sets.dict, dictionary_extensions_delete_callback, &statsd.sets);
+    dictionary_register_delete_callback(statsd.timers.dict, dictionary_extensions_delete_callback, &statsd.timers);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd configuration

@@ -8,8 +8,6 @@ typedef struct dictionary DICTIONARY;
 
 #include "../libnetdata.h"
 
-// #undef ENABLE_DBENGINE
-
 #ifndef ENABLE_DBENGINE
 #define DICTIONARY_WITH_AVL
 #else
@@ -136,7 +134,7 @@ struct dictionary {
     struct dictionary_stats *stats;     // the statistics when DICTIONARY_FLAG_WITH_STATISTICS is set
 };
 
-void dictionary_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data) {
+void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data) {
     dict->del_callback = del_callback;
     dict->del_callback_data = data;
 }
@@ -454,8 +452,8 @@ static inline void linkedlist_namevalue_link_unsafe(DICTIONARY *dict, NAME_VALUE
     }
     else {
         // add it at the end
-        nv->prev = dict->last_item;
         nv->next = NULL;
+        nv->prev = dict->last_item;
 
         if (likely(nv->prev)) nv->prev->next = nv;
         dict->last_item = nv;

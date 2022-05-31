@@ -54,7 +54,8 @@ typedef enum dictionary_flags {
 extern DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags);
 
 // a delete callback to be called just before an item is deleted forever
-extern void dictionary_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data);
+// this callback is called while the dictionary is write locked!
+extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data);
 
 // Destroy a dictionary
 // returns the number of bytes freed
@@ -141,8 +142,8 @@ typedef DICTFE_CONST struct dictionary_foreach {
     void *value;                // the dictionary value of the last item used
                                 // same as the return value of dictfe_start() and dictfe_next()
 
-    usec_t started_ut;           // the time the caller started iterating (now_realtime_usec())
     // the following are for internal use only - to keep track of the point we are
+    usec_t started_ut;          // the time the caller started iterating (now_realtime_usec())
     DICTIONARY *dict;           // the dictionary upon we work
     void *last_position_index;  // the internal position index, to remember the position we are at
     void *next_position_index;  // the internal position index, of the next item
