@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_functions.h"
+#include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION "1"
+#define DB_METADATA_VERSION 1
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
@@ -52,7 +53,6 @@ const char *database_config[] = {
     "INSERT INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id) "
     "on conflict (chart_id, hash_id) do nothing; END; ",
 
-    "PRAGMA user_version="DB_METADATA_VERSION";",
     NULL
 };
 
@@ -404,6 +404,8 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
 
+    int target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
+
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
     snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
@@ -433,6 +435,9 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
     snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
+    if(init_database_batch(rebuild, 0, list)) return 1;
+
+    snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
     if(init_database_batch(rebuild, 0, list)) return 1;
 
     if (init_database_batch(rebuild, 0, &database_config[0]))
