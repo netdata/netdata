@@ -1091,6 +1091,9 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  */
 void collect_data_for_all_processes(int tbl_pid_stats_fd)
 {
+    if (unlikely(!all_pids))
+        return;
+
     struct pid_stat *pids = root_of_pids; // global list of all processes running
     while (pids) {
         if (pids->updated_twice) {
