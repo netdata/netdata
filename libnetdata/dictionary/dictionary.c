@@ -902,7 +902,7 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
     // written in such a way, that the callback can delete the active element
 
     int ret = 0;
-    NAME_VALUE *nv = dict->first_item, *nv_next = nv->next;
+    NAME_VALUE *nv = dict->first_item, *nv_next;
     while(nv) {
         nv_next = nv->next;
 
