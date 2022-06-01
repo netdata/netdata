@@ -53,6 +53,10 @@ typedef enum dictionary_flags {
 // Create a dictionary
 extern DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags);
 
+// an insert callback to be called just after an item is added to the dictionary
+// this callback is called while the dictionary is write locked!
+extern void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const char *name, void *value, void *data), void *data);
+
 // a delete callback to be called just before an item is deleted forever
 // this callback is called while the dictionary is write locked!
 extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data);
@@ -73,8 +77,10 @@ extern size_t dictionary_destroy(DICTIONARY *dict);
 //
 // When neither DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE nor DICTIONARY_FLAG_NAME_LINK_DONT_CLONE are set, all the
 // memory management for names and values is done by the dictionary.
-#define dictionary_set(dict, name, value, value_len) dictionary_set_with_name_ptr(dict, name, value, value_len, NULL)
-extern void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr) NEVERNULL;
+//
+// Passing NULL as value, the dictionary will callocz() the newly allocated value, otherwise it will copy it.
+// Passing 0 as value_len, the dictionary will set the value to NULL (no allocations for value will be made).
+extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) NEVERNULL;
 
 // Get an item from the dictionary
 // If it returns NULL, the item is not found
@@ -93,12 +99,10 @@ extern int dictionary_del(DICTIONARY *dict, const char *name);
 #define dictionary_get_having_read_lock(dict, name) dictionary_get_unsafe(dict, name)
 #define dictionary_get_having_write_lock(dict, name) dictionary_get_unsafe(dict, name)
 #define dictionary_set_having_write_lock(dict, name, value, value_len) dictionary_set_unsafe(dict, name, value, value_len)
-#define dictionary_set_with_name_ptr_having_write_lock(dict, name, value, value_len, name_ptr) dictionary_set_unsafe(dict, name, value, value_len, name_ptr)
 #define dictionary_del_having_write_lock(dict, name) dictionary_del_unsafe(dict, name)
 
 extern void *dictionary_get_unsafe(DICTIONARY *dict, const char *name);
-#define dictionary_set_unsafe(dict, name, value, value_len) dictionary_set_with_name_ptr_unsafe(dict, name, value, value_len, NULL)
-extern void *dictionary_set_with_name_ptr_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr);
+extern void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len);
 extern int dictionary_del_unsafe(DICTIONARY *dict, const char *name);
 
 // Traverse (walk through) the items of the dictionary.
@@ -149,12 +153,19 @@ typedef DICTFE_CONST struct dictionary_foreach {
     void *next_position_index;  // the internal position index, of the next item
 } DICTFE;
 
-#define dfe_name(dfe) (dfe)->name
-#define dfe_value(dfe) (dfe)->value
-#define dfe_start_read(dfe, dict) dictionary_foreach_start_rw(dfe, dict, 'r')
-#define dfe_start_write(dfe, dict) dictionary_foreach_start_rw(dfe, dict, 'w')
-#define dfe_next(dfe) dictionary_foreach_next(dfe)
-#define dfe_done(dfe) dictionary_foreach_done(dfe)
+#define dfe_start_read(dict, value) dfe_start_rw(dict, value, 'r')
+#define dfe_start_write(dict, value) dfe_start_rw(dict, value, 'r')
+#define dfe_start_rw(dict, value, mode) \
+        do { \
+            DICTFE dfe_ ## value = {};  \
+            const char *value ## _name; (void)(value ## _name); \
+            for((value) = dictionary_foreach_start_rw(&dfe_ ## value, (dict), (mode)), ( value ## _name ) = dfe_ ## value.name; \
+                (value) ;\
+                (value) = dictionary_foreach_next(&dfe_ ## value), ( value ## _name ) = dfe_ ## value.name)
+
+#define dfe_done(value) \
+            dictionary_foreach_done(&dfe_ ## value); \
+        } while(0)
 
 extern void * dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw);
 extern void * dictionary_foreach_next(DICTFE *dfe);

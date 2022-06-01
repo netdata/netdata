@@ -129,11 +129,19 @@ struct dictionary {
 
     netdata_rwlock_t *rwlock;           // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
 
+    void (*ins_callback)(const char *name, void *value, void *data);
+    void *ins_callback_data;
+
     void (*del_callback)(const char *name, void *value, void *data);
     void *del_callback_data;
 
     struct dictionary_stats *stats;     // the statistics when DICTIONARY_FLAG_WITH_STATISTICS is set
 };
+
+void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const char *name, void *value, void *data), void *data) {
+    dict->ins_callback = ins_callback;
+    dict->ins_callback_data = data;
+}
 
 void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data) {
     dict->del_callback = del_callback;
@@ -532,8 +540,24 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
     if(likely(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE))
         nv->value = value;
     else {
-        nv->value = mallocz(value_len);
-        memcpy(nv->value, value, value_len);
+        if(likely(value_len)) {
+            if (value) {
+                // a value has been supplied
+                // copy it
+                nv->value = mallocz(value_len);
+                memcpy(nv->value, value, value_len);
+            }
+            else {
+                // no value has been supplied
+                // allocate a clear memory block
+                nv->value = callocz(1, value_len);
+            }
+        }
+        else {
+            // the caller want an item without any value
+            nv->value = NULL;
+        }
+
         allocated += value_len;
     }
 
@@ -669,7 +693,12 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // API - items management
 
-void *dictionary_set_with_name_ptr_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr) {
+void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+    if(unlikely(!name || !*name)) {
+        error("Attempted to dictionary_set() a dictionary item without a name");
+        return NULL;
+    }
+
     size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
@@ -691,6 +720,9 @@ void *dictionary_set_with_name_ptr_unsafe(DICTIONARY *dict, const char *name, vo
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
         hashtable_inserted_name_value_unsafe(dict, name, name_len, nv);
         linkedlist_namevalue_link_unsafe(dict, nv);
+
+        if(dict->ins_callback)
+            dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
     }
     else {
         // the item is already in the index
@@ -702,18 +734,22 @@ void *dictionary_set_with_name_ptr_unsafe(DICTIONARY *dict, const char *name, vo
             namevalue_reset_unsafe(dict, nv, value, value_len);
     }
 
-    if(name_ptr) *name_ptr = nv->name;
     return nv->value;
 }
 
-void *dictionary_set_with_name_ptr(DICTIONARY *dict, const char *name, void *value, size_t value_len, char **name_ptr) {
+void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
     dictionary_lock_wrlock(dict);
-    void *ret = dictionary_set_with_name_ptr_unsafe(dict, name, value, value_len, name_ptr);
+    void *ret = dictionary_set_unsafe(dict, name, value, value_len);
     dictionary_unlock(dict);
     return ret;
 }
 
 void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
+    if(unlikely(!name || !*name)) {
+        error("Attempted to dictionary_get() without a name");
+        return NULL;
+    }
+
     size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
@@ -736,6 +772,11 @@ void *dictionary_get(DICTIONARY *dict, const char *name) {
 }
 
 int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
+    if(unlikely(!name || !*name)) {
+        error("Attempted to dictionary_det() without a name");
+        return -1;
+    }
+
     size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
@@ -923,11 +964,8 @@ static size_t dictionary_unittest_set_clone(DICTIONARY *dict, char **names, char
     size_t errors = 0;
     for(size_t i = 0; i < entries ;i++) {
         size_t vallen = strlen(values[i]) + 1;
-        char *nam;
-        char *val = (char *)dictionary_set_with_name_ptr(dict, names[i], values[i], vallen, &nam);
-        if(nam == names[i])  { fprintf(stderr, ">>> %s() returns reference to name\n", __FUNCTION__); errors++; }
+        char *val = (char *)dictionary_set(dict, names[i], values[i], vallen);
         if(val == values[i]) { fprintf(stderr, ">>> %s() returns reference to value\n", __FUNCTION__); errors++; }
-        if(!nam || strcmp(nam, names[i]) != 0)  { fprintf(stderr, ">>> %s() returns invalid name\n", __FUNCTION__); errors++; }
         if(!val || memcmp(val, values[i], vallen) != 0)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
     }
     return errors;
@@ -937,9 +975,7 @@ static size_t dictionary_unittest_set_nonclone(DICTIONARY *dict, char **names, c
     size_t errors = 0;
     for(size_t i = 0; i < entries ;i++) {
         size_t vallen = strlen(values[i]) + 1;
-        char *nam;
-        char *val = (char *)dictionary_set_with_name_ptr(dict, names[i], values[i], vallen, &nam);
-        if(nam != names[i])  { fprintf(stderr, ">>> %s() returns invalid pointer to name\n", __FUNCTION__); errors++; }
+        char *val = (char *)dictionary_set(dict, names[i], values[i], vallen);
         if(val != values[i]) { fprintf(stderr, ">>> %s() returns invalid pointer to value\n", __FUNCTION__); errors++; }
     }
     return errors;
@@ -1017,11 +1053,8 @@ static size_t dictionary_unittest_reset_clone(DICTIONARY *dict, char **names, ch
     size_t errors = 0;
     for(size_t i = 0; i < entries ;i++) {
         size_t vallen = strlen(names[i]) + 1;
-        char *nam;
-        char *val = (char *)dictionary_set_with_name_ptr(dict, names[i], names[i], vallen, &nam);
-        if(nam == names[i]) { fprintf(stderr, ">>> %s() returns reference to name\n", __FUNCTION__); errors++; }
+        char *val = (char *)dictionary_set(dict, names[i], names[i], vallen);
         if(val == names[i]) { fprintf(stderr, ">>> %s() returns reference to value\n", __FUNCTION__); errors++; }
-        if(!nam || strcmp(nam, names[i]) != 0)  { fprintf(stderr, ">>> %s() returns invalid name\n", __FUNCTION__); errors++; }
         if(!val || memcmp(val, names[i], vallen) != 0)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
     }
     return errors;
@@ -1033,11 +1066,8 @@ static size_t dictionary_unittest_reset_nonclone(DICTIONARY *dict, char **names,
     size_t errors = 0;
     for(size_t i = 0; i < entries ;i++) {
         size_t vallen = strlen(names[i]) + 1;
-        char *nam;
-        char *val = (char *)dictionary_set_with_name_ptr(dict, names[i], names[i], vallen, &nam);
-        if(nam != names[i]) { fprintf(stderr, ">>> %s() returns invalid pointer to name\n", __FUNCTION__); errors++; }
+        char *val = (char *)dictionary_set(dict, names[i], names[i], vallen);
         if(val != names[i]) { fprintf(stderr, ">>> %s() returns invalid pointer to value\n", __FUNCTION__); errors++; }
-        if(!nam)  { fprintf(stderr, ">>> %s() returns invalid name\n", __FUNCTION__); errors++; }
         if(!val)  { fprintf(stderr, ">>> %s() returns invalid value\n", __FUNCTION__); errors++; }
     }
     return errors;
@@ -1048,9 +1078,7 @@ static size_t dictionary_unittest_reset_dont_overwrite_nonclone(DICTIONARY *dict
     size_t errors = 0;
     for(size_t i = 0; i < entries ;i++) {
         size_t vallen = strlen(names[i]) + 1;
-        char *nam;
-        char *val = (char *)dictionary_set_with_name_ptr(dict, names[i], names[i], vallen, &nam);
-        if(nam != names[i]) { fprintf(stderr, ">>> %s() returns invalid pointer to name\n", __FUNCTION__); errors++; }
+        char *val = (char *)dictionary_set(dict, names[i], names[i], vallen);
         if(val != values[i]) { fprintf(stderr, ">>> %s() returns invalid pointer to value\n", __FUNCTION__); errors++; }
     }
     return errors;
@@ -1109,11 +1137,10 @@ static size_t dictionary_unittest_foreach(DICTIONARY *dict, char **names, char *
     (void)values;
     (void)entries;
     size_t count = 0;
-    DICTFE dfe;
-    for(char *item = dfe_start_read(&dfe, dict); item ; item = dfe_next(&dfe)) {
-       count++;
-    }
-    dfe_done(&dfe);
+    char *item;
+    dfe_start_read(dict, item)
+        count++;
+    dfe_done(item);
 
     if(count > entries) return count - entries;
     return entries - count;
@@ -1124,11 +1151,10 @@ static size_t dictionary_unittest_foreach_delete_this(DICTIONARY *dict, char **n
     (void)values;
     (void)entries;
     size_t count = 0;
-    DICTFE dfe;
-    for(char *item = dfe_start_write(&dfe, dict); item ; item = dfe_next(&dfe)) {
-        if(dictionary_del_having_write_lock(dict, dfe.name) != -1) count++;
-    }
-    dfe_done(&dfe);
+    char *item;
+    dfe_start_write(dict, item)
+        if(dictionary_del_having_write_lock(dict, item_name) != -1) count++;
+    dfe_done(item);
 
     if(count > entries) return count - entries;
     return entries - count;

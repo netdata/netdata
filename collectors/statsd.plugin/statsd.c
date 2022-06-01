@@ -79,7 +79,6 @@ typedef struct statsd_metric_set {
 typedef struct statsd_metric_dictionary_item {
     size_t count;
     RRDDIM *rd;
-    char oldnew;
 } STATSD_METRIC_DICTIONARY_ITEM;
 
 typedef struct statsd_metric_dictionary {
@@ -160,6 +159,7 @@ typedef struct statsd_index {
     size_t metrics;                 // the number of metrics in this index
     size_t useful;                  // the number of useful metrics in this index
 
+    STATSD_METRIC_TYPE type;        // the type of index
     DICTIONARY *dict;
 
     STATSD_METRIC *first_useful;    // the linked list of useful metrics (new metrics are added in front)
@@ -301,6 +301,7 @@ static struct statsd {
                 .events = 0,
                 .metrics = 0,
                 .dict = NULL,
+                .type = STATSD_METRIC_TYPE_GAUGE,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .counters   = {
@@ -308,6 +309,7 @@ static struct statsd {
                 .events = 0,
                 .metrics = 0,
                 .dict = NULL,
+                .type = STATSD_METRIC_TYPE_COUNTER,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .timers     = {
@@ -315,6 +317,7 @@ static struct statsd {
                 .events = 0,
                 .metrics = 0,
                 .dict = NULL,
+                .type = STATSD_METRIC_TYPE_TIMER,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .histograms = {
@@ -322,6 +325,7 @@ static struct statsd {
                 .events = 0,
                 .metrics = 0,
                 .dict = NULL,
+                .type = STATSD_METRIC_TYPE_HISTOGRAM,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .meters     = {
@@ -329,6 +333,7 @@ static struct statsd {
                 .events = 0,
                 .metrics = 0,
                 .dict = NULL,
+                .type = STATSD_METRIC_TYPE_METER,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .sets       = {
@@ -336,6 +341,7 @@ static struct statsd {
                 .events = 0,
                 .metrics = 0,
                 .dict = NULL,
+                .type = STATSD_METRIC_TYPE_SET,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .dictionaries = {
@@ -343,6 +349,7 @@ static struct statsd {
                 .events = 0,
                 .metrics = 0,
                 .dict = NULL,
+                .type = STATSD_METRIC_TYPE_DICTIONARY,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
 
@@ -367,12 +374,30 @@ static struct statsd {
 // --------------------------------------------------------------------------------------------------------------------
 // statsd index management - add/find metrics
 
-static void dictionary_extensions_delete_callback(const char *name, void *value, void *data) {
-    (void)name;
-    (void)data;
-
-    // STATSD_INDEX *index = (STATSD_INDEX *)data;
+static void dictionary_metric_insert_callback(const char *name, void *value, void *data) {
+    STATSD_INDEX *index = (STATSD_INDEX *)data;
     STATSD_METRIC *m = (STATSD_METRIC *)value;
+
+    debug(D_STATSD, "Creating new %s metric '%s'", index->name, name);
+
+    m->name = name;
+    m->hash = simple_hash(name);
+    m->type = index->type;
+    m->options = index->default_options;
+
+    if (m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
+        m->histogram.ext = callocz(1,sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS));
+        netdata_mutex_init(&m->histogram.ext->mutex);
+    }
+
+    __atomic_fetch_add(&index->metrics, 1, __ATOMIC_SEQ_CST);
+}
+
+static void dictionary_metric_delete_callback(const char *name, void *value, void *data) {
+    (void)data; // STATSD_INDEX *index = (STATSD_INDEX *)data;
+    (void)name;
+    STATSD_METRIC *m = (STATSD_METRIC *)value;
+
     if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
         freez(m->histogram.ext);
         m->histogram.ext = NULL;
@@ -383,32 +408,20 @@ static void dictionary_extensions_delete_callback(const char *name, void *value,
     freez(m->dimname);
 }
 
-static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name, STATSD_METRIC_TYPE type) {
+static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name) {
     debug(D_STATSD, "searching for metric '%s' under '%s'", name, index->name);
 
+#ifdef STATSD_MULTITHREADED
+    // avoid the write lock of dictionary_set() for existing metrics
     STATSD_METRIC *m = dictionary_get(index->dict, name);
-    if(!m) {
-        char *name_in_index;
-        STATSD_METRIC tmp = {}; // the dictionary will copy this
-        m = dictionary_set_with_name_ptr(index->dict, name, &tmp, sizeof(STATSD_METRIC), &name_in_index);
-        if (!m->name) {
-            // a new one
-
-            debug(D_STATSD, "Creating new %s metric '%s'", index->name, name);
-
-            m->name = name_in_index;
-            m->hash = simple_hash(m->name);
-            m->type = type;
-            m->options = index->default_options;
-
-            if (type == STATSD_METRIC_TYPE_HISTOGRAM || type == STATSD_METRIC_TYPE_TIMER) {
-                m->histogram.ext = callocz(1,sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS));
-                netdata_mutex_init(&m->histogram.ext->mutex);
-            }
-
-            __atomic_fetch_add(&index->metrics, 1, __ATOMIC_SEQ_CST);
-        }
-    }
+    if(!m) m = dictionary_set(index->dict, name, NULL, sizeof(STATSD_METRIC));
+#else
+    // no locks here, go faster
+    // this will call the dictionary_metric_insert_callback() if an item
+    // is inserted, otherwise it will return the existing one.
+    // We used the flag DICTIONARY_FLAG_DONT_OVERWRITE_VALUE to support this.
+    STATSD_METRIC *m = dictionary_set(index->dict, name, NULL, sizeof(STATSD_METRIC));
+#endif
 
     index->events++;
     return m;
@@ -562,6 +575,13 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
 #define statsd_process_timer(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "timer")
 #define statsd_process_histogram(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "histogram")
 
+static void dictionary_metric_set_value_insert_callback(const char *name, void *value, void *data) {
+    (void)name;
+    (void)value;
+    STATSD_METRIC *m = (STATSD_METRIC *)data;
+    m->set.unique++;
+}
+
 static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     if(!is_metric_useful_for_collection(m)) return;
 
@@ -573,6 +593,7 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     if(unlikely(m->reset)) {
         if(likely(m->set.dict)) {
             dictionary_destroy(m->set.dict);
+            dictionary_register_insert_callback(m->set.dict, dictionary_metric_set_value_insert_callback, m);
             m->set.dict = NULL;
         }
         statsd_reset_metric(m);
@@ -587,22 +608,23 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
         // magic loading of metric, without affecting anything
     }
     else {
-        char c = 'N'; // new
-        char *cptr = (char *)dictionary_set(m->set.dict, value, &c, sizeof(char));
-
-        // since we pass DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-        // the dictionary will return an existing value, if the key is already there
-        // and based on the returned value, we can know if it is New or Old.
-
-        if(*cptr == 'N') {
-            // it is a new item
-            *cptr = 'O'; // mark it as old
-            m->set.unique++;
-        }
-
+#ifdef STATSD_MULTITHREADED
+        // avoid the write lock to check if something is already there
+        if(!dictionary_get(m->set.dict, value))
+            dictionary_set(m->set.dict, value, NULL, 0);
+#else
+        dictionary_set(m->set.dict, value, NULL, 0);
+#endif
         m->events++;
         m->count++;
     }
+}
+
+static void dictionary_metric_dict_value_insert_callback(const char *name, void *value, void *data) {
+    (void)name;
+    (void)value;
+    STATSD_METRIC *m = (STATSD_METRIC *)data;
+    m->dictionary.unique++;
 }
 
 static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value) {
@@ -618,6 +640,7 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
 
     if (unlikely(!m->dictionary.dict)) {
         m->dictionary.dict   = dictionary_create(STATSD_DICTIONARY_OPTIONS);
+        dictionary_register_insert_callback(m->dictionary.dict, dictionary_metric_dict_value_insert_callback, m);
         m->dictionary.unique = 0;
     }
 
@@ -631,13 +654,7 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
             if(!t && m->dictionary.unique >= statsd.dictionary_max_unique)
                 value = "other";
 
-            STATSD_METRIC_DICTIONARY_ITEM tmp = { .oldnew = 'N' };
-            t = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_set(m->dictionary.dict, value, &tmp, sizeof(STATSD_METRIC_DICTIONARY_ITEM));
-            if(t->oldnew == 'N') {
-                // we just added this
-                t->oldnew = 'O';
-                m->dictionary.unique++;
-            }
+            t = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_set(m->dictionary.dict, value, NULL, sizeof(STATSD_METRIC_DICTIONARY_ITEM));
         }
 
         t->count++;
@@ -694,39 +711,39 @@ static void statsd_process_metric(const char *name, const char *value, const cha
     char t0 = type[0], t1 = type[1];
     if(unlikely(t0 == 'g' && t1 == '\0')) {
         statsd_process_gauge(
-            m = statsd_find_or_add_metric(&statsd.gauges, name, STATSD_METRIC_TYPE_GAUGE),
+            m = statsd_find_or_add_metric(&statsd.gauges, name),
             value, sampling);
     }
     else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0')) {
         // etsy/statsd uses 'c'
         // brubeck     uses 'C'
         statsd_process_counter(
-            m = statsd_find_or_add_metric(&statsd.counters, name, STATSD_METRIC_TYPE_COUNTER),
+            m = statsd_find_or_add_metric(&statsd.counters, name),
             value, sampling);
     }
     else if(unlikely(t0 == 'm' && t1 == '\0')) {
         statsd_process_meter(
-            m = statsd_find_or_add_metric(&statsd.meters, name, STATSD_METRIC_TYPE_METER),
+            m = statsd_find_or_add_metric(&statsd.meters, name),
             value, sampling);
     }
     else if(unlikely(t0 == 'h' && t1 == '\0')) {
         statsd_process_histogram(
-            m = statsd_find_or_add_metric(&statsd.histograms, name, STATSD_METRIC_TYPE_HISTOGRAM),
+            m = statsd_find_or_add_metric(&statsd.histograms, name),
             value, sampling);
     }
     else if(unlikely(t0 == 's' && t1 == '\0')) {
         statsd_process_set(
-            m = statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
+            m = statsd_find_or_add_metric(&statsd.sets, name),
             value);
     }
     else if(unlikely(t0 == 'd' && t1 == '\0')) {
         statsd_process_dictionary(
-            m = statsd_find_or_add_metric(&statsd.dictionaries, name, STATSD_METRIC_TYPE_DICTIONARY),
+            m = statsd_find_or_add_metric(&statsd.dictionaries, name),
             value);
     }
     else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
         statsd_process_timer(
-            m = statsd_find_or_add_metric(&statsd.timers, name, STATSD_METRIC_TYPE_TIMER),
+            m = statsd_find_or_add_metric(&statsd.timers, name),
             value, sampling);
     }
     else {
@@ -1748,12 +1765,11 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
     else rrdset_next(m->st);
 
     STATSD_METRIC_DICTIONARY_ITEM *t;
-    DICTFE dfe = {};
-    for(t = dfe_start_read(&dfe, m->dictionary.dict); t ;t = dfe_next(&dfe)) {
-        if(!t->rd) t->rd = rrddim_add(m->st, dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    dfe_start_read(m->dictionary.dict, t) {
+        if (!t->rd) t->rd = rrddim_add(m->st, t_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rrddim_set_by_pointer(m->st, t->rd, (collected_number)t->count);
     }
-    dfe_done(&dfe);
+    dfe_done(t);
 
     if(m->rd_count)
         rrddim_set_by_pointer(m->st, m->rd_count, m->events);
@@ -2248,8 +2264,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
     STATSD_METRIC *m;
 
     // find the useful metrics (incremental = each time we are called, we check the new metrics only)
-    DICTFE dfe = {};
-    for(m = dfe_start_read(&dfe, index->dict); m ; m = dfe_next(&dfe)) {
+    dfe_start_read(index->dict, m) {
         // since we add new metrics at the beginning
         // check for useful charts, until the point we last checked
         if(unlikely(is_metric_checked(m))) break;
@@ -2290,7 +2305,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
             index->first_useful = m;
         }
     }
-    dfe_done(&dfe);
+    dfe_done(m);
 
     // flush all the useful metrics
     for(m = index->first_useful; m ; m = m->next_useful) {
@@ -2376,13 +2391,21 @@ void *statsd_main(void *ptr) {
     statsd.sets.dict = dictionary_create(STATSD_DICTIONARY_OPTIONS);
     statsd.timers.dict = dictionary_create(STATSD_DICTIONARY_OPTIONS);
 
-    dictionary_register_delete_callback(statsd.gauges.dict, dictionary_extensions_delete_callback, &statsd.gauges);
-    dictionary_register_delete_callback(statsd.meters.dict, dictionary_extensions_delete_callback, &statsd.meters);
-    dictionary_register_delete_callback(statsd.counters.dict, dictionary_extensions_delete_callback, &statsd.counters);
-    dictionary_register_delete_callback(statsd.histograms.dict, dictionary_extensions_delete_callback, &statsd.histograms);
-    dictionary_register_delete_callback(statsd.dictionaries.dict, dictionary_extensions_delete_callback, &statsd.dictionaries);
-    dictionary_register_delete_callback(statsd.sets.dict, dictionary_extensions_delete_callback, &statsd.sets);
-    dictionary_register_delete_callback(statsd.timers.dict, dictionary_extensions_delete_callback, &statsd.timers);
+    dictionary_register_insert_callback(statsd.gauges.dict, dictionary_metric_insert_callback, &statsd.gauges);
+    dictionary_register_insert_callback(statsd.meters.dict, dictionary_metric_insert_callback, &statsd.meters);
+    dictionary_register_insert_callback(statsd.counters.dict, dictionary_metric_insert_callback, &statsd.counters);
+    dictionary_register_insert_callback(statsd.histograms.dict, dictionary_metric_insert_callback, &statsd.histograms);
+    dictionary_register_insert_callback(statsd.dictionaries.dict, dictionary_metric_insert_callback, &statsd.dictionaries);
+    dictionary_register_insert_callback(statsd.sets.dict, dictionary_metric_insert_callback, &statsd.sets);
+    dictionary_register_insert_callback(statsd.timers.dict, dictionary_metric_insert_callback, &statsd.timers);
+
+    dictionary_register_delete_callback(statsd.gauges.dict, dictionary_metric_delete_callback, &statsd.gauges);
+    dictionary_register_delete_callback(statsd.meters.dict, dictionary_metric_delete_callback, &statsd.meters);
+    dictionary_register_delete_callback(statsd.counters.dict, dictionary_metric_delete_callback, &statsd.counters);
+    dictionary_register_delete_callback(statsd.histograms.dict, dictionary_metric_delete_callback, &statsd.histograms);
+    dictionary_register_delete_callback(statsd.dictionaries.dict, dictionary_metric_delete_callback, &statsd.dictionaries);
+    dictionary_register_delete_callback(statsd.sets.dict, dictionary_metric_delete_callback, &statsd.sets);
+    dictionary_register_delete_callback(statsd.timers.dict, dictionary_metric_delete_callback, &statsd.timers);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd configuration
