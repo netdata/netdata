@@ -7,6 +7,8 @@ sidebar_url: Anomalies
 
 # Anomaly detection with Netdata
 
+**Note**: Check out the [Netdata Anomaly Advisor](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor) for a more native anomaly detection experience within Netdata.
+
 This collector uses the Python [PyOD](https://pyod.readthedocs.io/en/latest/index.html) library to perform unsupervised [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) on your Netdata charts and/or dimensions.
 
 Instead of this collector just _collecting_ data, it also does some computation on the data it collects to return an anomaly probability and anomaly flag for each chart or custom model you define. This computation consists of a **train** function that runs every `train_n_secs` to train the ML models to learn what 'normal' typically looks like on your node. At each iteration there is also a **predict** function that uses the latest trained models and most recent metrics to produce an anomaly probability and anomaly flag for each chart or custom model you define.
