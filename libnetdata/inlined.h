@@ -222,19 +222,6 @@ static inline long double str2ld(const char *s, char **endptr) {
     }
 }
 
-#ifdef NETDATA_STRCMP_OVERRIDE
-#ifdef strcmp
-#undef strcmp
-#endif
-#define strcmp(a, b) strsame(a, b)
-#endif // NETDATA_STRCMP_OVERRIDE
-
-static inline int strsame(const char *a, const char *b) {
-    if(unlikely(a == b)) return 0;
-    while(*a && *a == *b) { a++; b++; }
-    return *a - *b;
-}
-
 static inline char *strncpyz(char *dst, const char *src, size_t n) {
     char *p = dst;
 
