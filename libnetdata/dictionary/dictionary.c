@@ -8,7 +8,7 @@ typedef struct dictionary DICTIONARY;
 
 #include "../libnetdata.h"
 
-#ifdef ENABLE_DBENGINE
+#ifndef ENABLE_DBENGINE
 #define DICTIONARY_WITH_AVL
 #warning Compiling DICTIONARY with an AVL index
 #else
