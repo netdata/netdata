@@ -377,7 +377,7 @@ void *ebpf_oomkill_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = oomkill_maps;
 
-    if (unlikely(!all_pids)) {
+    if (unlikely(!all_pids || !em->apps_charts)) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
         if (em->enabled)
