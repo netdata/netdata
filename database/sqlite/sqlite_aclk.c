@@ -36,6 +36,7 @@ uv_mutex_t aclk_async_lock;
 struct aclk_database_worker_config  *aclk_thread_head = NULL;
 int retention_running = 0;
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static void stop_retention_run()
 {
     uv_mutex_lock(&aclk_async_lock);
@@ -54,6 +55,7 @@ static int request_retention_run()
     uv_mutex_unlock(&aclk_async_lock);
     return rc;
 }
+#endif
 
 int claimed()
 {
@@ -371,7 +373,7 @@ static void timer_cb(uv_timer_t* handle)
 }
 
 
-
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void after_send_retention(uv_work_t *req, int status)
 {
     struct aclk_database_worker_config *wc = req->data;
@@ -400,7 +402,7 @@ static void send_retention(uv_work_t *req)
 
     aclk_update_retention(wc);
 }
-
+#endif
 
 #define MAX_CMD_BATCH_SIZE (256)
 
@@ -478,6 +480,7 @@ void aclk_database_worker(void *arg)
 
     memset(&cmd, 0, sizeof(cmd));
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    uv_work_t retention_work;
     sql_get_last_chart_sequence(wc);
     wc->chart_payload_count = sql_get_pending_count(wc);
     if (!wc->chart_payload_count)
@@ -489,7 +492,6 @@ void aclk_database_worker(void *arg)
     wc->rotation_after = wc->startup_time + ACLK_DATABASE_ROTATION_DELAY;
 
     debug(D_ACLK_SYNC,"Node %s reports pending message count = %u", wc->node_id, wc->chart_payload_count);
-    uv_work_t retention_work;
 
     while (likely(!netdata_exit)) {
         worker_is_idle();
