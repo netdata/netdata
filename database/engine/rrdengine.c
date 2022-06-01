@@ -964,6 +964,22 @@ static void delete_old_data(void *arg)
     fatal_assert(0 == uv_async_send(&wc->async));
 }
 
+int rrdeng_page_has_only_empty_metrics(struct rrdeng_page_descr *descr) {
+    unsigned i;
+    uint8_t has_only_empty_metrics = 1;
+    storage_number *page;
+
+    page = descr->pg_cache_descr->page;
+    for (i = 0; i < descr->page_length / sizeof(storage_number); ++i) {
+        if (SN_EMPTY_SLOT != page[i]) {
+            has_only_empty_metrics = 0;
+            break;
+        }
+    }
+
+    return has_only_empty_metrics;
+}
+
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
     struct rrdengine_instance *ctx = wc->ctx;

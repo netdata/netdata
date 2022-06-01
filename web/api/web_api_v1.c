@@ -1434,8 +1434,27 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     freez(s);
     return HTTP_RESP_OK;
 }
+#endif
 
-#endif // defined(ENABLE_ML)
+#ifdef ENABLE_REPLICATION
+int web_client_api_request_v1_replication(RRDHOST *host, struct web_client *w, char *url) {
+    (void) url;
+
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    const char *s = replication_logs(host);
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_strcat(wb, s);
+    buffer_no_cacheable(wb);
+
+    freez((char *) s);
+    return HTTP_RESP_OK;
+}
+#endif
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
@@ -1691,6 +1710,10 @@ static struct api_command {
         { "weights",             0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_weights },
 
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_dbengine_stats },
+
+#if defined(ENABLE_REPLICATION)
+        { "replication",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_replication      },
+#endif
 
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },

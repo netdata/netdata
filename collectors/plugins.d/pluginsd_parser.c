@@ -210,6 +210,22 @@ PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, DICTIONARY *new_h
     return PARSER_RC_OK;
 }
 
+PARSER_RC pluginsd_fillgap_action(void *user, RRDHOST *host, const char *buf)
+{
+    UNUSED(user);
+
+    replication_receiver_fill_gap(host, buf);
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_dropgap_action(void *user, RRDHOST *host, time_t after, time_t before)
+{
+    UNUSED(user);
+
+    replication_receiver_drop_gap(host, after, before);
+    return PARSER_RC_OK;
+}
+
 PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *dimension = words[1];
@@ -635,6 +651,43 @@ PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plu
 
     return rc;
 }
+
+PARSER_RC pluginsd_fillgap(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{
+    if (!words[1]) {
+        error("Ignoring malformed or empty FILLGAP command.");
+        return PARSER_RC_OK;
+    }
+
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (plugins_action->fillgap_action) {
+        PARSER_RC rc = plugins_action->fillgap_action(user, host, words[1]);
+        return rc;
+    }
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_dropgap(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    if (!words[1] || !words[2]) {
+        error("Ignoring malformed or empty DROPGAP command.");
+        return PARSER_RC_OK;
+    }
+
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    time_t after = str2l(words[1]);
+    time_t before = str2l(words[2]);
+
+    if (plugins_action->dropgap_action) {
+        PARSER_RC rc = plugins_action->dropgap_action(user, host, after, before);
+        return rc;
+    }
+
+    return PARSER_RC_OK;
+}
+
 
 PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {

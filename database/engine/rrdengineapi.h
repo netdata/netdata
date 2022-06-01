@@ -136,4 +136,8 @@ typedef struct rrdengine_size_statistics {
 
 extern RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 
+extern int rrdeng_page_has_only_empty_metrics(struct rrdeng_page_descr *descr);
+
+extern bool rrdeng_store_past_metrics_realtime(RRDDIM *rd, RRDDIM_PAST_DATA *dim_past_data);
+
 #endif /* NETDATA_RRDENGINEAPI_H */

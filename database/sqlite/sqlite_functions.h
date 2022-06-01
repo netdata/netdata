@@ -112,4 +112,11 @@ extern void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_in
 void sql_store_host_labels(RRDHOST *host);
 extern int sql_metadata_cache_stats(int op);
 DICTIONARY *sql_load_host_labels(uuid_t *host_id);
+
+int replication_save_host_entries_range(uuid_t *host_id, time_t After, time_t Before);
+int replication_load_host_entries_range(uuid_t *host_id, time_t *After, time_t *Before);
+
+int replication_save_gaps(RRDHOST *host, const char *Buf, size_t Len);
+int replication_load_gaps(RRDHOST *host);
+
 #endif //NETDATA_SQLITE_FUNCTIONS_H

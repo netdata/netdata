@@ -497,6 +497,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         host->system_info->ml_capable = ml_capable();
         host->system_info->ml_enabled = ml_enabled(host);
         host->system_info->mc_version = enable_metric_correlations ? metric_correlations_version : 0;
+        host->system_info->handshake_enabled = true;
     }
 
     info("Host '%s' (at registry as '%s') with guid '%s' initialized"
@@ -542,9 +543,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrd_hosts_available++;
 
     rrdhost_load_rrdcontext_data(host);
-    if (!archived)
+    if (!archived) {
         ml_new_host(host);
-    else
+        replication_new_host(host);
+    } else
         rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
 
 
@@ -643,6 +645,7 @@ void rrdhost_update(RRDHOST *host
 
         rrd_hosts_available++;
         ml_new_host(host);
+        replication_new_host(host);
         rrdhost_load_rrdcontext_data(host);
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
     }
@@ -1015,6 +1018,8 @@ void stop_streaming_sender(RRDHOST *host)
     if (unlikely(!host->sender))
         return;
 
+    // ------------------------------------------------------------------------
+    // clean up streaming
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
     buffer_free(host->sender->build);
@@ -1092,6 +1097,8 @@ void rrdhost_free(RRDHOST *host, bool force) {
     freez(host->exporting_flags);
 
     health_alarm_log_free(host);
+
+    replication_delete_host(host);
 
 #ifdef ENABLE_DBENGINE
     for(int tier = 0; tier < storage_tiers ;tier++) {
@@ -1591,5 +1598,19 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
             result = st_last;
     }
     rrdset_foreach_done(st);
+    return result;
+}
+
+time_t rrdhost_first_entry_t(RRDHOST *h) {
+    RRDSET *st;
+    time_t result = LONG_MAX;
+
+    rrdset_foreach_read(st, h) {
+        time_t st_first = rrdset_first_entry_t(st);
+        if (st_first < result)
+            result = st_first;
+    }
+    rrdset_foreach_done(st);
+
     return result;
 }

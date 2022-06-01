@@ -58,13 +58,12 @@ extern int connect_to_this(const char *definition, int default_port, struct time
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout);
 
-#ifdef ENABLE_HTTPS
 extern ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 extern ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
-#else
-extern ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
-extern ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
-#endif
+
+// 0 on success. Otherwise, a non-zero value denoting the number of unprocessed bytes
+extern size_t recv_exact(struct netdata_ssl *ssl, int sockfd, void *buf, size_t len, int flags, time_t timeout);
+extern size_t send_exact(struct netdata_ssl *ssl, int sockfd, void *buf, size_t len, int flags, time_t timeout);
 
 extern int sock_setnonblock(int fd);
 extern int sock_delnonblock(int fd);

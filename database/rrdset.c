@@ -1065,6 +1065,21 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     // store the metric on tier 0
     rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 
+    // skip the rest of the tiers, if the dimension's host is receiving gaps.
+    if (replication_receiver_number_of_pending_gaps(rd->rrdset->rrdhost) != 0) {
+        // mark each tier as not collected in order to force a backfill
+        // from tier 0 when the receiver has no more gaps.
+        for (int tier = 1; tier < storage_tiers ;tier++) {
+            if (unlikely(!rd->tiers[tier]))
+                continue;
+
+            struct rrddim_tier *t = rd->tiers[tier];
+            t->last_collected_ut = 0;
+        }
+
+        return;
+    }
+
     for(int tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 

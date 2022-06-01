@@ -8,6 +8,29 @@
 #include "web/server/web_client.h"
 #include "daemon/common.h"
 
+#define WORKER_SENDER_JOB_CONNECT                    0
+#define WORKER_SENDER_JOB_PIPE_READ                  1
+#define WORKER_SENDER_JOB_SOCKET_RECEIVE             2
+#define WORKER_SENDER_JOB_EXECUTE                    3
+#define WORKER_SENDER_JOB_SOCKET_SEND                4
+#define WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE   5
+#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW        6
+#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT         7
+#define WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR      8
+#define WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR    9
+#define WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR      10
+#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED  11
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR  12
+#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR     13
+#define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION 14
+#define WORKER_SENDER_JOB_BUFFER_RATIO              15
+#define WORKER_SENDER_JOB_BYTES_RECEIVED            16
+#define WORKER_SENDER_JOB_BYTES_SENT                17
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 18
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 18
+#endif
+
 #define CONNECTED_TO_SIZE 100
 
 #define STREAM_VERSION_CLAIM 3
@@ -25,10 +48,16 @@
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
 #define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
 #define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
+#define HANDSHAKE_PROTOCOL_PROMPT "handshake_protocol=1"
 
 #define START_STREAMING_ERROR_SAME_LOCALHOST "Don't hit me baby, you are trying to stream my localhost back"
 #define START_STREAMING_ERROR_ALREADY_STREAMING "This GUID is already streaming to this server"
 #define START_STREAMING_ERROR_NOT_PERMITTED "You are not permitted to access this. Check the logs for more info."
+
+#define STREAMING_FEATURE_REPLICATION_DISABLED  10
+#define STREAMING_FEATURE_REPLICATION_V1        20
+
+#define REPLICATION_V1_STR "&replication=20"
 
 #define HTTP_HEADER_SIZE 8192
 
@@ -130,7 +159,7 @@ struct receiver_state {
     int update_every;
     uint32_t stream_version;
     time_t last_msg_t;
-    char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
+    char read_buffer[/* PLUGINSD_LINE_MAX = */ 16 * 1024];
     int read_len;
     unsigned int shutdown:1;    // Tell the thread to exit
     unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
@@ -194,5 +223,7 @@ struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
 size_t is_compressed_data(const char *data, size_t data_size);
 #endif
+
+void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
 #endif //NETDATA_RRDPUSH_H

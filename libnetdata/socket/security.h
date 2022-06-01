@@ -59,5 +59,12 @@ int security_process_accept(SSL *ssl,int msg);
 int security_test_certificate(SSL *ssl);
 SSL_CTX * security_initialize_openssl_client();
 
+#else // ENABLE_HTTPS
+
+struct netdata_ssl {
+    int dummy_field;
+};
+
 # endif //ENABLE_HTTPS
+
 #endif //NETDATA_SECURITY_H

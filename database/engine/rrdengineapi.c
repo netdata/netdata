@@ -75,13 +75,6 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-struct rrdeng_metric_handle {
-    RRDDIM *rd;
-    struct rrdengine_instance *ctx;
-    uuid_t *rrdeng_uuid;                            // database engine metric UUID
-    struct pg_cache_page_index *page_index;
-};
-
 void rrdeng_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle) {
     freez(db_metric_handle);
 }
@@ -173,43 +166,6 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     return (STORAGE_COLLECT_HANDLE *)handle;
 }
 
-/* The page must be populated and referenced */
-static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
-{
-    switch(descr->type) {
-        case PAGE_METRICS: {
-            size_t slots = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
-            storage_number *array = (storage_number *)descr->pg_cache_descr->page;
-            for (size_t i = 0 ; i < slots; ++i) {
-                if(does_storage_number_exist(array[i]))
-                    return 0;
-            }
-        }
-        break;
-
-        case PAGE_TIER: {
-            size_t slots = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
-            storage_number_tier1_t *array = (storage_number_tier1_t *)descr->pg_cache_descr->page;
-            for (size_t i = 0 ; i < slots; ++i) {
-                if(fpclassify(array[i].sum_value) != FP_NAN)
-                    return 0;
-            }
-        }
-        break;
-
-        default: {
-            static bool logged = false;
-            if(!logged) {
-                error("DBENGINE: cannot check page for nulls on unknown page type id %d", descr->type);
-                logged = true;
-            }
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     // struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
@@ -224,7 +180,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
 
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
-        page_is_empty = page_has_only_empty_metrics(descr);
+        page_is_empty = rrdeng_page_has_only_empty_metrics(descr);
         if (page_is_empty) {
             debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
             if (unlikely(debug_flags & D_RRDENGINE))

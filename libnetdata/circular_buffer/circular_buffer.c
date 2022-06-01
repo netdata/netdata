@@ -51,6 +51,21 @@ size_t cbuffer_available_size_unsafe(struct circular_buffer *buf) {
     return buf->max_size - len;
 }
 
+size_t cbuffer_remaining_capacity(struct circular_buffer *buf, bool from_current_size) {
+    size_t len = (buf->write >= buf->read) ? (buf->write - buf->read) : (buf->size - buf->read + buf->write);
+    if (from_current_size) {
+        if (len >= buf->size)
+            return 0;
+        else
+            return buf->size - len;
+    } else {
+        if (len >= buf->max_size)
+            return 0;
+        else
+            return buf->max_size - len;
+    }
+}
+
 int cbuffer_add_unsafe(struct circular_buffer *buf, const char *d, size_t d_len) {
     size_t len = (buf->write >= buf->read) ? (buf->write - buf->read) : (buf->size - buf->read + buf->write);
     while (d_len + len >= buf->size) {

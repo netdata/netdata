@@ -37,6 +37,7 @@ extern PARSER_RC pluginsd_label_action(void *user, char *key, char *value, RRDLA
 extern PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, DICTIONARY *new_host_labels);
 extern PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, DICTIONARY *new_chart_labels);
 extern PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, RRDLABEL_SRC source);
-
+extern PARSER_RC pluginsd_fillgap_action(void *user, RRDHOST *host, const char *Buf);
+extern PARSER_RC pluginsd_dropgap_action(void *user, RRDHOST *host, time_t after, time_t before);
 
 #endif //NETDATA_PLUGINSD_PARSER_H

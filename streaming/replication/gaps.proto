@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package replication.pb;
+
+message TimeRange {
+    int64 After = 1;
+    int64 Before = 2;
+}
+
+message TimeRanges {
+    repeated TimeRange TRs= 1;
+}
+
+message GapData {
+    string Chart = 1;
+    string Dimension = 2;
+    repeated int64 Timestamps = 3;
+    repeated uint32 Values = 4;
+}

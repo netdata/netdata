@@ -43,6 +43,9 @@
 // streaming metrics between netdata servers
 #include "streaming/rrdpush.h"
 
+// support for replication through streaming protocol
+#include "streaming/replication/replication.h"
+
 // health monitoring and alarm notifications
 #include "health/health.h"
 

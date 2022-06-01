@@ -30,6 +30,8 @@ void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
+    replication_fini();
+
     send_statistics("EXIT", ret?"ERROR":"OK","-");
 
     char agent_crash_file[FILENAME_MAX + 1];
@@ -394,10 +396,10 @@ static void security_init(){
 static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug",  filename);
+    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug",  "/dev/stdout");
 
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
+    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  "/dev/stdout");
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
@@ -1374,6 +1376,10 @@ int main(int argc, char **argv) {
         health_initialize_global_silencers();
 
         // --------------------------------------------------------------------
+        // Initialize replication configuration
+        replication_init();
+
+        // --------------------------------------------------------------------
         // Initialize ML configuration
 
         ml_init();
@@ -1447,7 +1453,9 @@ int main(int argc, char **argv) {
     // initialize internal registry
     registry_init();
     // fork the spawn server
+#if 0
     spawn_init();
+#endif
     /*
      * Libuv uv_spawn() uses SIGCHLD internally:
      * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
@@ -1518,7 +1526,9 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // Initialize netdata agent command serving from cli and signals
 
+#if 0
     commands_init();
+#endif
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;

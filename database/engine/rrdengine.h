@@ -36,6 +36,13 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
+struct rrdeng_metric_handle {
+    RRDDIM *rd;
+    struct rrdengine_instance *ctx;
+    uuid_t *rrdeng_uuid;
+    struct pg_cache_page_index *page_index;
+};
+
 struct rrdeng_collect_handle {
     struct rrdeng_metric_handle *metric_handle;
     struct rrdeng_page_descr *descr;

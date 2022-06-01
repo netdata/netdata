@@ -437,6 +437,15 @@ set_source_files_properties(libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTI
 set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src/JudyL")
 
 # -----------------------------------------------------------------------------
+# Detect replication feature
+file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_REPLICATION REGEX "^#define ENABLE_REPLICATION 1$")
+IF(DEFINE_ENABLE_REPLICATION MATCHES ".+")
+    set(ENABLE_REPLICATION True)
+ELSE()
+    set(ENABLE_REPLICATION False)
+ENDIF()
+
+# -----------------------------------------------------------------------------
 # netdata files
 
 set(LIBNETDATA_FILES
@@ -766,6 +775,7 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdenginelib.h
         database/engine/rrdengineapi.c
         database/engine/rrdengineapi.h
+        database/engine/rrdenginerepl.c
         database/engine/pagecache.c
         database/engine/pagecache.h
         database/engine/rrdenglocking.c
@@ -859,7 +869,30 @@ set(STREAMING_PLUGIN_FILES
         streaming/compression.c
         streaming/receiver.c
         streaming/sender.c
-        )
+)
+
+set(REPLICATION_FILES
+        streaming/replication/replication.h
+        streaming/replication/replication-dummy.c
+)
+
+if(ENABLE_REPLICATION)
+list(APPEND REPLICATION_FILES
+        streaming/replication/gaps.pb.cc
+        streaming/replication/gaps.pb.h
+        streaming/replication/Base64.cc
+        streaming/replication/Base64.h
+        streaming/replication/Config.cc
+        streaming/replication/Config.h
+        streaming/replication/GapData.cc
+        streaming/replication/GapData.h
+        streaming/replication/Logger.h
+        streaming/replication/TimeRange.cc
+        streaming/replication/TimeRange.h
+        streaming/replication/Utils.h
+        streaming/replication/replication.cc
+)
+endif()
 
 set(CLAIM_PLUGIN_FILES
         claim/claim.c
@@ -1064,6 +1097,7 @@ set(NETDATA_FILES
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
         ${STREAMING_PLUGIN_FILES}
+        ${REPLICATION_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
@@ -1266,6 +1300,48 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
+
+# -----------------------------------------------------------------------------
+# replication
+
+function(PROTOBUF_REPLICATION_GENERATE_CPP SRCS HDRS)
+  if(NOT ARGN)
+    message(SEND_ERROR "Error: PROTOBUF_REPLICATION_GENERATE_CPP() called without any proto files")
+    return()
+  endif()
+
+  set(${SRCS})
+  set(${HDRS})
+  foreach(FIL ${ARGN})
+    get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+    get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+    get_filename_component(FIL_WE ${FIL} NAME_WE)
+    set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+    set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+# cmake > 3.20 required :(
+#    cmake_path(SET GENERATED_PB_CC "${DIR}")
+#    cmake_path(SET GENERATED_PB_H "${DIR}")
+#    cmake_path(APPEND GENERATED_PB_CC "${FIL_WE}.pb.cc")
+#    cmake_path(APPEND GENERATED_PB_H "${FIL_WE}.pb.h")
+
+    list(APPEND ${SRCS} ${GENERATED_PB_CC})
+    list(APPEND ${HDRS} ${GENERATED_PB_H})
+    add_custom_command(
+      OUTPUT ${GENERATED_PB_CC}
+             ${GENERATED_PB_H}
+      COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+      ARGS -I=${CMAKE_SOURCE_DIR}/streaming/replication --cpp_out=${CMAKE_SOURCE_DIR}/streaming/replication ${ABS_FIL}
+      DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+      COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+      VERBATIM )
+  endforeach()
+  set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+  set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+  set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+endfunction()
+
+set(REPLICATION_PROTO_DEFS streaming/replication/gaps.proto)
+PROTOBUF_REPLICATION_GENERATE_CPP(REPLICATION_PROTO_BUILT_SRCS REPLICATION_PROTO_BUILT_HDRS ${REPLICATION_PROTO_DEFS})
 
 # -----------------------------------------------------------------------------
 # netdata

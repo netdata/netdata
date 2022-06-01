@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package protocol;
+
+message TimeRange {
+    int32 After = 1;
+    int32 Before = 2;
+}
+
+message RequestFillGaps {
+    repeated TimeRange TimeRanges = 1;
+}
+
+message ResponseFillGap {
+    string Chart = 1;
+    string Dimension = 2;
+    repeated int32 DeltaEncodedTimestamps = 3;
+    repeated uint32 StorageNumbers = 4;
+}
+
+message RequestDropGap {
+    int32 After = 1;
+    int32 Before = 2;
+}
+
+enum VersionValue {
+    Unknown = 0;
+    V1 = 1;
+}
+
+message HandshakeInfo {
+    VersionValue Version = 1;
+
+    bool EnableReplication = 2;
+}

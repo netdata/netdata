@@ -127,6 +127,8 @@ Netdata parses 9 lines starting with:
 -    `DISABLE` - disable this plugin
 -    `CLABEL` - add a label to a chart
 -    `CLABEL_COMMIT` - commit added labels to the chart.
+-    `FILLGAP` - fill gap with data for a single dimension.
+-    `DROPGAP` - delete gap information for the specified host.
 
 a single program can produce any number of charts with any number of dimensions each.
 
@@ -361,6 +363,20 @@ The `source` is an integer field that can have the following values:
 #### CLABEL_COMMIT
 
 `CLABEL_COMMIT` indicates that all labels were defined and the chart can be updated.
+
+#### FILLGAP
+
+The `FILLGAP` command is generated when a gap is detected upstream and
+replication is enabled. Its argument is a base64-encoded protobuf message,
+identifying the chart and the dimension for which we want to backfill data,
+and a list of timestamp/values that we want the parent to save.
+
+#### DROPGAP
+
+The `DROPGAP` command is generated when a child has sent all the necessary
+`FILLGAP` commands that are required to backfill the parent's missing data.
+It's followed by the gap's time range, ie. an [after, before] tuple that
+identifies the exact gap that the parent should drop..
 
 ## Data collection
 

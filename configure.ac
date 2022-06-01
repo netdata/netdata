@@ -198,6 +198,12 @@ AC_ARG_ENABLE(
     [enable_ml="detect"]
 )
 AC_ARG_ENABLE(
+    [replication],
+    [AS_HELP_STRING([--enable-replication], [Enable anomaly detection @<:@default autodetect@:>@])],
+    ,
+    [enable_replication="detect"]
+)
+AC_ARG_ENABLE(
     [ml_tests],
     [AS_HELP_STRING([--enable-ml-tests], [Enable anomaly detection tests @<:@no@:>@])],
     [enable_ml_tests="yes"],
@@ -1165,6 +1171,31 @@ if test "${build_ml_tests}" = "yes"; then
     AC_DEFINE([ENABLE_ML_TESTS], [1], [anomaly detection tests])
     OPTIONAL_ML_TESTS_CFLAGS="${OPTIONAL_GTEST_CFLAGS}"
     OPTIONAL_ML_TESTS_LIBS="${OPTIONAL_GTEST_LIBS}"
+fi
+
+# -----------------------------------------------------------------------------
+# replication
+
+if test "${enable_replication}" =  "yes" -a "${have_libprotobuf}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-replication functionality but libprotobuf can not be found."])
+fi
+
+if test "${enable_replication}" =  "yes" -a "${have_protoc}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-replication functionality but protoc can not be found."])
+fi
+
+if test "${enable_replication}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_protoc}" = "yes"; then
+    build_replication="yes"
+else
+    build_replication="no"
+fi
+
+AM_CONDITIONAL([ENABLE_REPLICATION], [test "${build_replication}" = "yes"])
+if test "${build_replication}" = "yes"; then
+    AC_DEFINE([ENABLE_REPLICATION], [1], [replication usability])
+
+    OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
+    OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
 fi
 
 # -----------------------------------------------------------------------------

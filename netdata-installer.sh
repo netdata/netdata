@@ -343,6 +343,10 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-x86-sse)}" | sed 's/$/ --disable-x86-sse/g')" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
+    "--disable-replication")
+        DISABLE_REPLICATION=1
+        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-replication)}" | sed 's/$/ --disable-replication/g')"
+        ;;
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
     "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')" ;;
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
@@ -605,7 +609,7 @@ copy_protobuf() {
 }
 
 bundle_protobuf() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ] && [ -n "${DISABLE_REPLICATION}" ]; then
     echo "Skipping protobuf"
     return 0
   fi

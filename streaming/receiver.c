@@ -2,6 +2,7 @@
 
 #include "rrdpush.h"
 #include "parser/parser.h"
+#include "protocol/setup.h"
 
 #define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
 
@@ -402,6 +403,8 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     parser->plugins_action->set_action       = &pluginsd_set_action;
     parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
     parser->plugins_action->clabel_action    = &pluginsd_clabel_action;
+    parser->plugins_action->fillgap_action   = &pluginsd_fillgap_action;
+    parser->plugins_action->dropgap_action   = &pluginsd_dropgap_action;
 
     user.parser = parser;
 
@@ -431,7 +434,6 @@ done:
 
     return result;
 }
-
 
 static int rrdpush_receive(struct receiver_state *rpt)
 {
@@ -497,10 +499,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_HTTPS
         rpt->host->stream_ssl.conn = rpt->ssl.conn;
         rpt->host->stream_ssl.flags = rpt->ssl.flags;
-        if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
-#else
-        if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
 #endif
+
+        if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
             log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - CANNOT REPLY");
             error("STREAM %s [receive from [%s]:%s]: cannot send command.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
             close(rpt->fd);
@@ -620,41 +621,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
-    info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-    char initial_response[HTTP_HEADER_SIZE];
-    if (rpt->stream_version > 1) {
-        if(rpt->stream_version >= STREAM_VERSION_COMPRESSION){
-#ifdef ENABLE_COMPRESSION
-            if(!rpt->rrdpush_compression)
-                rpt->stream_version = STREAM_VERSION_CLABELS;
-#else
-            if(STREAMING_PROTOCOL_CURRENT_VERSION < rpt->stream_version) {
-                rpt->stream_version =  STREAMING_PROTOCOL_CURRENT_VERSION;               
-            }
-#endif
-        }
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->stream_version);
-        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, rpt->stream_version);
-    } else if (rpt->stream_version == 1) {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->stream_version);
-        sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
-    } else {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-        sprintf(initial_response, "%s", START_STREAMING_PROMPT);
-    }
-    debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-    #ifdef ENABLE_HTTPS
-    rpt->host->stream_ssl.conn = rpt->ssl.conn;
-    rpt->host->stream_ssl.flags = rpt->ssl.flags;
-    if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
-#else
-    if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
-#endif
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - CANNOT REPLY");
-        error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-        close(rpt->fd);
+    bool ok = protocol_setup_on_receiver(rpt);
+    if (!ok)
         return 0;
-    }
 
     // remove the non-blocking flag from the socket
     if(sock_delnonblock(rpt->fd) < 0)
@@ -780,4 +749,3 @@ void *rrdpush_receiver_thread(void *ptr) {
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
-

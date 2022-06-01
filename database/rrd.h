@@ -20,6 +20,7 @@ typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 typedef struct context_param CONTEXT_PARAM;
+typedef struct rrddim_past_data RRDDIM_PAST_DATA;
 
 typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
@@ -28,6 +29,8 @@ typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
 
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;
+
+typedef void *replication_handle_t;
 
 // forward declarations
 struct rrddim_tier;
@@ -432,6 +435,19 @@ struct rrddim_query_ops {
     time_t (*oldest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
 };
 
+// struct to hold gap data
+struct rrddim_past_data {
+    RRDHOST *host;
+    RRDSET *st;
+    RRDDIM *rd;
+    void* page;
+    uint32_t page_length;
+    usec_t start_time;
+    usec_t end_time;
+    struct rrdeng_page_descr* descr;
+    struct rrdengine_instance *ctx;
+    unsigned long page_correlation_id;
+};
 
 // ----------------------------------------------------------------------------
 // Storage tier data for every dimension
@@ -837,6 +853,7 @@ struct rrdhost_system_info {
     uint16_t hops;
     bool ml_capable;
     bool ml_enabled;
+    bool handshake_enabled;
     char *install_type;
     char *prebuilt_arch;
     char *prebuilt_dist;
@@ -952,6 +969,10 @@ struct rrdhost {
     ml_host_t ml_host;
 
     // ------------------------------------------------------------------------
+    // Replicator handle
+    replication_handle_t repl_handle;
+
+    // ------------------------------------------------------------------------
     // Support for host-level labels
     DICTIONARY *rrdlabels;
 
@@ -974,10 +995,8 @@ struct rrdhost {
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
 
-#ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                         //Structure used to encrypt the connection
-    struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
-#endif
+    struct netdata_ssl stream_ssl;                  //Structure used to encrypt the stream
 
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;
@@ -1206,6 +1225,7 @@ extern time_t rrddim_last_entry_t(RRDDIM *rd);
 extern time_t rrdset_last_entry_t(RRDSET *st);
 extern time_t rrdset_first_entry_t(RRDSET *st);
 extern time_t rrdhost_last_entry_t(RRDHOST *h);
+extern time_t rrdhost_first_entry_t(RRDHOST *h);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions

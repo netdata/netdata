@@ -867,12 +867,7 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
 // --------------------------------------------------------------------------------------------------------------------
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
-#ifdef ENABLE_HTTPS
 ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
-#else
-ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
-#endif
-
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -907,15 +902,12 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         }
     }
 #endif
+
+    UNUSED(ssl);
     return recv(sockfd, buf, len, flags);
 }
 
-#ifdef ENABLE_HTTPS
-ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
-#else
-ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
-#endif
-
+ssize_t send_timeout(struct netdata_ssl *ssl, int sockfd, void *buf, size_t len, int flags, int timeout) {
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -950,9 +942,145 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         }
     }
 #endif
+
+    UNUSED(ssl);
     return send(sockfd, buf, len, flags);
 }
 
+static int data_ready(int fd, bool pollin, time_t timeout) {
+    for(;;) {
+        struct pollfd pfd = {
+                .fd = fd,
+                .events = pollin ? POLLIN : POLLOUT,
+                .revents = 0
+        };
+
+        errno = 0;
+        int retval = poll(&pfd, 1, timeout * 1000);
+
+        if(retval == -1) {
+            // failed
+
+            if(errno == EINTR || errno == EAGAIN)
+                continue;
+
+            return -1;
+        }
+
+        if(!retval) {
+            // timeout
+            return 0;
+        }
+
+        if (pfd.events & (pollin ? POLLIN : POLLOUT)) {
+            // recv/ret data
+            return 1;
+        }
+    }
+}
+
+static size_t
+process_exact(struct netdata_ssl *ssl, int sockfd, void *buf, size_t len, int flags, time_t timeout, bool pollin)
+{
+    time_t start_time = now_realtime_sec();
+
+    for (time_t curr_time = start_time;
+         curr_time <= (start_time + timeout);
+         curr_time = now_realtime_sec())
+    {
+        int rc = data_ready(sockfd, pollin, /* timeout= */ 1);
+
+        switch (rc) {
+        case -1:
+            // error
+            return len;
+        case 0: {
+            // timeout
+            continue;
+        } case 1:
+            // recv data
+            break;
+        default:
+            fatal("Invalid return code from data_ready: %d", rc);
+        }
+
+#if ENABLE_HTTPS
+        if (ssl->conn) {
+            if (!ssl->flags) {
+                ERR_clear_error();
+                errno = 0;
+
+                int n;
+                if (pollin)
+                    n = SSL_read(ssl->conn, buf, len);
+                else
+                    n = SSL_write(ssl->conn, buf, len);
+
+                if (n <= 0) {
+                    switch (SSL_get_error(ssl->conn, n)) {
+                        case SSL_ERROR_SYSCALL:
+                            if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)
+                                return len;
+                            break;
+                        case SSL_ERROR_WANT_READ:
+                        case SSL_ERROR_WANT_WRITE:
+                            break;
+                        default:
+                            return len;
+                    }
+
+                    n = 0;
+                    continue;
+                }
+
+                len -= n;
+                buf += n;
+
+                if (!len)
+                    return 0;
+
+                // next iteration will process pending bytes
+                continue;
+            }
+        }
+#else
+        UNUSED(ssl);
+#endif
+        ssize_t n;
+
+        errno = 0;
+        if (pollin)
+            n = recv(sockfd, buf, len, flags);
+        else
+            n = send(sockfd, buf, len, flags);
+
+        if (n == -1) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+                continue;
+            else
+                return len;
+        }
+
+        len -= n;
+        buf += n;
+
+        if (!len)
+            return 0;
+
+        // next iteration will process pending bytes
+        continue;
+    }
+
+    return len;
+}
+
+size_t recv_exact(struct netdata_ssl *ssl, int sockfd, void *buf, size_t len, int flags, time_t timeout) {
+    return process_exact(ssl, sockfd, buf, len, flags, timeout, /* pollin: */ true);
+}
+
+size_t send_exact(struct netdata_ssl *ssl, int sockfd, void *buf, size_t len, int flags, time_t timeout) {
+    return process_exact(ssl, sockfd, buf, len, flags, timeout, /* pollin: */ false);
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // accept4() replacement for systems that do not have one
