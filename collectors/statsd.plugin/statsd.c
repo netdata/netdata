@@ -370,6 +370,7 @@ static struct statsd {
 static void dictionary_extensions_delete_callback(const char *name, void *value, void *data) {
     (void)name;
     (void)data;
+
     // STATSD_INDEX *index = (STATSD_INDEX *)data;
     STATSD_METRIC *m = (STATSD_METRIC *)value;
     if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
@@ -377,9 +378,9 @@ static void dictionary_extensions_delete_callback(const char *name, void *value,
         m->histogram.ext = NULL;
     }
 
-    if(m->units) freez(m->units);
-    if(m->family) freez(m->family);
-    if(m->dimname) freez(m->dimname);
+    freez(m->units);
+    freez(m->family);
+    freez(m->dimname);
 }
 
 static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name, STATSD_METRIC_TYPE type) {

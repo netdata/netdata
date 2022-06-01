@@ -10,6 +10,7 @@ typedef struct dictionary DICTIONARY;
 
 #ifndef ENABLE_DBENGINE
 #define DICTIONARY_WITH_AVL
+#warning Compiling DICTIONARY with an AVL index
 #else
 #define DICTIONARY_WITH_JUDYHS
 #endif
@@ -324,11 +325,20 @@ static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *nam
 }
 
 static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
+    // AVL needs a NAME_VALUE to insert into the dictionary but we don't have it yet.
+    // So, the only thing we can do, is return an existing one if it is already there.
+    // Returning NULL will make the caller thing we added it, will allocate one
+    // and will call hashtable_inserted_name_value_unsafe(), at which we will do
+    // the actual indexing.
+
     dict->hash_base = hashtable_get_unsafe(dict, name, name_len);
     return &dict->hash_base;
 }
 
 static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+    // we have our new NAME_VALUE object.
+    // Let's index it.
+
     (void)name;
     (void)name_len;
     nv->hash = simple_hash(nv->name);
