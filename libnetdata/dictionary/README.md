@@ -159,12 +159,33 @@ The callback function returns an `int`. If this value is negative, traversal of 
 The following is a snippet of such a loop:
 
 ```c
-DICTFE dfe = {};
-for(MY_ITEM *item = dfe_start_read(&dfe, dict); item ; item = dfe_next(&dfe)) {
-   printf("hey, I got an item named '%s'", dfe.name);
+MY_ITEM *item;
+dfe_start_read(dict, item) {
+   printf("hey, I got an item named '%s' with value ptr %08X", item_name, item);
 }
-dfe_done(&dfe);
+dfe_done(item);
 ```
+
+The `item` parameter gives the name of the pointer to be used while iterating the items. Any name is accepted.
+
+The `item_name` is a variable that is automatically created, by concatenating whatever is given as `item` and `_name`. So, if you call `dfe_start_read(dict, myvar)`, the name will be `myvar_name`.
+
+Both `dfe_start_read(dict, item)` and `dfe_done(item)` are together inside a `do { ... } while(0)` loop, so that the following will work:
+
+```c
+MY_ITEM *item;
+
+if(x = 1)
+    // do {
+    dfe_start_read(dict, item)
+        printf("hey, I got an item named '%s' with value ptr %08X", item_name, item);
+    dfe_done(item);
+    // } while(0);
+else
+    something else;
+```
+
+In the above, the `if(x)` condition will work as expected. It will do the foreach loop when x is 1, otherwise it will run `something else`.
 
 There are 2 versions of `dfe_start`:
 
