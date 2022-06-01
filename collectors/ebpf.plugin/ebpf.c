@@ -1083,10 +1083,32 @@ int ebpf_start_pthread_variables()
 }
 
 /**
+ * Am I collecting PIDs?
+ *
+ * Test if eBPF plugin needs to collect PID information.
+ *
+ * @return It returns 1 if at least one thread needs to collect the data, or zero otherwise.
+ */
+static inline uint32_t ebpf_am_i_collect_pids()
+{
+    uint32_t ret = 0;
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ret |= ebpf_modules[i].cgroup_charts | ebpf_modules[i].apps_charts;
+    }
+
+    return ret;
+}
+
+/**
  * Allocate the vectors used for all threads.
  */
 static void ebpf_allocate_common_vectors()
 {
+    if (unlikely(!ebpf_am_i_collect_pids())) {
+        return;
+    }
+
     all_pids = callocz((size_t)pid_max, sizeof(struct pid_stat *));
     global_process_stat = callocz((size_t)ebpf_nprocs, sizeof(ebpf_process_stat_t));
 }
@@ -1427,8 +1449,6 @@ void set_global_variables()
 
 /**
  * Load collector config
- *
- * @param lmode  the mode that will be used for them.
  */
 static inline void ebpf_load_thread_config()
 {

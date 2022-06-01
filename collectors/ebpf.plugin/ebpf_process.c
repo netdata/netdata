@@ -579,6 +579,9 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_create_apps_charts(struct target *root)
 {
+    if (unlikely(!all_pids))
+        return;
+
     struct target *w;
     int newly_added = 0;
 
