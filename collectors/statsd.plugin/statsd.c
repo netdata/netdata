@@ -774,10 +774,9 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             statsd_parse_field_trim(tagkey, tagkey_end);
             statsd_parse_field_trim(tagvalue, tagvalue_end);
 
-            if(tagkey && tagkey && tagvalue && *tagvalue) {
-                if (!m->units && strcmp(tagkey, "units") == 0) {
+            if(tagkey && *tagkey && tagvalue && *tagvalue) {
+                if (!m->units && strcmp(tagkey, "units") == 0)
                     m->units = strdupz(tagvalue);
-                }
 
                 if (!m->dimname && strcmp(tagkey, "name") == 0)
                     m->dimname = strdupz(tagvalue);
@@ -1546,23 +1545,46 @@ static inline void statsd_readdir(const char *user_path, const char *stock_path,
 
 // extract chart type and chart id from metric name
 static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, char *id, char *context, const char *metrictype, size_t len) {
-    char *s = NULL;
 
-    snprintfz(type, len, "%s_%s", STATSD_CHART_PREFIX, m->name);
-    if(sizeof(STATSD_CHART_PREFIX) + 2 < len)
-        for(s = &type[sizeof(STATSD_CHART_PREFIX) + 2]; *s ;s++)
-            if(unlikely(*s == '.' || *s == '_')) break;
+    // The full chart type.id looks like this:
+    // ${STATSD_CHART_PREFIX} + "_" + ${METRIC_NAME} + "_" + ${METRIC_TYPE}
+    //
+    // where:
+    // STATSD_CHART_PREFIX = "statsd" as defined above
+    // METRIC_NAME = whatever the user gave to statsd
+    // METRIC_TYPE = "gauge", "counter", "meter", "timer", "histogram", "set", "dictionary"
 
-    if(s && (*s == '.' || *s == '_')) {
-        *s++ = '\0';
+    // for chart type, we want:
+    // ${STATSD_CHART_PREFIX} + "_" + the first word of ${METRIC_NAME}
+
+    // find the first word of ${METRIC_NAME}
+    char firstword[len + 1], *s = "";
+    strncpyz(firstword, m->name, len);
+    for (s = firstword; *s ; s++) {
+        if (unlikely(*s == '.' || *s == '_')) {
+            *s = '\0';
+            s++;
+            break;
+        }
+    }
+    // firstword has the first word of ${METRIC_NAME}
+    // s has the remaining, if any
+
+    // create the chart type:
+    snprintfz(type, len, STATSD_CHART_PREFIX "_%s", firstword);
+
+    // for chart id, we want:
+    // the remaining of the words of ${METRIC_NAME} + "_" + ${METRIC_TYPE}
+    // or the ${METRIC_NAME} has no remaining words, the ${METRIC_TYPE} alone
+    if(*s)
         snprintfz(id, len, "%s_%s", s, metrictype);
-    }
-    else {
+    else
         snprintfz(id, len, "%s", metrictype);
-    }
 
-    snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_%s.%s", metrictype, m->name);
+    // for the context, we want the full of both the above, separated with a dot (type.id):
+    snprintfz(context, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
+    // make sure they don't have illegal characters
     netdata_fix_chart_id(type);
     netdata_fix_chart_id(id);
     netdata_fix_chart_id(context);

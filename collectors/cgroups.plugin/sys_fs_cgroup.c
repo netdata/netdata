@@ -3659,7 +3659,7 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         cg->cpuset_cpus = get_system_cpus();
 
         char *s = "max\n\0";
-        if(strsame(s, procfile_lineword(ff, 0, 0)) == 0){
+        if(strcmp(s, procfile_lineword(ff, 0, 0)) == 0){
             cg->cpu_cfs_quota = cg->cpu_cfs_period * cg->cpuset_cpus;
         } else {
             cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0));
@@ -3707,7 +3707,7 @@ static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, u
                     return 0;
                 }
                 char *s = "max\n\0";
-                if(strsame(s, buffer) == 0){
+                if(strcmp(s, buffer) == 0){
                     *value = UINT64_MAX;
                     rrdsetvar_custom_chart_variable_set(*chart_var, (calculated_number)(*value / (1024 * 1024)));
                     return 1;
