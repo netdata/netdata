@@ -249,8 +249,9 @@ void analytics_exporters(void)
     buffer_free(bi);
 }
 
-int collector_counter_callb(void *entry, void *data)
-{
+int collector_counter_callb(const char *name, void *entry, void *data) {
+    (void)name;
+
     struct array_printer *ap = (struct array_printer *)data;
     struct collector *col = (struct collector *)entry;
 
@@ -296,7 +297,7 @@ void analytics_collectors(void)
     ap.c = 0;
     ap.both = bt;
 
-    dictionary_get_all(dict, collector_counter_callb, &ap);
+    dictionary_walkthrough_read(dict, collector_counter_callb, &ap);
     dictionary_destroy(dict);
 
     analytics_set_data(&analytics_data.netdata_collectors, (char *)buffer_tostring(ap.both));

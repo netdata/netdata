@@ -137,7 +137,8 @@ getIntegerOption(
   return ((int)intvalue);
 }
 
-int reset_job_metrics(void *entry, void *data) {
+static int reset_job_metrics(const char *name, void *entry, void *data) {
+    (void)name;
     (void)data;
 
     struct job_metrics *jm = (struct job_metrics *)entry;
@@ -158,7 +159,7 @@ struct job_metrics *get_job_metrics(char *dest) {
 
     if (unlikely(!jm)) {
         struct job_metrics new_job_metrics;
-        reset_job_metrics(&new_job_metrics, NULL);
+        reset_job_metrics(NULL, &new_job_metrics, NULL);
         jm = dictionary_set(dict_dest_job_metrics, dest, &new_job_metrics, sizeof(struct job_metrics));
 
         printf("CHART cups.job_num_%s '' 'Active job number of destination %s' jobs '%s' cups.job_num stacked %i %i\n", dest, dest, dest, netdata_priority++, netdata_update_every);
@@ -174,7 +175,7 @@ struct job_metrics *get_job_metrics(char *dest) {
     return jm;
 }
 
-int collect_job_metrics(char *name, void *entry, void *data) {
+int collect_job_metrics(const char *name, void *entry, void *data) {
     (void)data;
 
     struct job_metrics *jm = (struct job_metrics *)entry;
@@ -204,7 +205,7 @@ int collect_job_metrics(char *name, void *entry, void *data) {
         printf("DIMENSION pending '' absolute 1 1\n");
         printf("DIMENSION held '' absolute 1 1\n");
         printf("DIMENSION processing '' absolute 1 1\n");
-        dictionary_del(dict_dest_job_metrics, name);
+        dictionary_del_having_write_lock(dict_dest_job_metrics, name);
     }
 
     return 0;
@@ -219,8 +220,8 @@ void reset_metrics() {
     num_dest_printing = 0;
     num_dest_stopped = 0;
 
-    reset_job_metrics(&global_job_metrics, NULL);
-    dictionary_get_all(dict_dest_job_metrics, reset_job_metrics, NULL);
+    reset_job_metrics(NULL, &global_job_metrics, NULL);
+    dictionary_walkthrough_write(dict_dest_job_metrics, reset_job_metrics, NULL);
 }
 
 int main(int argc, char **argv) {
@@ -370,7 +371,7 @@ int main(int argc, char **argv) {
         }
         cupsFreeJobs(num_jobs, jobs);
 
-        dictionary_get_all_name_value(dict_dest_job_metrics, collect_job_metrics, NULL);
+        dictionary_walkthrough_write(dict_dest_job_metrics, collect_job_metrics, NULL);
 
         static int cups_printer_by_option_created = 0;
         if (unlikely(!cups_printer_by_option_created))

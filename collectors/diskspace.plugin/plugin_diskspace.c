@@ -52,7 +52,8 @@ static DICTIONARY *dict_mountpoints = NULL;
 
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
 
-int mount_point_cleanup(void *entry, void *data) {
+int mount_point_cleanup(const char *name, void *entry, void *data) {
+    (void)name;
     (void)data;
 
     struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
@@ -439,7 +440,7 @@ void *diskspace_main(void *ptr) {
 
         if(dict_mountpoints) {
             worker_is_busy(WORKER_JOB_CLEANUP);
-            dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
+            dictionary_walkthrough_read(dict_mountpoints, mount_point_cleanup, NULL);
         }
 
     }

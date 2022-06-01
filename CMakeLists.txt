@@ -231,6 +231,15 @@ pkg_check_modules(CURL libcurl)
 # ${CURL_INCLUDE_DIRS}
 
 # -----------------------------------------------------------------------------
+# Detect libcups
+
+pkg_check_modules(CURL libcups)
+# later we use:
+# ${CUPS_LIBRARIES}
+# ${CUPS_CFLAGS_OTHER}
+# ${CUPS_INCLUDE_DIRS}
+
+# -----------------------------------------------------------------------------
 # Detect libaws-c-common
 
 find_library(HAVE_AWS_CHECKSUMS aws-checksums)
@@ -489,6 +498,10 @@ set(PERF_PLUGIN_FILES
 
 set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
+        )
+
+set(CUPS_PLUGIN_FILES
+        collectors/cups.plugin/cups_plugin.c
         )
 
 set(EBPF_PROCESS_PLUGIN_FILES
@@ -1229,6 +1242,12 @@ ELSE()
     SET(ENABLE_PLUGIN_XENSTAT False)
 ENDIF()
 
+IF(CUPS_LIBRARIES)
+    SET(ENABLE_PLUGIN_CUPS True)
+ELSE()
+    SET(ENABLE_PLUGIN_CUPS False)
+ENDIF()
+
 
 # -----------------------------------------------------------------------------
 # netdatacli
@@ -1334,6 +1353,20 @@ IF(ENABLE_PLUGIN_SLABINFO)
     target_compile_options(slabinfo.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "slabinfo.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# cups.plugin
+
+IF(ENABLE_PLUGIN_CUPS)
+    message(STATUS "cups.plugin: enabled")
+    add_executable(cups.plugin config.h ${CUPS_PLUGIN_FILES})
+    target_link_libraries (cups.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${CUPS_LIBRARIES})
+    target_include_directories(cups.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CUPS_INCLUDE_DIRS})
+    target_compile_options(cups.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CUPS_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "cups.plugin: disabled")
 ENDIF()
 
 

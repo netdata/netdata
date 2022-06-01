@@ -150,7 +150,9 @@ struct array_printer {
     BUFFER *wb;
 };
 
-int print_collector(void *entry, void *data) {
+static int print_collector_callback(const char *name, void *entry, void *data) {
+    (void)name;
+
     struct array_printer *ap = (struct array_printer *)data;
     BUFFER *wb = ap->wb;
     struct collector *col=(struct collector *) entry;
@@ -187,6 +189,6 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
             .c = 0,
             .wb = wb
     };
-    dictionary_get_all(dict, print_collector, &ap);
+    dictionary_walkthrough_read(dict, print_collector_callback, &ap);
     dictionary_destroy(dict);
 }

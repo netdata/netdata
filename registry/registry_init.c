@@ -76,8 +76,8 @@ int registry_init(void) {
     netdata_mutex_init(&registry.lock);
 
     // create dictionaries
-    registry.persons = dictionary_create(DICTIONARY_FLAGS);
-    registry.machines = dictionary_create(DICTIONARY_FLAGS);
+    registry.persons = dictionary_create(REGISTRY_DICTIONARY_FLAGS);
+    registry.machines = dictionary_create(REGISTRY_DICTIONARY_FLAGS);
     avl_init(&registry.registry_urls_root_index, registry_url_compare);
 
     // load the registry database
@@ -93,56 +93,63 @@ int registry_init(void) {
     return 0;
 }
 
+static int machine_urls_delete_callback(const char *name, void *entry, void *data) {
+    (void)name;
+
+    REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)data;
+    (void)m;
+
+    REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
+
+    debug(D_REGISTRY, "Registry: unlinking url '%s' from machine", mu->url->url);
+    registry_url_unlink(mu->url);
+
+    debug(D_REGISTRY, "Registry: freeing machine url");
+    freez(mu);
+
+    return 1;
+}
+
+static int machine_delete_callback(const char *name, void *entry, void *data) {
+    (void)name;
+    (void)data;
+
+    REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)entry;
+    int ret = dictionary_walkthrough_read(m->machine_urls, machine_urls_delete_callback, m);
+
+    dictionary_destroy(m->machine_urls);
+    freez(m);
+
+    return ret + 1;
+}
+static int registry_person_del_callback(const char *name, void *entry, void *d) {
+    (void)name;
+    (void)d;
+
+    REGISTRY_PERSON *p = (REGISTRY_PERSON *)entry;
+
+    debug(D_REGISTRY, "Registry: registry_person_del('%s'): deleting person", p->guid);
+
+    while(p->person_urls.root)
+        registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls.root);
+
+    //debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
+    //dictionary_del(registry.persons, p->guid);
+
+    debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
+    freez(p);
+
+    return 1;
+}
+
 void registry_free(void) {
     if(!registry.enabled) return;
 
-    // we need to destroy the dictionaries ourselves
-    // since the dictionaries use memory we allocated
-
-    while(registry.persons->values_index.root) {
-        REGISTRY_PERSON *p = ((NAME_VALUE *)registry.persons->values_index.root)->value;
-        registry_person_del(p);
-    }
-
-    while(registry.machines->values_index.root) {
-        REGISTRY_MACHINE *m = ((NAME_VALUE *)registry.machines->values_index.root)->value;
-
-        // fprintf(stderr, "\nMACHINE: '%s', first: %u, last: %u, usages: %u\n", m->guid, m->first_t, m->last_t, m->usages);
-
-        while(m->machine_urls->values_index.root) {
-            REGISTRY_MACHINE_URL *mu = ((NAME_VALUE *)m->machine_urls->values_index.root)->value;
-
-            // fprintf(stderr, "\tURL: '%s', first: %u, last: %u, usages: %u, flags: 0x%02x\n", mu->url->url, mu->first_t, mu->last_t, mu->usages, mu->flags);
-
-            //debug(D_REGISTRY, "Registry: destroying persons dictionary from url '%s'", mu->url->url);
-            //dictionary_destroy(mu->persons);
-
-            debug(D_REGISTRY, "Registry: deleting url '%s' from person '%s'", mu->url->url, m->guid);
-            dictionary_del(m->machine_urls, mu->url->url);
-
-            debug(D_REGISTRY, "Registry: unlinking url '%s' from machine", mu->url->url);
-            registry_url_unlink(mu->url);
-
-            debug(D_REGISTRY, "Registry: freeing machine url");
-            freez(mu);
-        }
-
-        debug(D_REGISTRY, "Registry: deleting machine '%s' from machines registry", m->guid);
-        dictionary_del(registry.machines, m->guid);
-
-        debug(D_REGISTRY, "Registry: destroying URL dictionary of machine '%s'", m->guid);
-        dictionary_destroy(m->machine_urls);
-
-        debug(D_REGISTRY, "Registry: freeing machine '%s'", m->guid);
-        freez(m);
-    }
-
-    // and free the memory of remaining dictionary structures
-
     debug(D_REGISTRY, "Registry: destroying persons dictionary");
+    dictionary_walkthrough_read(registry.persons, registry_person_del_callback, NULL);
     dictionary_destroy(registry.persons);
 
     debug(D_REGISTRY, "Registry: destroying machines dictionary");
+    dictionary_walkthrough_read(registry.machines, machine_delete_callback, NULL);
     dictionary_destroy(registry.machines);
 }
-

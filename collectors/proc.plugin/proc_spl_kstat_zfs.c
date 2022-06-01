@@ -252,7 +252,7 @@ void disable_zfs_pool_state(struct zfs_pool *pool)
     pool->disabled = 1;
 }
 
-int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
+int update_zfs_pool_state_chart(const char *name, void *pool_p, void *update_every_p)
 {
     struct zfs_pool *pool = (struct zfs_pool *)pool_p;
     int update_every = *(int *)update_every_p;
@@ -408,7 +408,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
     }
 
     if (do_zfs_pool_state)
-        dictionary_get_all_name_value(zfs_pools, update_zfs_pool_state_chart, &update_every);
+        dictionary_walkthrough_read(zfs_pools, update_zfs_pool_state_chart, &update_every);
 
     while (deleted_zfs_pools) {
         struct deleted_zfs_pool *current_pool = deleted_zfs_pools;
