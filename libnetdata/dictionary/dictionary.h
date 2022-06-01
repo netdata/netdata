@@ -154,7 +154,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
 } DICTFE;
 
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, 'r')
-#define dfe_start_write(dict, value) dfe_start_rw(dict, value, 'r')
+#define dfe_start_write(dict, value) dfe_start_rw(dict, value, 'w')
 #define dfe_start_rw(dict, value, mode) \
         do { \
             DICTFE dfe_ ## value = {};  \
