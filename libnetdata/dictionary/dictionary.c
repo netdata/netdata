@@ -8,7 +8,7 @@ typedef struct dictionary DICTIONARY;
 
 #include "../libnetdata.h"
 
-#ifndef ENABLE_DBENGINE
+#ifdef ENABLE_DBENGINE
 #define DICTIONARY_WITH_AVL
 #warning Compiling DICTIONARY with an AVL index
 #else
@@ -72,7 +72,6 @@ typedef struct dictionary DICTIONARY;
 typedef struct name_value {
 #ifdef DICTIONARY_WITH_AVL
     avl_t avl_node;
-    uint32_t hash;
 #endif
 
     struct name_value *next;    // a double linked list to allow fast insertions and deletions
@@ -298,9 +297,7 @@ static int reference_counter_mark_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
 
 #ifdef DICTIONARY_WITH_AVL
 static int name_value_compare(void* a, void* b) {
-    if(((NAME_VALUE *)a)->hash < ((NAME_VALUE *)b)->hash) return -1;
-    else if(((NAME_VALUE *)a)->hash > ((NAME_VALUE *)b)->hash) return 1;
-    else return strcmp(((NAME_VALUE *)a)->name, ((NAME_VALUE *)b)->name);
+    return strcmp(((NAME_VALUE *)a)->name, ((NAME_VALUE *)b)->name);
 }
 
 static void hashtable_init_unsafe(DICTIONARY *dict) {
@@ -324,10 +321,8 @@ static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, si
 
 static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
     (void)name_len;
-    uint32_t hash = simple_hash(name);
 
     NAME_VALUE tmp;
-    tmp.hash = (hash)?hash:simple_hash(name);
     tmp.name = (char *)name;
     return (NAME_VALUE *)avl_search(&(dict->values_index), (avl_t *) &tmp);
 }
@@ -349,7 +344,6 @@ static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, const 
 
     (void)name;
     (void)name_len;
-    nv->hash = simple_hash(nv->name);
 
     if(unlikely(avl_insert(&((dict)->values_index), (avl_t *)(nv)) != (avl_t *)nv))
         error("dictionary: INTERNAL ERROR: duplicate insertion to dictionary.");
