@@ -7,7 +7,9 @@ struct value_output {
     BUFFER *wb;
 };
 
-static int value_list_output(void *entry, void *data) {
+static int value_list_output(const char *name, void *entry, void *data) {
+    (void)name;
+
     struct value_output *ap = (struct value_output *)data;
     BUFFER *wb = ap->wb;
     char *output = (char *) entry;
@@ -130,7 +132,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rd->id, rd->name);
             dictionary_set(dict, name, output, len+1);
         }
-        dictionary_get_all(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output, &co);
         dictionary_destroy(dict);
 
         co.c = 0;
@@ -142,7 +144,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             dictionary_set(dict, name, output, len + 1);
         }
 
-        dictionary_get_all(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output, &co);
         dictionary_destroy(dict);
 
         RRDSET *st;
@@ -165,7 +167,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                 }
             }
         }
-        dictionary_get_all(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output, &co);
         dictionary_destroy(dict);
         buffer_strcat(wb, "],\n");
     }
