@@ -67,4 +67,5 @@ uint32_t sql_get_pending_count(struct aclk_database_worker_config *wc);
 void aclk_send_dimension_update(RRDDIM *rd);
 struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host);
 void sql_check_chart_liveness(RRDSET *st);
+void aclk_update_retention(struct aclk_database_worker_config *wc);
 #endif //NETDATA_SQLITE_ACLK_CHART_H
