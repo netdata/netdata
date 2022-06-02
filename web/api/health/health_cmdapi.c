@@ -199,6 +199,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
         BUFFER *jsonb = buffer_create(200);
         health_silencers2json(jsonb);
         health_silencers2file(jsonb);
+        buffer_free(jsonb);
     }
 
     return ret;
