@@ -35,7 +35,7 @@ In **clone** mode, the dictionary guarantees that all operations on the dictiona
 
    1.`dictionary_register_insert_callback()` that will be called just after the insertion of an item to the dictionary, or after the replacement of the value of a dictionary item (but while the dictionary is write-locked - if locking is enabled).
    2. `dictionary_register_delete_callback()` that will be called just prior to the deletion of an item from the dictionary, or prior to the replacement of the value of a dictionary item (but while the dictionary is write-locked - if locking is enabled).
-   3. `dictionary_register_merge_callback()` that will be called when `DICTIONARY_FLAG_DONT_OVERWRITE_VALUE` is set and another value is attempted to be inserted for the same key. 
+   3. `dictionary_register_conflict_callback()` that will be called when `DICTIONARY_FLAG_DONT_OVERWRITE_VALUE` is set and another value is attempted to be inserted for the same key. 
 
 In **link** mode, the name and/or the value are just linked to the dictionary item, and it is the user's responsibility to free the memory used after an item is deleted from the dictionary.
 

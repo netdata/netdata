@@ -64,7 +64,7 @@ extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_cal
 // a merge callback to be called when DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
 // and an item is already found in the dictionary - the dictionary does nothing else in this case
 // the old_value will remain in the dictionary - the new_value is ignored
-extern void dictionary_register_merge_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *old_value, void *new_value, void *data), void *data);
+extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data), void *data);
 
 // Destroy a dictionary
 // returns the number of bytes freed
