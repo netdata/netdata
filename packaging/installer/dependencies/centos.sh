@@ -10,7 +10,6 @@ declare -a package_tree=(
   make
   autoconf
   autoconf-archive
-  autogen
   automake
   libatomic
   libtool
@@ -106,7 +105,22 @@ validate_tree_centos() {
 
   echo >&2 " > CentOS Version: $(os_version) ..."
 
-  if [[ $(os_version) =~ ^8(\..*)?$ ]]; then
+  if [[ $(os_version) =~ ^9(\..*)?$ ]]; then
+    package_manager=dnf
+    echo >&2 " > Checking for config-manager ..."
+    if ! dnf config-manager --help &> /dev/null; then
+      if prompt "config-manager not found, shall I install it?"; then
+        dnf ${opts} install 'dnf-command(config-manager)'
+      fi
+    fi
+
+    echo >&2 " > Checking for CRB ..."
+    if ! dnf repolist | grep CRB; then
+      if prompt "CRB not found, shall I install it?"; then
+        dnf ${opts} config-manager --set-enabled crb
+      fi
+    fi
+  elif [[ $(os_version) =~ ^8(\..*)?$ ]]; then
     package_manager=dnf
     echo >&2 " > Checking for config-manager ..."
     if ! dnf config-manager --help &> /dev/null; then
@@ -128,7 +142,7 @@ validate_tree_centos() {
     echo >&2 " > Installing Judy-devel directly ..."
     dnf ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.3.0+757+d382997d.x86_64.rpm
     dnf makecache --refresh
-elif [[ $(os_version) =~ ^7(\..*)?$ ]]; then
+  elif [[ $(os_version) =~ ^7(\..*)?$ ]]; then
     package_manager=yum
     echo >&2 " > Checking for EPEL ..."
     if ! rpm -qa | grep epel-release > /dev/null; then
