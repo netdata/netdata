@@ -31,10 +31,11 @@ Dictionaries come with 2 memory management options:
 - **Clone** (copy) the name and/or the value to memory allocated by the dictionary.
 - **Link** the name and/or the value, without allocating any memory about them.
 
-In **clone** mode, the dictionary guarantees that all operations on the dictionary items will automatically take care of the memory used by the name and/or the value. In case the value is an object needs to have user allocated memory, two callback functions can be registered:
+In **clone** mode, the dictionary guarantees that all operations on the dictionary items will automatically take care of the memory used by the name and/or the value. In case the value is an object needs to have user allocated memory, the following callback functions can be registered:
 
-   1.`dictionary_register_insert_callback()` that will be called just after the insertion of an item to the dictionary (but while the dictionary is write-locked - if locking is enabled).
-   2. `dictionary_register_delete_callback()` that will be called just prior to the deletion of an item from the dictionary (but while the dictionary is write-locked - if locking is enabled).
+   1.`dictionary_register_insert_callback()` that will be called just after the insertion of an item to the dictionary, or after the replacement of the value of a dictionary item (but while the dictionary is write-locked - if locking is enabled).
+   2. `dictionary_register_delete_callback()` that will be called just prior to the deletion of an item from the dictionary, or prior to the replacement of the value of a dictionary item (but while the dictionary is write-locked - if locking is enabled).
+   3. `dictionary_register_merge_callback()` that will be called when `DICTIONARY_FLAG_DONT_OVERWRITE_VALUE` is set and  
 
 In **link** mode, the name and/or the value are just linked to the dictionary item, and it is the user's responsibility to free the memory used after an item is deleted from the dictionary.
 

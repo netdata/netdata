@@ -61,6 +61,11 @@ extern void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_cal
 // this callback is called while the dictionary is write locked!
 extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data);
 
+// a merge callback to be called when DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+// and an item is already found in the dictionary - the dictionary does nothing else in this case
+// the old_value will remain in the dictionary - the new_value is ignored
+extern void dictionary_register_merge_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *old_value, void *new_value, void *data), void *data);
+
 // Destroy a dictionary
 // returns the number of bytes freed
 // the returned value will not include name and value sizes if DICTIONARY_FLAG_WITH_STATISTICS is not set
@@ -154,17 +159,17 @@ typedef DICTFE_CONST struct dictionary_foreach {
 } DICTFE;
 
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, 'r')
-#define dfe_start_write(dict, value) dfe_start_rw(dict, value, 'r')
+#define dfe_start_write(dict, value) dfe_start_rw(dict, value, 'w')
 #define dfe_start_rw(dict, value, mode) \
         do { \
-            DICTFE dfe_ ## value = {};  \
+            DICTFE value ## _dfe = {};  \
             const char *value ## _name; (void)(value ## _name); \
-            for((value) = dictionary_foreach_start_rw(&dfe_ ## value, (dict), (mode)), ( value ## _name ) = dfe_ ## value.name; \
+            for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode)), ( value ## _name ) = value ## _dfe.name; \
                 (value) ;\
-                (value) = dictionary_foreach_next(&dfe_ ## value), ( value ## _name ) = dfe_ ## value.name)
+                (value) = dictionary_foreach_next(&value ## _dfe), ( value ## _name ) = value ## _dfe.name)
 
 #define dfe_done(value) \
-            dictionary_foreach_done(&dfe_ ## value); \
+            dictionary_foreach_done(&value ## _dfe); \
         } while(0)
 
 extern void * dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw);

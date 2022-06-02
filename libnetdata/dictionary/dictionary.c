@@ -134,6 +134,9 @@ struct dictionary {
     void (*del_callback)(const char *name, void *value, void *data);
     void *del_callback_data;
 
+    void (*merge_callback)(const char *name, void *old_value, void *new_value, void *data);
+    void *merge_callback_data;
+
     struct dictionary_stats *stats;     // the statistics when DICTIONARY_FLAG_WITH_STATISTICS is set
 };
 
@@ -145,6 +148,11 @@ void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(
 void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data) {
     dict->del_callback = del_callback;
     dict->del_callback_data = data;
+}
+
+void dictionary_register_merge_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *old_value, void *new_value, void *data), void *data) {
+    dict->merge_callback = del_callback;
+    dict->merge_callback_data = data;
 }
 
 // ----------------------------------------------------------------------------
@@ -724,8 +732,18 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
         // or overwrite the value, depending on dictionary flags
 
         nv = *pnv;
-        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE))
+        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
+
+            if(dict->del_callback)
+                dict->del_callback(nv->name, nv->value, dict->del_callback_data);
+
             namevalue_reset_unsafe(dict, nv, value, value_len);
+
+            if(dict->ins_callback)
+                dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
+        }
+        else if(dict->merge_callback)
+            dict->merge_callback(nv->name, nv->value, value, dict->merge_callback_data);
     }
 
     return nv->value;
@@ -1253,6 +1271,8 @@ int dictionary_unittest(size_t entries) {
     dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "foreach write delete this", names, values, entries, &errors, dictionary_unittest_foreach_delete_this);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop empty", names, values, 0, &errors, dictionary_unittest_foreach);
+    dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback empty", names, values, 0, &errors, dictionary_unittest_walkthrough);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     dictionary_unittest_free_char_pp(names, entries);
