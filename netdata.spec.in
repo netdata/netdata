@@ -127,7 +127,9 @@ BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
+%if 0%{?rhel} <= 8
 BuildRequires: autogen
+%endif
 %endif
 BuildRequires: automake
 BuildRequires: cmake
