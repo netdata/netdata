@@ -159,7 +159,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         chart_payload.id = strdupz(st->id);
 
         struct label_index *labels = &st->state->labels;
-        netdata_rwlock_wrlock(&labels->labels_rwlock);
+        netdata_rwlock_rdlock(&labels->labels_rwlock);
         struct label *label_list = labels->head;
         struct label *chart_label = NULL;
         while (label_list) {

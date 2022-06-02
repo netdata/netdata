@@ -1974,7 +1974,7 @@ void rrdset_finalize_labels(RRDSET *st)
         replace_label_list(labels, new_labels);
     }
 
-    netdata_rwlock_wrlock(&labels->labels_rwlock);
+    netdata_rwlock_rdlock(&labels->labels_rwlock);
     struct label *lbl = labels->head;
     while (lbl) {
         sql_store_chart_label(st->chart_uuid, (int)lbl->label_source, lbl->key, lbl->value);
