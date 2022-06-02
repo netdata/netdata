@@ -531,6 +531,8 @@ void *diskspace_slow_worker(void *ptr)
         // --------------------------------------------------------------------------
         // disk space metrics
 
+        worker_is_busy(WORKER_JOB_SLOW_MOUNTPOINT);
+
         netdata_mutex_lock(&slow_mountinfo_mutex);
         struct basic_mountinfo *slow_mountinfo_root = slow_mountinfo_tmp_root;
         free_basic_mountinfo_list(slow_mountinfo_tmp_root);
@@ -538,19 +540,21 @@ void *diskspace_slow_worker(void *ptr)
 
         struct basic_mountinfo *bmi;
         for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
-
-            worker_is_busy(WORKER_JOB_SLOW_MOUNTPOINT);
             do_slow_disk_space_stats(bmi, update_every);
+            
             if(unlikely(netdata_exit)) break;
         }
 
         if(unlikely(netdata_exit)) break;
 
-        if(dict_mountpoints) {
-            worker_is_busy(WORKER_JOB_SLOW_CLEANUP);
-            dictionary_walkthrough_read(dict_mountpoints, mount_point_cleanup_cb, NULL);
-        }
+        worker_is_busy(WORKER_JOB_SLOW_CLEANUP);
 
+        for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
+            struct mount_point_metadata *m = dictionary_get(dict_mountpoints, bmi->mount_point);
+
+            if (m)
+                mount_point_cleanup(bmi->mount_point, m, 1);
+        }
     }
 
     netdata_thread_cleanup_pop(1);
