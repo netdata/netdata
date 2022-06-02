@@ -101,9 +101,7 @@ main() {
       ;;
   esac
 
-  tmpdir="$(create_tmp_directory)"
-  progress "Using ${tmpdir} as a temporary directory."
-  cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
+  set_tmpdir
 
   if [ -n "${INSTALL_VERSION}" ]; then
     if echo "${INSTALL_VERSION}" | grep -E -o "^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$" > /dev/null 2>&1; then
@@ -373,7 +371,8 @@ success_banner() {
 }
 
 cleanup() {
-  if [ -z "${NO_CLEANUP}" ]; then
+  if [ -z "${NO_CLEANUP}" ] && [ -n "${tmpdir}" ]; then
+    cd || true
     ${ROOTCMD} rm -rf "${tmpdir}"
   fi
 }
@@ -504,6 +503,14 @@ create_tmp_directory() {
   fi
 
   mktemp -d -t netdata-kickstart-XXXXXXXXXX
+}
+
+set_tmpdir() {
+  if [ -z "${tmpdir}" ]; then
+    tmpdir="$(create_tmp_directory)"
+    progress "Using ${tmpdir} as a temporary directory."
+    cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
+  fi
 }
 
 check_for_remote_file() {
@@ -710,6 +717,7 @@ update() {
 }
 
 uninstall() {
+  set_tmpdir
   get_system_info
   detect_existing_install
 
