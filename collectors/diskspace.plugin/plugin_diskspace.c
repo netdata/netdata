@@ -3,6 +3,7 @@
 #include "../proc.plugin/plugin_proc.h"
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
+#define THREAD_DISKSPACE_SLOW_NAME "PLUGIN[diskspace slow]"
 
 #define DEFAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
@@ -353,6 +354,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
     if(unlikely(!m)) {
+        int slow = 0;
         char var_name[4096 + 1];
         snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
 
@@ -399,7 +401,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             }
 
             if ((now_monotonic_high_precision_usec() - start_time) > MAX_STAT_USEC)
-                m->slow = 1;
+                slow = 1;
         }
 
         do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
@@ -410,6 +412,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .do_inodes = do_inodes,
                 .shown_error = 0,
                 .updated = 0,
+                .slow = 0,
 
                 .collected = 0,
 
@@ -425,6 +428,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         };
 
         m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
+
+        m->slow = slow;
     }
 
     if (m->slow) {
@@ -516,6 +521,8 @@ void *diskspace_slow_worker(void *ptr)
     worker_register_job_name(WORKER_JOB_SLOW_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_SLOW_CLEANUP, "cleanup");
 
+    struct basic_mountinfo *slow_mountinfo_root = NULL;
+
     netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, ptr);
 
     usec_t step = (update_every > SLOW_UPDATE_EVERY ? update_every : SLOW_UPDATE_EVERY) * USEC_PER_SEC;
@@ -526,6 +533,9 @@ void *diskspace_slow_worker(void *ptr)
         worker_is_idle();
         heartbeat_next(&hb, step);
 
+        if (!dict_mountpoints)
+            continue;
+
         if(unlikely(netdata_exit)) break;
 
         // --------------------------------------------------------------------------
@@ -534,8 +544,9 @@ void *diskspace_slow_worker(void *ptr)
         worker_is_busy(WORKER_JOB_SLOW_MOUNTPOINT);
 
         netdata_mutex_lock(&slow_mountinfo_mutex);
-        struct basic_mountinfo *slow_mountinfo_root = slow_mountinfo_tmp_root;
-        free_basic_mountinfo_list(slow_mountinfo_tmp_root);
+        free_basic_mountinfo_list(slow_mountinfo_root);
+        slow_mountinfo_root = slow_mountinfo_tmp_root;
+        slow_mountinfo_tmp_root = NULL;
         netdata_mutex_unlock(&slow_mountinfo_mutex);
 
         struct basic_mountinfo *bmi;
@@ -607,8 +618,12 @@ void *diskspace_main(void *ptr) {
 
     diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
     netdata_thread_create(
-        diskspace_slow_thread, THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, diskspace_slow_worker, diskspace_slow_thread);
-        
+        diskspace_slow_thread,
+        THREAD_DISKSPACE_SLOW_NAME,
+        NETDATA_THREAD_OPTION_JOINABLE,
+        diskspace_slow_worker,
+        diskspace_slow_thread);
+
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -629,6 +644,9 @@ void *diskspace_main(void *ptr) {
         // disk space metrics
 
         netdata_mutex_lock(&slow_mountinfo_mutex);
+        free_basic_mountinfo_list(slow_mountinfo_tmp_root);
+        slow_mountinfo_tmp_root = NULL;
+
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
             if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
