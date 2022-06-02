@@ -36,6 +36,10 @@ install_centos() {
 
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
+  if [ "${PKGMGR}" = "dnf" ]; then
+    opts="--allowerasing"
+  fi
+
   # Install EPEL (needed for `jq`
   "$PKGMGR" install -y epel-release || exit 1
 
@@ -43,7 +47,7 @@ install_centos() {
   "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
-  "$PKGMGR" install -y curl nc jq || exit 1
+  "$PKGMGR" install -y ${opts} curl nc jq || exit 1
 }
 
 install_suse_like() {
