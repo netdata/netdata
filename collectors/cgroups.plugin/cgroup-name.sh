@@ -261,7 +261,7 @@ function k8s_get_kubepod_name() {
     IFS= read -r kube_cluster_name 2>/dev/null <"$tmp_kube_cluster_name"
   else
     IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
-    IFS= read -r kube_cluster_name 2>/dev/null <"$tmp_kube_containers_file"
+    IFS= read -r kube_cluster_name 2>/dev/null <"$tmp_kube_cluster_name"
     [ -z "$kube_cluster_name" ] && ! kube_cluster_name=$(k8s_gcp_get_cluster_name) && kube_cluster_name="unknown"
 
     local kube_system_ns
