@@ -116,6 +116,31 @@ static inline int rrdcalc_test_additional_restriction(RRDCALC *rc, RRDSET *st){
     if (rc->plugin_match && !simple_pattern_matches(rc->plugin_pattern, st->plugin_name))
         return 0;
 
+    if (rc->labels) {
+        int labels_count=1;
+        int labels_match=0;
+        char *s = rc->labels;
+        while (*s) {
+            if (*s==' ')
+                labels_count++;
+            s++;
+        }
+        RRDHOST *host = st->rrdhost;
+        char cmp[CONFIG_FILE_LINE_MAX+1];
+        struct label *move = host->labels.head;
+        while(move) {
+            snprintf(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);
+            if (simple_pattern_matches(rc->splabels, move->key) ||
+                simple_pattern_matches(rc->splabels, cmp)) {
+                labels_match++;
+            }
+            move = move->next;
+        }
+
+        if (labels_match != labels_count)
+            return 0;
+    }
+
     return 1;
 }
 
