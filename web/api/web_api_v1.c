@@ -652,6 +652,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         .timeout = timeout,
         .max_anomaly_rates = max_anomaly_rates,
         .show_dimensions = show_dimensions,
+        .chart_label_key = chart_label_key,
         .wb = w->response.data};
 
     ret = rrdset2anything_api_v1(owa, st, &query_params, dimensions, format,
