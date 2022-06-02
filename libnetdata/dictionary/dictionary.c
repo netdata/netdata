@@ -134,6 +134,9 @@ struct dictionary {
     void (*del_callback)(const char *name, void *value, void *data);
     void *del_callback_data;
 
+    void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data);
+    void *conflict_callback_data;
+
     struct dictionary_stats *stats;     // the statistics when DICTIONARY_FLAG_WITH_STATISTICS is set
 };
 
@@ -145,6 +148,11 @@ void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(
 void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data) {
     dict->del_callback = del_callback;
     dict->del_callback_data = data;
+}
+
+void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data), void *data) {
+    dict->conflict_callback = conflict_callback;
+    dict->conflict_callback_data = data;
 }
 
 // ----------------------------------------------------------------------------
@@ -724,8 +732,18 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
         // or overwrite the value, depending on dictionary flags
 
         nv = *pnv;
-        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE))
+        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
+
+            if(dict->del_callback)
+                dict->del_callback(nv->name, nv->value, dict->del_callback_data);
+
             namevalue_reset_unsafe(dict, nv, value, value_len);
+
+            if(dict->ins_callback)
+                dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
+        }
+        else if(dict->conflict_callback)
+            dict->conflict_callback(nv->name, nv->value, value, dict->conflict_callback_data);
     }
 
     return nv->value;

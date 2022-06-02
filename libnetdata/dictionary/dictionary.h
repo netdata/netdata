@@ -61,6 +61,11 @@ extern void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_cal
 // this callback is called while the dictionary is write locked!
 extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data);
 
+// a merge callback to be called when DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+// and an item is already found in the dictionary - the dictionary does nothing else in this case
+// the old_value will remain in the dictionary - the new_value is ignored
+extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data), void *data);
+
 // Destroy a dictionary
 // returns the number of bytes freed
 // the returned value will not include name and value sizes if DICTIONARY_FLAG_WITH_STATISTICS is not set
