@@ -133,6 +133,7 @@ struct basic_mountinfo {
 };
 
 static struct basic_mountinfo *slow_mountinfo_tmp_root = NULL;
+static netdata_mutex_t slow_mountinfo_mutex;
 
 static struct basic_mountinfo *basic_mountinfo_create_and_copy(struct mountinfo* mi)
 {
@@ -158,6 +159,29 @@ static void add_basic_mountinfo(struct basic_mountinfo **root, struct mountinfo 
     bmi->next = *root;
     *root = bmi;
 };
+
+static void free_basic_mountinfo(struct basic_mountinfo *bmi)
+{
+    if (!bmi) {
+        freez(bmi->persistent_id);
+        freez(bmi->root);
+        freez(bmi->mount_point);
+        freez(bmi->filesystem);
+    }
+
+    freez(bmi);
+};
+
+static void free_basic_mountinfo_list(struct basic_mountinfo *root)
+{
+    struct basic_mountinfo *bmi = root, *next;
+
+    while (bmi) {
+        next = bmi->next;
+        free_basic_mountinfo(bmi);
+        bmi = next;
+    }
+}
 
 static void calculate_values_and_show_charts(
     struct basic_mountinfo *mi,
@@ -507,8 +531,13 @@ void *diskspace_slow_worker(void *ptr)
         // --------------------------------------------------------------------------
         // disk space metrics
 
+        netdata_mutex_lock(&slow_mountinfo_mutex);
+        struct basic_mountinfo *slow_mountinfo_root = slow_mountinfo_tmp_root;
+        free_basic_mountinfo_list(slow_mountinfo_tmp_root);
+        netdata_mutex_unlock(&slow_mountinfo_mutex);
+
         struct basic_mountinfo *bmi;
-        for(bmi = slow_mountinfo_tmp_root; bmi; bmi = bmi->next) {
+        for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
 
             worker_is_busy(WORKER_JOB_SLOW_MOUNTPOINT);
             do_slow_disk_space_stats(bmi, update_every);
@@ -570,6 +599,8 @@ void *diskspace_main(void *ptr) {
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
+    netdata_mutex_init(&slow_mountinfo_mutex);
+
     diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
     netdata_thread_create(
         diskspace_slow_thread, THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, diskspace_slow_worker, diskspace_slow_thread);
@@ -593,9 +624,9 @@ void *diskspace_main(void *ptr) {
         // --------------------------------------------------------------------------
         // disk space metrics
 
+        netdata_mutex_lock(&slow_mountinfo_mutex);
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
-
             if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
                 continue;
 
@@ -607,6 +638,7 @@ void *diskspace_main(void *ptr) {
             do_disk_space_stats(mi, update_every);
             if(unlikely(netdata_exit)) break;
         }
+        netdata_mutex_unlock(&slow_mountinfo_mutex);
 
         if(unlikely(netdata_exit)) break;
 
