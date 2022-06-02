@@ -899,8 +899,6 @@ static inline void del_pid_entry(pid_t pid)
         p->prev->next = p->next;
 
     freez(p->stat_filename);
-    freez(p->status_filename);
-    freez(p->io_filename);
     freez(p->cmdline_filename);
     freez(p->cmdline);
     freez(p);

@@ -327,8 +327,8 @@ struct pid_stat {
     char *fds_dirname; // the full directory name in /proc/PID/fd
 
     char *stat_filename;
-    char *status_filename;
-    char *io_filename;
+    //char *status_filename;
+    //char *io_filename;
     char *cmdline_filename;
 
     struct pid_stat *parent;
