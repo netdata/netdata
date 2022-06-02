@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- Fix dictionary crash walkthrough empty [\#13051](https://github.com/netdata/netdata/pull/13051) ([ktsaou](https://github.com/ktsaou))
+- coverity fixes about statsd; removal of strsame [\#13049](https://github.com/netdata/netdata/pull/13049) ([ktsaou](https://github.com/ktsaou))
+- Fix disabled apps \(ebpf.plugin\) [\#13044](https://github.com/netdata/netdata/pull/13044) ([thiagoftsm](https://github.com/thiagoftsm))
+- add note about anomaly advisor [\#13042](https://github.com/netdata/netdata/pull/13042) ([andrewm4894](https://github.com/andrewm4894))
 - replace `history` with relevant `dbengine` params [\#13041](https://github.com/netdata/netdata/pull/13041) ([andrewm4894](https://github.com/andrewm4894))
 - Fix the retry count and netdata\_exit check when running an sqlite3\_step command [\#13040](https://github.com/netdata/netdata/pull/13040) ([stelfrag](https://github.com/stelfrag))
+- Schedule retention message calculation to a worker thread [\#13039](https://github.com/netdata/netdata/pull/13039) ([stelfrag](https://github.com/stelfrag))
 - Check return value and log an error on failure [\#13037](https://github.com/netdata/netdata/pull/13037) ([stelfrag](https://github.com/stelfrag))
 - Add additional metadata to the data response [\#13036](https://github.com/netdata/netdata/pull/13036) ([stelfrag](https://github.com/stelfrag))
 - When sending a dimension for the first time, make sure there is a non zero created\_at timestamp [\#13035](https://github.com/netdata/netdata/pull/13035) ([stelfrag](https://github.com/stelfrag))
 - Update apps\_groups.conf [\#13033](https://github.com/netdata/netdata/pull/13033) ([fqx](https://github.com/fqx))
+- Dictionary with JudyHS and double linked list [\#13032](https://github.com/netdata/netdata/pull/13032) ([ktsaou](https://github.com/ktsaou))
 - add hostname to mirrored hosts [\#13030](https://github.com/netdata/netdata/pull/13030) ([ktsaou](https://github.com/ktsaou))
 - Update dashboard to version v2.25.6. [\#13028](https://github.com/netdata/netdata/pull/13028) ([netdatabot](https://github.com/netdatabot))
 - prevent gap filling on dbengine gaps [\#13027](https://github.com/netdata/netdata/pull/13027) ([ktsaou](https://github.com/ktsaou))
@@ -326,8 +332,6 @@
 - fix: temporarily disable charts.d apcupsd collectors [\#12415](https://github.com/netdata/netdata/pull/12415) ([ilyam8](https://github.com/ilyam8))
 - Add additional link to badges doc [\#12412](https://github.com/netdata/netdata/pull/12412) ([Steve8291](https://github.com/Steve8291))
 - chore: remove contrib/sles11 [\#12410](https://github.com/netdata/netdata/pull/12410) ([ilyam8](https://github.com/ilyam8))
-- Update dashboard to version v2.21.3. [\#12407](https://github.com/netdata/netdata/pull/12407) ([netdatabot](https://github.com/netdatabot))
-- chore: remove "web files" options leftovers [\#12403](https://github.com/netdata/netdata/pull/12403) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
