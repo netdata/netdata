@@ -1103,7 +1103,7 @@ static void ebpf_allocate_common_vectors()
         return;
     }
 
-    all_pids = callocz((size_t)pid_max, sizeof(struct pid_stat *));
+    all_pids = callocz((size_t)pid_max, sizeof(struct pid_stat));
     global_process_stat = callocz((size_t)ebpf_nprocs, sizeof(ebpf_process_stat_t));
 }
 

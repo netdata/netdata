@@ -207,7 +207,7 @@ struct pid_stat {
 
     uint32_t log_thrown;
 
-    // char state;
+    char state; // state is set 1 for Active or 0 otherwise
     int32_t ppid;
 
     // int32_t pgrp;
@@ -406,7 +406,7 @@ static inline void debug_log_int(const char *fmt, ...)
 // ----------------------------------------------------------------------------
 // Exported variabled and functions
 //
-extern struct pid_stat **all_pids;
+extern struct pid_stat *all_pids;
 
 extern int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target,
                                       struct target **apps_groups_root_target,
