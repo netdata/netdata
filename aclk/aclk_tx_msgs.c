@@ -129,7 +129,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
 
     if (unlikely(!topic || topic[0] != '/')) {
         error ("Full topic required!");
-        return 500;
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
@@ -160,12 +160,12 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
         if (rc == MQTT_WSS_ERR_BLOCK_TIMEOUT) {
             error("Timeout sending binpacked message");
             freez(full_msg);
-            return 503;
+            return HTTP_RESP_BACKEND_FETCH_FAILED;
         }
         if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
             error("Message is bigger than allowed maximum");
             freez(full_msg);
-            return 403;
+            return HTTP_RESP_FORBIDDEN;
         }
     }
 
@@ -372,13 +372,13 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
     json_object_put(msg);
 
     switch (rc) {
-    case 403:
+    case HTTP_RESP_FORBIDDEN:
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, payload, payload_len);
         break;
-    case 500:
+    case HTTP_RESP_INTERNAL_SERVER_ERROR:
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
         break;
-    case 503:
+    case HTTP_RESP_BACKEND_FETCH_FAILED:
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
         break;
     }
