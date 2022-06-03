@@ -523,9 +523,11 @@ void *diskspace_slow_worker(void *ptr)
 
     struct basic_mountinfo *slow_mountinfo_root = NULL;
 
+    int slow_update_every = update_every > SLOW_UPDATE_EVERY ? update_every : SLOW_UPDATE_EVERY;
+
     netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, ptr);
 
-    usec_t step = (update_every > SLOW_UPDATE_EVERY ? update_every : SLOW_UPDATE_EVERY) * USEC_PER_SEC;
+    usec_t step = slow_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -551,7 +553,7 @@ void *diskspace_slow_worker(void *ptr)
 
         struct basic_mountinfo *bmi;
         for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
-            do_slow_disk_space_stats(bmi, update_every);
+            do_slow_disk_space_stats(bmi, slow_update_every);
             
             if(unlikely(netdata_exit)) break;
         }
@@ -632,7 +634,6 @@ void *diskspace_main(void *ptr) {
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
         if(unlikely(netdata_exit)) break;
-
 
         // --------------------------------------------------------------------------
         // this is smart enough not to reload it every time
