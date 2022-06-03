@@ -121,6 +121,9 @@ struct mqtt_wss_client_struct {
 // Application layer callback pointers
     void (*msg_callback)(const char *, const void *, size_t, int);
     void (*puback_callback)(uint16_t packet_id);
+
+    pthread_mutex_t stat_lock;
+    struct mqtt_wss_stats stats;
 };
 
 static void mws_connack_callback(struct mqtt_client* client, enum MQTTConnackReturnCode code)
@@ -280,6 +283,7 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
     }
 
     pthread_mutex_init(&client->pub_lock, NULL);
+    pthread_mutex_init(&client->stat_lock, NULL);
 
     client->msg_callback = msg_callback;
     client->puback_callback = puback_callback;
@@ -382,6 +386,7 @@ void mqtt_wss_destroy(mqtt_wss_client client)
         close(client->sockfd);
 
     pthread_mutex_destroy(&client->pub_lock);
+    pthread_mutex_destroy(&client->stat_lock);
 
     mqtt_wss_log_ctx_destroy(client->log);
     free(client);
@@ -1042,6 +1047,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #ifdef DEBUG_ULTRA_VERBOSE
             mws_debug(client->log, "SSL_Read: Read %d.", ret);
 #endif
+            pthread_mutex_lock(&client->stat_lock);
+            client->stats.bytes_rx += ret;
+            pthread_mutex_unlock(&client->stat_lock);
             rbuf_bump_head(client->ws_client->buf_read, ret);
         } else {
             ret = SSL_get_error(client->ssl, ret);
@@ -1086,6 +1094,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #ifdef DEBUG_ULTRA_VERBOSE
             mws_debug(client->log, "SSL_Write: Written %d of avail %d.", ret, size);
 #endif
+            pthread_mutex_lock(&client->stat_lock);
+            client->stats.bytes_tx += ret;
+            pthread_mutex_unlock(&client->stat_lock);
             rbuf_bump_tail(client->ws_client->buf_write, ret);
         } else {
             ret = SSL_get_error(client->ssl, ret);
@@ -1364,4 +1375,14 @@ int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level)
 
     mqtt_wss_wakeup(client);
     return 0;
+}
+
+struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client)
+{
+    struct mqtt_wss_stats current;
+    pthread_mutex_lock(&client->stat_lock);
+    current = client->stats;
+    memset(&client->stats, 0, sizeof(client->stats));
+    pthread_mutex_unlock(&client->stat_lock);
+    return current;
 }

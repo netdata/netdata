@@ -163,4 +163,11 @@ int mqtt_wss_publish5(mqtt_wss_client client,
  */
 int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level);
 
+struct mqtt_wss_stats {
+    uint64_t bytes_tx;
+    uint64_t bytes_rx;
+};
+
+struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client);
+
 #endif /* MQTT_WSS_CLIENT_H */
