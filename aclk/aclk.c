@@ -392,7 +392,7 @@ static inline void queue_connect_payloads(void)
 
 static inline void mqtt_connected_actions(mqtt_wss_client client)
 {
-    const char *topic = aclk_get_topic(ACLK_TOPICID_COMMAND);
+    char *topic = (char*)aclk_get_topic(ACLK_TOPICID_COMMAND);
 
     if (!topic)
         error("Unable to fetch topic for COMMAND (to subscribe)");
@@ -401,7 +401,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (aclk_use_new_cloud_arch) {
-        topic = aclk_get_topic(ACLK_TOPICID_CMD_NG_V1);
+        topic = (char*)aclk_get_topic(ACLK_TOPICID_CMD_NG_V1);
         if (!topic)
             error("Unable to fetch topic for protobuf COMMAND (to subscribe)");
         else
@@ -1095,7 +1095,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
 
     info("Queuing status update for node=%s, live=%d, hops=%u",(char*)node_state_update.node_id, cmd,
          host->system_info->hops);
-    freez(node_state_update.node_id);
+    freez((void*)node_state_update.node_id);
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
     aclk_queue_query(query);
@@ -1128,7 +1128,7 @@ void aclk_send_node_instances()
             info("Queuing status update for node=%s, live=%d, hops=%d",(char*)node_state_update.node_id,
                  list->live,
                  list->hops);
-            freez(node_state_update.node_id);
+            freez((void*)node_state_update.node_id);
             query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
             query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
             aclk_queue_query(query);
