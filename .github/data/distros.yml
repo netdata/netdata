@@ -96,13 +96,6 @@ include:
       repo_distro: debian/buster
     test:
       ebpf-core: false
-  - <<: *debian
-    version: "9"
-    packages:
-      <<: *debian_packages
-      repo_distro: debian/stretch
-    test:
-      ebpf-core: false
 
   - &fedora
     distro: fedora
