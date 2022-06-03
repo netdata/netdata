@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- fix\(cgroup.plugin\): read k8s\_cluster\_name label from the correct file [\#13062](https://github.com/netdata/netdata/pull/13062) ([ilyam8](https://github.com/ilyam8))
+- Initialize chart label key parameter correctly [\#13061](https://github.com/netdata/netdata/pull/13061) ([stelfrag](https://github.com/stelfrag))
+- Fix coverity 378625 [\#13055](https://github.com/netdata/netdata/pull/13055) ([MrZammler](https://github.com/MrZammler))
+- add the ability to merge dictionary items [\#13054](https://github.com/netdata/netdata/pull/13054) ([ktsaou](https://github.com/ktsaou))
+- Check for host labels when linking alerts for children [\#13053](https://github.com/netdata/netdata/pull/13053) ([MrZammler](https://github.com/MrZammler))
+- dictionary improvements [\#13052](https://github.com/netdata/netdata/pull/13052) ([ktsaou](https://github.com/ktsaou))
 - Fix dictionary crash walkthrough empty [\#13051](https://github.com/netdata/netdata/pull/13051) ([ktsaou](https://github.com/ktsaou))
 - coverity fixes about statsd; removal of strsame [\#13049](https://github.com/netdata/netdata/pull/13049) ([ktsaou](https://github.com/ktsaou))
 - Fix disabled apps \(ebpf.plugin\) [\#13044](https://github.com/netdata/netdata/pull/13044) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -327,11 +333,6 @@
 - fix: ensure claim\_id is always sent lowercase as string [\#12423](https://github.com/netdata/netdata/pull/12423) ([underhood](https://github.com/underhood))
 - fix: lowercase uuidgen [\#12422](https://github.com/netdata/netdata/pull/12422) ([ilyam8](https://github.com/ilyam8))
 - fix: add a delay between starting Netdata and checking pids [\#12420](https://github.com/netdata/netdata/pull/12420) ([ilyam8](https://github.com/ilyam8))
-- fix\(charts.d.plugin\): fix recursion in apcupsd\_check and enable it again [\#12418](https://github.com/netdata/netdata/pull/12418) ([ilyam8](https://github.com/ilyam8))
-- Add content for eBPF documentation [\#12417](https://github.com/netdata/netdata/pull/12417) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix: temporarily disable charts.d apcupsd collectors [\#12415](https://github.com/netdata/netdata/pull/12415) ([ilyam8](https://github.com/ilyam8))
-- Add additional link to badges doc [\#12412](https://github.com/netdata/netdata/pull/12412) ([Steve8291](https://github.com/Steve8291))
-- chore: remove contrib/sles11 [\#12410](https://github.com/netdata/netdata/pull/12410) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
