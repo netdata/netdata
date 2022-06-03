@@ -154,7 +154,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
 #endif */
 
     if (use_mqtt_5)
-        mqtt_wss_publish5(client, topic, NULL, payload_len ? full_msg : str, NULL, len, MQTT_WSS_PUB_QOS1, &packet_id);
+        mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), NULL, len, MQTT_WSS_PUB_QOS1, &packet_id);
     else {
         rc = mqtt_wss_publish_pid_block(client, topic, payload_len ? full_msg : str, len,  MQTT_WSS_PUB_QOS1, &packet_id, 5000);
         if (rc == MQTT_WSS_ERR_BLOCK_TIMEOUT) {
