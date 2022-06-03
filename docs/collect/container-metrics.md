@@ -25,7 +25,7 @@ A handful of additional collectors gather metrics from container-related service
 [dockerd](/collectors/python.d.plugin/dockerd/README.md) or [Docker
 Engine](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker_engine/). You can find all
 container collectors in our supported collectors list under the
-[containers/VMs](/collectors/COLLECTORS.md#containers-and-vms) and
+[containers/VMs](/collectors#containers-and-vms) and
 [Kubernetes](/collectors/COLLECTORS.md#containers-and-vms) headings.
 
 ## Collect Docker metrics
