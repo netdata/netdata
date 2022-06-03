@@ -1124,7 +1124,6 @@ void aclk_send_node_instances()
             node_state_update.claim_id = localhost->aclk_state.claimed_id;
             query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
             rrdhost_aclk_state_unlock(localhost);
-            freez(list->hostname);
             info("Queuing status update for node=%s, live=%d, hops=%d",(char*)node_state_update.node_id,
                  list->live,
                  list->hops);
@@ -1152,6 +1151,7 @@ void aclk_send_node_instances()
             freez(node_instance_creation.machine_guid);
             aclk_queue_query(create_query);
         }
+        freez(list->hostname);
 
         list++;
     }
