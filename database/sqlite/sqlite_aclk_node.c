@@ -76,7 +76,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.ml_info.ml_enabled = host->system_info->ml_enabled;
 
     struct label_index *labels = &host->labels;
-    netdata_rwlock_wrlock(&labels->labels_rwlock);
+    netdata_rwlock_rdlock(&labels->labels_rwlock);
     node_info.data.host_labels_head = labels->head;
 
     aclk_update_node_info(&node_info);
