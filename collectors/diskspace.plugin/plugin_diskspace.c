@@ -163,7 +163,7 @@ static void add_basic_mountinfo(struct basic_mountinfo **root, struct mountinfo 
 
 static void free_basic_mountinfo(struct basic_mountinfo *bmi)
 {
-    if (!bmi) {
+    if (bmi) {
         freez(bmi->persistent_id);
         freez(bmi->root);
         freez(bmi->mount_point);
@@ -581,6 +581,9 @@ void *diskspace_slow_worker(void *ptr)
     }
 
     netdata_thread_cleanup_pop(1);
+
+    free_basic_mountinfo_list(slow_mountinfo_root);
+
     return NULL;
 }
 
@@ -596,6 +599,8 @@ static void diskspace_main_cleanup(void *ptr) {
         netdata_thread_join(*diskspace_slow_thread, NULL);
         freez(diskspace_slow_thread);
     }
+
+    free_basic_mountinfo_list(slow_mountinfo_tmp_root);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
