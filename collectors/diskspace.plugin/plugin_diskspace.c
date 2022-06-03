@@ -237,10 +237,10 @@ static void calculate_values_and_show_charts(
     if(m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
                                              (bavail || breserved_root || bused ||
                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        if(unlikely(!m->st_space)) {
+        if(unlikely(!m->st_space) || m->st_space->update_every != update_every) {
             m->do_space = CONFIG_BOOLEAN_YES;
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
-            if(unlikely(!m->st_space)) {
+            if(unlikely(!m->st_space || m->st_space->update_every != update_every)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Space Usage");
                 m->st_space = rrdset_create_localhost(
@@ -279,10 +279,10 @@ static void calculate_values_and_show_charts(
     if(m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
                                               (favail || freserved_root || fused ||
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        if(unlikely(!m->st_inodes)) {
+        if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
             m->do_inodes = CONFIG_BOOLEAN_YES;
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
-            if(unlikely(!m->st_inodes)) {
+            if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Files (inodes) Usage");
                 m->st_inodes = rrdset_create_localhost(
@@ -535,6 +535,8 @@ void *diskspace_slow_worker(void *ptr)
         worker_is_idle();
         heartbeat_next(&hb, step);
 
+        usec_t start_time = now_monotonic_high_precision_usec();
+
         if (!dict_mountpoints)
             continue;
 
@@ -567,6 +569,14 @@ void *diskspace_slow_worker(void *ptr)
 
             if (m)
                 mount_point_cleanup(bmi->mount_point, m, 1);
+        }
+
+        usec_t dt = now_monotonic_high_precision_usec() - start_time;
+        if (dt > step) {
+            slow_update_every = (dt / USEC_PER_SEC) * 3 / 2;
+            if (slow_update_every % SLOW_UPDATE_EVERY)
+                slow_update_every += SLOW_UPDATE_EVERY - slow_update_every % SLOW_UPDATE_EVERY;
+            step = slow_update_every * USEC_PER_SEC;
         }
     }
 
