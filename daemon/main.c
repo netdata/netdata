@@ -1440,7 +1440,9 @@ int main(int argc, char **argv) {
     // initialize internal registry
     registry_init();
     // fork the spawn server
+#if 0
     spawn_init();
+#endif
     /*
      * Libuv uv_spawn() uses SIGCHLD internally:
      * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
@@ -1511,7 +1513,9 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // Initialize netdata agent command serving from cli and signals
 
+#if 0
     commands_init();
+#endif
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;

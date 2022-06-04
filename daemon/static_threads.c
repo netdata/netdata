@@ -12,6 +12,7 @@ extern void *pluginsd_main(void *ptr);
 extern void *service_main(void *ptr);
 extern void *statsd_main(void *ptr);
 extern void *timex_main(void *ptr);
+extern void *profile_main(void *ptr);
 
 const struct netdata_static_thread static_threads_common[] = {
     {
@@ -54,7 +55,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "GLOBAL_STATS",
         .config_section = NULL,
         .config_name = NULL,
-        .enabled = 1,
+        .enabled = 0,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = global_statistics_main
@@ -121,6 +122,15 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = socket_listen_main_static_threaded
+    },
+    {
+        .name = "PROFILE",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = profile_main
     },
 
 #ifdef ENABLE_ACLK
