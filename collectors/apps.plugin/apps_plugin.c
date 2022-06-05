@@ -2933,7 +2933,7 @@ static size_t zero_all_targets(struct target *root) {
             while(pid_on_target) {
                 pid_on_target_to_free = pid_on_target;
                 pid_on_target = pid_on_target->next;
-                free(pid_on_target_to_free);
+                freez(pid_on_target_to_free);
             }
 
             w->root_pid = NULL;
