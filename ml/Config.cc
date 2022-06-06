@@ -42,7 +42,7 @@ void Config::readMLConfig(void) {
     unsigned MaxKMeansIters = config_get_number(ConfigSectionML, "maximum number of k-means iterations", 1000);
 
     double DimensionAnomalyScoreThreshold = config_get_float(ConfigSectionML, "dimension anomaly score threshold", 0.99);
-    double HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 0.01);
+    double HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 0.02);
 
     double ADMinWindowSize = config_get_float(ConfigSectionML, "minimum window size", 30);
     double ADMaxWindowSize = config_get_float(ConfigSectionML, "maximum window size", 600);
