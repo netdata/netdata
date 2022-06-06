@@ -1956,20 +1956,3 @@ after_second_database_work:
 
     netdata_thread_enable_cancelability();
 }
-
-static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
-    RRDSET *st = (RRDSET *)data;
-    sql_store_chart_label(st->chart_uuid, (int)ls, (char *)name, (char *)value);
-    return 1;
-}
-
-void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
-    if(!st->state->chart_labels)
-        st->state->chart_labels = rrdlabels_create();
-
-    if (new_rrdlabels)
-        rrdlabels_migrate_to_these(st->state->chart_labels, new_rrdlabels);
-
-    // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
-    rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, st);
-}

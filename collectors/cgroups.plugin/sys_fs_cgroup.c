@@ -1738,7 +1738,7 @@ static inline void substitute_dots_in_id(char *s) {
 // ----------------------------------------------------------------------------
 // parse k8s labels
 
-static char *k8s_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
+char *k8s_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
     // the first word, up to the first space is the name
     char *name = mystrsep(&data, " ");
 

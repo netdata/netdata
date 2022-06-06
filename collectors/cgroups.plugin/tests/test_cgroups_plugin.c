@@ -86,10 +86,10 @@ static void test_k8s_parse_resolved_name(void **state)
             expect_value(__wrap_add_label_to_list, l, 0xff);
             expect_string(__wrap_add_label_to_list, key, key);
             expect_string(__wrap_add_label_to_list, value, value);
-            expect_value(__wrap_add_label_to_list, label_source, LABEL_SOURCE_KUBERNETES);    
+            expect_value(__wrap_add_label_to_list, label_source, RRDLABEL_SRC_K8S);    
         }
 
-        char *name = k8s_parse_resolved_name(&labels, data);
+        char *name = k8s_parse_resolved_name_and_labels(&labels, data);
 
         assert_string_equal(name, test_data[i].name);
         assert_ptr_equal(labels, 0xff);

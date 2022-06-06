@@ -111,7 +111,7 @@ int teardown_initialized_engine(void **state)
     struct engine *engine = *state;
 
     teardown_rrdhost();
-    buffer_free(engine->instance_root->labels);
+    buffer_free(engine->instance_root->labels_buffer);
     buffer_free(engine->instance_root->buffer);
     teardown_configured_engine(state);
 

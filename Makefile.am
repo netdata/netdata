@@ -1166,6 +1166,7 @@ if ENABLE_UNITTESTS
         $(EXPORTING_ENGINE_TEST_FILES) \
         $(EXPORTING_ENGINE_FILES) \
         $(LIBNETDATA_FILES) \
+        database/rrdlabels.c \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_CFLAGS = \
         $(AM_CFLAGS) \
