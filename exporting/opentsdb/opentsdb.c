@@ -127,10 +127,11 @@ int init_opentsdb_http_instance(struct instance *instance)
 void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
 {
     while (*src != '\0' && len) {
-        if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/' || IS_UTF8_BYTE(*src))
+        if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '.' || *src == '/' || IS_UTF8_BYTE(*src))
             *dst++ = *src;
         else
             *dst++ = '_';
+
         src++;
         len--;
     }
@@ -278,14 +279,6 @@ void opentsdb_http_prepare_header(struct instance *instance)
  * @return Always returns 0.
  */
 
-static void sanitize_opentsdb_json_escaped_value(char *dst, const char *src, size_t dst_len) {
-    char escaped_value[dst_len + 1]; // dst_len is already double the max
-
-    // really? we sanitize the value twice here?
-    sanitize_json_string(escaped_value, src, dst_len);
-    sanitize_opentsdb_label_value(dst, escaped_value, dst_len);
-}
-
 int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host) {
     if (!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024);
@@ -296,7 +289,7 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host) {
     buffer_strcat(instance->labels_buffer, ",");
     rrdlabels_to_buffer(host->host_labels, instance->labels_buffer, "", ":", "\"", ",",
                         exporting_labels_filter_callback, instance,
-                        NULL, sanitize_opentsdb_json_escaped_value);
+                        NULL, sanitize_opentsdb_label_value);
     return 0;
 }
 

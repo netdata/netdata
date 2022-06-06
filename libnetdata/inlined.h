@@ -235,17 +235,17 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
 
 static inline void sanitize_json_string(char *dst, const char *src, size_t dst_size) {
     while (*src != '\0' && dst_size > 1) {
-        if (*src == '\\' || *src == '\"' || *src < 0x1F) {
-            if (*src < 0x1F) {
-                *dst++ = '_';
-                src++;
-                dst_size--;
-            } else {
-                *dst++ = '\\';
-                *dst++ = *src++;
-                dst_size -= 2;
-            }
-        } else {
+        if (*src < 0x1F) {
+            *dst++ = '_';
+            src++;
+            dst_size--;
+        }
+        else if (*src == '\\' || *src == '\"') {
+            *dst++ = '\\';
+            *dst++ = *src++;
+            dst_size -= 2;
+        }
+        else {
             *dst++ = *src++;
             dst_size--;
         }
