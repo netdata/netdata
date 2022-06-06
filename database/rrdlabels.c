@@ -1062,9 +1062,49 @@ int rrdlabels_unittest_simple_pattern() {
     return errors;
 }
 
+int rrdlabels_unittest_sanitize_value(const char *src, const char *expected) {
+    char buf[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    size_t mblen = rrdlabels_sanitize_value(buf, src, RRDLABELS_MAX_VALUE_LENGTH);
+
+    int err = 0;
+    if(strcmp(buf, expected) != 0) err = 1;
+
+    fprintf(stderr, "%s(%s): %s, expected '%s', got '%s', mblen = %zu, bytes = %zu\n", __FUNCTION__, src, (err==1)?"FAILED":"OK", expected, buf, mblen, strlen(buf));
+    return err;
+}
+
+int rrdlabels_unittest_sanitization() {
+    int errors = 0;
+
+    errors += rrdlabels_unittest_sanitize_value("", "");
+    errors += rrdlabels_unittest_sanitize_value("1", "1");
+    errors += rrdlabels_unittest_sanitize_value("  hello   world   ", "hello_world");
+
+    // 2-byte UTF-8
+    errors += rrdlabels_unittest_sanitize_value(" Ελλάδα ", "Ελλάδα");
+    errors += rrdlabels_unittest_sanitize_value("aŰbŲcŴ", "aŰbŲcŴ");
+    errors += rrdlabels_unittest_sanitize_value("Ű b Ų c Ŵ", "Ű_b_Ų_c_Ŵ");
+
+    // 3-byte UTF-8
+    errors += rrdlabels_unittest_sanitize_value("‱", "‱");
+    errors += rrdlabels_unittest_sanitize_value("a‱b", "a‱b");
+    errors += rrdlabels_unittest_sanitize_value("a ‱ b", "a_‱_b");
+
+    // 4-byte UTF-8
+    errors += rrdlabels_unittest_sanitize_value("𩸽", "𩸽");
+    errors += rrdlabels_unittest_sanitize_value("a𩸽b", "a𩸽b");
+    errors += rrdlabels_unittest_sanitize_value("a 𩸽 b", "a_𩸽_b");
+
+    // mixed multi-byte
+    errors += rrdlabels_unittest_sanitize_value("Ű‱𩸽‱Ű", "Ű‱𩸽‱Ű");
+
+    return errors;
+}
+
 int rrdlabels_unittest(void) {
     int errors = 0;
 
+    errors += rrdlabels_unittest_sanitization();
     errors += rrdlabels_unittest_add_pairs();
     errors += rrdlabels_unittest_simple_pattern();
 
