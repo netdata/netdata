@@ -780,6 +780,7 @@ update_binpkg() {
 
   # shellcheck disable=SC2086
   env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata || fatal "Failed to update Netdata package." U000F
+  [ -n "${logfile}" ] && rm "${logfile}" && logfile=
 }
 
 # Simple function to encapsulate original updater behavior.
