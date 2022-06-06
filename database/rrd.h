@@ -3,6 +3,10 @@
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // forward typedefs
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
@@ -22,7 +26,6 @@ typedef void *ml_dimension_t;
 struct rrddim_volatile;
 struct rrdset_volatile;
 struct context_param;
-struct label;
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -177,66 +180,45 @@ typedef enum rrddim_flags {
 #define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_SEQ_CST)
 #define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
-typedef enum label_source {
-    LABEL_SOURCE_AUTO             = 0,
-    LABEL_SOURCE_NETDATA_CONF     = 1,
-    LABEL_SOURCE_DOCKER           = 2,
-    LABEL_SOURCE_ENVIRONMENT      = 3,
-    LABEL_SOURCE_KUBERNETES       = 4
-} LABEL_SOURCE;
+typedef enum rrdlabel_source {
+    RRDLABEL_SRC_AUTO   = (1 << 0), // set when Netdata found the label by some automation
+    RRDLABEL_SRC_CONFIG = (1 << 1), // set when the user configured the label
+    RRDLABEL_SRC_K8S    = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
+    RRDLABEL_SRC_ACLK   = (1 << 3), // set when this label is found from ACLK (RRDLABEL_SRC_AUTO should also be set)
 
-#define LABEL_FLAG_UPDATE_STREAM 1
-#define LABEL_FLAG_STOP_STREAM 2
+    // more sources can be added here
 
-struct label {
-    char *key, *value;
-    uint32_t key_hash;
-    LABEL_SOURCE label_source;
-    struct label *next;
-};
+    RRDLABEL_FLAG_OLD   = (1 << 30), // marks set for rrdlabels internal use - they are not exposed outside rrdlabels
+    RRDLABEL_FLAG_NEW   = (1 << 31)  //
+} RRDLABEL_SRC;
 
-struct label_index {
-    struct label *head;                     // Label list
-    netdata_rwlock_t labels_rwlock;         // lock for the label list
-    uint32_t labels_flag;                   // Flags for labels
-};
+extern DICTIONARY *rrdlabels_create(void);
+extern void rrdlabels_destroy(DICTIONARY *labels_dict);
+extern void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
+extern void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
+extern const char *rrdlabels_get(DICTIONARY *labels, const char *key);
 
-typedef enum strip_quotes {
-    DO_NOT_STRIP_QUOTES,
-    STRIP_QUOTES
-} STRIP_QUOTES_OPTION;
+extern void rrdlabels_unmark_all(DICTIONARY *labels);
+extern void rrdlabels_remove_all_unmarked(DICTIONARY *labels);
 
-typedef enum skip_escaped_characters {
-    DO_NOT_SKIP_ESCAPED_CHARACTERS,
-    SKIP_ESCAPED_CHARACTERS
-} SKIP_ESCAPED_CHARACTERS_OPTION;
+extern int rrdlabels_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
+extern int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
 
-char *translate_label_source(LABEL_SOURCE l);
-struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
-extern struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
-extern void update_label_list(struct label **labels, struct label *new_labels);
-extern void replace_label_list(struct label_index *labels, struct label *new_labels);
-extern int is_valid_label_value(char *value);
-extern int is_valid_label_key(char *key);
-extern void free_label_list(struct label *labels);
-extern struct label *label_list_lookup_key(struct label *head, char *key, uint32_t key_hash);
-extern struct label *label_list_lookup_keylist(struct label *head, char *keylist);
-extern int label_list_contains_keylist(struct label *head, char *keylist);
-extern int label_list_contains_key(struct label *head, char *key, uint32_t key_hash);
-extern int label_list_contains(struct label *head, struct label *check);
-extern struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri);
-extern void strip_last_symbol(
-    char *str,
-    char symbol,
-    SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters);
-extern char *strip_double_quotes(char *str, SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters);
+extern void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
+extern bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
+extern bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
+extern void rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
+
+extern void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
+extern void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
+
 void reload_host_labels(void);
-extern void rrdset_add_label_to_new_list(RRDSET *st, char *key, char *value, LABEL_SOURCE source);
-extern void rrdset_finalize_labels(RRDSET *st);
-extern void rrdset_update_labels(RRDSET *st, struct label *labels);
-extern int rrdset_contains_label_keylist(RRDSET *st, char *key);
-extern int rrdset_matches_label_keys(RRDSET *st, char *key, char *words[], uint32_t *hash_key_list, int *word_count, int size);
-extern struct label *rrdset_lookup_label_key(RRDSET *st, char *key, uint32_t key_hash);
+extern void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
+
+extern int rrdlabels_unittest(void);
+
+// unfortunately this break when defined in exporting_engine.h
+extern bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -402,8 +384,7 @@ struct rrdset_volatile {
     char *old_units;
     char *old_context;
     uuid_t hash_id;
-    struct label *new_labels;
-    struct label_index labels;
+    DICTIONARY *chart_labels;
     bool is_ar_chart;
 };
 
@@ -593,11 +574,14 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
     RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
     RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2, // delete the entire host when orphan
-    RRDHOST_FLAG_EXPORTING_SEND           = 1 << 3, // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND      = 1 << 4, // don't send it to external databases
+    RRDHOST_FLAG_EXPORTING_SEND         = 1 << 3, // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND    = 1 << 4, // don't send it to external databases
     RRDHOST_FLAG_ARCHIVED               = 1 << 5, // The host is archived, no collected charts yet
     RRDHOST_FLAG_MULTIHOST              = 1 << 6, // Host belongs to localhost/megadb
-    RRDHOST_FLAG_PENDING_FOREACH_ALARMS  = 1 << 7, // contains dims with uninitialized foreach alarms
+    RRDHOST_FLAG_PENDING_FOREACH_ALARMS = 1 << 7, // contains dims with uninitialized foreach alarms
+    RRDHOST_FLAG_STREAM_LABELS_UPDATE   = 1 << 8,
+    RRDHOST_FLAG_STREAM_LABELS_STOP     = 1 << 9,
+
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -859,7 +843,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
-    struct label_index labels;
+    DICTIONARY *host_labels;
 
     // ------------------------------------------------------------------------
     // indexes
@@ -1349,4 +1333,9 @@ extern void set_host_properties(
 #include "sqlite/sqlite_aclk_alert.h"
 #include "sqlite/sqlite_aclk_node.h"
 #include "sqlite/sqlite_health.h"
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* NETDATA_RRD_H */

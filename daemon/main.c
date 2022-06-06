@@ -898,6 +898,9 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "dicttest") == 0) {
                             return dictionary_unittest(10000);
                         }
+                        else if(strcmp(optarg, "rrdlabelstest") == 0) {
+                            return rrdlabels_unittest();
+                        }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);

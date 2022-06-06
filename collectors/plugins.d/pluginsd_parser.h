@@ -13,8 +13,8 @@ typedef struct parser_user_object {
     void    *opaque;
     struct plugind *cd;
     int trust_durations;
-    struct label *new_labels;
-    struct label *chart_labels;
+    DICTIONARY *new_host_labels;
+    DICTIONARY *new_chart_labels;
     size_t count;
     int enabled;
     uint8_t st_exists;
@@ -34,10 +34,10 @@ extern PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st,
                                           calculated_number value);
 extern PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name, char *algorithm,
                                            long multiplier, long divisor, char *options, RRD_ALGORITHM algorithm_type);
-extern PARSER_RC pluginsd_label_action(void *user, char *key, char *value, LABEL_SOURCE source);
-extern PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, struct label *new_labels);
-extern PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, struct label *new_labels);
-extern PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, LABEL_SOURCE source);
+extern PARSER_RC pluginsd_label_action(void *user, char *key, char *value, RRDLABEL_SRC source);
+extern PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, DICTIONARY *new_host_labels);
+extern PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, DICTIONARY *new_chart_labels);
+extern PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, RRDLABEL_SRC source);
 
 
 #endif //NETDATA_PLUGINSD_PARSER_H

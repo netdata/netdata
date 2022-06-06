@@ -7,7 +7,7 @@
 
 int init_graphite_instance(struct instance *instance);
 
-void sanitize_graphite_label_value(char *dst, char *src, size_t len);
+void sanitize_graphite_label_value(char *dst, const char *src, size_t len);
 int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *host);
 
 int format_dimension_collected_graphite_plaintext(struct instance *instance, RRDDIM *rd);

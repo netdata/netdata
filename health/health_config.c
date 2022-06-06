@@ -955,17 +955,17 @@ static int health_readfile(const char *filename, void *data) {
             }
             else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
                 alert_cfg->host_labels = strdupz(value);
-                if(rc->labels) {
-                    if(strcmp(rc->labels, value) != 0)
+                if(rc->host_labels) {
+                    if(strcmp(rc->host_labels, value) != 0)
                         error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'.",
                               line, filename, rc->name, key, value, value);
 
-                    freez(rc->labels);
-                    simple_pattern_free(rc->splabels);
+                    freez(rc->host_labels);
+                    simple_pattern_free(rc->host_labels_pattern);
                 }
 
-                rc->labels = simple_pattern_trim_around_equal(value);
-                rc->splabels = simple_pattern_create(rc->labels, NULL, SIMPLE_PATTERN_EXACT);
+                rc->host_labels = simple_pattern_trim_around_equal(value);
+                rc->host_labels_pattern = simple_pattern_create(rc->host_labels, NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
                 alert_cfg->plugin = strdupz(value);
@@ -1204,17 +1204,17 @@ static int health_readfile(const char *filename, void *data) {
             }
             else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
                 alert_cfg->host_labels = strdupz(value);
-                if(rt->labels) {
-                    if(strcmp(rt->labels, value) != 0)
+                if(rt->host_labels) {
+                    if(strcmp(rt->host_labels, value) != 0)
                         error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                              line, filename, rt->name, key, rt->labels, value, value);
+                              line, filename, rt->name, key, rt->host_labels, value, value);
 
-                    freez(rt->labels);
-                    simple_pattern_free(rt->splabels);
+                    freez(rt->host_labels);
+                    simple_pattern_free(rt->host_labels_pattern);
                 }
 
-                rt->labels = simple_pattern_trim_around_equal(value);
-                rt->splabels = simple_pattern_create(rt->labels, NULL, SIMPLE_PATTERN_EXACT);
+                rt->host_labels = simple_pattern_trim_around_equal(value);
+                rt->host_labels_pattern = simple_pattern_create(rt->host_labels, NULL, SIMPLE_PATTERN_EXACT);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",

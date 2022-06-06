@@ -45,13 +45,15 @@ void aclk_single_update_enable()
 }
 #endif /* ENABLE_ACLK */
 
-struct label *add_aclk_host_labels(struct label *label) {
+void add_aclk_host_labels(void) {
+    DICTIONARY *labels = localhost->host_labels;
+
 #ifdef ENABLE_ACLK
-    label = add_label_to_list(label, "_aclk_ng_available", "true", LABEL_SOURCE_AUTO);
+    rrdlabels_add(labels, "_aclk_ng_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
 #else
-    label = add_label_to_list(label, "_aclk_ng_available", "false", LABEL_SOURCE_AUTO);
+    rrdlabels_add(labels, "_aclk_ng_available", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
 #endif
-    label = add_label_to_list(label, "_aclk_legacy_available", "false", LABEL_SOURCE_AUTO);
+    rrdlabels_add(labels, "_aclk_legacy_available", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
 #ifdef ENABLE_ACLK
     ACLK_PROXY_TYPE aclk_proxy;
     char *proxy_str;
@@ -70,16 +72,16 @@ struct label *add_aclk_host_labels(struct label *label) {
     }
 
     int mqtt5 = config_get_boolean(CONFIG_SECTION_CLOUD, "mqtt5", CONFIG_BOOLEAN_NO);
-    label = add_label_to_list(label, "_mqtt_version", mqtt5 ? "5" : "3", LABEL_SOURCE_AUTO);
-    label = add_label_to_list(label, "_aclk_impl", "Next Generation", LABEL_SOURCE_AUTO);
-    label = add_label_to_list(label, "_aclk_proxy", proxy_str, LABEL_SOURCE_AUTO);
+    rrdlabels_add(labels, "_mqtt_version", mqtt5 ? "5" : "3", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_aclk_impl", "Next Generation", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_aclk_proxy", proxy_str, RRDLABEL_SRC_AUTO);
+
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    label = add_label_to_list(label, "_aclk_ng_new_cloud_protocol", "true", LABEL_SOURCE_AUTO);
+    rrdlabels_add(labels, "_aclk_ng_new_cloud_protocol", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
 #else
-    label = add_label_to_list(label, "_aclk_ng_new_cloud_protocol", "false", LABEL_SOURCE_AUTO);
+    rrdlabels_add(labels, "_aclk_ng_new_cloud_protocol", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
 #endif
 #endif
-    return label;
 }
 
 char *aclk_state(void) {

@@ -19,6 +19,21 @@ static int value_list_output(const char *name, void *entry, void *data) {
     return 0;
 }
 
+static int fill_formatted_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    (void)ls;
+    DICTIONARY *dict = (DICTIONARY *)data;
+    char n[RRD_ID_LENGTH_MAX * 2 + 2];
+    char output[RRD_ID_LENGTH_MAX * 2 + 8];
+    char v[RRD_ID_LENGTH_MAX * 2 + 1];
+
+    sanitize_json_string(v, (char *)value, RRD_ID_LENGTH_MAX * 2);
+    int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\", \"%s\"]", name, v);
+    snprintfz(n, RRD_ID_LENGTH_MAX * 2, "%s:%s", name, v);
+    dictionary_set(dict, n, output, len + 1);
+
+    return 1;
+}
+
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
     QUERY_PARAMS *rrdset_query_data)
 {
@@ -122,7 +137,6 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         char name[RRD_ID_LENGTH_MAX * 2 + 2];
         char output[RRD_ID_LENGTH_MAX * 2 + 8];
-        char value[RRD_ID_LENGTH_MAX * 2 + 1];
 
         struct value_output co = {.c = 0, .wb = wb};
 
@@ -153,19 +167,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
             st = rd->rrdset;
-            if (likely(st->state)) {
-                struct label_index *labels = &st->state->labels;
-                if (labels->head) {
-                    netdata_rwlock_rdlock(&labels->labels_rwlock);
-                    for (struct label *label = labels->head; label; label = label->next) {
-                        sanitize_json_string(value, label->value, RRD_ID_LENGTH_MAX * 2);
-                        int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\", \"%s\"]", label->key, value);
-                        snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", label->key, value);
-                        dictionary_set(dict, name, output, len + 1);
-                    }
-                    netdata_rwlock_unlock(&labels->labels_rwlock);
-                }
-            }
+            if (st->state && st->state->chart_labels)
+                rrdlabels_walkthrough_read(st->state->chart_labels, fill_formatted_callback, dict);
         }
         dictionary_walkthrough_read(dict, value_list_output, &co);
         dictionary_destroy(dict);
@@ -202,13 +205,13 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         if (chart_label_key) {
             buffer_sprintf(wb, "   %schart_labels%s: { ", kq, kq);
 
+            // TODO - This should either be pattern matching or list of keys
             SIMPLE_PATTERN *pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
             SIMPLE_PATTERN *original_pattern = pattern;
             char *label_key = NULL;
             int keys = 0;
             while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
-                uint32_t key_hash = simple_hash(label_key);
-                struct label *current_label;
+                const char *label_value;
 
                 if (keys)
                     buffer_strcat(wb, ", ");
@@ -223,10 +226,11 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                     if (i)
                         buffer_strcat(wb, ", ");
 
-                    current_label = rrdset_lookup_label_key(rd->rrdset, label_key, key_hash);
-                    if (current_label) {
+                    // TODO - this does not get all the values of each key
+                    label_value = rrdlabels_get(rd->rrdset->state->chart_labels, label_key);
+                    if (label_value) {
                         buffer_strcat(wb, sq);
-                        buffer_strcat(wb, current_label->value);
+                        buffer_strcat(wb, label_value);
                         buffer_strcat(wb, sq);
                     } else
                         buffer_strcat(wb, "null");

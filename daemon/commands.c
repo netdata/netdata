@@ -217,17 +217,7 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     reload_host_labels();
 
     BUFFER *wb = buffer_create(10);
-
-    rrdhost_rdlock(localhost);
-    netdata_rwlock_rdlock(&localhost->labels.labels_rwlock);
-    struct label *l = localhost->labels.head;
-    while (l != NULL) {
-        buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, l->value);
-        l = l->next;
-    }
-    netdata_rwlock_unlock(&localhost->labels.labels_rwlock);
-    rrdhost_unlock(localhost);
-
+    rrdlabels_log_to_buffer(localhost->host_labels, wb);
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);
 

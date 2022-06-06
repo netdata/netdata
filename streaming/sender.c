@@ -172,8 +172,8 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
 }
 
 static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
-    host->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
-    host->labels.labels_flag &= ~LABEL_FLAG_STOP_STREAM;
+    rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_STOP);
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
@@ -236,8 +236,8 @@ static inline long int parse_stream_version(RRDHOST *host, char *http)
             answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
             if (!answer) {
                 stream_version = 0;
-                host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
-                host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+                rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_LABELS_STOP);
+                rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
             }
             else {
                 stream_version = parse_stream_version_for_errors(http);

@@ -75,14 +75,11 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.ml_info.ml_capable = host->system_info->ml_capable;
     node_info.data.ml_info.ml_enabled = host->system_info->ml_enabled;
 
-    struct label_index *labels = &host->labels;
-    netdata_rwlock_rdlock(&labels->labels_rwlock);
-    node_info.data.host_labels_head = labels->head;
+    node_info.data.host_labels_ptr = host->host_labels;
 
     aclk_update_node_info(&node_info);
     log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, wc->host->hostname, wc->host_guid, wc->host == localhost ? "parent" : "child");
 
-    netdata_rwlock_unlock(&labels->labels_rwlock);
     rrd_unlock();
     freez(node_info.claim_id);
     freez(host_version);

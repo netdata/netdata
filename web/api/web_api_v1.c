@@ -392,6 +392,7 @@ void fix_google_param(char *s) {
     }
 }
 
+
 // returns the HTTP code
 inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
@@ -528,18 +529,23 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
         uint32_t context_hash = simple_hash(context);
 
+        SIMPLE_PATTERN *chart_label_key_pattern = NULL;
+        if(chart_label_key)
+            chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+        SIMPLE_PATTERN *chart_labels_filter_pattern = NULL;
+        if(chart_labels_filter)
+            chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
         rrdhost_rdlock(host);
-        char *words[MAX_CHART_LABELS_FILTER];
-        uint32_t hash_key_list[MAX_CHART_LABELS_FILTER];
-        int word_count = 0;
         rrdset_foreach_read(st1, host) {
             if (st1->hash_context == context_hash && !strcmp(st1->context, context) &&
-                (!chart_label_key || rrdset_contains_label_keylist(st1, chart_label_key)) &&
-                (!chart_labels_filter ||
-                 rrdset_matches_label_keys(st1, chart_labels_filter, words, hash_key_list, &word_count, MAX_CHART_LABELS_FILTER)))
+                (!chart_label_key_pattern || rrdlabels_match_simple_pattern_parsed(st1->state->chart_labels, chart_label_key_pattern, '=')) &&
+                (!chart_labels_filter_pattern || rrdlabels_match_simple_pattern_parsed(st1->state->chart_labels, chart_labels_filter_pattern, '=')))
                     build_context_param_list(owa, &context_param_list, st1);
         }
         rrdhost_unlock(host);
+
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
         else {
@@ -964,22 +970,7 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
         indentation--;
     }
 
-    int count = 0;
-    rrdhost_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
-    for (struct label *label = host->labels.head; label; label = label->next) {
-        if(count > 0) buffer_strcat(wb, ",\n");
-        buffer_strcat(wb, tabs);
-
-        char value[CONFIG_MAX_VALUE * 2 + 1];
-        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
-        buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, value);
-
-        count++;
-    }
-    buffer_strcat(wb, "\n");
-    netdata_rwlock_unlock(&host->labels.labels_rwlock);
-    rrdhost_unlock(host);
+    rrdlabels_to_buffer(host->host_labels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
 }
 
 extern int aclk_connected;

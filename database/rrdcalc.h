@@ -103,8 +103,8 @@ struct rrdcalc {
 
     // ------------------------------------------------------------------------
     // Labels settings
-    char *labels;                   // the label read from an alarm file
-    SIMPLE_PATTERN *splabels;       // the simple pattern of labels
+    char *host_labels;                   // the label read from an alarm file
+    SIMPLE_PATTERN *host_labels_pattern; // the simple pattern of labels
 
     // ------------------------------------------------------------------------
     // runtime information

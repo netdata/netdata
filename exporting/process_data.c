@@ -358,8 +358,8 @@ int flush_host_labels(struct instance *instance, RRDHOST *host)
 {
     (void)host;
 
-    if (instance->labels)
-        buffer_flush(instance->labels);
+    if (instance->labels_buffer)
+        buffer_flush(instance->labels_buffer);
 
     return 0;
 }
