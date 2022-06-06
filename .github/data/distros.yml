@@ -27,17 +27,24 @@ include:
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
 
-  - distro: almalinux
-    version: "8"
+  - &alma
+    distro: almalinux
+    version: "9"
     base_image: almalinux
     jsonc_removal: |
       dnf remove -y json-c-devel
-    packages:
+    packages: &alma_packages
       type: rpm
-      repo_distro: el/8
+      repo_distro: el/9
       arches:
         - amd64
         - arm64
+  - <<: *alma
+    version: "8"
+    packages:
+      <<: *alma_packages
+      repo_distro: el/8
+
   - distro: centos
     version: "7"
     packages:

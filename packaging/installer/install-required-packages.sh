@@ -660,6 +660,8 @@ declare -A pkg_autogen=(
   # exceptions
   ['centos-6']="WARNING|"
   ['rhel-6']="WARNING|"
+  ['centos-9']="NOTREQUIRED|"
+  ['rhel-9']="NOTREQUIRED|"
 )
 
 declare -A pkg_automake=(
@@ -1601,7 +1603,21 @@ validate_tree_centos() {
 
   echo >&2 " > CentOS Version: ${version} ..."
 
-  if [[ "${version}" =~ ^8(\..*)?$ ]]; then
+  if [[ "${version}" =~ ^9(\..*)?$ ]]; then
+    echo >&2 " > Checking for config-manager ..."
+    if ! run ${sudo} dnf config-manager --help; then
+      if prompt "config-manager not found, shall I install it?"; then
+        run ${sudo} dnf ${opts} install 'dnf-command(config-manager)'
+      fi
+    fi
+
+    echo >&2 " > Checking for CRB ..."
+    if ! run dnf ${sudo} repolist | grep CRB; then
+      if prompt "CRB not found, shall I install it?"; then
+        run ${sudo} dnf ${opts} config-manager --set-enabled crb
+      fi
+    fi
+  elif [[ "${version}" =~ ^8(\..*)?$ ]]; then
     echo >&2 " > Checking for config-manager ..."
     if ! run ${sudo} yum config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
