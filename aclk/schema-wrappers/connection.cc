@@ -61,8 +61,8 @@ struct disconnect_cmd *parse_disconnect_cmd(const char *data, size_t len) {
     res->permaban = req.permaban();
     res->error_code = req.error_code();
     if (req.error_description().c_str()) {
-        res->error_message = strdup(req.error_description().c_str());
-        if (!res->error_message) {
+        res->error_description = strdup(req.error_description().c_str());
+        if (!res->error_description) {
             free(res);
             return NULL;
         }

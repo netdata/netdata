@@ -3,8 +3,13 @@
 
 
 #if ENABLE_JSONC
-# include <json-c/json.h>
-#endif
+#include <json-c/json.h>
+// fix an older json-c bug
+// https://github.com/json-c/json-c/issues/135
+#ifdef error_description
+#undef error_description
+#endif // error_description
+#endif // ENABLE_JSONC
 
 #include "jsmn.h"
 
