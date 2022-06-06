@@ -34,7 +34,7 @@ for pkg in /usr/src/*.deb; do
   version="$(echo "${pkgname}" | cut -f 2 -d '_')"
   arch="$(echo "${pkgname}" | cut -f 3 -d '_')"
 
-  newname="$(dirname "${pkgname}")/${name}_${version}+${distid}_${arch}.deb"
+  newname="$(dirname "${pkg}")/${name}_${version}+${distid}_${arch}.deb"
   mv "${pkg}" "${newname}"
 done
 
