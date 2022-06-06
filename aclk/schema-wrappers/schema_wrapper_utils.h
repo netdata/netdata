@@ -3,10 +3,10 @@
 #ifndef SCHEMA_WRAPPER_UTILS_H
 #define SCHEMA_WRAPPER_UTILS_H
 
-#include "node_info.h"
-
 #include <sys/time.h>
 #include <google/protobuf/timestamp.pb.h>
+
+#include "database/rrd.h"
 
 #if GOOGLE_PROTOBUF_VERSION < 3001000
 #define PROTO_COMPAT_MSG_SIZE(msg) (size_t)msg.ByteSize();

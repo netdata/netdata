@@ -3,10 +3,6 @@
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // forward typedefs
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
@@ -1333,9 +1329,5 @@ extern void set_host_properties(
 #include "sqlite/sqlite_aclk_alert.h"
 #include "sqlite/sqlite_aclk_node.h"
 #include "sqlite/sqlite_health.h"
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* NETDATA_RRD_H */
