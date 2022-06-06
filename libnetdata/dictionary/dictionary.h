@@ -44,10 +44,9 @@ typedef enum dictionary_flags {
     DICTIONARY_FLAG_SINGLE_THREADED        = (1 << 0), // don't use any locks (default: use locks)
     DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE  = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
     DICTIONARY_FLAG_NAME_LINK_DONT_CLONE   = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
-    DICTIONARY_FLAG_WITH_STATISTICS        = (1 << 3), // maintain statistics about dictionary operations (default: disabled)
-    DICTIONARY_FLAG_DONT_OVERWRITE_VALUE   = (1 << 4), // don't overwrite values of dictionary items (default: overwrite)
-    DICTIONARY_FLAG_ADD_IN_FRONT           = (1 << 5), // add dictionary items at the front of the linked list (default: at the end)
-    DICTIONARY_FLAG_RESERVED1              = (1 << 6), // this is reserved for DICTIONARY_FLAG_REFERENCE_COUNTERS
+    DICTIONARY_FLAG_DONT_OVERWRITE_VALUE   = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
+    DICTIONARY_FLAG_ADD_IN_FRONT           = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
+    DICTIONARY_FLAG_RESERVED1              = (1 << 5), // this is reserved for DICTIONARY_FLAG_REFERENCE_COUNTERS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
@@ -126,6 +125,10 @@ extern int dictionary_del_unsafe(DICTIONARY *dict, const char *name);
 #define dictionary_walkthrough_write(dict, callback, data) dictionary_walkthrough_rw(dict, 'w', callback, data)
 extern int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *value, void *data), void *data);
 
+#define dictionary_sorted_walkthrough_read(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'r', callback, data)
+#define dictionary_sorted_walkthrough_write(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'w', callback, data)
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data);
+
 // Traverse with foreach
 //
 // Use like this:
@@ -184,6 +187,7 @@ extern size_t dictionary_stats_inserts(DICTIONARY *dict);
 extern size_t dictionary_stats_searches(DICTIONARY *dict);
 extern size_t dictionary_stats_deletes(DICTIONARY *dict);
 extern size_t dictionary_stats_resets(DICTIONARY *dict);
+extern size_t dictionary_stats_walkthroughs(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
 

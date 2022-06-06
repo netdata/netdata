@@ -776,7 +776,7 @@ struct cgroup {
 
     char *chart_title;
 
-    struct label *chart_labels;
+    DICTIONARY *chart_labels;
 
     struct cpuacct_stat cpuacct_stat;
     struct cpuacct_usage cpuacct_usage;
@@ -1735,33 +1735,23 @@ static inline void substitute_dots_in_id(char *s) {
     }
 }
 
-char *k8s_parse_resolved_name(struct label **labels, char *data) {
+// ----------------------------------------------------------------------------
+// parse k8s labels
+
+static char *k8s_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
+    // the first word, up to the first space is the name
     char *name = mystrsep(&data, " ");
-    
-    if (!data) {
-        return name;
-    }
 
-    while (data) {
-        char *key = mystrsep(&data, "=");
-
-        char *value;
-        if (data && *data == ',') {
-            value = "";
-            *data++ = '\0';
-        } else {
-            value = mystrsep(&data, ",");
-        }
-        value = strip_double_quotes(value, 1);
-
-        if (!key || *key == '\0' || !value || *value == '\0')
-            continue;
-
-        *labels = add_label_to_list(*labels, key, value, LABEL_SOURCE_KUBERNETES);
+    // the rest are key=value pairs separated by comma
+    while(data) {
+        char *pair = mystrsep(&data, ",");
+        rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_AUTO| RRDLABEL_SRC_K8S);
     }
 
     return name;
 }
+
+// ----------------------------------------------------------------------------
 
 static inline void free_pressure(struct pressure *res) {
     if (res->some.share_time.st)   rrdset_is_obsolete(res->some.share_time.st);
@@ -1834,7 +1824,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->chart_id);
     freez(cg->chart_title);
 
-    free_label_list(cg->chart_labels);
+    rrdlabels_destroy(cg->chart_labels);
 
     freez(cg);
 
@@ -1870,31 +1860,33 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
         case 0:
             cg->pending_renames = 0;
             break;
+
         case 3:
             cg->pending_renames = 0;
             cg->processed = 1;
             break;
     }
 
-    if (cg->pending_renames || cg->processed) {
-        return;
-    }
-    if (!(new_name && *new_name && *new_name != '\n')) {
-        return;
-    }
-    new_name = trim(new_name);
-    if (!(new_name)) {
-        return;
-    }
+    if(cg->pending_renames || cg->processed) return;
+    if(!new_name || !*new_name || *new_name == '\n') return;
+    if(!(new_name = trim(new_name))) return;
+
     char *name = new_name;
     if (!strncmp(new_name, "k8s_", 4)) {
-        free_label_list(cg->chart_labels);
-        name = k8s_parse_resolved_name(&cg->chart_labels, new_name);
+        if(!cg->chart_labels) cg->chart_labels = rrdlabels_create();
+
+        // read the new labels and remove the obsolete ones
+        rrdlabels_unmark_all(cg->chart_labels);
+        name = k8s_parse_resolved_name_and_labels(cg->chart_labels, new_name);
+        rrdlabels_remove_all_unmarked(cg->chart_labels);
     }
+
     freez(cg->chart_title);
     cg->chart_title = cgroup_title_strdupz(name);
+
     freez(cg->chart_id);
     cg->chart_id = cgroup_chart_id_strdupz(name);
+
     substitute_dots_in_id(cg->chart_id);
     cg->hash_chart = simple_hash(cg->chart_id);
 }
@@ -3782,7 +3774,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_STACKED
                 );
 
-                rrdset_update_labels(cg->st_cpu, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_cpu, cg->chart_labels);
 
                 if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
@@ -3855,7 +3847,7 @@ void update_cgroup_charts(int update_every) {
                                     , RRDSET_TYPE_LINE
                             );
 
-                            rrdset_update_labels(cg->st_cpu_limit, cg->chart_labels);
+                            rrdset_update_rrdlabels(cg->st_cpu_limit, cg->chart_labels);
 
                             if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED))
                                 rrddim_add(cg->st_cpu_limit, "used", NULL, 1, system_hz, RRD_ALGORITHM_ABSOLUTE);
@@ -3908,7 +3900,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_update_labels(cg->st_cpu_nr_throttled, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_cpu_nr_throttled, cg->chart_labels);
                 rrddim_add(cg->st_cpu_nr_throttled, "throttled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(cg->st_cpu_nr_throttled);
@@ -3934,7 +3926,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_update_labels(cg->st_cpu_throttled_time, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_cpu_throttled_time, cg->chart_labels);
                 rrddim_add(cg->st_cpu_throttled_time, "duration", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
             } else {
                 rrdset_next(cg->st_cpu_throttled_time);
@@ -3962,7 +3954,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_update_labels(cg->st_cpu_shares, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_cpu_shares, cg->chart_labels);
                 rrddim_add(cg->st_cpu_shares, "shares", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(cg->st_cpu_shares);
@@ -3993,7 +3985,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_STACKED
                 );
 
-                rrdset_update_labels(cg->st_cpu_per_core, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_cpu_per_core, cg->chart_labels);
 
                 for(i = 0; i < cg->cpuacct_usage.cpus; i++) {
                     snprintfz(id, RRD_ID_LENGTH_MAX, "cpu%u", i);
@@ -4028,8 +4020,8 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
-                
-                rrdset_update_labels(cg->st_mem, cg->chart_labels);
+
+                rrdset_update_rrdlabels(cg->st_mem, cg->chart_labels);
 
                 if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     rrddim_add(cg->st_mem, "cache", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -4089,7 +4081,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_AREA
                 );
 
-                rrdset_update_labels(cg->st_writeback, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_writeback, cg->chart_labels);
 
                 if(cg->memory.detailed_has_dirty)
                     rrddim_add(cg->st_writeback, "dirty", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -4124,7 +4116,7 @@ void update_cgroup_charts(int update_every) {
                             , RRDSET_TYPE_LINE
                     );
 
-                    rrdset_update_labels(cg->st_mem_activity, cg->chart_labels);
+                    rrdset_update_rrdlabels(cg->st_mem_activity, cg->chart_labels);
 
                     rrddim_add(cg->st_mem_activity, "pgpgin", "in", system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(cg->st_mem_activity, "pgpgout", "out", -system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -4155,7 +4147,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_update_labels(cg->st_pgfaults, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_pgfaults, cg->chart_labels);
 
                 rrddim_add(cg->st_pgfaults, "pgfault", NULL, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_add(cg->st_pgfaults, "pgmajfault", "swap", -system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -4187,7 +4179,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_STACKED
                 );
 
-                rrdset_update_labels(cg->st_mem_usage, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_mem_usage, cg->chart_labels);
 
                 rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -4254,7 +4246,7 @@ void update_cgroup_charts(int update_every) {
                                 , RRDSET_TYPE_STACKED
                         );
 
-                        rrdset_update_labels(cg->st_mem_usage_limit, cg->chart_labels);
+                        rrdset_update_rrdlabels(cg->st_mem_usage_limit, cg->chart_labels);
 
                         rrddim_add(cg->st_mem_usage_limit, "available", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(cg->st_mem_usage_limit, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -4286,7 +4278,7 @@ void update_cgroup_charts(int update_every) {
                                 , RRDSET_TYPE_AREA
                         );
 
-                        rrdset_update_labels(cg->st_mem_utilization, cg->chart_labels);
+                        rrdset_update_rrdlabels(cg->st_mem_utilization, cg->chart_labels);
 
                         rrddim_add(cg->st_mem_utilization, "utilization", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     } else
@@ -4334,8 +4326,8 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-                
-                rrdset_update_labels(cg->st_mem_failcnt, cg->chart_labels);
+
+                rrdset_update_rrdlabels(cg->st_mem_failcnt, cg->chart_labels);
 
                 rrddim_add(cg->st_mem_failcnt, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
@@ -4365,7 +4357,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_AREA
                 );
 
-                rrdset_update_labels(cg->st_io, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_io, cg->chart_labels);
 
                 rrddim_add(cg->st_io, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_add(cg->st_io, "write", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -4397,7 +4389,7 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_update_labels(cg->st_serviced_ops, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_serviced_ops, cg->chart_labels);
 
                 rrddim_add(cg->st_serviced_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_add(cg->st_serviced_ops, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -4428,8 +4420,8 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
-                
-                rrdset_update_labels(cg->st_throttle_io, cg->chart_labels);
+
+                rrdset_update_rrdlabels(cg->st_throttle_io, cg->chart_labels);
 
                 rrddim_add(cg->st_throttle_io, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_add(cg->st_throttle_io, "write", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -4460,8 +4452,8 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-                
-                rrdset_update_labels(cg->st_throttle_serviced_ops, cg->chart_labels);
+
+                rrdset_update_rrdlabels(cg->st_throttle_serviced_ops, cg->chart_labels);
 
                 rrddim_add(cg->st_throttle_serviced_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_add(cg->st_throttle_serviced_ops, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -4492,8 +4484,8 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-                
-                rrdset_update_labels(cg->st_queued_ops, cg->chart_labels);
+
+                rrdset_update_rrdlabels(cg->st_queued_ops, cg->chart_labels);
 
                 rrddim_add(cg->st_queued_ops, "read", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_add(cg->st_queued_ops, "write", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -4524,8 +4516,8 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-                
-                rrdset_update_labels(cg->st_merged_ops, cg->chart_labels);
+
+                rrdset_update_rrdlabels(cg->st_merged_ops, cg->chart_labels);
 
                 rrddim_add(cg->st_merged_ops, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_add(cg->st_merged_ops, "write", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -4562,7 +4554,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->share_time.st, cg->chart_labels);
                     pcs->share_time.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -4586,7 +4578,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
                     pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else {
                     rrdset_next(pcs->total_time.st);
@@ -4614,7 +4606,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->share_time.st, cg->chart_labels);
                     pcs->share_time.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -4638,7 +4630,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
                     pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else {
                     rrdset_next(pcs->total_time.st);
@@ -4668,8 +4660,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 2300
                         , update_every
                         , RRDSET_TYPE_LINE
-                        );         
-                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                        );
+                    rrdset_update_rrdlabels(chart = pcs->share_time.st, cg->chart_labels);
                     pcs->share_time.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -4693,7 +4685,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
                     pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else {
                     rrdset_next(pcs->total_time.st);
@@ -4723,8 +4715,8 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                         );
-                        
-                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+
+                    rrdset_update_rrdlabels(chart = pcs->share_time.st, cg->chart_labels);
                     pcs->share_time.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -4748,7 +4740,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
                     pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else {
                     rrdset_next(pcs->total_time.st);
@@ -4779,7 +4771,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                         );
-                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->share_time.st, cg->chart_labels);
                     pcs->share_time.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -4803,7 +4795,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
                     pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else {
                     rrdset_next(pcs->total_time.st);
@@ -4832,7 +4824,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                         );
-                    rrdset_update_labels(chart = pcs->share_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->share_time.st, cg->chart_labels);
                     pcs->share_time.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -4856,7 +4848,7 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_LINE
                     );
-                    rrdset_update_labels(chart = pcs->total_time.st, cg->chart_labels);
+                    rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
                     pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else {
                     rrdset_next(pcs->total_time.st);

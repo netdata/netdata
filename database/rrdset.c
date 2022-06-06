@@ -387,7 +387,6 @@ void rrdset_free(RRDSET *st) {
     // free it
 
     netdata_rwlock_destroy(&st->rrdset_rwlock);
-    netdata_rwlock_destroy(&st->state->labels.labels_rwlock);
 
     // free directly allocated members
     freez((void *)st->name);
@@ -402,7 +401,7 @@ void rrdset_free(RRDSET *st) {
     freez(st->state->old_title);
     freez(st->state->old_units);
     freez(st->state->old_context);
-    free_label_list(st->state->labels.head);
+    rrdlabels_destroy(st->state->chart_labels);
     freez(st->state);
     freez(st->chart_uuid);
 
@@ -888,7 +887,7 @@ RRDSET *rrdset_create_custom(
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
-    netdata_rwlock_init(&st->state->labels.labels_rwlock);
+    st->state->chart_labels = rrdlabels_create();
 
     if(name && *name && rrdset_set_name(st, name))
         // we did set the name
@@ -1958,102 +1957,19 @@ after_second_database_work:
     netdata_thread_enable_cancelability();
 }
 
-void rrdset_add_label_to_new_list(RRDSET *st, char *key, char *value, LABEL_SOURCE source)
-{
-    st->state->new_labels = add_label_to_list(st->state->new_labels, key, value, source);
+static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    RRDSET *st = (RRDSET *)data;
+    sql_store_chart_label(st->chart_uuid, (int)ls, (char *)name, (char *)value);
+    return 1;
 }
 
-void rrdset_finalize_labels(RRDSET *st)
-{
-    struct label *new_labels = st->state->new_labels;
-    struct label_index *labels = &st->state->labels;
+void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
+    if(!st->state->chart_labels)
+        st->state->chart_labels = rrdlabels_create();
 
-    if (!labels->head) {
-        labels->head = new_labels;
-    } else {
-        replace_label_list(labels, new_labels);
-    }
+    if (new_rrdlabels)
+        rrdlabels_migrate_to_these(st->state->chart_labels, new_rrdlabels);
 
-    netdata_rwlock_rdlock(&labels->labels_rwlock);
-    struct label *lbl = labels->head;
-    while (lbl) {
-        sql_store_chart_label(st->chart_uuid, (int)lbl->label_source, lbl->key, lbl->value);
-        lbl = lbl->next;
-    }
-    netdata_rwlock_unlock(&labels->labels_rwlock);
-
-    st->state->new_labels = NULL;
-}
-
-void rrdset_update_labels(RRDSET *st, struct label *labels)
-{
-    if (!labels)
-        return;
-
-    update_label_list(&st->state->new_labels, labels);
-    rrdset_finalize_labels(st);
-}
-
-int rrdset_contains_label_keylist(RRDSET *st, char *keylist)
-{
-    struct label_index *labels = &st->state->labels;
-    int ret;
-
-    if (!labels->head)
-        return 0;
-
-    netdata_rwlock_rdlock(&labels->labels_rwlock);
-    ret = label_list_contains_keylist(labels->head, keylist);
-    netdata_rwlock_unlock(&labels->labels_rwlock);
-
-    return ret;
-}
-
-struct label *rrdset_lookup_label_key(RRDSET *st, char *key, uint32_t key_hash)
-{
-    struct label_index *labels = &st->state->labels;
-    struct label *ret = NULL;
-
-    if (labels->head) {
-        netdata_rwlock_rdlock(&labels->labels_rwlock);
-        ret = label_list_lookup_key(labels->head, key, key_hash);
-        netdata_rwlock_unlock(&labels->labels_rwlock);
-    }
-    return ret;
-}
-
-static inline int k8s_space(char c) {
-    switch(c) {
-        case ':':
-        case ',':
-            return 1;
-        default:
-            return 0;
-    }
-}
-
-int rrdset_matches_label_keys(RRDSET *st, char *keylist, char *words[], uint32_t *hash_key_list, int *word_count, int size)
-{
-    struct label_index *labels = &st->state->labels;
-
-    if (!labels->head)
-        return 0;
-
-    struct label *one_label;
-
-    if (!*word_count) {
-        *word_count = quoted_strings_splitter(keylist, words, size, k8s_space, NULL, NULL, 0);
-        for (int i = 0; i < *word_count - 1; i += 2) {
-            hash_key_list[i] = simple_hash(words[i]);
-        }
-    }
-
-    int ret = 1;
-    netdata_rwlock_rdlock(&labels->labels_rwlock);
-    for (int i = 0; ret && i < *word_count - 1; i += 2) {
-        one_label = label_list_lookup_key(labels->head, words[i], hash_key_list[i]);
-        ret = (one_label && !strcmp(one_label->value, words[i + 1]));
-    }
-    netdata_rwlock_unlock(&labels->labels_rwlock);
-    return ret;
+    // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
+    rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, st);
 }

@@ -290,35 +290,44 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
  * @param instance an instance data structure.
  * @param host a data collecting host.
  */
+
+struct format_prometheus_label_callback {
+    struct instance *instance;
+    size_t count;
+};
+
+static int format_prometheus_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    struct format_prometheus_label_callback *d = (struct format_prometheus_label_callback *)data;
+
+    if (!should_send_label(d->instance, ls)) return 0;
+
+    char k[PROMETHEUS_ELEMENT_MAX + 1];
+    char v[PROMETHEUS_ELEMENT_MAX + 1];
+
+    prometheus_name_copy(k, name, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(v, value, PROMETHEUS_ELEMENT_MAX);
+
+    if (*k && *v) {
+        if (d->count > 0) buffer_strcat(d->instance->labels_buffer, ",");
+        buffer_sprintf(d->instance->labels_buffer, "%s=\"%s\"", k, v);
+        d->count++;
+    }
+    return 1;
+}
+
 void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
 {
     if (unlikely(!sending_labels_configured(instance)))
         return;
 
-    if (!instance->labels)
-        instance->labels = buffer_create(1024);
+    if (!instance->labels_buffer)
+        instance->labels_buffer = buffer_create(1024);
 
-    int count = 0;
-    rrdhost_check_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
-    for (struct label *label = host->labels.head; label; label = label->next) {
-        if (!should_send_label(instance, label))
-            continue;
-
-        char key[PROMETHEUS_ELEMENT_MAX + 1];
-        char value[PROMETHEUS_ELEMENT_MAX + 1];
-
-        prometheus_name_copy(key, label->key, PROMETHEUS_ELEMENT_MAX);
-        prometheus_label_copy(value, label->value, PROMETHEUS_ELEMENT_MAX);
-
-        if (*key && *value) {
-            if (count > 0)
-                buffer_strcat(instance->labels, ",");
-            buffer_sprintf(instance->labels, "%s=\"%s\"", key, value);
-            count++;
-        }
-    }
-    netdata_rwlock_unlock(&host->labels.labels_rwlock);
+    struct format_prometheus_label_callback tmp = {
+        .instance = instance,
+        .count = 0
+    };
+    rrdlabels_walkthrough_read(host->host_labels, format_prometheus_label_callback, &tmp);
 }
 
 struct host_variables_callback_options {
@@ -534,13 +543,13 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if (allhosts) {
-        if (instance->labels && buffer_tostring(instance->labels)) {
+        if (instance->labels_buffer && buffer_tostring(instance->labels_buffer)) {
             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
                 buffer_sprintf(
                     wb,
                     "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n",
                     hostname,
-                    buffer_tostring(instance->labels),
+                    buffer_tostring(instance->labels_buffer),
                     now_realtime_usec() / USEC_PER_MS);
 
                 // deprecated, exists only for compatibility with older queries
@@ -548,45 +557,45 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     wb,
                     "netdata_host_tags{instance=\"%s\",%s} 1 %llu\n",
                     hostname,
-                    buffer_tostring(instance->labels),
+                    buffer_tostring(instance->labels_buffer),
                     now_realtime_usec() / USEC_PER_MS);
             } else {
                 buffer_sprintf(
-                    wb, "netdata_host_tags_info{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels));
+                    wb, "netdata_host_tags_info{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels_buffer));
 
                 // deprecated, exists only for compatibility with older queries
                 buffer_sprintf(
-                    wb, "netdata_host_tags{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels));
+                    wb, "netdata_host_tags{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels_buffer));
             }
         }
 
         snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
     } else {
-        if (instance->labels && buffer_tostring(instance->labels)) {
+        if (instance->labels_buffer && buffer_tostring(instance->labels_buffer)) {
             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
                 buffer_sprintf(
                     wb,
                     "netdata_host_tags_info{%s} 1 %llu\n",
-                    buffer_tostring(instance->labels),
+                    buffer_tostring(instance->labels_buffer),
                     now_realtime_usec() / USEC_PER_MS);
 
                 // deprecated, exists only for compatibility with older queries
                 buffer_sprintf(
                     wb,
                     "netdata_host_tags{%s} 1 %llu\n",
-                    buffer_tostring(instance->labels),
+                    buffer_tostring(instance->labels_buffer),
                     now_realtime_usec() / USEC_PER_MS);
             } else {
-                buffer_sprintf(wb, "netdata_host_tags_info{%s} 1\n", buffer_tostring(instance->labels));
+                buffer_sprintf(wb, "netdata_host_tags_info{%s} 1\n", buffer_tostring(instance->labels_buffer));
 
                 // deprecated, exists only for compatibility with older queries
-                buffer_sprintf(wb, "netdata_host_tags{%s} 1\n", buffer_tostring(instance->labels));
+                buffer_sprintf(wb, "netdata_host_tags{%s} 1\n", buffer_tostring(instance->labels_buffer));
             }
         }
     }
 
-    if (instance->labels)
-        buffer_flush(instance->labels);
+    if (instance->labels_buffer)
+        buffer_flush(instance->labels_buffer);
 
     // send custom variables set for the host
     if (output_options & PROMETHEUS_OUTPUT_VARIABLES) {

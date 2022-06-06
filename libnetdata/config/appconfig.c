@@ -805,6 +805,18 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
     struct section *co;
     struct config_option *cv;
 
+    {
+        int found_host_labels = 0;
+        for (co = root->first_section; co; co = co->next)
+            if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))
+                found_host_labels = 1;
+
+        if(!found_host_labels) {
+            appconfig_section_create(root, CONFIG_SECTION_HOST_LABEL);
+            appconfig_get(root, CONFIG_SECTION_HOST_LABEL, "name", "value");
+        }
+    }
+
     buffer_strcat(wb,
                   "# netdata configuration\n"
                   "#\n"

@@ -109,49 +109,21 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     health_alarm_log(host, ae);
 }
 
-static inline int rrdcalc_test_additional_restriction(RRDCALC *rc, RRDSET *st){
-    if (rc->module_match && !simple_pattern_matches(rc->module_pattern, st->module_name))
+static int rrdcalc_is_matching_rrdset(RRDCALC *rc, RRDSET *st) {
+    if((rc->hash_chart != st->hash || strcmp(rc->chart, st->id) != 0) &&
+        (rc->hash_chart != st->hash_name || strcmp(rc->chart, st->name) != 0))
         return 0;
 
-    if (rc->plugin_match && !simple_pattern_matches(rc->plugin_pattern, st->plugin_name))
+    if (rc->module_pattern && !simple_pattern_matches(rc->module_pattern, st->module_name))
         return 0;
 
-    if (rc->labels) {
-        int labels_count=1;
-        int labels_match=0;
-        char *s = rc->labels;
-        while (*s) {
-            if (*s==' ')
-                labels_count++;
-            s++;
-        }
-        RRDHOST *host = st->rrdhost;
-        char cmp[CONFIG_FILE_LINE_MAX+1];
-        struct label *move = host->labels.head;
-        while(move) {
-            snprintf(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);
-            if (simple_pattern_matches(rc->splabels, move->key) ||
-                simple_pattern_matches(rc->splabels, cmp)) {
-                labels_match++;
-            }
-            move = move->next;
-        }
+    if (rc->plugin_pattern && !simple_pattern_matches(rc->plugin_pattern, st->plugin_name))
+        return 0;
 
-        if (labels_match != labels_count)
-            return 0;
-    }
+    if (st->rrdhost->host_labels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdhost->host_labels, rc->host_labels_pattern, '='))
+        return 0;
 
     return 1;
-}
-
-static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
-    if(((rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
-        (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name))) &&
-        rrdcalc_test_additional_restriction(rc, st)) {
-            return 1;
-    }
-
-    return 0;
 }
 
 // this has to be called while the RRDHOST is locked
@@ -164,7 +136,7 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
         if(unlikely(rc->rrdset))
             continue;
 
-        if(unlikely(rrdcalc_is_matching_this_rrdset(rc, st)))
+        if(unlikely(rrdcalc_is_matching_rrdset(rc, st)))
             rrdsetcalc_link(st, rc);
     }
 }
@@ -382,7 +354,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
         // link it to its chart
         RRDSET *st;
         rrdset_foreach_read(st, host) {
-            if(rrdcalc_is_matching_this_rrdset(rc, st)) {
+            if(rrdcalc_is_matching_rrdset(rc, st)) {
                 rrdsetcalc_link(st, rc);
                 break;
             }
@@ -612,8 +584,8 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->component);
     freez(rc->type);
     simple_pattern_free(rc->spdim);
-    freez(rc->labels);
-    simple_pattern_free(rc->splabels);
+    freez(rc->host_labels);
+    simple_pattern_free(rc->host_labels_pattern);
     freez(rc->module_match);
     simple_pattern_free(rc->module_pattern);
     freez(rc->plugin_match);
@@ -681,51 +653,26 @@ void rrdcalc_foreach_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
 }
 
 static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
-    RRDCALC *rc = alarms;
-    while (rc) {
-        if (!rc->labels) {
-            rc = rc->next;
-            continue;
-        }
+    for(RRDCALC *rc = alarms ; rc ; rc = rc->next ) {
+        if (!rc->host_labels) continue;
 
-        char cmp[CONFIG_FILE_LINE_MAX+1];
-        struct label *move = host->labels.head;
-        while(move) {
-            snprintf(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);
-            if (simple_pattern_matches(rc->splabels, move->key) ||
-                simple_pattern_matches(rc->splabels, cmp)) {
-                break;
-            }
-
-            move = move->next;
-        }
-
-        RRDCALC *next = rc->next;
-        if(!move) {
+        if(!rrdlabels_match_simple_pattern_parsed(host->host_labels, rc->host_labels_pattern, '=')) {
             info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                  rc->name,
                  host->hostname,
-                 rc->labels);
+                 rc->host_labels);
 
-            if(host->alarms == alarms) {
+            if(host->alarms == alarms)
                 rrdcalc_unlink_and_free(host, rc);
-            } else
+            else
                 rrdcalc_foreach_unlink_and_free(host, rc);
-
         }
-
-        rc = next;
     }
 }
 
 void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
-    rrdhost_check_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
-
     rrdcalc_labels_unlink_alarm_loop(host, host->alarms);
     rrdcalc_labels_unlink_alarm_loop(host, host->alarms_with_foreach);
-
-    netdata_rwlock_unlock(&host->labels.labels_rwlock);
 }
 
 void rrdcalc_labels_unlink() {
@@ -736,7 +683,7 @@ void rrdcalc_labels_unlink() {
         if (unlikely(!host->health_enabled))
             continue;
 
-        if (host->labels.head) {
+        if (host->host_labels) {
             rrdhost_wrlock(host);
 
             rrdcalc_labels_unlink_alarm_from_host(host);

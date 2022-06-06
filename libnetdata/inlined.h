@@ -233,21 +233,21 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
     return p;
 }
 
-static inline void sanitize_json_string(char *dst, char *src, size_t len) {
-    while (*src != '\0' && len > 1) {
+static inline void sanitize_json_string(char *dst, const char *src, size_t dst_size) {
+    while (*src != '\0' && dst_size > 1) {
         if (*src == '\\' || *src == '\"' || *src < 0x1F) {
             if (*src < 0x1F) {
                 *dst++ = '_';
                 src++;
-                len--;
+                dst_size--;
             } else {
                 *dst++ = '\\';
                 *dst++ = *src++;
-                len -= 2;
+                dst_size -= 2;
             }
         } else {
             *dst++ = *src++;
-            len--;
+            dst_size--;
         }
     }
     *dst = '\0';

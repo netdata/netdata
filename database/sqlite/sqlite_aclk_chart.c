@@ -158,16 +158,8 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         chart_payload.claim_id = claim_id;
         chart_payload.id = strdupz(st->id);
 
-        struct label_index *labels = &st->state->labels;
-        netdata_rwlock_rdlock(&labels->labels_rwlock);
-        struct label *label_list = labels->head;
-        struct label *chart_label = NULL;
-        while (label_list) {
-            chart_label = add_label_to_list(chart_label, label_list->key, label_list->value, label_list->label_source);
-            label_list = label_list->next;
-        }
-        netdata_rwlock_unlock(&labels->labels_rwlock);
-        chart_payload.label_head = chart_label;
+        chart_payload.chart_labels = rrdlabels_create();
+        rrdlabels_copy(chart_payload.chart_labels, st->state->chart_labels);
 
         size_t size;
         char *payload = generate_chart_instance_updated(&size, &chart_payload);
