@@ -180,11 +180,11 @@ The command line options of the Netdata 1.10.0 version are the following:
   -W set section option value
                            set netdata.conf option from the command line.
 
-  -W buildinfo             Print print it's version, the configure options, 
+  -W buildinfo             Print it's version, the configure options, 
                            and a list of optional features and whether they 
                            are enabled or not in human readable form.
 
-  -W buildinfojson         Print print it's version, the configure options, 
+  -W buildinfojson         Print it's version, the configure options, 
                            and a list of optional features and whether they 
                            are enabled or not in json format.
   
