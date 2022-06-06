@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# Extract distro info from /etc/os-release
+DISTVERS="$(awk -F'"' '/VERSION_ID=/ {print $2}' /etc/os-release)"
+DISTNAME="$(awk -F'=' '/^ID=/ {print $2}' /etc/os-release)"
+
 # Needed because dpkg is stupid and tries to configure things interactively if it sees a terminal.
 export DEBIAN_FRONTEND=noninteractive
 
@@ -20,6 +24,19 @@ if dpkg-buildpackage --help | grep "\-\-post\-clean" 2> /dev/null > /dev/null; t
 else
   dpkg-buildpackage -b -us -uc || exit 1
 fi
+
+# Embed distro info in package name.
+# This is required to make the repo actually standards compliant wthout packageclouds hacks.
+distid="${DISTNAME}${DISTVERS}"
+for pkg in /usr/src/*.deb; do
+  pkgname="$(basename "${pkg}" .deb)"
+  name="$(echo "${pkgname}" | cut -f 1 -d '_')"
+  version="$(echo "${pkgname}" | cut -f 2 -d '_')"
+  arch="$(echo "${pkgname}" | cut -f 3 -d '_')"
+
+  newname="$(dirname "${pkgname}")/${name}_${version}+${distid}_${arch}.deb"
+  mv "${pkg}" "${newname}"
+done
 
 # Copy the built packages to /netdata/artifacts (which may be bind-mounted)
 # Also ensure /netdata/artifacts exists and create it if it doesn't

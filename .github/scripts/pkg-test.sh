@@ -7,7 +7,7 @@ install_debian_like() {
   apt-get update
 
   # Install Netdata
-  apt-get install -y /netdata/artifacts/netdata_"${VERSION}"_*.deb || exit 1
+  apt-get install -y /netdata/artifacts/netdata_"${VERSION}"*_*.deb || exit 1
 
   # Install testing tools
   apt-get install -y --no-install-recommends curl netcat jq || exit 1
