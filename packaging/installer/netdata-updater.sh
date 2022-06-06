@@ -764,22 +764,22 @@ update_binpkg() {
 
   if [ -n "${repo_subcmd}" ]; then
     # shellcheck disable=SC2086
-    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata." U000C
+    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000C
   fi
 
   for repopkg in netdata-repo netdata-repo-edge; do
     if ${pkg_installed_check} ${repopkg} > /dev/null 2>&1; then
       # shellcheck disable=SC2086
-      env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} ${repopkg} || fatal "Failed to update Netdata repository config." U000D
+      env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} ${repopkg} >&3 2>&3 || fatal "Failed to update Netdata repository config." U000D
       # shellcheck disable=SC2086
       if [ -n "${repo_subcmd}" ]; then
-        env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata." U000E
+        env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000E
       fi
     fi
   done
 
   # shellcheck disable=SC2086
-  env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata || fatal "Failed to update Netdata package." U000F
+  env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
   [ -n "${logfile}" ] && rm "${logfile}" && logfile=
 }
 
