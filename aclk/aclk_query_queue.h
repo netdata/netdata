@@ -77,8 +77,6 @@ struct aclk_query {
         struct aclk_query_metadata metadata_alarms;
         struct aclk_query_http_api_v2 http_api_v2;
         struct aclk_query_chart_add_del chart_add_del;
-        node_instance_creation_t node_creation;
-        node_instance_connection_t node_update;
         struct aclk_bin_payload bin_payload;
         json_object *alarm_update;
     } data;

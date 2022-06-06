@@ -8,9 +8,9 @@ extern "C" {
 #endif
 
 typedef struct {
-    const char* claim_id;
-    const char* machine_guid;
-    const char* hostname;
+    char* claim_id;
+    char* machine_guid;
+    char* hostname;
 
     int32_t hops;
 } node_instance_creation_t;

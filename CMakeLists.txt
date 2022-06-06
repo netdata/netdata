@@ -817,6 +817,11 @@ set(ACLK_FILES
         mqtt_websockets/src/include/mqtt_wss_log.h
         mqtt_websockets/src/ws_client.c
         mqtt_websockets/src/include/ws_client.h
+        mqtt_websockets/src/mqtt_ng.c
+        mqtt_websockets/src/include/mqtt_ng.h
+        mqtt_websockets/src/common_public.c
+        mqtt_websockets/src/include/common_public.h
+        mqtt_websockets/src/include/common_internal.h
         mqtt_websockets/c-rbuf/src/ringbuffer.c
         mqtt_websockets/c-rbuf/include/ringbuffer.h
         mqtt_websockets/c-rbuf/src/ringbuffer_internal.h

@@ -292,22 +292,6 @@ static int alarm_state_update_query(struct aclk_query_thread *query_thr, aclk_qu
 }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-static int register_node(struct aclk_query_thread *query_thr, aclk_query_t query) {
-    // TODO create a pending registrations list
-    // with some timeouts to detect registration requests that
-    // go unanswered from the cloud
-    aclk_generate_node_registration(query_thr->client, &query->data.node_creation);
-    return 0;
-}
-
-static int node_state_update(struct aclk_query_thread *query_thr, aclk_query_t query) {
-    // TODO create a pending registrations list
-    // with some timeouts to detect registration requests that
-    // go unanswered from the cloud
-    aclk_generate_node_state_update(query_thr->client, &query->data.node_update);
-    return 0;
-}
-
 static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
     // this will be simplified when legacy support is removed
@@ -324,8 +308,8 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = CHART_NEW,            .name = "chart_new",                .fnc = chart_query              },
     { .type = CHART_DEL,            .name = "chart_delete",             .fnc = info_metadata            },
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    { .type = REGISTER_NODE,        .name = "register_node",            .fnc = register_node            },
-    { .type = NODE_STATE_UPDATE,    .name = "node_state_update",        .fnc = node_state_update        },
+    { .type = REGISTER_NODE,        .name = "register_node",            .fnc = send_bin_msg             },
+    { .type = NODE_STATE_UPDATE,    .name = "node_state_update",        .fnc = send_bin_msg             },
     { .type = CHART_DIMS_UPDATE,    .name = "chart_and_dim_update",     .fnc = send_bin_msg             },
     { .type = CHART_CONFIG_UPDATED, .name = "chart_config_updated",     .fnc = send_bin_msg             },
     { .type = CHART_RESET,          .name = "reset_chart_messages",     .fnc = send_bin_msg             },

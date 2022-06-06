@@ -43,9 +43,10 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, int create);
 void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
 void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_host_state_update(RRDHOST *host, int cmd);
-
 void aclk_send_node_instances(void);
+#endif
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 

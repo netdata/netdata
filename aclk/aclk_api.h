@@ -21,6 +21,7 @@ extern int aclk_stats_enabled;
 extern int aclk_alert_reloaded;
 
 extern int aclk_ng;
+extern int use_mqtt_5;
 
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr);
@@ -36,7 +37,9 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
 void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_host_state_update(RRDHOST *host, int connect);
+#endif
 
 #define NETDATA_ACLK_HOOK                                                                                              \
     { .name = "ACLK_Main",                                                                                             \
