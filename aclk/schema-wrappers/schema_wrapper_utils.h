@@ -6,7 +6,13 @@
 #include <sys/time.h>
 #include <google/protobuf/timestamp.pb.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "database/rrd.h"
+#ifdef __cplusplus
+}
+#endif
 
 #if GOOGLE_PROTOBUF_VERSION < 3001000
 #define PROTO_COMPAT_MSG_SIZE(msg) (size_t)msg.ByteSize();
