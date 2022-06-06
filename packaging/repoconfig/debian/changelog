@@ -1,3 +1,9 @@
+netdata-repo (1-2) unstable; urgency=medium
+
+  * Fixed package file naming for repo layout compliance
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 6 Jun 2022 09:30:00 -0500
+
 netdata-repo (1-1) unstable; urgency=medium
 
   * Initial Release
