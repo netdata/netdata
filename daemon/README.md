@@ -184,11 +184,9 @@ The command line options of the Netdata 1.10.0 version are the following:
                            and a list of optional features and whether they 
                            are enabled or not in human readable form.
 
-  -W buildinfo             Print print it's version, the configure options, 
+  -W buildinfojson         Print print it's version, the configure options, 
                            and a list of optional features and whether they 
                            are enabled or not in json format.
-  
-  -W createdataset=N       Create a DB engine dataset of N seconds and exit.
   
   -W simple-pattern pattern string
                            Check if string matches pattern and exit.
