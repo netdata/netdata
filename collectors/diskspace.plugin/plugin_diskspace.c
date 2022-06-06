@@ -12,8 +12,6 @@
 #define MAX_STAT_USEC 10000
 #define SLOW_UPDATE_EVERY 5
 
-static int update_every;
-
 static netdata_thread_t *diskspace_slow_thread = NULL;
 
 static struct mountinfo *disk_mountinfo_root = NULL;
@@ -515,17 +513,24 @@ static void diskspace_slow_worker_cleanup(void *ptr)
 #define WORKER_JOB_SLOW_MOUNTPOINT 0
 #define WORKER_JOB_SLOW_CLEANUP 1
 
+struct slow_worker_data {
+    netdata_thread_t *slow_thread;
+    int update_every;
+};
+
 void *diskspace_slow_worker(void *ptr)
 {
+    struct slow_worker_data *data = (struct slow_worker_data *)ptr;
+    
     worker_register("DISKSPACE_SLOW");
     worker_register_job_name(WORKER_JOB_SLOW_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_SLOW_CLEANUP, "cleanup");
 
     struct basic_mountinfo *slow_mountinfo_root = NULL;
 
-    int slow_update_every = update_every > SLOW_UPDATE_EVERY ? update_every : SLOW_UPDATE_EVERY;
+    int slow_update_every = data->update_every > SLOW_UPDATE_EVERY ? data->update_every : SLOW_UPDATE_EVERY;
 
-    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, ptr);
+    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, data->slow_thread);
 
     usec_t step = slow_update_every * USEC_PER_SEC;
     heartbeat_t hb;
@@ -623,7 +628,7 @@ void *diskspace_main(void *ptr) {
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
-    update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
+    int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
@@ -634,12 +639,15 @@ void *diskspace_main(void *ptr) {
     netdata_mutex_init(&slow_mountinfo_mutex);
 
     diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
+
+    struct slow_worker_data slow_worker_data = {.slow_thread = diskspace_slow_thread, .update_every = update_every};
+
     netdata_thread_create(
         diskspace_slow_thread,
         THREAD_DISKSPACE_SLOW_NAME,
         NETDATA_THREAD_OPTION_JOINABLE,
         diskspace_slow_worker,
-        diskspace_slow_thread);
+        &slow_worker_data);
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
