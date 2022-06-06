@@ -397,17 +397,18 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
                     utf_character_size--;
                     *d++ = *src++;
                 }
-                last_is_space = 0;
-                mblen++;
-                continue;
             }
             else {
                 // UTF-8 characters are not allowed.
                 // Assume it is an underscore
                 // and skip all except the first byte
-                c = '_';
+                *d++ = '_';
                 src += (utf_character_size - 1);
             }
+
+            last_is_space = 0;
+            mblen++;
+            continue;
         }
 
         if(label_spaces_char_map[c]) {
@@ -431,7 +432,7 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
     }
 
     // remove the last trailing space
-    if(last_is_space) {
+    if(last_is_space && d > dst) {
         d--;
         mblen--;
     }
@@ -441,7 +442,7 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
 
     // check if dst is all underscores and empty it if it is
     d = dst;
-    while(*d++ == '_') ;
+    while(*d == '_') d++;
     if(!*d) {
         *dst = '\0';
         mblen = 0;
@@ -999,6 +1000,10 @@ int rrdlabels_unittest_add_pairs() {
     errors += rrdlabels_unittest_add_a_pair("tag::value", "tag", ":value");
     errors += rrdlabels_unittest_add_a_pair("   tag   =   :value ", "tag", ":value");
     errors += rrdlabels_unittest_add_a_pair("   tag   :   :value ", "tag", ":value");
+    errors += rrdlabels_unittest_add_a_pair("tag:5", "tag", "5");
+    errors += rrdlabels_unittest_add_a_pair("tag:55", "tag", "55");
+    errors += rrdlabels_unittest_add_a_pair("tag:aa", "tag", "aa");
+    errors += rrdlabels_unittest_add_a_pair("tag:a", "tag", "a");
 
     // test empty values
     errors += rrdlabels_unittest_add_a_pair("tag", "tag", "");

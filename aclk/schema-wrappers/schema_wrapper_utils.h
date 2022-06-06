@@ -3,7 +3,7 @@
 #ifndef SCHEMA_WRAPPER_UTILS_H
 #define SCHEMA_WRAPPER_UTILS_H
 
-#include "node_info.h"
+#include "database/rrd.h"
 
 #include <sys/time.h>
 #include <google/protobuf/timestamp.pb.h>
