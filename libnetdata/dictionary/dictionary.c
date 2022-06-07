@@ -895,9 +895,9 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
 // sort
 
 static int dictionary_sort_compar(const void *nv1, const void *nv2) {
-    NAME_VALUE *a = (NAME_VALUE *)nv1;
-    NAME_VALUE *b = (NAME_VALUE *)nv2;
-    return strcmp(a->name, b->name);
+    NAME_VALUE **a = (NAME_VALUE **)nv1;
+    NAME_VALUE **b = (NAME_VALUE **)nv2;
+    return strcmp((*a)->name, (*b)->name);
 }
 
 int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
@@ -1189,7 +1189,7 @@ static usec_t dictionary_unittest_run_and_measure_time(DICTIONARY *dict, char *m
     return dt;
 }
 
-void dictionary_unittest_clone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+static void dictionary_unittest_clone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_clone);
     dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, errors, dictionary_unittest_get_clone);
     dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, errors, dictionary_unittest_get_nonexisting);
@@ -1204,7 +1204,7 @@ void dictionary_unittest_clone(DICTIONARY *dict, char **names, char **values, si
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, errors, dictionary_unittest_destroy);
 }
 
-void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+static void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, errors, dictionary_unittest_get_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, errors, dictionary_unittest_get_nonexisting);
@@ -1217,6 +1217,42 @@ void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **values,
     dictionary_unittest_run_and_measure_time(dict, "walking through empty", names, values, 0, errors, dictionary_unittest_walkthrough);
     dictionary_unittest_run_and_measure_time(dict, "traverse foreach empty", names, values, 0, errors, dictionary_unittest_foreach);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, errors, dictionary_unittest_destroy);
+}
+
+struct dictionary_unittest_sorting {
+    const char *oldname;
+    const char *oldvalue;
+};
+
+static int dictionary_unittest_sorting_callback(const char *name, void *value, void *data) {
+    struct dictionary_unittest_sorting *t = (struct dictionary_unittest_sorting *)data;
+    const char *v = (const char *)value;
+
+    int ret = 0;
+    if(t->oldname && strcmp(t->oldname, name) > 0) {
+        fprintf(stderr, "name '%s' should be after '%s'\n", t->oldname, name);
+        ret = 1;
+    }
+    t->oldname = name;
+    t->oldvalue = v;
+
+    return ret;
+}
+
+static size_t dictionary_unittest_sorted_walkthrough(DICTIONARY *dict, char **names, char **values, size_t entries) {
+    (void)names;
+    (void)values;
+    (void)entries;
+    struct dictionary_unittest_sorting tmp = { .oldname = NULL, .oldvalue = NULL };
+    size_t errors;
+    errors = dictionary_walkthrough_read(dict, dictionary_unittest_sorting_callback, &tmp);
+    return errors;
+}
+
+static void dictionary_unittest_sorting(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+    dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_clone);
+    dictionary_unittest_run_and_measure_time(dict, "sorted walkthrough", names, values, entries, errors, dictionary_unittest_sorted_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "destroying dictionary", names, values, entries, errors, dictionary_unittest_destroy);
 }
 
 int dictionary_unittest(size_t entries) {
@@ -1267,6 +1303,10 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop empty", names, values, 0, &errors, dictionary_unittest_foreach);
     dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback empty", names, values, 0, &errors, dictionary_unittest_walkthrough);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+
+    fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    dictionary_unittest_sorting(dict, names, values, entries, &errors);
 
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);

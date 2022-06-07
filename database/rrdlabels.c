@@ -846,7 +846,7 @@ static int rrdlabels_log_label_to_buffer_callback(const char *name, void *value,
 }
 
 void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb) {
-    dictionary_walkthrough_read(labels, rrdlabels_log_label_to_buffer_callback, wb);
+    dictionary_sorted_walkthrough_read(labels, rrdlabels_log_label_to_buffer_callback, wb);
 }
 
 
@@ -909,7 +909,7 @@ void rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each
         .between_them = between_them,
         .count = 0
     };
-    dictionary_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
+    dictionary_sorted_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
 }
 
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
