@@ -96,11 +96,6 @@ include:
     packages:
       <<: *fedora_packages
       repo_distro: fedora/35
-  - <<: *fedora
-    version: "34"
-    packages:
-      <<: *fedora_packages
-      repo_distro: fedora/34
 
   - &opensuse
     distro: opensuse
