@@ -524,11 +524,17 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
 
     DICTIONARY_STATS_ENTRIES_PLUS1(dict, allocated);
 
+    if(dict->ins_callback)
+        dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
+
     return nv;
 }
 
 static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", nv->name);
+
+    if(dict->del_callback)
+        dict->del_callback(nv->name, nv->value, dict->del_callback_data);
 
     if(likely(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE)) {
         debug(D_DICTIONARY, "Dictionary: linking value to '%s'", nv->name);
@@ -539,19 +545,29 @@ static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value
         debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", nv->name);
         DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
 
-        void *old = nv->value;
-        void *new = mallocz(value_len);
-        memcpy(new, value, value_len);
-        nv->value = new;
+        void *oldvalue = nv->value;
+        void *newvalue = NULL;
+        if(value_len) {
+            newvalue = mallocz(value_len);
+            if(value) memcpy(newvalue, value, value_len);
+            else memset(newvalue, 0, value_len);
+        }
+        nv->value = newvalue;
         nv->value_len = value_len;
 
         debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", nv->name);
-        freez(old);
+        freez(oldvalue);
     }
+
+    if(dict->ins_callback)
+        dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
 }
 
 static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
+
+    if(dict->del_callback)
+        dict->del_callback(nv->name, nv->value, dict->del_callback_data);
 
     size_t freed = 0;
 
@@ -665,9 +681,6 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
         hashtable_inserted_name_value_unsafe(dict, name, name_len, nv);
         linkedlist_namevalue_link_unsafe(dict, nv);
-
-        if(dict->ins_callback)
-            dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
     }
     else {
         // the item is already in the index
@@ -675,16 +688,9 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
         // or overwrite the value, depending on dictionary flags
 
         nv = *pnv;
-        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
-
-            if(dict->del_callback)
-                dict->del_callback(nv->name, nv->value, dict->del_callback_data);
-
+        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE))
             namevalue_reset_unsafe(dict, nv, value, value_len);
 
-            if(dict->ins_callback)
-                dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
-        }
         else if(dict->conflict_callback)
             dict->conflict_callback(nv->name, nv->value, value, dict->conflict_callback_data);
     }
@@ -754,10 +760,6 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
 
         if(!reference_counter_mark_deleted(dict, nv)) {
             linkedlist_namevalue_unlink_unsafe(dict, nv);
-
-            if(dict->del_callback)
-                dict->del_callback(nv->name, nv->value, dict->del_callback_data);
-
             namevalue_destroy_unsafe(dict, nv);
         }
         ret = 0;

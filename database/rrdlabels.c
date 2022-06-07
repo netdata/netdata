@@ -469,7 +469,7 @@ typedef struct rrdlabel {
 
 static void rrdlabel_insert_callback(const char *name, void *value, void *data) {
     (void)name;
-    RRDHOST *host = (RRDHOST *)data; (void)host;
+    DICTIONARY *dict = (DICTIONARY *)data; (void)dict;
     RRDLABEL *lb = (RRDLABEL *)value;
 
     // allocate our own memory for the value
@@ -479,7 +479,7 @@ static void rrdlabel_insert_callback(const char *name, void *value, void *data) 
 
 static void rrdlabel_delete_callback(const char *name, void *value, void *data) {
     (void)name;
-    RRDHOST *host = (RRDHOST *)data; (void)host;
+    DICTIONARY *dict = (DICTIONARY *)data; (void)dict;
     RRDLABEL *lb = (RRDLABEL *)value;
 
     freez((void *)lb->value);
@@ -488,8 +488,7 @@ static void rrdlabel_delete_callback(const char *name, void *value, void *data) 
 
 static void rrdlabel_conflict_callback(const char *name, void *oldvalue, void *newvalue, void *data) {
     (void)name;
-    (void)data;
-
+    DICTIONARY *dict = (DICTIONARY *)data; (void)dict;
     RRDLABEL *lbold = (RRDLABEL *)oldvalue;
     RRDLABEL *lbnew = (RRDLABEL *)newvalue;
 
@@ -509,9 +508,9 @@ static void rrdlabel_conflict_callback(const char *name, void *oldvalue, void *n
 
 DICTIONARY *rrdlabels_create(void) {
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(dict, rrdlabel_insert_callback, NULL);
-    dictionary_register_delete_callback(dict, rrdlabel_delete_callback, NULL);
-    dictionary_register_conflict_callback(dict, rrdlabel_conflict_callback, NULL);
+    dictionary_register_insert_callback(dict, rrdlabel_insert_callback, dict);
+    dictionary_register_delete_callback(dict, rrdlabel_delete_callback, dict);
+    dictionary_register_conflict_callback(dict, rrdlabel_conflict_callback, dict);
     return dict;
 }
 
@@ -1084,6 +1083,8 @@ int rrdlabels_unittest_simple_pattern() {
     errors += rrdlabels_unittest_check_simple_pattern(labels, "tag*=value*", true);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "!tag*=value*", false);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "!tag2=something2 tag2=*2", true);
+
+    rrdlabels_destroy(labels);
 
     return errors;
 }
