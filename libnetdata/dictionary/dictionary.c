@@ -895,13 +895,11 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
 // sort
 
 static int dictionary_sort_compar(const void *nv1, const void *nv2) {
-    NAME_VALUE **a = (NAME_VALUE **)nv1;
-    NAME_VALUE **b = (NAME_VALUE **)nv2;
-    return strcmp((*a)->name, (*b)->name);
+    return strcmp((*(NAME_VALUE **)nv1)->name, (*(NAME_VALUE **)nv2)->name);
 }
 
 int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
-    if(unlikely(!dict)) return 0;
+    if(unlikely(!dict || !dict->entries)) return 0;
 
     DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
@@ -918,20 +916,26 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
     for(nv = dict->first_item, i = 0; nv && i < count ;nv = nv->next, i++)
         array[i] = nv;
 
-    if(nv)
+    if(unlikely(nv))
         error("DICTIONARY: during sorting expected to have %zu items in dictionary, but there are more. Sorted results may be incomplete. This is internal error - dictionaries fail to maintain an accurate number of the number of entries they have.", count);
+
+    if(unlikely(i != count)) {
+        error("DICTIONARY: during sorting expected to have %zu items in dictionary, but there are %zu. Sorted results may be incomplete. This is internal error - dictionaries fail to maintain an accurate number of the number of entries they have.", count, i);
+        count = i;
+    }
 
     qsort(array, count, sizeof(NAME_VALUE *), dictionary_sort_compar);
 
     int ret = 0;
     for(i = 0; i < count ;i++) {
-        int r = callback(array[i]->name, array[i]->value, data);
+        int r = callback((array[i])->name, (array[i])->value, data);
         if(r < 0) { ret = r; break; }
         ret += r;
     }
 
-    freez(array);
     dictionary_unlock(dict);
+    freez(array);
+
     return ret;
 }
 
@@ -1222,6 +1226,7 @@ static void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **
 struct dictionary_unittest_sorting {
     const char *oldname;
     const char *oldvalue;
+    size_t count;
 };
 
 static int dictionary_unittest_sorting_callback(const char *name, void *value, void *data) {
@@ -1233,6 +1238,7 @@ static int dictionary_unittest_sorting_callback(const char *name, void *value, v
         fprintf(stderr, "name '%s' should be after '%s'\n", t->oldname, name);
         ret = 1;
     }
+    t->count++;
     t->oldname = name;
     t->oldvalue = v;
 
@@ -1242,10 +1248,14 @@ static int dictionary_unittest_sorting_callback(const char *name, void *value, v
 static size_t dictionary_unittest_sorted_walkthrough(DICTIONARY *dict, char **names, char **values, size_t entries) {
     (void)names;
     (void)values;
-    (void)entries;
-    struct dictionary_unittest_sorting tmp = { .oldname = NULL, .oldvalue = NULL };
+    struct dictionary_unittest_sorting tmp = { .oldname = NULL, .oldvalue = NULL, .count = 0 };
     size_t errors;
     errors = dictionary_walkthrough_read(dict, dictionary_unittest_sorting_callback, &tmp);
+
+    if(tmp.count != entries) {
+        fprintf(stderr, "Expected %zu entries, counted %zu\n", entries, tmp.count);
+        errors++;
+    }
     return errors;
 }
 
