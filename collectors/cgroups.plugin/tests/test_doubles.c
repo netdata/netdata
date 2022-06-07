@@ -44,22 +44,6 @@ void mountinfo_free_all(struct mountinfo *mi)
     UNUSED(mi);
 }
 
-struct label *__wrap_add_label_to_list(struct label *l, char *key, char *value, RRDLABEL_SRC label_source)
-{
-    function_called();
-    check_expected_ptr(l);
-    check_expected_ptr(key);
-    check_expected_ptr(value);
-    check_expected(label_source);
-    return l;
-}
-
-void rrdset_update_labels(RRDSET *st, struct label *labels)
-{
-    UNUSED(st);
-    UNUSED(labels);
-}
-
 RRDSET *rrdset_create_custom(
     RRDHOST *host, const char *type, const char *id, const char *name, const char *family, const char *context,
     const char *title, const char *units, const char *plugin, const char *module, long priority, int update_every,

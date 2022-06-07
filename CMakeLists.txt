@@ -1570,11 +1570,6 @@ endif()
         database/rrd.h
     )
     add_executable(cgroups_testdriver ${CGROUPS_TEST_FILES} ${CGROUPS_PLUGIN_FILES})
-    target_link_options(
-        cgroups_testdriver
-        PRIVATE
-        -Wl,--wrap=add_label_to_list
-    )
     target_link_libraries(cgroups_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_cgroups COMMAND cgroups_testdriver)
 

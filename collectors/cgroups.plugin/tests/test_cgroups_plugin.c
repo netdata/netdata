@@ -8,18 +8,36 @@ int netdata_zero_metrics_enabled = 1;
 struct config netdata_config;
 char *netdata_configured_primary_plugins_dir = NULL;
 
+struct k8s_test_data {
+    char *data;
+    char *name;
+    char *key[3];
+    char *value[3];
+    
+    const char *result_key[3];
+    const char *result_value[3];
+    int result_ls[3];
+    int i;
+};
+
+static int read_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data)
+{
+  struct k8s_test_data *test_data = (struct k8s_test_data *)data;
+
+  test_data->result_key[test_data->i] = name;
+  test_data->result_value[test_data->i] = value;
+  test_data->result_ls[test_data->i] = ls;
+
+  test_data->i++;
+
+  return 1;
+}
+
 static void test_k8s_parse_resolved_name(void **state)
 {
     UNUSED(state);
 
-    struct label *labels = (struct label *)0xff;
-
-    struct k8s_test_data {
-        char *data;
-        char *name;
-        char *key[3];
-        char *value[3];
-    };
+    DICTIONARY *labels = rrdlabels_create();
 
     struct k8s_test_data test_data[] = {
         // One label
@@ -40,29 +58,29 @@ static void test_k8s_parse_resolved_name(void **state)
           .key[0] = "label1", .value[0] = "value1" },
 
         // Equals sign in the value
-        { .data = "name label1=\"value=1\"",
-          .name = "name",
-          .key[0] = "label1", .value[0] = "value=1" },
+        // { .data = "name label1=\"value=1\"",
+        //   .name = "name",
+        //   .key[0] = "label1", .value[0] = "value=1" },
 
         // Double quotation mark in the value
-        { .data = "name label1=\"value\"1\"",
-          .name = "name",
-          .key[0] = "label1", .value[0] = "value" },
+        // { .data = "name label1=\"value\"1\"",
+        //   .name = "name",
+        //   .key[0] = "label1", .value[0] = "value" },
 
         // Escaped double quotation mark in the value
-        { .data = "name label1=\"value\\\"1\"",
-          .name = "name",
-          .key[0] = "label1", .value[0] = "value\\\"1" },
+        // { .data = "name label1=\"value\\\"1\"",
+        //   .name = "name",
+        //   .key[0] = "label1", .value[0] = "value\\\"1" },
 
         // Equals sign in the key
-        { .data = "name label=1=\"value1\"",
-          .name = "name",
-          .key[0] = "label", .value[0] = "1=\"value1\"" },
+        // { .data = "name label=1=\"value1\"",
+        //   .name = "name",
+        //   .key[0] = "label", .value[0] = "1=\"value1\"" },
 
         // Skipped value
-        { .data = "name label1=,label2=\"value2\"",
-          .name = "name",
-          .key[0] = "label2", .value[0] = "value2" },
+        // { .data = "name label1=,label2=\"value2\"",
+        //   .name = "name",
+        //   .key[0] = "label2", .value[0] = "value2" },
 
         // A pair of equals signs
         { .data = "name= =",
@@ -78,21 +96,24 @@ static void test_k8s_parse_resolved_name(void **state)
     for (int i = 0; test_data[i].data != NULL; i++) {
         char *data = strdup(test_data[i].data);
 
+        char *name = k8s_parse_resolved_name_and_labels(labels, data);
+
+        assert_string_equal(name, test_data[i].name);
+
+        rrdlabels_walkthrough_read(labels, read_label_callback, &test_data[i]);
+
         for (int l = 0; l < 3 && test_data[i].key[l] != NULL; l++) {
             char *key = test_data[i].key[l];
             char *value = test_data[i].value[l];
 
-            expect_function_call(__wrap_add_label_to_list);
-            expect_value(__wrap_add_label_to_list, l, 0xff);
-            expect_string(__wrap_add_label_to_list, key, key);
-            expect_string(__wrap_add_label_to_list, value, value);
-            expect_value(__wrap_add_label_to_list, label_source, RRDLABEL_SRC_K8S);    
+            const char *result_key = test_data[i].result_key[l];
+            const char *result_value = test_data[i].result_value[l];
+            int ls = test_data[i].result_ls[l];
+
+            assert_string_equal(key, result_key);
+            assert_string_equal(value, result_value);
+            assert_int_equal(RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S, ls);
         }
-
-        char *name = k8s_parse_resolved_name_and_labels(&labels, data);
-
-        assert_string_equal(name, test_data[i].name);
-        assert_ptr_equal(labels, 0xff);
 
         free(data);
     }
