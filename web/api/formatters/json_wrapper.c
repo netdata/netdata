@@ -205,7 +205,6 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         if (chart_label_key) {
             buffer_sprintf(wb, "   %schart_labels%s: { ", kq, kq);
 
-            // TODO - This should either be pattern matching or list of keys
             SIMPLE_PATTERN *pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
             SIMPLE_PATTERN *original_pattern = pattern;
             char *label_key = NULL;
@@ -226,14 +225,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                     if (i)
                         buffer_strcat(wb, ", ");
 
-                    // TODO - this does not get all the values of each key
-                    label_value = rrdlabels_get(rd->rrdset->state->chart_labels, label_key);
-                    if (label_value) {
-                        buffer_strcat(wb, sq);
-                        buffer_strcat(wb, label_value);
-                        buffer_strcat(wb, sq);
-                    } else
-                        buffer_strcat(wb, "null");
+                    rrdlabels_get_value_to_buffer_or_null(rd->rrdset->state->chart_labels, wb, label_key, sq, "null");
                     i++;
                 }
                 if (!i) {

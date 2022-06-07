@@ -605,21 +605,21 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
 }
 
 // ----------------------------------------------------------------------------
-// rrdlabels_get()
+// rrdlabels_get_to_buffer_or_null()
 
-// TODO - no one should be using this ever!
-// the returned string is not guaranteed to exist after the return of this call
-#warning Someone is still using labels_get()
+void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
+    // Get a read lock on the dictionary
+    // to copy the value into the buffer
+    const char *v;
+    dfe_start_read(labels, v) {
+        RRDLABEL *lb = dictionary_get_having_read_lock(labels, key);
 
-const char *rrdlabels_get(DICTIONARY *labels, const char *key) {
-    if(!labels) {
-        error("%s(): called with NULL dictionary.", __FUNCTION__ );
-        return NULL;
+        if(lb && lb->value)
+            buffer_sprintf(wb, "%s%s%s", quote, lb->value, quote);
+        else
+            buffer_strcat(wb, null);
     }
-
-    RRDLABEL *lb = dictionary_get(labels, key);
-    if(lb) return lb->value;
-    return NULL;
+    dfe_done(v);
 }
 
 
