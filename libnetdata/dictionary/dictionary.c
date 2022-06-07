@@ -1250,7 +1250,7 @@ static size_t dictionary_unittest_sorted_walkthrough(DICTIONARY *dict, char **na
     (void)values;
     struct dictionary_unittest_sorting tmp = { .oldname = NULL, .oldvalue = NULL, .count = 0 };
     size_t errors;
-    errors = dictionary_walkthrough_read(dict, dictionary_unittest_sorting_callback, &tmp);
+    errors = dictionary_sorted_walkthrough_read(dict, dictionary_unittest_sorting_callback, &tmp);
 
     if(tmp.count != entries) {
         fprintf(stderr, "Expected %zu entries, counted %zu\n", entries, tmp.count);
