@@ -166,9 +166,9 @@ static void free_basic_mountinfo(struct basic_mountinfo *bmi)
         freez(bmi->root);
         freez(bmi->mount_point);
         freez(bmi->filesystem);
-    }
 
-    freez(bmi);
+        freez(bmi);
+    }
 };
 
 static void free_basic_mountinfo_list(struct basic_mountinfo *root)
@@ -198,11 +198,7 @@ static void calculate_values_and_show_charts(
     fsblkcnt_t btotal         = buff_statvfs->f_blocks;
     fsblkcnt_t bavail_root    = buff_statvfs->f_bfree;
     fsblkcnt_t breserved_root = bavail_root - bavail;
-    fsblkcnt_t bused;
-    if(likely(btotal >= bavail_root))
-        bused = btotal - bavail_root;
-    else
-        bused = bavail_root - btotal;
+    fsblkcnt_t bused = likely(btotal >= bavail_root) ? btotal - bavail_root : bavail_root - btotal;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
