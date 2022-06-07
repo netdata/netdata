@@ -44,9 +44,11 @@ if [ -z "${VIRTUALIZATION}" ]; then
     [ -n "$VIRTUALIZATION" ] && VIRT_DETECTION="dmidecode"
   fi
 
-  if [ -z "${VIRTUALIZATION}" ] && [ "${KERNEL_NAME}" = "FreeBSD" ]; then
-    VIRTUALIZATION=$(sysctl kern.vm_guest 2>/dev/null | cut -d: -f 2 | awk '{$1=$1};1')
-    [ -n "$VIRTUALIZATION" ] && VIRT_DETECTION="sysctl"
+  if [ -z "${VIRTUALIZATION}" ] || [ "$VIRTUALIZATION" = "unknown" ]; then
+    if [ "${KERNEL_NAME}" = "FreeBSD" ]; then
+      VIRTUALIZATION=$(sysctl kern.vm_guest 2>/dev/null | cut -d: -f 2 | awk '{$1=$1};1')
+      [ -n "$VIRTUALIZATION" ] && VIRT_DETECTION="sysctl"
+    fi
   fi
 
   if [ -z "${VIRTUALIZATION}" ]; then
