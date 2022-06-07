@@ -1036,6 +1036,13 @@ int rrdlabels_unittest_add_pairs() {
     errors += rrdlabels_unittest_add_a_pair("\"tag=1\": country:\"Gre\\\"ece\"", "tag_1", "country:Gre_ece");
     errors += rrdlabels_unittest_add_a_pair("\"tag=1\" = country:\"Gre\\\"ece\"", "tag_1", "country:Gre_ece");
 
+    errors += rrdlabels_unittest_add_a_pair("\t'LABE=L'\t=\t\"World\" peace", "labe_l", "World_peace");
+    errors += rrdlabels_unittest_add_a_pair("\t'LA\\'B:EL'\t=\tcountry:\"World\":\"Europe\":\"Greece\"", "la_b_el", "country:World:Europe:Greece");
+
+    errors += rrdlabels_unittest_add_a_pair("NAME=\"VALUE\"", "name", "VALUE");
+    errors += rrdlabels_unittest_add_a_pair("\"NAME\" : \"VALUE\"", "name", "VALUE");
+    errors += rrdlabels_unittest_add_a_pair("NAME: \"VALUE\"", "name", "VALUE");
+
     return errors;
 }
 
@@ -1062,6 +1069,9 @@ int rrdlabels_unittest_simple_pattern() {
     errors += rrdlabels_unittest_check_simple_pattern(labels, "tag", false);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "tag*", true);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "*1", true);
+    errors += rrdlabels_unittest_check_simple_pattern(labels, "value*", false);
+    errors += rrdlabels_unittest_check_simple_pattern(labels, "*=value*", true);
+    errors += rrdlabels_unittest_check_simple_pattern(labels, "*:value*", true);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "*2", true);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "*2 *3", true);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "!tag3 *2", true);
