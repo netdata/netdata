@@ -154,7 +154,7 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
         return 0;
 
     buffer_strcat(instance->labels_buffer, " ");
-    rrdlabels_to_buffer(host->host_labels, instance->labels_buffer, "", "=", "\"", " ",
+    rrdlabels_to_buffer(host->host_labels, instance->labels_buffer, "", "=", "", " ",
                         exporting_labels_filter_callback, instance,
                         NULL, sanitize_opentsdb_label_value);
     return 0;
