@@ -210,7 +210,6 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             char *label_key = NULL;
             int keys = 0;
             while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
-                const char *label_value;
 
                 if (keys)
                     buffer_strcat(wb, ", ");
