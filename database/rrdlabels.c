@@ -481,7 +481,11 @@ static void rrdlabel_insert_callback(const char *name, void *value, void *data) 
     RRDLABEL *lb = (RRDLABEL *)value;
 
     // allocate our own memory for the value
+#ifdef UNIT_TESTING
+    lb->value = strdup(lb->value);
+#else
     lb->value = strdupz(lb->value);
+#endif
     lb->label_source |= RRDLABEL_FLAG_NEW;
 }
 
