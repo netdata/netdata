@@ -3,6 +3,14 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
+#ifdef UNIT_TESTING
+// cmocka workaround for strdupz()
+#ifdef strdupz
+#undef strdupz
+#endif // strdupz
+#define strdupz(x) strdup(x)
+#endif // UNIT_TESTING
+
 // ----------------------------------------------------------------------------
 // labels sanitization
 
