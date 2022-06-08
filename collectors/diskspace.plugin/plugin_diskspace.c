@@ -321,6 +321,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     static SIMPLE_PATTERN *excluded_filesystems = NULL;
+
+    usec_t slow_timeout = MAX_STAT_USEC * update_every;
+
     int do_space, do_inodes;
 
     if(unlikely(!dict_mountpoints)) {
@@ -394,7 +397,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 }
             }
 
-            if ((now_monotonic_high_precision_usec() - start_time) > MAX_STAT_USEC)
+            if ((now_monotonic_high_precision_usec() - start_time) > slow_timeout)
                 slow = 1;
         }
 
@@ -460,7 +463,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         return;
     }
 
-    if ((now_monotonic_high_precision_usec() - start_time) > MAX_STAT_USEC)
+    if ((now_monotonic_high_precision_usec() - start_time) > slow_timeout)
         m->slow = 1;
 
     m->shown_error = 0;
