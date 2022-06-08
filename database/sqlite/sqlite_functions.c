@@ -68,6 +68,9 @@ const char *database_cleanup[] = {
 
 sqlite3 *db_meta = NULL;
 
+#define MAX_PREPARED_STATEMENTS (32)
+pthread_key_t key_pool[MAX_PREPARED_STATEMENTS];
+
 static uv_mutex_t sqlite_transaction_lock;
 
 int execute_insert(sqlite3_stmt *res)
@@ -107,13 +110,39 @@ static void add_stmt_to_list(sqlite3_stmt *res)
 
     if (unlikely(idx == MAX_OPEN_STATEMENTS))
         return;
-    statements[idx++] = res;
 }
 
-int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement) {
+static void release_statement(void *statement)
+{
+    int rc;
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Thread %d: Cleaning prepared statement on %p", gettid(), statement);
+#endif
+    if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK))
+        error_report("Failed to finalize statement, rc = %d", rc);
+}
+
+int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement)
+{
+    static __thread uint32_t keys_used = 0;
+
+    pthread_key_t *key = NULL;
+    int ret = 1;
+
+    if (likely(keys_used < MAX_PREPARED_STATEMENTS))
+        key = &key_pool[keys_used++];
+
     int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
-    if (likely(rc == SQLITE_OK))
-        add_stmt_to_list(*statement);
+    if (likely(rc == SQLITE_OK)) {
+        if (likely(key)) {
+            ret = pthread_setspecific(*key, *statement);
+#ifdef NETDATA_INTERNAL_CHECKS
+            info("Thread %d: Using key %u on statement %p", gettid(), keys_used, *statement);
+#endif
+        }
+        if (ret)
+            add_stmt_to_list(*statement);
+    }
     return rc;
 }
 
@@ -443,6 +472,10 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     fatal_assert(0 == uv_mutex_init(&sqlite_transaction_lock));
     info("SQLite database initialization completed");
+
+    for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
+        (void)pthread_key_create(&key_pool[i], release_statement);
+
     return 0;
 }
 
