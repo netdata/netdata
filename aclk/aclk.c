@@ -622,10 +622,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         // aclk_get_topic moved here as during OTP we
         // generate the topic cache
-        if (aclk_use_new_cloud_arch)
-            mqtt_conn_params.will_topic = aclk_get_topic(ACLK_TOPICID_AGENT_CONN);
-        else
-            mqtt_conn_params.will_topic = aclk_get_topic(ACLK_TOPICID_METADATA);
+        mqtt_conn_params.will_topic = aclk_get_topic(ACLK_TOPICID_AGENT_CONN);
 
         if (!mqtt_conn_params.will_topic) {
             error("Couldn't get LWT topic. Will not send LWT.");
