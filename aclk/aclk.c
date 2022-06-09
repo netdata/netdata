@@ -776,10 +776,6 @@ exit:
     return NULL;
 }
 
-// TODO this is taken over as workaround from old ACLK
-// fix this in both old and new ACLK
-extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
-
 void aclk_alarm_reload(void)
 {
     ACLK_SHARED_STATE_LOCK;
