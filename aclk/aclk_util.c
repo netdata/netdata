@@ -4,7 +4,6 @@
 
 #include "daemon/common.h"
 
-int aclk_use_new_cloud_arch = 0;
 usec_t aclk_session_newarch = 0;
 
 aclk_env_t *aclk_env = NULL;

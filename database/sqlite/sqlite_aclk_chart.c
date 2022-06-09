@@ -212,7 +212,7 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
     int rc = 0;
     sqlite3_stmt *res = NULL;
 
-    if (!aclk_use_new_cloud_arch || !aclk_connected)
+    if (!aclk_connected)
         return;
 
     if (unlikely(!db_meta))
@@ -843,7 +843,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
 {
     int rc;
 
-    if (!aclk_use_new_cloud_arch || !aclk_connected)
+    if (!aclk_connected)
         return;
 
     char *claim_id = is_agent_claimed();
@@ -1146,9 +1146,6 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
 
 void aclk_send_dimension_update(RRDDIM *rd)
 {
-    if (!aclk_use_new_cloud_arch)
-        return;
-
     char *claim_id = is_agent_claimed();
     if (unlikely(!claim_id))
         return;

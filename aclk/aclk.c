@@ -481,8 +481,6 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             .drop_on_publish_fail = 1
         };
 
-        aclk_use_new_cloud_arch = 0;
-
 #ifndef ACLK_DISABLE_CHALLENGE
         if (aclk_env) {
             aclk_env_t_destroy(aclk_env);
@@ -715,7 +713,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     uuid_t node_id;
     int ret;
 
-    if (!aclk_connected || !aclk_use_new_cloud_arch)
+    if (!aclk_connected)
         return;
 
     ret = get_node_id(&host->host_uuid, &node_id);
