@@ -1321,19 +1321,6 @@ void sql_check_chart_liveness(RRDSET *st) {
 // ST is read locked
 int queue_chart_to_aclk(RRDSET *st)
 {
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
-#ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id, 1);
-#else
-    UNUSED(st);
-#endif
-    return 0;
-#else
-    if (!aclk_use_new_cloud_arch && aclk_connected) {
-        aclk_update_chart(st->rrdhost, st->id, 1);
-        return 0;
-    }
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                        st, ACLK_DATABASE_ADD_CHART);
-#endif
 }

@@ -34,11 +34,6 @@ extern struct aclk_shared_state {
 
 void aclk_alarm_reload(void);
 
-/* Informs ACLK about created/deleted chart
- * @param create 0 - if chart was deleted, other if chart created
- */
-int aclk_update_chart(RRDHOST *host, char *chart_name, int create);
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_host_state_update(RRDHOST *host, int cmd);
 void aclk_send_node_instances(void);

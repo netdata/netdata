@@ -724,10 +724,6 @@ struct rrdhost {
     const char *tags;                               // tags for this host
     const char *timezone;                           // the timezone of the host
 
-#ifdef ENABLE_ACLK
-    long    deleted_charts_count;
-#endif
-
     const char *abbrev_timezone;                    // the abbriviated timezone of the host
     int32_t utc_offset;                             // the offset in seconds from utc
 

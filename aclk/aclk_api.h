@@ -31,8 +31,6 @@ void aclk_single_update_enable();
 
 void aclk_alarm_reload(void);
 
-int aclk_update_chart(RRDHOST *host, char *chart_name, int create);
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_host_state_update(RRDHOST *host, int connect);
 #endif
