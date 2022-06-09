@@ -595,19 +595,16 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         if (netdata_exit)
             return 1;
 
-        if (aclk_env->encoding == ACLK_ENC_PROTO) {
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
-            error("Cloud requested New Cloud Protocol to be used but this agent cannot support it!");
+        if (aclk_env->encoding != ACLK_ENC_PROTO) {
+            error_report("This agent can only use the new cloud protocol but cloud requested old one.");
             continue;
-#else
-            if (!aclk_env_has_capa("proto")) {
-                error ("Can't encoding=proto without at least \"proto\" capability.");
-                continue;
-            }
-            info("Switching ACLK to new protobuf protocol. Due to /env response.");
-            aclk_use_new_cloud_arch = 1;
-#endif
         }
+
+        if (!aclk_env_has_capa("proto")) {
+            error ("Can't use encoding=proto without at least \"proto\" capability.");
+            continue;
+        }
+        info("New ACLK protobuf protocol negotiated successfully (/env response).");
 
         memset(&auth_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->auth_endpoint, &auth_url)) {

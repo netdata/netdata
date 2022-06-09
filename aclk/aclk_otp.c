@@ -814,11 +814,8 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
         return 1;
     }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=json,proto&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
-#else
-    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=json&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
-#endif
+    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=proto&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
+
     freez(agent_id);
 
     req.host = (char*)aclk_hostname;
