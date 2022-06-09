@@ -536,8 +536,6 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
     url_t mqtt_url;
 #endif
 
-    json_object *lwt = NULL;
-
     while (!netdata_exit) {
         char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
         if (cloud_base_url == NULL) {
@@ -644,17 +642,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         aclk_session_sec = aclk_session_newarch / USEC_PER_SEC;
         aclk_session_us = aclk_session_newarch % USEC_PER_SEC;
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        if (aclk_use_new_cloud_arch) {
-            mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
-        } else {
-#endif
-            lwt = aclk_generate_disconnect(NULL);
-            mqtt_conn_params.will_msg = json_object_to_json_string_ext(lwt, JSON_C_TO_STRING_PLAIN);
-            mqtt_conn_params.will_msg_len = strlen(mqtt_conn_params.will_msg);
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        }
-#endif
+        mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
 
 #ifdef ACLK_DISABLE_CHALLENGE
         ret = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
@@ -668,10 +656,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         freez((char*)mqtt_conn_params.username);
 #endif
 
-        if (aclk_use_new_cloud_arch)
-            freez((char *)mqtt_conn_params.will_msg);
-        else
-            json_object_put(lwt);
+        freez((char *)mqtt_conn_params.will_msg);
 
         if (!ret) {
             last_conn_time_mqtt = now_realtime_sec();
