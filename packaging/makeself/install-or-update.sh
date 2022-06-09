@@ -154,7 +154,6 @@ set_netdata_updater_channel || run_failed "Cannot set netdata updater tool relea
 
 # -----------------------------------------------------------------------------
 progress "Install (but not enable) netdata updater tool"
-cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
 install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
 # -----------------------------------------------------------------------------
