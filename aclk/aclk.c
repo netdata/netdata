@@ -325,17 +325,6 @@ inline static int aclk_popcorn_check_bump()
     return 0;
 }
 
-static inline void queue_connect_payloads(void)
-{
-    aclk_query_t query = aclk_query_new(METADATA_INFO);
-    query->data.metadata_info.host = localhost;
-    query->data.metadata_info.initial_on_connect = 1;
-    aclk_queue_query(query);
-    query = aclk_query_new(METADATA_ALARMS);
-    query->data.metadata_alarms.initial_on_connect = 1;
-    aclk_queue_query(query);
-}
-
 static inline void mqtt_connected_actions(mqtt_wss_client client)
 {
     char *topic = (char*)aclk_get_topic(ACLK_TOPICID_COMMAND);
@@ -357,20 +346,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_rcvd_cloud_msgs = 0;
     aclk_connection_counter++;
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (!aclk_use_new_cloud_arch) {
-#endif
-        ACLK_SHARED_STATE_LOCK;
-        if (aclk_shared_state.agent_state != ACLK_HOST_INITIALIZING) {
-            error("Sending `connect` payload immediately as popcorning was finished already.");
-            queue_connect_payloads();
-        }
-        ACLK_SHARED_STATE_UNLOCK;
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    } else {
-        aclk_send_agent_connection_update(client, 1);
-    }
-#endif
+    aclk_send_agent_connection_update(client, 1);
 }
 
 /* Waits until agent is ready or needs to exit
@@ -766,9 +742,6 @@ void *aclk_main(void *ptr)
         
         if (unlikely(!query_threads.thread_list))
             aclk_query_threads_start(&query_threads, mqttwss_client);
-
-        if (!aclk_use_new_cloud_arch)
-            queue_connect_payloads();
 
         if (handle_connection(mqttwss_client)) {
             aclk_stats_upd_online(0);
