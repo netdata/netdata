@@ -1175,13 +1175,9 @@ char *ng_aclk_state(void)
     buffer_strcat(wb,
         "ACLK Available: Yes\n"
         "ACLK Version: 2\n"
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        "Protocols Supported: Legacy, Protobuf\n"
-#else
-        "Protocols Supported: Legacy\n"
-#endif
+        "Protocols Supported: Protobuf\n"
     );
-    buffer_sprintf(wb, "Protocol Used: %s\nMQTT Version: %d\nClaimed: ", aclk_use_new_cloud_arch ? "Protobuf" : "Legacy", use_mqtt_5 ? 5 : 3);
+    buffer_sprintf(wb, "Protocol Used: Protobuf\nMQTT Version: %d\nClaimed: ", use_mqtt_5 ? 5 : 3);
 
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
@@ -1349,15 +1345,8 @@ char *ng_aclk_state_json(void)
     json_object_object_add(msg, "aclk-version", tmp);
 
     grp = json_object_new_array();
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    tmp = json_object_new_string("Legacy");
-    json_object_array_add(grp, tmp);
     tmp = json_object_new_string("Protobuf");
     json_object_array_add(grp, tmp);
-#else
-    tmp = json_object_new_string("Legacy");
-    json_object_array_add(grp, tmp);
-#endif
     json_object_object_add(msg, "protocols-supported", grp);
 
     char *agent_id = is_agent_claimed();
@@ -1378,7 +1367,7 @@ char *ng_aclk_state_json(void)
     tmp = json_object_new_boolean(aclk_connected);
     json_object_object_add(msg, "online", tmp);
 
-    tmp = json_object_new_string(aclk_use_new_cloud_arch ? "Protobuf" : "Legacy");
+    tmp = json_object_new_string("Protobuf");
     json_object_object_add(msg, "used-cloud-protocol", tmp);
 
     tmp = json_object_new_int(use_mqtt_5 ? 5 : 3);
