@@ -188,54 +188,10 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
 
 //TODO prevent big buffer on stack
 #define RX_MSGLEN_MAX 4096
-static void msg_callback_old_protocol(const char *topic, const void *msg, size_t msglen, int qos)
+static void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
 {
     UNUSED(qos);
-    char cmsg[RX_MSGLEN_MAX];
-    size_t len = (msglen < RX_MSGLEN_MAX - 1) ? msglen : (RX_MSGLEN_MAX - 1);
-    const char *cmd_topic = aclk_get_topic(ACLK_TOPICID_COMMAND);
-    if (!cmd_topic) {
-        error("Error retrieving command topic");
-        return;
-    }
-
-    if (msglen > RX_MSGLEN_MAX - 1)
-        error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
-
-    memcpy(cmsg,
-           msg,
-           len);
-    cmsg[len] = 0;
-
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 512
-    char filename[FN_MAX_LEN];
-    int logfd;
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-rx.json", ACLK_GET_CONV_LOG_NEXT());
-    logfd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR );
-    if(logfd < 0)
-        error("Error opening ACLK Conversation logfile \"%s\" for RX message.", filename);
-    write(logfd, msg, msglen);
-    close(logfd);
-#endif
-
-    debug(D_ACLK, "Got Message From Broker Topic \"%s\" QoS %d MSG: \"%s\"", topic, qos, cmsg);
-
-    if (strcmp(cmd_topic, topic))
-        error("Received message on unexpected topic %s", topic);
-
-    if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
-        error("Link is shutting down. Ignoring incoming message.");
-        return;
-    }
-
-    aclk_handle_cloud_cmd_message(cmsg);
-}
-
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-static void msg_callback_new_protocol(const char *topic, const void *msg, size_t msglen, int qos)
-{
-    UNUSED(qos);
+    aclk_rcvd_cloud_msgs++;
     if (msglen > RX_MSGLEN_MAX)
         error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
 
@@ -271,15 +227,6 @@ static void msg_callback_new_protocol(const char *topic, const void *msg, size_t
 
     aclk_handle_new_cloud_msg(msgtype, msg, msglen);
 }
-
-static inline void msg_callback(const char *topic, const void *msg, size_t msglen, int qos) {
-    aclk_rcvd_cloud_msgs++;
-    if (aclk_use_new_cloud_arch)
-        msg_callback_new_protocol(topic, msg, msglen, qos);
-    else
-        msg_callback_old_protocol(topic, msg, msglen, qos);
-}
-#endif /* ENABLE_NEW_CLOUD_PROTOCOL */
 
 static void puback_callback(uint16_t packet_id)
 {
@@ -803,11 +750,7 @@ void *aclk_main(void *ptr)
 
     use_mqtt_5 = config_get_boolean(CONFIG_SECTION_CLOUD, "mqtt5", CONFIG_BOOLEAN_NO);
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback, use_mqtt_5))) {
-#else
-    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback_old_protocol, puback_callback, use_mqtt_5))) {
-#endif
         error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }
