@@ -417,12 +417,8 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     info("Preparing to gracefully shutdown ACLK connection");
     aclk_queue_lock();
     aclk_queue_flush();
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (aclk_use_new_cloud_arch)
-        aclk_shared_state.mqtt_shutdown_msg_id = aclk_send_agent_connection_update(client, 0);
-    else
-#endif
-        aclk_shared_state.mqtt_shutdown_msg_id = aclk_send_app_layer_disconnect(client, "graceful");
+
+    aclk_shared_state.mqtt_shutdown_msg_id = aclk_send_agent_connection_update(client, 0);
 
     time_t t = now_monotonic_sec();
     while (!mqtt_wss_service(client, 100)) {

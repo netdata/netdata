@@ -71,30 +71,6 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     return packet_id;
 }
 
-static uint16_t aclk_send_message_subtopic_pid(mqtt_wss_client client, json_object *msg, enum aclk_topics subtopic)
-{
-    uint16_t packet_id;
-    const char *str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
-    const char *topic = aclk_get_topic(subtopic);
-
-    if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting message send");
-        return 0;
-    }
-
-    mqtt_wss_publish_pid(client, topic, str, strlen(str),  MQTT_WSS_PUB_QOS1, &packet_id);
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published(packet_id);
-#endif
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 1024
-    char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx.json", ACLK_GET_CONV_LOG_NEXT());
-    json_object_to_file_ext(filename, msg, JSON_C_TO_STRING_PRETTY);
-#endif
-    return packet_id;
-}
-
 /* UNUSED now but can be used soon MVP1?
 static void aclk_send_message_topic(mqtt_wss_client client, json_object *msg, const char *topic)
 {
@@ -446,16 +422,6 @@ json_object *aclk_generate_disconnect(const char *message)
 
     return msg;
 }
-
-int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message)
-{
-    int pid;
-    json_object *msg = aclk_generate_disconnect(message);
-    pid = aclk_send_message_subtopic_pid(client, msg, ACLK_TOPICID_METADATA);
-    json_object_put(msg);
-    return pid;
-}
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 // new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
