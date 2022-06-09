@@ -146,7 +146,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 | -------- | ------- | ----- |
 | Alpine Linux | 3.12 | EOL as of 2022-05-01 |
 | Alpine Linux | 3.11 | EOL as of 2021-11-01 |
-| Fedora 34 | EOL as of 2022-06-07 |
+| Fedora | 34 | EOL as of 2022-06-07 |
 | Fedora | 33 | EOL as of 2021-11-30 |
 | Fedora | 32 | EOL as of 2021-05-25 |
 | FreeBSD | 11-STABLE | EOL as of 2021-10-30 |
