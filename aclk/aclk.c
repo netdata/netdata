@@ -819,37 +819,6 @@ void aclk_alarm_reload(void)
     aclk_queue_query(aclk_query_new(METADATA_ALARMS));
 }
 
-int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
-{
-    BUFFER *local_buffer;
-    json_object *msg;
-
-    if (host != localhost)
-        return 0;
-
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
-        ACLK_SHARED_STATE_UNLOCK;
-        return 0;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
-
-    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
-
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
-    health_alarm_entry2json_nolock(local_buffer, ae, host);
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
-
-    msg = json_tokener_parse(local_buffer->buffer);
-
-    struct aclk_query *query = aclk_query_new(ALARM_STATE_UPDATE);
-    query->data.alarm_update = msg;
-    aclk_queue_query(query);
-
-    buffer_free(local_buffer);
-    return 0;
-}
-
 int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
 {
     struct aclk_query *query;
