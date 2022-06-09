@@ -553,7 +553,7 @@ update_build() {
       NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
       tar -xf netdata-latest.tar.gz >&3 2>&3
       rm netdata-latest.tar.gz >&3 2>&3
-      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
+      cd "$(find . -maxdepth 1 -type d -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
       RUN_INSTALLER=1
     fi
   fi
