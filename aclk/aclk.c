@@ -345,15 +345,11 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     else
         mqtt_wss_subscribe(client, topic, 1);
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (aclk_use_new_cloud_arch) {
-        topic = (char*)aclk_get_topic(ACLK_TOPICID_CMD_NG_V1);
-        if (!topic)
-            error("Unable to fetch topic for protobuf COMMAND (to subscribe)");
-        else
-            mqtt_wss_subscribe(client, topic, 1);
-    }
-#endif
+    topic = (char*)aclk_get_topic(ACLK_TOPICID_CMD_NG_V1);
+    if (!topic)
+        error("Unable to fetch topic for protobuf COMMAND (to subscribe)");
+    else
+        mqtt_wss_subscribe(client, topic, 1);
 
     aclk_stats_upd_online(1);
     aclk_connected = 1;
