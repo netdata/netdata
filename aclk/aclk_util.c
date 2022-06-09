@@ -127,19 +127,11 @@ struct topic_name {
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
-enum aclk_topics compulsory_topics_legacy[] = {
-    ACLK_TOPICID_CHART,
-    ACLK_TOPICID_ALARMS,
-    ACLK_TOPICID_METADATA,
-    ACLK_TOPICID_COMMAND,
-    ACLK_TOPICID_UNKNOWN
-};
-
-enum aclk_topics compulsory_topics_new_cloud_arch[] = {
+enum aclk_topics compulsory_topics[] = {
 // TODO remove old topics once not needed anymore
-    ACLK_TOPICID_CHART,
-    ACLK_TOPICID_ALARMS,
-    ACLK_TOPICID_METADATA,
+    ACLK_TOPICID_CHART, //TODO from legacy
+    ACLK_TOPICID_ALARMS, //TODO from legacy
+    ACLK_TOPICID_METADATA, //TODO from legacy
     ACLK_TOPICID_COMMAND,
     ACLK_TOPICID_AGENT_CONN,
     ACLK_TOPICID_CMD_NG_V1,
@@ -278,8 +270,6 @@ int aclk_generate_topic_cache(struct json_object *json)
             return 1;
         }
     }
-
-    enum aclk_topics *compulsory_topics = aclk_use_new_cloud_arch ? compulsory_topics_new_cloud_arch : compulsory_topics_legacy;
 
     for (int i = 0; compulsory_topics[i] != ACLK_TOPICID_UNKNOWN; i++) {
         if (!aclk_get_topic(compulsory_topics[i])) {
