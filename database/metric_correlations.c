@@ -47,10 +47,14 @@ static inline int binary_search_bigger_than(const double arr[], int left, int ri
         // so, binary search the next available value
 
         right = orig_right;
+
+        // for constant metrics, let's skip everything
+        if(unlikely(arr[right] == K)) return right + 1;
+
         while(left <= right) {
             int middle = left + (right - left) / 2;
 
-            if(arr[middle] == K)
+            if(likely(arr[middle] == K))
                 left = middle + 1;
 
             else
