@@ -21,24 +21,43 @@ struct per_dim {
     double highlight_diffs[MAX_POINTS];
 };
 
-static long int binarySearch(double arr[], long int left, long int right, double K) {
-    while (left <= right) {
-        long int m = left + (right - left) / 2;
+static inline int binary_search_bigger_than(const double arr[], int left, int right, double K) {
+    int orig_right = right;
 
-        // Check if x is present at mid
-        if (arr[m] == K)
-            return m;
+    // binary search to find K in the array
+    while(left <= right) {
+        int middle = left + (right - left) / 2;
+        double value = arr[middle];
 
-        // If x greater, ignore left half
-        if (arr[m] < K)
-            left = m + 1;
+        if(value < K)
+            left = middle + 1;
 
-        // If x is smaller, ignore right half
-        else
-            right = m - 1;
+        else if(value > K)
+            right = middle - 1;
+
+        else {
+            left = middle;
+            break;
+        }
     }
 
-    // if we reach here, then element was not present
+    // if "left" is inside the array and its value is K
+    // we need the index of the first value that is bigger than K
+    if(left <= orig_right && arr[left] == K) {
+        // so, binary search the next available value
+
+        right = orig_right;
+        while(left <= right) {
+            int middle = left + (right - left) / 2;
+
+            if(arr[middle] == K)
+                left = middle + 1;
+
+            else
+                right = middle - 1;
+        }
+    }
+
     return left;
 }
 
@@ -50,87 +69,67 @@ int compare_doubles(const void *left, const void *right) {
     return (lt > rt) - (lt < rt);
 }
 
-static double kstwo(double data1[], long int n1, double data2[], long int n2) {
+static double kstwo(double data1[], int n1, double data2[], int n2) {
     qsort(data1, n1, sizeof(double), compare_doubles);
     qsort(data2, n2, sizeof(double), compare_doubles);
 
     double en1 = (double)n1;
 	double en2 = (double)n2;
-
     double min, max;
 
     // initialize min and max using the first number of data1
-    min = max = 0 - (binarySearch(data2, 0, n2 - 1, data1[0]) / en2);
+    double K = data1[0];
+    double cdf1 = (double)binary_search_bigger_than(data1, 0, n1 - 1, K) / en1; // starting from i, since data1 is sorted
+    double cdf2 = (double)binary_search_bigger_than(data2, 0, n2 - 1, K) / en2;
+    double delta = cdf1 - cdf2;
+    min = max = delta;
 
+    // do the first set starting from 1 (we did position 0 above)
     for(int i = 1; i < n1 ; i++) {
-        double K = data1[i];
-        double cdf1, cdf2, cddiffs;
+        K = data1[i];
+        cdf1 = (double)binary_search_bigger_than(data1, i, n1 - 1, K) / en1; // starting from i, since data1 is sorted
+        cdf2 = (double)binary_search_bigger_than(data2, 0, n2 - 1, K) / en2;
 
-        cdf1 = i / en1;
-        cdf2 = binarySearch(data2, 0, n2 - 1, K) / en2;
-
-        cddiffs = cdf1 - cdf2;
-        if(cddiffs < min) min = cddiffs;
-        if(cddiffs > max) max = cddiffs;
+        delta = cdf1 - cdf2;
+        if(delta < min) min = delta;
+        else if(delta > max) max = delta;
     }
 
+    // do the second set
     for(int i = 0; i < n2 ; i++) {
-        double K = data2[i];
-        double cdf1, cdf2, cddiffs;
+        K = data2[i];
+        cdf1 = (double)binary_search_bigger_than(data1, 0, n1 - 1, K) / en1;
+        cdf2 = (double)binary_search_bigger_than(data2, i, n2 - 1, K) / en2; // starting from i, since data2 is sorted
 
-        cdf1 = binarySearch(data1, 0, n1 - 1, K) / en1;
-        cdf2 = i / en2;
-
-        cddiffs = cdf1 - cdf2;
-        if(cddiffs < min) min = cddiffs;
-        if(cddiffs > max) max = cddiffs;
+        delta = cdf1 - cdf2;
+        if(delta < min) min = delta;
+        else if(delta > max) max = delta;
     }
 
-    // clip min
     if (fabs(min) > 1) min = 1;
 
     double d;
     if (fabs(min) < max) d = max;
     else d = fabs(min);
 
-    if(isnan(d)) d = 0.0;
-
     double en = en1 * en2 / (en1 + en2);
 
     return KSfbar((int)round(en), d);
 }
 
-static void fill_nan (struct per_dim *d, long int hp, long int bp) {
-    int k;
+static void calculate_pairs_diff(double *diffs, calculated_number *arr, size_t size) {
+    double *diffs_end = &diffs[size - 1];
+    arr = &arr[size - 1];
 
-    for (k = 0; k < bp; k++) {
-        if (isnan(d->baseline[k])) {
-            d->baseline[k] = 0.0;
-        }
-    }
-
-    for (k = 0; k < hp; k++) {
-        if (isnan(d->highlight[k])) {
-            d->highlight[k] = 0.0;
-        }
-    }
-}
-
-// TODO check counters
-static void run_diffs_and_rev (struct per_dim *d, long int hp, long int bp)
-{
-    int k, j;
-
-    for (k = 0, j = bp; k < bp - 1; k++, j--)
-        d->baseline_diffs[k] = (double)d->baseline[j - 2] - (double)d->baseline[j - 1];
-
-    for (k = 0, j = hp; k < hp - 1; k++, j--) {
-        d->highlight_diffs[k] = (double)d->highlight[j - 2] - (double)d->highlight[j - 1];
+    while(diffs <= diffs_end) {
+        double second = (double)*arr--;
+        double first  = (double)*arr;
+        *diffs++ = first - second;
     }
 }
 
 static int run_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points) {
-    uint32_t options = 0x00000000;
+    RRDR_OPTIONS options = RRDR_OPTION_NULL2ZERO;
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
@@ -201,15 +200,16 @@ static int run_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_af
     rrdr_free(owa, rh);
     onewayalloc_destroy(owa);
 
-    for(i = 0; i < b_dims ; i++)
-        fill_nan(&pd[i], highlight_points, baseline_points);
-
-    for(i = 0; i < b_dims ; i++)
-        run_diffs_and_rev(&pd[i], highlight_points, baseline_points);
+    for(i = 0; i < b_dims ; i++) {
+        calculate_pairs_diff(pd[i].baseline_diffs, pd[i].baseline, baseline_points);
+        calculate_pairs_diff(pd[i].highlight_diffs, pd[i].highlight, highlight_points);
+    }
 
     for(i = 0 ; i < j ; i++) {
         if (baseline_points && highlight_points) {
             double prob = kstwo(pd[i].baseline_diffs, baseline_points-1, pd[i].highlight_diffs, highlight_points-1);
+
+            // fprintf(stderr, "kstwo %d = %s:%s:%f\n", gettid(), st->name, pd[i].dimension, prob);
 
             buffer_sprintf(wb, "\t\t\t\t\"%s\": %f", pd[i].dimension, prob);
             if (i != j-1)
