@@ -45,8 +45,6 @@ netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
 struct aclk_shared_state aclk_shared_state = {
-    .agent_state = ACLK_HOST_INITIALIZING,
-    .last_popcorn_interrupt = 0,
     .mqtt_shutdown_msg_id = -1,
     .mqtt_shutdown_msg_rcvd = 0
 };
@@ -302,29 +300,6 @@ static int handle_connection(mqtt_wss_client client)
     return 0;
 }
 
-inline static int aclk_popcorn_check()
-{
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
-        ACLK_SHARED_STATE_UNLOCK;
-        return 1;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
-    return 0;
-}
-
-inline static int aclk_popcorn_check_bump()
-{
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
-        aclk_shared_state.last_popcorn_interrupt = now_realtime_sec();
-        ACLK_SHARED_STATE_UNLOCK;
-        return 1;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
-    return 0;
-}
-
 static inline void mqtt_connected_actions(mqtt_wss_client client)
 {
     char *topic = (char*)aclk_get_topic(ACLK_TOPICID_COMMAND);
@@ -347,41 +322,6 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_connection_counter++;
 
     aclk_send_agent_connection_update(client, 1);
-}
-
-/* Waits until agent is ready or needs to exit
- * @param client instance of mqtt_wss_client
- * @param query_threads pointer to aclk_query_threads
- *        structure where to store data about started query threads
- * @return  0 - Popcorning Finished - Agent STABLE,
- *         !0 - netdata_exit
- */
-static int wait_popcorning_finishes()
-{
-    time_t elapsed;
-    int need_wait;
-    if (aclk_use_new_cloud_arch)
-        return 0;
-
-    while (!netdata_exit) {
-        ACLK_SHARED_STATE_LOCK;
-        if (likely(aclk_shared_state.agent_state != ACLK_HOST_INITIALIZING)) {
-            ACLK_SHARED_STATE_UNLOCK;
-            return 0;
-        }
-        elapsed = now_realtime_sec() - aclk_shared_state.last_popcorn_interrupt;
-        if (elapsed >= ACLK_STABLE_TIMEOUT) {
-            aclk_shared_state.agent_state = ACLK_HOST_STABLE;
-            ACLK_SHARED_STATE_UNLOCK;
-            error("ACLK localhost popcorn timer finished");
-            return 0;
-        }
-        ACLK_SHARED_STATE_UNLOCK;
-        need_wait = ACLK_STABLE_TIMEOUT - elapsed;
-        error("ACLK localhost popcorn timer - wait %d seconds longer", need_wait);
-        sleep(need_wait);
-    }
-    return 1;
 }
 
 void aclk_graceful_disconnect(mqtt_wss_client client)
@@ -685,7 +625,6 @@ void *aclk_main(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 #endif
-    aclk_popcorn_check_bump(); // start localhost popcorn timer
     query_threads.count = read_query_thread_count();
 
     if (wait_till_cloud_enabled())
@@ -734,12 +673,6 @@ void *aclk_main(void *ptr)
         error_report("######################################################################");
 #endif
 
-        // warning this assumes the popcorning is relative short (3s)
-        // if that changes call mqtt_wss_service from within
-        // to keep OpenSSL, WSS and MQTT connection alive
-        if (wait_popcorning_finishes())
-            goto exit_full;
-        
         if (unlikely(!query_threads.thread_list))
             aclk_query_threads_start(&query_threads, mqttwss_client);
 
@@ -778,13 +711,6 @@ exit:
 
 void aclk_alarm_reload(void)
 {
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
-        ACLK_SHARED_STATE_UNLOCK;
-        return;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
-
     aclk_queue_query(aclk_query_new(METADATA_ALARMS));
 }
 

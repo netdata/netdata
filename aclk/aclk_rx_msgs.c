@@ -116,20 +116,8 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     return 0;
 }
 
-#define HTTP_CHECK_AGENT_INITIALIZED() ACLK_SHARED_STATE_LOCK;\
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {\
-        debug(D_ACLK, "Ignoring \"http\" cloud request; agent not in stable state");\
-        ACLK_SHARED_STATE_UNLOCK;\
-        return 1;\
-    }\
-    ACLK_SHARED_STATE_UNLOCK;
-
 static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent, char *raw_payload)
 {
-    if (!aclk_use_new_cloud_arch) {
-        HTTP_CHECK_AGENT_INITIALIZED();
-    }
-
     aclk_query_t query;
 
     errno = 0;

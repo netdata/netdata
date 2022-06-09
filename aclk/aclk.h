@@ -21,9 +21,6 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
 extern struct aclk_shared_state {
-    ACLK_AGENT_STATE agent_state;
-    time_t last_popcorn_interrupt;
-
     // To wait for `disconnect` message PUBACK
     // when shutting down
     // at the same time if > 0 we know link is
