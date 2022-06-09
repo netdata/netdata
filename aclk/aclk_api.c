@@ -13,7 +13,6 @@ usec_t aclk_session_us = 0;
 time_t aclk_session_sec = 0;
 
 int aclk_disable_runtime = 0;
-int aclk_disable_single_updates = 0;
 
 int aclk_stats_enabled;
 int use_mqtt_5 = 0;
@@ -32,16 +31,6 @@ void *aclk_starter(void *ptr) {
         error("Unknown value \"%s\" of key \"" ACLK_IMPL_KEY_NAME "\" in section \"" CONFIG_SECTION_CLOUD "\". Using ACLK-NG. This config key will be deprecated.", aclk_impl_req);
     }
     return aclk_main(ptr);
-}
-
-void aclk_single_update_disable()
-{
-    aclk_disable_single_updates = 1;
-}
-
-void aclk_single_update_enable()
-{
-    aclk_disable_single_updates = 0;
 }
 #endif /* ENABLE_ACLK */
 
