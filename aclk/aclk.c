@@ -709,11 +709,6 @@ exit:
     return NULL;
 }
 
-void aclk_alarm_reload(void)
-{
-    aclk_queue_query(aclk_query_new(METADATA_ALARMS));
-}
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_host_state_update(RRDHOST *host, int cmd)
 {

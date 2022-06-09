@@ -25,8 +25,6 @@ extern int use_mqtt_5;
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr);
 
-void aclk_alarm_reload(void);
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_host_state_update(RRDHOST *host, int connect);
 #endif

@@ -230,10 +230,7 @@ void health_reload(void) {
     rrd_unlock();
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting) {
-        aclk_alarm_reload();
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         aclk_alert_reloaded = 1;
-#endif
     }
 #endif
 }
