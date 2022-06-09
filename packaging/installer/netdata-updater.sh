@@ -422,7 +422,7 @@ self_update() {
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
       force_update=""
       [ "$NETDATA_FORCE_UPDATE" = "1" ] && force_update="--force-update"
-      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update --tmpdir-path "$(pwd)" "$force_update"
+      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update "$force_update" --tmpdir-path "$(pwd)"
     else
       error "Failed to download newest version of updater script, continuing with current version."
     fi
