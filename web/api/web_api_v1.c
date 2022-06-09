@@ -1334,12 +1334,16 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
 
         if (!strcmp(name, "baseline_after"))
             baseline_after = (long long) strtoul(value, NULL, 0);
+
         else if (!strcmp(name, "baseline_before"))
             baseline_before = (long long) strtoul(value, NULL, 0);
+
         else if (!strcmp(name, "highlight_after"))
             highlight_after = (long long) strtoul(value, NULL, 0);
+
         else if (!strcmp(name, "highlight_before"))
             highlight_before = (long long) strtoul(value, NULL, 0);
+
         else if (!strcmp(name, "max_points"))
             max_points = (long long) strtoul(value, NULL, 0);
         
@@ -1350,11 +1354,10 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    if (!highlight_after || !highlight_before)
+    if(!highlight_after || !highlight_before)
         buffer_strcat(wb, "{\"error\": \"Missing or invalid required highlight after and before parameters.\" }");
-    else {
+    else
         metric_correlations(host, wb, baseline_after, baseline_before, highlight_after, highlight_before, max_points);
-    }
 
     return HTTP_RESP_OK;
 }

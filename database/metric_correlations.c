@@ -21,78 +21,86 @@ struct per_dim {
     double highlight_diffs[MAX_POINTS];
 };
 
-int find_index(double arr[], long int n, double K, long int start)
-{
-    for (long int i = start; i < n; i++) {
-        if (K<arr[i]){
-            return i;
-        }
+static long int binarySearch(double arr[], long int left, long int right, double K) {
+    while (left <= right) {
+        long int m = left + (right - left) / 2;
+
+        // Check if x is present at mid
+        if (arr[m] == K)
+            return m;
+
+        // If x greater, ignore left half
+        if (arr[m] < K)
+            left = m + 1;
+
+        // If x is smaller, ignore right half
+        else
+            right = m - 1;
     }
-    return n;
+
+    // if we reach here, then element was not present
+    return left;
 }
 
-int compare(const void *left, const void *right) {
+int compare_doubles(const void *left, const void *right) {
     double lt = *(double *)left;
     double rt = *(double *)right;
 
-    if(unlikely(lt < rt)) return -1;
-    if(unlikely(lt > rt)) return 1;
-    return 0;
+    // https://stackoverflow.com/a/3886497/1114110
+    return (lt > rt) - (lt < rt);
 }
 
-void kstwo(double data1[], long int n1, double data2[], long int n2, double *d, double *prob)
-{
-	double en1, en2, en, data_all[MAX_POINTS*2], cdf1[MAX_POINTS], cdf2[MAX_POINTS], cddiffs[MAX_POINTS];
-    double min = 0.0, max = 0.0;
-    qsort(data1, n1, sizeof(double), compare);
-    qsort(data2, n2, sizeof(double), compare);
+static double kstwo(double data1[], long int n1, double data2[], long int n2) {
+    qsort(data1, n1, sizeof(double), compare_doubles);
+    qsort(data2, n2, sizeof(double), compare_doubles);
 
-    for (int i = 0; i < n1; i++)
-        data_all[i] = data1[i];
-    for (int i = 0; i < n2; i++)
-        data_all[n1 + i] = data2[i];
+    double en1 = (double)n1;
+	double en2 = (double)n2;
 
-    en1 = (double)n1;
-	en2 = (double)n2;
-    *d = 0.0;
-    cddiffs[0]=0; //for uninitialized warning
+    double min, max;
 
-    for (int i=0; i<n1+n2;i++)
-        cdf1[i] = find_index(data1, n1, data_all[i], 0) / en1; //TODO, use the start to reduce loops
+    // initialize min and max using the first number of data1
+    min = max = 0 - (binarySearch(data2, 0, n2 - 1, data1[0]) / en2);
 
-    for (int i=0; i<n1+n2;i++)
-        cdf2[i] = find_index(data2, n2, data_all[i], 0) / en2;
+    for(int i = 1; i < n1 ; i++) {
+        double K = data1[i];
+        double cdf1, cdf2, cddiffs;
 
-    for ( int i=0;i<n2+n1;i++)
-        cddiffs[i] = cdf1[i] - cdf2[i];
+        cdf1 = i / en1;
+        cdf2 = binarySearch(data2, 0, n2 - 1, K) / en2;
 
-    min = cddiffs[0];
-    for ( int i=0;i<n2+n1;i++) {
-        if (cddiffs[i] < min)
-            min = cddiffs[i];
+        cddiffs = cdf1 - cdf2;
+        if(cddiffs < min) min = cddiffs;
+        if(cddiffs > max) max = cddiffs;
     }
 
-    //clip min
-    if (fabs(min) < 0) min = 0;
-    else if (fabs(min) > 1) min = 1;
+    for(int i = 0; i < n2 ; i++) {
+        double K = data2[i];
+        double cdf1, cdf2, cddiffs;
 
-    max = fabs(cddiffs[0]);
-    for ( int i=0;i<n2+n1;i++)
-        if (cddiffs[i] >= max) max = cddiffs[i];
+        cdf1 = binarySearch(data1, 0, n1 - 1, K) / en1;
+        cdf2 = i / en2;
 
-    if (fabs(min) < max)
-        *d = max;
-    else
-        *d = fabs(min);
+        cddiffs = cdf1 - cdf2;
+        if(cddiffs < min) min = cddiffs;
+        if(cddiffs > max) max = cddiffs;
+    }
 
-    
-    
-    en = (en1*en2 / (en1 + en2));
-    *prob = KSfbar(round(en), *d);
+    // clip min
+    if (fabs(min) > 1) min = 1;
+
+    double d;
+    if (fabs(min) < max) d = max;
+    else d = fabs(min);
+
+    if(isnan(d)) d = 0.0;
+
+    double en = en1 * en2 / (en1 + en2);
+
+    return KSfbar((int)round(en), d);
 }
 
-void fill_nan (struct per_dim *d, long int hp, long int bp)
-{
+static void fill_nan (struct per_dim *d, long int hp, long int bp) {
     int k;
 
     for (k = 0; k < bp; k++) {
@@ -108,20 +116,20 @@ void fill_nan (struct per_dim *d, long int hp, long int bp)
     }
 }
 
-//TODO check counters
-void run_diffs_and_rev (struct per_dim *d, long int hp, long int bp)
+// TODO check counters
+static void run_diffs_and_rev (struct per_dim *d, long int hp, long int bp)
 {
     int k, j;
 
     for (k = 0, j = bp; k < bp - 1; k++, j--)
         d->baseline_diffs[k] = (double)d->baseline[j - 2] - (double)d->baseline[j - 1];
+
     for (k = 0, j = hp; k < hp - 1; k++, j--) {
         d->highlight_diffs[k] = (double)d->highlight[j - 2] - (double)d->highlight[j - 1];
     }
 }
 
-int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points)
-{
+static int run_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points) {
     uint32_t options = 0x00000000;
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
@@ -133,8 +141,9 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
 
     struct per_dim *pd = NULL;
 
-    //TODO get everything in one go, when baseline is right before highlight
-    //get baseline
+    // TODO get everything in one go, when baseline is right before highlight
+
+    // get baseline
     ONEWAYALLOC *owa = onewayalloc_create(0);
     RRDR *rb = rrd2rrdr(owa, st, max_points, baseline_after, baseline_before, group_method, group_time, options, NULL, context_param_list, 0);
     if(!rb) {
@@ -192,18 +201,16 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
     rrdr_free(owa, rh);
     onewayalloc_destroy(owa);
 
-    for (i = 0; i < b_dims; i++) {
+    for(i = 0; i < b_dims ; i++)
         fill_nan(&pd[i], highlight_points, baseline_points);
-    }
 
-    for (i = 0; i < b_dims; i++) {
+    for(i = 0; i < b_dims ; i++)
         run_diffs_and_rev(&pd[i], highlight_points, baseline_points);
-    }
 
-    double d=0, prob=0;
-    for (i=0;i < j ;i++) {
+    for(i = 0 ; i < j ; i++) {
         if (baseline_points && highlight_points) {
-            kstwo(pd[i].baseline_diffs, baseline_points-1, pd[i].highlight_diffs, highlight_points-1, &d, &prob);
+            double prob = kstwo(pd[i].baseline_diffs, baseline_points-1, pd[i].highlight_diffs, highlight_points-1);
+
             buffer_sprintf(wb, "\t\t\t\t\"%s\": %f", pd[i].dimension, prob);
             if (i != j-1)
                 buffer_sprintf(wb, ",\n");
@@ -216,8 +223,10 @@ int run_metric_correlations (BUFFER *wb, RRDSET *st, long long baseline_after, l
     return j;
 }
 
-void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points)
-{
+void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points) {
+
+    usec_t started_t = now_realtime_usec();
+
     info ("Running metric correlations, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld", highlight_after, highlight_before, baseline_after, baseline_before, max_points);
 
     if (!enable_metric_correlations) {
@@ -265,8 +274,8 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
         buffer_flush(wdims);
         dims = run_metric_correlations(wdims, ch->st, baseline_after, baseline_before, highlight_after, highlight_before, max_points);
         if (dims) {
-            if (c)
-                buffer_strcat(wb, "\t\t},");
+            if (c) buffer_strcat(wb, "\t\t},");
+
             buffer_strcat(wb, "\n\t\t\"");
             buffer_strcat(wb, ch->st->id);
             buffer_strcat(wb, "\": {\n");
@@ -296,5 +305,8 @@ void metric_correlations (RRDHOST *host, BUFFER *wb, long long baseline_after, l
     }
 
     buffer_free(wdims);
-    info ("Done running metric correlations");
+
+    usec_t ended_t = now_realtime_usec();
+
+    info ("Done running metric correlations in %llu usec", ended_t -started_t);
 }
