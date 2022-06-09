@@ -10,7 +10,6 @@
 #include "aclk_query_queue.h"
 #include "aclk_util.h"
 #include "aclk_rx_msgs.h"
-#include "aclk_collector_list.h"
 #include "https_client.h"
 #include "schema-wrappers/schema_wrappers.h"
 
@@ -898,94 +897,6 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
 
     aclk_queue_query(query);
     return 0;
-}
-
-/*
- * Add a new collector to the list
- * If it exists, update the chart count
- */
-void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
-{
-    struct aclk_query *query;
-    struct _collector *tmp_collector;
-    if (unlikely(!netdata_ready || aclk_use_new_cloud_arch)) {
-        return;
-    }
-
-    COLLECTOR_LOCK;
-
-    tmp_collector = _add_collector(host->machine_guid, plugin_name, module_name);
-
-    if (unlikely(tmp_collector->count != 1)) {
-        COLLECTOR_UNLOCK;
-        return;
-    }
-
-    COLLECTOR_UNLOCK;
-
-    if (aclk_popcorn_check_bump())
-        return;
-
-    if (host != localhost)
-        return;
-
-    query = aclk_query_new(METADATA_INFO);
-    query->data.metadata_info.host = localhost; //TODO
-    query->data.metadata_info.initial_on_connect = 0;
-    aclk_queue_query(query);
-
-    query = aclk_query_new(METADATA_ALARMS);
-    query->data.metadata_alarms.initial_on_connect = 0;
-    aclk_queue_query(query);
-}
-
-/*
- * Delete a collector from the list
- * If the chart count reaches zero the collector will be removed
- * from the list by calling del_collector.
- *
- * This function will release the memory used and schedule
- * a cloud update
- */
-void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
-{
-    struct aclk_query *query;
-    struct _collector *tmp_collector;
-    if (unlikely(!netdata_ready || aclk_use_new_cloud_arch)) {
-        return;
-    }
-
-    COLLECTOR_LOCK;
-
-    tmp_collector = _del_collector(host->machine_guid, plugin_name, module_name);
-
-    if (unlikely(!tmp_collector || tmp_collector->count)) {
-        COLLECTOR_UNLOCK;
-        return;
-    }
-
-    debug(
-        D_ACLK, "DEL COLLECTOR [%s:%s] -- charts %u", plugin_name ? plugin_name : "*", module_name ? module_name : "*",
-        tmp_collector->count);
-
-    COLLECTOR_UNLOCK;
-
-    _free_collector(tmp_collector);
-
-    if (aclk_popcorn_check_bump())
-        return;
-    
-    if (host != localhost)
-        return;
-
-    query = aclk_query_new(METADATA_INFO);
-    query->data.metadata_info.host = localhost; //TODO
-    query->data.metadata_info.initial_on_connect = 0;
-    aclk_queue_query(query);
-
-    query = aclk_query_new(METADATA_ALARMS);
-    query->data.metadata_alarms.initial_on_connect = 0;
-    aclk_queue_query(query);
 }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
