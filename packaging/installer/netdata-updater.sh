@@ -622,7 +622,7 @@ update_build() {
 }
 
 update_static() {
-  warning "Due to nown issues with updates on static builds, updates for this system are temporarily disabled. They should start working again automatically once this issue is fixed."
+  warning "Due to known issues with updates on static builds, updates for this system are temporarily disabled. They should start working again automatically once this issue is fixed."
   return 0
 
   ndtmpdir="$(create_tmp_directory)"
