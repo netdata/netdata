@@ -7,7 +7,7 @@ struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
 extern void analytics_exporting_connectors_ssl (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
-extern int aclk_connected, aclk_use_new_cloud_arch;
+extern int aclk_connected;
 
 struct collector {
     char *plugin;
@@ -499,12 +499,7 @@ void analytics_aclk(void)
 #ifdef ENABLE_ACLK
     if (aclk_connected) {
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "true");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        if (aclk_use_new_cloud_arch)
-            analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "New");
-        else
-#endif
-            analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "Legacy");
+        analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "New");
     }
     else
 #endif
