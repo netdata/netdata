@@ -981,35 +981,6 @@ install_netdata_updater() {
   return 0
 }
 
-cleanup_old_netdata_updater() {
-  if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh ]; then
-    echo >&2 "Removing updater from deprecated location"
-    rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
-  fi
-
-  if issystemd && [ -n "$(get_systemd_service_dir)" ] ; then
-    systemctl disable netdata-updater.timer
-    rm -f "$(get_systemd_service_dir)/netdata-updater.timer"
-    rm -f "$(get_systemd_service_dir)/netdata-updater.service"
-  fi
-
-  if [ -d /etc/cron.daily ]; then
-    rm -f /etc/cron.daily/netdata-updater.sh
-    rm -f /etc/cron.daily/netdata-updater
-  fi
-
-  if [ -d /etc/periodic/daily ]; then
-    rm -f /etc/periodic/daily/netdata-updater.sh
-    rm -f /etc/periodic/daily/netdata-updater
-  fi
-
-  if [ -d /etc/cron.d ]; then
-    rm -f /etc/cron.d/netdata-updater
-  fi
-
-  return 0
-}
-
 set_netdata_updater_channel() {
   sed -i -e "s/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL=\"${RELEASE_CHANNEL}\"/" "${NETDATA_USER_CONFIG_DIR}/.environment"
 }
