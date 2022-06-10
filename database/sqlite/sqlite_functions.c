@@ -99,6 +99,10 @@ static void add_stmt_to_list(sqlite3_stmt *res)
     static sqlite3_stmt *statements[MAX_OPEN_STATEMENTS];
 
     if (unlikely(!res)) {
+        if (idx)
+            info("Finilizing %d statements", idx);
+        else
+            info("No statements pending to finalize");
         while (idx > 0) {
             int rc;
             rc = sqlite3_finalize(statements[--idx]);
