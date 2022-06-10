@@ -77,7 +77,7 @@ Netdata fully supports the StatsD protocol and also extends it to support more a
 
 - **Sets**
 
-      The application sends `name:value|s`, where `value` is anything (**number or text**, leading and trailing spaces are removed), StatsD reports the number of unique values sent and the number of times it was updated (events).
+     The application sends `name:value|s`, where `value` is anything (**number or text**, leading and trailing spaces are removed), StatsD reports the number of unique values sent and the number of times it was updated (events).
 
      Sampling rate is **not** supported for Sets. `value` is always considered text (so `01` and `1` are considered different).
 
