@@ -4,7 +4,7 @@
 #include "KolmogorovSmirnovDist.h"
 
 #define MAX_POINTS 10000
-int enable_metric_correlations = CONFIG_BOOLEAN_NO;
+int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
 
 struct charts {
