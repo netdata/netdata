@@ -21,10 +21,11 @@ struct per_dim {
     long int highlight_diffs[MAX_POINTS];
 };
 
-#define DOUBLE_TO_INT_MULTIPLIER 100000.0
+#define DOUBLE_TO_INT_MULTIPLIER 1000000.0
 
 static inline int binary_search_bigger_than(const long int arr[], int left, int size, long int K) {
-    // binary search to find K in the array
+    // binary search to find the index the smallest index
+    // of the first value in the array that is greater than K
 
     int right = size;
     while(left < right) {
