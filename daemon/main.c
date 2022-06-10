@@ -584,6 +584,14 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
+    default_rrdeng_page_fetch_timeout = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine page fetch timeout", PAGE_CACHE_FETCH_WAIT_TIMEOUT);
+    if (default_rrdeng_page_fetch_timeout < 1)
+        default_rrdeng_page_fetch_timeout = 1;
+
+    default_rrdeng_page_fetch_retries = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine page fetch retries", MAX_PAGE_CACHE_FETCH_RETRIES);
+    if (default_rrdeng_page_fetch_retries < 1)
+        default_rrdeng_page_fetch_retries = 1;
+
     db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_GLOBAL, "page cache uses malloc", CONFIG_BOOLEAN_NO);
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
