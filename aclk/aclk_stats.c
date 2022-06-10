@@ -266,19 +266,24 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     static RRDSET *st = NULL;
     static RRDDIM *rd_sent = NULL;
     static RRDDIM *rd_recvd = NULL;
+    static uint64_t sent = 0;
+    static uint64_t recvd = 0;
+
+    sent += stats->bytes_tx;
+    recvd += stats->bytes_rx;
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_openssl_written", NULL, "aclk", NULL, "Sent bytes.", "B/s",
+            "netdata", "aclk_openssl_bytes", NULL, "aclk", NULL, "Received and Sent bytes.", "B/s",
             "netdata", "stats", 200011, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rd_sent  = rrddim_add(st, "sent", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_recvd = rrddim_add(st, "received", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_sent  = rrddim_add(st, "sent", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
+        rd_recvd = rrddim_add(st, "received", NULL, -11, localhost->rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
     } else
         rrdset_next(st);
 
-    rrddim_set_by_pointer(st, rd_sent, stats->bytes_tx);
-    rrddim_set_by_pointer(st, rd_recvd, -stats->bytes_rx);
+    rrddim_set_by_pointer(st, rd_sent, sent);
+    rrddim_set_by_pointer(st, rd_recvd, recvd);
 
     rrdset_done(st);
 }
