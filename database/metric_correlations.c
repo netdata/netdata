@@ -7,6 +7,9 @@
 int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
 
+typedef long long int DIFFS_NUMBERS;
+#define DOUBLE_TO_INT_MULTIPLIER 1000000.0
+
 struct charts {
     RRDSET *st;
     struct charts *next;
@@ -17,13 +20,11 @@ struct per_dim {
     calculated_number baseline[MAX_POINTS];
     calculated_number highlight[MAX_POINTS];
 
-    long int baseline_diffs[MAX_POINTS];
-    long int highlight_diffs[MAX_POINTS];
+    DIFFS_NUMBERS baseline_diffs[MAX_POINTS];
+    DIFFS_NUMBERS highlight_diffs[MAX_POINTS];
 };
 
-#define DOUBLE_TO_INT_MULTIPLIER 1000000.0
-
-static inline int binary_search_bigger_than(const long int arr[], int left, int size, long int K) {
+static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS K) {
     // binary search to find the index the smallest index
     // of the first value in the array that is greater than K
 
@@ -41,26 +42,24 @@ static inline int binary_search_bigger_than(const long int arr[], int left, int 
     return left;
 }
 
-int compare_doubles(const void *left, const void *right) {
-    long int lt = *(long int *)left;
-    long int rt = *(long int *)right;
+int compare_diffs(const void *left, const void *right) {
+    DIFFS_NUMBERS lt = *(DIFFS_NUMBERS *)left;
+    DIFFS_NUMBERS rt = *(DIFFS_NUMBERS *)right;
 
     // https://stackoverflow.com/a/3886497/1114110
     return (lt > rt) - (lt < rt);
 }
 
-static double kstwo(long int data1[], int n1, long int data2[], int n2) {
-    qsort(data1, n1, sizeof(long int), compare_doubles);
-    qsort(data2, n2, sizeof(long int), compare_doubles);
-
-    long int min, max;
+static double kstwo(DIFFS_NUMBERS data1[], int n1, DIFFS_NUMBERS data2[], int n2) {
+    qsort(data1, n1, sizeof(DIFFS_NUMBERS), compare_diffs);
+    qsort(data2, n2, sizeof(DIFFS_NUMBERS), compare_diffs);
 
     // initialize min and max using the first number of data1
-    long int K = data1[0];
-    long int cdf1 = binary_search_bigger_than(data1, 0, n1, K) / n1; // starting from i, since data1 is sorted
-    long int cdf2 = binary_search_bigger_than(data2, 0, n2, K) / n2;
-    long int delta = cdf1 - cdf2;
-    min = max = delta;
+    DIFFS_NUMBERS K = data1[0];
+    DIFFS_NUMBERS cdf1 = binary_search_bigger_than(data1, 0, n1, K) / n1; // starting from i, since data1 is sorted
+    DIFFS_NUMBERS cdf2 = binary_search_bigger_than(data2, 0, n2, K) / n2;
+    DIFFS_NUMBERS delta = cdf1 - cdf2;
+    DIFFS_NUMBERS min = delta, max = delta;
 
     // do the first set starting from 1 (we did position 0 above)
     for(int i = 1; i < n1 ; i++) {
@@ -100,14 +99,14 @@ static double kstwo(long int data1[], int n1, long int data2[], int n2) {
     return KSfbar((int)round(en), d);
 }
 
-static void calculate_pairs_diff(long int *diffs, calculated_number *arr, size_t size) {
-    long int *diffs_end = &diffs[size - 1];
+static void calculate_pairs_diff(DIFFS_NUMBERS *diffs, calculated_number *arr, size_t size) {
+    DIFFS_NUMBERS *diffs_end = &diffs[size - 1];
     arr = &arr[size - 1];
 
     while(diffs <= diffs_end) {
-        double second = (double)*arr--;
-        double first  = (double)*arr;
-        *diffs++ = (long int)((first - second) * DOUBLE_TO_INT_MULTIPLIER);
+        calculated_number second = *arr--;
+        calculated_number first  = *arr;
+        *diffs++ = (DIFFS_NUMBERS)((first - second) * DOUBLE_TO_INT_MULTIPLIER);
     }
 }
 
