@@ -297,7 +297,6 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = METADATA_INFO,        .name = "info_metadata",            .fnc = info_metadata            },
     { .type = METADATA_ALARMS,      .name = "alarms_metadata",          .fnc = alarms_metadata          },
     { .type = CHART_NEW,            .name = "chart_new",                .fnc = chart_query              },
-    { .type = CHART_DEL,            .name = "chart_delete",             .fnc = info_metadata            },
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     { .type = REGISTER_NODE,        .name = "register_node",            .fnc = send_bin_msg             },
     { .type = NODE_STATE_UPDATE,    .name = "node_state_update",        .fnc = send_bin_msg             },
