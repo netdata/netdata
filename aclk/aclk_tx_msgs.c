@@ -242,8 +242,6 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
     }
 }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-// new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
     size_t len;
     uint16_t pid;
@@ -318,7 +316,6 @@ char *aclk_generate_lwt(size_t *size) {
 
     return msg;
 }
-#endif /* ENABLE_NEW_CLOUD_PROTOCOL */
 
 #ifndef __GNUC__
 #pragma endregion

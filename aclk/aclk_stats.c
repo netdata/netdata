@@ -8,11 +8,9 @@ netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
 struct {
     int query_thread_count;
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     unsigned int proto_hdl_cnt;
     uint32_t *aclk_proto_rx_msgs_sample;
     RRDDIM **rx_msg_dims;
-#endif
 } aclk_stats_cfg; // there is only 1 stats thread at a time
 
 // data ACLK stats need per query thread
@@ -237,7 +235,6 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 const char *rx_handler_get_name(size_t i);
 static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
 {
@@ -259,7 +256,6 @@ static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
 
     rrdset_done(st);
 }
-#endif
 
 static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
 {
@@ -290,31 +286,23 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
 
 void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt)
 {
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
-    UNUSED(proto_hdl_cnt);
-#endif
-
     aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
     aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
     aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
 
     memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     aclk_stats_cfg.proto_hdl_cnt = proto_hdl_cnt;
     aclk_stats_cfg.aclk_proto_rx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_rx_msgs_sample));
     aclk_proto_rx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_rx_msgs_sample));
     aclk_stats_cfg.rx_msg_dims = callocz(proto_hdl_cnt, sizeof(RRDDIM*));
-#endif
 }
 
 void aclk_stats_thread_cleanup()
 {
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     freez(aclk_stats_cfg.rx_msg_dims);
     freez(aclk_proto_rx_msgs_sample);
     freez(aclk_stats_cfg.aclk_proto_rx_msgs_sample);
-#endif
     freez(aclk_qt_data);
     freez(aclk_queries_per_thread);
     freez(aclk_queries_per_thread_sample);
@@ -345,10 +333,10 @@ void *aclk_stats_main_thread(void *ptr)
         // to not hold lock longer than necessary, especially not to hold it
         // during database rrd* operations
         memcpy(&per_sample, &aclk_metrics_per_sample, sizeof(struct aclk_metrics_per_sample));
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+
         memcpy(aclk_stats_cfg.aclk_proto_rx_msgs_sample, aclk_proto_rx_msgs_sample, sizeof(*aclk_proto_rx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
         memset(aclk_proto_rx_msgs_sample, 0, sizeof(*aclk_proto_rx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
-#endif
+
         memcpy(&permanent, &aclk_metrics, sizeof(struct aclk_metrics));
         memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
 
@@ -373,9 +361,7 @@ void *aclk_stats_main_thread(void *ptr)
         struct mqtt_wss_stats mqtt_wss_stats = mqtt_wss_get_stats(args->client);
         aclk_stats_mqtt_wss(&mqtt_wss_stats);
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         aclk_stats_newproto_rx(aclk_stats_cfg.aclk_proto_rx_msgs_sample);
-#endif
     }
 
     return 0;

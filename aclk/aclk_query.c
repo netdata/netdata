@@ -256,14 +256,12 @@ cleanup:
     return retval;
 }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
     // this will be simplified when legacy support is removed
     aclk_send_bin_message_subtopic_pid(query_thr->client, query->data.bin_payload.payload, query->data.bin_payload.size, query->data.bin_payload.topic, query->data.bin_payload.msg_name);
     return 0;
 }
-#endif
 
 const char *aclk_query_get_name(aclk_query_type_t qt)
 {

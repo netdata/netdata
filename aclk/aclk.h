@@ -29,10 +29,8 @@ extern struct aclk_shared_state {
     int mqtt_shutdown_msg_rcvd;
 } aclk_shared_state;
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_host_state_update(RRDHOST *host, int cmd);
 void aclk_send_node_instances(void);
-#endif
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 

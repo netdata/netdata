@@ -47,7 +47,7 @@ void netdata_cleanup_and_exit(int ret) {
 
         // stop everything
         info("EXIT: stopping static threads...");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
         aclk_sync_exit_all();
 #endif
         cancel_main_threads();

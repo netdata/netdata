@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_chart.h"
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
 #include "../../aclk/aclk_charts_api.h"
 #include "../../aclk/aclk.h"
 
@@ -1313,11 +1313,11 @@ void sql_check_chart_liveness(RRDSET *st) {
     rrdset_unlock(st);
 }
 
-#endif //ENABLE_NEW_CLOUD_PROTOCOL
-
 // ST is read locked
 int queue_chart_to_aclk(RRDSET *st)
 {
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                        st, ACLK_DATABASE_ADD_CHART);
 }
+
+#endif //ENABLE_ACLK

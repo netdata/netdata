@@ -886,7 +886,7 @@ void rrdhost_free(RRDHOST *host) {
 
 
     rrdhost_wrlock(host);   // lock this RRDHOST
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
     struct aclk_database_worker_config *wc =  host->dbsync_worker;
     if (wc && !netdata_exit) {
         struct aclk_database_cmd cmd;
@@ -999,7 +999,7 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->node_id);
 
     freez(host);
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
     if (wc)
         wc->is_orphan = 0;
 #endif
@@ -1330,7 +1330,7 @@ restart_after_removal:
                             }
                             continue;
                         }
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
                         else
                             queue_dimension_to_aclk(rd, rd->last_collected_time.tv_sec);
 #endif
@@ -1363,7 +1363,7 @@ restart_after_removal:
             rrdset_free(st);
             goto restart_after_removal;
         }
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
         else
             sql_check_chart_liveness(st);
 #endif

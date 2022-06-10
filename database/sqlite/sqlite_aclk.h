@@ -115,7 +115,6 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     ACLK_DATABASE_ADD_CHART,
     ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_PUSH_CHART,
@@ -125,7 +124,6 @@ enum aclk_database_opcode {
     ACLK_DATABASE_UPD_RETENTION,
     ACLK_DATABASE_DIM_DELETION,
     ACLK_DATABASE_ORPHAN_HOST,
-#endif
     ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_DELETE_HOST,
