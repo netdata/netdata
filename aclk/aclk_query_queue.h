@@ -11,7 +11,6 @@
 
 typedef enum {
     UNKNOWN = 0,
-    METADATA_INFO,
     HTTP_API_V2,
     CHART_NEW,
     REGISTER_NODE,
@@ -26,11 +25,6 @@ typedef enum {
     ALARM_SNAPSHOT,
     ACLK_QUERY_TYPE_COUNT // always keep this as last
 } aclk_query_type_t;
-
-struct aclk_query_metadata {
-    RRDHOST *host;
-    int initial_on_connect;
-};
 
 struct aclk_query_chart_add_del {
     RRDHOST *host;
@@ -70,7 +64,6 @@ struct aclk_query {
     // TODO maybe remove?
     int version;
     union {
-        struct aclk_query_metadata metadata_info;
         struct aclk_query_http_api_v2 http_api_v2;
         struct aclk_query_chart_add_del chart_add_del;
         struct aclk_bin_payload bin_payload;
