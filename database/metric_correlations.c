@@ -7,8 +7,8 @@
 int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
 
-typedef long long int DIFFS_NUMBERS;
-#define DOUBLE_TO_INT_MULTIPLIER 1000000
+typedef long int DIFFS_NUMBERS;
+#define DOUBLE_TO_INT_MULTIPLIER 100000
 
 struct charts {
     RRDSET *st;
@@ -19,9 +19,6 @@ struct per_dim {
     char *dimension;
     calculated_number baseline[MAX_POINTS];
     calculated_number highlight[MAX_POINTS];
-
-    DIFFS_NUMBERS baseline_diffs[MAX_POINTS];
-    DIFFS_NUMBERS highlight_diffs[MAX_POINTS];
 };
 
 static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS K) {
@@ -50,91 +47,104 @@ int compare_diffs(const void *left, const void *right) {
     return (lt > rt) - (lt < rt);
 }
 
-static double kstwo(DIFFS_NUMBERS base[], int base_size, DIFFS_NUMBERS high[], int high_size, uint32_t base_shifts) {
-    qsort(base, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
-    qsort(high, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
+static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, calculated_number *arr, size_t size) {
+    DIFFS_NUMBERS *started_diffs = diffs;
+    calculated_number *last = &arr[size - 1];
+
+    while(last > arr) {
+        calculated_number second = *last--;
+        calculated_number first  = *last;
+        *diffs++ = (DIFFS_NUMBERS)((first - second) * (calculated_number)DOUBLE_TO_INT_MULTIPLIER);
+    }
+
+    return (diffs - started_diffs) / sizeof(DIFFS_NUMBERS);
+}
+
+static double kstwo(calculated_number baseline[], int baseline_points, calculated_number highlight[], int highlight_points, uint32_t base_shifts) {
+
+    DIFFS_NUMBERS baseline_diffs[baseline_points - 1];
+    DIFFS_NUMBERS highlight_diffs[highlight_points - 1];
+
+    int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
+    int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
+
+    qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
+    qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
 
     // initialize min and max using the first number of data1
-    DIFFS_NUMBERS K = base[0];
-    int cdf1 = binary_search_bigger_than(base, 1, base_size, K);
-    int cdf2 = binary_search_bigger_than(high, 0, high_size, K);
-    int delta = (cdf1 >> base_shifts) - cdf2;
+    DIFFS_NUMBERS K = baseline_diffs[0];
+    int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
+    int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+    int delta = (base_idx >> base_shifts) - high_idx;
     int min = delta, max = delta;
-    int min1 = cdf1, min2 = cdf2;
-    int max1 = cdf1, max2 = cdf2;
+    int base_min_idx = base_idx;
+    int base_max_idx = base_idx;
+    int high_min_idx = high_idx;
+    int high_max_idx = high_idx;
 
     // do the first set starting from 1 (we did position 0 above)
     for(int i = 1; i < base_size; i++) {
-        K = base[i];
-        cdf1 = binary_search_bigger_than(base, i + 1, base_size, K); // starting from i, since data1 is sorted
-        cdf2 = binary_search_bigger_than(high, 0, high_size, K);
+        K = baseline_diffs[i];
+        base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
+        high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
 
-        delta = (cdf1 >> base_shifts) - cdf2;
+        delta = (base_idx >> base_shifts) - high_idx;
         if(delta < min) {
             min = delta;
-            min1 = cdf1;
-            min2 = cdf2;
+            base_min_idx = base_idx;
+            high_min_idx = high_idx;
         }
         else if(delta > max) {
             max = delta;
-            max1 = cdf1;
-            max2 = cdf2;
+            base_max_idx = base_idx;
+            high_max_idx = high_idx;
         }
     }
 
     // do the second set
     for(int i = 0; i < high_size; i++) {
-        K = high[i];
-        cdf1 = binary_search_bigger_than(base, 0, base_size, K);
-        cdf2 = binary_search_bigger_than(high, i + 1, high_size, K); // starting from i, since data2 is sorted
+        K = highlight_diffs[i];
+        base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
+        high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
 
-        delta = (cdf1 >> base_shifts) - cdf2;
+        delta = (base_idx >> base_shifts) - high_idx;
         if(delta < min) {
             min = delta;
-            min1 = cdf1;
-            min2 = cdf2;
+            base_min_idx = base_idx;
+            high_min_idx = high_idx;
         }
         else if(delta > max) {
             max = delta;
-            max1 = cdf1;
-            max2 = cdf2;
+            base_max_idx = base_idx;
+            high_max_idx = high_idx;
         }
     }
 
-    double en1 = (double)base_size;
-    double en2 = (double)high_size;
-    double emin = ((double)min1 / en1) - ((double)min2 / en2);
-    double emax = ((double)max1 / en1) - ((double)max2 / en2);
-
-    if (fabs(emin) > 1) emin = 1.0;
+    double base_length = (double)base_size;
+    double high_length = (double)high_size;
+    double dmin = ((double)base_min_idx / base_length) - ((double)high_min_idx / high_length);
+    double dmax = ((double)base_max_idx / base_length) - ((double)high_max_idx / high_length);
 
     double d;
-    if (fabs(emin) < emax) d = emax;
-    else d = fabs(emin);
 
-    double en = en1 * en2 / (en1 + en2);
+    if (fabs(dmin) > 1)
+        dmin = 1.0;
+
+    if (fabs(dmin) < dmax) d = dmax;
+    else d = fabs(dmin);
+
+    double en = base_length * high_length / (base_length + high_length);
     return KSfbar((int)round(en), d);
 }
 
-static void calculate_pairs_diff(DIFFS_NUMBERS *diffs, calculated_number *arr, size_t size) {
-    DIFFS_NUMBERS *diffs_end = &diffs[size - 1];
-    arr = &arr[size - 1];
-
-    while(diffs <= diffs_end) {
-        calculated_number second = *arr--;
-        calculated_number first  = *arr;
-        *diffs++ = (DIFFS_NUMBERS)((first - second) * (calculated_number)DOUBLE_TO_INT_MULTIPLIER);
-    }
-}
-
-static int run_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points, uint32_t shifts) {
+static int rrdset_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points, uint32_t shifts) {
     RRDR_OPTIONS options = RRDR_OPTION_NULL2ZERO;
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
     long c;
     int i=0, j=0;
-    int b_dims = 0;
+    int dim_count = 0;
     int baseline_points = 0, highlight_points = 0;
 
     struct per_dim *pd = NULL;
@@ -147,29 +157,35 @@ static int run_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_af
     ONEWAYALLOC *owa = onewayalloc_create(0);
     RRDR *rrdr = rrd2rrdr(owa, st, max_points, highlight_after, highlight_before, group_method, group_time, options, NULL, context_param_list, 0);
     if(!rrdr) {
-        info("Cannot generate metric correlations output with these parameters on this chart.");
+        info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
         onewayalloc_destroy(owa);
         return 0;
     }
 
-    highlight_points = rrdr_rows(rrdr);
-    b_dims = rrdr->d;
-    pd = mallocz(sizeof(struct per_dim) * rrdr->d);
-    for (c = 0; c != rrdr_rows(rrdr) ; ++c) {
-        RRDDIM *d;
-        for (j = 0, d = rrdr->st->dimensions ; d && j < rrdr->d ; ++j, d = d->next) {
-            if(unlikely(!c)) {
-                // TODO use points from query
-                pd[j].dimension = strdupz(d->name);
-            }
-
-            calculated_number *cn = &rrdr->v[ c * rrdr->d ];
-            pd[j].highlight[c] = cn[j];
-        }
+    // initialize the dataset for the dimensions we need
+    dim_count = rrdr->d;
+    if(!dim_count) {
+        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
+        rrdr_free(owa, rrdr);
+        onewayalloc_destroy(owa);
+        return 0;
     }
+
+    pd = mallocz(sizeof(struct per_dim) * dim_count);
+    RRDDIM *d;
+    for (j = 0, d = rrdr->st->dimensions ; d && j < rrdr->d ; ++j, d = d->next)
+        pd[j].dimension = strdupz(d->name);
+
+    // copy the highlight points of all dimensions
+    highlight_points = rrdr_rows(rrdr);
+    for (c = 0; c != highlight_points ; c++) {
+        calculated_number *cn = &rrdr->v[ c * rrdr->d ];
+        for (j = 0, d = rrdr->st->dimensions ; d && j < rrdr->d ; ++j, d = d->next)
+            pd[j].highlight[c] = cn[j];
+    }
+
     rrdr_free(owa, rrdr);
     onewayalloc_destroy(owa);
-    if (!pd) return 0;
 
     // fprintf(stderr, "Quering baseline for chart '%s' for points %d\n", st->name, highlight_points);
 
@@ -177,63 +193,86 @@ static int run_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_af
     owa = onewayalloc_create(0);
     rrdr = rrd2rrdr(owa, st, highlight_points << shifts, baseline_after, baseline_before, group_method, group_time, options, NULL, context_param_list, 0);
     if(!rrdr) {
-        info("Cannot generate metric correlations output with these parameters on this chart.");
+        info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
         freez(pd);
         onewayalloc_destroy(owa);
         return 0;
     }
-    if (rrdr->d != b_dims) {
+    if (rrdr->d != dim_count) {
         // TODO handle different dims
-        info("Cannot generate metric correlations output when the baseline and the highlight have different number of dimensions.");
+
+        info("Cannot generate metric correlations for chart '%s' when the baseline and the highlight have different number of dimensions.", st->name);
         rrdr_free(owa, rrdr);
         onewayalloc_destroy(owa);
         freez(pd);
         return 0;
     }
 
+    // copy the baseline points of all dimensions
     baseline_points = rrdr_rows(rrdr);
-    for (c = 0; c != rrdr_rows(rrdr) ; ++c) {
-        RRDDIM *d;
-        // TODO - the dimensions may have been returned in different order
-        for (j = 0, d = rrdr->st->dimensions ; d && j < rrdr->d ; ++j, d = d->next) {
-            calculated_number *cn = &rrdr->v[ c * rrdr->d ];
-                pd[j].baseline[c] = cn[j];
-        }
+    for (c = 0; c < baseline_points ; ++c) {
+        calculated_number *cn = &rrdr->v[ c * rrdr->d ];
+        for (j = 0, d = rrdr->st->dimensions ; d && j < rrdr->d ; ++j, d = d->next)
+            pd[j].baseline[c] = cn[j];
     }
     rrdr_free(owa, rrdr);
     onewayalloc_destroy(owa);
 
-    for(i = 0; i < b_dims ; i++) {
-        calculate_pairs_diff(pd[i].baseline_diffs, pd[i].baseline, baseline_points);
-        calculate_pairs_diff(pd[i].highlight_diffs, pd[i].highlight, highlight_points);
-    }
-
-    for(i = 0 ; i < j ; i++) {
-        if (baseline_points && highlight_points) {
-
+    // we need at least 2 points to do the job
+    if(baseline_points > 2 && highlight_points > 2) {
+        for(i = 0 ; i < dim_count; i++) {
             // calculate_pairs_diff() produces one point less than in the data series
-            double prob = kstwo(pd[i].baseline_diffs, baseline_points - 1, pd[i].highlight_diffs, highlight_points - 1, shifts);
+            double prob = kstwo(pd[i].baseline, baseline_points, pd[i].highlight, highlight_points, shifts);
 
             // fprintf(stderr, "kstwo %d = %s:%s:%f\n", gettid(), st->name, pd[i].dimension, prob);
 
             buffer_sprintf(wb, "\t\t\t\t\"%s\": %f", pd[i].dimension, prob);
-            if (i != j-1)
+            if (i != j - 1)
                 buffer_sprintf(wb, ",\n");
             else
                 buffer_sprintf(wb, "\n");
         }
     }
 
+    // free the dimension names
+    for (j = 0; j < dim_count ; j++)
+        freez(pd[j].dimension);
+
+    // free the dimensions arrays
     freez(pd);
     return j;
 }
 
-void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points) {
+int metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, long long baseline_before, long long highlight_after, long long highlight_before, long long max_points, long timeout) {
 
+    if (enable_metric_correlations == CONFIG_BOOLEAN_NO) {
+        error("Metric correlations: not enabled.");
+        buffer_strcat(wb, "{\"error\": \"Metric correlations functionality is not enabled.\" }");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    if (highlight_before <= highlight_after || baseline_before <= baseline_after) {
+        error("Invalid baseline or highlight ranges.");
+        buffer_strcat(wb, "{\"error\": \"Invalid baseline or highlight ranges.\" }");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    // if the user didn't give a timeout
+    // assume 20 seconds
+    if(!timeout) timeout = 20 * MSEC_PER_SEC;
+
+    // if the timeout is less than 1 second
+    // make it at least 1 second
+    if(timeout < (long)(1 * MSEC_PER_SEC))
+        timeout = 1 * MSEC_PER_SEC;
+
+    // if the number of points is less than 100
+    // make them 100 points
+    if(max_points < 100)
+        max_points = 100;
+
+    usec_t timeout_usec = timeout * USEC_PER_MS;
     usec_t started_t = now_realtime_usec();
-
-    if (!max_points || max_points > MAX_POINTS)
-        max_points = MAX_POINTS;
 
     // baseline should be a power of two multiple of highlight
     uint32_t shifts = 0;
@@ -242,7 +281,7 @@ void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, lo
         long long high_delta = highlight_before - highlight_after;
         uint32_t multiplier = (uint32_t)round((double)base_delta / (double)high_delta);
 
-        // check if the ratio is a power of two
+        // check if the multiplier is a power of two
         // https://stackoverflow.com/a/600306/1114110
         if((multiplier & (multiplier - 1)) != 0) {
             // it is not power of two
@@ -257,6 +296,9 @@ void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, lo
             multiplier++;
         }
 
+        // convert the multiplier to the number of shifts
+        // we need to do, to divide baseline numbers to match
+        // the highlight ones
         while(multiplier > 1) {
             shifts++;
             multiplier = multiplier >> 1;
@@ -275,56 +317,55 @@ void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, lo
         // adjust the baseline to be multiplier times bigger than the highlight
         long long baseline_after_new = baseline_before - (high_delta << shifts);
         if(baseline_after_new != baseline_after)
-            info("Metric correlations, adjusting baseline to be %d times bigger than highlight, from %lld to %lld", 1 << shifts, baseline_after, baseline_after_new);
+            info("Metric correlations: adjusted baseline to be %d times bigger than highlight, from %lld to %lld", 1 << shifts, baseline_after, baseline_after_new);
         baseline_after = baseline_after_new;
     }
 
-    info ("Running metric correlations, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld", highlight_after, highlight_before, baseline_after, baseline_before, max_points);
+    info ("Running metric correlations, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld, timeout: %ld ms, shifts %u", highlight_after, highlight_before, baseline_after, baseline_before, max_points, timeout, shifts);
 
-    if (!enable_metric_correlations) {
-        error("Metric correlations functionality is not enabled.");
-        buffer_strcat(wb, "{\"error\": \"Metric correlations functionality is not enabled.\" }");
-        return;
-    }
-
-    if (highlight_before <= highlight_after || baseline_before <= baseline_after) {
-        error("Invalid baseline or highlight ranges.");
-        buffer_strcat(wb, "{\"error\": \"Invalid baseline or highlight ranges.\" }");
-        return;
-    }
+    char *error = NULL;
+    int resp = HTTP_RESP_OK;
 
     long long dims = 0, total_dims = 0;
     RRDSET *st;
     size_t c = 0;
     BUFFER *wdims = buffer_create(1000);
 
-    //dont lock here and wait for results
-    //get the charts and run mc after
-    //should not be a problem for the query
+    // dont lock here and wait for results
+    // get the charts and run mc after
+    // should not be a problem for the query
     struct charts *charts = NULL;
     rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             rrdset_rdlock(st);
-            struct charts *chart = callocz(1, sizeof(struct charts));
-            chart->st = st;
-            chart->next = NULL;
-            if (charts) {
-                chart->next = charts;
-            }
-            charts = chart;
+            struct charts *ch = mallocz(sizeof(struct charts));
+            ch->st = st;
+            ch->next = charts;
+            charts = ch;
         }
     }
     rrdhost_unlock(host);
 
+    if(!charts) {
+        error = "no charts to correlate";
+        resp = HTTP_RESP_NOT_FOUND;
+        goto cleanup;
+    }
+
     buffer_strcat(wb, "{\n\t\"correlated_charts\": {");
 
     for (struct charts *ch = charts; ch; ch = ch->next) {
+        if(now_realtime_usec() - started_t > timeout_usec) {
+            error = "timed out";
+            resp = HTTP_RESP_GATEWAY_TIMEOUT;
+            goto cleanup;
+        }
+
         buffer_flush(wdims);
-        dims = run_metric_correlations(wdims, ch->st, baseline_after, baseline_before, highlight_after, highlight_before, max_points, shifts);
+        dims = rrdset_metric_correlations(wdims, ch->st, baseline_after, baseline_before, highlight_after, highlight_before, max_points, shifts);
         if (dims) {
             if (c) buffer_strcat(wb, "\t\t},");
-
             buffer_strcat(wb, "\n\t\t\"");
             buffer_strcat(wb, ch->st->id);
             buffer_strcat(wb, "\": {\n");
@@ -336,26 +377,37 @@ void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, lo
             total_dims += dims;
             c++;
         }
+
+        // unlock the chart as soon as possible
+        rrdset_unlock(ch->st);
+        ch->st = NULL; // mark it NULL, so that we will not try to unlock it later
     }
     buffer_strcat(wb, "\t\t}\n");
     buffer_sprintf(wb, "\t},\n\t\"total_dimensions_count\": %lld\n}", total_dims);
 
-    if (!total_dims) {
+    if(!total_dims) {
+        error = "no results produced from correlations";
+        resp = HTTP_RESP_NOT_FOUND;
+    }
+
+cleanup:
+    buffer_free(wdims);
+
+    if(error) {
         buffer_flush(wb);
-        buffer_strcat(wb, "{\"error\": \"No results from metric correlations.\" }");
+        buffer_sprintf(wb, "{\"error\": \"%s\" }", error);
     }
 
     struct charts* ch;
     while(charts){
         ch = charts;
         charts = charts->next;
-        rrdset_unlock(ch->st);
+        if(ch->st) rrdset_unlock(ch->st);
         free(ch);
     }
 
-    buffer_free(wdims);
-
     usec_t ended_t = now_realtime_usec();
-
     info ("Done running metric correlations in %llu usec", ended_t -started_t);
+
+    return resp;
 }

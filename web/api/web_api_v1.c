@@ -1320,6 +1320,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     long long baseline_after = 0, baseline_before = 0, highlight_after = 0, highlight_before = 0, max_points = 0;
+    long timeout = 0;
  
     while (url) {
         char *value = mystrsep(&url, "&");
@@ -1346,7 +1347,10 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
 
         else if (!strcmp(name, "max_points"))
             max_points = (long long) strtoul(value, NULL, 0);
-        
+
+        else if (!strcmp(name, "timeout"))
+            timeout = (long long) strtoul(value, NULL, 0);
+
     }
 
     BUFFER *wb = w->response.data;
@@ -1354,12 +1358,12 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    if(!highlight_after || !highlight_before)
+    if(!highlight_after || !highlight_before) {
         buffer_strcat(wb, "{\"error\": \"Missing or invalid required highlight after and before parameters.\" }");
-    else
-        metric_correlations(host, wb, baseline_after, baseline_before, highlight_after, highlight_before, max_points);
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
-    return HTTP_RESP_OK;
+    return metric_correlations(host, wb, baseline_after, baseline_before, highlight_after, highlight_before, max_points, timeout);
 }
 
 static struct api_command {
