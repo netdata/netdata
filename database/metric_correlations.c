@@ -232,12 +232,15 @@ void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, lo
 
     usec_t started_t = now_realtime_usec();
 
+    if (!max_points || max_points > MAX_POINTS)
+        max_points = MAX_POINTS;
+
     // baseline should be a power of two multiple of highlight
     uint32_t shifts = 0;
     {
         long long base_delta = baseline_before - baseline_after;
         long long high_delta = highlight_before - highlight_after;
-        uint32_t multiplier = (uint32_t) round((double)base_delta / (double)high_delta);
+        uint32_t multiplier = (uint32_t)round((double)base_delta / (double)high_delta);
 
         // check if the ratio is a power of two
         // https://stackoverflow.com/a/600306/1114110
@@ -254,15 +257,26 @@ void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, lo
             multiplier++;
         }
 
-        // adjust the baseline to be multiplier times bigger than the highlight
-        long long baseline_after_new = baseline_before - ((multiplier == 0)?1:multiplier) * high_delta;
-        // info("Metric correlations, chart %s, adjusting baseline to be %u times bigger than highlight, from %lld to %lld", st->name, multiplier, baseline_after, baseline_after_new);
-        baseline_after = baseline_after_new;
-
-        while(multiplier) {
+        while(multiplier > 1) {
             shifts++;
             multiplier = multiplier >> 1;
         }
+
+        // if the baseline size will not fit in our buffers
+        // lower the window of the baseline
+        while(shifts && (max_points << shifts) > MAX_POINTS)
+            shifts--;
+
+        // if the baseline size still does not fit our buffer
+        // lower the resolution of the highlight and the baseline
+        while((max_points << shifts) > MAX_POINTS)
+            max_points = max_points >> 1;
+
+        // adjust the baseline to be multiplier times bigger than the highlight
+        long long baseline_after_new = baseline_before - (high_delta << shifts);
+        if(baseline_after_new != baseline_after)
+            info("Metric correlations, adjusting baseline to be %d times bigger than highlight, from %lld to %lld", 1 << shifts, baseline_after, baseline_after_new);
+        baseline_after = baseline_after_new;
     }
 
     info ("Running metric correlations, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld", highlight_after, highlight_before, baseline_after, baseline_before, max_points);
@@ -283,9 +297,6 @@ void metric_correlations(RRDHOST *host, BUFFER *wb, long long baseline_after, lo
     RRDSET *st;
     size_t c = 0;
     BUFFER *wdims = buffer_create(1000);
-
-    if (!max_points || max_points > MAX_POINTS)
-        max_points = MAX_POINTS;
 
     //dont lock here and wait for results
     //get the charts and run mc after
