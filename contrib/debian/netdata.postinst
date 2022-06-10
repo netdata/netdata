@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 set -e
 
@@ -25,6 +25,14 @@ case "$1" in
       if ! getent passwd netdata > /dev/null; then
         adduser --quiet --system --ingroup netdata --home /var/lib/netdata --no-create-home netdata
       fi
+
+      set -- docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C
+      for item
+        do
+          if getent group $item > /dev/null 2>&1; then
+          usermod -a -G $item netdata
+        fi
+      done
 
       if ! dpkg-statoverride --list /var/lib/netdata > /dev/null 2>&1; then
         dpkg-statoverride --update --add netdata netdata 0755 /var/lib/netdata
