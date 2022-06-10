@@ -16,7 +16,6 @@ typedef enum {
     HTTP_API_V2,
     CHART_NEW,
     CHART_DEL,
-    ALARM_STATE_UPDATE,
     REGISTER_NODE,
     NODE_STATE_UPDATE,
     CHART_DIMS_UPDATE,
@@ -78,7 +77,6 @@ struct aclk_query {
         struct aclk_query_http_api_v2 http_api_v2;
         struct aclk_query_chart_add_del chart_add_del;
         struct aclk_bin_payload bin_payload;
-        json_object *alarm_update;
     } data;
 };
 

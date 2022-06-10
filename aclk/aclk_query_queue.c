@@ -114,11 +114,6 @@ void aclk_query_free(aclk_query_t query)
     case CHART_NEW:
         freez(query->data.chart_add_del.chart_name);
         break;
-    
-    case ALARM_STATE_UPDATE:
-        if (query->data.alarm_update)
-            json_object_put(query->data.alarm_update);
-        break;
 
     case NODE_STATE_UPDATE:
     case REGISTER_NODE:

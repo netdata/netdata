@@ -19,8 +19,6 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
 
 void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart);
 
-void aclk_alarm_state_msg(mqtt_wss_client client, json_object *msg);
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 // new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable);
