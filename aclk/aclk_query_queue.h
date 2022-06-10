@@ -12,7 +12,6 @@
 typedef enum {
     UNKNOWN = 0,
     METADATA_INFO,
-    METADATA_ALARMS,
     HTTP_API_V2,
     CHART_NEW,
     REGISTER_NODE,
@@ -72,7 +71,6 @@ struct aclk_query {
     int version;
     union {
         struct aclk_query_metadata metadata_info;
-        struct aclk_query_metadata metadata_alarms;
         struct aclk_query_http_api_v2 http_api_v2;
         struct aclk_query_chart_add_del chart_add_del;
         struct aclk_bin_payload bin_payload;

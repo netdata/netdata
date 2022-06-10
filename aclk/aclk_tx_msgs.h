@@ -12,7 +12,6 @@
 uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 
 void aclk_send_info_metadata(mqtt_wss_client client, int metadata_submitted, RRDHOST *host);
-void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted);
 
 void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len);
 void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len);

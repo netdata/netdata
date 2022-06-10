@@ -27,13 +27,6 @@ static int info_metadata(struct aclk_query_thread *query_thr, aclk_query_t query
     return 0;
 }
 
-static int alarms_metadata(struct aclk_query_thread *query_thr, aclk_query_t query)
-{
-    aclk_send_alarm_metadata(query_thr->client,
-        !query->data.metadata_info.initial_on_connect);
-    return 0;
-}
-
 static usec_t aclk_web_api_v1_request(RRDHOST *host, struct web_client *w, char *url)
 {
     usec_t t;
@@ -295,7 +288,6 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,          .name = "http_api_request_v2",      .fnc = http_api_v2              },
     { .type = METADATA_INFO,        .name = "info_metadata",            .fnc = info_metadata            },
-    { .type = METADATA_ALARMS,      .name = "alarms_metadata",          .fnc = alarms_metadata          },
     { .type = CHART_NEW,            .name = "chart_new",                .fnc = chart_query              },
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     { .type = REGISTER_NODE,        .name = "register_node",            .fnc = send_bin_msg             },

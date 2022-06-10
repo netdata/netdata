@@ -268,48 +268,6 @@ void aclk_send_info_metadata(mqtt_wss_client client, int metadata_submitted, RRD
     buffer_free(local_buffer);
 }
 
-// TODO should include header instead
-void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb);
-
-void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted)
-{
-    BUFFER *local_buffer = buffer_create(BUFFER_INITIAL_SIZE);
-    json_object *msg, *payload, *tmp;
-
-    char *msg_id = create_uuid();
-    buffer_flush(local_buffer);
-    local_buffer->contenttype = CT_APPLICATION_JSON;
-
-    // on_connect messages are sent on a health reload, if the on_connect message is real then we
-    // use the session time as the fake timestamp to indicate that it starts the session. If it is
-    // a fake on_connect message then use the real timestamp to indicate it is within the existing
-    // session.
-
-    if (metadata_submitted)
-        msg = create_hdr("connect_alarms", msg_id, 0, 0, ACLK_VERSION);
-    else
-        msg = create_hdr("connect_alarms", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
-
-    payload = json_object_new_object();
-    json_object_object_add(msg, "payload", payload);
-
-    health_alarms2json(localhost, local_buffer, 1);
-    tmp = json_tokener_parse(local_buffer->buffer);
-    json_object_object_add(payload, "configured-alarms", tmp);
-
-    buffer_flush(local_buffer);
-
-    health_active_log_alarms_2json(localhost, local_buffer);
-    tmp = json_tokener_parse(local_buffer->buffer);
-    json_object_object_add(payload, "alarms-active", tmp);
-
-    aclk_send_message_subtopic(client, msg, ACLK_TOPICID_ALARMS);
-
-    json_object_put(msg);
-    freez(msg_id);
-    buffer_free(local_buffer);
-}
-
 void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
