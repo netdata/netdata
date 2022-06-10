@@ -111,10 +111,6 @@ void aclk_query_free(aclk_query_t query)
             freez(query->data.http_api_v2.query);
         break;
 
-    case CHART_NEW:
-        freez(query->data.chart_add_del.chart_name);
-        break;
-
     case NODE_STATE_UPDATE:
     case REGISTER_NODE:
     case CHART_DIMS_UPDATE:

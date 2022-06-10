@@ -13,29 +13,6 @@
 // version for aclk legacy (old cloud arch)
 #define ACLK_VERSION 2
 
-static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg, enum aclk_topics subtopic)
-{
-    uint16_t packet_id;
-    const char *str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
-    const char *topic = aclk_get_topic(subtopic);
-
-    if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting message send");
-        return;
-    }
-
-    mqtt_wss_publish_pid(client, topic, str, strlen(str),  MQTT_WSS_PUB_QOS1, &packet_id);
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published(packet_id);
-#endif
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 1024
-    char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx.json", ACLK_GET_CONV_LOG_NEXT());
-    json_object_to_file_ext(filename, msg, JSON_C_TO_STRING_PRETTY);
-#endif
-}
-
 uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
 #ifndef ACLK_LOG_CONVERSATION_DIR
@@ -207,17 +184,6 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
     return obj;
 }
 
-static char *create_uuid()
-{
-    uuid_t uuid;
-    char *uuid_str = mallocz(36 + 1);
-
-    uuid_generate(uuid);
-    uuid_unparse(uuid, uuid_str);
-
-    return uuid_str;
-}
-
 #ifndef __GNUC__
 #pragma endregion
 #endif
@@ -274,39 +240,6 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
         break;
     }
-}
-
-#define BUFFER_INITIAL_SIZE (1024 * 16)
-void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart)
-{
-    json_object *msg, *payload;
-    BUFFER *tmp_buffer;
-    RRDSET *st;
-    
-    st = rrdset_find(host, chart);
-    if (!st)
-        st = rrdset_find_byname(host, chart);
-    if (!st) {
-        info("FAILED to find chart %s", chart);
-        return;
-    }
-
-    tmp_buffer = buffer_create(BUFFER_INITIAL_SIZE);
-    rrdset2json(st, tmp_buffer, NULL, NULL, 1);
-    payload = json_tokener_parse(tmp_buffer->buffer);
-    if (!payload) {
-        error("Failed to parse JSON from rrdset2json");
-        buffer_free(tmp_buffer);
-        return;
-    }
-
-    msg = create_hdr("chart", NULL, 0, 0, ACLK_VERSION);
-    json_object_object_add(msg, "payload", payload);
-
-    aclk_send_message_subtopic(client, msg, ACLK_TOPICID_CHART);
-
-    buffer_free(tmp_buffer);
-    json_object_put(msg);
 }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL

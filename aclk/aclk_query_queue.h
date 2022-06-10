@@ -12,7 +12,6 @@
 typedef enum {
     UNKNOWN = 0,
     HTTP_API_V2,
-    CHART_NEW,
     REGISTER_NODE,
     NODE_STATE_UPDATE,
     CHART_DIMS_UPDATE,
@@ -25,11 +24,6 @@ typedef enum {
     ALARM_SNAPSHOT,
     ACLK_QUERY_TYPE_COUNT // always keep this as last
 } aclk_query_type_t;
-
-struct aclk_query_chart_add_del {
-    RRDHOST *host;
-    char* chart_name;
-};
 
 struct aclk_query_http_api_v2 {
     char *payload;
@@ -65,7 +59,6 @@ struct aclk_query {
     int version;
     union {
         struct aclk_query_http_api_v2 http_api_v2;
-        struct aclk_query_chart_add_del chart_add_del;
         struct aclk_bin_payload bin_payload;
     } data;
 };

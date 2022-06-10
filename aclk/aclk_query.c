@@ -262,12 +262,6 @@ cleanup:
     return retval;
 }
 
-static int chart_query(struct aclk_query_thread *query_thr, aclk_query_t query)
-{
-    aclk_chart_msg(query_thr->client, query->data.chart_add_del.host, query->data.chart_add_del.chart_name);
-    return 0;
-}
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
@@ -279,7 +273,6 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,          .name = "http_api_request_v2",      .fnc = http_api_v2              },
-    { .type = CHART_NEW,            .name = "chart_new",                .fnc = chart_query              },
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     { .type = REGISTER_NODE,        .name = "register_node",            .fnc = send_bin_msg             },
     { .type = NODE_STATE_UPDATE,    .name = "node_state_update",        .fnc = send_bin_msg             },

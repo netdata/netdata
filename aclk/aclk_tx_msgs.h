@@ -14,8 +14,6 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len);
 void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len);
 
-void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart);
-
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 // new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable);
