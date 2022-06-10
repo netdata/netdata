@@ -17,82 +17,55 @@ struct per_dim {
     calculated_number baseline[MAX_POINTS];
     calculated_number highlight[MAX_POINTS];
 
-    double baseline_diffs[MAX_POINTS];
-    double highlight_diffs[MAX_POINTS];
+    long int baseline_diffs[MAX_POINTS];
+    long int highlight_diffs[MAX_POINTS];
 };
 
-static inline int binary_search_bigger_than(const double arr[], int left, int right, double K) {
-    int orig_right = right;
+#define DOUBLE_TO_INT_MULTIPLIER 100000.0
 
+static inline int binary_search_bigger_than(const long int arr[], int left, int size, long int K) {
     // binary search to find K in the array
-    while(left <= right) {
-        int middle = left + (right - left) / 2;
-        double value = arr[middle];
 
-        if(value < K)
+    int right = size;
+    while(left < right) {
+        int middle = (int)(((unsigned int)(left + right)) >> 1);
+
+        if(arr[middle] > K)
+            right = middle;
+
+        else
             left = middle + 1;
-
-        else if(value > K)
-            right = middle - 1;
-
-        else {
-            left = middle;
-            break;
-        }
-    }
-
-    // if "left" is inside the array and its value is K
-    // we need the index of the first value that is bigger than K
-    if(left <= orig_right && arr[left] == K) {
-        // so, binary search the next available value
-
-        right = orig_right;
-
-        // for constant metrics, let's skip everything
-        if(unlikely(arr[right] == K)) return right + 1;
-
-        while(left <= right) {
-            int middle = left + (right - left) / 2;
-
-            if(likely(arr[middle] == K))
-                left = middle + 1;
-
-            else
-                right = middle - 1;
-        }
     }
 
     return left;
 }
 
 int compare_doubles(const void *left, const void *right) {
-    double lt = *(double *)left;
-    double rt = *(double *)right;
+    long int lt = *(long int *)left;
+    long int rt = *(long int *)right;
 
     // https://stackoverflow.com/a/3886497/1114110
     return (lt > rt) - (lt < rt);
 }
 
-static double kstwo(double data1[], int n1, double data2[], int n2) {
-    qsort(data1, n1, sizeof(double), compare_doubles);
-    qsort(data2, n2, sizeof(double), compare_doubles);
+static double kstwo(long int data1[], int n1, long int data2[], int n2) {
+    qsort(data1, n1, sizeof(long int), compare_doubles);
+    qsort(data2, n2, sizeof(long int), compare_doubles);
 
-    double en1 = (double)n1;
-	double en2 = (double)n2;
-    double min, max;
+    long int min, max;
 
     // initialize min and max using the first number of data1
-    double K = data1[0];
-    double cdf1 = (double)binary_search_bigger_than(data1, 0, n1 - 1, K) / en1; // starting from i, since data1 is sorted
-    double cdf2 = (double)binary_search_bigger_than(data2, 0, n2 - 1, K) / en2;
-    double delta = cdf1 - cdf2;
+    long int K = data1[0];
+    long int cdf1 = binary_search_bigger_than(data1, 0, n1, K) / n1; // starting from i, since data1 is sorted
+    long int cdf2 = binary_search_bigger_than(data2, 0, n2, K) / n2;
+    long int delta = cdf1 - cdf2;
     min = max = delta;
 
     // do the first set starting from 1 (we did position 0 above)
     for(int i = 1; i < n1 ; i++) {
         K = data1[i];
-        cdf1 = (double)binary_search_bigger_than(data1, i, n1 - 1, K) / en1; // starting from i, since data1 is sorted
-        cdf2 = (double)binary_search_bigger_than(data2, 0, n2 - 1, K) / en2;
+        cdf1 = binary_search_bigger_than(data1, i, n1, K) / n1; // starting from i, since data1 is sorted
+        cdf2 = binary_search_bigger_than(data2, 0, n2, K) / n2;
 
         delta = cdf1 - cdf2;
         if(delta < min) min = delta;
@@ -102,33 +75,38 @@ static double kstwo(double data1[], int n1, double data2[], int n2) {
     // do the second set
     for(int i = 0; i < n2 ; i++) {
         K = data2[i];
-        cdf1 = (double)binary_search_bigger_than(data1, 0, n1 - 1, K) / en1;
-        cdf2 = (double)binary_search_bigger_than(data2, i, n2 - 1, K) / en2; // starting from i, since data2 is sorted
+        cdf1 = binary_search_bigger_than(data1, 0, n1, K) / n1;
+        cdf2 = binary_search_bigger_than(data2, i, n2, K) / n2; // starting from i, since data2 is sorted
 
         delta = cdf1 - cdf2;
         if(delta < min) min = delta;
         else if(delta > max) max = delta;
     }
 
-    if (fabs(min) > 1) min = 1;
+    double emin = (double)min / DOUBLE_TO_INT_MULTIPLIER;
+    double emax = (double)max / DOUBLE_TO_INT_MULTIPLIER;
+
+    if (fabs(emin) > 1) emin = 1.0;
 
     double d;
-    if (fabs(min) < max) d = max;
-    else d = fabs(min);
+    if (fabs(emin) < emax) d = emax;
+    else d = fabs(emin);
 
+    double en1 = (double)n1;
+    double en2 = (double)n2;
     double en = en1 * en2 / (en1 + en2);
 
     return KSfbar((int)round(en), d);
 }
 
-static void calculate_pairs_diff(double *diffs, calculated_number *arr, size_t size) {
-    double *diffs_end = &diffs[size - 1];
+static void calculate_pairs_diff(long int *diffs, calculated_number *arr, size_t size) {
+    long int *diffs_end = &diffs[size - 1];
     arr = &arr[size - 1];
 
     while(diffs <= diffs_end) {
         double second = (double)*arr--;
         double first  = (double)*arr;
-        *diffs++ = first - second;
+        *diffs++ = (long int)((first - second) * DOUBLE_TO_INT_MULTIPLIER);
     }
 }
 
@@ -140,7 +118,7 @@ static int run_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_af
     long c;
     int i=0, j=0;
     int b_dims = 0;
-    long int baseline_points = 0, highlight_points = 0;
+    int baseline_points = 0, highlight_points = 0;
 
     struct per_dim *pd = NULL;
 
@@ -211,7 +189,9 @@ static int run_metric_correlations(BUFFER *wb, RRDSET *st, long long baseline_af
 
     for(i = 0 ; i < j ; i++) {
         if (baseline_points && highlight_points) {
-            double prob = kstwo(pd[i].baseline_diffs, baseline_points-1, pd[i].highlight_diffs, highlight_points-1);
+
+            // calculate_pairs_diff() produces one point less than in the data series
+            double prob = kstwo(pd[i].baseline_diffs, baseline_points - 1, pd[i].highlight_diffs, highlight_points - 1);
 
             // fprintf(stderr, "kstwo %d = %s:%s:%f\n", gettid(), st->name, pd[i].dimension, prob);
 
