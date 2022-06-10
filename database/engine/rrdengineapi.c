@@ -130,7 +130,6 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
     handle->ctx = ctx;
     handle->descr = NULL;
-    handle->prev_descr = NULL;
     handle->unaligned_page = 0;
     rd->state->handle = (STORAGE_COLLECT_HANDLE *)handle;
 
@@ -176,10 +175,6 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
 
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
-        if (handle->prev_descr) {
-            /* unpin old second page */
-            pg_cache_put(ctx, handle->prev_descr);
-        }
         page_is_empty = page_has_only_empty_metrics(descr);
         if (page_is_empty) {
             debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
@@ -187,21 +182,8 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
                 print_page_cache_descr(descr);
             pg_cache_put(ctx, descr);
             pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
-            handle->prev_descr = NULL;
-        } else {
-            /*
-             * Disable pinning for now as it leads to deadlocks. When a collector stops collecting the extra pinned page
-             * eventually gets rotated but it cannot be destroyed due to the extra reference.
-             */
-            /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
-/*          rrdeng_page_descr_mutex_lock(ctx, descr);
-            ret = pg_cache_try_get_unsafe(descr, 0);
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
-            fatal_assert(1 == ret);*/
-
+        } else
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
-            /* handle->prev_descr = descr;*/
-        }
     } else {
         dbengine_page_free(descr->pg_cache_descr->page);
         rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
@@ -305,10 +287,6 @@ int rrdeng_store_metric_finalize(RRDDIM *rd)
     ctx = handle->ctx;
     page_index = rd->state->page_index;
     rrdeng_store_metric_flush_current_page(rd);
-    if (handle->prev_descr) {
-        /* unpin old second page */
-        pg_cache_put(ctx, handle->prev_descr);
-    }
     uv_rwlock_wrlock(&page_index->lock);
     if (!--page_index->writers && !page_index->page_count) {
         can_delete_metric = 1;
