@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.35.0...v1.35.1)
+
+**Merged pull requests:**
+
+- Remove unnescesary ‘cleanup’ code. [\#13103](https://github.com/netdata/netdata/pull/13103) ([Ferroin](https://github.com/Ferroin))
+- Temporarily disable updates for static builds. [\#13100](https://github.com/netdata/netdata/pull/13100) ([Ferroin](https://github.com/Ferroin))
+
 ## [v1.35.0](https://github.com/netdata/netdata/tree/v1.35.0) (2022-06-08)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.34.1...v1.35.0)
@@ -335,7 +344,6 @@
 - Fix issue with charts not properly synchronized with the cloud [\#12451](https://github.com/netdata/netdata/pull/12451) ([stelfrag](https://github.com/stelfrag))
 - Add delay on missing priv\_key [\#12450](https://github.com/netdata/netdata/pull/12450) ([underhood](https://github.com/underhood))
 - fix unclaimed agents [\#12449](https://github.com/netdata/netdata/pull/12449) ([underhood](https://github.com/underhood))
-- apps.plugin: fix for plugin sending unnecessary data in freebsd [\#12446](https://github.com/netdata/netdata/pull/12446) ([surajnpn](https://github.com/surajnpn))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
