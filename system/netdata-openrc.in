@@ -15,10 +15,6 @@
 # to exit.
 : "${NETDATA_FORCE_EXIT:=0}"
 
-# Netdata will use these services, only if they
-# are enabled to start.
-: "${NETDATA_START_AFTER_SERVICES:=apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors}"
-
 extra_started_commands="reload rotate save"
 pidfile="@localstatedir_POST@/run/netdata/netdata.pid"
 command="@sbindir_POST@/netdata"
@@ -34,7 +30,7 @@ fi
 depend() {
     use logger
     need net
-    after ${NETDATA_START_AFTER_SERVICES}
+    after apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors
 }
 
 start_pre() {
