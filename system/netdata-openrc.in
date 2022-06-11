@@ -15,9 +15,13 @@
 # to exit.
 : "${NETDATA_FORCE_EXIT:=0}"
 
+# When set to 1, we use netdatacli for reload/rotate/save commands instead of s-s-d.
+: "${NETDATA_USE_NETDATACLI:=0}"
+
 extra_started_commands="reload rotate save"
 pidfile="@localstatedir_POST@/run/netdata/netdata.pid"
-command="@sbindir_POST@/netdata"
+command_prefix="@sbindir_POST@"
+command="${command_prefix}/netdata"
 command_args="-P ${pidfile} ${NETDATA_EXTRA_ARGS}"
 start_stop_daemon_args="-u ${NETDATA_OWNER}"
 required_files="/etc/netdata/netdata.conf"
@@ -39,18 +43,33 @@ start_pre() {
 
 reload() {
     ebegin "Reloading Netdata health configuration"
-    start-stop-daemon --signal SIGUSR2 --pidfile "${pidfile}"
-    eend $? "Failed to reload Netdata health configuration"
+    if [ "${NETDATA_USE_NETDATACLI}" = 1 ]; then
+        "${command_prefix}/netdatacli" reload-health >/dev/null
+        eend $? "Failed to reload Netdata health configuration"
+    else
+        start-stop-daemon --signal SIGUSR2 --pidfile "${pidfile}"
+        eend $? "Failed to reload Netdata health configuration"
+    fi
 }
 
 rotate() {
     ebegin "Reopening Netdata log files"
-    start-stop-daemon --signal SIGHUP --pidfile "${pidfile}"
-    eend $? "Failed to reopen Netdata log files"
+    if [ "${NETDATA_USE_NETDATACLI}" = 1 ]; then
+        "${command_prefix}/netdatacli" reopen-logs >/dev/null
+        eend $? "Failed to reopen Netdata log files"
+    else
+        start-stop-daemon --signal SIGHUP --pidfile "${pidfile}"
+        eend $? "Failed to reopen Netdata log files"
+    fi
 }
 
 save() {
     ebegin "Saving Netdata database"
-    start-stop-daemon --signal SIGUSR1 --pidfile "${pidfile}"
-    eend $? "Failed to save Netdata database"
+    if [ "${NETDATA_USE_NETDATACLI}" = 1 ]; then
+        "${command_prefix}/netdatacli" save-database >/dev/null
+        eend $? "Failed to save Netdata database"
+    else
+        start-stop-daemon --signal SIGUSR1 --pidfile "${pidfile}"
+        eend $? "Failed to save Netdata database"
+    fi
 }
