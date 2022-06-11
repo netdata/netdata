@@ -15,12 +15,6 @@ struct charts {
     struct charts *next;
 };
 
-struct per_dim {
-    char *dimension;
-    calculated_number baseline[MAX_POINTS];
-    calculated_number highlight[MAX_POINTS];
-};
-
 static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS K) {
     // binary search to find the index the smallest index
     // of the first value in the array that is greater than K
@@ -164,15 +158,6 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
     return KSfbar((int)round(en), d);
 }
 
-static void free_pd(struct per_dim *pd, int dim_count) {
-    // free the dimension names
-    for (int j = 0; j < dim_count ; j++)
-        freez(pd[j].dimension);
-
-    // free the dimensions arrays
-    freez(pd);
-}
-
 static int rrdset_metric_correlations(BUFFER *wb, RRDSET *st,
                                       long long baseline_after, long long baseline_before,
                                       long long highlight_after, long long highlight_before,
@@ -181,125 +166,94 @@ static int rrdset_metric_correlations(BUFFER *wb, RRDSET *st,
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
-    long c;
-    int i=0, j=0;
-    int dim_count = 0;
-    int baseline_points = 0, highlight_points = 0;
 
-    struct per_dim *pd = NULL;
+    int correlated_dimensions = 0;
 
-    // TODO get everything in one go, when baseline is right before highlight
-
-    // fprintf(stderr, "Quering highlight for chart '%s'\n", st->name);
+    RRDR *high_rrdr = NULL;
+    RRDR *base_rrdr = NULL;
 
     // get first the highlight to find the number of points available
     usec_t started_usec = now_realtime_usec();
     ONEWAYALLOC *owa = onewayalloc_create(0);
-    RRDR *rrdr = rrd2rrdr(owa, st, max_points,
+    high_rrdr = rrd2rrdr(owa, st, max_points,
                           highlight_after, highlight_before, group_method,
                           group_time, options, NULL, context_param_list,
                           timeout_ms);
-    if(!rrdr) {
+    if(!high_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
-        onewayalloc_destroy(owa);
-        return 0;
+        goto cleanup;
     }
-
-    // initialize the dataset for the dimensions we need
-    dim_count = rrdr->d;
-    if(!dim_count) {
+    if(!high_rrdr->d) {
         info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
-        rrdr_free(owa, rrdr);
-        onewayalloc_destroy(owa);
-        return 0;
+        goto cleanup;
     }
-
-    pd = callocz(1, sizeof(struct per_dim) * dim_count);
-    RRDDIM *d;
-    for (j = 0, d = rrdr->st->dimensions ; d && j < rrdr->d ; ++j, d = d->next) {
-        if(unlikely(rrdr->od[j] & RRDR_DIMENSION_HIDDEN)) continue;
-        pd[j].dimension = strdupz(d->name);
-    }
-
-    // copy the highlight points of all dimensions
-    highlight_points = rrdr_rows(rrdr);
-    for (c = 0; c != highlight_points ; c++) {
-        calculated_number *cn = &rrdr->v[ c * rrdr->d ];
-        for (j = 0, d = rrdr->st->dimensions ; d && j < rrdr->d ; ++j, d = d->next) {
-            if(unlikely(rrdr->od[j] & RRDR_DIMENSION_HIDDEN)) continue;
-            pd[j].highlight[c] = cn[j];
-        }
-    }
-
-    rrdr_free(owa, rrdr);
-    onewayalloc_destroy(owa);
+    int high_points = rrdr_rows(high_rrdr);
 
     usec_t now_usec = now_realtime_usec();
-    if(now_usec - started_usec > timeout_ms * USEC_PER_MS) {
-        free_pd(pd, dim_count);
-        return 0;
-    }
+    if(now_usec - started_usec > timeout_ms * USEC_PER_MS)
+        goto cleanup;
 
     // get the baseline, requesting the same number of points as the highlight
-    owa = onewayalloc_create(0);
-    rrdr = rrd2rrdr(owa, st, highlight_points << shifts,
+    base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
                     baseline_after, baseline_before, group_method,
                     group_time, options, NULL, context_param_list,
                     (int)(timeout_ms - ((now_usec - started_usec) / USEC_PER_MS)));
-    if(!rrdr) {
+    if(!base_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
-        free_pd(pd, dim_count);
-        onewayalloc_destroy(owa);
-        return 0;
+        goto cleanup;
     }
-    if (rrdr->d != dim_count) {
-        // TODO handle different dims
-
+    if(!base_rrdr->d) {
+        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
+        goto cleanup;
+    }
+    if (base_rrdr->d != high_rrdr->d) {
         info("Cannot generate metric correlations for chart '%s' when the baseline and the highlight have different number of dimensions.", st->name);
-        free_pd(pd, dim_count);
-        rrdr_free(owa, rrdr);
-        onewayalloc_destroy(owa);
-        return 0;
+        goto cleanup;
     }
-
-    // copy the baseline points of all dimensions
-    baseline_points = rrdr_rows(rrdr);
-    for (c = 0; c < baseline_points ; ++c) {
-        calculated_number *cn = &rrdr->v[ c * rrdr->d ];
-        for (j = 0, d = rrdr->st->dimensions ; d && j < rrdr->d ; ++j, d = d->next) {
-            if(unlikely(rrdr->od[j] & RRDR_DIMENSION_HIDDEN)) continue;
-            pd[j].baseline[c] = cn[j];
-        }
-    }
-    rrdr_free(owa, rrdr);
-    onewayalloc_destroy(owa);
+    int base_points = rrdr_rows(base_rrdr);
 
     now_usec = now_realtime_usec();
-    if(now_usec - started_usec > timeout_ms * USEC_PER_MS) {
-        free_pd(pd, dim_count);
-        return 0;
-    }
+    if(now_usec - started_usec > timeout_ms * USEC_PER_MS)
+        goto cleanup;
 
     // we need at least 2 points to do the job
-    if(baseline_points > 2 && highlight_points > 2) {
-        for(i = 0 ; i < dim_count; i++) {
-            if(!pd[i].dimension) continue; // skip the hidden dimensions
+    if(base_points < 2 || high_points < 2)
+        goto cleanup;
 
-            // calculate_pairs_diff() produces one point less than in the data series
-            double prob = kstwo(pd[i].baseline, baseline_points, pd[i].highlight, highlight_points, shifts);
+    // for each dimension
+    RRDDIM *d;
+    int i;
+    for(i = 0, d = base_rrdr->st->dimensions ; d && i < base_rrdr->d; i++, d = d->next) {
 
-            // fprintf(stderr, "kstwo %d = %s:%s:%f\n", gettid(), st->name, pd[i].dimension, prob);
+        // skip the not evaluated ones
+        if(likely(!(base_rrdr->od[i] & RRDR_DIMENSION_SELECTED) || !(high_rrdr->od[i] & RRDR_DIMENSION_SELECTED)))
+            continue;
 
-            buffer_sprintf(wb, "\t\t\t\t\"%s\": %f", pd[i].dimension, prob);
-            if (i != j - 1)
-                buffer_sprintf(wb, ",\n");
-            else
-                buffer_sprintf(wb, "\n");
-        }
+        // copy the baseline points of the dimension to a contiguous array
+        calculated_number baseline[base_points];
+        for(int c = 0; c < base_points; c++)
+            baseline[c] = base_rrdr->v[ c * base_rrdr->d + i ];
+
+        // copy the highlight points of the dimension to a contiguous array
+        calculated_number highlight[high_points];
+        for(int c = 0; c < high_points; c++)
+            highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
+
+        double prob = kstwo(baseline, base_points, highlight, high_points, shifts);
+
+        // fprintf(stderr, "kstwo %d = %s:%s:%f\n", gettid(), st->name, d->name, prob);
+
+        if(i) buffer_sprintf(wb, ",\n");
+        buffer_sprintf(wb, "\t\t\t\t\"%s\": %f", d->name, prob);
+        correlated_dimensions++;
     }
+    buffer_sprintf(wb, "\n");
 
-    free_pd(pd, dim_count);
-    return j;
+cleanup:
+    rrdr_free(owa, high_rrdr);
+    rrdr_free(owa, base_rrdr);
+    onewayalloc_destroy(owa);
+    return correlated_dimensions;
 }
 
 int metric_correlations(RRDHOST *host, BUFFER *wb,
