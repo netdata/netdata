@@ -320,9 +320,9 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
     }
 
     // if the user didn't give a timeout
-    // assume 20 seconds
+    // assume 60 seconds
     if(!timeout_ms)
-        timeout_ms = 30 * MSEC_PER_SEC;
+        timeout_ms = 60 * MSEC_PER_SEC;
 
     // if the timeout is less than 1 second
     // make it at least 1 second
