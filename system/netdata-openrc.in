@@ -38,15 +38,15 @@ start_pre() {
 }
 
 reload() {
-    ebegin "Reloading Netdata"
+    ebegin "Reloading Netdata health configuration"
     start-stop-daemon --signal SIGUSR2 --pidfile "${pidfile}"
-    eend $? "Failed to reload Netdata"
+    eend $? "Failed to reload Netdata health configuration"
 }
 
 rotate() {
-    ebegin "Logrotating Netdata"
+    ebegin "Reopening Netdata log files"
     start-stop-daemon --signal SIGHUP --pidfile "${pidfile}"
-    eend $? "Failed to logrotate Netdata"
+    eend $? "Failed to reopen Netdata log files"
 }
 
 save() {
