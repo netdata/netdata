@@ -2,12 +2,18 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.35.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.35.1...HEAD)
 
 **Merged pull requests:**
 
+- Re-enable updates for systems using static builds. [\#13110](https://github.com/netdata/netdata/pull/13110) ([Ferroin](https://github.com/Ferroin))
 - Remove unnescesary ‘cleanup’ code. [\#13103](https://github.com/netdata/netdata/pull/13103) ([Ferroin](https://github.com/Ferroin))
 - Temporarily disable updates for static builds. [\#13100](https://github.com/netdata/netdata/pull/13100) ([Ferroin](https://github.com/Ferroin))
+- docs\(statsd.plugin\): fix indentation [\#13096](https://github.com/netdata/netdata/pull/13096) ([ilyam8](https://github.com/ilyam8))
+
+## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.35.0...v1.35.1)
 
 ## [v1.35.0](https://github.com/netdata/netdata/tree/v1.35.0) (2022-06-08)
 
@@ -342,8 +348,6 @@
 - fix\(collectors/cgroups\): use different context for cgroup network charts [\#12454](https://github.com/netdata/netdata/pull/12454) ([ilyam8](https://github.com/ilyam8))
 - Initialize foreach alarms of dimensions in health thread. [\#12452](https://github.com/netdata/netdata/pull/12452) ([vkalintiris](https://github.com/vkalintiris))
 - Fix issue with charts not properly synchronized with the cloud [\#12451](https://github.com/netdata/netdata/pull/12451) ([stelfrag](https://github.com/stelfrag))
-- Add delay on missing priv\_key [\#12450](https://github.com/netdata/netdata/pull/12450) ([underhood](https://github.com/underhood))
-- fix unclaimed agents [\#12449](https://github.com/netdata/netdata/pull/12449) ([underhood](https://github.com/underhood))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
