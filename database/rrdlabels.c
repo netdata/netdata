@@ -609,7 +609,7 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
     // Get a read lock on the dictionary
     // to copy the value into the buffer
-    const char *v;
+    void *v;
     dfe_start_read(labels, v) {
         RRDLABEL *lb = dictionary_get_having_read_lock(labels, key);
 
@@ -617,6 +617,8 @@ void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const
             buffer_sprintf(wb, "%s%s%s", quote, lb->value, quote);
         else
             buffer_strcat(wb, null);
+
+        break;
     }
     dfe_done(v);
 }
