@@ -259,7 +259,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
     if (enable_metric_correlations == CONFIG_BOOLEAN_NO) {
         error("Metric correlations: not enabled.");
         buffer_strcat(wb, "{\"error\": \"Metric correlations functionality is not enabled.\" }");
-        return HTTP_RESP_BAD_REQUEST;
+        return HTTP_RESP_FORBIDDEN;
     }
 
     if (highlight_before <= highlight_after || baseline_before <= baseline_after) {
