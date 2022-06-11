@@ -157,7 +157,7 @@ static int rrdset_metric_correlations(BUFFER *wb, RRDSET *st,
                                       long long baseline_after, long long baseline_before,
                                       long long highlight_after, long long highlight_before,
                                       long long max_points, uint32_t shifts, int timeout_ms) {
-    RRDR_OPTIONS options = RRDR_OPTION_NULL2ZERO;
+    RRDR_OPTIONS options = RRDR_OPTION_NULL2ZERO | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO;
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
