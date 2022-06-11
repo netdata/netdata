@@ -10,11 +10,6 @@ int metric_correlations_version = 1;
 typedef long int DIFFS_NUMBERS;
 #define DOUBLE_TO_INT_MULTIPLIER 100000
 
-struct charts {
-    RRDSET *st;
-    struct charts *next;
-};
-
 static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS K) {
     // binary search to find the index the smallest index
     // of the first value in the array that is greater than K
@@ -291,6 +286,12 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
     usec_t timeout_usec = timeout_ms * USEC_PER_MS;
     usec_t started_usec = now_realtime_usec();
 
+    DICTIONARY *charts = NULL;
+    BUFFER *wdims = NULL;
+
+    char *error = NULL;
+    int resp = HTTP_RESP_OK;
+
     // baseline should be a power of two multiple of highlight
     uint32_t shifts = 0;
     {
@@ -321,15 +322,21 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
             multiplier = multiplier >> 1;
         }
 
-        // if the baseline size will not fit in our buffers
+        // if the baseline size will not comply to MAX_POINTS
         // lower the window of the baseline
         while(shifts && (max_points << shifts) > MAX_POINTS)
             shifts--;
 
-        // if the baseline size still does not fit our buffer
+        // if the baseline size still does not comply to MAX_POINTS
         // lower the resolution of the highlight and the baseline
         while((max_points << shifts) > MAX_POINTS)
             max_points = max_points >> 1;
+
+        if(max_points < 100) {
+            error = "cannot comply to at least 100 points";
+            resp = HTTP_RESP_BAD_REQUEST;
+            goto cleanup;
+        }
 
         // adjust the baseline to be multiplier times bigger than the highlight
         long long baseline_after_new = baseline_before - (high_delta << shifts);
@@ -340,39 +347,27 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
 
     info ("Running metric correlations, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld, timeout: %d ms, shifts %u", highlight_after, highlight_before, baseline_after, baseline_before, max_points, timeout_ms, shifts);
 
-    char *error = NULL;
-    int resp = HTTP_RESP_OK;
-
-    long long dims = 0, total_dims = 0;
-    RRDSET *st;
-    size_t c = 0;
-    BUFFER *wdims = buffer_create(1000);
+    charts = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
 
     // dont lock here and wait for results
     // get the charts and run mc after
-    // should not be a problem for the query
-    struct charts *charts = NULL;
+    RRDSET *st;
     rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
-        if (rrdset_is_available_for_viewers(st)) {
-            rrdset_rdlock(st);
-            struct charts *ch = mallocz(sizeof(struct charts));
-            ch->st = st;
-            ch->next = charts;
-            charts = ch;
-        }
+        if (rrdset_is_available_for_viewers(st))
+            dictionary_set(charts, st->name, "", 1);
     }
     rrdhost_unlock(host);
 
-    if(!charts) {
-        error = "no charts to correlate";
-        resp = HTTP_RESP_NOT_FOUND;
-        goto cleanup;
-    }
-
     buffer_strcat(wb, "{\n\t\"correlated_charts\": {");
 
-    for (struct charts *ch = charts; ch; ch = ch->next) {
+    long long dims = 0, total_dims = 0;
+    void *ptr;
+    int c = 0;
+    wdims = buffer_create(1000);
+
+    // for every chart in the dictionary
+    dfe_start_read(charts, ptr) {
         usec_t now_usec = now_realtime_usec();
         if(now_usec - started_usec > timeout_usec) {
             error = "timed out";
@@ -380,30 +375,36 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
             goto cleanup;
         }
 
+        st = rrdset_find_byname(host, ptr_name);
+        if(!st) continue;
+
         buffer_flush(wdims);
-        dims = rrdset_metric_correlations(wdims, ch->st,
-                                          baseline_after, baseline_before,
-                                          highlight_after, highlight_before,
-                                          max_points, shifts,
-                                          (int)(timeout_ms - ((now_usec - started_usec) / USEC_PER_MS)));
-        if (dims) {
-            if (c) buffer_strcat(wb, "\t\t},");
+
+        rrdset_rdlock(st);
+        dims = rrdset_metric_correlations(wdims,st,
+            baseline_after, baseline_before,
+            highlight_after, highlight_before,
+            max_points, shifts,
+            (int)(timeout_ms - ((now_usec - started_usec) / USEC_PER_MS)));
+        rrdset_unlock(st);
+
+        if(dims) {
+            if (c)
+                buffer_strcat(wb, "\t\t},");
             buffer_strcat(wb, "\n\t\t\"");
-            buffer_strcat(wb, ch->st->id);
+            buffer_strcat(wb, st->id);
             buffer_strcat(wb, "\": {\n");
             buffer_strcat(wb, "\t\t\t\"context\": \"");
-            buffer_strcat(wb, ch->st->context);
+            buffer_strcat(wb, st->context);
             buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
             buffer_sprintf(wb, "%s", buffer_tostring(wdims));
             buffer_strcat(wb, "\t\t\t}\n");
             total_dims += dims;
             c++;
         }
-
-        // unlock the chart as soon as possible
-        rrdset_unlock(ch->st);
-        ch->st = NULL; // mark it NULL, so that we will not try to unlock it later
     }
+    dfe_done(ptr);
+
     buffer_strcat(wb, "\t\t}\n");
     buffer_sprintf(wb, "\t},\n\t\"total_dimensions_count\": %lld\n}", total_dims);
 
@@ -413,19 +414,12 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
     }
 
 cleanup:
-    buffer_free(wdims);
+    if(charts) dictionary_destroy(charts);
+    if(wdims) buffer_free(wdims);
 
     if(error) {
         buffer_flush(wb);
         buffer_sprintf(wb, "{\"error\": \"%s\" }", error);
-    }
-
-    struct charts* ch;
-    while(charts){
-        ch = charts;
-        charts = charts->next;
-        if(ch->st) rrdset_unlock(ch->st);
-        free(ch);
     }
 
     usec_t ended_t = now_realtime_usec();
