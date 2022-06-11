@@ -6,6 +6,6 @@
 extern int enable_metric_correlations;
 extern int metric_correlations_version;
 
-extern int metric_correlations (RRDHOST *host, BUFFER *wb, long long selected_after, long long selected_before, long long reference_after, long long reference_before, long long max_points, long timeout);
+extern int metric_correlations (RRDHOST *host, BUFFER *wb, long long selected_after, long long selected_before, long long reference_after, long long reference_before, long long max_points, int timeout_ms);
 
 #endif //NETDATA_METRIC_CORRELATIONS_H
