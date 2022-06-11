@@ -221,7 +221,11 @@ static int rrdset_metric_correlations(BUFFER *wb, RRDSET *st,
     for(i = 0, d = base_rrdr->st->dimensions ; d && i < base_rrdr->d; i++, d = d->next) {
 
         // skip the not evaluated ones
-        if(likely(!(base_rrdr->od[i] & RRDR_DIMENSION_SELECTED) || !(high_rrdr->od[i] & RRDR_DIMENSION_SELECTED)))
+        if(unlikely(!(base_rrdr->od[i] & RRDR_DIMENSION_SELECTED) || !(high_rrdr->od[i] & RRDR_DIMENSION_SELECTED)))
+            continue;
+
+        // skip the dimensions that are just zero
+        if(unlikely(!(base_rrdr->od[i] & RRDR_DIMENSION_NONZERO) && !(high_rrdr->od[i] & RRDR_DIMENSION_NONZERO)))
             continue;
 
         // copy the baseline points of the dimension to a contiguous array
@@ -238,7 +242,7 @@ static int rrdset_metric_correlations(BUFFER *wb, RRDSET *st,
 
         // fprintf(stderr, "kstwo %d = %s:%s:%f\n", gettid(), st->name, d->name, prob);
 
-        if(i) buffer_sprintf(wb, ",\n");
+        if(correlated_dimensions) buffer_sprintf(wb, ",\n");
         buffer_sprintf(wb, "\t\t\t\t\"%s\": %f", d->name, prob);
         correlated_dimensions++;
     }
