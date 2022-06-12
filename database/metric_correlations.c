@@ -140,16 +140,17 @@ int compare_diffs(const void *left, const void *right) {
 }
 
 static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, calculated_number *arr, size_t size) {
-    DIFFS_NUMBERS *started_diffs = diffs;
     calculated_number *last = &arr[size - 1];
+    size_t added = 0;
 
     while(last > arr) {
         calculated_number second = *last--;
         calculated_number first  = *last;
         *diffs++ = (DIFFS_NUMBERS)((first - second) * (calculated_number)DOUBLE_TO_INT_MULTIPLIER);
+        added++;
     }
 
-    return (diffs - started_diffs) / sizeof(DIFFS_NUMBERS);
+    return added;
 }
 
 static double kstwo(calculated_number baseline[], int baseline_points, calculated_number highlight[], int highlight_points, uint32_t base_shifts) {
@@ -160,6 +161,9 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
 
     int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
     int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
+
+    if(unlikely(!base_size || !high_size))
+        return NAN;
 
     qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
     qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
@@ -244,6 +248,9 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
     double dmin = ((double)base_min_idx / dbase_size) - ((double)high_min_idx / dhigh_size);
     double dmax = ((double)base_max_idx / dbase_size) - ((double)high_max_idx / dhigh_size);
 
+    if(isnan(dmin) || isinf(dmin) || isnan(dmax) || isinf(dmax))
+        return NAN;
+
     double d;
 
     if (fabs(dmin) > 1)
@@ -253,6 +260,11 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
     else d = fabs(dmin);
 
     double en = dbase_size * dhigh_size / (dbase_size + dhigh_size);
+
+    // under these conditions, KSfbar crashes
+    if(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d))
+        return NAN;
+
     return KSfbar((int)round(en), d);
 }
 
@@ -342,8 +354,10 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
             highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
 
         double prob = kstwo(baseline, base_points, highlight, high_points, shifts);
-        register_result(results, base_rrdr->st, d, prob);
-        correlated_dimensions++;
+        if(!isnan(prob)) {
+            register_result(results, base_rrdr->st, d, prob);
+            correlated_dimensions++;
+        }
     }
 
 cleanup:
