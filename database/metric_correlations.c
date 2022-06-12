@@ -7,6 +7,109 @@
 int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
 
+// ----------------------------------------------------------------------------
+// The results per dimension are aggregated into a dictionary
+
+struct register_result {
+    RRDSET *st;
+    const char *chart_id;
+    const char *context;
+    const char *dim_name;
+    calculated_number value;
+};
+
+static void register_result_insert_callback(const char *name, void *value, void *data) {
+    (void)name;
+    (void)data;
+
+    struct register_result *t = (struct register_result *)value;
+
+    if(t->chart_id) t->chart_id = strdupz(t->chart_id);
+    if(t->context) t->context = strdupz(t->context);
+    if(t->dim_name) t->dim_name = strdupz(t->dim_name);
+}
+
+static int register_result_delete_callback(const char *name, void *value, void *data) {
+    (void)name;
+    (void)data;
+    struct register_result *t = (struct register_result *)value;
+
+    freez((void *)t->chart_id);
+    freez((void *)t->context);
+    freez((void *)t->dim_name);
+
+    return 1;
+}
+
+static DICTIONARY *register_result_init() {
+    DICTIONARY *results = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    dictionary_register_insert_callback(results, register_result_insert_callback, results);
+    // dictionary_register_delete_callback(results, register_result_delete_callback, results);
+    return results;
+}
+
+static void register_result_destroy(DICTIONARY *results) {
+    dictionary_walkthrough_write(results, register_result_delete_callback, results);
+    dictionary_destroy(results);
+}
+
+static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, calculated_number value) {
+    struct register_result t = {
+        .st = st,
+        .chart_id = st->id,
+        .context = st->context,
+        .dim_name = d->name,
+        .value = value
+    };
+
+    char buf[5000 + 1];
+    snprintfz(buf, 5000, "%s:%s", st->id, d->name);
+    dictionary_set(results, buf, &t, sizeof(struct register_result));
+}
+
+// ----------------------------------------------------------------------------
+// Generation of JSON output for the results
+
+static size_t registered_results_to_json(DICTIONARY *results, BUFFER *wb) {
+    buffer_strcat(wb, "{\n\t\"correlated_charts\": {\n");
+
+    size_t charts = 0, chart_dims = 0, total_dimensions = 0;
+    struct register_result *t;
+    RRDSET *last_st = NULL; // never access this - we use it only for comparison
+    dfe_start_read(results, t) {
+        if(!last_st || t->st != last_st) {
+            last_st = t->st;
+
+            if(charts) buffer_strcat(wb, "\n\t\t\t}\n\t\t},\n");
+            buffer_strcat(wb, "\t\t\"");
+            buffer_strcat(wb, t->chart_id);
+            buffer_strcat(wb, "\": {\n");
+            buffer_strcat(wb, "\t\t\t\"context\": \"");
+            buffer_strcat(wb, t->context);
+            buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
+            charts++;
+            chart_dims = 0;
+        }
+        if (chart_dims) buffer_sprintf(wb, ",\n");
+        buffer_sprintf(wb, "\t\t\t\t\"%s\": " CALCULATED_NUMBER_FORMAT, t->dim_name, t->value);
+        chart_dims++;
+        total_dimensions++;
+    }
+    dfe_done(t);
+
+    // close dimensions and chart
+    if (total_dimensions)
+        buffer_strcat(wb, "\n\t\t\t}\n\t\t}\n");
+
+    // close correlated_charts
+    buffer_sprintf(wb, "\t},\n\t\"total_dimensions_count\": %zu\n}", total_dimensions);
+
+    return total_dimensions;
+}
+
+// ----------------------------------------------------------------------------
+// KS2 algorithm functions
+
 typedef long int DIFFS_NUMBERS;
 #define DOUBLE_TO_INT_MULTIPLIER 100000
 
@@ -153,7 +256,7 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
     return KSfbar((int)round(en), d);
 }
 
-static int rrdset_metric_correlations(BUFFER *wb, RRDSET *st,
+static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                       long long baseline_after, long long baseline_before,
                                       long long highlight_after, long long highlight_before,
                                       long long max_points, uint32_t shifts, int timeout_ms) {
@@ -239,14 +342,9 @@ static int rrdset_metric_correlations(BUFFER *wb, RRDSET *st,
             highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
 
         double prob = kstwo(baseline, base_points, highlight, high_points, shifts);
-
-        // fprintf(stderr, "kstwo %d = %s:%s:%f\n", gettid(), st->name, d->name, prob);
-
-        if(correlated_dimensions) buffer_sprintf(wb, ",\n");
-        buffer_sprintf(wb, "\t\t\t\t\"%s\": %f", d->name, prob);
+        register_result(results, base_rrdr->st, d, prob);
         correlated_dimensions++;
     }
-    buffer_sprintf(wb, "\n");
 
 cleanup:
     rrdr_free(owa, high_rrdr);
@@ -255,7 +353,141 @@ cleanup:
     return correlated_dimensions;
 }
 
-int metric_correlations(RRDHOST *host, BUFFER *wb,
+// ----------------------------------------------------------------------------
+// VOLUME algorithm functions
+
+static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
+                                          long long baseline_after, long long baseline_before,
+                                          long long highlight_after, long long highlight_before) {
+    RRDR_OPTIONS options = RRDR_OPTION_NULL2ZERO | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO;
+    int group_method = RRDR_GROUPING_AVERAGE;
+    long group_time = 0;
+
+    int correlated_dimensions = 0;
+    int ret, value_is_null;
+
+    RRDDIM *d;
+    for(d = st->dimensions; d ; d = d->next) {
+
+        calculated_number highlight_average = NAN;
+        value_is_null = 1;
+        ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1, highlight_after, highlight_before,
+                                  group_method, group_time, options, NULL, NULL, &value_is_null, 0);
+
+        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_average)) {
+            // error("Metric correlations: cannot query highlight duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(highlight_average))?"result is NAN":"");
+            // this means no data for the highlighted duration - so skip it
+            continue;
+        }
+
+        calculated_number baseline_average = NAN;
+        value_is_null = 1;
+        ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1, baseline_after, baseline_before,
+                                  group_method, group_time, options, NULL, NULL, &value_is_null, 0);
+
+        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(baseline_average)) {
+            // error("Metric correlations: cannot query baseline duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(baseline_average))?"result is NAN":"");
+            // continue;
+            // this means no data for the baseline window, but we have data for the highlighted one - assume zero
+            baseline_average = 0.0;
+        }
+
+        calculated_number pcent = 0.0;
+        if(baseline_average > 0.0)
+            pcent = (highlight_average - baseline_average) / baseline_average;
+
+        else if(highlight_average > baseline_average)
+            pcent = 1000000000.0;
+
+        pcent = calculated_number_fabs(pcent);
+
+        register_result(results, st, d, pcent);
+        correlated_dimensions++;
+    }
+
+    return correlated_dimensions;
+}
+
+int compare_calculated_numbers(const void *left, const void *right) {
+    calculated_number lt = *(calculated_number *)left;
+    calculated_number rt = *(calculated_number *)right;
+
+    // https://stackoverflow.com/a/3886497/1114110
+    return (lt > rt) - (lt < rt);
+}
+
+static inline int binary_search_bigger_than_calculated_number(const calculated_number arr[], int left, int size, calculated_number K) {
+    // binary search to find the index the smallest index
+    // of the first value in the array that is greater than K
+
+    int right = size;
+    while(left < right) {
+        int middle = (int)(((unsigned int)(left + right)) >> 1);
+
+        if(arr[middle] > K)
+            right = middle;
+
+        else
+            left = middle + 1;
+    }
+
+    return left;
+}
+
+static size_t volume_post_processing(DICTIONARY *results) {
+    struct register_result *t;
+
+    // count the dimensions
+    // TODO - remove this once rrdlabels is merged and use dictionary_entries()
+    size_t dimensions = 0;
+    dfe_start_read(results, t)
+        dimensions++;
+    dfe_done(t);
+
+    if(!dimensions) return 0;
+
+    // create an array of the right size and copy all the values in it
+    calculated_number slots[dimensions];
+    dimensions = 0;
+    dfe_start_read(results, t) {
+        slots[dimensions++] = t->value;
+    }
+    dfe_done(t);
+
+    // sort the array with the values of all dimensions
+    qsort(slots, dimensions, sizeof(calculated_number), compare_calculated_numbers);
+
+    // skip the duplicates in the sorted array
+    calculated_number last_value = NAN;
+    size_t unique_values = 0;
+    for(size_t i = 0; i < dimensions ;i++) {
+        if(likely(slots[i] != last_value))
+            slots[unique_values++] = last_value = slots[i];
+    }
+
+    // if we shortened the array, put an unrealistic value past the useful ones
+    if(unique_values > 0 && unique_values < dimensions)
+        slots[unique_values] = slots[unique_values - 1] * 2;
+
+    // calculate the weight of each slot, using the number of unique values
+    calculated_number slot_weight = 1.0 / (calculated_number)unique_values;
+
+    dfe_start_read(results, t) {
+        int slot = binary_search_bigger_than_calculated_number(slots, 0, (int)unique_values, t->value);
+        calculated_number v = slot * slot_weight;
+        if(unlikely(v > 1.0)) v = 1.0;
+        v = 1.0 - v;
+        t->value = v;
+    }
+    dfe_done(t);
+
+    return dimensions;
+}
+
+// ----------------------------------------------------------------------------
+// The main function
+
+int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method,
                         long long baseline_after, long long baseline_before,
                         long long highlight_after, long long highlight_before,
                         long long max_points, int timeout_ms) {
@@ -290,8 +522,8 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
     usec_t timeout_usec = timeout_ms * USEC_PER_MS;
     usec_t started_usec = now_realtime_usec();
 
-    DICTIONARY *charts = NULL;
-    BUFFER *wdims = NULL;
+    DICTIONARY *results = register_result_init();
+    DICTIONARY *charts = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);;
 
     char *error = NULL;
     int resp = HTTP_RESP_OK;
@@ -349,9 +581,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
         baseline_after = baseline_after_new;
     }
 
-    info ("Running metric correlations, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld, timeout: %d ms, shifts %u", highlight_after, highlight_before, baseline_after, baseline_before, max_points, timeout_ms, shifts);
-
-    charts = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
+    info ("Running metric correlations, method %u, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld, timeout: %d ms, shifts %u", method, highlight_after, highlight_before, baseline_after, baseline_before, max_points, timeout_ms, shifts);
 
     // dont lock here and wait for results
     // get the charts and run mc after
@@ -365,10 +595,8 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
 
     buffer_strcat(wb, "{\n\t\"correlated_charts\": {");
 
-    long long dims = 0, total_dims = 0;
+    size_t total_dims = 0;
     void *ptr;
-    int c = 0;
-    wdims = buffer_create(1000);
 
     // for every chart in the dictionary
     dfe_start_read(charts, ptr) {
@@ -382,35 +610,43 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
         st = rrdset_find_byname(host, ptr_name);
         if(!st) continue;
 
-        buffer_flush(wdims);
-
         rrdset_rdlock(st);
-        dims = rrdset_metric_correlations(wdims,st,
-            baseline_after, baseline_before,
-            highlight_after, highlight_before,
-            max_points, shifts,
-            (int)(timeout_ms - ((now_usec - started_usec) / USEC_PER_MS)));
-        rrdset_unlock(st);
 
-        if(dims) {
-            if (c)
-                buffer_strcat(wb, "\t\t},");
-            buffer_strcat(wb, "\n\t\t\"");
-            buffer_strcat(wb, st->id);
-            buffer_strcat(wb, "\": {\n");
-            buffer_strcat(wb, "\t\t\t\"context\": \"");
-            buffer_strcat(wb, st->context);
-            buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
-            buffer_sprintf(wb, "%s", buffer_tostring(wdims));
-            buffer_strcat(wb, "\t\t\t}\n");
-            total_dims += dims;
-            c++;
+        switch(method) {
+            case METRIC_CORRELATIONS_VOLUME:
+                total_dims += rrdset_metric_correlations_volume(st, results,
+                                                             baseline_after, baseline_before,
+                                                             highlight_after, highlight_before);
+                break;
+
+            default:
+            case METRIC_CORRELATIONS_KS2:
+                total_dims += rrdset_metric_correlations_ks2(st, results,
+                                                             baseline_after, baseline_before,
+                                                             highlight_after, highlight_before,
+                                                             max_points, shifts,
+                                                             (int)(timeout_ms - ((now_usec - started_usec) / USEC_PER_MS)));
+                break;
         }
+
+        rrdset_unlock(st);
     }
     dfe_done(ptr);
 
-    buffer_strcat(wb, "\t\t}\n");
-    buffer_sprintf(wb, "\t},\n\t\"total_dimensions_count\": %lld\n}", total_dims);
+    // post processing of registered results
+    switch(method) {
+        case METRIC_CORRELATIONS_VOLUME:
+            volume_post_processing(results);
+            break;
+
+        default:
+        case METRIC_CORRELATIONS_KS2:
+            break;
+    }
+
+    // generate the json output we need
+    buffer_flush(wb);
+    total_dims = registered_results_to_json(results, wb);
 
     if(!total_dims) {
         error = "no results produced from correlations";
@@ -419,7 +655,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb,
 
 cleanup:
     if(charts) dictionary_destroy(charts);
-    if(wdims) buffer_free(wdims);
+    if(results) register_result_destroy(results);
 
     if(error) {
         buffer_flush(wb);

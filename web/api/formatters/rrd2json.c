@@ -178,8 +178,6 @@ int rrdset2value_api_v1(
     }
 
     if(rrdr_rows(r) == 0) {
-        rrdr_free(owa, r);
-
         if(db_after)  *db_after  = 0;
         if(db_before) *db_before = 0;
         if(value_is_null) *value_is_null = 1;

@@ -1320,6 +1320,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     long long baseline_after = 0, baseline_before = 0, highlight_after = 0, highlight_before = 0, max_points = 0;
+    METRIC_CORRELATIONS_METHOD method = METRIC_CORRELATIONS_KS2;
     long timeout = 0;
  
     while (url) {
@@ -1351,6 +1352,11 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         else if (!strcmp(name, "timeout"))
             timeout = (long long) strtoul(value, NULL, 0);
 
+        else if(!strcmp(name, "method")) {
+            if(!strcmp(value, "volume")) method = METRIC_CORRELATIONS_VOLUME;
+            else method = METRIC_CORRELATIONS_KS2;
+        }
+
     }
 
     BUFFER *wb = w->response.data;
@@ -1363,7 +1369,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    return metric_correlations(host, wb, baseline_after, baseline_before, highlight_after, highlight_before, max_points, timeout);
+    return metric_correlations(host, wb, method, baseline_after, baseline_before, highlight_after, highlight_before, max_points, timeout);
 }
 
 static struct api_command {
