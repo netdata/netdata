@@ -857,6 +857,14 @@ static int rrdr_convert_before_after_to_absolute(
         after_requested = tmp;
     }
 
+    // we need to make sure that the query is at least aligned
+    // with the database update every, otherwise when the user
+    // requests just 1 point for the entire duration, it may not
+    // be created (the last 1 point may be misaligned with the
+    // query).
+    before_requested -= before_requested % update_every;
+    after_requested  -= after_requested % update_every;
+
     *before_requestedp = before_requested;
     *after_requestedp = after_requested;
 

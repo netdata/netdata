@@ -277,7 +277,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                       long long baseline_after, long long baseline_before,
                                       long long highlight_after, long long highlight_before,
                                       long long max_points, uint32_t shifts, int timeout_ms) {
-    RRDR_OPTIONS options = RRDR_OPTION_NULL2ZERO | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO;
+    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO;
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
@@ -341,19 +341,22 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     for(i = 0, d = base_rrdr->st->dimensions ; d && i < base_rrdr->d; i++, d = d->next) {
 
         // skip the not evaluated ones
-        if(unlikely(!(base_rrdr->od[i] & RRDR_DIMENSION_SELECTED) || !(high_rrdr->od[i] & RRDR_DIMENSION_SELECTED)))
+        if(unlikely(base_rrdr->od[i] & RRDR_DIMENSION_HIDDEN) || (high_rrdr->od[i] & RRDR_DIMENSION_HIDDEN))
             continue;
 
-        // skip the dimensions that are just zero
+        // skip the dimensions that are just zero for both the baseline and the highlight
         if(unlikely(!(base_rrdr->od[i] & RRDR_DIMENSION_NONZERO) && !(high_rrdr->od[i] & RRDR_DIMENSION_NONZERO)))
             continue;
 
         // copy the baseline points of the dimension to a contiguous array
+        // there is no need to check for empty values, since empty are already zero
         calculated_number baseline[base_points];
         for(int c = 0; c < base_points; c++)
             baseline[c] = base_rrdr->v[ c * base_rrdr->d + i ];
 
         // copy the highlight points of the dimension to a contiguous array
+        // there is no need to check for empty values, since empty values are already zero
+        // https://github.com/netdata/netdata/blob/6e3144683a73a2024d51425b20ecfd569034c858/web/api/queries/average/average.c#L41-L43
         calculated_number highlight[high_points];
         for(int c = 0; c < high_points; c++)
             highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
@@ -391,7 +394,7 @@ cleanup:
 static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                           long long baseline_after, long long baseline_before,
                                           long long highlight_after, long long highlight_before) {
-    RRDR_OPTIONS options = RRDR_OPTION_NULL2ZERO | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO;
+    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO | RRDR_OPTION_MATCH_IDS;
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
 
@@ -425,15 +428,15 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         }
 
         calculated_number pcent = 0.0;
-        if(baseline_average > 0.0)
+        if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0))
             pcent = (highlight_average - baseline_average) / baseline_average;
-
-        else if(highlight_average > baseline_average)
-            pcent = 1000000000.0;
-
-        pcent = calculated_number_fabs(pcent);
+        else if(isgreater(highlight_average, 0.0))
+            pcent = CALCULATED_NUMBER_MAX;
+        else if(isless(highlight_average, 0.0))
+            pcent = -CALCULATED_NUMBER_MAX;
 
         register_result(results, st, d, pcent);
+
         correlated_dimensions++;
     }
 
@@ -485,6 +488,7 @@ static size_t spread_results_evenly(DICTIONARY *results) {
     calculated_number slots[dimensions];
     dimensions = 0;
     dfe_start_read(results, t) {
+        t->value = calculated_number_fabs(t->value);
         slots[dimensions++] = t->value;
     }
     dfe_done(t);
@@ -526,6 +530,8 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
                         long long baseline_after, long long baseline_before,
                         long long highlight_after, long long highlight_before,
                         long long max_points, int timeout_ms) {
+
+    // method = METRIC_CORRELATIONS_VOLUME;
 
     if (enable_metric_correlations == CONFIG_BOOLEAN_NO) {
         error("Metric correlations: not enabled.");

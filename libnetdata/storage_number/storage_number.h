@@ -23,6 +23,8 @@ typedef double calculated_number;
 #define LONG_DOUBLE_MODIFIER "f"
 typedef double LONG_DOUBLE;
 
+#define CALCULATED_NUMBER_MAX DBL_MAX
+
 #else // NETDATA_WITHOUT_LONG_DOUBLE
 
 typedef long double calculated_number;
@@ -32,6 +34,8 @@ typedef long double calculated_number;
 
 #define LONG_DOUBLE_MODIFIER "Lf"
 typedef long double LONG_DOUBLE;
+
+#define CALCULATED_NUMBER_MAX LDBL_MAX
 
 #endif // NETDATA_WITHOUT_LONG_DOUBLE
 
