@@ -1319,9 +1319,10 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    long long baseline_after = 0, baseline_before = 0, highlight_after = 0, highlight_before = 0, max_points = 0;
+    long long baseline_after = 300, baseline_before = -60, highlight_after = -60, highlight_before = 0, points = 1000;
+    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
     METRIC_CORRELATIONS_METHOD method = METRIC_CORRELATIONS_KS2;
-    long timeout = 0;
+    int timeout = 20000;
  
     while (url) {
         char *value = mystrsep(&url, "&");
@@ -1346,17 +1347,18 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         else if (!strcmp(name, "highlight_before"))
             highlight_before = (long long) strtoul(value, NULL, 0);
 
-        else if (!strcmp(name, "max_points"))
-            max_points = (long long) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
+            points = (long long) strtoul(value, NULL, 0);
 
         else if (!strcmp(name, "timeout"))
-            timeout = (long long) strtoul(value, NULL, 0);
+            timeout = (int) strtoul(value, NULL, 0);
 
         else if(!strcmp(name, "method")) {
             if(!strcmp(value, "volume")) method = METRIC_CORRELATIONS_VOLUME;
             else method = METRIC_CORRELATIONS_KS2;
         }
-
+        else if(!strcmp(name, "options"))
+            options |= web_client_api_request_v1_data_options(value);
     }
 
     BUFFER *wb = w->response.data;
@@ -1369,7 +1371,8 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    return metric_correlations(host, wb, method, baseline_after, baseline_before, highlight_after, highlight_before, max_points, timeout);
+    return metric_correlations(host, wb, method, baseline_after, baseline_before,
+                               highlight_after, highlight_before, points, options, timeout);
 }
 
 static struct api_command {

@@ -274,10 +274,10 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
 }
 
 static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
-                                      long long baseline_after, long long baseline_before,
-                                      long long highlight_after, long long highlight_before,
-                                      long long max_points, uint32_t shifts, int timeout_ms) {
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO;
+                                          long long baseline_after, long long baseline_before,
+                                          long long highlight_after, long long highlight_before,
+                                          long long points, RRDR_OPTIONS options,
+                                          uint32_t shifts, int timeout_ms) {
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
@@ -290,7 +290,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     // get first the highlight to find the number of points available
     usec_t started_usec = now_realtime_usec();
     ONEWAYALLOC *owa = onewayalloc_create(0);
-    high_rrdr = rrd2rrdr(owa, st, max_points,
+    high_rrdr = rrd2rrdr(owa, st, points,
                           highlight_after, highlight_before, group_method,
                           group_time, options, NULL, context_param_list,
                           timeout_ms);
@@ -392,9 +392,10 @@ cleanup:
 // VOLUME algorithm functions
 
 static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
-                                          long long baseline_after, long long baseline_before,
-                                          long long highlight_after, long long highlight_before) {
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO | RRDR_OPTION_MATCH_IDS;
+                                             long long baseline_after, long long baseline_before,
+                                             long long highlight_after, long long highlight_before,
+                                             RRDR_OPTIONS options) {
+    options |= RRDR_OPTION_MATCH_IDS;
     int group_method = RRDR_GROUPING_AVERAGE;
     long group_time = 0;
 
@@ -529,9 +530,10 @@ static size_t spread_results_evenly(DICTIONARY *results) {
 int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method,
                         long long baseline_after, long long baseline_before,
                         long long highlight_after, long long highlight_before,
-                        long long max_points, int timeout_ms) {
+                        long long points, RRDR_OPTIONS options, int timeout_ms) {
 
     // method = METRIC_CORRELATIONS_VOLUME;
+    // options |= RRDR_OPTION_ANOMALY_BIT;
 
     if (enable_metric_correlations == CONFIG_BOOLEAN_NO) {
         error("Metric correlations: not enabled.");
@@ -557,8 +559,8 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
 
     // if the number of points is less than 100
     // make them 100 points
-    if(max_points < 100)
-        max_points = 100;
+    if(points < 100)
+        points = 100;
 
     usec_t timeout_usec = timeout_ms * USEC_PER_MS;
     usec_t started_usec = now_realtime_usec();
@@ -601,15 +603,15 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
 
         // if the baseline size will not comply to MAX_POINTS
         // lower the window of the baseline
-        while(shifts && (max_points << shifts) > MAX_POINTS)
+        while(shifts && (points << shifts) > MAX_POINTS)
             shifts--;
 
         // if the baseline size still does not comply to MAX_POINTS
         // lower the resolution of the highlight and the baseline
-        while((max_points << shifts) > MAX_POINTS)
-            max_points = max_points >> 1;
+        while((points << shifts) > MAX_POINTS)
+            points = points >> 1;
 
-        if(max_points < 100) {
+        if(points < 100) {
             error = "cannot comply to at least 100 points";
             resp = HTTP_RESP_BAD_REQUEST;
             goto cleanup;
@@ -622,7 +624,8 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
         baseline_after = baseline_after_new;
     }
 
-    info ("Running metric correlations, method %u, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld, timeout: %d ms, shifts %u", method, highlight_after, highlight_before, baseline_after, baseline_before, max_points, timeout_ms, shifts);
+    info ("Running metric correlations, method %u, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld, timeout: %d ms, shifts %u", method, highlight_after, highlight_before, baseline_after, baseline_before,
+        points, timeout_ms, shifts);
 
     // dont lock here and wait for results
     // get the charts and run mc after
@@ -657,7 +660,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
             case METRIC_CORRELATIONS_VOLUME:
                 total_dims += rrdset_metric_correlations_volume(st, results,
                                                              baseline_after, baseline_before,
-                                                             highlight_after, highlight_before);
+                                                             highlight_after, highlight_before, options);
                 break;
 
             default:
@@ -665,7 +668,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
                 total_dims += rrdset_metric_correlations_ks2(st, results,
                                                              baseline_after, baseline_before,
                                                              highlight_after, highlight_before,
-                                                             max_points, shifts,
+                                                             points, options, shifts,
                                                              (int)(timeout_ms - ((now_usec - started_usec) / USEC_PER_MS)));
                 break;
         }
