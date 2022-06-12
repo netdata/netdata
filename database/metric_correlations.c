@@ -165,6 +165,11 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
     if(unlikely(!base_size || !high_size))
         return NAN;
 
+    if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
+        error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
+        return NAN;
+    }
+
     qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
     qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
 
@@ -248,7 +253,7 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
     double dmin = ((double)base_min_idx / dbase_size) - ((double)high_min_idx / dhigh_size);
     double dmax = ((double)base_max_idx / dbase_size) - ((double)high_max_idx / dhigh_size);
 
-    if(isnan(dmin) || isinf(dmin) || isnan(dmax) || isinf(dmax))
+    if(unlikely(isnan(dmin) || isinf(dmin) || isnan(dmax) || isinf(dmax)))
         return NAN;
 
     double d;
@@ -261,8 +266,8 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
 
     double en = dbase_size * dhigh_size / (dbase_size + dhigh_size);
 
-    // under these conditions, KSfbar crashes
-    if(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d))
+    // under these conditions, KSfbar() crashes
+    if(unlikely(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d)))
         return NAN;
 
     return KSfbar((int)round(en), d);
@@ -354,8 +359,21 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
             highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
 
         double prob = kstwo(baseline, base_points, highlight, high_points, shifts);
-        if(!isnan(prob)) {
-            register_result(results, base_rrdr->st, d, prob);
+        if(!isnan(prob) && !isinf(prob)) {
+
+            // these conditions should never happen, but still let's check
+            if(unlikely(prob < 0.0)) {
+                error("Metric correlations: kstwo() returned a negative number: %f", prob);
+                prob = -prob;
+            }
+            if(unlikely(prob > 1.0)) {
+                error("Metric correlations: kstwo() returned a number above 1.0: %f", prob);
+                prob = 1.0;
+            }
+
+            // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
+            // so we flip the result of kstwo()
+            register_result(results, base_rrdr->st, d, 1.0 - prob);
             correlated_dimensions++;
         }
     }
@@ -448,7 +466,10 @@ static inline int binary_search_bigger_than_calculated_number(const calculated_n
     return left;
 }
 
-static size_t volume_post_processing(DICTIONARY *results) {
+// ----------------------------------------------------------------------------
+// spread the results evenly according to their value
+
+static size_t spread_results_evenly(DICTIONARY *results) {
     struct register_result *t;
 
     // count the dimensions
@@ -647,16 +668,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
     }
     dfe_done(ptr);
 
-    // post processing of registered results
-    switch(method) {
-        case METRIC_CORRELATIONS_VOLUME:
-            volume_post_processing(results);
-            break;
-
-        default:
-        case METRIC_CORRELATIONS_KS2:
-            break;
-    }
+    spread_results_evenly(results);
 
     // generate the json output we need
     buffer_flush(wb);
