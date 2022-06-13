@@ -61,11 +61,11 @@ static void register_result_insert_callback(const char *name, void *value, void 
     struct register_result *t = (struct register_result *)value;
 
     if(t->chart_id) t->chart_id = strdupz(t->chart_id);
-    if(t->context) t->context = strdupz(t->context);
+    if(t->context)  t->context  = strdupz(t->context);
     if(t->dim_name) t->dim_name = strdupz(t->dim_name);
 }
 
-static int register_result_delete_callback(const char *name, void *value, void *data) {
+static void register_result_delete_callback(const char *name, void *value, void *data) {
     (void)name;
     (void)data;
     struct register_result *t = (struct register_result *)value;
@@ -73,19 +73,16 @@ static int register_result_delete_callback(const char *name, void *value, void *
     freez((void *)t->chart_id);
     freez((void *)t->context);
     freez((void *)t->dim_name);
-
-    return 1;
 }
 
 static DICTIONARY *register_result_init() {
     DICTIONARY *results = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     dictionary_register_insert_callback(results, register_result_insert_callback, results);
-    // dictionary_register_delete_callback(results, register_result_delete_callback, results);
+    dictionary_register_delete_callback(results, register_result_delete_callback, results);
     return results;
 }
 
 static void register_result_destroy(DICTIONARY *results) {
-    dictionary_walkthrough_write(results, register_result_delete_callback, results);
     dictionary_destroy(results);
 }
 
@@ -596,12 +593,7 @@ static size_t spread_results_evenly(DICTIONARY *results) {
     struct register_result *t;
 
     // count the dimensions
-    // TODO - remove this once rrdlabels is merged and use dictionary_entries()
-    size_t dimensions = 0;
-    dfe_start_read(results, t)
-        dimensions++;
-    dfe_done(t);
-
+    size_t dimensions = dictionary_stats_entries(results);
     if(!dimensions) return 0;
 
     // create an array of the right size and copy all the values in it
@@ -623,10 +615,6 @@ static size_t spread_results_evenly(DICTIONARY *results) {
         if(likely(slots[i] != last_value))
             slots[unique_values++] = last_value = slots[i];
     }
-
-    // if we shortened the array, put an unrealistic value past the useful ones
-    if(unique_values > 0 && unique_values < dimensions)
-        slots[unique_values] = slots[unique_values - 1] * 2;
 
     // calculate the weight of each slot, using the number of unique values
     calculated_number slot_weight = 1.0 / (calculated_number)unique_values;
