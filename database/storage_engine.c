@@ -5,6 +5,7 @@
 #ifdef ENABLE_DBENGINE
 #include "engine/rrdengineapi.h"
 #endif
+#include "libnetdata/libnetdata.h"
 
 static STORAGE_ENGINE engines[] = {
     {
@@ -169,7 +170,8 @@ STORAGE_ENGINE* storage_engine_find(const char* name)
         if (strcmp(engines[i].name, name) == 0)
             return &engines[i];
 
-    return NULL;
+    error("No storage engine found for memory mode %s.", name);
+    return storage_engine_get(default_rrd_memory_mode);
 }
 
 STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode)
@@ -177,7 +179,11 @@ STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode)
     for (size_t i = 0; i != engine_count; i++)
         if (engines[i].id == mmode)
             return &engines[i];
-    return NULL;
+    STORAGE_ENGINE* eng = mmode == default_rrd_memory_mode
+        ? &engines[0] // default engine not available, use NONE
+        : storage_engine_get(default_rrd_memory_mode);
+    error("No storage engine for memory mode %u, will use %s (%u) instead.", mmode, eng->name, eng->id);
+    return eng;
 }
 
 STORAGE_ENGINE* storage_engine_foreach_init()
