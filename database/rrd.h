@@ -19,6 +19,7 @@ typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 typedef struct context_param CONTEXT_PARAM;
 typedef struct storage_engine_instance STORAGE_ENGINE_INSTANCE;
+typedef struct storage_engine STORAGE_ENGINE;
 
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;

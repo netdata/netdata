@@ -19,6 +19,10 @@ struct mem_query_handle {
     size_t last_slot;
 };
 
+STORAGE_ENGINE_INSTANCE* rrddim_storage_engine_instance_new(STORAGE_ENGINE* engine, RRDHOST *host);
+void rrddim_storage_engine_instance_exit(STORAGE_ENGINE_INSTANCE* context);
+void rrddim_storage_engine_instance_destroy(STORAGE_ENGINE_INSTANCE* context);
+
 extern void rrddim_collect_init(RRDDIM *rd);
 extern void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, SN_FLAGS flags);
 extern int rrddim_collect_finalize(RRDDIM *rd);
