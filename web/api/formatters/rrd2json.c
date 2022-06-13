@@ -264,7 +264,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_SSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
             rrdr2ssv(r, wb, options, "", " ", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -277,7 +277,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_SSV_COMMA:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
             rrdr2ssv(r, wb, options, "", ",", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -290,7 +290,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_JS_ARRAY:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
             rrdr2ssv(r, wb, options, "[", ",", "]", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         }
@@ -303,7 +303,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_CSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
             rrdr2csv(r, wb, format, options, "", ",", "\\n", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -316,7 +316,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_CSV_MARKDOWN:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
             rrdr2csv(r, wb, format, options, "", "|", "\\n", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -329,7 +329,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_CSV_JSON_ARRAY:
         wb->contenttype = CT_APPLICATION_JSON;
         if(options & RRDR_OPTION_JSON_WRAP) {
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
             buffer_strcat(wb, "[\n");
             rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n", temp_rd);
             buffer_strcat(wb, "\n]");
@@ -346,7 +346,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_TSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
             rrdr2csv(r, wb, format, options, "", "\t", "\\n", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -359,7 +359,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_HTML:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
             buffer_strcat(wb, "<html>\\n<center>\\n<table border=\\\"0\\\" cellpadding=\\\"5\\\" cellspacing=\\\"5\\\">\\n");
             rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "", temp_rd);
             buffer_strcat(wb, "</table>\\n</center>\\n</html>\\n");
@@ -377,7 +377,7 @@ int rrdset2anything_api_v1(
         wb->contenttype = CT_APPLICATION_X_JAVASCRIPT;
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
 
         rrdr2json(r, wb, options, 1, query_params->context_param_list);
 
@@ -389,7 +389,7 @@ int rrdset2anything_api_v1(
         wb->contenttype = CT_APPLICATION_JSON;
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
 
         rrdr2json(r, wb, options, 1, query_params->context_param_list);
 
@@ -400,7 +400,7 @@ int rrdset2anything_api_v1(
     case DATASOURCE_JSONP:
         wb->contenttype = CT_APPLICATION_X_JAVASCRIPT;
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
 
         rrdr2json(r, wb, options, 0, query_params->context_param_list);
 
@@ -413,7 +413,7 @@ int rrdset2anything_api_v1(
         wb->contenttype = CT_APPLICATION_JSON;
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
 
         rrdr2json(r, wb, options, 0, query_params->context_param_list);
 

@@ -36,9 +36,9 @@ static struct {
         , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
-        , {"allow_past"      , 0    , RRDR_OPTION_ALLOW_PAST}
         , {"anomaly-bit"     , 0    , RRDR_OPTION_ANOMALY_BIT}
-        , {                  NULL, 0, 0}
+        , {"raw"             , 0    , RRDR_OPTION_RETURN_RAW}
+        , {NULL              , 0    , 0}
 };
 
 static struct {
@@ -162,8 +162,8 @@ void web_client_api_v1_management_init(void) {
 	api_secret = get_mgmt_api_key();
 }
 
-inline uint32_t web_client_api_request_v1_data_options(char *o) {
-    uint32_t ret = 0x00000000;
+inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
+    RRDR_OPTIONS ret = 0x00000000;
     char *tok;
 
     while(o && *o && (tok = mystrsep(&o, ", |"))) {
@@ -180,6 +180,19 @@ inline uint32_t web_client_api_request_v1_data_options(char *o) {
     }
 
     return ret;
+}
+
+void web_client_api_request_v1_data_options_to_string(BUFFER *wb, RRDR_OPTIONS options) {
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    int added = 0;
+    for(int i = 0; api_v1_data_options[i].name ; i++) {
+        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
+            if(added) buffer_strcat(wb, ",");
+            buffer_strcat(wb, api_v1_data_options[i].name);
+            used |= api_v1_data_options[i].value;
+            added++;
+        }
+    }
 }
 
 inline uint32_t web_client_api_request_v1_data_format(char *name) {
@@ -1319,11 +1332,12 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    long long baseline_after = 300, baseline_before = -60, highlight_after = -60, highlight_before = 0, points = 1000;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_ALLOW_PAST | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
+    long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
+    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO | RRDR_OPTION_ALLOW_PAST;
     METRIC_CORRELATIONS_METHOD method = METRIC_CORRELATIONS_KS2;
-    int timeout = 20000;
- 
+    RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
+    int timeout = 0;
+
     while (url) {
         char *value = mystrsep(&url, "&");
         if (!value || !*value)
@@ -1341,11 +1355,11 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         else if (!strcmp(name, "baseline_before"))
             baseline_before = (long long) strtoul(value, NULL, 0);
 
-        else if (!strcmp(name, "highlight_after"))
-            highlight_after = (long long) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
+            after = (long long) strtoul(value, NULL, 0);
 
-        else if (!strcmp(name, "highlight_before"))
-            highlight_before = (long long) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
+            before = (long long) strtoul(value, NULL, 0);
 
         else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
             points = (long long) strtoul(value, NULL, 0);
@@ -1353,12 +1367,15 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         else if (!strcmp(name, "timeout"))
             timeout = (int) strtoul(value, NULL, 0);
 
-        else if(!strcmp(name, "method")) {
-            if(!strcmp(value, "volume")) method = METRIC_CORRELATIONS_VOLUME;
-            else method = METRIC_CORRELATIONS_KS2;
-        }
+        else if(!strcmp(name, "group"))
+            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+
         else if(!strcmp(name, "options"))
             options |= web_client_api_request_v1_data_options(value);
+
+        else if(!strcmp(name, "method"))
+            method = mc_string_to_method(value);
+
     }
 
     BUFFER *wb = w->response.data;
@@ -1366,13 +1383,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    if(!highlight_after || !highlight_before) {
-        buffer_strcat(wb, "{\"error\": \"Missing or invalid required highlight after and before parameters.\" }");
-        return HTTP_RESP_BAD_REQUEST;
-    }
-
-    return metric_correlations(host, wb, method, baseline_after, baseline_before,
-                               highlight_after, highlight_before, points, options, timeout);
+    return metric_correlations(host, wb, method, group, baseline_after, baseline_before, after, before, points, options, timeout);
 }
 
 static struct api_command {

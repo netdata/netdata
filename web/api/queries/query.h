@@ -20,5 +20,6 @@ typedef enum rrdr_grouping {
 extern const char *group_method2string(RRDR_GROUPING group);
 extern void web_client_api_v1_init_grouping(void);
 extern RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def);
+extern const char *web_client_api_request_v1_data_group_to_string(RRDR_GROUPING group);
 
 #endif //NETDATA_API_DATA_QUERY_H

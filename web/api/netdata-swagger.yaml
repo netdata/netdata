@@ -1025,6 +1025,7 @@ paths:
                 - allow_past
                 - nonzero
                 - anomaly-bit
+                - raw
             default:
               - null2zero
               - allow_past

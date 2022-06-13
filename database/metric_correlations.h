@@ -3,6 +3,8 @@
 #ifndef NETDATA_METRIC_CORRELATIONS_H
 #define NETDATA_METRIC_CORRELATIONS_H 1
 
+#include "web/api/queries/query.h"
+
 extern int enable_metric_correlations;
 extern int metric_correlations_version;
 
@@ -11,6 +13,12 @@ typedef enum {
     METRIC_CORRELATIONS_VOLUME = 2,
 } METRIC_CORRELATIONS_METHOD;
 
-extern int metric_correlations (RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method, long long selected_after, long long selected_before, long long reference_after, long long reference_before, long long points, RRDR_OPTIONS options, int timeout_ms);
+extern int metric_correlations (RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method, RRDR_GROUPING group,
+                               long long baseline_after, long long baseline_before,
+                               long long after, long long before,
+                               long long points, RRDR_OPTIONS options, int timeout);
+
+extern METRIC_CORRELATIONS_METHOD mc_string_to_method(const char *method);
+extern const char *mc_method_to_string(METRIC_CORRELATIONS_METHOD method);
 
 #endif //NETDATA_METRIC_CORRELATIONS_H

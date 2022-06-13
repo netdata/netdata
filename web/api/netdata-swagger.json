@@ -1241,7 +1241,8 @@
                   "unaligned",
                   "allow_past",
                   "nonzero",
-                  "anomaly-bit"
+                  "anomaly-bit",
+                  "raw"
                 ]
               },
               "default": [
