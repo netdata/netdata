@@ -9,7 +9,7 @@ static inline int find_keyword(char *str, char *keyword, int max_size, int (*cus
     while (unlikely(custom_isspace(*s))) s++;
     keyword_start = s;
 
-    while (likely(*s && !custom_isspace(*s)) && max_size > 0) {
+    while (likely(*s && !custom_isspace(*s)) && max_size > 1) {
         *keyword++ = *s++;
         max_size--;
     }
