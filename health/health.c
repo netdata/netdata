@@ -855,10 +855,12 @@ void *health_main(void *ptr) {
                     /* time_t old_db_timestamp = rc->db_before; */
                     int value_is_null = 0;
 
-                    int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rc->dimensions, 1, rc->after,
-                                                  rc->before, rc->group, 0, rc->options, &rc->db_after,
-                                                  &rc->db_before, &value_is_null, 0
-                    );
+                    int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rc->dimensions, 1,
+                                                  rc->after, rc->before, rc->group,
+                                                  0, rc->options,
+                                                  &rc->db_after,&rc->db_before,
+                                                  NULL, NULL,
+                                                  &value_is_null, 0);
 
                     if (unlikely(ret != 200)) {
                         // database lookup failed

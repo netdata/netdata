@@ -20,5 +20,6 @@ extern int metric_correlations (RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_M
 
 extern METRIC_CORRELATIONS_METHOD mc_string_to_method(const char *method);
 extern const char *mc_method_to_string(METRIC_CORRELATIONS_METHOD method);
+extern int mc_unittest(void);
 
 #endif //NETDATA_METRIC_CORRELATIONS_H

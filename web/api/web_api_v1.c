@@ -1334,7 +1334,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
 
     long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
     RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO | RRDR_OPTION_ALLOW_PAST;
-    METRIC_CORRELATIONS_METHOD method = METRIC_CORRELATIONS_KS2;
+    METRIC_CORRELATIONS_METHOD method = METRIC_CORRELATIONS_VOLUME;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
 

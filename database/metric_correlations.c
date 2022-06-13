@@ -7,6 +7,13 @@
 int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
 
+typedef struct mc_stats {
+    size_t db_points;
+    size_t result_points;
+    size_t db_queries;
+    size_t binary_searches;
+} MC_STATS;
+
 // ----------------------------------------------------------------------------
 // parse and render metric correlations methods
 
@@ -24,7 +31,7 @@ METRIC_CORRELATIONS_METHOD mc_string_to_method(const char *method) {
         if(strcmp(method, metric_correlations_methods[i].name) == 0)
             return metric_correlations_methods[i].value;
 
-    return METRIC_CORRELATIONS_KS2;
+    return METRIC_CORRELATIONS_VOLUME;
 }
 
 const char *mc_method_to_string(METRIC_CORRELATIONS_METHOD method) {
@@ -103,7 +110,7 @@ static size_t registered_results_to_json(DICTIONARY *results, BUFFER *wb,
                                          long long baseline_after, long long baseline_before,
                                          long points, METRIC_CORRELATIONS_METHOD method,
                                          RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
-                                         size_t correlated_dimensions) {
+                                         size_t correlated_dimensions, usec_t duration, MC_STATS *stats) {
 
     buffer_sprintf(wb, "{\n"
                        "\t\"after\": %lld,\n"
@@ -114,6 +121,13 @@ static size_t registered_results_to_json(DICTIONARY *results, BUFFER *wb,
                        "\t\"baseline_before\": %lld,\n"
                        "\t\"baseline_duration\": %lld,\n"
                        "\t\"baseline_points\": %ld,\n"
+                       "\t\"statistics\": {\n"
+                       "\t\t\"query_time_ms\": %f,\n"
+                       "\t\t\"db_queries\": %zu,\n"
+                       "\t\t\"db_points_read\": %zu,\n"
+                       "\t\t\"query_result_points\": %zu,\n"
+                       "\t\t\"binary_searches\": %zu\n"
+                       "\t},\n"
                        "\t\"group\": \"%s\",\n"
                        "\t\"method\": \"%s\",\n"
                        "\t\"options\": \"",
@@ -125,6 +139,11 @@ static size_t registered_results_to_json(DICTIONARY *results, BUFFER *wb,
                    baseline_before,
                    baseline_before - baseline_after,
                    points << shifts,
+                   (double)duration / (double)USEC_PER_MS,
+                   stats->db_queries,
+                   stats->db_points,
+                   stats->result_points,
+                   stats->binary_searches,
                    web_client_api_request_v1_data_group_to_string(group),
                    mc_method_to_string(method));
 
@@ -217,22 +236,7 @@ static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, calculated_number *arr,
     return added;
 }
 
-static double kstwo(calculated_number baseline[], int baseline_points, calculated_number highlight[], int highlight_points, uint32_t base_shifts) {
-
-    // -1 in size, since the calculate_pairs_diffs() returns one less point
-    DIFFS_NUMBERS baseline_diffs[baseline_points - 1];
-    DIFFS_NUMBERS highlight_diffs[highlight_points - 1];
-
-    int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
-    int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
-
-    if(unlikely(!base_size || !high_size))
-        return NAN;
-
-    if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
-        error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
-        return NAN;
-    }
+static double ks_2samp(DIFFS_NUMBERS baseline_diffs[], int base_size, DIFFS_NUMBERS highlight_diffs[], int high_size, uint32_t base_shifts) {
 
     qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
     qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
@@ -265,7 +269,7 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
     DIFFS_NUMBERS K = baseline_diffs[0];
     int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
     int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
-    int delta = (base_idx >> base_shifts) - high_idx;
+    int delta = base_idx - (high_idx << base_shifts);
     int min = delta, max = delta;
     int base_min_idx = base_idx;
     int base_max_idx = base_idx;
@@ -278,7 +282,7 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
         base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
         high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
 
-        delta = (base_idx >> base_shifts) - high_idx;
+        delta = base_idx - (high_idx << base_shifts);
         if(delta < min) {
             min = delta;
             base_min_idx = base_idx;
@@ -297,7 +301,7 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
         base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
         high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
 
-        delta = (base_idx >> base_shifts) - high_idx;
+        delta = base_idx - (high_idx << base_shifts);
         if(delta < min) {
             min = delta;
             base_min_idx = base_idx;
@@ -317,31 +321,48 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
     double dmin = ((double)base_min_idx / dbase_size) - ((double)high_min_idx / dhigh_size);
     double dmax = ((double)base_max_idx / dbase_size) - ((double)high_max_idx / dhigh_size);
 
-    if(unlikely(isnan(dmin) || isinf(dmin) || isnan(dmax) || isinf(dmax)))
-        return NAN;
+    dmin = -dmin;
+    if(islessequal(dmin, 0.0)) dmin = 0.0;
+    else if(isgreaterequal(dmin, 1.0)) dmin = 1.0;
 
     double d;
+    if(isgreaterequal(dmin, dmax)) d = dmin;
+    else d = dmax;
 
-    if (fabs(dmin) > 1)
-        dmin = 1.0;
-
-    if (fabs(dmin) < dmax) d = dmax;
-    else d = fabs(dmin);
-
-    double en = dbase_size * dhigh_size / (dbase_size + dhigh_size);
+    double en = round(dbase_size * dhigh_size / (dbase_size + dhigh_size));
 
     // under these conditions, KSfbar() crashes
     if(unlikely(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d)))
         return NAN;
 
-    return KSfbar((int)round(en), d);
+    return KSfbar((int)en, d);
 }
+
+static double kstwo(calculated_number baseline[], int baseline_points, calculated_number highlight[], int highlight_points, uint32_t base_shifts) {
+    // -1 in size, since the calculate_pairs_diffs() returns one less point
+    DIFFS_NUMBERS baseline_diffs[baseline_points - 1];
+    DIFFS_NUMBERS highlight_diffs[highlight_points - 1];
+
+    int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
+    int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
+
+    if(unlikely(!base_size || !high_size))
+        return NAN;
+
+    if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
+        error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
+        return NAN;
+    }
+
+    return ks_2samp(baseline_diffs, base_size, highlight_diffs, high_size, base_shifts);
+}
+
 
 static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                           long long baseline_after, long long baseline_before,
                                           long long after, long long before,
                                           long long points, RRDR_OPTIONS options, RRDR_GROUPING group,
-                                          uint32_t shifts, int timeout) {
+                                          uint32_t shifts, int timeout, MC_STATS *stats) {
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
 
@@ -351,6 +372,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     RRDR *base_rrdr = NULL;
 
     // get first the highlight to find the number of points available
+    stats->db_queries++;
     usec_t started_usec = now_realtime_usec();
     ONEWAYALLOC *owa = onewayalloc_create(0);
     high_rrdr = rrd2rrdr(owa, st, points,
@@ -360,6 +382,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
         goto cleanup;
     }
+    stats->db_points     += high_rrdr->internal.db_points_read;
+    stats->result_points += high_rrdr->internal.result_points_generated;
     if(!high_rrdr->d) {
         info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
         goto cleanup;
@@ -375,6 +399,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         goto cleanup;
 
     // get the baseline, requesting the same number of points as the highlight
+    stats->db_queries++;
     base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
                     baseline_after, baseline_before, group,
                     group_time, options, NULL, context_param_list,
@@ -383,6 +408,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
         goto cleanup;
     }
+    stats->db_points     += base_rrdr->internal.db_points_read;
+    stats->result_points += base_rrdr->internal.result_points_generated;
     if(!base_rrdr->d) {
         info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
         goto cleanup;
@@ -433,6 +460,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         for(int c = 0; c < high_points; c++)
             highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
 
+        stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);
+
         double prob = kstwo(baseline, base_points, highlight, high_points, shifts);
         if(!isnan(prob) && !isinf(prob)) {
 
@@ -465,7 +494,7 @@ cleanup:
 static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              long long baseline_after, long long baseline_before,
                                              long long after, long long before,
-                                             RRDR_OPTIONS options, RRDR_GROUPING group, int timeout) {
+                                             RRDR_OPTIONS options, RRDR_GROUPING group, int timeout, MC_STATS *stats) {
     options |= RRDR_OPTION_MATCH_IDS;
     long group_time = 0;
 
@@ -486,11 +515,15 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         // since the query engine checks for a timeout between
         // dimensions, and we query a single dimension at a time.
 
+        stats->db_queries++;
         calculated_number highlight_average = NAN;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
                                   after, before,
-                                  group, group_time, options, NULL, NULL, &value_is_null, 0);
+                                  group, group_time, options,
+                                  NULL, NULL,
+                                  &stats->db_points, &stats->result_points,
+                                  &value_is_null, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_average)) {
             // error("Metric correlations: cannot query highlight duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(highlight_average))?"result is NAN":"");
@@ -498,11 +531,15 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
             continue;
         }
 
+        stats->db_queries++;
         calculated_number baseline_average = NAN;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
                                   baseline_after, baseline_before,
-                                  group, group_time, options, NULL, NULL, &value_is_null, 0);
+                                  group, group_time, options,
+                                  NULL, NULL,
+                                  &stats->db_points, &stats->result_points,
+                                  &value_is_null, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(baseline_average)) {
             // error("Metric correlations: cannot query baseline duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(baseline_average))?"result is NAN":"");
@@ -616,8 +653,9 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
     // method = METRIC_CORRELATIONS_VOLUME;
     // options |= RRDR_OPTION_ANOMALY_BIT;
 
+    MC_STATS stats = {};
+
     if (enable_metric_correlations == CONFIG_BOOLEAN_NO) {
-        error("Metric correlations: not enabled.");
         buffer_strcat(wb, "{\"error\": \"Metric correlations functionality is not enabled.\" }");
         return HTTP_RESP_FORBIDDEN;
     }
@@ -635,7 +673,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
     usec_t timeout_usec = timeout * USEC_PER_MS;
     usec_t started_usec = now_realtime_usec();
 
-    if(!points) points = 1000;
+    if(!points) points = 500;
 
     rrdr_relative_window_to_absolute(&after, &before, default_rrd_update_every, points);
 
@@ -645,11 +683,9 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
     rrdr_relative_window_to_absolute(&baseline_after, &baseline_before, default_rrd_update_every, points * 4);
 
     if (before <= after || baseline_before <= baseline_after) {
-        error("Invalid baseline or highlight ranges.");
         buffer_strcat(wb, "{\"error\": \"Invalid baseline or highlight ranges.\" }");
         return HTTP_RESP_BAD_REQUEST;
     }
-
 
     DICTIONARY *results = register_result_init();
     DICTIONARY *charts = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);;
@@ -698,21 +734,14 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
             points = points >> 1;
 
         if(points < 100) {
-            error = "cannot comply to at least 100 points";
+            // error = "cannot comply to at least 100 points";
             resp = HTTP_RESP_BAD_REQUEST;
             goto cleanup;
         }
 
         // adjust the baseline to be multiplier times bigger than the highlight
-        long long baseline_after_new = baseline_before - (high_delta << shifts);
-        if(baseline_after_new != baseline_after)
-            info("Metric correlations: adjusted baseline to be %d times bigger than highlight, baseline_after moved from %lld to %lld", 1 << shifts, baseline_after, baseline_after_new);
-        baseline_after = baseline_after_new;
+        baseline_after = baseline_before - (high_delta << shifts);
     }
-
-    //info("Running metric correlations, method %u, highlight_after: %lld, highlight_before: %lld, baseline_after: %lld, baseline_before: %lld, max_points: %lld, timeout: %d ms, shifts %u",
-    //     method, after, before, baseline_after, baseline_before, points,
-    //    timeout, shifts);
 
     // dont lock here and wait for results
     // get the charts and run mc after
@@ -747,7 +776,8 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
                                                                 baseline_after, baseline_before,
                                                                 after, before,
                                                                 options, group,
-                                                                (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)));
+                                                                (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
+                                                                &stats);
                 break;
 
             default:
@@ -756,7 +786,8 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
                                                              baseline_after, baseline_before,
                                                              after, before,
                                                              points, options, group, shifts,
-                                                             (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)));
+                                                             (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
+                                                             &stats);
                 break;
         }
 
@@ -767,9 +798,15 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
     if(!(options & RRDR_OPTION_RETURN_RAW))
         spread_results_evenly(results);
 
+    usec_t ended_usec = now_realtime_usec();
+
     // generate the json output we need
     buffer_flush(wb);
-    size_t added_dimensions = registered_results_to_json(results, wb, after, before, baseline_after, baseline_before, points, method, group, options, shifts, correlated_dimensions);
+    size_t added_dimensions = registered_results_to_json(results, wb,
+                                                         after, before,
+                                                         baseline_after, baseline_before,
+                                                         points, method, group, options, shifts, correlated_dimensions,
+                                                         ended_usec - started_usec, &stats);
 
     if(!added_dimensions) {
         error = "no results produced from correlations";
@@ -785,8 +822,105 @@ cleanup:
         buffer_sprintf(wb, "{\"error\": \"%s\" }", error);
     }
 
-    usec_t ended_t = now_realtime_usec();
-    info ("Done running metric correlations in %llu usec", ended_t - started_usec);
-
     return resp;
 }
+
+
+
+// ----------------------------------------------------------------------------
+// unittest
+
+/*
+
+Unit tests against the output of this:
+
+https://github.com/scipy/scipy/blob/4cf21e753cf937d1c6c2d2a0e372fbc1dbbeea81/scipy/stats/_stats_py.py#L7275-L7449
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import scipy as sp
+from scipy import stats
+
+data1 = np.array([ 1111, -2222, 33, 100, 100, 15555, -1, 19999, 888, 755, -1, -730 ])
+data2 = np.array([365, -123, 0])
+data1 = np.sort(data1)
+data2 = np.sort(data2)
+n1 = data1.shape[0]
+n2 = data2.shape[0]
+data_all = np.concatenate([data1, data2])
+cdf1 = np.searchsorted(data1, data_all, side='right') / n1
+cdf2 = np.searchsorted(data2, data_all, side='right') / n2
+print(data_all)
+print("\ndata1", data1, cdf1)
+print("\ndata2", data2, cdf2)
+cddiffs = cdf1 - cdf2
+print("\ncddiffs", cddiffs)
+minS = np.clip(-np.min(cddiffs), 0, 1)
+maxS = np.max(cddiffs)
+print("\nmin", minS)
+print("max", maxS)
+m, n = sorted([float(n1), float(n2)], reverse=True)
+en = m * n / (m + n)
+d = max(minS, maxS)
+prob = stats.distributions.kstwo.sf(d, np.round(en))
+print("\nprob", prob)
+
+*/
+
+static int double_expect(double v, const char *str, const char *descr) {
+    char buf[100 + 1];
+    snprintfz(buf, 100, "%0.6f", v);
+    int ret = strcmp(buf, str) ? 1 : 0;
+
+    fprintf(stderr, "%s %s, expected %s, got %s\n", ret?"FAILED":"OK", descr, str, buf);
+    return ret;
+}
+
+static int mc_unittest1(void) {
+    int bs = 3, hs = 3;
+    DIFFS_NUMBERS base[3] = { 1, 2, 3 };
+    DIFFS_NUMBERS high[3] = { 3, 4, 6 };
+
+    double prob = ks_2samp(base, bs, high, hs, 0);
+    return double_expect(prob, "0.222222", "3x3");
+}
+
+static int mc_unittest2(void) {
+    int bs = 6, hs = 3;
+    DIFFS_NUMBERS base[6] = { 1, 2, 3, 10, 10, 15 };
+    DIFFS_NUMBERS high[3] = { 3, 4, 6 };
+
+    double prob = ks_2samp(base, bs, high, hs, 1);
+    return double_expect(prob, "0.500000", "6x3");
+}
+
+static int mc_unittest3(void) {
+    int bs = 12, hs = 3;
+    DIFFS_NUMBERS base[12] = { 1, 2, 3, 10, 10, 15, 111, 19999, 8, 55, -1, -73 };
+    DIFFS_NUMBERS high[3] = { 3, 4, 6 };
+
+    double prob = ks_2samp(base, bs, high, hs, 2);
+    return double_expect(prob, "0.347222", "12x3");
+}
+
+static int mc_unittest4(void) {
+    int bs = 12, hs = 3;
+    DIFFS_NUMBERS base[12] = { 1111, -2222, 33, 100, 100, 15555, -1, 19999, 888, 755, -1, -730 };
+    DIFFS_NUMBERS high[3] = { 365, -123, 0 };
+
+    double prob = ks_2samp(base, bs, high, hs, 2);
+    return double_expect(prob, "0.777778", "12x3");
+}
+
+int mc_unittest(void) {
+    int errors = 0;
+
+    errors += mc_unittest1();
+    errors += mc_unittest2();
+    errors += mc_unittest3();
+    errors += mc_unittest4();
+
+    return errors;
+}
+

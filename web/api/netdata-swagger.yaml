@@ -985,7 +985,7 @@ paths:
           schema:
             type: number
             format: integer
-            default: 1000
+            default: 500
         - name: method
           in: query
           description: the algorithm to run
@@ -995,7 +995,7 @@ paths:
             enum:
               - ks2
               - volume
-            default: ks2
+            default: volume
         - name: timeout
           in: query
           description: Cancel the query if to takes more that this amount of milliseconds.

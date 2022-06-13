@@ -1101,8 +1101,12 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
-            ret = rrdset2value_api_v1(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL
-                                      , points, after, before, group, 0, options, NULL, &latest_timestamp, &value_is_null, 0);
+            ret = rrdset2value_api_v1(st, w->response.data, &n,
+                                      (dimensions) ? buffer_tostring(dimensions) : NULL,
+                                      points, after, before, group, 0, options,
+                                      NULL, &latest_timestamp,
+                                      NULL, NULL,
+                                      &value_is_null, 0);
 
         // if the value cannot be calculated, show empty badge
         if (ret != HTTP_RESP_OK) {
