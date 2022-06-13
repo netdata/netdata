@@ -1062,6 +1062,11 @@ extern void rrdset_done(RRDSET *st);
 extern void rrdset_is_obsolete(RRDSET *st);
 extern void rrdset_isnot_obsolete(RRDSET *st);
 
+static inline void last_updated_time_align(RRDSET *st) {
+    st->last_updated.tv_sec -= st->last_updated.tv_sec % st->update_every;
+    st->last_updated.tv_usec = 0;
+}
+
 // checks if the RRDSET should be offered to viewers
 #define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
 #define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
