@@ -361,7 +361,7 @@ void rrdset_done_push(RRDSET *st) {
 // labels
 static int send_labels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     BUFFER *wb = (BUFFER *)data;
-    buffer_sprintf(wb, "LABEL \"%s\" = %d %s\n", name, ls, value);
+    buffer_sprintf(wb, "LABEL \"%s\" = %d \"%s\"\n", name, ls, value);
     return 1;
 }
 void rrdpush_send_labels(RRDHOST *host) {

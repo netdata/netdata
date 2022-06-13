@@ -9,24 +9,26 @@
 /*
  * All labels follow these rules:
  *
- * Character          Symbol               Values     Names
- * UTF-8 characters   UTF-8                yes        -> _
- * Lower case letter  [a-z]                yes        yes
- * Upper case letter  [A-Z]                yes        -> [a-z]
- * Digit              [0-9]                yes        yes
- * Underscore         _                    yes        yes
- * Minus              -                    yes        yes
- * Plus               +                    yes        -> _
- * Colon              :                    yes        -> _
- * Semicolon          ;                    -> :       -> _
- * Equal              =                    -> :       -> _
- * Period             .                    yes        yes
- * Comma              ,                    -> .       -> .
- * Slash              /                    yes        -> _
- * Backslash          \                    -> /       -> _
- * At                 @                    yes        -> _
- * Space                                   -> _       -> _
- * anything else                           -> _       -> _
+ * Character           Symbol               Values     Names
+ * UTF-8 characters    UTF-8                yes        -> _
+ * Lower case letter   [a-z]                yes        yes
+ * Upper case letter   [A-Z]                yes        -> [a-z]
+ * Digit               [0-9]                yes        yes
+ * Underscore          _                    yes        yes
+ * Minus               -                    yes        yes
+ * Plus                +                    yes        -> _
+ * Colon               :                    yes        -> _
+ * Semicolon           ;                    -> :       -> _
+ * Equal               =                    -> :       -> _
+ * Period              .                    yes        yes
+ * Comma               ,                    -> .       -> .
+ * Slash               /                    yes        -> _
+ * Backslash           \                    -> /       -> _
+ * At                  @                    yes        -> _
+ * Space                                    -> _       yes
+ * Opening parenthesis (                    -> _       yes
+ * Closing parenthesis )                    -> _       yes
+ * anything else                            -> _       -> _
 *
  * The above rules should allow users to set in tags (indicative):
  *
@@ -92,7 +94,7 @@ static unsigned char label_values_char_map[256] = {
     [29] = '_', //
     [30] = '_', //
     [31] = '_', //
-    [32] = '_', // SPACE    - convert SPACE to underscore
+    [32] = ' ', // SPACE keep
     [33] = '_', // !
     [34] = '_', // "
     [35] = '_', // #
@@ -100,8 +102,8 @@ static unsigned char label_values_char_map[256] = {
     [37] = '_', // %
     [38] = '_', // &
     [39] = '_', // '
-    [40] = '_', // (
-    [41] = '_', // )
+    [40] = '(', // ( keep
+    [41] = ')', // ) keep
     [42] = '_', // *
     [43] = '+', // + keep
     [44] = '.', // , convert , to .
@@ -357,6 +359,9 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
     label_names_char_map[';'] = '_';
     label_names_char_map['@'] = '_';
     label_names_char_map['/'] = '_';
+    label_names_char_map['('] = '_';
+    label_names_char_map[')'] = '_';
+    label_names_char_map[' '] = '_';
     label_names_char_map['\\'] = '_';
 
     // create the spaces map
