@@ -6,6 +6,7 @@
 #define MAX_POINTS 10000
 int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
+METRIC_CORRELATIONS_METHOD default_metric_correlations_method = METRIC_CORRELATIONS_VOLUME;
 
 typedef struct mc_stats {
     size_t db_points;
@@ -31,7 +32,7 @@ METRIC_CORRELATIONS_METHOD mc_string_to_method(const char *method) {
         if(strcmp(method, metric_correlations_methods[i].name) == 0)
             return metric_correlations_methods[i].value;
 
-    return METRIC_CORRELATIONS_VOLUME;
+    return default_metric_correlations_method;
 }
 
 const char *mc_method_to_string(METRIC_CORRELATIONS_METHOD method) {

@@ -625,6 +625,7 @@ static void get_netdata_configured_variables() {
     // --------------------------------------------------------------------
     // metric correlations
     enable_metric_correlations = config_get_boolean(CONFIG_SECTION_GLOBAL, "enable metric correlations", enable_metric_correlations);
+    default_metric_correlations_method = mc_string_to_method(config_get(CONFIG_SECTION_GLOBAL, "metric correlations method", mc_method_to_string(default_metric_correlations_method)));
 
     // --------------------------------------------------------------------
     // get various system parameters

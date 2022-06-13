@@ -5,13 +5,14 @@
 
 #include "web/api/queries/query.h"
 
-extern int enable_metric_correlations;
-extern int metric_correlations_version;
-
 typedef enum {
     METRIC_CORRELATIONS_KS2    = 1,
     METRIC_CORRELATIONS_VOLUME = 2,
 } METRIC_CORRELATIONS_METHOD;
+
+extern int enable_metric_correlations;
+extern int metric_correlations_version;
+extern METRIC_CORRELATIONS_METHOD default_metric_correlations_method;
 
 extern int metric_correlations (RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method, RRDR_GROUPING group,
                                long long baseline_after, long long baseline_before,
