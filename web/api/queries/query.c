@@ -802,7 +802,7 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
 int rrdr_relative_window_to_absolute(long long *after, long long *before, int update_every, long points) {
-    time_t now = now_realtime_sec();
+    time_t now = now_realtime_sec() - 1;
 
     int absolute_period_requested = -1;
     long long after_requested, before_requested;
@@ -854,7 +854,7 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before, int up
         before_requested += update_every - (before_requested % update_every);
 
     if(after_requested % update_every)
-        after_requested += update_every - (after_requested % update_every);
+        after_requested -= after_requested % update_every;
 
     // if the query requests future data
     // shift the query back to be in the present time
@@ -865,15 +865,6 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before, int up
             delta += update_every - (delta % update_every);
         before_requested -= delta;
         after_requested  -= delta;
-    }
-
-    // if the query requests last second data and
-    // the update every is 1 second, shift it a
-    // second in the past to make sure we have the
-    // data available
-    if(update_every == 1 && before_requested == now) {
-        before_requested -= update_every;
-        after_requested  -= update_every;
     }
 
     *before = before_requested;
@@ -1673,11 +1664,15 @@ RRDR *rrd2rrdr(
         , int timeout
 )
 {
-    int rrd_update_every;
+    int rrd_update_every = st->update_every;
     int absolute_period_requested;
 
     if(unlikely(points_requested < 0))
         points_requested = -points_requested;
+
+    long points_original = points_requested;
+    if(unlikely(!points_requested))
+        points_requested = (before_requested - after_requested) / rrd_update_every;
 
     if(unlikely(!points_requested))
         points_requested = 1;
@@ -1695,7 +1690,6 @@ RRDR *rrd2rrdr(
         rrdset_unlock(st);
     }
 
-    rrd_update_every = st->update_every;
     absolute_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested,
                                                                  rrd_update_every, points_requested);
 
@@ -1713,6 +1707,9 @@ RRDR *rrd2rrdr(
         if(before_requested > last_entry_t)
             before_requested = last_entry_t;
     }
+
+    if(!points_original)
+        points_requested = (before_requested - after_requested) / rrd_update_every;
 
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
         rebuild_context_param_list(owa, context_param_list, after_requested);
