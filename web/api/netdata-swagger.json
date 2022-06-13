@@ -319,7 +319,8 @@
                   "match-ids",
                   "match-names",
                   "showcustomvars",
-                  "allow_past"
+                  "allow_past",
+                  "anomaly-bit"
                 ]
               },
               "default": [
@@ -484,7 +485,8 @@
                   "absolute-sum",
                   "null2zero",
                   "percentage",
-                  "unaligned"
+                  "unaligned",
+                  "anomaly-bit"
                 ]
               },
               "default": [
@@ -908,7 +910,7 @@
     "/alarms_values": {
       "get": {
         "summary": "Get a list of active or raised alarms on the server",
-        "description": "The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value`, `last_updated` time and alarm `status`.",
+        "description": "The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value`, `last_updated` time, and alarm `status`.",
         "parameters": [
           {
             "name": "all",
@@ -1129,6 +1131,154 @@
           }
         }
       }
+    },
+    "/metric_correlations": {
+      "get": {
+        "summary": "Analyze all the metrics to find their correlations",
+        "description": "Given two time-windows (baseline, highlight), it goes through all the available metrics, querying both windows and tries to find how these two windows relate to each other. It supports multiple algorithms to do so. The result is a list of all metrics evaluated, weighted for 0.0 (the two windows are more different) to 1.0 (the two windows are similar). The algorithm adjusts automatically the baseline window to be a power of two multiple of the highlighted (1, 2, 4, 8, etc).",
+        "parameters": [
+          {
+            "name": "baseline_after",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the starting point of baseline window, or a relative number of seconds (negative, relative to parameter baseline_before). Netdata will assume it is a relative number if it is less that 3 years (in seconds).",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": -300
+            }
+          },
+          {
+            "name": "baseline_before",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the ending point of the baseline window, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds).",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": -60
+            }
+          },
+          {
+            "name": "highlight_after",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the starting point of highlighted window, or a relative number of seconds (negative, relative to parameter highlight_before). Netdata will assume it is a relative number if it is less that 3 years (in seconds).",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": -60
+            }
+          },
+          {
+            "name": "highlight_before",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the ending point of the highlighted window, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds).",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "points",
+            "in": "query",
+            "description": "The number of points to be evaluated for the highlighted window. The baseline window will be adjusted automatically to receive a proportional amount of points.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 500
+            }
+          },
+          {
+            "name": "method",
+            "in": "query",
+            "description": "the algorithm to run",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ks2",
+                "volume"
+              ],
+              "default": "volume"
+            }
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "description": "Cancel the query if to takes more that this amount of milliseconds.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 60000
+            }
+          },
+          {
+            "name": "options",
+            "in": "query",
+            "description": "Options that affect data generation.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "min2max",
+                  "abs",
+                  "absolute",
+                  "absolute-sum",
+                  "null2zero",
+                  "percentage",
+                  "unaligned",
+                  "allow_past",
+                  "nonzero",
+                  "anomaly-bit",
+                  "raw"
+                ]
+              },
+              "default": [
+                "null2zero",
+                "allow_past",
+                "nonzero",
+                "unaligned"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON object with weights for each chart and dimension.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/metric_correlations"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The given parameters are invalid."
+          },
+          "403": {
+            "description": "metrics correlations are not enabled on this Netdata Agent."
+          },
+          "404": {
+            "description": "No charts could be found, or the method that correlated the metrics did not produce any result."
+          },
+          "504": {
+            "description": "Timeout - the query took too long and has been cancelled."
+          }
+        }
+      }
     }
   },
   "servers": [
@@ -1267,7 +1417,7 @@
           "stream_compression": {
             "type": "boolean",
             "description": "Stream transmission compression method.",
-            "example": "true"
+            "example": true
           },
           "labels": {
             "type": "object",
@@ -2135,7 +2285,7 @@
         "type": "object",
         "properties": {
           "aclk-available": {
-            "type": "boolean",
+            "type": "string",
             "description": "Describes whether this agent is capable of connection to the Cloud. False means agent has been built without ACLK component either on purpose (user choice) or due to missing dependency."
           },
           "aclk-version": {
@@ -2153,7 +2303,7 @@
             "type": "boolean",
             "description": "Informs whether this agent has been added to a space in the cloud (User has to perform claiming). If false (user didn't perform claiming) agent will never attempt any cloud connection."
           },
-          "claimed-id": {
+          "claimed_id": {
             "type": "string",
             "format": "uuid",
             "description": "Unique ID this agent uses to identify when connecting to cloud"
@@ -2169,6 +2319,59 @@
               "Old",
               "New"
             ]
+          }
+        }
+      },
+      "metric_correlations": {
+        "type": "object",
+        "properties": {
+          "correlated_charts": {
+            "type": "object",
+            "description": "An object containing chart objects with their metrics correlations.",
+            "properties": {
+              "chart-id1": {
+                "type": "object",
+                "properties": {
+                  "context": {
+                    "type": "string"
+                  },
+                  "dimensions": {
+                    "type": "object",
+                    "properties": {
+                      "dimension1-name": {
+                        "type": "number"
+                      },
+                      "dimension2-name": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              },
+              "chart-id2": {
+                "type": "object",
+                "properties": {
+                  "context": {
+                    "type": "string"
+                  },
+                  "dimensions": {
+                    "type": "object",
+                    "properties": {
+                      "dimension1-name": {
+                        "type": "number"
+                      },
+                      "dimension2-name": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "total_dimensions_count": {
+            "description": "The number of dimensions correlated",
+            "type": "integer"
           }
         }
       }

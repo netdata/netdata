@@ -280,6 +280,16 @@ RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPI
     return def;
 }
 
+const char *web_client_api_request_v1_data_group_to_string(RRDR_GROUPING group) {
+    int i;
+
+    for(i = 0; api_v1_data_groups[i].name ; i++)
+        if(unlikely(group == api_v1_data_groups[i].value))
+            return api_v1_data_groups[i].name;
+
+    return "unknown";
+}
+
 // ----------------------------------------------------------------------------
 
 static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims,
@@ -791,49 +801,36 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 #endif // NETDATA_INTERNAL_CHECKS
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-static int rrdr_convert_before_after_to_absolute(
-        long long *after_requestedp
-        , long long *before_requestedp
-        , int update_every
-        , time_t first_entry_t
-        , time_t last_entry_t
-        , RRDR_OPTIONS options
-) {
+int rrdr_relative_window_to_absolute(long long *after, long long *before, int update_every, long points) {
+    time_t now = now_realtime_sec() - 1;
+
     int absolute_period_requested = -1;
     long long after_requested, before_requested;
 
-    before_requested = *before_requestedp;
-    after_requested = *after_requestedp;
-
-    if(before_requested == 0 && after_requested == 0) {
-        // dump the all the data
-        before_requested = last_entry_t;
-        after_requested = first_entry_t;
-        absolute_period_requested = 0;
-    }
+    before_requested = *before;
+    after_requested = *after;
 
     // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
     if(ABS(before_requested) <= API_RELATIVE_TIME_MAX) {
-        if(ABS(before_requested) % update_every) {
-            // make sure it is multiple of st->update_every
-            if(before_requested < 0) before_requested = before_requested - update_every -
-                                                        before_requested % update_every;
-            else before_requested = before_requested + update_every - before_requested % update_every;
-        }
-        if(before_requested > 0) before_requested = first_entry_t + before_requested;
-        else                     before_requested = last_entry_t  + before_requested; //last_entry_t is not really now_t
-        //TODO: fix before_requested to be relative to now_t
+        // if the user asked for a positive relative time,
+        // flip it to a negative
+        if(before_requested > 0)
+            before_requested = -before_requested;
+
+        before_requested = now + before_requested;
         absolute_period_requested = 0;
     }
 
     // allow relative for after (smaller than API_RELATIVE_TIME_MAX)
     if(ABS(after_requested) <= API_RELATIVE_TIME_MAX) {
-        if(after_requested == 0) after_requested = -update_every;
-        if(ABS(after_requested) % update_every) {
-            // make sure it is multiple of st->update_every
-            if(after_requested < 0) after_requested = after_requested - update_every - after_requested % update_every;
-            else after_requested = after_requested + update_every - after_requested % update_every;
-        }
+        if(after_requested > 0)
+            after_requested = -after_requested;
+
+        // if the user didn't give an after, use the number of points
+        // to give a sane default
+        if(after_requested == 0)
+            after_requested = -(points * update_every);
+
         after_requested = before_requested + after_requested;
         absolute_period_requested = 0;
     }
@@ -841,24 +838,37 @@ static int rrdr_convert_before_after_to_absolute(
     if(absolute_period_requested == -1)
         absolute_period_requested = 1;
 
-    // make sure they are within our timeframe
-    if(before_requested > last_entry_t)  before_requested = last_entry_t;
-    if(before_requested < first_entry_t && !(options & RRDR_OPTION_ALLOW_PAST))
-        before_requested = first_entry_t;
-
-    if(after_requested > last_entry_t)  after_requested = last_entry_t;
-    if(after_requested < first_entry_t && !(options & RRDR_OPTION_ALLOW_PAST))
-        after_requested = first_entry_t;
-
-    // check if they are reversed
-    if(after_requested > before_requested) {
-        time_t tmp = before_requested;
+    // check if the parameters are flipped
+    if(after_requested >= before_requested) {
+        long long t = before_requested;
         before_requested = after_requested;
-        after_requested = tmp;
+        after_requested = t;
     }
 
-    *before_requestedp = before_requested;
-    *after_requestedp = after_requested;
+    // we need to make sure that the query is aligned
+    // with the database update every, otherwise when the user
+    // requests just 1 point for the entire duration, it may not
+    // be created (the last 1 point may be misaligned with the
+    // query).
+    if(before_requested % update_every)
+        before_requested += update_every - (before_requested % update_every);
+
+    if(after_requested % update_every)
+        after_requested -= after_requested % update_every;
+
+    // if the query requests future data
+    // shift the query back to be in the present time
+    // (this may also happen because of the rules above)
+    if(before_requested > now) {
+        long long delta = before_requested - now;
+        if(delta % update_every)
+            delta += update_every - (delta % update_every);
+        before_requested -= delta;
+        after_requested  -= delta;
+    }
+
+    *before = before_requested;
+    *after = after_requested;
 
     return absolute_period_requested;
 }
@@ -881,25 +891,25 @@ static RRDR *rrd2rrdr_fixedstep(
         , int timeout
 ) {
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
     // the duration of the chart
     time_t duration = before_requested - after_requested;
     long available_points = duration / update_every;
 
-    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-
     if(duration <= 0 || available_points <= 0)
-        return rrdr_create(owa, st, 1, context_param_list);
+        return NULL;
 
-    // check the number of wanted points in the result
-    if(unlikely(points_requested < 0)) points_requested = -points_requested;
-    if(unlikely(points_requested > available_points)) points_requested = available_points;
-    if(unlikely(points_requested == 0)) points_requested = available_points;
+    if(unlikely(points_requested > available_points))
+        points_requested = available_points;
 
     // calculate the desired grouping of source data points
     long group = available_points / points_requested;
     if(unlikely(group <= 0)) group = 1;
-    if(unlikely(available_points % points_requested > points_requested / 2)) group++; // rounding to the closest integer
+
+    // round "group" to the closest integer
+    if(unlikely(available_points % points_requested > points_requested / 2))
+        group++;
 
     // resampling_time_requested enforces a certain grouping multiple
     calculated_number resampling_divisor = 1.0;
@@ -955,7 +965,7 @@ static RRDR *rrd2rrdr_fixedstep(
     if(aligned) {
         // alignment has been requested, so align the values
         before_requested -= before_requested % (group * update_every);
-        after_requested  -= after_requested % (group * update_every);
+        after_requested  -= after_requested  % (group * update_every);
     }
 
     // we align the request on requested_before
@@ -967,7 +977,6 @@ static RRDR *rrd2rrdr_fixedstep(
 
         before_wanted = last_entry_t - (last_entry_t % ( ((aligned)?group:1) * update_every ));
     }
-    //size_t before_slot = rrdset_time2slot(st, before_wanted);
 
     // we need to estimate the number of points, for having
     // an integer number of values per point
@@ -989,7 +998,6 @@ static RRDR *rrd2rrdr_fixedstep(
             after_wanted = first_entry_t - (first_entry_t % ( ((aligned)?group:1) * update_every )) + ( ((aligned)?group:1) * update_every );
         }
     }
-    //size_t after_slot = rrdset_time2slot(st, after_wanted);
 
     // check if they are reversed
     if(unlikely(after_wanted > before_wanted)) {
@@ -1656,28 +1664,52 @@ RRDR *rrd2rrdr(
         , int timeout
 )
 {
-    int rrd_update_every;
+    int rrd_update_every = st->update_every;
     int absolute_period_requested;
+
+    if(unlikely(points_requested < 0))
+        points_requested = -points_requested;
+
+    long points_original = points_requested;
+    if(unlikely(!points_requested))
+        points_requested = (before_requested - after_requested) / rrd_update_every;
+
+    if(unlikely(!points_requested))
+        points_requested = 1;
 
     time_t first_entry_t;
     time_t last_entry_t;
     if (context_param_list) {
         first_entry_t = context_param_list->first_entry_t;
-        last_entry_t = context_param_list->last_entry_t;
-    } else {
+        last_entry_t  = context_param_list->last_entry_t;
+    }
+    else {
         rrdset_rdlock(st);
         first_entry_t = rrdset_first_entry_t_nolock(st);
-        last_entry_t = rrdset_last_entry_t_nolock(st);
+        last_entry_t  = rrdset_last_entry_t_nolock(st);
         rrdset_unlock(st);
     }
 
-    rrd_update_every = st->update_every;
-    absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
-                                                                      rrd_update_every, first_entry_t,
-                                                                      last_entry_t, options);
-    if (options & RRDR_OPTION_ALLOW_PAST)
+    absolute_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested,
+                                                                 rrd_update_every, points_requested);
+
+    if(options & RRDR_OPTION_ALLOW_PAST) {
         if (first_entry_t > after_requested)
             first_entry_t = after_requested;
+
+        if (last_entry_t < before_requested)
+            last_entry_t = before_requested;
+    }
+    else {
+        if(after_requested < first_entry_t)
+            after_requested = first_entry_t;
+
+        if(before_requested > last_entry_t)
+            before_requested = last_entry_t;
+    }
+
+    if(!points_original)
+        points_requested = (before_requested - after_requested) / rrd_update_every;
 
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
         rebuild_context_param_list(owa, context_param_list, after_requested);
@@ -1699,22 +1731,21 @@ RRDR *rrd2rrdr(
                 if (rrd_update_every != region_info_array[0].update_every) {
                     rrd_update_every = region_info_array[0].update_every;
                     /* recalculate query alignment */
-                    absolute_period_requested =
-                            rrdr_convert_before_after_to_absolute(&after_requested, &before_requested, rrd_update_every,
-                                                                  first_entry_t, last_entry_t, options);
+                    absolute_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested,
+                                                                                 rrd_update_every, points_requested);
                 }
                 freez(region_info_array);
             }
             return rrd2rrdr_fixedstep(owa, st, points_requested, after_requested, before_requested, group_method,
                                       resampling_time_requested, options, dimensions, rrd_update_every,
                                       first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
-        } else {
+        }
+        else {
             if (rrd_update_every != (uint16_t)max_interval) {
                 rrd_update_every = (uint16_t) max_interval;
                 /* recalculate query alignment */
-                absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
-                                                                                  rrd_update_every, first_entry_t,
-                                                                                  last_entry_t, options);
+                absolute_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested,
+                                                                             rrd_update_every, points_requested);
             }
             return rrd2rrdr_variablestep(owa, st, points_requested, after_requested, before_requested, group_method,
                                          resampling_time_requested, options, dimensions, rrd_update_every,

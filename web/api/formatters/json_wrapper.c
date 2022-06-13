@@ -35,7 +35,7 @@ static int fill_formatted_callback(const char *name, const char *value, RRDLABEL
 }
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
-    QUERY_PARAMS *rrdset_query_data)
+    RRDR_GROUPING group_method, QUERY_PARAMS *rrdset_query_data)
 {
     struct context_param *context_param_list = rrdset_query_data->context_param_list;
     char *chart_label_key = rrdset_query_data->chart_label_key;
@@ -76,7 +76,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %slast_entry%s: %u,\n"
                        "   %sbefore%s: %u,\n"
                        "   %safter%s: %u,\n"
-                       "   %sdimension_names%s: ["
+                       "   %sgroup%s: %s%s%s,\n"
+                       "   %soptions%s: %s"
                    , kq, kq
                    , kq, kq, sq, context_mode && temp_rd?r->st->context:r->st->id, sq
                    , kq, kq, sq, context_mode && temp_rd?r->st->context:r->st->name, sq
@@ -86,7 +87,13 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, (uint32_t) (context_param_list ? context_param_list->last_entry_t : rrdset_last_entry_t_nolock(r->st))
                    , kq, kq, (uint32_t)r->before
                    , kq, kq, (uint32_t)r->after
-                   , kq, kq);
+                   , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq
+                   , kq, kq, sq);
+
+    web_client_api_request_v1_data_options_to_string(wb, options);
+
+    buffer_sprintf(wb, "%s,\n   %sdimension_names%s: [", sq, kq, kq);
+
     if (should_lock)
         rrdset_unlock(r->st);
 

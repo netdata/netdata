@@ -83,12 +83,8 @@ inline static void rrdr_unlock_rrdset(RRDR *r) {
     }
 }
 
-inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r)
-{
-    if(unlikely(!r)) {
-        error("NULL value given!");
-        return;
-    }
+inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
+    if(unlikely(!r)) return;
 
     rrdr_unlock_rrdset(r);
     onewayalloc_freez(owa, r->t);

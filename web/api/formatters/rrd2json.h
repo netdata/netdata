@@ -92,6 +92,8 @@ extern int rrdset2value_api_v1(
         , uint32_t options
         , time_t *db_after
         , time_t *db_before
+        , size_t *db_points_read
+        , size_t *result_points_generated
         , int *value_is_null
         , int timeout
 );

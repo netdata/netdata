@@ -25,6 +25,7 @@ typedef enum rrdr_options {
     RRDR_OPTION_CUSTOM_VARS  = 0x00010000, // when wrapping response in a JSON, return custom variables in response
     RRDR_OPTION_ALLOW_PAST   = 0x00020000, // The after parameter can extend in the past before the first entry
     RRDR_OPTION_ANOMALY_BIT  = 0x00040000, // Return the anomaly bit stored in each collected_number
+    RRDR_OPTION_RETURN_RAW   = 0x00080000, // Return raw data for aggregating across multiple nodes
 } RRDR_OPTIONS;
 
 typedef enum rrdr_value_flag {
@@ -113,6 +114,8 @@ extern RRDR *rrd2rrdr(
     RRDSET *st, long points_requested, long long after_requested, long long before_requested,
     RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
     struct context_param *context_param_list, int timeout);
+
+extern int rrdr_relative_window_to_absolute(long long *after, long long *before, int update_every, long points);
 
 #include "query.h"
 

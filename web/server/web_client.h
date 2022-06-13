@@ -26,6 +26,7 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 // HTTP_CODES 5XX Server Errors
 #define HTTP_RESP_INTERNAL_SERVER_ERROR 500
 #define HTTP_RESP_BACKEND_FETCH_FAILED 503
+#define HTTP_RESP_GATEWAY_TIMEOUT 504
 
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
