@@ -381,7 +381,7 @@ static void test_prepare_buffers(void **state)
     expect_value(__mock_end_batch_formatting, instance, instance);
     will_return(__mock_end_batch_formatting, 0);
 
-    assert_int_equal(__real_prepare_buffers(engine), 0);
+    __real_prepare_buffers(engine);
 
     assert_int_equal(instance->stats.buffered_metrics, 1);
 
@@ -393,7 +393,7 @@ static void test_prepare_buffers(void **state)
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = NULL;
     instance->end_batch_formatting = NULL;
-    assert_int_equal(__real_prepare_buffers(engine), 0);
+    __real_prepare_buffers(engine);
 
     assert_int_equal(instance->scheduled, 0);
     assert_int_equal(instance->after, 2);
@@ -705,7 +705,7 @@ static void test_format_host_labels_json_plaintext(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
     assert_int_equal(format_host_labels_json_plaintext(instance, localhost), 0);
-    assert_string_equal(buffer_tostring(instance->labels), "\"labels\":{\"key1\":\"value1\",\"key2\":\"value2\"},");
+    assert_string_equal(buffer_tostring(instance->labels_buffer), "\"labels\":{\"key1\":\"value1\",\"key2\":\"value2\"},");
 }
 
 static void test_format_host_labels_graphite_plaintext(void **state)
@@ -717,7 +717,7 @@ static void test_format_host_labels_graphite_plaintext(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
     assert_int_equal(format_host_labels_graphite_plaintext(instance, localhost), 0);
-    assert_string_equal(buffer_tostring(instance->labels), ";key1=value1;key2=value2");
+    assert_string_equal(buffer_tostring(instance->labels_buffer), ";key1=value1;key2=value2");
 }
 
 static void test_format_host_labels_opentsdb_telnet(void **state)
@@ -729,7 +729,7 @@ static void test_format_host_labels_opentsdb_telnet(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
     assert_int_equal(format_host_labels_opentsdb_telnet(instance, localhost), 0);
-    assert_string_equal(buffer_tostring(instance->labels), " key1=value1 key2=value2");
+    assert_string_equal(buffer_tostring(instance->labels_buffer), " key1=value1 key2=value2");
 }
 
 static void test_format_host_labels_opentsdb_http(void **state)
@@ -741,7 +741,7 @@ static void test_format_host_labels_opentsdb_http(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
     assert_int_equal(format_host_labels_opentsdb_http(instance, localhost), 0);
-    assert_string_equal(buffer_tostring(instance->labels), ",\"key1\":\"value1\",\"key2\":\"value2\"");
+    assert_string_equal(buffer_tostring(instance->labels_buffer), ",\"key1\":\"value1\",\"key2\":\"value2\"");
 }
 
 static void test_flush_host_labels(void **state)
@@ -749,12 +749,12 @@ static void test_flush_host_labels(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
 
-    instance->labels = buffer_create(12);
-    buffer_strcat(instance->labels, "check string");
-    assert_int_equal(buffer_strlen(instance->labels), 12);
+    instance->labels_buffer = buffer_create(12);
+    buffer_strcat(instance->labels_buffer, "check string");
+    assert_int_equal(buffer_strlen(instance->labels_buffer), 12);
 
     assert_int_equal(flush_host_labels(instance, localhost), 0);
-    assert_int_equal(buffer_strlen(instance->labels), 0);
+    assert_int_equal(buffer_strlen(instance->labels_buffer), 0);
 }
 
 static void test_create_main_rusage_chart(void **state)
@@ -1048,7 +1048,7 @@ static void test_format_host_labels_prometheus(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
     format_host_labels_prometheus(instance, localhost);
-    assert_string_equal(buffer_tostring(instance->labels), "key1=\"value1\",key2=\"value2\"");
+    assert_string_equal(buffer_tostring(instance->labels_buffer), "key1=\"value1\",key2=\"value2\"");
 }
 
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)

@@ -4,7 +4,6 @@
 #define NETDATA_EXPORTING_ENGINE_H 1
 
 #include "daemon/common.h"
-
 #include <uv.h>
 
 #define exporter_get(section, name, value) expconfig_get(&exporting_config, section, name, value)
@@ -40,11 +39,11 @@ extern const char *global_exporting_prefix;
 #define sending_labels_configured(instance)                                                                            \
     (instance->config.options & (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))
 
-#define should_send_label(instance, label)                                                                             \
+#define should_send_label(instance, label_source)                                                                      \
     ((instance->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS &&                                            \
-      label->label_source == LABEL_SOURCE_NETDATA_CONF) ||                                                             \
+      label_source & RRDLABEL_SRC_CONFIG) ||                                                                           \
      (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&                                             \
-      label->label_source != LABEL_SOURCE_NETDATA_CONF))
+      label_source & RRDLABEL_SRC_AUTO))
 
 typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_UNKNOWN,                 // Invalid type
@@ -205,7 +204,7 @@ struct instance {
     int skip_host;
     int skip_chart;
 
-    BUFFER *labels;
+    BUFFER *labels_buffer;
 
     time_t after;
     time_t before;

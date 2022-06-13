@@ -141,6 +141,26 @@ int init_prometheus_remote_write_instance(struct instance *instance)
  * @param host a data collecting host.
  * @return Always returns 0.
  */
+
+struct format_remote_write_label_callback {
+    struct instance *instance;
+    void *write_request;
+};
+
+static int format_remote_write_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    struct format_remote_write_label_callback *d = (struct format_remote_write_label_callback *)data;
+
+    if (!should_send_label(d->instance, ls)) return 0;
+
+    char k[PROMETHEUS_ELEMENT_MAX + 1];
+    char v[PROMETHEUS_ELEMENT_MAX + 1];
+
+    prometheus_name_copy(k, name, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(v, value, PROMETHEUS_ELEMENT_MAX);
+    add_label(d->write_request, k, v);
+    return 1;
+}
+
 int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host)
 {
     struct simple_connector_data *simple_connector_data =
@@ -159,21 +179,11 @@ int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host
         "netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
 
     if (unlikely(sending_labels_configured(instance))) {
-        rrdhost_check_rdlock(host);
-        netdata_rwlock_rdlock(&host->labels.labels_rwlock);
-        for (struct label *label = host->labels.head; label; label = label->next) {
-            if (!should_send_label(instance, label))
-                continue;
-
-            char key[PROMETHEUS_ELEMENT_MAX + 1];
-            prometheus_name_copy(key, label->key, PROMETHEUS_ELEMENT_MAX);
-
-            char value[PROMETHEUS_ELEMENT_MAX + 1];
-            prometheus_label_copy(value, label->value, PROMETHEUS_ELEMENT_MAX);
-
-            add_label(connector_specific_data->write_request, key, value);
-        }
-        netdata_rwlock_unlock(&host->labels.labels_rwlock);
+        struct format_remote_write_label_callback tmp = {
+            .write_request = connector_specific_data->write_request,
+            .instance = instance
+        };
+        rrdlabels_walkthrough_read(host->host_labels, format_remote_write_label_callback, &tmp);
     }
 
     return 0;

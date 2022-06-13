@@ -30,7 +30,14 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <stdint.h>
+
+#ifndef UNIT_TESTING
 #include <cmocka.h>
+#else
+#undef UNIT_TESTING
+#include <cmocka.h>
+#define UNIT_TESTING
+#endif
 
 #define MAX_LOG_LINE 1024
 extern char log_line[];

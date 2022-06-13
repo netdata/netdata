@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // NOT TO BE USED BY USERS YET
-#define DICTIONARY_FLAG_REFERENCE_COUNTERS (1 << 6) // maintain reference counter in walkthrough and foreach
+#define DICTIONARY_FLAG_REFERENCE_COUNTERS (1 << 5) // maintain reference counter in walkthrough and foreach
 
 typedef struct dictionary DICTIONARY;
 #define DICTIONARY_INTERNALS
@@ -79,10 +79,13 @@ typedef struct name_value {
 
     char *name;                 // the name of the dictionary item
     void *value;                // the value of the dictionary item
+
+    size_t name_len;            // the size of the name, including the terminating zero
+    size_t value_len;           // the size of the value (assumed binary)
 } NAME_VALUE;
 
 /*
- * When DICTIONARY_FLAG_WITH_STATISTICS is set, we need to keep track of all the memory
+ * When DICTIONARY_FLAG_REFERENCE_COUNTERS is set, we need to keep track of all the memory
  * we allocate and free. So, we need to keep track of the sizes of all names and values.
  * We do this by overloading NAME_VALUE with the following additional fields.
  */
@@ -92,24 +95,12 @@ typedef enum name_value_flags {
     NAME_VALUE_FLAG_DELETED                = (1 << 0), // this item is deleted
 } NAME_VALUE_FLAGS;
 
-typedef struct name_value_with_stats {
+typedef struct name_value_with_reference_counters {
     NAME_VALUE name_value_data_here;    // never used - just to put the lengths at the right position
-
-    size_t name_len;                    // the size of the name, including the terminating zero
-    size_t value_len;                   // the size of the value (assumed binary)
 
     size_t refcount;                    // the reference counter
     NAME_VALUE_FLAGS flags;             // the flags for this item
-} NAME_VALUE_WITH_STATS;
-
-struct dictionary_stats {
-    size_t inserts;
-    size_t deletes;
-    size_t searches;
-    size_t resets;
-    size_t entries;
-    size_t memory;
-};
+} NAME_VALUE_WITH_REFERENCE_COUNTERS;
 
 struct dictionary {
     DICTIONARY_FLAGS flags;             // the flags of the dictionary
@@ -137,7 +128,13 @@ struct dictionary {
     void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data);
     void *conflict_callback_data;
 
-    struct dictionary_stats *stats;     // the statistics when DICTIONARY_FLAG_WITH_STATISTICS is set
+    size_t inserts;
+    size_t deletes;
+    size_t searches;
+    size_t resets;
+    size_t entries;
+    size_t walkthroughs;
+    size_t memory;
 };
 
 void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const char *name, void *value, void *data), void *data) {
@@ -159,60 +156,49 @@ void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_cal
 // dictionary statistics maintenance
 
 size_t dictionary_stats_allocated_memory(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
-        return dict->stats->memory;
-    return 0;
+    return dict->memory;
 }
 size_t dictionary_stats_entries(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
-        return dict->stats->entries;
-    return 0;
+    return dict->entries;
 }
 size_t dictionary_stats_searches(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
-        return dict->stats->searches;
-    return 0;
+    return dict->searches;
 }
 size_t dictionary_stats_inserts(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
-        return dict->stats->inserts;
-    return 0;
+    return dict->inserts;
 }
 size_t dictionary_stats_deletes(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
-        return dict->stats->deletes;
-    return 0;
+    return dict->deletes;
 }
 size_t dictionary_stats_resets(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
-        return dict->stats->resets;
-    return 0;
+    return dict->resets;
+}
+
+size_t dictionary_stats_walkthroughs(DICTIONARY *dict) {
+    return dict->walkthroughs;
 }
 
 static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS))
-        dict->stats->searches++;
+    __atomic_fetch_add(&dict->searches, 1, __ATOMIC_SEQ_CST);
 }
 static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICTIONARY *dict, size_t size) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
-        dict->stats->inserts++;
-        dict->stats->entries++;
-        dict->stats->memory += size;
-    }
+    __atomic_fetch_add(&dict->inserts, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&dict->entries, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&dict->memory, size, __ATOMIC_SEQ_CST);
 }
 static inline void DICTIONARY_STATS_ENTRIES_MINUS1(DICTIONARY *dict, size_t size) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
-        dict->stats->deletes++;
-        dict->stats->entries--;
-        dict->stats->memory -= size;
-    }
+    __atomic_fetch_add(&dict->deletes, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_sub(&dict->memory, size, __ATOMIC_SEQ_CST);
 }
 static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t oldsize, size_t newsize) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
-        dict->stats->resets++;
-        dict->stats->memory += newsize;
-        dict->stats->memory -= oldsize;
-    }
+    __atomic_fetch_add(&dict->resets, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&dict->memory, newsize, __ATOMIC_SEQ_CST);
+    __atomic_fetch_sub(&dict->memory, oldsize, __ATOMIC_SEQ_CST);
+}
+
+static inline void DICTIONARY_STATS_WALKTHROUGHS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->walkthroughs, 1, __ATOMIC_SEQ_CST);
 }
 
 // ----------------------------------------------------------------------------
@@ -279,21 +265,21 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
 
 static void reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
-        NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
+        NAME_VALUE_WITH_REFERENCE_COUNTERS *nvs = (NAME_VALUE_WITH_REFERENCE_COUNTERS *)nv;
         __atomic_fetch_add(&nvs->refcount, 1, __ATOMIC_SEQ_CST);
     }
 }
 
 static void reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
-        NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
+        NAME_VALUE_WITH_REFERENCE_COUNTERS *nvs = (NAME_VALUE_WITH_REFERENCE_COUNTERS *)nv;
         __atomic_fetch_sub(&nvs->refcount, 1, __ATOMIC_SEQ_CST);
     }
 }
 
 static int reference_counter_mark_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
-        NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
+        NAME_VALUE_WITH_REFERENCE_COUNTERS *nvs = (NAME_VALUE_WITH_REFERENCE_COUNTERS *)nv;
         nvs->flags |= NAME_VALUE_FLAG_DELETED;
         return 1;
     }
@@ -491,35 +477,7 @@ static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VAL
 // NAME_VALUE methods
 
 static inline size_t namevalue_alloc_size(DICTIONARY *dict) {
-    return (dict->flags & DICTIONARY_FLAG_WITH_STATISTICS) ? sizeof(NAME_VALUE_WITH_STATS) : sizeof(NAME_VALUE);
-}
-
-static inline size_t namevalue_get_namelen(DICTIONARY *dict, NAME_VALUE *nv) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
-        NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
-        return nvs->name_len;
-    }
-    return 0;
-}
-static inline size_t namevalue_get_valuelen(DICTIONARY *dict, NAME_VALUE *nv) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
-        NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
-        return nvs->value_len;
-    }
-    return 0;
-}
-static inline void namevalue_set_valuelen(DICTIONARY *dict, NAME_VALUE *nv, size_t value_len) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
-        NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
-        nvs->value_len = value_len;
-    }
-}
-static inline void namevalue_set_namevaluelen(DICTIONARY *dict, NAME_VALUE *nv, size_t name_len, size_t value_len) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
-        NAME_VALUE_WITH_STATS *nvs = (NAME_VALUE_WITH_STATS *)nv;
-        nvs->name_len = name_len;
-        nvs->value_len = value_len;
-    }
+    return (dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS) ? sizeof(NAME_VALUE_WITH_REFERENCE_COUNTERS) : sizeof(NAME_VALUE);
 }
 
 static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len) {
@@ -529,7 +487,8 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
     NAME_VALUE *nv = mallocz(size);
     size_t allocated = size;
 
-    namevalue_set_namevaluelen(dict, nv, name_len, value_len);
+    nv->name_len = name_len;
+    nv->value_len = value_len;
 
     if(likely(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE))
         nv->name = (char *)name;
@@ -565,47 +524,63 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
 
     DICTIONARY_STATS_ENTRIES_PLUS1(dict, allocated);
 
+    if(dict->ins_callback)
+        dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
+
     return nv;
 }
 
 static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", nv->name);
 
+    if(dict->del_callback)
+        dict->del_callback(nv->name, nv->value, dict->del_callback_data);
+
     if(likely(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE)) {
         debug(D_DICTIONARY, "Dictionary: linking value to '%s'", nv->name);
         nv->value = value;
-        namevalue_set_valuelen(dict, nv, value_len);
+        nv->value_len = value_len;
     }
     else {
         debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", nv->name);
-        DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, namevalue_get_valuelen(dict, nv), value_len);
+        DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
 
-        void *old = nv->value;
-        void *new = mallocz(value_len);
-        memcpy(new, value, value_len);
-        nv->value = new;
-        namevalue_set_valuelen(dict, nv, value_len);
+        void *oldvalue = nv->value;
+        void *newvalue = NULL;
+        if(value_len) {
+            newvalue = mallocz(value_len);
+            if(value) memcpy(newvalue, value, value_len);
+            else memset(newvalue, 0, value_len);
+        }
+        nv->value = newvalue;
+        nv->value_len = value_len;
 
         debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", nv->name);
-        freez(old);
+        freez(oldvalue);
     }
+
+    if(dict->ins_callback)
+        dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
 }
 
 static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
+
+    if(dict->del_callback)
+        dict->del_callback(nv->name, nv->value, dict->del_callback_data);
 
     size_t freed = 0;
 
     if(unlikely(!(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE))) {
         debug(D_DICTIONARY, "Dictionary freeing value of '%s'", nv->name);
         freez(nv->value);
-        freed += namevalue_get_valuelen(dict, nv);
+        freed += nv->value_len;
     }
 
     if(unlikely(!(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE))) {
         debug(D_DICTIONARY, "Dictionary freeing name '%s'", nv->name);
         freez(nv->name);
-        freed += namevalue_get_namelen(dict, nv);
+        freed += nv->name_len;
     }
 
     freez(nv);
@@ -627,11 +602,6 @@ DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
         flags &= ~DICTIONARY_FLAG_REFERENCE_COUNTERS;
     }
 
-    if(flags & DICTIONARY_FLAG_REFERENCE_COUNTERS) {
-        // we need statistics to allocate the extra NAME_VALUE attributes
-        flags |= DICTIONARY_FLAG_WITH_STATISTICS;
-    }
-
     DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
     size_t allocated = sizeof(DICTIONARY);
 
@@ -640,20 +610,15 @@ DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
 
     allocated += dictionary_lock_init(dict);
     allocated += reference_counter_init(dict);
-
-    if(flags & DICTIONARY_FLAG_WITH_STATISTICS) {
-        dict->stats = callocz(1, sizeof(struct dictionary_stats));
-        allocated += sizeof(struct dictionary_stats);
-        dict->stats->memory = allocated;
-    }
-    else
-        dict->stats = NULL;
+    dict->memory = allocated;
 
     hashtable_init_unsafe(dict);
     return (DICTIONARY *)dict;
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
+    if(!dict) return 0;
+
     debug(D_DICTIONARY, "Destroying dictionary.");
 
     dictionary_lock_wrlock(dict);
@@ -679,12 +644,6 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     dictionary_unlock(dict);
     freed += dictionary_lock_free(dict);
     freed += reference_counter_free(dict);
-
-    if(unlikely(dict->flags & DICTIONARY_FLAG_WITH_STATISTICS)) {
-        freez(dict->stats);
-        dict->stats = NULL;
-        freed += sizeof(struct dictionary_stats);
-    }
 
     freez(dict);
     freed += sizeof(DICTIONARY);
@@ -722,9 +681,6 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
         hashtable_inserted_name_value_unsafe(dict, name, name_len, nv);
         linkedlist_namevalue_link_unsafe(dict, nv);
-
-        if(dict->ins_callback)
-            dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
     }
     else {
         // the item is already in the index
@@ -732,16 +688,9 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
         // or overwrite the value, depending on dictionary flags
 
         nv = *pnv;
-        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
-
-            if(dict->del_callback)
-                dict->del_callback(nv->name, nv->value, dict->del_callback_data);
-
+        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE))
             namevalue_reset_unsafe(dict, nv, value, value_len);
 
-            if(dict->ins_callback)
-                dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
-        }
         else if(dict->conflict_callback)
             dict->conflict_callback(nv->name, nv->value, value, dict->conflict_callback_data);
     }
@@ -811,10 +760,6 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
 
         if(!reference_counter_mark_deleted(dict, nv)) {
             linkedlist_namevalue_unlink_unsafe(dict, nv);
-
-            if(dict->del_callback)
-                dict->del_callback(nv->name, nv->value, dict->del_callback_data);
-
             namevalue_destroy_unsafe(dict, nv);
         }
         ret = 0;
@@ -834,6 +779,8 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
 
 void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
     if(unlikely(!dfe || !dict)) return NULL;
+
+    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     dfe->dict = dict;
     dfe->started_ut = now_realtime_usec();
@@ -912,6 +859,10 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
 // do not use other dictionary calls while walking the dictionary - deadlock!
 
 int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
+    if(unlikely(!dict)) return 0;
+
+    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
+
     if(rw == 'r' || rw == 'R')
         dictionary_lock_rlock(dict);
     else
@@ -938,6 +889,54 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
     }
 
     dictionary_unlock(dict);
+
+    return ret;
+}
+
+// ----------------------------------------------------------------------------
+// sort
+
+static int dictionary_sort_compar(const void *nv1, const void *nv2) {
+    return strcmp((*(NAME_VALUE **)nv1)->name, (*(NAME_VALUE **)nv2)->name);
+}
+
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
+    if(unlikely(!dict || !dict->entries)) return 0;
+
+    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
+
+    if(rw == 'r' || rw == 'R')
+        dictionary_lock_rlock(dict);
+    else
+        dictionary_lock_wrlock(dict);
+
+    size_t count = dict->entries;
+    NAME_VALUE **array = mallocz(sizeof(NAME_VALUE *) * count);
+
+    size_t i;
+    NAME_VALUE *nv;
+    for(nv = dict->first_item, i = 0; nv && i < count ;nv = nv->next, i++)
+        array[i] = nv;
+
+    if(unlikely(nv))
+        error("DICTIONARY: during sorting expected to have %zu items in dictionary, but there are more. Sorted results may be incomplete. This is internal error - dictionaries fail to maintain an accurate number of the number of entries they have.", count);
+
+    if(unlikely(i != count)) {
+        error("DICTIONARY: during sorting expected to have %zu items in dictionary, but there are %zu. Sorted results may be incomplete. This is internal error - dictionaries fail to maintain an accurate number of the number of entries they have.", count, i);
+        count = i;
+    }
+
+    qsort(array, count, sizeof(NAME_VALUE *), dictionary_sort_compar);
+
+    int ret = 0;
+    for(i = 0; i < count ;i++) {
+        int r = callback((array[i])->name, (array[i])->value, data);
+        if(r < 0) { ret = r; break; }
+        ret += r;
+    }
+
+    dictionary_unlock(dict);
+    freez(array);
 
     return ret;
 }
@@ -1196,7 +1195,7 @@ static usec_t dictionary_unittest_run_and_measure_time(DICTIONARY *dict, char *m
     return dt;
 }
 
-void dictionary_unittest_clone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+static void dictionary_unittest_clone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_clone);
     dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, errors, dictionary_unittest_get_clone);
     dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, errors, dictionary_unittest_get_nonexisting);
@@ -1211,7 +1210,7 @@ void dictionary_unittest_clone(DICTIONARY *dict, char **names, char **values, si
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, errors, dictionary_unittest_destroy);
 }
 
-void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+static void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "getting entries", names, values, entries, errors, dictionary_unittest_get_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "getting non-existing entries", names, values, entries, errors, dictionary_unittest_get_nonexisting);
@@ -1226,6 +1225,48 @@ void dictionary_unittest_nonclone(DICTIONARY *dict, char **names, char **values,
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, errors, dictionary_unittest_destroy);
 }
 
+struct dictionary_unittest_sorting {
+    const char *oldname;
+    const char *oldvalue;
+    size_t count;
+};
+
+static int dictionary_unittest_sorting_callback(const char *name, void *value, void *data) {
+    struct dictionary_unittest_sorting *t = (struct dictionary_unittest_sorting *)data;
+    const char *v = (const char *)value;
+
+    int ret = 0;
+    if(t->oldname && strcmp(t->oldname, name) > 0) {
+        fprintf(stderr, "name '%s' should be after '%s'\n", t->oldname, name);
+        ret = 1;
+    }
+    t->count++;
+    t->oldname = name;
+    t->oldvalue = v;
+
+    return ret;
+}
+
+static size_t dictionary_unittest_sorted_walkthrough(DICTIONARY *dict, char **names, char **values, size_t entries) {
+    (void)names;
+    (void)values;
+    struct dictionary_unittest_sorting tmp = { .oldname = NULL, .oldvalue = NULL, .count = 0 };
+    size_t errors;
+    errors = dictionary_sorted_walkthrough_read(dict, dictionary_unittest_sorting_callback, &tmp);
+
+    if(tmp.count != entries) {
+        fprintf(stderr, "Expected %zu entries, counted %zu\n", entries, tmp.count);
+        errors++;
+    }
+    return errors;
+}
+
+static void dictionary_unittest_sorting(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+    dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_clone);
+    dictionary_unittest_run_and_measure_time(dict, "sorted walkthrough", names, values, entries, errors, dictionary_unittest_sorted_walkthrough);
+    dictionary_unittest_run_and_measure_time(dict, "destroying dictionary", names, values, entries, errors, dictionary_unittest_destroy);
+}
+
 int dictionary_unittest(size_t entries) {
     if(entries < 10) entries = 10;
 
@@ -1237,23 +1278,23 @@ int dictionary_unittest(size_t entries) {
     char **values = dictionary_unittest_generate_values(entries);
 
     fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
-    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     dictionary_unittest_clone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary multi threaded, clone, %zu items\n", entries);
-    dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS);
+    dict = dictionary_create(DICTIONARY_FLAG_NONE);
     dictionary_unittest_clone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary single threaded, non-clone, add-in-front options, %zu items\n", entries);
-    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_ADD_IN_FRONT);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_ADD_IN_FRONT);
     dictionary_unittest_nonclone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary multi threaded, non-clone, add-in-front options, %zu items\n", entries);
-    dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_ADD_IN_FRONT);
+    dict = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_ADD_IN_FRONT);
     dictionary_unittest_nonclone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary single-threaded, non-clone, don't overwrite options, %zu items\n", entries);
-    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "resetting non-overwrite entries", names, values, entries, &errors, dictionary_unittest_reset_dont_overwrite_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop", names, values, entries, &errors, dictionary_unittest_foreach);
@@ -1262,18 +1303,22 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     fprintf(stderr, "\nCreating dictionary multi-threaded, non-clone, don't overwrite options, %zu items\n", entries);
-    dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dict = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "walkthrough write delete this", names, values, entries, &errors, dictionary_unittest_walkthrough_delete_this);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     fprintf(stderr, "\nCreating dictionary multi-threaded, non-clone, don't overwrite options, %zu items\n", entries);
-    dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dict = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "foreach write delete this", names, values, entries, &errors, dictionary_unittest_foreach_delete_this);
     dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop empty", names, values, 0, &errors, dictionary_unittest_foreach);
     dictionary_unittest_run_and_measure_time(dict, "walkthrough read callback empty", names, values, 0, &errors, dictionary_unittest_walkthrough);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+
+    fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    dictionary_unittest_sorting(dict, names, values, entries, &errors);
 
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);

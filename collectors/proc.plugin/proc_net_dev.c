@@ -90,7 +90,7 @@ static struct netdev {
 
     const char *chart_family;
 
-    struct label *chart_labels;
+    DICTIONARY *chart_labels;
 
     int flipped;
     unsigned long priority;
@@ -273,7 +273,7 @@ static void netdev_free_chart_strings(struct netdev *d) {
 static void netdev_free(struct netdev *d) {
     netdev_charts_release(d);
     netdev_free_chart_strings(d);
-    free_label_list(d->chart_labels);
+    rrdlabels_destroy(d->chart_labels);
 
     freez((void *)d->name);
     freez((void *)d->filename_speed);
@@ -295,7 +295,7 @@ static struct netdev_rename {
     const char *container_device;
     const char *container_name;
 
-    struct label *chart_labels;
+    DICTIONARY *chart_labels;
 
     int processed;
 
@@ -316,9 +316,7 @@ static struct netdev_rename *netdev_rename_find(const char *host_device, uint32_
 }
 
 // other threads can call this function to register a rename to a netdev
-void netdev_rename_device_add(
-    const char *host_device, const char *container_device, const char *container_name, struct label *labels)
-{
+void netdev_rename_device_add(const char *host_device, const char *container_device, const char *container_name, DICTIONARY *labels) {
     netdata_mutex_lock(&netdev_rename_mutex);
 
     uint32_t hash = simple_hash(host_device);
@@ -328,7 +326,8 @@ void netdev_rename_device_add(
         r->host_device      = strdupz(host_device);
         r->container_device = strdupz(container_device);
         r->container_name   = strdupz(container_name);
-        update_label_list(&r->chart_labels, labels);
+        r->chart_labels     = rrdlabels_create();
+        rrdlabels_migrate_to_these(r->chart_labels, labels);
         r->hash             = hash;
         r->next             = netdev_rename_root;
         r->processed        = 0;
@@ -344,7 +343,7 @@ void netdev_rename_device_add(
             r->container_device = strdupz(container_device);
             r->container_name   = strdupz(container_name);
 
-            update_label_list(&r->chart_labels, labels);
+            rrdlabels_migrate_to_these(r->chart_labels, labels);
             
             r->processed        = 0;
             netdev_pending_renames++;
@@ -377,7 +376,7 @@ void netdev_rename_device_del(const char *host_device) {
             freez((void *) r->host_device);
             freez((void *) r->container_name);
             freez((void *) r->container_device);
-            free_label_list(r->chart_labels);
+            rrdlabels_destroy(r->chart_labels);
             freez((void *) r);
             break;
         }
@@ -449,7 +448,7 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
     d->chart_family = strdupz(buffer);
 
-    update_label_list(&d->chart_labels, r->chart_labels);
+    rrdlabels_migrate_to_these(d->chart_labels, r->chart_labels);
 
     d->priority = NETDATA_CHART_PRIO_CGROUP_NET_IFACE;
     d->flipped = 1;
@@ -542,6 +541,7 @@ static struct netdev *get_netdev(const char *name) {
     d->name = strdupz(name);
     d->hash = simple_hash(d->name);
     d->len = strlen(d->name);
+    d->chart_labels = rrdlabels_create();
 
     d->chart_type_net_bytes      = strdupz("net");
     d->chart_type_net_compressed = strdupz("net_compressed");
@@ -881,7 +881,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_AREA
                 );
 
-                rrdset_update_labels(d->st_bandwidth, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_bandwidth, d->chart_labels);
 
                 d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
@@ -947,7 +947,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                                 rrdset_flag_set(d->st_speed, RRDSET_FLAG_DETAIL);
 
-                                rrdset_update_labels(d->st_speed, d->chart_labels);
+                                rrdset_update_rrdlabels(d->st_speed, d->chart_labels);
 
                                 d->rd_speed = rrddim_add(d->st_speed, "speed",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
                             }
@@ -982,7 +982,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_duplex, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_duplex, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_duplex, d->chart_labels);
 
                 d->rd_duplex = rrddim_add(d->st_duplex, "duplex",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
@@ -1013,7 +1013,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_operstate, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_operstate, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_operstate, d->chart_labels);
 
                 d->rd_operstate = rrddim_add(d->st_operstate, "state",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
@@ -1044,7 +1044,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_carrier, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_carrier, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_carrier, d->chart_labels);
 
                 d->rd_carrier = rrddim_add(d->st_carrier, "carrier",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
@@ -1075,7 +1075,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_mtu, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_mtu, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_mtu, d->chart_labels);
 
                 d->rd_mtu = rrddim_add(d->st_mtu, "mtu",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
@@ -1111,7 +1111,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_packets, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_packets, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_packets, d->chart_labels);
 
                 d->rd_rpackets   = rrddim_add(d->st_packets, "received",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tpackets   = rrddim_add(d->st_packets, "sent",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1159,7 +1159,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_errors, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_errors, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_errors, d->chart_labels);
 
                 d->rd_rerrors = rrddim_add(d->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_terrors = rrddim_add(d->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1205,7 +1205,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_drops, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_drops, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_drops, d->chart_labels);
 
                 d->rd_rdrops = rrddim_add(d->st_drops, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tdrops = rrddim_add(d->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1251,7 +1251,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_fifo, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_fifo, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_fifo, d->chart_labels);
 
                 d->rd_rfifo = rrddim_add(d->st_fifo, "receive",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tfifo = rrddim_add(d->st_fifo, "transmit", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1297,7 +1297,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_compressed, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_compressed, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_compressed, d->chart_labels);
 
                 d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcompressed = rrddim_add(d->st_compressed, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1343,7 +1343,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_events, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_events, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_events, d->chart_labels);
 
                 d->rd_rframe      = rrddim_add(d->st_events, "frames",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcollisions = rrddim_add(d->st_events, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

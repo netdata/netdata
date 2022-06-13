@@ -2,6 +2,14 @@
 
 #include "exporting_engine.h"
 
+
+bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    (void)name;
+    (void)value;
+    struct instance *instance = (struct instance *)data;
+    return should_send_label(instance, ls);
+}
+
 /**
  * Check if the connector instance should export the host metrics
  *

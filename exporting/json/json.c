@@ -113,34 +113,20 @@ int init_json_http_instance(struct instance *instance)
  * @param host a data collecting host.
  * @return Always returns 0.
  */
+
 int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
 {
-    if (!instance->labels)
-        instance->labels = buffer_create(1024);
+    if (!instance->labels_buffer)
+        instance->labels_buffer = buffer_create(1024);
 
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
-    buffer_strcat(instance->labels, "\"labels\":{");
-
-    int count = 0;
-    rrdhost_check_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
-    for (struct label *label = host->labels.head; label; label = label->next) {
-        if (!should_send_label(instance, label))
-            continue;
-
-        char value[CONFIG_MAX_VALUE * 2 + 1];
-        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE);
-        if (count > 0)
-            buffer_strcat(instance->labels, ",");
-        buffer_sprintf(instance->labels, "\"%s\":\"%s\"", label->key, value);
-
-        count++;
-    }
-    netdata_rwlock_unlock(&host->labels.labels_rwlock);
-
-    buffer_strcat(instance->labels, "},");
+    buffer_strcat(instance->labels_buffer, "\"labels\":{");
+    rrdlabels_to_buffer(host->host_labels, instance->labels_buffer, "", ":", "\"", ",",
+                        exporting_labels_filter_callback, instance,
+                        NULL, sanitize_json_string);
+    buffer_strcat(instance->labels_buffer, "},");
 
     return 0;
 }
@@ -203,7 +189,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         tags_pre,
         tags,
         tags_post,
-        instance->labels ? buffer_tostring(instance->labels) : "",
+        instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
 
         st->id,
         st->name,
@@ -288,7 +274,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         tags_pre,
         tags,
         tags_post,
-        instance->labels ? buffer_tostring(instance->labels) : "",
+        instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
 
         st->id,
         st->name,

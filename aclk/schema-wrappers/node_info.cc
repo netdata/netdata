@@ -6,7 +6,6 @@
 
 static int generate_node_info(nodeinstance::info::v1::NodeInfo *info, struct aclk_node_info *data)
 {
-    struct label *label;
     google::protobuf::Map<std::string, std::string> *map;
 
     if (data->name)
@@ -67,12 +66,7 @@ static int generate_node_info(nodeinstance::info::v1::NodeInfo *info, struct acl
     ml_info->set_ml_enabled(data->ml_info.ml_enabled);
 
     map = info->mutable_host_labels();
-    label = data->host_labels_head;
-    while (label) {
-        map->insert({label->key, label->value});
-        label = label->next;
-    }
-
+    rrdlabels_walkthrough_read(data->host_labels_ptr, label_add_to_map_callback, map);
     return 0;
 }
 
