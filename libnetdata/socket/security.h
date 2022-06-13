@@ -22,6 +22,7 @@
 #define OPENSSL_VERSION_097 0x0907000L
 #define OPENSSL_VERSION_110 0x10100000L
 #define OPENSSL_VERSION_111 0x10101000L
+#define OPENSSL_VERSION_300 0x30000000L
 
 #  include <openssl/ssl.h>
 #  include <openssl/err.h>
