@@ -28,8 +28,8 @@ case "$1" in
 
       set -- docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C
       for item
-        do
-          if getent group $item > /dev/null 2>&1; then
+      do
+        if getent group $item > /dev/null 2>&1; then
           usermod -a -G $item netdata
         fi
       done
