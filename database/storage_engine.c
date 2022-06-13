@@ -6,51 +6,29 @@
 #include "engine/rrdengineapi.h"
 #endif
 
-/** Empty create op for engines not using a context */
-STORAGE_ENGINE_INSTANCE* create_op_null(STORAGE_ENGINE* engine, RRDHOST *host) {
-    (void)engine; (void)host;
-    return NULL;
-}
-
-/** Empty exit op for engines not using a context */
-void exit_op_null(STORAGE_ENGINE_INSTANCE* context) {
-    (void)context;
-}
-
-/** Empty destroy op for engines not using a context */
-void destroy_op_null(STORAGE_ENGINE_INSTANCE* context) {
-    (void)context;
-}
-
-#define engine_ops_null { \
-    .create = create_op_null, \
-    .exit = exit_op_null, \
-    .destroy = destroy_op_null \
-}
-
-#define im_collect_ops { \
-    .init = rrddim_collect_init,\
-    .store_metric = rrddim_collect_store_metric,\
-    .finalize = rrddim_collect_finalize\
-}
-
-#define im_query_ops { \
-    .init = rrddim_query_init, \
-    .next_metric = rrddim_query_next_metric, \
-    .is_finished = rrddim_query_is_finished, \
-    .finalize = rrddim_query_finalize, \
-    .latest_time = rrddim_query_latest_time, \
-    .oldest_time = rrddim_query_oldest_time \
-}
-
 static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_NONE,
         .name = RRD_MEMORY_MODE_NONE_NAME,
         .api = {
-            .engine_ops = engine_ops_null,
-            .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .engine_ops = {
+                .create = rrddim_storage_engine_instance_new,
+                .exit = rrddim_storage_engine_instance_exit,
+                .destroy = rrddim_storage_engine_instance_destroy
+            },
+            .collect_ops = {
+                .init = rrddim_collect_init,
+                .store_metric = rrddim_collect_store_metric,
+                .finalize = rrddim_collect_finalize
+            },
+            .query_ops = {
+                .init = rrddim_query_init,
+                .next_metric = rrddim_query_next_metric,
+                .is_finished = rrddim_query_is_finished,
+                .finalize = rrddim_query_finalize,
+                .latest_time = rrddim_query_latest_time,
+                .oldest_time = rrddim_query_oldest_time
+            }
         },
         .context = NULL
     },
@@ -58,9 +36,24 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_RAM,
         .name = RRD_MEMORY_MODE_RAM_NAME,
         .api = {
-            .engine_ops = engine_ops_null,
-            .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .engine_ops = {
+                .create = rrddim_storage_engine_instance_new,
+                .exit = rrddim_storage_engine_instance_exit,
+                .destroy = rrddim_storage_engine_instance_destroy
+            },
+            .collect_ops = {
+                .init = rrddim_collect_init,
+                .store_metric = rrddim_collect_store_metric,
+                .finalize = rrddim_collect_finalize
+            },
+            .query_ops = {
+                .init = rrddim_query_init,
+                .next_metric = rrddim_query_next_metric,
+                .is_finished = rrddim_query_is_finished,
+                .finalize = rrddim_query_finalize,
+                .latest_time = rrddim_query_latest_time,
+                .oldest_time = rrddim_query_oldest_time
+            }
         },
         .context = NULL
     },
@@ -68,9 +61,24 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_MAP,
         .name = RRD_MEMORY_MODE_MAP_NAME,
         .api = {
-            .engine_ops = engine_ops_null,
-            .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .engine_ops = {
+                .create = rrddim_storage_engine_instance_new,
+                .exit = rrddim_storage_engine_instance_exit,
+                .destroy = rrddim_storage_engine_instance_destroy
+            },
+            .collect_ops = {
+                .init = rrddim_collect_init,
+                .store_metric = rrddim_collect_store_metric,
+                .finalize = rrddim_collect_finalize
+            },
+            .query_ops = {
+                .init = rrddim_query_init,
+                .next_metric = rrddim_query_next_metric,
+                .is_finished = rrddim_query_is_finished,
+                .finalize = rrddim_query_finalize,
+                .latest_time = rrddim_query_latest_time,
+                .oldest_time = rrddim_query_oldest_time
+            }
         },
         .context = NULL
     },
@@ -78,9 +86,24 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_SAVE,
         .name = RRD_MEMORY_MODE_SAVE_NAME,
         .api = {
-            .engine_ops = engine_ops_null,
-            .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .engine_ops = {
+                .create = rrddim_storage_engine_instance_new,
+                .exit = rrddim_storage_engine_instance_exit,
+                .destroy = rrddim_storage_engine_instance_destroy
+            },
+            .collect_ops = {
+                .init = rrddim_collect_init,
+                .store_metric = rrddim_collect_store_metric,
+                .finalize = rrddim_collect_finalize
+            },
+            .query_ops = {
+                .init = rrddim_query_init,
+                .next_metric = rrddim_query_next_metric,
+                .is_finished = rrddim_query_is_finished,
+                .finalize = rrddim_query_finalize,
+                .latest_time = rrddim_query_latest_time,
+                .oldest_time = rrddim_query_oldest_time
+            }
         },
         .context = NULL
     },
@@ -88,9 +111,24 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_ALLOC,
         .name = RRD_MEMORY_MODE_ALLOC_NAME,
         .api = {
-            .engine_ops = engine_ops_null,
-            .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .engine_ops = {
+                .create = rrddim_storage_engine_instance_new,
+                .exit = rrddim_storage_engine_instance_exit,
+                .destroy = rrddim_storage_engine_instance_destroy
+            },
+            .collect_ops = {
+                .init = rrddim_collect_init,
+                .store_metric = rrddim_collect_store_metric,
+                .finalize = rrddim_collect_finalize
+            },
+            .query_ops = {
+                .init = rrddim_query_init,
+                .next_metric = rrddim_query_next_metric,
+                .is_finished = rrddim_query_is_finished,
+                .finalize = rrddim_query_finalize,
+                .latest_time = rrddim_query_latest_time,
+                .oldest_time = rrddim_query_oldest_time
+            }
         },
         .context = NULL
     },
