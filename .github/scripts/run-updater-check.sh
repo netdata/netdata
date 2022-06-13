@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo ">>> Installing CI support packages..."
+/netdata/.github/scripts/ci-support-pkgs.sh
 echo ">>> Installing Netdata..."
 /netdata/packaging/installer/kickstart.sh --dont-wait --build-only --disable-telemetry || exit 1
 echo "::group::Environment File Contents"
