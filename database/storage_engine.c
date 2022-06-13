@@ -157,26 +157,26 @@ static STORAGE_ENGINE engines[] = {
             }
         },
         .context = NULL
-    },
+    }
 #endif
-    { .id = RRD_MEMORY_MODE_NONE, .name = NULL }
 };
+
+const size_t engine_count = sizeof(engines) / sizeof(engines[0]);
 
 STORAGE_ENGINE* storage_engine_find(const char* name)
 {
-    for (STORAGE_ENGINE* it = engines; it->name; it++) {
-        if (strcmp(it->name, name) == 0)
-            return it;
-    }
+    for (size_t i = 0; i != engine_count; i++)
+        if (strcmp(engines[i].name, name) == 0)
+            return &engines[i];
+
     return NULL;
 }
 
 STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode)
 {
-    for (STORAGE_ENGINE* it = engines; it->name; it++) {
-        if (it->id == mmode)
-            return it;
-    }
+    for (size_t i = 0; i != engine_count; i++)
+        if (engines[i].id == mmode)
+            return &engines[i];
     return NULL;
 }
 
@@ -188,11 +188,8 @@ STORAGE_ENGINE* storage_engine_foreach_init()
 
 STORAGE_ENGINE* storage_engine_foreach_next(STORAGE_ENGINE* it)
 {
-    if (!it || !it->name)
-        return NULL;
-
     it++;
-    return it->name ? it : NULL;
+    return (it >= &engines[engine_count]) ? NULL : it;
 }
 
 STORAGE_ENGINE_INSTANCE* storage_engine_new(STORAGE_ENGINE* eng, RRDHOST *host)
