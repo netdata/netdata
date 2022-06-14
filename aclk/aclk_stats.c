@@ -277,8 +277,8 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
             "netdata", "aclk_openssl_bytes", NULL, "aclk", NULL, "Received and Sent bytes.", "B/s",
             "netdata", "stats", 200011, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rd_sent  = rrddim_add(st, "sent", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
-        rd_recvd = rrddim_add(st, "received", NULL, -11, localhost->rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
+        rd_sent  = rrddim_add(st, "sent", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_recvd = rrddim_add(st, "received", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
     } else
         rrdset_next(st);
 
