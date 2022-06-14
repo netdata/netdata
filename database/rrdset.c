@@ -649,6 +649,7 @@ RRDSET *rrdset_create_custom(
         }
 
         if (mark_rebuild) {
+            rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
             freez(old_plugin);
             freez(old_module);
             freez(old_title);
