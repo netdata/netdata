@@ -831,8 +831,10 @@ static int rrdlabels_log_label_to_buffer_callback(const char *name, void *value,
     buffer_sprintf(wb, "Label: %s: \"%s\" (", name, lb->value);
 
     size_t sources = 0;
-    if(lb->label_source & RRDLABEL_SRC_AUTO)
-        buffer_sprintf(wb, "%sauto", sources++?",":"");
+    if(lb->label_source & RRDLABEL_SRC_AUTO) {
+        buffer_sprintf(wb, "auto");
+        sources++;
+    }
 
     if(lb->label_source & RRDLABEL_SRC_CONFIG)
         buffer_sprintf(wb, "%snetdata.conf", sources++?",":"");
@@ -968,7 +970,7 @@ int rrdlabels_unittest_add_a_pair_callback(const char *name, const char *value, 
         t->errors++;
     }
     else if(strcmp(value, t->expected_value) != 0) {
-        fprintf(stderr, "values don't match, found \"%s\", expected \"%s\"", value?value:"(null)", t->expected_value?t->expected_value:"(null)");
+        fprintf(stderr, "values don't match, found \"%s\", expected \"%s\"", value, t->expected_value);
         t->errors++;
     }
 

@@ -87,6 +87,8 @@ static void register_result_destroy(DICTIONARY *results) {
 }
 
 static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, calculated_number value) {
+    if(!calculated_number_isnumber(value)) return;
+
     struct register_result t = {
         .st = st,
         .chart_id = st->id,
@@ -553,8 +555,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         else if(isgreater(highlight_average, 0.0) || isless(highlight_average, 0.0))
             pcent = highlight_average;
 
-        if(!isnan(pcent))
-            register_result(results, st, d, pcent);
+        register_result(results, st, d, pcent);
     }
 
     return correlated_dimensions;
@@ -615,6 +616,10 @@ static size_t spread_results_evenly(DICTIONARY *results) {
         if(likely(slots[i] != last_value))
             slots[unique_values++] = last_value = slots[i];
     }
+
+    // this cannot happen, but coverity thinks otherwise...
+    if(!unique_values)
+        unique_values = dimensions;
 
     // calculate the weight of each slot, using the number of unique values
     calculated_number slot_weight = 1.0 / (calculated_number)unique_values;
