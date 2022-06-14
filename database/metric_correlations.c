@@ -6,7 +6,7 @@
 #define MAX_POINTS 10000
 int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
-METRIC_CORRELATIONS_METHOD default_metric_correlations_method = METRIC_CORRELATIONS_VOLUME;
+METRIC_CORRELATIONS_METHOD default_metric_correlations_method = METRIC_CORRELATIONS_KS2;
 
 typedef struct mc_stats {
     size_t db_points;
