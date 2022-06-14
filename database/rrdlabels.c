@@ -22,12 +22,12 @@
  * Equal               =                    -> :       -> _
  * Period              .                    yes        yes
  * Comma               ,                    -> .       -> .
- * Slash               /                    yes        -> _
- * Backslash           \                    -> /       -> _
+ * Slash               /                    yes        yes
+ * Backslash           \                    -> /       -> /
  * At                  @                    yes        -> _
- * Space                                    -> _       yes
- * Opening parenthesis (                    -> _       yes
- * Closing parenthesis )                    -> _       yes
+ * Space                                    yes        -> _
+ * Opening parenthesis (                    yes        -> _
+ * Closing parenthesis )                    yes        -> _
  * anything else                            -> _       -> _
 *
  * The above rules should allow users to set in tags (indicative):
@@ -358,11 +358,10 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
     label_names_char_map['+'] = '_';
     label_names_char_map[';'] = '_';
     label_names_char_map['@'] = '_';
-    label_names_char_map['/'] = '_';
     label_names_char_map['('] = '_';
     label_names_char_map[')'] = '_';
     label_names_char_map[' '] = '_';
-    label_names_char_map['\\'] = '_';
+    label_names_char_map['\\'] = '/';
 
     // create the spaces map
     for(i = 0; i < 256 ;i++)
