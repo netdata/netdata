@@ -441,11 +441,8 @@ void rrdset_save(RRDSET *st) {
     }
 }
 
-void rrdset_delete_custom(RRDSET *st, int db_rotated) {
+void rrdset_delete(RRDSET *st) {
     RRDDIM *rd;
-#ifndef ENABLE_ACLK
-    UNUSED(db_rotated);
-#endif
     rrdset_check_rdlock(st);
 
     info("Deleting chart '%s' ('%s') from disk...", st->id, st->name);

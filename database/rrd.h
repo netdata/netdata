@@ -1299,8 +1299,7 @@ extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
 extern void rrdset_save(RRDSET *st);
-#define rrdset_delete(st) rrdset_delete_custom(st, 0)
-extern void rrdset_delete_custom(RRDSET *st, int db_rotated);
+extern void rrdset_delete(RRDSET *st);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern RRDHOST *rrdhost_create(
