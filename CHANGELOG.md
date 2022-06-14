@@ -7,9 +7,13 @@
 **Merged pull requests:**
 
 - Re-enable updates for systems using static builds. [\#13110](https://github.com/netdata/netdata/pull/13110) ([Ferroin](https://github.com/Ferroin))
+- Add user netdata to secondary group in DEB package [\#13109](https://github.com/netdata/netdata/pull/13109) ([iigorkarpov](https://github.com/iigorkarpov))
+- 73x times faster metrics correlations at the agent [\#13107](https://github.com/netdata/netdata/pull/13107) ([ktsaou](https://github.com/ktsaou))
 - Remove unnescesary ‘cleanup’ code. [\#13103](https://github.com/netdata/netdata/pull/13103) ([Ferroin](https://github.com/Ferroin))
 - Temporarily disable updates for static builds. [\#13100](https://github.com/netdata/netdata/pull/13100) ([Ferroin](https://github.com/Ferroin))
 - docs\(statsd.plugin\): fix indentation [\#13096](https://github.com/netdata/netdata/pull/13096) ([ilyam8](https://github.com/ilyam8))
+- fix virtualization detection on FreeBSD [\#13087](https://github.com/netdata/netdata/pull/13087) ([ilyam8](https://github.com/ilyam8))
+- Labels with dictionary [\#13070](https://github.com/netdata/netdata/pull/13070) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
@@ -342,12 +346,6 @@
 - feat\(collectors/cgroups\): prefer `blkio.*_recursive` when available [\#12462](https://github.com/netdata/netdata/pull/12462) ([ilyam8](https://github.com/ilyam8))
 - Updated static build components to latest versions. [\#12461](https://github.com/netdata/netdata/pull/12461) ([ktsaou](https://github.com/ktsaou))
 - Implement fine-grained errors to cloud queries [\#12460](https://github.com/netdata/netdata/pull/12460) ([underhood](https://github.com/underhood))
-- Extend aclk-state [\#12458](https://github.com/netdata/netdata/pull/12458) ([underhood](https://github.com/underhood))
-- Add support for passing extra claiming options when claiming with Docker. [\#12457](https://github.com/netdata/netdata/pull/12457) ([Ferroin](https://github.com/Ferroin))
-- Update dashboard to version v2.21.8. [\#12455](https://github.com/netdata/netdata/pull/12455) ([netdatabot](https://github.com/netdatabot))
-- fix\(collectors/cgroups\): use different context for cgroup network charts [\#12454](https://github.com/netdata/netdata/pull/12454) ([ilyam8](https://github.com/ilyam8))
-- Initialize foreach alarms of dimensions in health thread. [\#12452](https://github.com/netdata/netdata/pull/12452) ([vkalintiris](https://github.com/vkalintiris))
-- Fix issue with charts not properly synchronized with the cloud [\#12451](https://github.com/netdata/netdata/pull/12451) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
