@@ -255,7 +255,7 @@ int rrdset2anything_api_v1(
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 
-    if (st && st->state && st->state->is_ar_chart)
+    if (st->state && st->state->is_ar_chart)
         ml_process_rrdr(r, query_params->max_anomaly_rates);
 
     RRDDIM *temp_rd = query_params->context_param_list ? query_params->context_param_list->rd : NULL;
