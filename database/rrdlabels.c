@@ -970,7 +970,7 @@ int rrdlabels_unittest_add_a_pair_callback(const char *name, const char *value, 
         t->errors++;
     }
     else if(strcmp(value, t->expected_value) != 0) {
-        fprintf(stderr, "values don't match, found \"%s\", expected \"%s\"", value, t->expected_value?t->expected_value:"(null)");
+        fprintf(stderr, "values don't match, found \"%s\", expected \"%s\"", value, t->expected_value);
         t->errors++;
     }
 
