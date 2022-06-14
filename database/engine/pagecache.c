@@ -238,7 +238,6 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
  */
 unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
 {
-    /* it's twice the number of producers since we pin 2 pages per producer */
     return ctx->max_cache_pages + (unsigned long)ctx->metric_API_max_producers;
 }
 
@@ -248,7 +247,6 @@ unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
  */
 unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
 {
-    /* it's twice the number of producers since we pin 2 pages per producer */
     return ctx->cache_pages_low_watermark + (unsigned long)ctx->metric_API_max_producers;
 }
 
