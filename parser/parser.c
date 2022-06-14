@@ -9,7 +9,7 @@ static inline int find_keyword(char *str, char *keyword, int max_size, int (*cus
     while (unlikely(custom_isspace(*s))) s++;
     keyword_start = s;
 
-    while (likely(*s && !custom_isspace(*s)) && max_size > 0) {
+    while (likely(*s && !custom_isspace(*s)) && max_size > 1) {
         *keyword++ = *s++;
         max_size--;
     }
@@ -238,7 +238,7 @@ inline int parser_action(PARSER *parser, char *input)
 {
     PARSER_RC   rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    char command[PLUGINSD_LINE_MAX];
+    char command[PLUGINSD_LINE_MAX + 1];
     keyword_function action_function;
     keyword_function *action_function_list = NULL;
 
