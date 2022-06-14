@@ -261,6 +261,33 @@ static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
 }
 #endif
 
+static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
+{
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_sent = NULL;
+    static RRDDIM *rd_recvd = NULL;
+    static uint64_t sent = 0;
+    static uint64_t recvd = 0;
+
+    sent += stats->bytes_tx;
+    recvd += stats->bytes_rx;
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_openssl_bytes", NULL, "aclk", NULL, "Received and Sent bytes.", "B/s",
+            "netdata", "stats", 200011, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        rd_sent  = rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_recvd = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    } else
+        rrdset_next(st);
+
+    rrddim_set_by_pointer(st, rd_sent, sent);
+    rrddim_set_by_pointer(st, rd_recvd, recvd);
+
+    rrdset_done(st);
+}
+
 void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt)
 {
 #ifndef ENABLE_NEW_CLOUD_PROTOCOL
@@ -342,6 +369,9 @@ void *aclk_stats_main_thread(void *ptr)
         aclk_stats_query_threads(aclk_queries_per_thread_sample);
 
         aclk_stats_query_time(&per_sample);
+
+        struct mqtt_wss_stats mqtt_wss_stats = mqtt_wss_get_stats(args->client);
+        aclk_stats_mqtt_wss(&mqtt_wss_stats);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
         aclk_stats_newproto_rx(aclk_stats_cfg.aclk_proto_rx_msgs_sample);

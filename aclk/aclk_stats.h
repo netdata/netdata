@@ -6,6 +6,7 @@
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
 #include "aclk_query_queue.h"
+#include "mqtt_wss_client.h"
 
 #define ACLK_STATS_THREAD_NAME "ACLK_Stats"
 
@@ -22,6 +23,7 @@ int aclk_cloud_req_http_type_to_idx(const char *name);
 struct aclk_stats_thread {
     netdata_thread_t *thread;
     int query_thread_count;
+    mqtt_wss_client client;
 };
 
 // preserve between samples
