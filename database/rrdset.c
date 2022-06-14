@@ -750,7 +750,7 @@ RRDSET *rrdset_create_custom(
             (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename,
             size,
             ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE),
-            0);
+            1);
 
         if(st) {
             memset(&st->avl, 0, sizeof(avl_t));

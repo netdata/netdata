@@ -1004,8 +1004,11 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
     if(unlikely((flags & MAP_SHARED) && (!filename || !*filename)))
         fatal("MAP_SHARED requested, without a filename to netdata_mmap()");
 
-    // don't enable ksm is the global setting is disabled
-    if(unlikely(!enable_ksm)) ksm = 0;
+    // don't enable ksm if filename is not null (memory mode not ram or dbengine)
+    // and either flags is MAP_SHARED (memory mode map)
+    // or ksm is disabled by default
+    if (filename && (flags & MAP_SHARED || !enable_ksm || !ksm))
+        ksm = 0;
 
     // KSM only merges anonymous (private) pages, never pagecache (file) pages
     // but MAP_PRIVATE without MAP_ANONYMOUS it fails too, so we need it always
