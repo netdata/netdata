@@ -279,12 +279,10 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 int rrdeng_store_metric_finalize(RRDDIM *rd)
 {
     struct rrdeng_collect_handle *handle;
-    struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
     uint8_t can_delete_metric = 0;
 
     handle = (struct rrdeng_collect_handle *)rd->state->handle;
-    ctx = handle->ctx;
     page_index = rd->state->page_index;
     rrdeng_store_metric_flush_current_page(rd);
     uv_rwlock_wrlock(&page_index->lock);
