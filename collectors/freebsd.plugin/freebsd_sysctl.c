@@ -1057,7 +1057,7 @@ int do_system_ram(int update_every, usec_t dt) {
         rrdset_done(st);
 
         if (unlikely(!st_mem_available)) {
-            st = rrdset_create_localhost(
+            st_mem_available = rrdset_create_localhost(
                     "mem",
                     "available",
                     NULL,
