@@ -15,6 +15,17 @@ struct mem_query_handle {
     uint8_t finished;
 };
 
+extern RRDDIM* rrddim_init_map(RRDSET *st, const char *id, const char *filename, collected_number multiplier,
+                          collected_number divisor, RRD_ALGORITHM algorithm);
+extern RRDDIM* rrddim_init_ram(RRDSET *st, const char *id, const char *filename, collected_number multiplier,
+                          collected_number divisor, RRD_ALGORITHM algorithm);
+extern RRDDIM* rrddim_init_save(RRDSET *st, const char *id, const char *filename, collected_number multiplier,
+                          collected_number divisor, RRD_ALGORITHM algorithm);
+
+extern RRDSET* rrdset_init_map(const char *id, const char *fullid, const char *filename, long entries, int update_every);
+extern RRDSET* rrdset_init_ram(const char *id, const char *fullid, const char *filename, long entries, int update_every);
+extern RRDSET* rrdset_init_save(const char *id, const char *fullid, const char *filename, long entries, int update_every);
+
 STORAGE_ENGINE_INSTANCE* rrddim_storage_engine_instance_new(STORAGE_ENGINE* engine, RRDHOST *host);
 void rrddim_storage_engine_instance_exit(STORAGE_ENGINE_INSTANCE* context);
 void rrddim_storage_engine_instance_destroy(STORAGE_ENGINE_INSTANCE* context);

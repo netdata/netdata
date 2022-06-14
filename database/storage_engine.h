@@ -17,9 +17,27 @@ struct storage_engine_ops {
 };
 
 // ------------------------------------------------------------------------
+// function pointers that handle RRDSET creation, destruction and query
+struct rrdset_ops {
+    RRDSET*(*create)(const char *id, const char *fullid, const char *filename, long entries, int update_every);
+    void(*destroy)(RRDSET *rd);
+};
+
+// ------------------------------------------------------------------------
+// function pointers that handle RRDDIM creation and destruction
+struct rrddim_ops {
+    RRDDIM*(*create)(RRDSET *st, const char *id, const char *filename, collected_number multiplier,
+                          collected_number divisor, RRD_ALGORITHM algorithm);
+    void(*init)(RRDDIM* rd);
+    void(*destroy)(RRDDIM *rd);
+};
+
+// ------------------------------------------------------------------------
 // function pointers for all APIs provided by a storge engine
 typedef struct storage_engine_api {
     struct storage_engine_ops engine_ops;
+    struct rrdset_ops set_ops;
+    struct rrddim_ops dim_ops;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
 } STORAGE_ENGINE_API;

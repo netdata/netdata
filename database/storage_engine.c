@@ -7,6 +7,62 @@
 #endif
 #include "libnetdata/libnetdata.h"
 
+static void rrddim_destroy_freez(RRDDIM *rd) {
+    freez(rd);
+}
+static void rrddim_destroy_unmap(RRDDIM *rd) {
+    munmap(rd, rd->memsize);
+}
+static void rrdset_destroy_freez(RRDSET *st) {
+    freez(st);
+}
+static void rrdset_destroy_unmap(RRDSET *st) {
+    munmap(st, st->memsize);
+}
+
+// Initialize a rrdset with calloc and the provided memory mode
+static inline RRDSET* rrdset_init_calloc(RRD_MEMORY_MODE mode) {
+    RRDSET* st = callocz(1, sizeof(RRDSET));
+    st->rrd_memory_mode = mode;
+    return st;
+}
+static RRDSET* rrdset_init_none(const char *id, const char *fullid, const char *filename, long entries, int update_every) {
+    (void)id; (void)filename; (void)fullid; (void)entries; (void)update_every;
+    return rrdset_init_calloc(RRD_MEMORY_MODE_NONE);
+}
+static RRDSET* rrdset_init_alloc(const char *id, const char *fullid, const char *filename, long entries, int update_every) {
+    (void)id; (void)filename; (void)fullid; (void)entries; (void)update_every;
+    return rrdset_init_calloc(RRD_MEMORY_MODE_ALLOC);
+}
+static RRDSET* rrdset_init_dbengine(const char *id, const char *fullid, const char *filename, long entries, int update_every) {
+    (void)id; (void)filename; (void)fullid; (void)entries; (void)update_every;
+    return rrdset_init_calloc(RRD_MEMORY_MODE_DBENGINE);
+}
+
+// Initialize a rrddim with calloc and the provided memory mode
+static RRDDIM* rrddim_init_calloc(RRDSET *st, RRD_MEMORY_MODE mode) {
+    size_t size = sizeof(RRDDIM) + (st->entries * sizeof(storage_number));
+    RRDDIM* rd = callocz(1, size);
+    rd->memsize = size;
+    rd->rrd_memory_mode = mode;
+    return rd;
+}
+static RRDDIM* rrddim_init_none(RRDSET *st, const char *id, const char *filename, collected_number multiplier,
+                          collected_number divisor, RRD_ALGORITHM algorithm) {
+    (void)st; (void)id; (void)filename; (void)multiplier; (void)divisor; (void)algorithm;
+    return rrddim_init_calloc(st, RRD_MEMORY_MODE_NONE);
+}
+static RRDDIM* rrddim_init_alloc(RRDSET *st, const char *id, const char *filename, collected_number multiplier,
+                          collected_number divisor, RRD_ALGORITHM algorithm) {
+    (void)st; (void)id; (void)filename; (void)multiplier; (void)divisor; (void)algorithm;
+    return rrddim_init_calloc(st, RRD_MEMORY_MODE_ALLOC);
+}
+static RRDDIM* rrddim_init_dbengine(RRDSET *st, const char *id, const char *filename, collected_number multiplier,
+                          collected_number divisor, RRD_ALGORITHM algorithm) {
+    (void)st; (void)id; (void)filename; (void)multiplier; (void)divisor; (void)algorithm;
+    return rrddim_init_calloc(st, RRD_MEMORY_MODE_DBENGINE);
+}
+
 static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_NONE,
@@ -16,6 +72,15 @@ static STORAGE_ENGINE engines[] = {
                 .create = rrddim_storage_engine_instance_new,
                 .exit = rrddim_storage_engine_instance_exit,
                 .destroy = rrddim_storage_engine_instance_destroy
+            },
+            .set_ops = {
+                .create = rrdset_init_none,
+                .destroy = rrdset_destroy_freez,
+            },
+            .dim_ops = {
+                .create = rrddim_init_none,
+                .init = NULL,
+                .destroy = rrddim_destroy_freez,
             },
             .collect_ops = {
                 .init = rrddim_collect_init,
@@ -42,6 +107,15 @@ static STORAGE_ENGINE engines[] = {
                 .exit = rrddim_storage_engine_instance_exit,
                 .destroy = rrddim_storage_engine_instance_destroy
             },
+            .set_ops = {
+                .create = rrdset_init_ram,
+                .destroy = rrdset_destroy_unmap,
+            },
+            .dim_ops = {
+                .create = rrddim_init_ram,
+                .init = NULL,
+                .destroy = rrddim_destroy_unmap,
+            },
             .collect_ops = {
                 .init = rrddim_collect_init,
                 .store_metric = rrddim_collect_store_metric,
@@ -66,6 +140,15 @@ static STORAGE_ENGINE engines[] = {
                 .create = rrddim_storage_engine_instance_new,
                 .exit = rrddim_storage_engine_instance_exit,
                 .destroy = rrddim_storage_engine_instance_destroy
+            },
+            .set_ops = {
+                .create = rrdset_init_map,
+                .destroy = rrdset_destroy_unmap,
+            },
+            .dim_ops = {
+                .create = rrddim_init_map,
+                .init = NULL,
+                .destroy = rrddim_destroy_unmap,
             },
             .collect_ops = {
                 .init = rrddim_collect_init,
@@ -92,6 +175,15 @@ static STORAGE_ENGINE engines[] = {
                 .exit = rrddim_storage_engine_instance_exit,
                 .destroy = rrddim_storage_engine_instance_destroy
             },
+            .set_ops = {
+                .create = rrdset_init_save,
+                .destroy = rrdset_destroy_unmap,
+            },
+            .dim_ops = {
+                .create = rrddim_init_save,
+                .init = NULL,
+                .destroy = rrddim_destroy_unmap,
+            },
             .collect_ops = {
                 .init = rrddim_collect_init,
                 .store_metric = rrddim_collect_store_metric,
@@ -116,6 +208,15 @@ static STORAGE_ENGINE engines[] = {
                 .create = rrddim_storage_engine_instance_new,
                 .exit = rrddim_storage_engine_instance_exit,
                 .destroy = rrddim_storage_engine_instance_destroy
+            },
+            .set_ops = {
+                .create = rrdset_init_alloc,
+                .destroy = rrdset_destroy_freez,
+            },
+            .dim_ops = {
+                .create = rrddim_init_alloc,
+                .init = NULL,
+                .destroy = rrddim_destroy_freez,
             },
             .collect_ops = {
                 .init = rrddim_collect_init,
@@ -142,6 +243,15 @@ static STORAGE_ENGINE engines[] = {
                 .create = rrdeng_init,
                 .exit = rrdeng_prepare_exit,
                 .destroy = rrdeng_exit
+            },
+            .set_ops = {
+                .create = rrdset_init_dbengine,
+                .destroy = rrdset_destroy_freez,
+            },
+            .dim_ops = {
+                .create = rrddim_init_dbengine,
+                .init = rrdeng_metric_init,
+                .destroy = rrddim_destroy_freez,
             },
             .collect_ops = {
                 .init = rrdeng_store_metric_init,

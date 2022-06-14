@@ -3,6 +3,192 @@
 #include "rrddim_mem.h"
 #include "../storage_engine.h"
 
+
+RRDSET* rrdset_init(RRD_MEMORY_MODE memory_mode, const char *id, const char *fullid, const char *filename, long entries, int update_every)
+{
+    size_t size = sizeof(RRDSET);
+
+    RRDSET *st = (RRDSET *) netdata_mmap(
+                (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : filename
+            , size
+            , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
+            , 0
+    );
+
+    if(st) {
+        memset(&st->avl, 0, sizeof(avl_t));
+        memset(&st->avlname, 0, sizeof(avl_t));
+        memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
+        memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
+        memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
+
+        st->name = NULL;
+        st->type = NULL;
+        st->family = NULL;
+        st->title = NULL;
+        st->units = NULL;
+        st->context = NULL;
+        st->cache_dir = NULL;
+        st->plugin_name = NULL;
+        st->module_name = NULL;
+        st->dimensions = NULL;
+        st->rrdfamily = NULL;
+        st->rrdhost = NULL;
+        st->next = NULL;
+        st->variables = NULL;
+        st->alarms = NULL;
+        st->flags = 0x00000000;
+        st->exporting_flags = NULL;
+
+        if(memory_mode == RRD_MEMORY_MODE_RAM) {
+            memset(st, 0, size);
+        }
+        else {
+            time_t now = now_realtime_sec();
+
+            if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
+                info("Initializing file %s.", filename);
+                memset(st, 0, size);
+            }
+            else if(strcmp(st->id, fullid) != 0) {
+                error("File %s contents are not for chart %s. Clearing it.", filename, fullid);
+                // munmap(st, size);
+                // st = NULL;
+                memset(st, 0, size);
+            }
+            else if(st->memsize != size || st->entries != entries) {
+                error("File %s does not have the desired size. Clearing it.", filename);
+                memset(st, 0, size);
+            }
+            else if(st->update_every != update_every) {
+                error("File %s does not have the desired update frequency. Clearing it.", filename);
+                memset(st, 0, size);
+            }
+            else if((now - st->last_updated.tv_sec) > update_every * entries) {
+                info("File %s is too old. Clearing it.", filename);
+                memset(st, 0, size);
+            }
+            else if(st->last_updated.tv_sec > now + update_every) {
+                error("File %s refers to the future by %zd secs. Resetting it to now.", filename, (ssize_t)(st->last_updated.tv_sec - now));
+                st->last_updated.tv_sec = now;
+            }
+
+            // make sure the database is aligned
+            if(st->last_updated.tv_sec) {
+                st->update_every = update_every;
+                last_updated_time_align(st);
+            }
+        }
+
+        // make sure we have the right memory mode
+        // even if we cleared the memory
+        st->rrd_memory_mode = memory_mode;
+    }
+    return st;
+}
+
+
+RRDSET* rrdset_init_map(const char *id, const char *fullid, const char *filename, long entries, int update_every)
+{
+    return rrdset_init(RRD_MEMORY_MODE_MAP, id, fullid, filename, entries, update_every);
+}
+
+RRDSET* rrdset_init_ram(const char *id, const char *fullid, const char *filename, long entries, int update_every)
+{
+    return rrdset_init(RRD_MEMORY_MODE_RAM, id, fullid, filename, entries, update_every);
+}
+
+RRDSET* rrdset_init_save(const char *id, const char *fullid, const char *filename, long entries, int update_every)
+{
+    return rrdset_init(RRD_MEMORY_MODE_SAVE, id, fullid, filename, entries, update_every);
+}
+
+
+RRDDIM* rrddim_init(RRDSET *st, RRD_MEMORY_MODE memory_mode, const char* filename, int map_mode, collected_number multiplier,
+                          collected_number divisor, RRD_ALGORITHM algorithm)
+{
+    unsigned long size = sizeof(RRDDIM) + (st->entries * sizeof(storage_number));
+    RRDDIM* rd = (RRDDIM *)netdata_mmap(filename, size, map_mode, 1);
+
+    if(likely(rd)) {
+        // we have a file mapped for rd
+
+        memset(&rd->avl, 0, sizeof(avl_t));
+        rd->id = NULL;
+        rd->name = NULL;
+        rd->cache_filename = NULL;
+        rd->variables = NULL;
+        rd->next = NULL;
+        rd->rrdset = NULL;
+        rd->exposed = 0;
+
+        struct timeval now;
+        now_realtime_timeval(&now);
+
+        if(memory_mode == RRD_MEMORY_MODE_RAM) {
+            memset(rd, 0, size);
+        }
+        else {
+            int reset = 0;
+
+            if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
+                info("Initializing file %s.", filename);
+                memset(rd, 0, size);
+                reset = 1;
+            }
+            else if(rd->memsize != size) {
+                error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", filename, size, rd->memsize);
+                memset(rd, 0, size);
+                reset = 1;
+            }
+            else if(rd->update_every != st->update_every) {
+                error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", filename, st->update_every, rd->update_every);
+                memset(rd, 0, size);
+                reset = 1;
+            }
+            else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
+                info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", filename, dt_usec(&now, &rd->last_collected_time) / USEC_PER_SEC, rd->entries * rd->update_every);
+                memset(rd, 0, size);
+                reset = 1;
+            }
+
+            if(!reset) {
+                if(rd->algorithm != algorithm) {
+                    info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
+                            filename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm, rrd_algorithm_name(rd->algorithm));
+                }
+
+                if(rd->multiplier != multiplier) {
+                    info("File %s does not have the expected multiplier (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT "). Previous values may be wrong.", filename, multiplier, rd->multiplier);
+                }
+
+                if(rd->divisor != divisor) {
+                    info("File %s does not have the expected divisor (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT "). Previous values may be wrong.", filename, divisor, rd->divisor);
+                }
+            }
+        }
+
+        // make sure we have the right memory mode
+        // even if we cleared the memory
+        rd->rrd_memory_mode = memory_mode;
+    }
+    return rd;
+}
+
+RRDDIM* rrddim_init_map(RRDSET *st, const char *id, const char *filename, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm)
+{
+    return rrddim_init(st, RRD_MEMORY_MODE_MAP, filename, MAP_SHARED, multiplier, divisor, algorithm);
+}
+RRDDIM* rrddim_init_ram(RRDSET *st, const char *id, const char *filename, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm)
+{
+    return rrddim_init(st, RRD_MEMORY_MODE_RAM, NULL, MAP_PRIVATE, multiplier, divisor, algorithm);
+}
+RRDDIM* rrddim_init_save(RRDSET *st, const char *id, const char *filename, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm)
+{
+    return rrddim_init(st, RRD_MEMORY_MODE_SAVE, filename, MAP_PRIVATE, multiplier, divisor, algorithm);
+}
+
+
 STORAGE_ENGINE_INSTANCE* rrddim_storage_engine_instance_new(STORAGE_ENGINE* engine, RRDHOST *host) {
     (void)engine; (void)host;
     return NULL;
