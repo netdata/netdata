@@ -22,8 +22,8 @@
  * Equal               =                    -> :       -> _
  * Period              .                    yes        yes
  * Comma               ,                    -> .       -> .
- * Slash               /                    yes        -> _
- * Backslash           \                    -> /       -> _
+ * Slash               /                    yes        yes
+ * Backslash           \                    -> /       -> /
  * At                  @                    yes        -> _
  * Space                                    -> _       yes
  * Opening parenthesis (                    -> _       yes
@@ -358,11 +358,10 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
     label_names_char_map['+'] = '_';
     label_names_char_map[';'] = '_';
     label_names_char_map['@'] = '_';
-    label_names_char_map['/'] = '_';
     label_names_char_map['('] = '_';
     label_names_char_map[')'] = '_';
     label_names_char_map[' '] = '_';
-    label_names_char_map['\\'] = '_';
+    label_names_char_map['\\'] = '/';
 
     // create the spaces map
     for(i = 0; i < 256 ;i++)
