@@ -10,7 +10,7 @@ from datetime import datetime
 from sys import exc_info
 
 try:
-    from pymongo import MongoClient, ASCENDING, DESCENDING
+    from pymongo import MongoClient, ASCENDING, DESCENDING, version_tuple
     from pymongo.errors import PyMongoError
 
     PYMONGO = True
@@ -750,7 +750,7 @@ class Service(SimpleService):
             CONN_PARAM_HOST: conf.get(CONN_PARAM_HOST, DEFAULT_HOST),
             CONN_PARAM_PORT: conf.get(CONN_PARAM_PORT, DEFAULT_PORT),
         }
-        if hasattr(MongoClient, 'server_selection_timeout'):
+        if hasattr(MongoClient, 'server_selection_timeout') or version_tuple[0] >= 4:
             params[CONN_PARAM_SERVER_SELECTION_TIMEOUT_MS] = conf.get('timeout', DEFAULT_TIMEOUT)
 
         params.update(self.build_ssl_connection_params())
