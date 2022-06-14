@@ -25,9 +25,9 @@
  * Slash               /                    yes        yes
  * Backslash           \                    -> /       -> /
  * At                  @                    yes        -> _
- * Space                                    -> _       yes
- * Opening parenthesis (                    -> _       yes
- * Closing parenthesis )                    -> _       yes
+ * Space                                    yes        -> _
+ * Opening parenthesis (                    yes        -> _
+ * Closing parenthesis )                    yes        -> _
  * anything else                            -> _       -> _
 *
  * The above rules should allow users to set in tags (indicative):
