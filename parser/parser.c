@@ -238,7 +238,7 @@ inline int parser_action(PARSER *parser, char *input)
 {
     PARSER_RC   rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    char command[PLUGINSD_LINE_MAX];
+    char command[PLUGINSD_LINE_MAX + 1];
     keyword_function action_function;
     keyword_function *action_function_list = NULL;
 
