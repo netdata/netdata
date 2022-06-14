@@ -153,7 +153,7 @@ elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::set-output name=ref::${EVENT_VERSION}"
     echo "::set-output name=type::release"
     echo "::set-output name=branch::master"
-    echo "::set-output name=new-branch:${branch_name}"
+    echo "::set-output name=new-branch::${branch_name}"
     echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
 elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a major release build."
