@@ -356,6 +356,26 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     //info("JSONWRAPPER(): %s: END", r->st->id);
 }
 
+void rrdr_json_wrapper_anomaly_rates(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value) {
+    (void)format;
+
+    char kq[2] = "",                    // key quote
+        sq[2] = "";                     // string quote
+
+    if( options & RRDR_OPTION_GOOGLE_JSON ) {
+        kq[0] = '\0';
+        sq[0] = '\'';
+    }
+    else {
+        kq[0] = '"';
+        sq[0] = '"';
+    }
+
+    if(string_value) buffer_strcat(wb, sq);
+
+    buffer_sprintf(wb, ",\n   %sanomaly_rates%s: ", kq, kq);
+}
+
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value) {
     (void)format;
 

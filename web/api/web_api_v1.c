@@ -10,35 +10,36 @@ static struct {
     uint32_t hash;
     RRDR_OPTIONS value;
 } api_v1_data_options[] = {
-        {  "nonzero"         , 0    , RRDR_OPTION_NONZERO}
-        , {"flip"            , 0    , RRDR_OPTION_REVERSED}
-        , {"reversed"        , 0    , RRDR_OPTION_REVERSED}
-        , {"reverse"         , 0    , RRDR_OPTION_REVERSED}
-        , {"jsonwrap"        , 0    , RRDR_OPTION_JSON_WRAP}
-        , {"min2max"         , 0    , RRDR_OPTION_MIN2MAX}
-        , {"ms"              , 0    , RRDR_OPTION_MILLISECONDS}
-        , {"milliseconds"    , 0    , RRDR_OPTION_MILLISECONDS}
-        , {"abs"             , 0    , RRDR_OPTION_ABSOLUTE}
-        , {"absolute"        , 0    , RRDR_OPTION_ABSOLUTE}
-        , {"absolute_sum"    , 0    , RRDR_OPTION_ABSOLUTE}
-        , {"absolute-sum"    , 0    , RRDR_OPTION_ABSOLUTE}
-        , {"display_absolute", 0    , RRDR_OPTION_DISPLAY_ABS}
-        , {"display-absolute", 0    , RRDR_OPTION_DISPLAY_ABS}
-        , {"seconds"         , 0    , RRDR_OPTION_SECONDS}
-        , {"null2zero"       , 0    , RRDR_OPTION_NULL2ZERO}
-        , {"objectrows"      , 0    , RRDR_OPTION_OBJECTSROWS}
-        , {"google_json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
-        , {"google-json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
-        , {"percentage"      , 0    , RRDR_OPTION_PERCENTAGE}
-        , {"unaligned"       , 0    , RRDR_OPTION_NOT_ALIGNED}
-        , {"match_ids"       , 0    , RRDR_OPTION_MATCH_IDS}
-        , {"match-ids"       , 0    , RRDR_OPTION_MATCH_IDS}
-        , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
-        , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
-        , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
-        , {"anomaly-bit"     , 0    , RRDR_OPTION_ANOMALY_BIT}
-        , {"raw"             , 0    , RRDR_OPTION_RETURN_RAW}
-        , {NULL              , 0    , 0}
+        {  "nonzero"           , 0    , RRDR_OPTION_NONZERO}
+        , {"flip"              , 0    , RRDR_OPTION_REVERSED}
+        , {"reversed"          , 0    , RRDR_OPTION_REVERSED}
+        , {"reverse"           , 0    , RRDR_OPTION_REVERSED}
+        , {"jsonwrap"          , 0    , RRDR_OPTION_JSON_WRAP}
+        , {"min2max"           , 0    , RRDR_OPTION_MIN2MAX}
+        , {"ms"                , 0    , RRDR_OPTION_MILLISECONDS}
+        , {"milliseconds"      , 0    , RRDR_OPTION_MILLISECONDS}
+        , {"abs"               , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute"          , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute_sum"      , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute-sum"      , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"display_absolute"  , 0    , RRDR_OPTION_DISPLAY_ABS}
+        , {"display-absolute"  , 0    , RRDR_OPTION_DISPLAY_ABS}
+        , {"seconds"           , 0    , RRDR_OPTION_SECONDS}
+        , {"null2zero"         , 0    , RRDR_OPTION_NULL2ZERO}
+        , {"objectrows"        , 0    , RRDR_OPTION_OBJECTSROWS}
+        , {"google_json"       , 0    , RRDR_OPTION_GOOGLE_JSON}
+        , {"google-json"       , 0    , RRDR_OPTION_GOOGLE_JSON}
+        , {"percentage"        , 0    , RRDR_OPTION_PERCENTAGE}
+        , {"unaligned"         , 0    , RRDR_OPTION_NOT_ALIGNED}
+        , {"match_ids"         , 0    , RRDR_OPTION_MATCH_IDS}
+        , {"match-ids"         , 0    , RRDR_OPTION_MATCH_IDS}
+        , {"match_names"       , 0    , RRDR_OPTION_MATCH_NAMES}
+        , {"match-names"       , 0    , RRDR_OPTION_MATCH_NAMES}
+        , {"showcustomvars"    , 0    , RRDR_OPTION_CUSTOM_VARS}
+        , {"anomaly-bit"       , 0    , RRDR_OPTION_ANOMALY_BIT}
+        , {"raw"               , 0    , RRDR_OPTION_RETURN_RAW}
+        , {"jw-anomaly-rates"  , 0    , RRDR_OPTION_RETURN_JWAR}
+        , {NULL                , 0    , 0}
 };
 
 static struct {

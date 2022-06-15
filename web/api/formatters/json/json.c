@@ -162,6 +162,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
     for(i = start; i != end ;i += step) {
         calculated_number *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
+        uint8_t *ar = &r->ar[ i * r->d ];
 
         time_t now = r->t[i];
 
@@ -222,7 +223,11 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-                calculated_number n = cn[c];
+                calculated_number n;
+                if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
+                    n = (calculated_number)ar[c] / 2.0; // rrdr stores anomaly rates 0 - 200
+                else
+                    n = cn[c];
 
                 if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                     n = -n;
@@ -239,7 +244,11 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
-            calculated_number n = cn[c];
+            calculated_number n;
+            if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
+                n = (calculated_number)ar[c] / 2.0; // rrdr stores anomaly rates 0 - 200
+            else
+                n = cn[c];
 
             buffer_fast_strcat(wb, pre_value, pre_value_len);
 

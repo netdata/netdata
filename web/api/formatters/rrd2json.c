@@ -426,8 +426,13 @@ int rrdset2anything_api_v1(
 
         rrdr2json(r, wb, options, 0, query_params->context_param_list);
 
-        if(options & RRDR_OPTION_JSON_WRAP)
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            if(options & RRDR_OPTION_RETURN_JWAR) {
+                rrdr_json_wrapper_anomaly_rates(r, wb, format, options, 0);
+                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, 0, query_params->context_param_list);
+            }
             rrdr_json_wrapper_end(r, wb, format, options, 0);
+        }
         break;
     }
 
