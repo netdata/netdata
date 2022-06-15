@@ -4,7 +4,7 @@ description: "Replicate and mirror Netdata's metrics through real-time streaming
 custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README.md
 ---
 
-:::CAUTION
+:::caution
  
 This page is deprecated, to explore streaming capabilities try the following guides:
 
