@@ -495,7 +495,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              long long baseline_after, long long baseline_before,
                                              long long after, long long before,
                                              RRDR_OPTIONS options, RRDR_GROUPING group, int timeout, MC_STATS *stats) {
-    options |= RRDR_OPTION_MATCH_IDS;
+    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE;
     long group_time = 0;
 
     int correlated_dimensions = 0;
