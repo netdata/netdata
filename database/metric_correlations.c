@@ -517,13 +517,14 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 
         stats->db_queries++;
         calculated_number highlight_average = NAN;
+        uint8_t high_anomaly_rate = 0;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
                                   after, before,
                                   group, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, 0);
+                                  &value_is_null, &high_anomaly_rate, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_average)) {
             // error("Metric correlations: cannot query highlight duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(highlight_average))?"result is NAN":"");
@@ -533,13 +534,14 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 
         stats->db_queries++;
         calculated_number baseline_average = NAN;
+        uint8_t base_anomaly_rate = 0;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
                                   baseline_after, baseline_before,
                                   group, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, 0);
+                                  &value_is_null, &base_anomaly_rate, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(baseline_average)) {
             // error("Metric correlations: cannot query baseline duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(baseline_average))?"result is NAN":"");
@@ -552,8 +554,13 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0))
             pcent = (highlight_average - baseline_average) / baseline_average;
 
-        else if(isgreater(highlight_average, 0.0) || isless(highlight_average, 0.0))
-            pcent = highlight_average;
+        else {
+            if(high_anomaly_rate)
+                pcent = (calculated_number)high_anomaly_rate / 2.0; // rrdr returns anomaly rates 0 - 200
+
+            else if (isgreater(highlight_average, 0.0) || isless(highlight_average, 0.0))
+                pcent = highlight_average;
+        }
 
         register_result(results, st, d, pcent);
     }

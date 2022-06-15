@@ -1106,7 +1106,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                                       points, after, before, group, 0, options,
                                       NULL, &latest_timestamp,
                                       NULL, NULL,
-                                      &value_is_null, 0);
+                                      &value_is_null, NULL, 0);
 
         // if the value cannot be calculated, show empty badge
         if (ret != HTTP_RESP_OK) {

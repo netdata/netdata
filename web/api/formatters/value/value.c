@@ -3,7 +3,7 @@
 #include "value.h"
 
 
-inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, RRDDIM *temp_rd) {
+inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, uint8_t *anomaly_rate, RRDDIM *temp_rd) {
     if (r->st_needs_lock)
         rrdset_check_rdlock(r->st);
 
@@ -12,11 +12,14 @@ inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *
 
     calculated_number *cn = &r->v[ i * r->d ];
     RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
+    uint8_t *ar = &r->ar[ i * r->d ];
 
     calculated_number sum = 0, min = 0, max = 0, v;
     int all_null = 1, init = 1;
 
     calculated_number total = 1;
+    size_t total_anomaly_rate = 0;
+
     int set_min_max = 0;
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
@@ -74,6 +77,13 @@ inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *
 
         if(n < min) min = n;
         if(n > max) max = n;
+
+        total_anomaly_rate += ar[c];
+    }
+
+    if(anomaly_rate) {
+        if(!r->d) *anomaly_rate = 0;
+        else *anomaly_rate = total_anomaly_rate / r->d;
     }
 
     if(unlikely(all_null)) {

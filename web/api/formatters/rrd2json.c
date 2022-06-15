@@ -165,6 +165,7 @@ int rrdset2value_api_v1(
         , size_t *db_points_read
         , size_t *result_points_generated
         , int *value_is_null
+        , uint8_t *anomaly_rate
         , int timeout
 ) {
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -205,7 +206,7 @@ int rrdset2value_api_v1(
     if(db_before) *db_before = r->before;
 
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
-    *n = rrdr2value(r, i, options, value_is_null, NULL);
+    *n = rrdr2value(r, i, options, value_is_null, anomaly_rate, NULL);
     ret = HTTP_RESP_OK;
 
 cleanup:
