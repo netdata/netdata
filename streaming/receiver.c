@@ -217,9 +217,19 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
             // we need to receive data with LF to parse compression header
             size_t ofs = 0;
             int res = 0;
+            errno = 0;
             while (ofs < size) {
                 do {
                     res = SSL_read(r->ssl.conn, buffer + ofs, 1);
+                    // When either SSL_ERROR_SYSCALL (OpenSSL < 3.0) or SSL_ERROR_SSL(OpenSSL > 3.0) happens,
+                    // the connection was lost https://www.openssl.org/docs/man3.0/man3/SSL_get_error.html,
+                    // without the test we will have an infinite loop https://github.com/netdata/netdata/issues/13092
+                    int local_ssl_err = SSL_get_error(r->ssl.conn, res);
+                    if (local_ssl_err == SSL_ERROR_SYSCALL || local_ssl_err == SSL_ERROR_SSL) {
+                        error("The SSL connection has error SSL_ERROR_SYSCALL(%d) and system is registering errno = %d",
+                              local_ssl_err, errno);
+                        return 1;
+                    }
                 } while (res == 0);
 
                 if (res < 0)
