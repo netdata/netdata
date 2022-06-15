@@ -21,12 +21,13 @@ If you want to use a Python version of a collector, you need to explicitly [disa
 version](/docs/collect/enable-configure.md), and enable the Python version. Netdata then skips the Go version and
 attempts to load the Python version and its accompanying configuration file.
 
-If you don't see the app/service you'd like to monitor in this list, check out our [GitHub
-issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous discussions about that
-collector—we may be looking for contributions from users such as yourself! If you don't see the collector there, make a
-[feature request](https://community.netdata.cloud/c/feature-requests/7/none) on our community forums.
+If you don't see the app/service you'd like to monitor in this list:
+- Check out our [GitHub issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous discussions about that
+collector—we may be looking for assistance from users such as yourself!
+- If you don't see the collector there, you can make a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
+- If you have basic software development skills, you can add your own plugin in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector) or [Python](https://learn.netdata.cloud/guides/python-collector)
 
-- [Supported collectors list](#supported-collectors-list)
+Supported Collectors List:
   - [Service and application collectors](#service-and-application-collectors)
     - [Generic](#generic)
     - [APM (application performance monitoring)](#apm-application-performance-monitoring)
