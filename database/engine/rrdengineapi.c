@@ -4,6 +4,7 @@
 /* Default global database instance */
 struct rrdengine_instance multidb_ctx;
 
+int db_engine_use_malloc = 0;
 int default_rrdeng_page_cache_mb = 32;
 int default_rrdeng_disk_quota_mb = 256;
 int default_multidb_disk_quota_mb = 256;
