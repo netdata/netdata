@@ -10,6 +10,8 @@ struct mem_collect_handle {
     long entries;
 };
 struct mem_query_handle {
+    time_t dt;
+    time_t slot_timestamp;
     long slot;
     long last_slot;
     uint8_t finished;

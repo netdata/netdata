@@ -27,7 +27,9 @@ void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t st
     handle->end_time = end_time;
     struct mem_query_handle* h = calloc(1, sizeof(struct mem_query_handle));
     h->slot = rrdset_time2slot(rd->rrdset, start_time);
+    h->slot_timestamp = rrdset_slot2time(rd->rrdset, h->slot);
     h->last_slot = rrdset_time2slot(rd->rrdset, end_time);
+    h->dt = rd->update_every;
     h->finished = 0;
     handle->handle = (STORAGE_QUERY_HANDLE *)h;
 }
@@ -38,13 +40,18 @@ storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time
     long entries = rd->rrdset->entries;
     long slot = h->slot;
 
-    (void)current_time;
+    if(unlikely(h->finished || h->slot_timestamp > *current_time))
+        return SN_EMPTY_SLOT;
+
     if (unlikely(h->slot == h->last_slot))
         h->finished = 1;
+
     storage_number n = rd->values[slot++];
 
     if(unlikely(slot >= entries)) slot = 0;
+
     h->slot = slot;
+    h->slot_timestamp += h->dt;
 
     return n;
 }

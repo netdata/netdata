@@ -628,37 +628,27 @@ static inline void do_dimension_fixedstep(
         }
 #endif
 
-        db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
+        // load the metric value
+        db_now = now; // this is needed before calling next_metric()
+        storage_number n = next_metric(&handle, &db_now);
+        db_points_read++;
 
-        storage_number n;
+        // make sure we will not go beyond "before_wanted"
+        // but we have to loop up to there to make sure
+        // we send all the points required
+        if(unlikely(db_now > before_wanted))
+            db_now = before_wanted;
+
+        // and unpack it
         calculated_number value;
-
-        if (unlikely(rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && now <= first_time_t)) {
-            n = SN_EMPTY_SLOT;
-            value = NAN;
-        }
-        else {
-            // load the metric value
-            n = next_metric(&handle, &db_now);
-            db_points_read++;
-
-            // and unpack it
-            if(likely(does_storage_number_exist(n))) {
-                if (options & RRDR_OPTION_ANOMALY_BIT)
-                    value = (n & SN_ANOMALY_BIT) ? 0.0 : 100.0;
-                else
-                    value = unpack_storage_number(n);
-            }
+        if(likely(does_storage_number_exist(n))) {
+            if (options & RRDR_OPTION_ANOMALY_BIT)
+                value = (n & SN_ANOMALY_BIT) ? 0.0 : 100.0;
             else
-                value = NAN;
+                value = unpack_storage_number(n);
         }
-
-        if(unlikely(db_now > before_wanted)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-            r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
-#endif
-            break;
-        }
+        else
+            value = NAN;
 
         // this loop exists only to fill nulls
         // so, if there is a value already, we use it for the first iteration
