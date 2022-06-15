@@ -586,6 +586,8 @@ static inline void do_dimension_fixedstep(
             values_in_group_non_zero = 0,
             rrdr_line = -1;
 
+    size_t anomaly_rate = 0;
+
     RRDR_VALUE_FLAGS group_value_flags = RRDR_VALUE_NOTHING;
 
     struct rrddim_query_handle handle;
@@ -641,14 +643,18 @@ static inline void do_dimension_fixedstep(
 
         // and unpack it
         calculated_number value;
+        size_t anomaly;
         if(likely(does_storage_number_exist(n))) {
-            if (options & RRDR_OPTION_ANOMALY_BIT)
-                value = (n & SN_ANOMALY_BIT) ? 0.0 : 100.0;
-            else
-                value = unpack_storage_number(n);
+            anomaly = (n & SN_ANOMALY_BIT) ? 0 : 100;
+            value = unpack_storage_number(n);
+
+            if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
+                value = (calculated_number)anomaly;
         }
-        else
+        else {
             value = NAN;
+            anomaly = 0;
+        }
 
         // this loop exists only to fill nulls
         // so, if there is a value already, we use it for the first iteration
@@ -679,6 +685,7 @@ static inline void do_dimension_fixedstep(
 
             // add this value for grouping
             values_in_group++;
+            anomaly_rate += anomaly;
 
             if(unlikely(values_in_group == group_size)) {
                 rrdr_line = rrdr_line_init(r, now, rrdr_line);
@@ -701,6 +708,12 @@ static inline void do_dimension_fixedstep(
                 calculated_number group_value = grouping_flush(r, rrdr_value_options_ptr);
                 r->v[rrdr_o_v_index] = group_value;
 
+                // we only store uint8_t anomaly rates,
+                // so let's get double precision by storing
+                // anomaly rates in the range 0 - 200
+                anomaly_rate = (anomaly_rate << 1) / values_in_group;
+                r->ar[rrdr_o_v_index] = (uint8_t)anomaly_rate;
+
                 if(likely(points_added || dim_id_in_rrdr)) {
                     // find the min/max across all dimensions
 
@@ -718,6 +731,7 @@ static inline void do_dimension_fixedstep(
                 values_in_group = 0;
                 group_value_flags = RRDR_VALUE_NOTHING;
                 values_in_group_non_zero = 0;
+                anomaly_rate = 0;
             }
         }
         now = db_now;

@@ -65,6 +65,7 @@ typedef struct rrdresult {
     time_t *t;                // array of n timestamps
     calculated_number *v;     // array n x d values
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
+    uint8_t *ar;              // array n x d of anomaly rates
 
     long group;               // how many collected values were grouped for each row
     int update_every;         // what is the suggested update frequency in seconds
