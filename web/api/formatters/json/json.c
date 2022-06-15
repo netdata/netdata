@@ -255,7 +255,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_sprintf(wb, "%s%s%s: ", kq, rd->name, kq);
 
-            if(co[c] & RRDR_VALUE_EMPTY) {
+            if(co[c] & RRDR_VALUE_EMPTY && !(options & RRDR_OPTION_INTERNAL_AR)) {
                 if(unlikely(options & RRDR_OPTION_NULL2ZERO))
                     buffer_fast_strcat(wb, "0", 1);
                 else
