@@ -1206,7 +1206,7 @@
                 "ks2",
                 "volume"
               ],
-              "default": "volume"
+              "default": "ks2"
             }
           },
           {
