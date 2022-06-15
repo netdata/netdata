@@ -1067,9 +1067,9 @@ int do_system_ram(int update_every, usec_t dt) {
                     "MiB",
                     "freebsd.plugin",
                     "system.ram",
-                    NETDATA_CHART_PRIO_SYSTEM_RAM,
+                    NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE,
                     update_every,
-                    RRDSET_TYPE_STACKED
+                    RRDSET_TYPE_AREA
             );
 
             rd_avail   = rrddim_add(st_mem_available, "MemAvailable", "avail", system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
