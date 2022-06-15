@@ -4,6 +4,14 @@ description: "Replicate and mirror Netdata's metrics through real-time streaming
 custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README.md
 ---
 
+> **Warning**
+> 
+> This page is depracated, many infromations is deprecated. To explore streaming capabilities try the following guides:
+> 
+>    - [How streaming works](https://learn.netdata.cloud/docs/metrics-storage-management/how-streaming-works)
+>    - [Enable streaming](https://learn.netdata.cloud/docs/metrics-storage-management/enable-streaming)
+>    - [Streaming reference](https://learn.netdata.cloud/docs/metrics-storage-management/reference-streaming)
+> 
 
 Each Netdata node is able to replicate/mirror its database to another Netdata node, by streaming the collected
 metrics in real-time. This is quite different to [data archiving to third party time-series
