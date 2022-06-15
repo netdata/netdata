@@ -377,7 +377,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     ONEWAYALLOC *owa = onewayalloc_create(0);
     high_rrdr = rrd2rrdr(owa, st, points,
                          after, before, group,
-                         group_time, options, NULL, context_param_list, timeout);
+                         group_time, options, NULL, context_param_list, NULL,
+                         timeout);
     if(!high_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
         goto cleanup;
@@ -402,7 +403,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_queries++;
     base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
                     baseline_after, baseline_before, group,
-                    group_time, options, NULL, context_param_list,
+                    group_time, options, NULL, context_param_list, NULL,
                     (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)));
     if(!base_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
@@ -521,7 +522,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
                                   after, before,
-                                  group, group_time, options,
+                                  group, NULL, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
                                   &value_is_null, &high_anomaly_rate, 0);
@@ -538,7 +539,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
                                   baseline_after, baseline_before,
-                                  group, group_time, options,
+                                  group, NULL, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
                                   &value_is_null, &base_anomaly_rate, 0);

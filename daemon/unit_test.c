@@ -1733,7 +1733,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
     long points = (time_end - time_start) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, st[i], points, time_start + update_every, time_end, RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL, 0);
+        RRDR *r = rrd2rrdr(owa, st[i], points, time_start + update_every, time_end, RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL, NULL, 0);
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", st[i]->name);
             return ++errors;
@@ -1854,7 +1854,7 @@ int test_dbengine(void)
     long point_offset = (time_start[current_region] - time_start[0]) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, st[i], points, time_start[0] + update_every, time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL, 0);
+        RRDR *r = rrd2rrdr(owa, st[i], points, time_start[0] + update_every, time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL, NULL, 0);
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", st[i]->name);
             ++errors;

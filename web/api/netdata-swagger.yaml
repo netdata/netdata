@@ -209,6 +209,14 @@ paths:
               - sum
               - incremental-sum
             default: average
+        - name: group_options
+          in: query
+          description: When the group function supports additional parameters, this field
+            can be used to pass them to it.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
         - name: gtime
           in: query
           description: The grouping number of seconds. This is used in conjunction with
@@ -995,7 +1003,7 @@ paths:
             enum:
               - ks2
               - volume
-            default: volume
+            default: ks2
         - name: timeout
           in: query
           description: Cancel the query if to takes more that this amount of milliseconds.

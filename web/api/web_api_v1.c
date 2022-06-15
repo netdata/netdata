@@ -435,6 +435,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *context = NULL;
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
+    char *group_options = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
     int show_dimensions = 0;
@@ -469,6 +470,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "timeout")) timeout_str = value;
         else if(!strcmp(name, "gtime")) group_time_str = value;
+        else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
         }
@@ -676,7 +678,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         .wb = w->response.data};
 
     ret = rrdset2anything_api_v1(owa, st, &query_params, dimensions, format,
-            points, after, before, group, group_time, options, &last_timestamp_in_data);
+            points, after, before, group, group_options, group_time, options, &last_timestamp_in_data);
 
     free_context_param_list(owa, &context_param_list);
 

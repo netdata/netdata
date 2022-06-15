@@ -158,6 +158,7 @@ int rrdset2value_api_v1(
         , long long after
         , long long before
         , int group_method
+        , const char *group_options
         , long group_time
         , uint32_t options
         , time_t *db_after
@@ -172,7 +173,9 @@ int rrdset2value_api_v1(
 
     ONEWAYALLOC *owa = onewayalloc_create(0);
 
-    RRDR *r = rrd2rrdr(owa, st, points, after, before, group_method, group_time, options, dimensions, NULL, timeout);
+    RRDR *r = rrd2rrdr(owa, st, points, after, before,
+                       group_method, group_time, options, dimensions, NULL,
+                       group_options, timeout);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -225,6 +228,7 @@ int rrdset2anything_api_v1(
         , long long after
         , long long before
         , int group_method
+        , const char *group_options
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
@@ -245,6 +249,7 @@ int rrdset2anything_api_v1(
         options,
         dimensions ? buffer_tostring(dimensions) : NULL,
         query_params->context_param_list,
+        group_options,
         query_params->timeout);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");

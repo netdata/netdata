@@ -28,7 +28,7 @@ static struct {
 
     // Allocate all required structures for a query.
     // This is called once for each netdata query.
-    void (*create)(struct rrdresult *r);
+    void (*create)(struct rrdresult *r, const char *options);
 
     // Cleanup collected values, but don't destroy the structures.
     // This is called when the query engine switches dimensions,
@@ -917,6 +917,7 @@ static RRDR *rrd2rrdr_fixedstep(
         , time_t last_entry_t
         , int absolute_period_requested
         , struct context_param *context_param_list
+        , const char *group_options
         , int timeout
 ) {
     UNUSED(last_entry_t);
@@ -1105,7 +1106,7 @@ static RRDR *rrd2rrdr_fixedstep(
     rrdr_set_grouping_function(r, group_method);
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_create(r);
+    r->internal.grouping_create(r, group_options);
 
 
     // -------------------------------------------------------------------------
@@ -1259,6 +1260,7 @@ static RRDR *rrd2rrdr_variablestep(
         , int absolute_period_requested
         , struct rrdeng_region_info *region_info_array
         , struct context_param *context_param_list
+        , const char *group_options
         , int timeout
 ) {
     UNUSED(last_entry_t);
@@ -1454,7 +1456,7 @@ static RRDR *rrd2rrdr_variablestep(
     rrdr_set_grouping_function(r, group_method);
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_create(r);
+    r->internal.grouping_create(r, group_options);
 
 
     // -------------------------------------------------------------------------
@@ -1604,6 +1606,7 @@ RRDR *rrd2rrdr(
         , RRDR_OPTIONS options
         , const char *dimensions
         , struct context_param *context_param_list
+        , const char *group_options
         , int timeout
 )
 {
@@ -1678,7 +1681,7 @@ RRDR *rrd2rrdr(
             }
             return rrd2rrdr_fixedstep(owa, st, points_requested, after_requested, before_requested, group_method,
                                       resampling_time_requested, options, dimensions, rrd_update_every,
-                                      first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
+                                      first_entry_t, last_entry_t, absolute_period_requested, context_param_list, group_options, timeout);
         }
         else {
             if (rrd_update_every != (uint16_t)max_interval) {
@@ -1689,11 +1692,11 @@ RRDR *rrd2rrdr(
             }
             return rrd2rrdr_variablestep(owa, st, points_requested, after_requested, before_requested, group_method,
                                          resampling_time_requested, options, dimensions, rrd_update_every,
-                                         first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list, timeout);
+                                         first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list, group_options, timeout);
         }
     }
 #endif
     return rrd2rrdr_fixedstep(owa, st, points_requested, after_requested, before_requested, group_method,
                               resampling_time_requested, options, dimensions,
-                              rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list, timeout);
+                              rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list, group_options, timeout);
 }

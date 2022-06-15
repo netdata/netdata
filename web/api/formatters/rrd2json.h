@@ -74,6 +74,7 @@ extern int rrdset2anything_api_v1(
         , long long after
         , long long before
         , int group_method
+        , const char *group_options
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
@@ -88,6 +89,7 @@ extern int rrdset2value_api_v1(
         , long long after
         , long long before
         , int group_method
+        , const char *group_options
         , long group_time
         , uint32_t options
         , time_t *db_after

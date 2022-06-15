@@ -48,7 +48,7 @@ static inline void set_alpha(RRDR *r, struct grouping_ses *g) {
     g->alpha_other = 1.0 - g->alpha;
 }
 
-void grouping_create_ses(RRDR *r) {
+void grouping_create_ses(RRDR *r, const char *options __maybe_unused) {
     struct grouping_ses *g = (struct grouping_ses *)callocz(1, sizeof(struct grouping_ses));
     set_alpha(r, g);
     g->level = 0.0;

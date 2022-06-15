@@ -884,7 +884,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     , *fixed_width_lbl_str = NULL
     , *fixed_width_val_str = NULL
     , *text_color_lbl_str = NULL
-    , *text_color_val_str = NULL; 
+    , *text_color_val_str = NULL
+    , *group_options = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t options = 0x00000000;
@@ -913,6 +914,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
+        else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
         }
@@ -1103,7 +1105,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
             ret = rrdset2value_api_v1(st, w->response.data, &n,
                                       (dimensions) ? buffer_tostring(dimensions) : NULL,
-                                      points, after, before, group, 0, options,
+                                      points, after, before, group, group_options, 0, options,
                                       NULL, &latest_timestamp,
                                       NULL, NULL,
                                       &value_is_null, NULL, 0);
