@@ -584,6 +584,7 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
+    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_GLOBAL, "page cache uses malloc", CONFIG_BOOLEAN_NO);
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);

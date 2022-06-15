@@ -16,13 +16,21 @@ static unsigned pages_per_extent = MAX_PAGES_PER_EXTENT;
 #endif
 
 void *dbengine_page_alloc() {
-    void *page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
-    if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
+    void *page = NULL;
+    if (unlikely(db_engine_use_malloc))
+        page = mallocz(RRDENG_BLOCK_SIZE);
+    else {
+        page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
+        if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
+    }
     return page;
 }
 
 void dbengine_page_free(void *page) {
-    munmap(page, RRDENG_BLOCK_SIZE);
+    if (unlikely(db_engine_use_malloc))
+        freez(page);
+    else
+        munmap(page, RRDENG_BLOCK_SIZE);
 }
 
 static void sanity_check(void)
