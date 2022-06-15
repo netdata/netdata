@@ -290,6 +290,31 @@ const char *web_client_api_request_v1_data_group_to_string(RRDR_GROUPING group) 
     return "unknown";
 }
 
+static void rrdr_set_grouping_function(RRDR *r, RRDR_GROUPING group_method) {
+    int i, found = 0;
+    for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
+        if(api_v1_data_groups[i].value == group_method) {
+            r->internal.grouping_create= api_v1_data_groups[i].create;
+            r->internal.grouping_reset = api_v1_data_groups[i].reset;
+            r->internal.grouping_free  = api_v1_data_groups[i].free;
+            r->internal.grouping_add   = api_v1_data_groups[i].add;
+            r->internal.grouping_flush = api_v1_data_groups[i].flush;
+            found = 1;
+        }
+    }
+    if(!found) {
+        errno = 0;
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("INTERNAL ERROR: grouping method %u not found. Using 'average'", (unsigned int)group_method);
+#endif
+        r->internal.grouping_create= grouping_create_average;
+        r->internal.grouping_reset = grouping_reset_average;
+        r->internal.grouping_free  = grouping_free_average;
+        r->internal.grouping_add   = grouping_add_average;
+        r->internal.grouping_flush = grouping_flush_average;
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims,
@@ -1073,31 +1098,7 @@ static RRDR *rrd2rrdr_fixedstep(
 
     // -------------------------------------------------------------------------
     // assign the processor functions
-
-    {
-        int i, found = 0;
-        for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
-            if(api_v1_data_groups[i].value == group_method) {
-                r->internal.grouping_create= api_v1_data_groups[i].create;
-                r->internal.grouping_reset = api_v1_data_groups[i].reset;
-                r->internal.grouping_free  = api_v1_data_groups[i].free;
-                r->internal.grouping_add   = api_v1_data_groups[i].add;
-                r->internal.grouping_flush = api_v1_data_groups[i].flush;
-                found = 1;
-            }
-        }
-        if(!found) {
-            errno = 0;
-            #ifdef NETDATA_INTERNAL_CHECKS
-            error("INTERNAL ERROR: grouping method %u not found for chart '%s'. Using 'average'", (unsigned int)group_method, r->st->name);
-            #endif
-            r->internal.grouping_create= grouping_create_average;
-            r->internal.grouping_reset = grouping_reset_average;
-            r->internal.grouping_free  = grouping_free_average;
-            r->internal.grouping_add   = grouping_add_average;
-            r->internal.grouping_flush = grouping_flush_average;
-        }
-    }
+    rrdr_set_grouping_function(r, group_method);
 
     // allocate any memory required by the grouping method
     r->internal.grouping_create(r);
@@ -1446,31 +1447,7 @@ static RRDR *rrd2rrdr_variablestep(
 
     // -------------------------------------------------------------------------
     // assign the processor functions
-
-    {
-        int i, found = 0;
-        for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
-            if(api_v1_data_groups[i].value == group_method) {
-                r->internal.grouping_create= api_v1_data_groups[i].create;
-                r->internal.grouping_reset = api_v1_data_groups[i].reset;
-                r->internal.grouping_free  = api_v1_data_groups[i].free;
-                r->internal.grouping_add   = api_v1_data_groups[i].add;
-                r->internal.grouping_flush = api_v1_data_groups[i].flush;
-                found = 1;
-            }
-        }
-        if(!found) {
-            errno = 0;
-            #ifdef NETDATA_INTERNAL_CHECKS
-            error("INTERNAL ERROR: grouping method %u not found for chart '%s'. Using 'average'", (unsigned int)group_method, r->st->name);
-            #endif
-            r->internal.grouping_create= grouping_create_average;
-            r->internal.grouping_reset = grouping_reset_average;
-            r->internal.grouping_free  = grouping_free_average;
-            r->internal.grouping_add   = grouping_add_average;
-            r->internal.grouping_flush = grouping_flush_average;
-        }
-    }
+    rrdr_set_grouping_function(r, group_method);
 
     // allocate any memory required by the grouping method
     r->internal.grouping_create(r);
