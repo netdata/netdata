@@ -727,6 +727,8 @@ set(API_PLUGIN_FILES
         web/api/queries/query.h
         web/api/queries/average/average.c
         web/api/queries/average/average.h
+        web/api/queries/countif/countif.c
+        web/api/queries/countif/countif.h
         web/api/queries/incremental_sum/incremental_sum.c
         web/api/queries/incremental_sum/incremental_sum.h
         web/api/queries/max/max.c

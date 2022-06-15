@@ -15,6 +15,7 @@ typedef enum rrdr_grouping {
     RRDR_GROUPING_CV,
     RRDR_GROUPING_SES,
     RRDR_GROUPING_DES,
+    RRDR_GROUPING_COUNTIF,
 } RRDR_GROUPING;
 
 extern const char *group_method2string(RRDR_GROUPING group);

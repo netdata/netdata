@@ -9,6 +9,7 @@ int metric_correlations_version = 1;
 METRIC_CORRELATIONS_METHOD default_metric_correlations_method = METRIC_CORRELATIONS_KS2;
 
 typedef struct mc_stats {
+    calculated_number max_base_high_ratio;
     size_t db_points;
     size_t result_points;
     size_t db_queries;
@@ -46,7 +47,15 @@ const char *mc_method_to_string(METRIC_CORRELATIONS_METHOD method) {
 // ----------------------------------------------------------------------------
 // The results per dimension are aggregated into a dictionary
 
+typedef enum {
+    RESULT_IS_BASE_HIGH_RATIO     = (1 << 0),
+    RESULT_IS_PERCENTAGE_OF_TIME  = (1 << 1),
+    RESULT_IS_ANOMALY_RATE        = (1 << 2),
+    RESULT_IS_HIGHLIGHTED_AVERAGE = (1 << 3),
+} RESULT_FLAGS;
+
 struct register_result {
+    RESULT_FLAGS flags;
     RRDSET *st;
     const char *chart_id;
     const char *context;
@@ -86,15 +95,23 @@ static void register_result_destroy(DICTIONARY *results) {
     dictionary_destroy(results);
 }
 
-static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, calculated_number value) {
+static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, calculated_number value, RESULT_FLAGS flags, MC_STATS *stats) {
     if(!calculated_number_isnumber(value)) return;
 
+    // make it positive
+    calculated_number v = calculated_number_fabs(value);
+
+    // keep track of the max of the baseline / highlight ratio
+    if(flags & RESULT_IS_BASE_HIGH_RATIO && v > stats->max_base_high_ratio)
+        stats->max_base_high_ratio = v;
+
     struct register_result t = {
+        .flags = flags,
         .st = st,
         .chart_id = st->id,
         .context = st->context,
         .dim_name = d->name,
-        .value = value
+        .value = v
     };
 
     char buf[5000 + 1];
@@ -478,7 +495,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
 
             // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
             // so we flip the result of kstwo()
-            register_result(results, base_rrdr->st, d, 1.0 - prob);
+            register_result(results, base_rrdr->st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats);
         }
     }
 
@@ -551,19 +568,48 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
             baseline_average = 0.0;
         }
 
+        RESULT_FLAGS flags = RESULT_IS_BASE_HIGH_RATIO;
         calculated_number pcent = NAN;
         if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0))
             pcent = (highlight_average - baseline_average) / baseline_average;
 
         else {
-            if(high_anomaly_rate)
-                pcent = (calculated_number)high_anomaly_rate / 2.0; // rrdr returns anomaly rates 0 - 200
 
-            else if (isgreater(highlight_average, 0.0) || isless(highlight_average, 0.0))
-                pcent = highlight_average;
+            // since the baseline window was zero all the time
+            // let's find the percentage of time the highlighted window was not zero
+
+            stats->db_queries++;
+            calculated_number highlight_countif = NAN;
+            value_is_null = 1;
+
+            ret = rrdset2value_api_v1(st, NULL, &highlight_countif, d->id, 1,
+                                      after, before,
+                                      RRDR_GROUPING_COUNTIF, "!=0.0", group_time, options,
+                                      NULL, NULL,
+                                      &stats->db_points, &stats->result_points,
+                                      &value_is_null, NULL, 0);
+
+            if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_countif)) {
+
+                // it didn't work, do we have an anomaly rate?
+                if(high_anomaly_rate) {
+                    pcent = (calculated_number)high_anomaly_rate / 2.0; // rrdr returns anomaly rates 0 - 200
+                    flags = RESULT_IS_ANOMALY_RATE;
+                }
+                else {
+                    // still no luck, let's use just the highlighted_average
+                    pcent = highlight_average;
+                    flags = RESULT_IS_HIGHLIGHTED_AVERAGE;
+                }
+
+            }
+            else {
+                pcent = highlight_countif;
+                flags = RESULT_IS_PERCENTAGE_OF_TIME;
+            }
         }
 
-        register_result(results, st, d, pcent);
+        register_result(results, st, d, pcent, flags, stats);
     }
 
     return correlated_dimensions;
@@ -598,18 +644,23 @@ static inline int binary_search_bigger_than_calculated_number(const calculated_n
 // ----------------------------------------------------------------------------
 // spread the results evenly according to their value
 
-static size_t spread_results_evenly(DICTIONARY *results) {
+static size_t spread_results_evenly(DICTIONARY *results, MC_STATS *stats) {
     struct register_result *t;
 
     // count the dimensions
     size_t dimensions = dictionary_stats_entries(results);
     if(!dimensions) return 0;
 
+    if(stats->max_base_high_ratio == 0.0)
+        stats->max_base_high_ratio = 1.0;
+
     // create an array of the right size and copy all the values in it
     calculated_number slots[dimensions];
     dimensions = 0;
     dfe_start_read(results, t) {
-        t->value = calculated_number_fabs(t->value);
+        if(t->flags & (RESULT_IS_PERCENTAGE_OF_TIME|RESULT_IS_ANOMALY_RATE))
+            t->value = t->value * stats->max_base_high_ratio;
+
         slots[dimensions++] = t->value;
     }
     dfe_done(t);
@@ -798,7 +849,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
     dfe_done(ptr);
 
     if(!(options & RRDR_OPTION_RETURN_RAW))
-        spread_results_evenly(results);
+        spread_results_evenly(results, &stats);
 
     usec_t ended_usec = now_realtime_usec();
 

@@ -6,6 +6,7 @@
 #include "database/ram/rrddim_mem.h"
 
 #include "average/average.h"
+#include "countif/countif.h"
 #include "incremental_sum/incremental_sum.h"
 #include "max/max.h"
 #include "median/median.h"
@@ -231,6 +232,17 @@ static struct {
                 .free  = grouping_free_des,
                 .add   = grouping_add_des,
                 .flush = grouping_flush_des
+        },
+
+        {.name = "countif",
+                .hash  = 0,
+                .value = RRDR_GROUPING_COUNTIF,
+                .init = NULL,
+                .create= grouping_create_countif,
+                .reset = grouping_reset_countif,
+                .free  = grouping_free_countif,
+                .add   = grouping_add_countif,
+                .flush = grouping_flush_countif
         },
 
         // terminator

@@ -1785,6 +1785,7 @@ AC_CONFIG_FILES([
     web/api/formatters/value/Makefile
     web/api/queries/Makefile
     web/api/queries/average/Makefile
+    web/api/queries/countif/Makefile
     web/api/queries/des/Makefile
     web/api/queries/incremental_sum/Makefile
     web/api/queries/max/Makefile
