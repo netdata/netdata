@@ -26,7 +26,6 @@ issues](https://github.com/netdata/netdata/issues). Use the search bar to look f
 collector—we may be looking for contributions from users such as yourself! If you don't see the collector there, make a
 [feature request](https://community.netdata.cloud/c/feature-requests/7/none) on our community forums.
 
-- [Supported collectors list](#supported-collectors-list)
   - [Service and application collectors](#service-and-application-collectors)
     - [Generic](#generic)
     - [APM (application performance monitoring)](#apm-application-performance-monitoring)
