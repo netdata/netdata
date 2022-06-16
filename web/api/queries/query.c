@@ -890,6 +890,8 @@ static RRDR *rrd2rrdr_fixedstep(
         , struct context_param *context_param_list
         , int timeout
 ) {
+    UNUSED(last_entry_t);
+
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
@@ -1017,22 +1019,8 @@ static RRDR *rrd2rrdr_fixedstep(
     if(after_wanted < first_entry_t)
         error("INTERNAL CHECK: after_wanted %u is too small, minimum %u", (uint32_t)after_wanted, (uint32_t)first_entry_t);
 
-    if(after_wanted > last_entry_t)
-        error("INTERNAL CHECK: after_wanted %u is too big, maximum %u", (uint32_t)after_wanted, (uint32_t)last_entry_t);
-
     if(before_wanted < first_entry_t)
         error("INTERNAL CHECK: before_wanted %u is too small, minimum %u", (uint32_t)before_wanted, (uint32_t)first_entry_t);
-
-    if(before_wanted > last_entry_t)
-        error("INTERNAL CHECK: before_wanted %u is too big, maximum %u", (uint32_t)before_wanted, (uint32_t)last_entry_t);
-
-/*
-    if(before_slot >= (size_t)st->entries)
-        error("INTERNAL CHECK: before_slot is invalid %zu, expected 0 to %ld", before_slot, st->entries - 1);
-
-    if(after_slot >= (size_t)st->entries)
-        error("INTERNAL CHECK: after_slot is invalid %zu, expected 0 to %ld", after_slot, st->entries - 1);
-*/
 
     if(points_wanted > (before_wanted - after_wanted) / group / update_every + 1)
         error("INTERNAL CHECK: points_wanted %ld is more than points %ld", points_wanted, (before_wanted - after_wanted) / group / update_every + 1);
@@ -1268,6 +1256,7 @@ static RRDR *rrd2rrdr_variablestep(
         , struct context_param *context_param_list
         , int timeout
 ) {
+    UNUSED(last_entry_t);
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
     // the duration of the chart
@@ -1350,13 +1339,7 @@ static RRDR *rrd2rrdr_variablestep(
 
     // we align the request on requested_before
     time_t before_wanted = before_requested;
-    if(likely(before_wanted > last_entry_t)) {
-        #ifdef NETDATA_INTERNAL_CHECKS
-        error("INTERNAL ERROR: rrd2rrdr() on %s, before_wanted is after db max", st->name);
-        #endif
 
-        before_wanted = last_entry_t - (last_entry_t % ( ((aligned)?group:1) * update_every ));
-    }
     //size_t before_slot = rrdset_time2slot(st, before_wanted);
 
     // we need to estimate the number of points, for having
@@ -1405,9 +1388,6 @@ static RRDR *rrd2rrdr_variablestep(
 
     if(after_wanted < first_entry_t)
         error("INTERNAL CHECK: after_wanted %u is too small, minimum %u", (uint32_t)after_wanted, (uint32_t)first_entry_t);
-
-    if(after_wanted > last_entry_t)
-        error("INTERNAL CHECK: after_wanted %u is too big, maximum %u", (uint32_t)after_wanted, (uint32_t)last_entry_t);
 
     if(before_wanted < first_entry_t)
         error("INTERNAL CHECK: before_wanted %u is too small, minimum %u", (uint32_t)before_wanted, (uint32_t)first_entry_t);
