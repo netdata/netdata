@@ -1339,13 +1339,12 @@ error_after_loop_init:
  */
 void rrdengine_main(void)
 {
-    int ret;
-    struct rrdengine_instance *ctx;
+    STORAGE_ENGINE_INSTANCE* ctx;
 
     sanity_check();
-    ret = rrdeng_init(NULL, &ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
-    if (ret) {
-        exit(ret);
+    ctx = rrdeng_init(storage_engine_get(RRD_MEMORY_MODE_DBENGINE), NULL);
+    if (!ctx) {
+        exit(1);
     }
     rrdeng_exit(ctx);
     fprintf(stderr, "Hello world!");
