@@ -1734,7 +1734,12 @@ netdataDashboard.context = {
     },
 
     'mem.available': {
-        info: 'Available Memory is estimated by the kernel, as the amount of RAM that can be used by userspace processes, without causing swapping.'
+        info: function (os) {
+            if (os === "freebsd")
+                return 'The amount of memory that can be used by user-space processes without causing swapping. Calculated as the sum of free, cached, and inactive memory.';
+            else
+                return 'Available Memory is estimated by the kernel, as the amount of RAM that can be used by userspace processes, without causing swapping.';
+        }
     },
 
     'mem.writeback': {
