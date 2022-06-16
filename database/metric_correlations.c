@@ -50,8 +50,6 @@ const char *mc_method_to_string(METRIC_CORRELATIONS_METHOD method) {
 typedef enum {
     RESULT_IS_BASE_HIGH_RATIO     = (1 << 0),
     RESULT_IS_PERCENTAGE_OF_TIME  = (1 << 1),
-    RESULT_IS_ANOMALY_RATE        = (1 << 2),
-    RESULT_IS_HIGHLIGHTED_AVERAGE = (1 << 3),
 } RESULT_FLAGS;
 
 struct register_result {
@@ -100,6 +98,9 @@ static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, calculat
 
     // make it positive
     calculated_number v = calculated_number_fabs(value);
+
+    // no need to store zero scored values
+    if(v == 0.0) return;
 
     // keep track of the max of the baseline / highlight ratio
     if(flags & RESULT_IS_BASE_HIGH_RATIO && v > stats->max_base_high_ratio)
@@ -536,23 +537,6 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         // dimensions, and we query a single dimension at a time.
 
         stats->db_queries++;
-        calculated_number highlight_average = NAN;
-        uint8_t high_anomaly_rate = 0;
-        value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
-                                  after, before,
-                                  group, group_options, group_time, options,
-                                  NULL, NULL,
-                                  &stats->db_points, &stats->result_points,
-                                  &value_is_null, &high_anomaly_rate, 0);
-
-        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_average)) {
-            // error("Metric correlations: cannot query highlight duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(highlight_average))?"result is NAN":"");
-            // this means no data for the highlighted duration - so skip it
-            continue;
-        }
-
-        stats->db_queries++;
         calculated_number baseline_average = NAN;
         uint8_t base_anomaly_rate = 0;
         value_is_null = 1;
@@ -564,55 +548,65 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                   &value_is_null, &base_anomaly_rate, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(baseline_average)) {
-            // error("Metric correlations: cannot query baseline duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(baseline_average))?"result is NAN":"");
-            // continue;
-            // this means no data for the baseline window, but we have data for the highlighted one - assume zero
+            // this means no data for the baseline window, but we may have data for the highlighted one - assume zero
             baseline_average = 0.0;
         }
 
-        RESULT_FLAGS flags = RESULT_IS_BASE_HIGH_RATIO;
+        stats->db_queries++;
+        calculated_number highlight_average = NAN;
+        uint8_t high_anomaly_rate = 0;
+        value_is_null = 1;
+        ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
+                                  after, before,
+                                  group, group_options, group_time, options,
+                                  NULL, NULL,
+                                  &stats->db_points, &stats->result_points,
+                                  &value_is_null, &high_anomaly_rate, 0);
+
+        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_average)) {
+            // this means no data for the highlighted duration - so skip it
+            continue;
+        }
+
+        if(baseline_average == highlight_average) {
+            // they are the same - let's move on
+            continue;
+        }
+
+        stats->db_queries++;
+        calculated_number highlight_countif = NAN;
+        value_is_null = 1;
+
+        char highlighted_countif_options[50 + 1];
+        snprintfz(highlighted_countif_options, 50, "%s" CALCULATED_NUMBER_FORMAT, highlight_average < baseline_average ? "<":">", baseline_average);
+
+        ret = rrdset2value_api_v1(st, NULL, &highlight_countif, d->id, 1,
+                                  after, before,
+                                  RRDR_GROUPING_COUNTIF,highlighted_countif_options,
+                                  group_time, options,
+                                  NULL, NULL,
+                                  &stats->db_points, &stats->result_points,
+                                  &value_is_null, NULL, 0);
+
+        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_countif)) {
+            info("MC: highlighted countif query failed, but highlighted average worked - strange...");
+            continue;
+        }
+
+        // this represents the percentage of time
+        // the highlighted window was above/below the baseline window
+        // (above or below depending on their averages)
+        highlight_countif = highlight_countif / 100.0; // countif returns 0 - 100.0
+
+        RESULT_FLAGS flags;
         calculated_number pcent = NAN;
-        if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0))
-            pcent = (highlight_average - baseline_average) / baseline_average;
-
+        if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0)) {
+            flags = RESULT_IS_BASE_HIGH_RATIO;
+            pcent = (highlight_average - baseline_average) / baseline_average * highlight_countif;
+        }
         else {
-
-            // since the baseline window was zero all the time
-            // let's find the percentage of time the highlighted window was not zero
-
-            stats->db_queries++;
-            calculated_number highlight_countif = NAN;
-            value_is_null = 1;
-
-            ret = rrdset2value_api_v1(st, NULL, &highlight_countif, d->id, 1,
-                                      after, before,
-                                      RRDR_GROUPING_COUNTIF, "!=0.0", group_time, options,
-                                      NULL, NULL,
-                                      &stats->db_points, &stats->result_points,
-                                      &value_is_null, NULL, 0);
-
-            if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_countif)) {
-
-                // it didn't work, do we have an anomaly rate?
-                if(high_anomaly_rate) {
-                    // rrdr returns anomaly rates 0 - 200
-                    // but we need 0 - 1
-                    pcent = (calculated_number)high_anomaly_rate / 200.0;
-                    flags = RESULT_IS_ANOMALY_RATE;
-                }
-                else {
-                    // still no luck, let's use just the highlighted_average
-                    pcent = highlight_average;
-                    flags = RESULT_IS_HIGHLIGHTED_AVERAGE;
-                }
-
-            }
-            else {
-                // countif return 0 - 100
-                // but we need 0 - 1
-                pcent = highlight_countif / 100.0;
-                flags = RESULT_IS_PERCENTAGE_OF_TIME;
-            }
+            flags = RESULT_IS_PERCENTAGE_OF_TIME;
+            pcent = highlight_countif;
         }
 
         register_result(results, st, d, pcent, flags, stats);
@@ -664,7 +658,7 @@ static size_t spread_results_evenly(DICTIONARY *results, MC_STATS *stats) {
     calculated_number slots[dimensions];
     dimensions = 0;
     dfe_start_read(results, t) {
-        if(t->flags & (RESULT_IS_PERCENTAGE_OF_TIME|RESULT_IS_ANOMALY_RATE))
+        if(t->flags & (RESULT_IS_PERCENTAGE_OF_TIME))
             t->value = t->value * stats->max_base_high_ratio;
 
         slots[dimensions++] = t->value;
@@ -793,8 +787,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
         while((points << shifts) > MAX_POINTS)
             points = points >> 1;
 
-        if(points < 100) {
-            // error = "cannot comply to at least 100 points";
+        if(points < 15) {
             resp = HTTP_RESP_BAD_REQUEST;
             goto cleanup;
         }
