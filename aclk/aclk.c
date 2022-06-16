@@ -49,11 +49,25 @@ struct aclk_shared_state aclk_shared_state = {
     .mqtt_shutdown_msg_rcvd = 0
 };
 
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+OSSL_DECODER_CTX *aclk_dctx = NULL;
+EVP_PKEY *aclk_private_key = NULL;
+#else
 static RSA *aclk_private_key = NULL;
+#endif
 static int load_private_key()
 {
-    if (aclk_private_key != NULL)
+    if (aclk_private_key != NULL) {
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+        EVP_PKEY_free(aclk_private_key);
+        if (aclk_dctx)
+            OSSL_DECODER_CTX_free(aclk_dctx);
+
+        aclk_dctx = NULL;
+#else
         RSA_free(aclk_private_key);
+#endif
+    }
     aclk_private_key = NULL;
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/cloud.d/private.pem", netdata_configured_varlib_dir);
@@ -72,7 +86,25 @@ static int load_private_key()
         goto biofailed;
     }
 
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+    aclk_dctx = OSSL_DECODER_CTX_new_for_pkey(&aclk_private_key, "PEM", NULL,
+                                              "RSA",
+                                              OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+                                              NULL, NULL);
+
+    if (!aclk_dctx) {
+        error("Claimed agent cannot establish ACLK - no suitable potential decoders found.");
+        goto biofailed;
+    }
+
+    // this is necesseary to avoid RSA key with wrong size
+    if (!OSSL_DECODER_from_bio(aclk_dctx, key_bio)) {
+        error("Claimed agent cannot establish ACLK - Decode failure.");
+        goto biofailed;
+    }
+#else
     aclk_private_key = PEM_read_bio_RSAPrivateKey(key_bio, NULL, NULL, NULL);
+#endif
     BIO_free(key_bio);
     if (aclk_private_key!=NULL)
     {
