@@ -6,12 +6,17 @@
 
 **Merged pull requests:**
 
+- Update docs on what to do if collector not there [\#13152](https://github.com/netdata/netdata/pull/13152) ([cakrit](https://github.com/cakrit))
+- Add an option to use malloc for page cache instead of mmap [\#13142](https://github.com/netdata/netdata/pull/13142) ([stelfrag](https://github.com/stelfrag))
+- fix crashes due to misaligned allocations [\#13137](https://github.com/netdata/netdata/pull/13137) ([ktsaou](https://github.com/ktsaou))
 - fix\(python.d\): urllib3 import collection for py3.10+ [\#13136](https://github.com/netdata/netdata/pull/13136) ([ilyam8](https://github.com/ilyam8))
 - fix\(python.d/mongodb\): set `serverSelectionTimeoutMS` for pymongo4+ [\#13135](https://github.com/netdata/netdata/pull/13135) ([ilyam8](https://github.com/ilyam8))
+- use ks2 as MC default [\#13131](https://github.com/netdata/netdata/pull/13131) ([andrewm4894](https://github.com/andrewm4894))
 - allow label names to have slashes [\#13125](https://github.com/netdata/netdata/pull/13125) ([ktsaou](https://github.com/ktsaou))
 - fixed coveriry 379136 379135 379134 379133 [\#13123](https://github.com/netdata/netdata/pull/13123) ([ktsaou](https://github.com/ktsaou))
 - buffer overflow detected by the compiler [\#13120](https://github.com/netdata/netdata/pull/13120) ([ktsaou](https://github.com/ktsaou))
 - Ci coverage [\#13118](https://github.com/netdata/netdata/pull/13118) ([maneamarius](https://github.com/maneamarius))
+- Add missing control to streaming [\#13112](https://github.com/netdata/netdata/pull/13112) ([thiagoftsm](https://github.com/thiagoftsm))
 - Re-enable updates for systems using static builds. [\#13110](https://github.com/netdata/netdata/pull/13110) ([Ferroin](https://github.com/Ferroin))
 - Add user netdata to secondary group in DEB package [\#13109](https://github.com/netdata/netdata/pull/13109) ([iigorkarpov](https://github.com/iigorkarpov))
 - 73x times faster metrics correlations at the agent [\#13107](https://github.com/netdata/netdata/pull/13107) ([ktsaou](https://github.com/ktsaou))
@@ -21,6 +26,7 @@
 - Statistics on bytes recvd and sent [\#13091](https://github.com/netdata/netdata/pull/13091) ([underhood](https://github.com/underhood))
 - fix virtualization detection on FreeBSD [\#13087](https://github.com/netdata/netdata/pull/13087) ([ilyam8](https://github.com/ilyam8))
 - Labels with dictionary [\#13070](https://github.com/netdata/netdata/pull/13070) ([ktsaou](https://github.com/ktsaou))
+- Use a separate thread for slow mountpoints in the diskspace plugin [\#13067](https://github.com/netdata/netdata/pull/13067) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
@@ -342,9 +348,6 @@
 - Adjust timex.plugin information to be less cryptic [\#12495](https://github.com/netdata/netdata/pull/12495) ([DanTheMediocre](https://github.com/DanTheMediocre))
 - ML-related changes to address issue/discussion comments. [\#12494](https://github.com/netdata/netdata/pull/12494) ([vkalintiris](https://github.com/vkalintiris))
 - fix: open fd 3 before first use in the netdata-updater.sh script [\#12491](https://github.com/netdata/netdata/pull/12491) ([ilyam8](https://github.com/ilyam8))
-- timex: this plugin enables timex plugin for non-linux systems [\#12489](https://github.com/netdata/netdata/pull/12489) ([surajnpn](https://github.com/surajnpn))
-- Bump the debhelper compat level to 10 in our DEB packaging code. [\#12488](https://github.com/netdata/netdata/pull/12488) ([Ferroin](https://github.com/Ferroin))
-- Properly recognize Almalinux as an RHEL clone. [\#12487](https://github.com/netdata/netdata/pull/12487) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
