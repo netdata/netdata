@@ -1133,8 +1133,7 @@ const netOperstateInfo = '<p>The current ' +
     '<b>LowerLayerDown</b> - the interface is down due to state of lower-layer interface(s). ' +
     '<b>Testing</b> - the interface is in testing mode, e.g. cable test. It can’t be used for normal traffic until tests complete. ' +
     '<b>Dormant</b> - the interface is L1 up, but waiting for an external event, e.g. for a protocol to establish. ' +
-    '<b>Up</b> - the interface is ready to pass packets and can be used.</p>' +
-    '<p><b>State map</b>: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up.</p>'
+    '<b>Up</b> - the interface is ready to pass packets and can be used.</p>'
 const netCarrierInfo = '<p>The current physical link state of the interface.</p>' +
     '<p><b>State map</b>: 0 - down, 1 - up.</p>'
 const netSpeedInfo = 'The interface\'s latest or current speed that the network adapter ' +
