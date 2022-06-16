@@ -9,7 +9,7 @@
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
-#define MAX_STAT_USEC 10000
+#define MAX_STAT_USEC 10000LU
 #define SLOW_UPDATE_EVERY 5
 
 static netdata_thread_t *diskspace_slow_thread = NULL;

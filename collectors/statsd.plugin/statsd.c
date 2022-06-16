@@ -593,7 +593,6 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     if(unlikely(m->reset)) {
         if(likely(m->set.dict)) {
             dictionary_destroy(m->set.dict);
-            dictionary_register_insert_callback(m->set.dict, dictionary_metric_set_value_insert_callback, m);
             m->set.dict = NULL;
         }
         statsd_reset_metric(m);
@@ -601,6 +600,7 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
 
     if (unlikely(!m->set.dict)) {
         m->set.dict   = dictionary_create(STATSD_DICTIONARY_OPTIONS);
+        dictionary_register_insert_callback(m->set.dict, dictionary_metric_set_value_insert_callback, m);
         m->set.unique = 0;
     }
 
