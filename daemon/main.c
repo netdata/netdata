@@ -888,6 +888,10 @@ int main(int argc, char **argv) {
                             if(test_dbengine()) return 1;
 #endif
                             if(test_sqlite()) return 1;
+                            if (dictionary_unittest(10000))
+                                return 1;
+                            if (rrdlabels_unittest())
+                                return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
