@@ -458,7 +458,11 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     return result;
 }
 
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+int aclk_get_mqtt_otp(EVP_PKEY *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
+#else
 int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
+#endif
 {
     unsigned char *challenge;
     int challenge_bytes;
