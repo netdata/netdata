@@ -166,7 +166,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
 #define dfe_start_rw(dict, value, mode) \
         do { \
             DICTFE value ## _dfe = {};  \
-            const char *value ## _name; (void)(value ## _name); \
+            const char *value ## _name; (void)(value ## _name); (void)value; \
             for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode)), ( value ## _name ) = value ## _dfe.name; \
                 (value ## _dfe.name) ;\
                 (value) = dictionary_foreach_next(&value ## _dfe), ( value ## _name ) = value ## _dfe.name) \
