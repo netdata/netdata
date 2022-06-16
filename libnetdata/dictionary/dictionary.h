@@ -84,7 +84,7 @@ extern size_t dictionary_destroy(DICTIONARY *dict);
 //
 // Passing NULL as value, the dictionary will callocz() the newly allocated value, otherwise it will copy it.
 // Passing 0 as value_len, the dictionary will set the value to NULL (no allocations for value will be made).
-extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) NEVERNULL;
+extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len);
 
 // Get an item from the dictionary
 // If it returns NULL, the item is not found

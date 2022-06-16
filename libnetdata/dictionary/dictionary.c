@@ -77,11 +77,12 @@ typedef struct name_value {
     struct name_value *next;    // a double linked list to allow fast insertions and deletions
     struct name_value *prev;
 
-    char *name;                 // the name of the dictionary item
-    void *value;                // the value of the dictionary item
-
     size_t name_len;            // the size of the name, including the terminating zero
     size_t value_len;           // the size of the value (assumed binary)
+
+    void *value;                // the value of the dictionary item
+    char *name;                 // the name of the dictionary item
+
 } NAME_VALUE;
 
 /*
@@ -173,7 +174,6 @@ size_t dictionary_stats_deletes(DICTIONARY *dict) {
 size_t dictionary_stats_resets(DICTIONARY *dict) {
     return dict->resets;
 }
-
 size_t dictionary_stats_walkthroughs(DICTIONARY *dict) {
     return dict->walkthroughs;
 }
@@ -515,7 +515,7 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
             }
         }
         else {
-            // the caller want an item without any value
+            // the caller wants an item without any value
             nv->value = NULL;
         }
 
@@ -533,6 +533,8 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
 static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", nv->name);
 
+    DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
+
     if(dict->del_callback)
         dict->del_callback(nv->name, nv->value, dict->del_callback_data);
 
@@ -543,7 +545,6 @@ static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value
     }
     else {
         debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", nv->name);
-        DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
 
         void *oldvalue = nv->value;
         void *newvalue = NULL;
@@ -987,8 +988,8 @@ static size_t dictionary_unittest_set_null(DICTIONARY *dict, char **names, char 
     size_t errors = 0;
     size_t i = 0;
     for(; i < entries ;i++) {
-        char *val = (char *)dictionary_set(dict, names[i], NULL, 0);
-        if(val == NULL) { fprintf(stderr, ">>> %s() returns a non NULL value\n", __FUNCTION__); errors++; }
+        void *val = dictionary_set(dict, names[i], NULL, 0);
+        if(val != NULL) { fprintf(stderr, ">>> %s() returns a non NULL value\n", __FUNCTION__); errors++; }
     }
     if(dictionary_stats_entries(dict) != i) {
         fprintf(stderr, ">>> %s() dictionary items do not match\n", __FUNCTION__);
