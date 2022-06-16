@@ -126,7 +126,7 @@ calculated_number grouping_flush_countif(RRDR *r,  RRDR_VALUE_FLAGS *rrdr_value_
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        value = (calculated_number)g->matched / (calculated_number)g->count;
+        value = (calculated_number)g->matched * 100 / (calculated_number)g->count;
     }
 
     g->matched = 0;

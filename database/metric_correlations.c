@@ -593,7 +593,9 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 
                 // it didn't work, do we have an anomaly rate?
                 if(high_anomaly_rate) {
-                    pcent = (calculated_number)high_anomaly_rate / 2.0; // rrdr returns anomaly rates 0 - 200
+                    // rrdr returns anomaly rates 0 - 200
+                    // but we need 0 - 1
+                    pcent = (calculated_number)high_anomaly_rate / 200.0;
                     flags = RESULT_IS_ANOMALY_RATE;
                 }
                 else {
@@ -604,7 +606,9 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 
             }
             else {
-                pcent = highlight_countif;
+                // countif return 0 - 100
+                // but we need 0 - 1
+                pcent = highlight_countif / 100.0;
                 flags = RESULT_IS_PERCENTAGE_OF_TIME;
             }
         }
