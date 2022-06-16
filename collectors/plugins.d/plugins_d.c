@@ -39,7 +39,7 @@ inline int config_isspace(char c)
 inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
 {
     char *s = str, quote = 0;
-    int i = 0, j, rec = 0;
+    int i = 0, rec = 0;
     char *recover = recover_input;
 
     // skip all white space
@@ -112,9 +112,7 @@ inline int quoted_strings_splitter(char *str, char **words, int max_words, int (
     }
 
     // terminate the words
-    j = i;
-    while (likely(j < max_words))
-        words[j++] = NULL;
+     memset(&words[i], 0, (max_words - i) * sizeof (char *));
 
     return i;
 }
