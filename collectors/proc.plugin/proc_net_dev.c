@@ -17,27 +17,22 @@ enum {
     NETDEV_OPERSTATE_UP
 };
 
-// As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
-struct net_operstates {
-    char *name;
-    int value;
-} operstates[] = {
-    {"unknown", NETDEV_OPERSTATE_UNKNOWN},
-    {"notpresent", NETDEV_OPERSTATE_NOTPRESENT},
-    {"down", NETDEV_OPERSTATE_DOWN},
-    {"lowerlayerdown", NETDEV_OPERSTATE_LOWERLAYERDOWN},
-    {"testing", NETDEV_OPERSTATE_TESTING},
-    {"dormant", NETDEV_OPERSTATE_DORMANT},
-    {"up", NETDEV_OPERSTATE_UP},
-    {NULL, 0},
-};
-
 static inline int get_operstate(char *operstate)
 {
-    for (int i = 0; operstates[i].name != NULL; i++) {
-        if (!strcmp(operstate, operstates[i].name))
-            return operstates[i].value;
-    }
+    // As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
+    if (!strcmp(operstate, "up"))
+        return NETDEV_OPERSTATE_UP;
+    if (!strcmp(operstate, "down"))
+        return NETDEV_OPERSTATE_DOWN;
+    if (!strcmp(operstate, "notpresent"))
+        return NETDEV_OPERSTATE_NOTPRESENT;
+    if (!strcmp(operstate, "lowerlayerdown"))
+        return NETDEV_OPERSTATE_LOWERLAYERDOWN;
+    if (!strcmp(operstate, "testing"))
+        return NETDEV_OPERSTATE_TESTING;
+    if (!strcmp(operstate, "dormant"))
+        return NETDEV_OPERSTATE_DORMANT;
+
     return NETDEV_OPERSTATE_UNKNOWN;
 }
 
