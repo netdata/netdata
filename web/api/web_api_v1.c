@@ -1340,6 +1340,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     METRIC_CORRELATIONS_METHOD method = default_metric_correlations_method;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
+    const char *group_options = NULL;
 
     while (url) {
         char *value = mystrsep(&url, "&");
@@ -1386,7 +1387,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    return metric_correlations(host, wb, method, group, baseline_after, baseline_before, after, before, points, options, timeout);
+    return metric_correlations(host, wb, method, group, group_options, baseline_after, baseline_before, after, before, points, options, timeout);
 }
 
 static struct api_command {

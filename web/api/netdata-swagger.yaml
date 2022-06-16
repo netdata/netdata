@@ -208,11 +208,15 @@ paths:
               - stddev
               - sum
               - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
             default: average
         - name: group_options
           in: query
           description: When the group function supports additional parameters, this field
-            can be used to pass them to it.
+            can be used to pass them to it. Currently only "countif" supports this.
           required: false
           allowEmptyValue: false
           schema:
@@ -959,7 +963,7 @@ paths:
             type: number
             format: integer
             default: -60
-        - name: highlight_after
+        - name: after
           in: query
           description: This parameter can either be an absolute timestamp specifying the
             starting point of highlighted window, or a relative number of
@@ -971,7 +975,7 @@ paths:
             type: number
             format: integer
             default: -60
-        - name: highlight_before
+        - name: before
           in: query
           description: This parameter can either be an absolute timestamp specifying the
             ending point of the highlighted window, or a relative number of
@@ -1039,6 +1043,39 @@ paths:
               - allow_past
               - nonzero
               - unaligned
+        - name: group
+          in: query
+          description: The grouping method. If multiple collected values are to be grouped
+            in order to return fewer points, this parameters defines the method
+            of grouping. methods supported "min", "max", "average", "sum",
+            "incremental-sum". "max" is actually calculated on the absolute
+            value collected (so it works for both positive and negative
+            dimensions to return the most extreme value in either direction).
+          required: true
+          allowEmptyValue: false
+          schema:
+            type: string
+            enum:
+              - min
+              - max
+              - average
+              - median
+              - stddev
+              - sum
+              - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
+            default: average
+        - name: group_options
+          in: query
+          description: When the group function supports additional parameters, this field
+            can be used to pass them to it. Currently only "countif" supports this.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
       responses:
         "200":
           description: JSON object with weights for each chart and dimension.
@@ -1841,6 +1878,57 @@ components:
     metric_correlations:
       type: object
       properties:
+        after:
+          description: the start time of the highlighted window
+          type: integer
+        before:
+          description: the end time of the highlighted window
+          type: integer
+        duration:
+          description: the duration of the highlighted window
+          type: integer
+        points:
+          description: the points of the highlighted window
+          type: integer
+        baseline_after:
+          description: the start time of the baseline window
+          type: integer
+        baseline_before:
+          description: the end time of the baseline window
+          type: integer
+        baseline_duration:
+          description: the duration of the baseline window
+          type: integer
+        baseline_points:
+          description: the points of the baseline window
+          type: integer
+        group:
+          description: the grouping method across time
+          type: string
+        method:
+          description: the correlation method used
+          type: string
+        options:
+          description: a comma separated list of the query options set
+          type: string
+        correlated_dimensions:
+          description: the number of dimensions returned in the result
+        total_dimensions_count:
+          description: the total number of dimensions evaluated
+          type: integer
+        statistics:
+          type: object
+          properties:
+            query_time_ms:
+              type: number
+            db_queries:
+              type: integer
+            db_points_read:
+              type: integer
+            query_result_points:
+              type: integer
+            binary_searches:
+              type: integer
         correlated_charts:
           type: object
           description: An object containing chart objects with their metrics correlations.
@@ -1869,6 +1957,3 @@ components:
                       type: number
                     dimension2-name:
                       type: number
-        total_dimensions_count:
-          description: The number of dimensions correlated
-          type: integer

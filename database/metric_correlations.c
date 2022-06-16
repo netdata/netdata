@@ -378,7 +378,8 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
 static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                           long long baseline_after, long long baseline_before,
                                           long long after, long long before,
-                                          long long points, RRDR_OPTIONS options, RRDR_GROUPING group,
+                                          long long points, RRDR_OPTIONS options,
+                                          RRDR_GROUPING group, const char *group_options,
                                           uint32_t shifts, int timeout, MC_STATS *stats) {
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
@@ -394,7 +395,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     ONEWAYALLOC *owa = onewayalloc_create(0);
     high_rrdr = rrd2rrdr(owa, st, points,
                          after, before, group,
-                         group_time, options, NULL, context_param_list, NULL,
+                         group_time, options, NULL, context_param_list, group_options,
                          timeout);
     if(!high_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
@@ -420,7 +421,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_queries++;
     base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
                     baseline_after, baseline_before, group,
-                    group_time, options, NULL, context_param_list, NULL,
+                    group_time, options, NULL, context_param_list, group_options,
                     (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)));
     if(!base_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
@@ -512,7 +513,8 @@ cleanup:
 static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              long long baseline_after, long long baseline_before,
                                              long long after, long long before,
-                                             RRDR_OPTIONS options, RRDR_GROUPING group, int timeout, MC_STATS *stats) {
+                                             RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
+                                             int timeout, MC_STATS *stats) {
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE;
     long group_time = 0;
 
@@ -539,7 +541,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
                                   after, before,
-                                  group, NULL, group_time, options,
+                                  group, group_options, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
                                   &value_is_null, &high_anomaly_rate, 0);
@@ -556,7 +558,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
                                   baseline_after, baseline_before,
-                                  group, NULL, group_time, options,
+                                  group, group_options, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
                                   &value_is_null, &base_anomaly_rate, 0);
@@ -702,7 +704,8 @@ static size_t spread_results_evenly(DICTIONARY *results, MC_STATS *stats) {
 // ----------------------------------------------------------------------------
 // The main function
 
-int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method, RRDR_GROUPING group,
+int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method,
+                        RRDR_GROUPING group, const char *group_options,
                         long long baseline_after, long long baseline_before,
                         long long after, long long before,
                         long long points, RRDR_OPTIONS options, int timeout) {
@@ -832,7 +835,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
                 correlated_dimensions += rrdset_metric_correlations_volume(st, results,
                                                                 baseline_after, baseline_before,
                                                                 after, before,
-                                                                options, group,
+                                                                options, group, group_options,
                                                                 (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
                                                                 &stats);
                 break;
@@ -842,7 +845,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
                 correlated_dimensions += rrdset_metric_correlations_ks2(st, results,
                                                              baseline_after, baseline_before,
                                                              after, before,
-                                                             points, options, group, shifts,
+                                                             points, options, group, group_options, shifts,
                                                              (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
                                                              &stats);
                 break;

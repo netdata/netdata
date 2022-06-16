@@ -14,7 +14,8 @@ extern int enable_metric_correlations;
 extern int metric_correlations_version;
 extern METRIC_CORRELATIONS_METHOD default_metric_correlations_method;
 
-extern int metric_correlations (RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method, RRDR_GROUPING group,
+extern int metric_correlations (RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method,
+                               RRDR_GROUPING group, const char *group_options,
                                long long baseline_after, long long baseline_before,
                                long long after, long long before,
                                long long points, RRDR_OPTIONS options, int timeout);
