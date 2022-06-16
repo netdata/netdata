@@ -32,7 +32,6 @@ struct net_operstates {
 
 static inline int get_operstate(char *operstate)
 {
-    // As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
     for (int i = 0; operstates[i].name != NULL; i++) {
         if (!strcmp(operstate, operstates[i].name))
             return operstates[i].value;
