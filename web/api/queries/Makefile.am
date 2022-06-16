@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
     average \
+    countif \
     des \
     incremental_sum \
     max \
