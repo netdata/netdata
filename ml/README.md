@@ -8,9 +8,9 @@ keywords: [machine learning, anomaly detection, Netdata ML]
 
 ## Overview
 
-As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0), Netdata comes with some ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box, with minimal configuration required.
+As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0), Netdata comes with some ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box, with zero configuration required (ML was enabled by default in `v1.35.0-29-nightly` in [this PR](https://github.com/netdata/netdata/pull/13158), previously it required a one line config change).
 
-🚧 **Note**: This functionality is still under active development and considered experimental. Changes might cause the feature to break. We dogfood it internally and among early adopters within the Netdata community to build the feature. If you would like to get involved and help us with some feedback, email us at analytics-ml-team@netdata.cloud, comment on the [beta launch post](https://community.netdata.cloud/t/anomaly-advisor-beta-launch/2717) in the Netdata community, or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
+🚧 **Note**: If you would like to get involved and help us with some feedback, email us at analytics-ml-team@netdata.cloud, comment on the [beta launch post](https://community.netdata.cloud/t/anomaly-advisor-beta-launch/2717) in the Netdata community, or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 
 Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of potentially anomalous patterns in recent observations as opposed to just point anomalies like big spikes or drops. ([This infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies.) 
 
@@ -145,9 +145,11 @@ The query returns a list of dimension anomaly rates for all dimensions that were
 
 ## Configuration
 
-To enable anomaly detection:
+If you are running a netdata version after `v1.35.0-29-nightly` then ML will be enabled by default. 
+
+To enable or disable anomaly detection:
 1. Find and open the Netdata configuration file `netdata.conf`.
-2. In the `[ml]` section, set `enabled = yes`.
+2. In the `[ml]` section, set `enabled = yes` to enable or `enabled = no` to disable.
 3. Restart netdata (typically `sudo systemctl restart netdata`).
 
 **Note**: If you would like to learn more about configuring Netdata please see [the configuration guide](https://learn.netdata.cloud/guides/step-by-step/step-04).
@@ -156,7 +158,7 @@ Below is a list of all the available configuration params and their default valu
 
 ```
 [ml]
-	# enabled = no
+	# enabled = yes
 	# maximum num samples to train = 14400
 	# minimum num samples to train = 3600
 	# train every = 3600
