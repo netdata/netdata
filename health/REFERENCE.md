@@ -895,6 +895,48 @@ lookup: mean -10s of user
 
 Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alarms, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
 
+### Example 8 - Anomaly rate based CPU dimensions alarm
+
+Warning if 5 minute rolling anomaly rate for any CPU dimension is above 5%, critical if it goes above 20%:
+
+```yaml
+template: ml_5min_cpu_dims
+      on: system.cpu
+      os: linux
+   hosts: *
+  lookup: average -5m anomaly-bit foreach *
+    calc: $this
+   units: %
+   every: 30s
+    warn: $this > (($status >= $WARNING)  ? (5) : (20))
+    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    info: rolling 5min anomaly rate for each system.cpu dimension
+```
+
+The `lookup` line will calculate the average anomaly rate of each `system.cpu` dimension over the last 5 minues. In this case
+Netdata will create alarms for all dimensions of the chart.
+
+### Example 9 - Anomaly rate based CPU chart alarm
+
+Warning if 5 minute rolling anomaly rate averaged acorss all CPU dimensions is above 5%, critical if it goes above 20%:
+
+```yaml
+template: ml_5min_cpu_chart
+      on: system.cpu
+      os: linux
+   hosts: *
+  lookup: average -5m anomaly-bit of *
+    calc: $this
+   units: %
+   every: 30s
+    warn: $this > (($status >= $WARNING)  ? (5) : (20))
+    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    info: rolling 5min anomaly rate for system.cpu chart
+```
+
+The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minues. In this case
+Netdata will create one alarm for the chart.
+
 ## Troubleshooting
 
 You can compile Netdata with [debugging](/daemon/README.md#debugging) and then set in `netdata.conf`:
