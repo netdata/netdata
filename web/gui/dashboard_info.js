@@ -1123,8 +1123,7 @@ const netDuplexInfo = '<p>The interface\'s latest or current ' +
     '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to.</p>' +
     '<p><b>Unknown</b> - the duplex mode can not be determined. ' +
     '<b>Half duplex</b> - the communication is one direction at a time. ' +
-    '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>' +
-    '<p><b>State map</b>: 0 - unknown, 1 - half, 2 - full.</p>'
+    '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>'
 const netOperstateInfo = '<p>The current ' +
     '<a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface.</p>' +
     '<p><b>Unknown</b> - the state can not be determined. ' +
