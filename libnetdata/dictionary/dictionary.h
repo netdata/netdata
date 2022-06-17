@@ -84,7 +84,7 @@ extern size_t dictionary_destroy(DICTIONARY *dict);
 //
 // Passing NULL as value, the dictionary will callocz() the newly allocated value, otherwise it will copy it.
 // Passing 0 as value_len, the dictionary will set the value to NULL (no allocations for value will be made).
-extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) NEVERNULL;
+extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len);
 
 // Get an item from the dictionary
 // If it returns NULL, the item is not found
@@ -166,12 +166,14 @@ typedef DICTFE_CONST struct dictionary_foreach {
 #define dfe_start_rw(dict, value, mode) \
         do { \
             DICTFE value ## _dfe = {};  \
-            const char *value ## _name; (void)(value ## _name); \
+            const char *value ## _name; (void)(value ## _name); (void)value; \
             for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode)), ( value ## _name ) = value ## _dfe.name; \
-                (value) ;\
-                (value) = dictionary_foreach_next(&value ## _dfe), ( value ## _name ) = value ## _dfe.name)
+                (value ## _dfe.name) ;\
+                (value) = dictionary_foreach_next(&value ## _dfe), ( value ## _name ) = value ## _dfe.name) \
+            {
 
 #define dfe_done(value) \
+            }           \
             dictionary_foreach_done(&value ## _dfe); \
         } while(0)
 

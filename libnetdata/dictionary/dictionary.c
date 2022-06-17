@@ -77,11 +77,12 @@ typedef struct name_value {
     struct name_value *next;    // a double linked list to allow fast insertions and deletions
     struct name_value *prev;
 
-    char *name;                 // the name of the dictionary item
-    void *value;                // the value of the dictionary item
-
     size_t name_len;            // the size of the name, including the terminating zero
     size_t value_len;           // the size of the value (assumed binary)
+
+    void *value;                // the value of the dictionary item
+    char *name;                 // the name of the dictionary item
+
 } NAME_VALUE;
 
 /*
@@ -173,7 +174,6 @@ size_t dictionary_stats_deletes(DICTIONARY *dict) {
 size_t dictionary_stats_resets(DICTIONARY *dict) {
     return dict->resets;
 }
-
 size_t dictionary_stats_walkthroughs(DICTIONARY *dict) {
     return dict->walkthroughs;
 }
@@ -515,7 +515,7 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
             }
         }
         else {
-            // the caller want an item without any value
+            // the caller wants an item without any value
             nv->value = NULL;
         }
 
@@ -533,6 +533,8 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
 static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", nv->name);
 
+    DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
+
     if(dict->del_callback)
         dict->del_callback(nv->name, nv->value, dict->del_callback_data);
 
@@ -543,7 +545,6 @@ static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value
     }
     else {
         debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", nv->name);
-        DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
 
         void *oldvalue = nv->value;
         void *newvalue = NULL;
@@ -982,6 +983,22 @@ static size_t dictionary_unittest_set_clone(DICTIONARY *dict, char **names, char
     return errors;
 }
 
+static size_t dictionary_unittest_set_null(DICTIONARY *dict, char **names, char **values, size_t entries) {
+    (void)values;
+    size_t errors = 0;
+    size_t i = 0;
+    for(; i < entries ;i++) {
+        void *val = dictionary_set(dict, names[i], NULL, 0);
+        if(val != NULL) { fprintf(stderr, ">>> %s() returns a non NULL value\n", __FUNCTION__); errors++; }
+    }
+    if(dictionary_stats_entries(dict) != i) {
+        fprintf(stderr, ">>> %s() dictionary items do not match\n", __FUNCTION__);
+        errors++;
+    }
+    return errors;
+}
+
+
 static size_t dictionary_unittest_set_nonclone(DICTIONARY *dict, char **names, char **values, size_t entries) {
     size_t errors = 0;
     for(size_t i = 0; i < entries ;i++) {
@@ -1264,7 +1281,11 @@ static size_t dictionary_unittest_sorted_walkthrough(DICTIONARY *dict, char **na
 static void dictionary_unittest_sorting(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, errors, dictionary_unittest_set_clone);
     dictionary_unittest_run_and_measure_time(dict, "sorted walkthrough", names, values, entries, errors, dictionary_unittest_sorted_walkthrough);
-    dictionary_unittest_run_and_measure_time(dict, "destroying dictionary", names, values, entries, errors, dictionary_unittest_destroy);
+}
+
+static void dictionary_unittest_null_dfe(DICTIONARY *dict, char **names, char **values, size_t entries, size_t *errors) {
+    dictionary_unittest_run_and_measure_time(dict, "adding null value entries", names, values, entries, errors, dictionary_unittest_set_null);
+    dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop", names, values, entries, errors, dictionary_unittest_foreach);
 }
 
 int dictionary_unittest(size_t entries) {
@@ -1319,6 +1340,17 @@ int dictionary_unittest(size_t entries) {
     fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
     dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     dictionary_unittest_sorting(dict, names, values, entries, &errors);
+    dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+
+    fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    dictionary_unittest_null_dfe(dict, names, values, entries, &errors);
+    dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+
+    fprintf(stderr, "\nCreating dictionary single threaded, noclone, %zu items\n", entries);
+    dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
+    dictionary_unittest_null_dfe(dict, names, values, entries, &errors);
+    dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
