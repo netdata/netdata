@@ -8,6 +8,12 @@
 #define STATE_LENGTH_MAX 32
 
 enum {
+    NETDEV_DUPLEX_UNKNOWN,
+    NETDEV_DUPLEX_HALF,
+    NETDEV_DUPLEX_FULL
+};
+
+enum {
     NETDEV_OPERSTATE_UNKNOWN,
     NETDEV_OPERSTATE_NOTPRESENT,
     NETDEV_OPERSTATE_DOWN,
@@ -167,7 +173,9 @@ static struct netdev {
     RRDDIM *rd_tcompressed;
 
     RRDDIM *rd_speed;
-    RRDDIM *rd_duplex;
+    RRDDIM *rd_duplex_full;
+    RRDDIM *rd_duplex_half;
+    RRDDIM *rd_duplex_unknown;
     RRDDIM *rd_operstate_unknown;
     RRDDIM *rd_operstate_notpresent;
     RRDDIM *rd_operstate_down;
@@ -239,7 +247,9 @@ static void netdev_charts_release(struct netdev *d) {
     d->rd_tcompressed = NULL;
 
     d->rd_speed       = NULL;
-    d->rd_duplex      = NULL;
+    d->rd_duplex_full = NULL;
+    d->rd_duplex_half = NULL;
+    d->rd_duplex_unknown = NULL;
     d->rd_carrier     = NULL;
     d->rd_mtu         = NULL;
 
@@ -840,11 +850,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             } else {
                 // values can be unknown, half or full -- just check the first letter for speed
                 if (buffer[0] == 'f')
-                    d->duplex = 2;
+                    d->duplex = NETDEV_DUPLEX_FULL;
                 else if (buffer[0] == 'h')
-                    d->duplex = 1;
+                    d->duplex = NETDEV_DUPLEX_HALF;
                 else
-                    d->duplex = 0;
+                    d->duplex = NETDEV_DUPLEX_UNKNOWN;
             }
         } else {
             d->duplex = 0;
@@ -1011,11 +1021,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_update_rrdlabels(d->st_duplex, d->chart_labels);
 
-                d->rd_duplex = rrddim_add(d->st_duplex, "duplex",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_full = rrddim_add(d->st_duplex, "full", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_half = rrddim_add(d->st_duplex, "half", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_unknown = rrddim_add(d->st_duplex, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_duplex);
 
-            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex, (collected_number)d->duplex);
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_full, (collected_number)(d->duplex == NETDEV_DUPLEX_FULL));
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_half, (collected_number)(d->duplex == NETDEV_DUPLEX_HALF));
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_unknown, (collected_number)(d->duplex == NETDEV_DUPLEX_UNKNOWN));
             rrdset_done(d->st_duplex);
         }
 
