@@ -9,12 +9,14 @@ struct mem_collect_handle {
     long slot;
     long entries;
 };
+
 struct mem_query_handle {
     time_t dt;
+    time_t next_timestamp;
+    time_t last_timestamp;
     time_t slot_timestamp;
-    long slot;
-    long last_slot;
-    uint8_t finished;
+    size_t slot;
+    size_t last_slot;
 };
 
 extern void rrddim_collect_init(RRDDIM *rd);

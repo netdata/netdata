@@ -1184,10 +1184,10 @@ static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
             ret = rrdset_first_slot(st);
         }
         else {
-            if(rrdset_last_slot(st) >= ((last_entry_t - t) / (size_t)(st->update_every)))
-                ret = rrdset_last_slot(st) - ((last_entry_t - t) / (size_t)(st->update_every));
+            if(rrdset_last_slot(st) >= (size_t)((last_entry_t - t) / st->update_every))
+                ret = rrdset_last_slot(st) - ((last_entry_t - t) / st->update_every);
             else
-                ret = rrdset_last_slot(st) - ((last_entry_t - t) / (size_t)(st->update_every)) + (unsigned long)st->entries;
+                ret = rrdset_last_slot(st) - ((last_entry_t - t) / st->update_every) + st->entries;
         }
     }
 
@@ -1211,12 +1211,10 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
         slot = (size_t)st->entries - 1;
     }
 
-    if(slot > rrdset_last_slot(st)) {
-        ret = last_entry_t - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
-    }
-    else {
-        ret = last_entry_t - (size_t)st->update_every;
-    }
+    if(slot > rrdset_last_slot(st))
+        ret = last_entry_t - (time_t)(st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries));
+    else
+        ret = last_entry_t - (time_t)(st->update_every * (rrdset_last_slot(st) - slot));
 
     if(unlikely(ret < first_entry_t)) {
         error("INTERNAL ERROR: rrdset_slot2time() on %s returns time too far in the past", st->name);
