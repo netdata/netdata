@@ -6,8 +6,17 @@
 
 **Merged pull requests:**
 
+- Don’t manipulate positional parameters in DEB postinst script. [\#13169](https://github.com/netdata/netdata/pull/13169) ([Ferroin](https://github.com/Ferroin))
+- Fix coverity issues [\#13168](https://github.com/netdata/netdata/pull/13168) ([stelfrag](https://github.com/stelfrag))
+- Use memset to mark the empty words in the quoted\_strings\_splitter function [\#13161](https://github.com/netdata/netdata/pull/13161) ([stelfrag](https://github.com/stelfrag))
+- Fix labels unit test [\#13156](https://github.com/netdata/netdata/pull/13156) ([stelfrag](https://github.com/stelfrag))
+- add CAP\_SYS\_RAWIO to Netdata's systemd unit CapabilityBoundingSet [\#13154](https://github.com/netdata/netdata/pull/13154) ([ilyam8](https://github.com/ilyam8))
 - Update docs on what to do if collector not there [\#13152](https://github.com/netdata/netdata/pull/13152) ([cakrit](https://github.com/cakrit))
+- revert to default of `host anomaly rate threshold=0.01` [\#13150](https://github.com/netdata/netdata/pull/13150) ([andrewm4894](https://github.com/andrewm4894))
+- fix conditions for nightly build triggers [\#13145](https://github.com/netdata/netdata/pull/13145) ([maneamarius](https://github.com/maneamarius))
+- Add cargo/rustc/bazel/buck to apps\_groups.conf [\#13143](https://github.com/netdata/netdata/pull/13143) ([vkalintiris](https://github.com/vkalintiris))
 - Add an option to use malloc for page cache instead of mmap [\#13142](https://github.com/netdata/netdata/pull/13142) ([stelfrag](https://github.com/stelfrag))
+- Add mem.available chart to FreeBSD [\#13140](https://github.com/netdata/netdata/pull/13140) ([MrZammler](https://github.com/MrZammler))
 - fix crashes due to misaligned allocations [\#13137](https://github.com/netdata/netdata/pull/13137) ([ktsaou](https://github.com/ktsaou))
 - fix\(python.d\): urllib3 import collection for py3.10+ [\#13136](https://github.com/netdata/netdata/pull/13136) ([ilyam8](https://github.com/ilyam8))
 - fix\(python.d/mongodb\): set `serverSelectionTimeoutMS` for pymongo4+ [\#13135](https://github.com/netdata/netdata/pull/13135) ([ilyam8](https://github.com/ilyam8))
@@ -19,6 +28,7 @@
 - Add missing control to streaming [\#13112](https://github.com/netdata/netdata/pull/13112) ([thiagoftsm](https://github.com/thiagoftsm))
 - Re-enable updates for systems using static builds. [\#13110](https://github.com/netdata/netdata/pull/13110) ([Ferroin](https://github.com/Ferroin))
 - Add user netdata to secondary group in DEB package [\#13109](https://github.com/netdata/netdata/pull/13109) ([iigorkarpov](https://github.com/iigorkarpov))
+- Remove pinned page reference [\#13108](https://github.com/netdata/netdata/pull/13108) ([stelfrag](https://github.com/stelfrag))
 - 73x times faster metrics correlations at the agent [\#13107](https://github.com/netdata/netdata/pull/13107) ([ktsaou](https://github.com/ktsaou))
 - Remove unnescesary ‘cleanup’ code. [\#13103](https://github.com/netdata/netdata/pull/13103) ([Ferroin](https://github.com/Ferroin))
 - Temporarily disable updates for static builds. [\#13100](https://github.com/netdata/netdata/pull/13100) ([Ferroin](https://github.com/Ferroin))
@@ -27,6 +37,7 @@
 - fix virtualization detection on FreeBSD [\#13087](https://github.com/netdata/netdata/pull/13087) ([ilyam8](https://github.com/ilyam8))
 - Labels with dictionary [\#13070](https://github.com/netdata/netdata/pull/13070) ([ktsaou](https://github.com/ktsaou))
 - Use a separate thread for slow mountpoints in the diskspace plugin [\#13067](https://github.com/netdata/netdata/pull/13067) ([vlvkobal](https://github.com/vlvkobal))
+- Configurable storage engine for Netdata agents: step 3 [\#12892](https://github.com/netdata/netdata/pull/12892) ([aberaud](https://github.com/aberaud))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
@@ -338,16 +349,6 @@
 - fix centos gpg key issue [\#12519](https://github.com/netdata/netdata/pull/12519) ([maneamarius](https://github.com/maneamarius))
 - fix: Netdata segfault because of 2 timex.plugin threads [\#12512](https://github.com/netdata/netdata/pull/12512) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leaks on Netdata exit [\#12511](https://github.com/netdata/netdata/pull/12511) ([vlvkobal](https://github.com/vlvkobal))
-- fix centos7 gpg key issue [\#12506](https://github.com/netdata/netdata/pull/12506) ([maneamarius](https://github.com/maneamarius))
-- Use live charts to count the total number of dimensions. [\#12504](https://github.com/netdata/netdata/pull/12504) ([vkalintiris](https://github.com/vkalintiris))
-- Update ebpf doc [\#12503](https://github.com/netdata/netdata/pull/12503) ([thiagoftsm](https://github.com/thiagoftsm))
-- feat\(collectors/timex.plugin\): add clock status chart [\#12501](https://github.com/netdata/netdata/pull/12501) ([ilyam8](https://github.com/ilyam8))
-- PR template: Include user information section [\#12499](https://github.com/netdata/netdata/pull/12499) ([kickoke](https://github.com/kickoke))
-- add `locust` to `apps_groups.conf` [\#12498](https://github.com/netdata/netdata/pull/12498) ([andrewm4894](https://github.com/andrewm4894))
-- Properly skip running the updater in kickstart dry-run mode. [\#12497](https://github.com/netdata/netdata/pull/12497) ([Ferroin](https://github.com/Ferroin))
-- Adjust timex.plugin information to be less cryptic [\#12495](https://github.com/netdata/netdata/pull/12495) ([DanTheMediocre](https://github.com/DanTheMediocre))
-- ML-related changes to address issue/discussion comments. [\#12494](https://github.com/netdata/netdata/pull/12494) ([vkalintiris](https://github.com/vkalintiris))
-- fix: open fd 3 before first use in the netdata-updater.sh script [\#12491](https://github.com/netdata/netdata/pull/12491) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
