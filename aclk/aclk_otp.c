@@ -446,11 +446,34 @@ cleanup_buffers:
     return rc;
 }
 
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+static int private_decrypt(EVP_PKEY *p_key, unsigned char * enc_data, int data_len, unsigned char **decrypted)
+#else
 static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, unsigned char **decrypted)
+#endif
 {
+    int result;
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+    size_t outlen;
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(p_key, NULL);
+    if (!ctx)
+        return 1;
+
+    if (EVP_PKEY_decrypt_init(ctx) <= 0)
+        return 1;
+
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
+        return 1;
+
+    *decrypted = mallocz(EVP_PKEY_size(p_key));
+
+    result = EVP_PKEY_decrypt(ctx, *decrypted, &outlen, enc_data, data_len);
+#else
     *decrypted = mallocz(RSA_size(p_key));
-    int result = RSA_private_decrypt(data_len, enc_data, *decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
-    if (result == -1) {
+    result = RSA_private_decrypt(data_len, enc_data, *decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
+#endif
+    if (result == -1)
+    {
         char err[512];
         ERR_error_string_n(ERR_get_error(), err, sizeof(err));
         error("Decryption of the challenge failed: %s", err);
