@@ -9,9 +9,9 @@ void rrddim_collect_init(RRDDIM *rd) {
     rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
     rd->state->handle = calloc(1, sizeof(struct mem_collect_handle));
 }
-void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number) {
+void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, calculated_number number, SN_FLAGS flags) {
     (void)point_in_time;
-    rd->values[rd->rrdset->current_entry] = number;
+    rd->values[rd->rrdset->current_entry] = pack_storage_number(number, flags);
 }
 int rrddim_collect_finalize(RRDDIM *rd) {
     free((struct mem_collect_handle*)rd->state->handle);

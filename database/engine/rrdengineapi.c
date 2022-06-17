@@ -193,8 +193,10 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     handle->descr = NULL;
 }
 
-void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number)
+void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, calculated_number n, SN_FLAGS flags)
 {
+    storage_number number = pack_storage_number(n, flags);
+
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->state->handle;
     struct rrdengine_instance *ctx;
     struct page_cache *pg_cache;

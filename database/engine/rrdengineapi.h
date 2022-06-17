@@ -40,7 +40,7 @@ extern void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN +
 extern void rrdeng_metric_init(RRDDIM *rd);
 extern void rrdeng_store_metric_init(RRDDIM *rd);
 extern void rrdeng_store_metric_flush_current_page(RRDDIM *rd);
-extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number);
+extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, calculated_number number, SN_FLAGS flags);
 extern int rrdeng_store_metric_finalize(RRDDIM *rd);
 extern unsigned
     rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,

@@ -1130,7 +1130,7 @@ static inline size_t rrdset_done_interpolate(
     size_t counter = st->counter;
     long current_entry = st->current_entry;
 
-    uint32_t storage_flags = SN_DEFAULT_FLAGS;
+    SN_FLAGS storage_flags = SN_DEFAULT_FLAGS;
 
     if (has_reset_value)
         storage_flags |= SN_EXISTS_RESET;
@@ -1234,7 +1234,7 @@ static inline size_t rrdset_done_interpolate(
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
 //                rd->values[current_entry] = SN_EMPTY_SLOT;
                 continue;
             }
@@ -1247,7 +1247,7 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
                 }
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, pack_storage_number(new_value, dim_storage_flags));
+                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, dim_storage_flags);
 //                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
                 rd->last_stored_value = new_value;
 
@@ -1271,7 +1271,7 @@ static inline size_t rrdset_done_interpolate(
                 #endif
 
 //                rd->values[current_entry] = SN_EMPTY_SLOT;
-                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 rd->last_stored_value = NAN;
             }
 

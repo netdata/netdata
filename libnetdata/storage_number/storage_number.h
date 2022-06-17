@@ -64,13 +64,14 @@ typedef long double collected_number;
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
 
-#define SN_ANOMALY_BIT      (1 << 24) // the anomaly bit of the value
-#define SN_EXISTS_RESET     (1 << 25) // the value has been overflown
-#define SN_EXISTS_100       (1 << 26) // very large value (multiplier is 100 instead of 10)
+typedef enum {
+    SN_EMPTY_SLOT    = 0x00000000,
+    SN_ANOMALY_BIT   = (1 << 24), // the anomaly bit of the value
+    SN_EXISTS_RESET  = (1 << 25), // the value has been overflown
+    SN_EXISTS_100    = (1 << 26)  // very large value (multiplier is 100 instead of 10)
+} SN_FLAGS;
 
-#define SN_DEFAULT_FLAGS    SN_ANOMALY_BIT
-
-#define SN_EMPTY_SLOT 0x00000000
+#define SN_DEFAULT_FLAGS SN_ANOMALY_BIT
 
 // When the calculated number is zero and the value is anomalous (ie. it's bit
 // is zero) we want to return a storage_number representation that is
@@ -83,7 +84,7 @@ typedef uint32_t storage_number;
 #define does_storage_number_exist(value) (((storage_number) (value)) != SN_EMPTY_SLOT)
 #define did_storage_number_reset(value)  ((((storage_number) (value)) & SN_EXISTS_RESET) != 0)
 
-storage_number pack_storage_number(calculated_number value, uint32_t flags);
+storage_number pack_storage_number(calculated_number value, SN_FLAGS flags);
 static inline calculated_number unpack_storage_number(storage_number value) __attribute__((const));
 
 int print_calculated_number(char *str, calculated_number value);
