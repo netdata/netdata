@@ -1,20 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrddim_mem.h"
-#include "../storage_engine.h"
-
-STORAGE_ENGINE_INSTANCE* rrddim_storage_engine_instance_new(STORAGE_ENGINE* engine, RRDHOST *host) {
-    (void)engine; (void)host;
-    return NULL;
-}
-
-void rrddim_storage_engine_instance_exit(STORAGE_ENGINE_INSTANCE* context) {
-    (void)context;
-}
-
-void rrddim_storage_engine_instance_destroy(STORAGE_ENGINE_INSTANCE* context) {
-    (void)context;
-}
 
 // ----------------------------------------------------------------------------
 // RRDDIM legacy data collection functions

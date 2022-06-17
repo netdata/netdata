@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#ifdef ENABLE_DBENGINE
-#include "database/engine/rrdengineapi.h"
-#endif
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
@@ -459,7 +456,7 @@ static void dbengine_statistics_charts(void) {
 
         rrdhost_foreach_read(host) {
             if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-                if (host->rrdeng_ctx == host->rrdeng_ctx->engine->context) {
+                if (&multidb_ctx == host->rrdeng_ctx) {
                     if (counted_multihost_db)
                         continue; /* Only count multi-host DB once */
                     counted_multihost_db = 1;

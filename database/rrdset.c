@@ -3,10 +3,6 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 #include <sched.h>
-#ifdef ENABLE_DBENGINE
-#include "database/engine/rrddiskprotocol.h"
-#include "database/engine/rrdengineapi.h"
-#endif
 
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);

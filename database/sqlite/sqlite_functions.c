@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_functions.h"
-#ifdef ENABLE_DBENGINE
-#include "../engine/rrdengineapi.h"
-#endif
-#include "database/storage_engine.h"
 
 #define DB_METADATA_VERSION "1"
 
@@ -427,7 +423,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
     snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
     if(init_database_batch(rebuild, 0, list)) return 1;
-
+    
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
     snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
@@ -1282,9 +1278,9 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
 
     host->system_info = callocz(1, sizeof(*host->system_info));;
     rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
-
-    // Create multidb engine instance if necessary
-    host->rrdeng_ctx = storage_engine_new(storage_engine_get(RRD_MEMORY_MODE_DBENGINE), host);
+#ifdef ENABLE_DBENGINE
+    host->rrdeng_ctx = &multidb_ctx;
+#endif
 
 failed:
     rc = sqlite3_finalize(res);
