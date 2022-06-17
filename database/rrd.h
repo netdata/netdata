@@ -18,8 +18,6 @@ typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 typedef struct context_param CONTEXT_PARAM;
-typedef struct storage_engine_instance STORAGE_ENGINE_INSTANCE;
-typedef struct storage_engine STORAGE_ENGINE;
 
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;
@@ -856,7 +854,9 @@ struct rrdhost {
     avl_tree_lock rrdfamily_root_index;             // the host's chart families index
     avl_tree_lock rrdvar_root_index;                // the host's chart variables index
 
-    STORAGE_ENGINE_INSTANCE *rrdeng_ctx;          // DB engine instance for this host
+#ifdef ENABLE_DBENGINE
+    struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
+#endif
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
 
@@ -1324,6 +1324,9 @@ extern void set_host_properties(
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations
 
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengineapi.h"
+#endif
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_aclk.h"
 #include "sqlite/sqlite_aclk_chart.h"

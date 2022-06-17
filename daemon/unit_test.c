@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#ifdef ENABLE_DBENGINE
-#include "database/engine/rrdengineapi.h"
-#endif
 
 static int check_number_printing(void) {
     struct {
@@ -1160,7 +1157,7 @@ int run_test(struct test *test)
     RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1
                                          , test->update_every, RRDSET_TYPE_LINE);
     RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
-
+    
     RRDDIM *rd2 = NULL;
     if(test->feed2)
         rd2 = rrddim_add(st, "dim2", NULL, test->multiplier, test->divisor, test->algorithm);
@@ -1176,7 +1173,7 @@ int run_test(struct test *test)
 
         if(c) {
             time_now += test->feed[c].microseconds;
-            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " CALCULATED_NUMBER_FORMAT ", rate " CALCULATED_NUMBER_FORMAT "\n",
+            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " CALCULATED_NUMBER_FORMAT ", rate " CALCULATED_NUMBER_FORMAT "\n", 
                 test->name, c+1,
                 (float)test->feed[c].microseconds / 1000000.0,
                 (float)time_now / 1000000.0,

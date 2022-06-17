@@ -3,10 +3,6 @@
 #include "common.h"
 #include "buildinfo.h"
 #include "static_threads.h"
-#include "database/storage_engine.h"
-#ifdef ENABLE_DBENGINE
-#include "database/engine/rrdengineapi.h"
-#endif
 
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
@@ -58,18 +54,13 @@ void netdata_cleanup_and_exit(int ret) {
 
         // free the database
         info("EXIT: freeing database memory...");
-        for (STORAGE_ENGINE* eng = storage_engine_foreach_init(); eng; eng = storage_engine_foreach_next(eng)) {
-            if (eng->context)
-                eng->api.engine_ops.exit(eng->context);
-        }
-
+#ifdef ENABLE_DBENGINE
+        rrdeng_prepare_exit(&multidb_ctx);
+#endif
         rrdhost_free_all();
-        for (STORAGE_ENGINE* eng = storage_engine_foreach_init(); eng; eng = storage_engine_foreach_next(eng)) {
-            if (eng->context) {
-                eng->api.engine_ops.destroy(eng->context);
-                eng->context = NULL;
-            }
-        }
+#ifdef ENABLE_DBENGINE
+        rrdeng_exit(&multidb_ctx);
+#endif
     }
     sql_close_database();
 
