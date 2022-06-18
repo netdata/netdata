@@ -39,7 +39,7 @@ void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t st
     handle->handle = (STORAGE_QUERY_HANDLE *)h;
 }
 
-storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time) {
+calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time, SN_FLAGS *flags) {
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     size_t entries = rd->rrdset->entries;
@@ -51,11 +51,15 @@ storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time
     // set this timestamp for our caller
     *current_time = this_timestamp;
 
-    if(unlikely(this_timestamp < h->slot_timestamp))
+    if(unlikely(this_timestamp < h->slot_timestamp)) {
+        *flags = SN_EMPTY_SLOT;
         return SN_EMPTY_SLOT;
+    }
 
-    if(unlikely(this_timestamp > h->last_timestamp))
+    if(unlikely(this_timestamp > h->last_timestamp)) {
+        *flags = SN_EMPTY_SLOT;
         return SN_EMPTY_SLOT;
+    }
 
     storage_number n = rd->values[slot++];
     if(unlikely(slot >= entries)) slot = 0;
@@ -63,7 +67,8 @@ storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time
     h->slot = slot;
     h->slot_timestamp += h->dt;
 
-    return n;
+    *flags = (n & SN_ALL_FLAGS);
+    return unpack_storage_number(n);
 }
 
 int rrddim_query_is_finished(struct rrddim_query_handle *handle) {

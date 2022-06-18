@@ -462,7 +462,8 @@ static inline void do_dimension_variablestep(
     calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
     time_t db_now = now;
-    storage_number n_curr, n_prev = SN_EMPTY_SLOT;
+    calculated_number n_curr, n_prev = NAN;
+    SN_FLAGS n_curr_flags, n_prev_flags;
     calculated_number value;
 
     for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; points_added < points_wanted ; now += dt) {
@@ -480,39 +481,53 @@ static inline void do_dimension_variablestep(
             continue;
         }
 
-        while (now >= db_now && (!rd->state->query_ops.is_finished(&handle) ||
-                                 does_storage_number_exist(n_prev))) {
+        while (now >= db_now && (!rd->state->query_ops.is_finished(&handle) || calculated_number_isnumber(n_prev))) {
+
             value = NAN;
-            if (does_storage_number_exist(n_prev)) {
+            if (calculated_number_isnumber(n_prev)) {
+
                 // use the previously read database value
                 n_curr = n_prev;
-            } else {
-                // read the value from the database
-                n_curr = rd->state->query_ops.next_metric(&handle, &db_now);
+                n_curr_flags = n_prev_flags;
+
             }
-            n_prev = SN_EMPTY_SLOT;
+            else {
+
+                // read the value from the database
+                n_curr = rd->state->query_ops.next_metric(&handle, &db_now, &n_curr_flags);
+
+            }
+
+            n_prev = NAN;
+            n_prev_flags = SN_EMPTY_SLOT;
+
             // db_now has a different value than above
             if (likely(now >= db_now)) {
-                if (likely(does_storage_number_exist(n_curr))) {
+
+                if (likely(calculated_number_isnumber(n_curr))) {
                     if (options & RRDR_OPTION_ANOMALY_BIT)
-                        value = (n_curr & SN_ANOMALY_BIT) ? 0.0 : 100.0;
+                        value = (n_curr_flags & SN_ANOMALY_BIT) ? 0.0 : 100.0;
                     else
-                        value = unpack_storage_number(n_curr);
+                        value = n_curr;
 
                     if (likely(value != 0.0))
                         values_in_group_non_zero++;
 
-                    if (unlikely(did_storage_number_reset(n_curr)))
+                    if (unlikely(n_curr_flags & SN_EXISTS_RESET))
                         group_value_flags |= RRDR_VALUE_RESET;
                 }
-            } else {
+
+            }
+            else {
                 // We must postpone processing the value and fill the result with gaps instead
-                if (likely(does_storage_number_exist(n_curr))) {
+                if (likely(calculated_number_isnumber(n_curr))) {
                     n_prev = n_curr;
+                    n_prev_flags = n_curr_flags;
                 }
             }
+
             // add this value to grouping
-            if(likely(!isnan(value)))
+            if(likely(calculated_number_isnumber(value)))
                 r->internal.grouping_add(r, value);
 
             values_in_group++;
@@ -520,8 +535,8 @@ static inline void do_dimension_variablestep(
         }
 
         if (0 == values_in_group) {
-            // add NAN to grouping
-            r->internal.grouping_add(r, NAN);
+            // add 0.0 to grouping
+            r->internal.grouping_add(r, 0.0);
         }
 
         rrdr_line = rrdr_line_init(r, now, rrdr_line);
@@ -610,7 +625,7 @@ static inline void do_dimension_fixedstep(
     time_t first_time_t = rrddim_first_entry_t(rd);
 
     // cache the function pointers we need in the loop
-    storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time) = rd->state->query_ops.next_metric;
+    calculated_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, SN_FLAGS *flags) = rd->state->query_ops.next_metric;
     void (*grouping_add)(struct rrdresult *r, calculated_number value) = r->internal.grouping_add;
     calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) = r->internal.grouping_flush;
     RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
@@ -644,7 +659,8 @@ static inline void do_dimension_fixedstep(
 
         // load the metric value
         db_now = now; // this is needed before calling next_metric()
-        storage_number n = next_metric(&handle, &db_now);
+        SN_FLAGS nflags;
+        calculated_number value = next_metric(&handle, &db_now, &nflags);
         db_points_read++;
 
         // make sure we will not go beyond "before_wanted"
@@ -653,12 +669,9 @@ static inline void do_dimension_fixedstep(
         if(unlikely(db_now > before_wanted))
             db_now = before_wanted;
 
-        // and unpack it
-        calculated_number value;
         size_t anomaly;
-        if(likely(does_storage_number_exist(n))) {
-            anomaly = (n & SN_ANOMALY_BIT) ? 0 : 100;
-            value = unpack_storage_number(n);
+        if(likely(calculated_number_isnumber(value))) {
+            anomaly = (nflags & SN_ANOMALY_BIT) ? 0 : 100;
 
             if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
                 value = (calculated_number)anomaly;
@@ -671,8 +684,8 @@ static inline void do_dimension_fixedstep(
         // this loop exists only to fill nulls
         // so, if there is a value already, we use it for the first iteration
         // but the following iterations will just fill nulls to the destination
-        for ( ; now <= db_now ; now += dt, value = NAN, n = SN_EMPTY_SLOT) {
-            if(likely(does_storage_number_exist(n))) {
+        for ( ; now <= db_now ; now += dt, value = NAN) {
+            if(likely(calculated_number_isnumber(value))) {
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(ENABLE_DBENGINE)
                 if(now >= db_now) {
@@ -689,7 +702,7 @@ static inline void do_dimension_fixedstep(
                 if(likely(value != 0.0))
                     values_in_group_non_zero++;
 
-                if(unlikely(did_storage_number_reset(n)))
+                if(unlikely(nflags & SN_EXISTS_RESET))
                     group_value_flags |= RRDR_VALUE_RESET;
 
                 grouping_add(r, value);

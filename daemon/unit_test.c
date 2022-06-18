@@ -1677,7 +1677,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
     int i, j, k, c, errors, update_every;
     collected_number last;
     calculated_number value, expected;
-    storage_number n;
+    SN_FLAGS nflags;
     struct rrddim_query_handle handle;
 
     update_every = REGION_UPDATE_EVERY[current_region];
@@ -1694,8 +1694,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                            j * REGION_POINTS[current_region] + c + k;
                     expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
 
-                    n = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved);
-                    value = unpack_storage_number(n);
+                    value = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved, &nflags);
 
                     same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
                     if(!same) {
@@ -2074,7 +2073,7 @@ static void query_dbengine_chart(void *arg)
     time_t time_now, time_retrieved;
     collected_number generatedv;
     calculated_number value, expected;
-    storage_number n;
+    SN_FLAGS nflags;
     struct rrddim_query_handle handle;
 
     do {
@@ -2116,8 +2115,8 @@ static void query_dbengine_chart(void *arg)
                 }
                 break;
             }
-            n = rd->state->query_ops.next_metric(&handle, &time_retrieved);
-            if (SN_EMPTY_SLOT == n) {
+            value = rd->state->query_ops.next_metric(&handle, &time_retrieved, &nflags);
+            if (SN_EMPTY_SLOT == nflags) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
                                     CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
@@ -2127,7 +2126,6 @@ static void query_dbengine_chart(void *arg)
                 break;
             }
             ++thread_info->queried_metrics_nr;
-            value = unpack_storage_number(n);
 
             same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
             if (!same) {

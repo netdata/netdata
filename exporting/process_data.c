@@ -125,17 +125,18 @@ calculated_number exporting_calculate_value_from_stored_data(
 
     size_t counter = 0;
     calculated_number sum = 0;
+    calculated_number value;
 
     for (rd->state->query_ops.init(rd, &handle, after, before); !rd->state->query_ops.is_finished(&handle);) {
         time_t curr_t;
-        n = rd->state->query_ops.next_metric(&handle, &curr_t);
+        SN_FLAGS flags;
+        value = rd->state->query_ops.next_metric(&handle, &curr_t, &flags);
 
-        if (unlikely(!does_storage_number_exist(n))) {
+        if (unlikely(!calculated_number_isnumber(value))) {
             // not collected
             continue;
         }
 
-        calculated_number value = unpack_storage_number(n);
         sum += value;
 
         counter++;

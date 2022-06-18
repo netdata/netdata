@@ -345,7 +345,7 @@ struct rrddim_query_ops {
     void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 
     // run this to load each metric number from the database
-    storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time);
+    calculated_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, SN_FLAGS *flags);
 
     // run this to test if the series of next_metric() database queries is finished
     int (*is_finished)(struct rrddim_query_handle *handle);
