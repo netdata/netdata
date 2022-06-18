@@ -685,7 +685,20 @@ static inline void do_dimension_fixedstep(
         // this loop exists only to fill nulls
         // so, if there is a value already, we use it for the first iteration
         // but the following iterations will just fill nulls to the destination
-        for ( ; now <= db_now ; now += dt, value = NAN) {
+        SN_FLAGS saved_nflags = nflags;
+        calculated_number saved_value = value;
+
+        for ( ; now <= db_now ; now += dt) {
+
+            if(likely(now == db_now)) {
+                nflags = saved_nflags;
+                value = saved_value;
+            }
+            else {
+                nflags = SN_EMPTY_SLOT;
+                value = NAN;
+            }
+
             if(likely(calculated_number_isnumber(value))) {
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(ENABLE_DBENGINE)
