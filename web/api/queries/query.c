@@ -658,8 +658,8 @@ static inline void do_dimension_fixedstep(
 #endif
 
         // load the metric value
-        db_now = now; // this is needed before calling next_metric()
-        SN_FLAGS nflags;
+        db_now = now;
+        SN_FLAGS nflags = SN_EMPTY_SLOT;
         calculated_number value = next_metric(&handle, &db_now, &nflags);
         db_points_read++;
 
