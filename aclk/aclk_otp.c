@@ -454,7 +454,7 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
 {
     int result;
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
-    size_t outlen;
+    size_t outlen = EVP_PKEY_size(p_key);
     EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(p_key, NULL);
     if (!ctx)
         return 1;
@@ -465,9 +465,12 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
         return 1;
 
-    *decrypted = mallocz(EVP_PKEY_size(p_key));
+    *decrypted = mallocz(outlen);
 
-    result = EVP_PKEY_decrypt(ctx, *decrypted, &outlen, enc_data, data_len);
+    if (EVP_PKEY_decrypt(ctx, *decrypted, &outlen, enc_data, data_len) == 1)
+        result = (int) outlen;
+    else
+        result = -1;
 #else
     *decrypted = mallocz(RSA_size(p_key));
     result = RSA_private_decrypt(data_len, enc_data, *decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
