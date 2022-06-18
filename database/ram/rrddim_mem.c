@@ -53,12 +53,12 @@ calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, t
 
     if(unlikely(this_timestamp < h->slot_timestamp)) {
         *flags = SN_EMPTY_SLOT;
-        return SN_EMPTY_SLOT;
+        return NAN;
     }
 
     if(unlikely(this_timestamp > h->last_timestamp)) {
         *flags = SN_EMPTY_SLOT;
-        return SN_EMPTY_SLOT;
+        return NAN;
     }
 
     storage_number n = rd->values[slot++];

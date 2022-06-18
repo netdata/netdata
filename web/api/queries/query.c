@@ -677,6 +677,7 @@ static inline void do_dimension_fixedstep(
                 value = (calculated_number)anomaly;
         }
         else {
+            nflags = SN_EMPTY_SLOT;
             value = NAN;
             anomaly = 0;
         }

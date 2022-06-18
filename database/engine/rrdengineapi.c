@@ -600,8 +600,10 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time, SN_FLAGS *flags) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
-    if (unlikely(INVALID_TIME == handle->next_page_time))
-        return SN_EMPTY_SLOT;
+    if (unlikely(INVALID_TIME == handle->next_page_time)) {
+        *flags = SN_EMPTY_SLOT;
+        return NAN;
+    }
 
     struct rrdeng_page_descr *descr = handle->descr;
     unsigned position = handle->position + 1;
@@ -612,12 +614,13 @@ calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_han
         if(rrdeng_load_page_next(rrdimm_handle)) {
             // next calls will not load any more metrics
             handle->next_page_time = INVALID_TIME;
-            return SN_EMPTY_SLOT;
+            *flags = SN_EMPTY_SLOT;
+            return NAN;
         }
 
         descr = handle->descr;
         position = handle->position;
-        now = (descr->start_time + position * handle->dt) / USEC_PER_SEC;
+        now = (time_t)((descr->start_time + position * handle->dt) / USEC_PER_SEC);
     }
 
     storage_number n = handle->page[position];
