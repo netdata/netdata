@@ -3,6 +3,7 @@
 #ifndef NETDATA_STORAGE_NUMBER_H
 #define NETDATA_STORAGE_NUMBER_H 1
 
+#include <math.h>
 #include "../libnetdata.h"
 
 #ifdef NETDATA_WITHOUT_LONG_DOUBLE
