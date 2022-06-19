@@ -587,8 +587,6 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     usec_t entries = handle->entries = page_length / sizeof(storage_number);
     if (likely(entries > 1))
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
-    else
-        handle->dt = 0;
 
     handle->dt_sec = handle->dt / USEC_PER_SEC;
     handle->position = position;
@@ -596,7 +594,9 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     return 0;
 }
 
-/* Returns the metric and sets its timestamp into current_time */
+// Returns the metric and sets its timestamp into current_time
+// IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
+// IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
 calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
@@ -614,6 +614,9 @@ calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_han
         if(rrdeng_load_page_next(rrdimm_handle)) {
             // next calls will not load any more metrics
             handle->next_page_time = INVALID_TIME;
+            handle->now = now;
+            *current_time = now;
+            *end_time = now + handle->dt_sec;
             *flags = SN_EMPTY_SLOT;
             return NAN;
         }

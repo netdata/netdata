@@ -39,6 +39,9 @@ void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t st
     handle->handle = (STORAGE_QUERY_HANDLE *)h;
 }
 
+// Returns the metric and sets its timestamp into current_time
+// IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
+// IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
 calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) {
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
