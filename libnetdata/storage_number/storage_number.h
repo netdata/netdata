@@ -67,7 +67,7 @@ typedef long double collected_number;
 #elif defined(HAVE_FINITE) || defined(finite)
 #define calculated_number_isnumber(a) (finite(a))
 #else
-#define calculated_number_isnumber(a) (!(isnan(a) || isinf(a)))
+#define calculated_number_isnumber(a) (fpclassify(x) != FP_NAN && fpclassify(x) != FP_INFINITE)
 #endif
 
 typedef uint32_t storage_number;
