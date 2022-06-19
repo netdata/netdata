@@ -60,9 +60,13 @@ typedef long double collected_number;
 
 #define calculated_number_equal(a, b) (calculated_number_fabs((a) - (b)) < calculated_number_epsilon)
 
+#ifdef isfinite
 // The isfinite() macro shall determine whether its argument has a
 // finite value (zero, subnormal, or normal, and not infinite or NaN).
 #define calculated_number_isnumber(a) (isfinite(a))
+#else // isfinite
+#define calculated_number_isnumber(a) (!(isnan(a) || isinf(a)))
+#endif // isfinite
 
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
