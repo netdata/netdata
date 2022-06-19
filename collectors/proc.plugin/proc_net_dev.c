@@ -1107,7 +1107,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             else rrdset_next(d->st_carrier);
 
             rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_up, (collected_number)(d->carrier == 1));
-            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_down, (collected_number)(d->carrier == 1));
+            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_down, (collected_number)(d->carrier != 1));
             rrdset_done(d->st_carrier);
         }
 
