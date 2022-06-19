@@ -363,6 +363,8 @@ else
 fi
 AC_MSG_RESULT([${with_math}])
 
+AC_CHECK_FUNCS([isfinite])
+AC_CHECK_FUNCS([finite])
 
 # -----------------------------------------------------------------------------
 # libuv multi-platform support library with a focus on asynchronous I/O
