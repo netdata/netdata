@@ -1702,7 +1702,8 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                            j * REGION_POINTS[current_region] + c + k;
                     expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
 
-                    value = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved, &nflags);
+                    time_t end_time;
+                    value = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags);
 
                     same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
                     if(!same) {
@@ -2132,7 +2133,8 @@ static void query_dbengine_chart(void *arg)
                 }
                 break;
             }
-            value = rd->state->query_ops.next_metric(&handle, &time_retrieved, &nflags);
+            time_t end_time;
+            value = rd->state->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags);
             if (!calculated_number_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "

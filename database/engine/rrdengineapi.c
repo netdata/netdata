@@ -597,7 +597,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 }
 
 /* Returns the metric and sets its timestamp into current_time */
-calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time, SN_FLAGS *flags) {
+calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     if (unlikely(INVALID_TIME == handle->next_page_time)) {
@@ -634,6 +634,7 @@ calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_han
 
     *flags = n & SN_ALL_FLAGS;
     *current_time = now;
+    *end_time = now + handle->dt_sec;
     return unpack_storage_number(n);
 }
 

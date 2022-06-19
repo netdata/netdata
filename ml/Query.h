@@ -28,9 +28,9 @@ public:
     }
 
     std::pair<time_t, CalculatedNumber> nextMetric() {
-        time_t CurrT;
+        time_t CurrT, EndT;
         SN_FLAGS Flags;
-        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &Flags);
+        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags);
         return { CurrT, Value };
     }
 

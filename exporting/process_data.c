@@ -128,9 +128,9 @@ calculated_number exporting_calculate_value_from_stored_data(
     calculated_number value;
 
     for (rd->state->query_ops.init(rd, &handle, after, before); !rd->state->query_ops.is_finished(&handle);) {
-        time_t curr_t;
+        time_t curr_t, end_t;
         SN_FLAGS flags;
-        value = rd->state->query_ops.next_metric(&handle, &curr_t, &flags);
+        value = rd->state->query_ops.next_metric(&handle, &curr_t, &end_t, &flags);
 
         if (unlikely(!calculated_number_isnumber(value))) {
             // not collected

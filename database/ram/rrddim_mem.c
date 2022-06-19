@@ -39,7 +39,7 @@ void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t st
     handle->handle = (STORAGE_QUERY_HANDLE *)h;
 }
 
-calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time, SN_FLAGS *flags) {
+calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) {
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     size_t entries = rd->rrdset->entries;
@@ -50,6 +50,7 @@ calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, t
 
     // set this timestamp for our caller
     *current_time = this_timestamp;
+    *end_time = h->next_timestamp;
 
     if(unlikely(this_timestamp < h->slot_timestamp)) {
         *flags = SN_EMPTY_SLOT;
