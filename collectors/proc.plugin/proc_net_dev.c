@@ -183,7 +183,8 @@ static struct netdev {
     RRDDIM *rd_operstate_testing;
     RRDDIM *rd_operstate_dormant;
     RRDDIM *rd_operstate_up;
-    RRDDIM *rd_carrier;
+    RRDDIM *rd_carrier_up;
+    RRDDIM *rd_carrier_down;
     RRDDIM *rd_mtu;
 
     char *filename_speed;
@@ -250,7 +251,8 @@ static void netdev_charts_release(struct netdev *d) {
     d->rd_duplex_full = NULL;
     d->rd_duplex_half = NULL;
     d->rd_duplex_unknown = NULL;
-    d->rd_carrier     = NULL;
+    d->rd_carrier_up = NULL;
+    d->rd_carrier_down = NULL;
     d->rd_mtu         = NULL;
 
     d->rd_operstate_unknown = NULL;
@@ -1099,11 +1101,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_update_rrdlabels(d->st_carrier, d->chart_labels);
 
-                d->rd_carrier = rrddim_add(d->st_carrier, "carrier",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_carrier_up = rrddim_add(d->st_carrier, "up",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_carrier_down = rrddim_add(d->st_carrier, "down",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_carrier);
 
-            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier, (collected_number)d->carrier);
+            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_up, (collected_number)(d->carrier == 1));
+            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_down, (collected_number)(d->carrier == 1));
             rrdset_done(d->st_carrier);
         }
 
