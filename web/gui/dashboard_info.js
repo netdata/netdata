@@ -1133,8 +1133,7 @@ const netOperstateInfo = '<p>The current ' +
     '<b>Testing</b> - the interface is in testing mode, e.g. cable test. It can’t be used for normal traffic until tests complete. ' +
     '<b>Dormant</b> - the interface is L1 up, but waiting for an external event, e.g. for a protocol to establish. ' +
     '<b>Up</b> - the interface is ready to pass packets and can be used.</p>'
-const netCarrierInfo = '<p>The current physical link state of the interface.</p>' +
-    '<p><b>State map</b>: 0 - down, 1 - up.</p>'
+const netCarrierInfo = 'The current physical link state of the interface.'
 const netSpeedInfo = 'The interface\'s latest or current speed that the network adapter ' +
     '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. ' +
     'This does not give the max supported speed of the NIC.'
