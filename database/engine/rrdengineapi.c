@@ -597,7 +597,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) {
+calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     if (unlikely(INVALID_TIME == handle->next_page_time)) {
@@ -615,7 +615,7 @@ calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_han
             // next calls will not load any more metrics
             handle->next_page_time = INVALID_TIME;
             handle->now = now;
-            *current_time = now;
+            *start_time = now;
             *end_time = now + handle->dt_sec;
             *flags = SN_EMPTY_SLOT;
             return NAN;
@@ -636,7 +636,7 @@ calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_han
     }
 
     *flags = n & SN_ALL_FLAGS;
-    *current_time = now;
+    *start_time = now;
     *end_time = now + handle->dt_sec;
     return unpack_storage_number(n);
 }

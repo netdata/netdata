@@ -475,20 +475,6 @@ static inline void rrd2rrdr_do_dimension(
     size_t new_point_anomaly = 0;
 
     for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; points_added < points_wanted ; now += dt) {
-        // make sure we return data in the proper time range
-        if(unlikely(now > before_wanted)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-            r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
-#endif
-            break;
-        }
-
-        if(unlikely(now < after_wanted)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-            r->internal.log = "skipped, because attempted to access the db before 'wanted after'";
-#endif
-            continue;
-        }
 
         // save the old point, in case we need it
         last_point_value      = new_point_value;
@@ -533,7 +519,7 @@ static inline void rrd2rrdr_do_dimension(
             new_point_anomaly = 0;
         }
 
-        for ( ; now < new_point_end_time && now <= before_wanted && points_added < points_wanted; now += dt) {
+        for ( ; now < new_point_end_time && points_added < points_wanted; now += dt) {
 
             calculated_number current_point_value;
             SN_FLAGS current_point_flags;
@@ -541,7 +527,7 @@ static inline void rrd2rrdr_do_dimension(
             //time_t current_point_start_time;
             //time_t current_point_end_time;
 
-            if(likely(now == new_point_start_time)) {
+            if(likely(new_point_start_time >= now)) {
                 // it is time for our NEW point to be used
                 current_point_value      = new_point_value;
                 current_point_flags      = new_point_flags;
