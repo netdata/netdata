@@ -456,14 +456,11 @@ static inline void rrd2rrdr_do_dimension(
 
     calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
-    time_t db_now = now;
-    time_t first_time_t = rrddim_first_entry_t(rd);
 
     // cache the function pointers we need in the loop
     calculated_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) = rd->state->query_ops.next_metric;
     void (*grouping_add)(struct rrdresult *r, calculated_number value) = r->internal.grouping_add;
     calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) = r->internal.grouping_flush;
-    RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
 
     calculated_number last_point_value;
     SN_FLAGS last_point_flags;

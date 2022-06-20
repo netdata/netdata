@@ -81,7 +81,6 @@ calculated_number exporting_calculate_value_from_stored_data(
     time_t last_t = rd->state->query_ops.latest_time(rd);
     time_t update_every = st->update_every;
     struct rrddim_query_handle handle;
-    storage_number n;
 
     // step back a little, to make sure we have complete data collection
     // for all metrics
