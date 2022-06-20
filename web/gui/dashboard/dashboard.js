@@ -63,7 +63,7 @@
  *                                                  (default: null) */
 /*global netdataAlarmsRecipients     *//* array,    an array of alarm recipients to show notifications for
  *                                                  (default: null) */
-/*global netdataAlarmsRemember       *//* boolen,   keep our position in the alarm log at browser local storage
+/*global netdataAlarmsRemember       *//* boolean,  keep our position in the alarm log at browser local storage
  *                                                  (default: true) */
 /*global netdataAlarmsActiveCallback *//* function, a hook for the alarm logs
  *                                                  (default: undefined) */
@@ -6618,7 +6618,7 @@ let chartState = function (element) {
             if (NETDATA.options.current.show_help) {
                 if (this.element_legend_childs.toolbox !== null) {
                     if (this.debug) {
-                        this.log('hideChart(): hidding legend popovers');
+                        this.log('hideChart(): hiding legend popovers');
                     }
 
                     $(this.element_legend_childs.toolbox_left).popover('hide');
@@ -8165,7 +8165,7 @@ let chartState = function (element) {
             }
         }
 
-        // create a hidden div to be used for hidding
+        // create a hidden div to be used for hiding
         // the original legend of the chart library
         let el = document.createElement('div');
         if (this.element_legend !== null) {

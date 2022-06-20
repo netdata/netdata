@@ -26,7 +26,7 @@ dist_web_DATA = \
     index.html \
     infographic.html \
     manifest.json \
-    precache-manifest.b443acc162e1adddca46165b647e9f4b.js \
+    precache-manifest.a3c7bee8fb06b17413fbec95627b0f50.js \
     refresh-badges.js \
     robots.txt \
     service-worker.js \
@@ -61,6 +61,8 @@ dist_webimages_DATA = \
     images/alert-128-red.png \
     images/alert-multi-size-orange.ico \
     images/alert-multi-size-red.ico \
+    images/alerts.jpg \
+    images/alerts.png \
     images/android-icon-144x144.png \
     images/android-icon-192x192.png \
     images/android-icon-36x36.png \
@@ -82,12 +84,14 @@ dist_webimages_DATA = \
     images/banner-icon-144x144.png \
     images/check-mark-2-128-green.png \
     images/check-mark-2-multi-size-green.ico \
+    images/dashboards.png \
     images/favicon-128.png \
     images/favicon-16x16.png \
     images/favicon-196x196.png \
     images/favicon-32x32.png \
     images/favicon-96x96.png \
     images/favicon.ico \
+    images/home.png \
     images/ms-icon-144x144.png \
     images/ms-icon-150x150.png \
     images/ms-icon-310x150.png \
@@ -96,8 +100,12 @@ dist_webimages_DATA = \
     images/ms-icon-70x70.png \
     images/netdata-logomark.svg \
     images/netdata.svg \
+    images/nodeView.png \
+    images/nodes.jpg \
+    images/overview.png \
     images/packaging-beta-tag.svg \
     images/post.png \
+    images/pricing.png \
     images/seo-performance-128.png \
     $(NULL)
 
@@ -139,9 +147,9 @@ webstaticjsdir=$(webdir)/static/js
 dist_webstaticjs_DATA = \
     static/js/10.44d9d40b.chunk.js \
     static/js/10.44d9d40b.chunk.js.map \
-    static/js/2.97b8fd9b.chunk.js \
-    static/js/2.97b8fd9b.chunk.js.LICENSE \
-    static/js/2.97b8fd9b.chunk.js.map \
+    static/js/2.f41a2523.chunk.js \
+    static/js/2.f41a2523.chunk.js.LICENSE \
+    static/js/2.f41a2523.chunk.js.map \
     static/js/3.d49f0857.chunk.js \
     static/js/3.d49f0857.chunk.js.map \
     static/js/4.8b70c754.chunk.js \
@@ -157,9 +165,9 @@ dist_webstaticjs_DATA = \
     static/js/8.b1a4b595.chunk.js.map \
     static/js/9.50358509.chunk.js \
     static/js/9.50358509.chunk.js.map \
-    static/js/main.2d23101e.chunk.js \
-    static/js/main.2d23101e.chunk.js.LICENSE \
-    static/js/main.2d23101e.chunk.js.map \
+    static/js/main.24015fd5.chunk.js \
+    static/js/main.24015fd5.chunk.js.LICENSE \
+    static/js/main.24015fd5.chunk.js.map \
     static/js/runtime-main.b352aa47.js \
     static/js/runtime-main.b352aa47.js.map \
     $(NULL)

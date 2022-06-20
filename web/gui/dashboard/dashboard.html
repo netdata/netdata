@@ -59,7 +59,7 @@ This is a template for building custom dashboards. To build a dashboard you just
     <li>You can use different chart libraries on the same page: <b>peity</b>, <b>sparkline</b>, <b>dygraph</b>, <b>google</b></li>
     <li>You can customize each chart to your preferences. For each chart library most of their attributes can be given in <b>data-</b> attributes.</li>
     <li>Each chart can have each own duration - it is controlled with the <b>data-after</b> attribute to give that many seconds of data.</li>
-    <li>Depending on the width of the chart and <b>data-after</b> attribute, netdata will automatically refresh the chart when it needs to be updated. For example giving 600 pixels for width for -600 seconds of data, using a chart library that needs 3 pixels per point, will yeld in a chart updated once every 3 seconds.</li>
+    <li>Depending on the width of the chart and <b>data-after</b> attribute, netdata will automatically refresh the chart when it needs to be updated. For example giving 600 pixels for width for -600 seconds of data, using a chart library that needs 3 pixels per point, will yield in a chart updated once every 3 seconds.</li>
 </ul>
 
 
@@ -518,7 +518,7 @@ Sparklines using dygraphs
 
 <hr>
 <h1>Google Charts</h1>
-Netdata was originaly developed with Google Charts.
+Netdata was originally developed with Google Charts.
 Netdata is a complete Google Visualization API provider.
 <br/>
 <div style="width: 33%; display: inline-block;">
@@ -559,7 +559,7 @@ Netdata is a complete Google Visualization API provider.
     
 <hr>
 <h1>Morris Charts</h1>
-Unfortunatelly, Morris Charts are very slow. Here we force them to lower their detail to get acceptable results.
+Unfortunately, Morris Charts are very slow. Here we force them to lower their detail to get acceptable results.
 <br/>
 <div style="width: 33%; display: inline-block;">
     <div data-netdata="system.processes"
@@ -601,8 +601,8 @@ Unfortunatelly, Morris Charts are very slow. Here we force them to lower their d
 C3 charts are not usable in large scale. They suffer from the following issues:
 <ul>
  <li>extreme use of transitions (implemented with D3 instead of CSS, meaning they are javascript rendered) that cannot be disabled - even opacity is hardcoded in the javascript library</li>
- <li>rendering is done with <code>SVG</code> instead of <code>canvas</code>, so they use DOM elements for every point, becomimg useless if more than 500 points are drawn</li>
- <li>lack of a <code>raw</code> data format, so every time a chart is updated, data convertion in javascript is required</li>
+ <li>rendering is done with <code>SVG</code> instead of <code>canvas</code>, so they use DOM elements for every point, becoming useless if more than 500 points are drawn</li>
+ <li>lack of a <code>raw</code> data format, so every time a chart is updated, data conversion in javascript is required</li>
  <li>lack of <code>stacked</code> charts support</li>
 </ul>
 So, to avoid flashing the charts, we destroy and re-create the charts on each update. Also, since they manipulate the data with javascript we were forced to lower the detail they render to get acceptable speeds.
