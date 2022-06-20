@@ -29,7 +29,7 @@ void Config::readMLConfig(void) {
      */
 
     unsigned MaxTrainSamples = config_get_number(ConfigSectionML, "maximum num samples to train", 4 * 3600);
-    unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 3600);
+    unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 900);
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
 
     unsigned DBEngineAnomalyRateEvery = config_get_number(ConfigSectionML, "dbengine anomaly rate every", 30);
