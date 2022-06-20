@@ -527,7 +527,10 @@ static inline void rrd2rrdr_do_dimension(
             //time_t current_point_start_time;
             //time_t current_point_end_time;
 
-            if(likely(new_point_start_time >= now)) {
+            // TODO this should be <= but the old unit tests fail when it is
+            // the way it is now, it assumes that dt is aligned to the
+            // database data collection, which may not always be the case.
+            if(likely(new_point_start_time == now)) {
                 // it is time for our NEW point to be used
                 current_point_value      = new_point_value;
                 current_point_flags      = new_point_flags;
