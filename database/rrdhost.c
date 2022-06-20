@@ -860,11 +860,11 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // release its children resources
 
-    STORAGE_ENGINE* eng = host->rrdeng_ctx->engine;
-    if (host->rrdeng_ctx != eng->context) {
-        if (eng && eng->api.engine_ops.exit)
-            eng->api.engine_ops.exit(host->rrdeng_ctx);
-    }
+    STORAGE_ENGINE_INSTANCE* ctx = host->rrdeng_ctx;
+    // Destroy the host-specific storage engine context, if any.
+    bool destroy_engine_context = ctx && ctx != ctx->engine->context;
+    if (destroy_engine_context)
+        ctx->engine->api.engine_ops.exit(ctx);
 
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
@@ -896,10 +896,9 @@ void rrdhost_free(RRDHOST *host) {
 
     health_alarm_log_free(host);
 
-    if (host->rrdeng_ctx != eng->context) {
-        if (eng)
-            eng->api.engine_ops.destroy(host->rrdeng_ctx);
-        host->rrdeng_ctx = NULL;
+    if (destroy_engine_context) {
+        ctx->engine->api.engine_ops.destroy(ctx);
+        ctx = NULL;
     }
 
     // ------------------------------------------------------------------------
