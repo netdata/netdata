@@ -23,6 +23,8 @@ The target number and the desired condition can be set using the `group_options`
 - `!0`, to match any number except zero.
 - `>=-3` to match any number bigger or equal to -3.
 
+. When an invalid condition is given, the web server can deliver a not accurate response.
+
 ## how to use
 
 This query cannot be used in alarms.
