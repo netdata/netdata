@@ -1044,9 +1044,9 @@ int do_system_ram(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_free,     vmmeter_data.v_free_count);
         rrddim_set_by_pointer(st, rd_active,   vmmeter_data.v_active_count);
         rrddim_set_by_pointer(st, rd_inactive, vmmeter_data.v_inactive_count);
-        rrddim_set_by_pointer(st, rd_wired,    vmmeter_data.v_wire_count * system_pagesize - zfs_arcstats_shrinkable_cache_size_bytes);
+        rrddim_set_by_pointer(st, rd_wired,    (unsigned long long)vmmeter_data.v_wire_count * (unsigned long long)system_pagesize - zfs_arcstats_shrinkable_cache_size_bytes);
 #if __FreeBSD_version < 1200016
-        rrddim_set_by_pointer(st, rd_cache,    vmmeter_data.v_cache_count * system_pagesize + zfs_arcstats_shrinkable_cache_size_bytes);
+        rrddim_set_by_pointer(st, rd_cache,    (unsigned long long)vmmeter_data.v_cache_count * (unsigned long long)system_pagesize + zfs_arcstats_shrinkable_cache_size_bytes);
 #else
         rrddim_set_by_pointer(st, rd_cache,    zfs_arcstats_shrinkable_cache_size_bytes);
 #endif
