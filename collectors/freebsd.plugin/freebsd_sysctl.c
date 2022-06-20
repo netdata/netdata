@@ -1077,9 +1077,9 @@ int do_system_ram(int update_every, usec_t dt) {
         else rrdset_next(st_mem_available);
 
 #if __FreeBSD_version < 1200016
-        rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + (vmmeter_data.v_cache_count * system_pagesize + zfs_arcstats_shrinkable_cache_size_bytes));
+        rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + vmmeter_data.v_cache_count + zfs_arcstats_shrinkable_cache_size_bytes / system_pagesize);
 #else
-        rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + zfs_arcstats_shrinkable_cache_size_bytes);
+        rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + zfs_arcstats_shrinkable_cache_size_bytes / system_pagesize);
 #endif
 
         rrdset_done(st_mem_available);
