@@ -19,7 +19,7 @@ started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide or
 documentation](/claim/README.md).
 
 ## Data privacy
-[Data privacy](https://netdata.cloud/data-privacy/) is very important to us. We firmly believe that your data belongs to
+[Data privacy](https://netdata.cloud/privacy/) is very important to us. We firmly believe that your data belongs to
 you. This is why **we don't store any metric data in Netdata Cloud**.
 
 All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. 
@@ -27,7 +27,7 @@ The data passes through our systems, but it isn't stored.
 
 However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
 
-Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/data-privacy) in the documentation.
+Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/privacy) in the documentation.
 
 
 ## Enable and configure the ACLK
