@@ -474,7 +474,7 @@ static inline void rrd2rrdr_do_dimension(
     time_t new_point_end_time = 0;
     size_t new_point_anomaly = 0;
 
-    for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; points_added < points_wanted ; now += dt) {
+    for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; now <= before_wanted && points_added < points_wanted ; now += dt) {
 
         // save the old point, in case we need it
         last_point_value      = new_point_value;
@@ -486,6 +486,14 @@ static inline void rrd2rrdr_do_dimension(
         if(likely(!rd->state->query_ops.is_finished(&handle))) {
             // fetch the new point
             new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags);
+
+            if(unlikely(new_point_start_time <= last_point_start_time && new_point_end_time <= last_point_end_time)) {
+                error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point start time %ld, end time %ld, before the last point start time %ld, end time %ld", rd->rrdset->name, rd->name, new_point_start_time, new_point_end_time, last_point_start_time, last_point_end_time);
+                new_point_value      = last_point_value;
+                new_point_flags      = last_point_flags;
+                new_point_start_time = last_point_start_time;
+                new_point_end_time   = last_point_end_time;
+            }
 
             if(unlikely(new_point_end_time < last_point_end_time)) {
                 error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point end time %ld, before the last point end time %ld", rd->rrdset->name, rd->name, new_point_end_time, last_point_end_time);
@@ -519,7 +527,8 @@ static inline void rrd2rrdr_do_dimension(
             new_point_anomaly = 0;
         }
 
-        for ( ; now < new_point_end_time && points_added < points_wanted; now += dt) {
+        size_t iterations = 0;
+        for ( ; now < new_point_end_time && now <= before_wanted && points_added < points_wanted; now += dt, iterations++) {
 
             calculated_number current_point_value;
             SN_FLAGS current_point_flags;
@@ -619,7 +628,8 @@ static inline void rrd2rrdr_do_dimension(
         // the loop above increased "now" by dt,
         // but the main loop will increase it,
         // so, let's undo the last iteration of this loop
-        now -= dt;
+        if(iterations)
+            now -= dt;
     }
     rd->state->query_ops.finalize(&handle);
 

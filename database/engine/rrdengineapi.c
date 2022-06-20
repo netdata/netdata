@@ -600,14 +600,18 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
-    if (unlikely(INVALID_TIME == handle->next_page_time)) {
-        *flags = SN_EMPTY_SLOT;
-        return NAN;
-    }
-
     struct rrdeng_page_descr *descr = handle->descr;
     unsigned position = handle->position + 1;
     time_t now = handle->now + handle->dt_sec;
+
+    if (unlikely(INVALID_TIME == handle->next_page_time)) {
+        handle->next_page_time = INVALID_TIME;
+        handle->now = now;
+        *start_time = now;
+        *end_time = now + handle->dt_sec;
+        *flags = SN_EMPTY_SLOT;
+        return NAN;
+    }
 
     if (unlikely(!descr || position >= handle->entries)) {
         // We need to get a new page

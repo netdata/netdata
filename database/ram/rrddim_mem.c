@@ -77,7 +77,7 @@ calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, t
 
 int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
-    return (h->next_timestamp >= handle->end_time);
+    return (h->next_timestamp > handle->end_time);
 }
 
 void rrddim_query_finalize(struct rrddim_query_handle *handle) {
