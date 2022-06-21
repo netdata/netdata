@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // NOT TO BE USED BY USERS YET
-#define DICTIONARY_FLAG_REFERENCE_COUNTERS (1 << 5) // maintain reference counter in walkthrough and foreach
+#define DICTIONARY_FLAG_REFERENCE_COUNTERS (1 << 28) // maintain reference counter in walkthrough and foreach
+#define DICTIONARY_FLAG_EXCLUSIVE_ACCESS   (1 << 29) // there is only one thread accessing the dictionary
 
 typedef struct dictionary DICTIONARY;
 #define DICTIONARY_INTERNALS
@@ -179,26 +180,57 @@ size_t dictionary_stats_walkthroughs(DICTIONARY *dict) {
 }
 
 static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->searches, 1, __ATOMIC_SEQ_CST);
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->searches++;
+    }
+    else {
+        __atomic_fetch_add(&dict->searches, 1, __ATOMIC_SEQ_CST);
+    }
 }
 static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICTIONARY *dict, size_t size) {
-    __atomic_fetch_add(&dict->inserts, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&dict->entries, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&dict->memory, size, __ATOMIC_SEQ_CST);
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->inserts++;
+        dict->entries++;
+        dict->memory += size;
+    }
+    else {
+        __atomic_fetch_add(&dict->inserts, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&dict->entries, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&dict->memory, size, __ATOMIC_SEQ_CST);
+    }
 }
 static inline void DICTIONARY_STATS_ENTRIES_MINUS1(DICTIONARY *dict, size_t size) {
-    __atomic_fetch_add(&dict->deletes, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_sub(&dict->memory, size, __ATOMIC_SEQ_CST);
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->deletes++;
+        dict->entries--;
+        dict->memory -= size;
+    }
+    else {
+        __atomic_fetch_add(&dict->deletes, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_sub(&dict->memory, size, __ATOMIC_SEQ_CST);
+    }
 }
 static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t oldsize, size_t newsize) {
-    __atomic_fetch_add(&dict->resets, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&dict->memory, newsize, __ATOMIC_SEQ_CST);
-    __atomic_fetch_sub(&dict->memory, oldsize, __ATOMIC_SEQ_CST);
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->resets++;
+        dict->memory += newsize;
+        dict->memory -= oldsize;
+    }
+    else {
+        __atomic_fetch_add(&dict->resets, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&dict->memory, newsize, __ATOMIC_SEQ_CST);
+        __atomic_fetch_sub(&dict->memory, oldsize, __ATOMIC_SEQ_CST);
+    }
 }
 
 static inline void DICTIONARY_STATS_WALKTHROUGHS_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->walkthroughs, 1, __ATOMIC_SEQ_CST);
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->walkthroughs++;
+    }
+    else {
+        __atomic_fetch_add(&dict->walkthroughs, 1, __ATOMIC_SEQ_CST);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -208,8 +240,14 @@ static inline size_t dictionary_lock_init(DICTIONARY *dict) {
     if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
             dict->rwlock = mallocz(sizeof(netdata_rwlock_t));
             netdata_rwlock_init(dict->rwlock);
+
+            if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)
+                dict->flags &= ~DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
+
             return sizeof(netdata_rwlock_t);
     }
+
+    dict->flags |= DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
     dict->rwlock = NULL;
     return 0;
 }
@@ -223,10 +261,13 @@ static inline size_t dictionary_lock_free(DICTIONARY *dict) {
     return 0;
 }
 
-static inline void dictionary_lock_rlock(DICTIONARY *dict) {
+static inline void dictionary_lock_rdlock(DICTIONARY *dict) {
     if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
         // debug(D_DICTIONARY, "Dictionary READ lock");
         netdata_rwlock_rdlock(dict->rwlock);
+
+        if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)
+            dict->flags &= ~DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
     }
 }
 
@@ -234,6 +275,8 @@ static inline void dictionary_lock_wrlock(DICTIONARY *dict) {
     if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
         // debug(D_DICTIONARY, "Dictionary WRITE lock");
         netdata_rwlock_wrlock(dict->rwlock);
+
+        dict->flags |= DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
     }
 }
 
@@ -241,6 +284,9 @@ static inline void dictionary_unlock(DICTIONARY *dict) {
     if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
         // debug(D_DICTIONARY, "Dictionary UNLOCK lock");
         netdata_rwlock_unlock(dict->rwlock);
+
+        if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)
+            dict->flags &= ~DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
     }
 }
 
@@ -661,6 +707,9 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
         return NULL;
     }
 
+    if(unlikely(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)))
+        error("DICTIONARY: INTERNAL ERROR: inserting dictionary item '%s' without exclusive access to dictionary", name);
+
     size_t name_len = strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
@@ -727,7 +776,7 @@ void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
 }
 
 void *dictionary_get(DICTIONARY *dict, const char *name) {
-    dictionary_lock_rlock(dict);
+    dictionary_lock_rdlock(dict);
     void *ret = dictionary_get_unsafe(dict, name);
     dictionary_unlock(dict);
     return ret;
@@ -738,6 +787,9 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
         error("Attempted to dictionary_det() without a name");
         return -1;
     }
+
+    if(unlikely(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)))
+        error("DICTIONARY: INTERNAL ERROR: deleting dictionary item '%s' without exclusive access to dictionary", name);
 
     size_t name_len = strlen(name) + 1; // we need the terminating null too
 
@@ -781,15 +833,15 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
 void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
     if(unlikely(!dfe || !dict)) return NULL;
 
-    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
-
     dfe->dict = dict;
     dfe->started_ut = now_realtime_usec();
 
     if(rw == 'r' || rw == 'R')
-        dictionary_lock_rlock(dict);
+        dictionary_lock_rdlock(dict);
     else
         dictionary_lock_wrlock(dict);
+
+    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     NAME_VALUE *nv = dict->first_item;
     dfe->last_position_index = (void *)nv;
@@ -862,12 +914,12 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
 int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
     if(unlikely(!dict)) return 0;
 
-    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
-
     if(rw == 'r' || rw == 'R')
-        dictionary_lock_rlock(dict);
+        dictionary_lock_rdlock(dict);
     else
         dictionary_lock_wrlock(dict);
+
+    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     // written in such a way, that the callback can delete the active element
 
@@ -904,12 +956,12 @@ static int dictionary_sort_compar(const void *nv1, const void *nv2) {
 int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
     if(unlikely(!dict || !dict->entries)) return 0;
 
-    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
-
     if(rw == 'r' || rw == 'R')
-        dictionary_lock_rlock(dict);
+        dictionary_lock_rdlock(dict);
     else
         dictionary_lock_wrlock(dict);
+
+    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     size_t count = dict->entries;
     NAME_VALUE **array = mallocz(sizeof(NAME_VALUE *) * count);

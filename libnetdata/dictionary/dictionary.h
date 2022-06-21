@@ -46,7 +46,10 @@ typedef enum dictionary_flags {
     DICTIONARY_FLAG_NAME_LINK_DONT_CLONE   = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
     DICTIONARY_FLAG_DONT_OVERWRITE_VALUE   = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICTIONARY_FLAG_ADD_IN_FRONT           = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
-    DICTIONARY_FLAG_RESERVED1              = (1 << 5), // this is reserved for DICTIONARY_FLAG_REFERENCE_COUNTERS
+
+    // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
+    DICTIONARY_FLAG_RESERVED1              = (1 << 28), // this is reserved for DICTIONARY_FLAG_REFERENCE_COUNTERS
+    DICTIONARY_FLAG_RESERVED2              = (1 << 29), // this is reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
