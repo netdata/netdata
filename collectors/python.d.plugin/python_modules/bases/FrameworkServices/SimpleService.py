@@ -95,8 +95,9 @@ class SimpleService(PythonDLimitedLogger, object):
 
     @property
     def name(self):
-        if self.job_name and self.job_name != self.module_name:
-            return '_'.join([self.module_name, self.override_name or self.job_name])
+        name = self.override_name or self.job_name
+        if name and name != self.module_name:
+            return '_'.join([self.module_name, name])
         return self.module_name
 
     def actual_name(self):
