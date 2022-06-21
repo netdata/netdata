@@ -183,34 +183,34 @@ Below is a list of all the available configuration params and their default valu
 
 If you would like to run ML on a parent instead of at the edge, some configuration options are illustrated below.
 
-This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/agent/streaming) to 1 parent node and illustrates the main ways you might want to configure running ml for the children on the parent, running ML on the children themselves, or even a mix of approaches.
+This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/agent/streaming) to 1 parent node and illustrates the main ways you might want to configure running ML for the children on the parent, running ML on the children themselves, or even a mix of approaches.
 
 ![parent_child_options](https://user-images.githubusercontent.com/2178292/164439761-8fb7dddd-c4d8-4329-9f44-9a794937a086.png)
 
 ```
-# parent will run ml for itself and child 1,2, it will skip running ml for child 0.
-# child 0 will run its own ml at the edge.
-# child 1 will run its own ml at the edge, even though parent will also run ml for it, a bit wasteful potentially to run ml in both places but is possible (Netdata Cloud will essentially average any overlapping models).
-# child 2 will not run ml at the edge, it will be run in the parent only.
+# parent will run ML for itself and child 1,2, it will skip running ML for child 0.
+# child 0 will run its own ML at the edge.
+# child 1 will run its own ML at the edge, even though parent will also run ML for it, a bit wasteful potentially to run ML in both places but is possible (Netdata Cloud will essentially average any overlapping models).
+# child 2 will not run ML at the edge, it will be run in the parent only.
 
 # parent-ml-enabled
-# run ml on all hosts apart from child-ml-enabled
+# run ML on all hosts apart from child-ml-enabled
 [ml]
         enabled = yes
         hosts to skip from training = child-0-ml-enabled
 
 # child-0-ml-enabled
-# run ml on child-0-ml-enabled
+# run ML on child-0-ml-enabled
 [ml]
         enabled = yes
 
 # child-1-ml-enabled
-# run ml on child-1-ml-enabled
+# run ML on child-1-ml-enabled
 [ml]
         enabled = yes
 
 # child-2-ml-disabled
-# do not run ml on child-2-ml-disabled
+# do not run ML on child-2-ml-disabled
 [ml]
         enabled = no
 ```
