@@ -1335,13 +1335,8 @@ error_after_loop_init:
  */
 void rrdengine_main(void)
 {
-    STORAGE_ENGINE_INSTANCE* ctx;
-
     sanity_check();
-    ctx = rrdeng_init(storage_engine_get(RRD_MEMORY_MODE_DBENGINE), NULL);
-    if (!ctx) {
-        exit(1);
-    }
+    STORAGE_ENGINE_INSTANCE* ctx = rrdeng_init(storage_engine_get(RRD_MEMORY_MODE_DBENGINE), NULL);
     rrdeng_exit(ctx);
     fprintf(stderr, "Hello world!");
     exit(0);
