@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // NOT TO BE USED BY USERS YET
-#define DICTIONARY_FLAG_REFERENCE_COUNTERS (1 << 28) // maintain reference counter in walkthrough and foreach
 #define DICTIONARY_FLAG_EXCLUSIVE_ACCESS   (1 << 29) // there is only one thread accessing the dictionary
 
 typedef struct dictionary DICTIONARY;
@@ -66,6 +65,11 @@ typedef struct dictionary DICTIONARY;
  *
  */
 
+typedef enum name_value_flags {
+    NAME_VALUE_FLAG_NONE                   = 0,
+    NAME_VALUE_FLAG_DELETED                = (1 << 0), // this item is deleted
+} NAME_VALUE_FLAGS;
+
 
 /*
  * Every item in the dictionary has the following structure.
@@ -84,25 +88,9 @@ typedef struct name_value {
     void *value;                // the value of the dictionary item
     char *name;                 // the name of the dictionary item
 
+    int refcount;               // the reference counter
+    NAME_VALUE_FLAGS flags;     // the flags for this item
 } NAME_VALUE;
-
-/*
- * When DICTIONARY_FLAG_REFERENCE_COUNTERS is set, we need to keep track of all the memory
- * we allocate and free. So, we need to keep track of the sizes of all names and values.
- * We do this by overloading NAME_VALUE with the following additional fields.
- */
-
-typedef enum name_value_flags {
-    NAME_VALUE_FLAG_NONE                   = 0,
-    NAME_VALUE_FLAG_DELETED                = (1 << 0), // this item is deleted
-} NAME_VALUE_FLAGS;
-
-typedef struct name_value_with_reference_counters {
-    NAME_VALUE name_value_data_here;    // never used - just to put the lengths at the right position
-
-    size_t refcount;                    // the reference counter
-    NAME_VALUE_FLAGS flags;             // the flags for this item
-} NAME_VALUE_WITH_REFERENCE_COUNTERS;
 
 struct dictionary {
     DICTIONARY_FLAGS flags;             // the flags of the dictionary
@@ -184,7 +172,7 @@ static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
         dict->searches++;
     }
     else {
-        __atomic_fetch_add(&dict->searches, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&dict->searches, 1, __ATOMIC_RELAXED);
     }
 }
 static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICTIONARY *dict, size_t size) {
@@ -194,21 +182,27 @@ static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICTIONARY *dict, size_t size)
         dict->memory += size;
     }
     else {
-        __atomic_fetch_add(&dict->inserts, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_add(&dict->entries, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_add(&dict->memory, size, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&dict->inserts, 1, __ATOMIC_RELAXED);
+        __atomic_fetch_add(&dict->entries, 1, __ATOMIC_RELAXED);
+        __atomic_fetch_add(&dict->memory, size, __ATOMIC_RELAXED);
     }
 }
-static inline void DICTIONARY_STATS_ENTRIES_MINUS1(DICTIONARY *dict, size_t size) {
+static inline void DICTIONARY_STATS_ENTRIES_MINUS1(DICTIONARY *dict) {
     if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
         dict->deletes++;
         dict->entries--;
+    }
+    else {
+        __atomic_fetch_add(&dict->deletes, 1, __ATOMIC_RELAXED);
+        __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_RELAXED);
+    }
+}
+static inline void DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(DICTIONARY *dict, size_t size) {
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
         dict->memory -= size;
     }
     else {
-        __atomic_fetch_add(&dict->deletes, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_sub(&dict->memory, size, __ATOMIC_SEQ_CST);
+        __atomic_fetch_sub(&dict->memory, size, __ATOMIC_RELAXED);
     }
 }
 static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t oldsize, size_t newsize) {
@@ -218,9 +212,9 @@ static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t 
         dict->memory -= oldsize;
     }
     else {
-        __atomic_fetch_add(&dict->resets, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_add(&dict->memory, newsize, __ATOMIC_SEQ_CST);
-        __atomic_fetch_sub(&dict->memory, oldsize, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&dict->resets, 1, __ATOMIC_RELAXED);
+        __atomic_fetch_add(&dict->memory, newsize, __ATOMIC_RELAXED);
+        __atomic_fetch_sub(&dict->memory, oldsize, __ATOMIC_RELAXED);
     }
 }
 
@@ -229,7 +223,7 @@ static inline void DICTIONARY_STATS_WALKTHROUGHS_PLUS1(DICTIONARY *dict) {
         dict->walkthroughs++;
     }
     else {
-        __atomic_fetch_add(&dict->walkthroughs, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&dict->walkthroughs, 1, __ATOMIC_RELAXED);
     }
 }
 
@@ -309,24 +303,31 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
     return 0;
 }
 
-static void reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
-        NAME_VALUE_WITH_REFERENCE_COUNTERS *nvs = (NAME_VALUE_WITH_REFERENCE_COUNTERS *)nv;
-        __atomic_fetch_add(&nvs->refcount, 1, __ATOMIC_SEQ_CST);
-    }
+static int reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
+    (void)dict;
+    return __atomic_add_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
 }
 
-static void reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
-        NAME_VALUE_WITH_REFERENCE_COUNTERS *nvs = (NAME_VALUE_WITH_REFERENCE_COUNTERS *)nv;
-        __atomic_fetch_sub(&nvs->refcount, 1, __ATOMIC_SEQ_CST);
+static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
+static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
+
+static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv) {
+    (void)dict;
+    int refcount = __atomic_sub_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
+
+    if((nv->flags & NAME_VALUE_FLAG_DELETED) && !refcount) {
+        linkedlist_namevalue_unlink_unsafe(dict, nv);
+        namevalue_destroy_unsafe(dict, nv);
     }
+
+    return refcount;
 }
 
 static int reference_counter_mark_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS)) {
-        NAME_VALUE_WITH_REFERENCE_COUNTERS *nvs = (NAME_VALUE_WITH_REFERENCE_COUNTERS *)nv;
-        nvs->flags |= NAME_VALUE_FLAG_DELETED;
+    (void)dict;
+    int refcount = __atomic_load_n(&nv->refcount, __ATOMIC_SEQ_CST);
+    if(refcount) {
+        nv->flags |= NAME_VALUE_FLAG_DELETED;
         return 1;
     }
     return 0;
@@ -522,17 +523,15 @@ static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VAL
 // ----------------------------------------------------------------------------
 // NAME_VALUE methods
 
-static inline size_t namevalue_alloc_size(DICTIONARY *dict) {
-    return (dict->flags & DICTIONARY_FLAG_REFERENCE_COUNTERS) ? sizeof(NAME_VALUE_WITH_REFERENCE_COUNTERS) : sizeof(NAME_VALUE);
-}
-
 static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
-    size_t size = namevalue_alloc_size(dict);
+    size_t size = sizeof(NAME_VALUE);
     NAME_VALUE *nv = mallocz(size);
     size_t allocated = size;
 
+    nv->refcount = 0;
+    nv->flags = NAME_VALUE_FLAG_NONE;
     nv->name_len = name_len;
     nv->value_len = value_len;
 
@@ -631,9 +630,9 @@ static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
     }
 
     freez(nv);
-    freed += namevalue_alloc_size(dict);
+    freed += sizeof(NAME_VALUE);
 
-    DICTIONARY_STATS_ENTRIES_MINUS1(dict, freed);
+    DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(dict, freed);
 
     return freed;
 }
@@ -643,11 +642,6 @@ static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
 
 DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
     debug(D_DICTIONARY, "Creating dictionary.");
-
-    if((flags & DICTIONARY_FLAG_REFERENCE_COUNTERS) && (flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
-        error("DICTIONARY: requested reference counters on single threaded dictionary. Not adding reference counters.");
-        flags &= ~DICTIONARY_FLAG_REFERENCE_COUNTERS;
-    }
 
     DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
     size_t allocated = sizeof(DICTIONARY);
@@ -816,6 +810,9 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
             namevalue_destroy_unsafe(dict, nv);
         }
         ret = 0;
+
+        DICTIONARY_STATS_ENTRIES_MINUS1(dict);
+
     }
     return ret;
 }
@@ -843,17 +840,21 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
 
     DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
+    // get the first item from the list
     NAME_VALUE *nv = dict->first_item;
-    dfe->last_position_index = (void *)nv;
+
+    // skip all the deleted items
+    while(nv && (nv->flags & NAME_VALUE_FLAG_DELETED))
+        nv = nv->next;
 
     if(likely(nv)) {
-        dfe->next_position_index = (void *)nv->next;
+        dfe->last_position_index = nv;
         dfe->name = nv->name;
-        dfe->value = (void *)nv->value;
+        dfe->value = nv->value;
         reference_counter_acquire(dict, nv);
     }
     else {
-        dfe->next_position_index = NULL;
+        dfe->last_position_index = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
     }
@@ -864,21 +865,28 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
 void *dictionary_foreach_next(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return NULL;
 
+    // the item we just did
     NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
+
+    // get the next item from the list
+    NAME_VALUE *nv_next = (nv) ? nv->next : NULL;
+
+    // skip all the deleted items
+    while(nv_next && (nv_next->flags & NAME_VALUE_FLAG_DELETED))
+        nv_next = nv_next->next;
+
+    // release the old, so that it can possibly be deleted
     if(likely(nv))
         reference_counter_release(dfe->dict, nv);
 
-    nv = dfe->last_position_index = dfe->next_position_index;
-
-    if(likely(nv)) {
-        dfe->next_position_index = (void *)nv->next;
+    if(likely(nv = nv_next)) {
+        dfe->last_position_index = nv;
         dfe->name = nv->name;
-        dfe->value = (void *)nv->value;
-
+        dfe->value = nv->value;
         reference_counter_acquire(dfe->dict, nv);
     }
     else {
-        dfe->next_position_index = NULL;
+        dfe->last_position_index = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
     }
@@ -889,14 +897,16 @@ void *dictionary_foreach_next(DICTFE *dfe) {
 usec_t dictionary_foreach_done(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return 0;
 
+    // the item we just did
     NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
-    if(nv)
+
+    // release it, so that it can possibly be deleted
+    if(likely(nv))
         reference_counter_release(dfe->dict, nv);
 
     dictionary_unlock((DICTIONARY *)dfe->dict);
     dfe->dict = NULL;
     dfe->last_position_index = NULL;
-    dfe->next_position_index = NULL;
     dfe->name = NULL;
     dfe->value = NULL;
 
@@ -926,11 +936,24 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
     int ret = 0;
     NAME_VALUE *nv = dict->first_item, *nv_next;
     while(nv) {
-        nv_next = nv->next;
 
+        // skip the deleted items
+        if(nv->flags & NAME_VALUE_FLAG_DELETED) {
+            nv = nv->next;
+            continue;
+        }
+
+        // get a reference counter, so that our item will not be deleted
+        // while we are using it
         reference_counter_acquire(dict, nv);
+
         int r = callback(nv->name, nv->value, data);
+
+        // since we have a reference counter, this item cannot be deleted
+        // until we release the reference counter, so the pointers are there
+        nv_next = nv->next;
         reference_counter_release(dict, nv);
+
         if(unlikely(r < 0)) {
             ret = r;
             break;
@@ -968,8 +991,10 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 
     size_t i;
     NAME_VALUE *nv;
-    for(nv = dict->first_item, i = 0; nv && i < count ;nv = nv->next, i++)
-        array[i] = nv;
+    for(nv = dict->first_item, i = 0; nv && i < count ;nv = nv->next) {
+        if(likely(!(nv->flags & NAME_VALUE_FLAG_DELETED)))
+            array[i++] = nv;
+    }
 
     if(unlikely(nv))
         error("DICTIONARY: during sorting expected to have %zu items in dictionary, but there are more. Sorted results may be incomplete. This is internal error - dictionaries fail to maintain an accurate number of the number of entries they have.", count);
@@ -983,7 +1008,10 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 
     int ret = 0;
     for(i = 0; i < count ;i++) {
-        int r = callback((array[i])->name, (array[i])->value, data);
+        nv = array[i];
+        reference_counter_acquire(dict, nv);
+        int r = callback(nv->name, nv->value, data);
+        reference_counter_release(dict, nv);
         if(r < 0) { ret = r; break; }
         ret += r;
     }
