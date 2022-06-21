@@ -307,19 +307,19 @@ static void test_exporting_calculate_value_from_stored_data(void **state)
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 0);
     expect_function_call(__mock_rrddim_query_next_metric);
-    will_return(__mock_rrddim_query_next_metric, pack_storage_number(27, SN_DEFAULT_FLAGS));
+    will_return(__mock_rrddim_query_next_metric, 27);
 
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 0);
     expect_function_call(__mock_rrddim_query_next_metric);
-    will_return(__mock_rrddim_query_next_metric, pack_storage_number(45, SN_DEFAULT_FLAGS));
+    will_return(__mock_rrddim_query_next_metric, 45);
 
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 1);
 
     expect_function_call(__mock_rrddim_query_finalize);
 
-    assert_int_equal(__real_exporting_calculate_value_from_stored_data(instance, rd, &timestamp), 36);
+    assert_float_equal(__real_exporting_calculate_value_from_stored_data(instance, rd, &timestamp), 36, 0.1);
 }
 
 static void test_prepare_buffers(void **state)
