@@ -895,6 +895,68 @@ lookup: mean -10s of user
 
 Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alarms, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
 
+### Example 8 - [Anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) based CPU dimensions alarm
+
+Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) for any CPU dimension is above 5%, critical if it goes above 20%:
+
+```yaml
+template: ml_5min_cpu_dims
+      on: system.cpu
+      os: linux
+   hosts: *
+  lookup: average -5m anomaly-bit foreach *
+    calc: $this
+   units: %
+   every: 30s
+    warn: $this > (($status >= $WARNING)  ? (5) : (20))
+    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    info: rolling 5min anomaly rate for each system.cpu dimension
+```
+
+The `lookup` line will calculate the average anomaly rate of each `system.cpu` dimension over the last 5 minues. In this case
+Netdata will create alarms for all dimensions of the chart.
+
+### Example 9 - [Anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) based CPU chart alarm
+
+Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) averaged across all CPU dimensions is above 5%, critical if it goes above 20%:
+
+```yaml
+template: ml_5min_cpu_chart
+      on: system.cpu
+      os: linux
+   hosts: *
+  lookup: average -5m anomaly-bit of *
+    calc: $this
+   units: %
+   every: 30s
+    warn: $this > (($status >= $WARNING)  ? (5) : (20))
+    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    info: rolling 5min anomaly rate for system.cpu chart
+```
+
+The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minues. In this case
+Netdata will create one alarm for the chart.
+
+### Example 10 - [Anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) based node level alarm
+
+Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) averaged across all ML enabled dimensions is above 5%, critical if it goes above 20%:
+
+```yaml
+template: ml_5min_node
+      on: anomaly_detection.anomaly_rate
+      os: linux
+   hosts: *
+  lookup: average -5m of anomaly_rate
+    calc: $this
+   units: %
+   every: 30s
+    warn: $this > (($status >= $WARNING)  ? (5) : (20))
+    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    info: rolling 5min anomaly rate for all ML enabled dims
+```
+
+The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://learn.netdata.cloud/docs/agent/ml#node-anomaly-rate) over the last 5 minues.
+
 ## Troubleshooting
 
 You can compile Netdata with [debugging](/daemon/README.md#debugging) and then set in `netdata.conf`:
