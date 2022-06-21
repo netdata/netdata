@@ -519,7 +519,6 @@ static inline void rrd2rrdr_do_dimension(
             }
         }
         else {
-            info("QUERY: query is finished - not fetching more points");
             new_point_value      = NAN;
             new_point_flags      = SN_EMPTY_SLOT;
             new_point_start_time = last_point_end_time;
