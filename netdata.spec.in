@@ -447,12 +447,20 @@ ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{
 
 %pre
 
-# User/Group creations, as needed
-getent group netdata >/dev/null || groupadd -r netdata
-getent group docker >/dev/null || groupadd -r docker
-getent passwd netdata >/dev/null || \
-  useradd -r -g netdata -G docker -s /sbin/nologin \
-    -d %{contentdir} -c "netdata" netdata
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+if ! getent passwd netdata > /dev/null; then
+  useradd --system -g netdata --home %{contentdir} --no-create-home -s /sbin/nologin -c "Netdata pseudo user" netdata
+fi
+
+# I am not sure that the corresponding group names are exactly the same as in Debian, but we should start somewhere, shouldn't we?
+for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
+  if getent group $item > /dev/null 2>&1; then
+    usermod -a -G $item netdata
+  fi
+done
 
 %post
 %{netdata_init_post}
