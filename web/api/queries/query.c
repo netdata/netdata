@@ -477,7 +477,11 @@ static inline void rrd2rrdr_do_dimension(
     for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; points_added < points_wanted ; now += dt) {
 
         // TODO - should be removed when before and after are always respected
-        // independently of the databaase first and last time
+        // independently of the databaase first and last time and points_wanted
+        // is set to a sane number for the user to get the timeframe wanted.
+        // Without the above, this check is needed to stop the loop when the
+        // points_wanted is set to an unreasonably high number for the duration
+        // of the query.
         if(unlikely(now > before_wanted))
             break;
 
@@ -491,6 +495,18 @@ static inline void rrd2rrdr_do_dimension(
         if(likely(!rd->state->query_ops.is_finished(&handle))) {
             // fetch the new point
             new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags);
+
+            if(likely(calculated_number_isnumber(new_point_value))) {
+                new_point_anomaly = (new_point_flags & SN_ANOMALY_BIT) ? 0 : 100;
+
+                if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
+                    new_point_value = (calculated_number)new_point_anomaly;
+            }
+            else {
+                new_point_flags   = SN_EMPTY_SLOT;
+                new_point_value   = NAN;
+                new_point_anomaly = 0;
+            }
 
             if(unlikely(new_point_start_time == new_point_end_time)) {
                 error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point start time %ld, end time %ld, that are both equal", rd->rrdset->name, rd->name, new_point_start_time, new_point_end_time);
@@ -523,18 +539,6 @@ static inline void rrd2rrdr_do_dimension(
             new_point_flags      = SN_EMPTY_SLOT;
             new_point_start_time = last_point_end_time;
             new_point_end_time   = now;
-        }
-
-        if(likely(calculated_number_isnumber(new_point_value))) {
-            new_point_anomaly = (new_point_flags & SN_ANOMALY_BIT) ? 0 : 100;
-
-            if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
-                new_point_value = (calculated_number)new_point_anomaly;
-        }
-        else {
-            new_point_flags   = SN_EMPTY_SLOT;
-            new_point_value   = NAN;
-            new_point_anomaly = 0;
         }
 
         size_t iterations = 0;
