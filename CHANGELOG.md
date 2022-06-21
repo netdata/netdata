@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- add k8s\_state dashboard\_info [\#13181](https://github.com/netdata/netdata/pull/13181) ([ilyam8](https://github.com/ilyam8))
+- Update dashboard to version v2.26.2. [\#13177](https://github.com/netdata/netdata/pull/13177) ([netdatabot](https://github.com/netdatabot))
+- feat\(proc/proc\_net\_dev\): add dim per phys link state to the "Interface Physical Link State" chart [\#13176](https://github.com/netdata/netdata/pull/13176) ([ilyam8](https://github.com/ilyam8))
+- set default for `minimum num samples to train` to `900` [\#13174](https://github.com/netdata/netdata/pull/13174) ([andrewm4894](https://github.com/andrewm4894))
 - Revert "Configurable storage engine for Netdata agents: step 3 \(\#12892\)" [\#13171](https://github.com/netdata/netdata/pull/13171) ([vkalintiris](https://github.com/vkalintiris))
 - Don’t manipulate positional parameters in DEB postinst script. [\#13169](https://github.com/netdata/netdata/pull/13169) ([Ferroin](https://github.com/Ferroin))
 - Fix coverity issues [\#13168](https://github.com/netdata/netdata/pull/13168) ([stelfrag](https://github.com/stelfrag))
@@ -350,8 +354,6 @@
 - Socket connections \(eBPF\) and bug fix [\#12532](https://github.com/netdata/netdata/pull/12532) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: use internal defaults for sched policy/oom score in native packages [\#12529](https://github.com/netdata/netdata/pull/12529) ([ilyam8](https://github.com/ilyam8))
 - docs: fix unresolved file references [\#12528](https://github.com/netdata/netdata/pull/12528) ([ilyam8](https://github.com/ilyam8))
-- fix\(kickstart.sh\): use `$ROOTCMD` when setting auto updates [\#12526](https://github.com/netdata/netdata/pull/12526) ([ilyam8](https://github.com/ilyam8))
-- fix\(netdata-updater\): properly handle update for debian packages [\#12524](https://github.com/netdata/netdata/pull/12524) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
