@@ -474,7 +474,12 @@ static inline void rrd2rrdr_do_dimension(
     time_t new_point_end_time = 0;
     size_t new_point_anomaly = 0;
 
-    for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; now <= before_wanted && points_added < points_wanted ; now += dt) {
+    for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; points_added < points_wanted ; now += dt) {
+
+        // TODO - should be removed when before and after are always respected
+        // independently of the databaase first and last time
+        if(unlikely(now > before_wanted))
+            break;
 
         // save the old point, in case we need it
         last_point_value      = new_point_value;
@@ -487,7 +492,12 @@ static inline void rrd2rrdr_do_dimension(
             // fetch the new point
             new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags);
 
-            if(unlikely(new_point_start_time <= last_point_start_time && new_point_end_time <= last_point_end_time)) {
+            if(unlikely(new_point_start_time == new_point_end_time)) {
+                error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point start time %ld, end time %ld, that are both equal", rd->rrdset->name, rd->name, new_point_start_time, new_point_end_time);
+                new_point_start_time = new_point_end_time - rd->update_every;
+            }
+
+            if(unlikely(new_point_start_time < last_point_start_time && new_point_end_time < last_point_end_time)) {
                 error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point start time %ld, end time %ld, before the last point start time %ld, end time %ld", rd->rrdset->name, rd->name, new_point_start_time, new_point_end_time, last_point_start_time, last_point_end_time);
                 new_point_value      = last_point_value;
                 new_point_flags      = last_point_flags;
@@ -504,15 +514,16 @@ static inline void rrd2rrdr_do_dimension(
             }
 
             if(unlikely(new_point_end_time < now)) {
-                error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point ending at %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld)", rd->rrdset->name, rd->name, new_point_end_time, now, after_wanted, before_wanted, dt);
-                new_point_end_time   = now + dt;
+                error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld)", rd->rrdset->name, rd->name, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted, dt);
+                new_point_end_time   = now;
             }
         }
         else {
+            info("QUERY: query is finished - not fetching more points");
             new_point_value      = NAN;
             new_point_flags      = SN_EMPTY_SLOT;
-            new_point_start_time = now;
-            new_point_end_time   = before_wanted + dt;
+            new_point_start_time = last_point_end_time;
+            new_point_end_time   = now;
         }
 
         if(likely(calculated_number_isnumber(new_point_value))) {
@@ -528,7 +539,7 @@ static inline void rrd2rrdr_do_dimension(
         }
 
         size_t iterations = 0;
-        for ( ; now < new_point_end_time && now <= before_wanted && points_added < points_wanted; now += dt, iterations++) {
+        for ( ; now <= new_point_end_time && points_added < points_wanted; now += dt, iterations++) {
 
             calculated_number current_point_value;
             SN_FLAGS current_point_flags;
@@ -536,10 +547,7 @@ static inline void rrd2rrdr_do_dimension(
             //time_t current_point_start_time;
             //time_t current_point_end_time;
 
-            // TODO this should be <= but the old unit tests fail when it is
-            // the way it is now, it assumes that dt is aligned to the
-            // database data collection, which may not always be the case.
-            if(likely(new_point_start_time == now)) {
+            if(likely(now > new_point_start_time)) {
                 // it is time for our NEW point to be used
                 current_point_value      = new_point_value;
                 current_point_flags      = new_point_flags;
@@ -547,7 +555,7 @@ static inline void rrd2rrdr_do_dimension(
                 //current_point_start_time = new_point_start_time;
                 //current_point_end_time   = new_point_end_time;
             }
-            else if(likely(last_point_end_time >= now)) {
+            else if(likely(now <= last_point_end_time)) {
                 // our LAST point is still valid
                 current_point_value      = last_point_value;
                 current_point_flags      = last_point_flags;
@@ -560,7 +568,7 @@ static inline void rrd2rrdr_do_dimension(
                 current_point_value      = NAN;
                 current_point_flags      = SN_EMPTY_SLOT;
                 current_point_anomaly    = 0;
-                //current_point_start_time = now;
+                //current_point_start_time = now - dt;
                 //current_point_end_time   = now;
             }
 
@@ -642,10 +650,8 @@ static inline void rrd2rrdr_do_dimension(
     r->after = min_date - (r->group - 1) * dt;
     rrdr_done(r, rrdr_line);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(r->rows != points_added))
-        error("INTERNAL ERROR: %s.%s added %zu rows, but RRDR says I added %zu.", r->st->name, rd->name, (size_t)points_added, (size_t)r->rows);
-#endif
+    if(unlikely(points_wanted != points_added))
+        error("QUERY: INTERNAL ERROR: query on %s/%s requested %zu points, but RRDR added %zu.", r->st->name, rd->name, (size_t)points_wanted, (size_t)points_added);
 }
 
 // ----------------------------------------------------------------------------

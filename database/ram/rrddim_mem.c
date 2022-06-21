@@ -52,8 +52,8 @@ calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, t
     h->next_timestamp += h->dt;
 
     // set this timestamp for our caller
-    *start_time = this_timestamp;
-    *end_time = h->next_timestamp;
+    *start_time = this_timestamp - h->dt;
+    *end_time = this_timestamp;
 
     if(unlikely(this_timestamp < h->slot_timestamp)) {
         *flags = SN_EMPTY_SLOT;

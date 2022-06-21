@@ -1687,6 +1687,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
     calculated_number value, expected;
     SN_FLAGS nflags;
     struct rrddim_query_handle handle;
+    size_t value_errors = 0, time_errors = 0;
 
     update_every = REGION_UPDATE_EVERY[current_region];
     errors = 0;
@@ -1707,14 +1708,18 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 
                     same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
                     if(!same) {
-                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
+                        if(!value_errors)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
                                         CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
                                 st[i]->name, rd[i][j]->name, (unsigned long)time_now + k * update_every, expected, value);
+                        value_errors++;
                         errors++;
                     }
-                    if(time_retrieved != time_now + k * update_every) {
-                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
+                    if(end_time != time_now + k * update_every) {
+                        if(!time_errors)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
                                 st[i]->name, rd[i][j]->name, (unsigned long)time_now + k * update_every, (unsigned long)time_retrieved);
+                        time_errors++;
                         errors++;
                     }
                 }
@@ -1722,6 +1727,13 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
             }
         }
     }
+
+    if(value_errors)
+        fprintf(stderr, "%zu value errors encountered\n", value_errors);
+
+    if(time_errors)
+        fprintf(stderr, "%zu time errors encountered\n", time_errors);
+
     return errors;
 }
 
@@ -1729,20 +1741,20 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS],
                                     int current_region, time_t time_start, time_t time_end)
 {
-    fprintf(stderr, "%s() running on region %d...\n", __FUNCTION__, current_region);
+    int update_every = REGION_UPDATE_EVERY[current_region];
+    fprintf(stderr, "%s() running on region %d, start time %ld, end time %ld, update every %d...\n", __FUNCTION__, current_region, time_start, time_end, update_every);
     uint8_t same;
     time_t time_now, time_retrieved;
-    int i, j, errors, value_errors = 0, time_errors = 0, update_every;
+    int i, j, errors, value_errors = 0, time_errors = 0;
     long c;
     collected_number last;
     calculated_number value, expected;
 
     errors = 0;
-    update_every = REGION_UPDATE_EVERY[current_region];
     long points = (time_end - time_start) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, st[i], points, time_start + update_every, time_end, RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL, NULL, 0);
+        RRDR *r = rrd2rrdr(owa, st[i], points, time_start, time_end, RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL, NULL, 0);
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", st[i]->name, current_region);
             return ++errors;
@@ -1750,7 +1762,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
             assert(r->st == st[i]);
             for (c = 0; c != rrdr_rows(r) ; ++c) {
                 RRDDIM *d;
-                time_now = time_start + (c + 2) * update_every;
+                time_now = time_start + (c + 1) * update_every;
                 time_retrieved = r->t[c];
 
                 // for each dimension
@@ -1759,12 +1771,12 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                     value = cn[j];
                     assert(rd[i][j] == d);
 
-                    last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c + 1;
+                    last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c;
                     expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
 
                     same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
                     if(!same) {
-                        if(!value_errors)
+                        if(value_errors < 10)
                             fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
                                         CALCULATED_NUMBER_FORMAT ", RRDR found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
                                 st[i]->name, rd[i][j]->name, (unsigned long)time_now, expected, value);
@@ -1782,6 +1794,13 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
         }
         onewayalloc_destroy(owa);
     }
+
+    if(value_errors)
+        fprintf(stderr, "%d value errors encountered\n", value_errors);
+
+    if(time_errors)
+        fprintf(stderr, "%d time errors encountered\n", time_errors);
+
     return errors + value_errors + time_errors;
 }
 
@@ -2093,6 +2112,7 @@ static void query_dbengine_chart(void *arg)
     calculated_number value, expected;
     SN_FLAGS nflags;
     struct rrddim_query_handle handle;
+    size_t value_errors = 0, time_errors = 0;
 
     do {
         // pick a chart and dimension
@@ -2149,24 +2169,34 @@ static void query_dbengine_chart(void *arg)
             same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
             if (!same) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
+                    if(!value_errors)
+                       fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
                                     CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT
                                     ", ### E R R O R ###\n",
                             st->name, rd->name, (unsigned long) time_now, expected, value);
-                    ++thread_info->errors;
+                    value_errors++;
+                    thread_info->errors++;
                 }
             }
-            if (time_retrieved != time_now) {
+            if (end_time != time_now) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr,
+                    if(!time_errors)
+                        fprintf(stderr,
                             "    DB-engine stresstest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
                             st->name, rd->name, (unsigned long) time_now, (unsigned long) time_retrieved);
-                    ++thread_info->errors;
+                    time_errors++;
+                    thread_info->errors++;
                 }
             }
         }
         rd->state->query_ops.finalize(&handle);
     } while(!thread_info->done);
+
+    if(value_errors)
+        fprintf(stderr, "%zu value errors encountered\n", value_errors);
+
+    if(time_errors)
+        fprintf(stderr, "%zu time errors encountered\n", time_errors);
 }
 
 void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsigned QUERY_THREADS,

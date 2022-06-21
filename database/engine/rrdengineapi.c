@@ -511,6 +511,8 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
  */
 void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time)
 {
+    // fprintf(stderr, "%s: %s/%s start time %ld, end time %ld\n", __FUNCTION__ , rd->rrdset->name, rd->name, start_time, end_time);
+
     struct rrdeng_query_handle *handle;
     struct rrdengine_instance *ctx;
     unsigned pages_nr;
@@ -522,6 +524,8 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
+    handle->dt = rd->update_every * USEC_PER_SEC;
+    handle->dt_sec = rd->update_every;
     handle->position = 0;
     handle->ctx = ctx;
     handle->descr = NULL;
@@ -529,7 +533,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     pages_nr = pg_cache_preload(ctx, rd->state->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
                                 NULL, &handle->page_index);
     if (unlikely(NULL == handle->page_index || 0 == pages_nr))
-        /* there are no metrics to load */
+        // there are no metrics to load
         handle->next_page_time = INVALID_TIME;
 }
 
@@ -588,7 +592,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     if (likely(entries > 1))
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
 
-    handle->dt_sec = handle->dt / USEC_PER_SEC;
+    handle->dt_sec = (time_t)(handle->dt / USEC_PER_SEC);
     handle->position = position;
 
     return 0;
@@ -607,8 +611,8 @@ calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_han
     if (unlikely(INVALID_TIME == handle->next_page_time)) {
         handle->next_page_time = INVALID_TIME;
         handle->now = now;
-        *start_time = now;
-        *end_time = now + handle->dt_sec;
+        *start_time = now - handle->dt_sec;
+        *end_time = now;
         *flags = SN_EMPTY_SLOT;
         return NAN;
     }
@@ -619,8 +623,8 @@ calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_han
             // next calls will not load any more metrics
             handle->next_page_time = INVALID_TIME;
             handle->now = now;
-            *start_time = now;
-            *end_time = now + handle->dt_sec;
+            *start_time = now - handle->dt_sec;
+            *end_time = now;
             *flags = SN_EMPTY_SLOT;
             return NAN;
         }
@@ -640,8 +644,8 @@ calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_han
     }
 
     *flags = n & SN_ALL_FLAGS;
-    *start_time = now;
-    *end_time = now + handle->dt_sec;
+    *start_time = now - handle->dt_sec;
+    *end_time = now;
     return unpack_storage_number(n);
 }
 
