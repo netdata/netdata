@@ -749,7 +749,7 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
     return ret;
 }
 
-void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
+static NAME_VALUE *dictionary_get_name_value_unsafe(DICTIONARY *dict, const char *name) {
     if(unlikely(!name || !*name)) {
         error("Attempted to dictionary_get() without a name");
         return NULL;
@@ -766,6 +766,15 @@ void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
     }
 
     debug(D_DICTIONARY, "Found dictionary entry with name '%s'.", name);
+    return nv;
+}
+
+void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
+    NAME_VALUE *nv = dictionary_get_name_value_unsafe(dict, name);
+
+    if(unlikely(!nv))
+        return NULL;
+
     return nv->value;
 }
 
@@ -774,6 +783,41 @@ void *dictionary_get(DICTIONARY *dict, const char *name) {
     void *ret = dictionary_get_unsafe(dict, name);
     dictionary_unlock(dict);
     return ret;
+}
+
+void *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name) {
+    NAME_VALUE *nv = dictionary_get_name_value_unsafe(dict, name);
+
+    if(unlikely(!nv))
+        return NULL;
+
+    reference_counter_acquire(dict, nv);
+    return nv;
+}
+
+void *dictionary_acquire_item(DICTIONARY *dict, const char *name) {
+    dictionary_lock_rdlock(dict);
+    void *ret = dictionary_acquire_item_unsafe(dict, name);
+    dictionary_unlock(dict);
+    return ret;
+}
+
+void *dictionary_acquired_item_value(DICTIONARY *dict, void *item) {
+    (void)dict;
+    if(!item) return NULL;
+
+    NAME_VALUE *nv = (NAME_VALUE *)item;
+    return nv->value;
+}
+
+void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, void *item) {
+    if(!item) return;
+    NAME_VALUE *nv = (NAME_VALUE *)item;
+    reference_counter_release(dict, nv);
+}
+
+void dictionary_acquired_item_release(DICTIONARY *dict, void *item) {
+    dictionary_acquired_item_release_unsafe(dict, item);
 }
 
 int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
