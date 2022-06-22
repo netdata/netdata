@@ -1340,8 +1340,9 @@ send_telegram() {
   if [ "${SEND_TELEGRAM}" = "YES" ] && [ -n "${bottoken}" ] && [ -n "${chatids}" ] && [ -n "${message}" ]; then
     for chatid in ${chatids}; do
       successful=0
+      attempt_counter=0
 
-      while [ ${successful} -eq 0 ]; do
+      while [ ${successful} -eq 0 ] && [ ${attempt_counter} -lt 60 ]; do
         # https://core.telegram.org/bots/api#sendmessage
         httpcode=$(docurl ${disableNotification} \
           --data-urlencode "parse_mode=HTML" \
@@ -1350,6 +1351,7 @@ send_telegram() {
           "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
 
         successful=1
+        attempt_counter=$((attempt_counter + 1))
 
         if [ "${httpcode}" = "200" ]; then
           info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
