@@ -12,16 +12,16 @@ database engine helps you store a much larger dataset than the amount of RAM you
 On a system that's collecting approximately 2,000 metrics every second, the database engine's default configuration will
 store about two days worth of metrics in RAM and on disk.
 
-That's a lot of metrics. We're talking 345,600,000 individual data points. And the database engine does it with a tiny a
+That's a lot of metrics. We're talking 345,600,000 individual data points. And the database engine does it with a tiny
 footprint in the RAM available of any system.
 
-To increase the data retention of your collected metrics you could do that with two ways:
+You can increase the data retention of your collected metrics in the following three ways:
 
 1. Increase the data retention for the node in question (if the nodes has enough resources)
 2. Set up a parent Netdata Agent to act as a centralized database for multiple Agents.
 3. Archive metrics to an external database
 
-The third option is just an archive of your data, you will be able to see them only by querying the DB (in which you
+The third option is just an archive of your data; you will be able to see them only by querying the DB (in which you
 exported your metrics) and implementing custom dashboards.
 
 ## What you'll learn in this step
@@ -60,7 +60,7 @@ set `dbengine multihost disk space` based on your needs. The calculator gives an
 many child nodes you have, how many metrics your Agent collects, and more.
 
 These values above are the defaults, to change the data retention you mostly care about the
-`dbengine multihost disk space`. The higher this value, the more metrics Netdata will store. For example a value of
+`dbengine multihost disk space`. The higher this value, the more metrics Netdata will store. For example, a value of
 524 (in MiB) the database engine should store about two days worth of data on a system collecting 2,000 metrics every
 second.
 
@@ -81,24 +81,24 @@ Done!
 
 ## Set up a parent node to act as a centralize database for multiple Agents
 
-> For this how-to you will need to have installed the Agent in two different hosts that can talk to each other
+> For this how-to, you will need to have installed the Agent in two different hosts that can talk to each other.
 
 ### Intermediate steps of this guide
 
-What will cover in this guide:
+What we will cover in this guide:
 
-1. Configure the Agents in a parent-child architecture (enable streaming between nodes)
-2. Configure the parent Agent to retain its data for a greater period.
+1. Configuring the Agents in a parent-child architecture (enable streaming between nodes)
+2. Configuring the parent Agent to retain its data for a greater period.
 
 #### Configure the Agents in a parent-child architecture
 
-> We recommend you to follow the [Enable streaming between node](/docs/metrics-storage-management/enable-streaming.md)
-> guide to explore all the options of this process, otherwise stick to the following instructions for the least
+> We recommend you follow the [Enable streaming between node](/docs/metrics-storage-management/enable-streaming.md)
+> guide to explore all the options of this process; otherwise, stick to the following instructions for the least
 > actions you need to do.
 
 ##### Enable streaming on the parent node
 
-First, log onto the node that will act as the parent.
+First, log on to the node that will act as the parent.
 
 Run `uuidgen` to create a new API key, which is a randomly-generated machine GUID the Netdata Agent uses to identify
 itself while initiating a streaming connection. Copy that into a separate text file for later use.
@@ -155,18 +155,19 @@ the [appropriate method](/docs/configure/start-stop-restart.md) for your system.
 
 #### Configure the parent Agent to retain its data for a greater period.
 
-Here we won't introduce new actions here, you need to follow
+We won't introduce new actions here. You need to follow
 the [Configure the Agent to retain its data for a greater period](#Configure-the-Agent-to-retain-its-data-for-a-greater-period)
-guide we presented above, but we will focus on some aspects of it
+guide we presented above, but we will focus on some aspects of it.
 
-In this guide we will highlight this: _`dbengine multihost disk space` parameter determines the amount of disk space (in
-MiB) Netdata can allocate from the host for **any data** (metrics)_ sentence, which needs a bit more explanation. A
-parent now will need to balance it's available space for:
+IFrom this this guide, we  can a bit more explanation to this sentence: _`dbengine multihost disk space` parameter determines the amount of disk space (in
+MiB) Netdata can allocate from the host for **any data** (metrics)_. 
+
+A parent now will need to balance its available space for:
 
 1. The metrics it collects (its own database)
 2. The metrics every child collects
 
-That means that you need to take into consideration and all the metrics your children collect and include this info to
+This means that you need to consider all the metrics your children collect and include this information to
 your calculations in the [**database engine calculator**](/docs/store/change-metrics-storage.md)
 
 ## Archive metrics to an external database
