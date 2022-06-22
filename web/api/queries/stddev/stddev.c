@@ -14,7 +14,7 @@ struct grouping_stddev {
     calculated_number m_oldM, m_newM, m_oldS, m_newS;
 };
 
-void grouping_create_stddev(RRDR *r) {
+void grouping_create_stddev(RRDR *r, const char *options __maybe_unused) {
     r->internal.grouping_data = callocz(1, sizeof(struct grouping_stddev));
 }
 

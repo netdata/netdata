@@ -511,6 +511,8 @@ API_PLUGIN_FILES = \
     web/api/exporters/shell/allmetrics_shell.h \
     web/api/queries/average/average.c \
     web/api/queries/average/average.h \
+    web/api/queries/countif/countif.c \
+    web/api/queries/countif/countif.h \
     web/api/queries/des/des.c \
     web/api/queries/des/des.h \
     web/api/queries/incremental_sum/incremental_sum.c \

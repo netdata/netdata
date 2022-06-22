@@ -230,13 +230,16 @@ int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle)
     return mock_type(int);
 }
 
-storage_number __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time)
+calculated_number __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags)
 {
     (void)handle;
-    (void)current_time;
+    (void)start_time;
+    (void)end_time;
+    (void) flags;
+
 
     function_called();
-    return mock_type(storage_number);
+    return mock_type(calculated_number);
 }
 
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)

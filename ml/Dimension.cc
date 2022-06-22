@@ -6,55 +6,6 @@
 
 using namespace ml;
 
-/*
- * Copy of the unpack_storage_number which allows us to convert
- * a storage_number to double.
- */
-static CalculatedNumber unpack_storage_number_dbl(storage_number value) {
-    if(!value)
-        return 0;
-
-    int sign = 0, exp = 0;
-    int factor = 10;
-
-    // bit 32 = 0:positive, 1:negative
-    if(unlikely(value & (1 << 31)))
-        sign = 1;
-
-    // bit 31 = 0:divide, 1:multiply
-    if(unlikely(value & (1 << 30)))
-        exp = 1;
-
-    // bit 27 SN_EXISTS_100
-    if(unlikely(value & (1 << 26)))
-        factor = 100;
-
-    // bit 26 SN_EXISTS_RESET
-    // bit 25 SN_ANOMALY_BIT
-
-    // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
-    int mul = (value & ((1<<29)|(1<<28)|(1<<27))) >> 27;
-
-    // bit 24 to bit 1 = the value, so remove all other bits
-    value ^= value & ((1<<31)|(1<<30)|(1<<29)|(1<<28)|(1<<27)|(1<<26)|(1<<25)|(1<<24));
-
-    CalculatedNumber CN = value;
-
-    if(exp) {
-        for(; mul; mul--)
-            CN *= factor;
-    }
-    else {
-        for( ; mul ; mul--)
-            CN /= 10;
-    }
-
-    if(sign)
-        CN = -CN;
-
-    return CN;
-}
-
 std::pair<CalculatedNumber *, size_t>
 TrainableDimension::getCalculatedNumbers() {
     size_t MinN = Cfg.MinTrainSamples;
@@ -89,10 +40,10 @@ TrainableDimension::getCalculatedNumbers() {
             break;
 
         auto P = Q.nextMetric();
-        storage_number SN = P.second;
+        CalculatedNumber Value = P.second;
 
-        if (does_storage_number_exist(SN)) {
-            CNs[Idx] = unpack_storage_number_dbl(SN);
+        if (calculated_number_isnumber(Value)) {
+            CNs[Idx] = Value;
             LastValue = CNs[Idx];
             CollectedValues++;
         } else

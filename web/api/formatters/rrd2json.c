@@ -158,6 +158,7 @@ int rrdset2value_api_v1(
         , long long after
         , long long before
         , int group_method
+        , const char *group_options
         , long group_time
         , uint32_t options
         , time_t *db_after
@@ -165,13 +166,16 @@ int rrdset2value_api_v1(
         , size_t *db_points_read
         , size_t *result_points_generated
         , int *value_is_null
+        , uint8_t *anomaly_rate
         , int timeout
 ) {
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     ONEWAYALLOC *owa = onewayalloc_create(0);
 
-    RRDR *r = rrd2rrdr(owa, st, points, after, before, group_method, group_time, options, dimensions, NULL, timeout);
+    RRDR *r = rrd2rrdr(owa, st, points, after, before,
+                       group_method, group_time, options, dimensions, NULL,
+                       group_options, timeout);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -205,7 +209,7 @@ int rrdset2value_api_v1(
     if(db_before) *db_before = r->before;
 
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
-    *n = rrdr2value(r, i, options, value_is_null, NULL);
+    *n = rrdr2value(r, i, options, value_is_null, anomaly_rate, NULL);
     ret = HTTP_RESP_OK;
 
 cleanup:
@@ -224,6 +228,7 @@ int rrdset2anything_api_v1(
         , long long after
         , long long before
         , int group_method
+        , const char *group_options
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
@@ -244,6 +249,7 @@ int rrdset2anything_api_v1(
         options,
         dimensions ? buffer_tostring(dimensions) : NULL,
         query_params->context_param_list,
+        group_options,
         query_params->timeout);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
@@ -425,8 +431,13 @@ int rrdset2anything_api_v1(
 
         rrdr2json(r, wb, options, 0, query_params->context_param_list);
 
-        if(options & RRDR_OPTION_JSON_WRAP)
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            if(options & RRDR_OPTION_RETURN_JWAR) {
+                rrdr_json_wrapper_anomaly_rates(r, wb, format, options, 0);
+                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, 0, query_params->context_param_list);
+            }
             rrdr_json_wrapper_end(r, wb, format, options, 0);
+        }
         break;
     }
 

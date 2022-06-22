@@ -91,6 +91,7 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r->v);
     onewayalloc_freez(owa, r->o);
     onewayalloc_freez(owa, r->od);
+    onewayalloc_freez(owa, r->ar);
     onewayalloc_freez(owa, r);
 }
 
@@ -125,6 +126,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_pa
     r->t = onewayalloc_callocz(owa, (size_t)n, sizeof(time_t));
     r->v = onewayalloc_mallocz(owa, n * r->d * sizeof(calculated_number));
     r->o = onewayalloc_mallocz(owa, n * r->d * sizeof(RRDR_VALUE_FLAGS));
+    r->ar = onewayalloc_mallocz(owa, n * r->d * sizeof(uint8_t));
     r->od = onewayalloc_mallocz(owa, r->d * sizeof(RRDR_DIMENSION_FLAGS));
 
     // set the hidden flag on hidden dimensions

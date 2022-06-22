@@ -9,6 +9,7 @@ int metric_correlations_version = 1;
 METRIC_CORRELATIONS_METHOD default_metric_correlations_method = METRIC_CORRELATIONS_KS2;
 
 typedef struct mc_stats {
+    calculated_number max_base_high_ratio;
     size_t db_points;
     size_t result_points;
     size_t db_queries;
@@ -46,7 +47,13 @@ const char *mc_method_to_string(METRIC_CORRELATIONS_METHOD method) {
 // ----------------------------------------------------------------------------
 // The results per dimension are aggregated into a dictionary
 
+typedef enum {
+    RESULT_IS_BASE_HIGH_RATIO     = (1 << 0),
+    RESULT_IS_PERCENTAGE_OF_TIME  = (1 << 1),
+} RESULT_FLAGS;
+
 struct register_result {
+    RESULT_FLAGS flags;
     RRDSET *st;
     const char *chart_id;
     const char *context;
@@ -86,15 +93,26 @@ static void register_result_destroy(DICTIONARY *results) {
     dictionary_destroy(results);
 }
 
-static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, calculated_number value) {
+static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, calculated_number value, RESULT_FLAGS flags, MC_STATS *stats) {
     if(!calculated_number_isnumber(value)) return;
 
+    // make it positive
+    calculated_number v = calculated_number_fabs(value);
+
+    // no need to store zero scored values
+    if(v == 0.0) return;
+
+    // keep track of the max of the baseline / highlight ratio
+    if(flags & RESULT_IS_BASE_HIGH_RATIO && v > stats->max_base_high_ratio)
+        stats->max_base_high_ratio = v;
+
     struct register_result t = {
+        .flags = flags,
         .st = st,
         .chart_id = st->id,
         .context = st->context,
         .dim_name = d->name,
-        .value = value
+        .value = v
     };
 
     char buf[5000 + 1];
@@ -361,7 +379,8 @@ static double kstwo(calculated_number baseline[], int baseline_points, calculate
 static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                           long long baseline_after, long long baseline_before,
                                           long long after, long long before,
-                                          long long points, RRDR_OPTIONS options, RRDR_GROUPING group,
+                                          long long points, RRDR_OPTIONS options,
+                                          RRDR_GROUPING group, const char *group_options,
                                           uint32_t shifts, int timeout, MC_STATS *stats) {
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
@@ -377,7 +396,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     ONEWAYALLOC *owa = onewayalloc_create(0);
     high_rrdr = rrd2rrdr(owa, st, points,
                          after, before, group,
-                         group_time, options, NULL, context_param_list, timeout);
+                         group_time, options, NULL, context_param_list, group_options,
+                         timeout);
     if(!high_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
         goto cleanup;
@@ -402,7 +422,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_queries++;
     base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
                     baseline_after, baseline_before, group,
-                    group_time, options, NULL, context_param_list,
+                    group_time, options, NULL, context_param_list, group_options,
                     (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)));
     if(!base_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
@@ -477,7 +497,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
 
             // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
             // so we flip the result of kstwo()
-            register_result(results, base_rrdr->st, d, 1.0 - prob);
+            register_result(results, base_rrdr->st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats);
         }
     }
 
@@ -494,8 +514,9 @@ cleanup:
 static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              long long baseline_after, long long baseline_before,
                                              long long after, long long before,
-                                             RRDR_OPTIONS options, RRDR_GROUPING group, int timeout, MC_STATS *stats) {
-    options |= RRDR_OPTION_MATCH_IDS;
+                                             RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
+                                             int timeout, MC_STATS *stats) {
+    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE;
     long group_time = 0;
 
     int correlated_dimensions = 0;
@@ -516,46 +537,79 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         // dimensions, and we query a single dimension at a time.
 
         stats->db_queries++;
+        calculated_number baseline_average = NAN;
+        uint8_t base_anomaly_rate = 0;
+        value_is_null = 1;
+        ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
+                                  baseline_after, baseline_before,
+                                  group, group_options, group_time, options,
+                                  NULL, NULL,
+                                  &stats->db_points, &stats->result_points,
+                                  &value_is_null, &base_anomaly_rate, 0);
+
+        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(baseline_average)) {
+            // this means no data for the baseline window, but we may have data for the highlighted one - assume zero
+            baseline_average = 0.0;
+        }
+
+        stats->db_queries++;
         calculated_number highlight_average = NAN;
+        uint8_t high_anomaly_rate = 0;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
                                   after, before,
-                                  group, group_time, options,
+                                  group, group_options, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, 0);
+                                  &value_is_null, &high_anomaly_rate, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_average)) {
-            // error("Metric correlations: cannot query highlight duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(highlight_average))?"result is NAN":"");
             // this means no data for the highlighted duration - so skip it
             continue;
         }
 
-        stats->db_queries++;
-        calculated_number baseline_average = NAN;
-        value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
-                                  baseline_after, baseline_before,
-                                  group, group_time, options,
-                                  NULL, NULL,
-                                  &stats->db_points, &stats->result_points,
-                                  &value_is_null, 0);
-
-        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(baseline_average)) {
-            // error("Metric correlations: cannot query baseline duration of dimension '%s' of chart '%s', %d %s %s %s", st->name, d->name, ret, (ret != HTTP_RESP_OK)?"response failed":"", (value_is_null)?"value is null":"", (!calculated_number_isnumber(baseline_average))?"result is NAN":"");
-            // continue;
-            // this means no data for the baseline window, but we have data for the highlighted one - assume zero
-            baseline_average = 0.0;
+        if(baseline_average == highlight_average) {
+            // they are the same - let's move on
+            continue;
         }
 
+        stats->db_queries++;
+        calculated_number highlight_countif = NAN;
+        value_is_null = 1;
+
+        char highlighted_countif_options[50 + 1];
+        snprintfz(highlighted_countif_options, 50, "%s" CALCULATED_NUMBER_FORMAT, highlight_average < baseline_average ? "<":">", baseline_average);
+
+        ret = rrdset2value_api_v1(st, NULL, &highlight_countif, d->id, 1,
+                                  after, before,
+                                  RRDR_GROUPING_COUNTIF,highlighted_countif_options,
+                                  group_time, options,
+                                  NULL, NULL,
+                                  &stats->db_points, &stats->result_points,
+                                  &value_is_null, NULL, 0);
+
+        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_countif)) {
+            info("MC: highlighted countif query failed, but highlighted average worked - strange...");
+            continue;
+        }
+
+        // this represents the percentage of time
+        // the highlighted window was above/below the baseline window
+        // (above or below depending on their averages)
+        highlight_countif = highlight_countif / 100.0; // countif returns 0 - 100.0
+
+        RESULT_FLAGS flags;
         calculated_number pcent = NAN;
-        if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0))
-            pcent = (highlight_average - baseline_average) / baseline_average;
+        if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0)) {
+            flags = RESULT_IS_BASE_HIGH_RATIO;
+            pcent = (highlight_average - baseline_average) / baseline_average * highlight_countif;
+        }
+        else {
+            flags = RESULT_IS_PERCENTAGE_OF_TIME;
+            pcent = highlight_countif;
+        }
 
-        else if(isgreater(highlight_average, 0.0) || isless(highlight_average, 0.0))
-            pcent = highlight_average;
-
-        register_result(results, st, d, pcent);
+        register_result(results, st, d, pcent, flags, stats);
     }
 
     return correlated_dimensions;
@@ -590,18 +644,23 @@ static inline int binary_search_bigger_than_calculated_number(const calculated_n
 // ----------------------------------------------------------------------------
 // spread the results evenly according to their value
 
-static size_t spread_results_evenly(DICTIONARY *results) {
+static size_t spread_results_evenly(DICTIONARY *results, MC_STATS *stats) {
     struct register_result *t;
 
     // count the dimensions
     size_t dimensions = dictionary_stats_entries(results);
     if(!dimensions) return 0;
 
+    if(stats->max_base_high_ratio == 0.0)
+        stats->max_base_high_ratio = 1.0;
+
     // create an array of the right size and copy all the values in it
     calculated_number slots[dimensions];
     dimensions = 0;
     dfe_start_read(results, t) {
-        t->value = calculated_number_fabs(t->value);
+        if(t->flags & (RESULT_IS_PERCENTAGE_OF_TIME))
+            t->value = t->value * stats->max_base_high_ratio;
+
         slots[dimensions++] = t->value;
     }
     dfe_done(t);
@@ -639,7 +698,8 @@ static size_t spread_results_evenly(DICTIONARY *results) {
 // ----------------------------------------------------------------------------
 // The main function
 
-int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method, RRDR_GROUPING group,
+int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD method,
+                        RRDR_GROUPING group, const char *group_options,
                         long long baseline_after, long long baseline_before,
                         long long after, long long before,
                         long long points, RRDR_OPTIONS options, int timeout) {
@@ -727,8 +787,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
         while((points << shifts) > MAX_POINTS)
             points = points >> 1;
 
-        if(points < 100) {
-            // error = "cannot comply to at least 100 points";
+        if(points < 15) {
             resp = HTTP_RESP_BAD_REQUEST;
             goto cleanup;
         }
@@ -769,7 +828,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
                 correlated_dimensions += rrdset_metric_correlations_volume(st, results,
                                                                 baseline_after, baseline_before,
                                                                 after, before,
-                                                                options, group,
+                                                                options, group, group_options,
                                                                 (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
                                                                 &stats);
                 break;
@@ -779,7 +838,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
                 correlated_dimensions += rrdset_metric_correlations_ks2(st, results,
                                                              baseline_after, baseline_before,
                                                              after, before,
-                                                             points, options, group, shifts,
+                                                             points, options, group, group_options, shifts,
                                                              (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
                                                              &stats);
                 break;
@@ -790,7 +849,7 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
     dfe_done(ptr);
 
     if(!(options & RRDR_OPTION_RETURN_RAW))
-        spread_results_evenly(results);
+        spread_results_evenly(results, &stats);
 
     usec_t ended_usec = now_realtime_usec();
 
