@@ -21,14 +21,15 @@ To increase the data retention of your collected metrics you could do that with 
 2. Set up a parent Netdata Agent to act as a centralized database for multiple Agents.
 3. Archive metrics to an external database
 
-The third option is just an archive, you will be able to see them only by querying and creating custom dashboards.
+The third option is just an archive of your data, you will be able to see them only by querying and creating custom
+dashboards.
 
 ## What you'll learn in this step
 
 In this step of the Netdata guide, you'll learn how to:
 
 - [Configure the Agent to retain its data for a greater period](#Configure-the-Agent-to-retain-its-data-for-a-greater-period)
-- [Set up a parent node to act as a centralize database for multiple Agents](#Set-up-a-parent-nodeto-act-as-a-centralize-database-for-multiple-Agents)
+- [Set up a parent node to act as a centralize database for multiple Agents](#Set-up-a-parent-node-to-act-as-a-centralize-database-for-multiple-Agents)
 - [Archive metrics to an external database](#archive-metrics-to-an-external-database)
 
 Let's get started!
@@ -165,8 +166,8 @@ parent now will need to balance it's available space for:
 1. The metrics it collects (its own database)
 2. The metrics every child collects
 
-That means that you need to take into consideration and all the metrics your children collect and include this info
-to your calculations in the [**database engine calculator**](/docs/store/change-metrics-storage.md) 
+That means that you need to take into consideration and all the metrics your children collect and include this info to
+your calculations in the [**database engine calculator**](/docs/store/change-metrics-storage.md)
 
 ## Archive metrics to an external database
 
