@@ -1231,6 +1231,7 @@ int main(int argc, char **argv) {
         // initialize the log files
         open_all_log_files();
 
+#ifdef ENABLE_DBENGINE
         default_rrdeng_page_fetch_timeout = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine page fetch timeout", PAGE_CACHE_FETCH_WAIT_TIMEOUT);
         if (default_rrdeng_page_fetch_timeout < 1) {
             info("\"dbengine page fetch timeout\" found in netdata.conf cannot be %d, using 1", default_rrdeng_page_fetch_timeout);
@@ -1242,6 +1243,7 @@ int main(int argc, char **argv) {
             info("\"dbengine page fetch retries\" found in netdata.conf cannot be %d, using 1", default_rrdeng_page_fetch_retries);
             default_rrdeng_page_fetch_retries = 1;
         }
+#endif
 
         get_system_timezone();
         // --------------------------------------------------------------------
