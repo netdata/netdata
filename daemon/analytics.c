@@ -847,6 +847,28 @@ void set_global_environment()
     setenv("HOME", verify_required_directory(netdata_configured_home_dir), 1);
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
+    {
+        size_t len = 0;
+
+        for (size_t i = 1; i < PLUGINSD_MAX_DIRECTORIES && plugin_directories[i]; i++) {
+            if (i > 1)
+                len++;
+            len += strlen(plugin_directories[i]);
+        }
+
+        char *user_plugins_dir = callocz(1, len + 1);
+
+        for (size_t i = 1; i < PLUGINSD_MAX_DIRECTORIES && plugin_directories[i]; i++) {
+            if (i > 1)
+                strcat(user_plugins_dir, " ");
+            strcat(user_plugins_dir, plugin_directories[i]);
+        }
+
+        setenv("NETDATA_USER_PLUGINS_DIR", user_plugins_dir, 1);
+
+        freez(user_plugins_dir);
+    }
+
     analytics_data.data_length = 0;
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, "null");
     analytics_set_data(&analytics_data.netdata_config_memory_mode, "null");
