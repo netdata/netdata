@@ -69,7 +69,7 @@ static inline void set_beta(RRDR *r, struct grouping_des *g) {
     //info("beta for chart '%s' is " CALCULATED_NUMBER_FORMAT, r->st->name, g->beta);
 }
 
-void grouping_create_des(RRDR *r) {
+void grouping_create_des(RRDR *r, const char *options __maybe_unused) {
     struct grouping_des *g = (struct grouping_des *)mallocz(sizeof(struct grouping_des));
     set_alpha(r, g);
     set_beta(r, g);

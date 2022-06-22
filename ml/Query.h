@@ -27,10 +27,11 @@ public:
         return Ops->is_finished(&Handle);
     }
 
-    std::pair<time_t, storage_number> nextMetric() {
-        time_t CurrT;
-        storage_number SN = Ops->next_metric(&Handle, &CurrT);
-        return { CurrT, SN };
+    std::pair<time_t, CalculatedNumber> nextMetric() {
+        time_t CurrT, EndT;
+        SN_FLAGS Flags;
+        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags);
+        return { CurrT, Value };
     }
 
     ~Query() {
