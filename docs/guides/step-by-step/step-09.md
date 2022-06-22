@@ -21,8 +21,8 @@ To increase the data retention of your collected metrics you could do that with 
 2. Set up a parent Netdata Agent to act as a centralized database for multiple Agents.
 3. Archive metrics to an external database
 
-The third option is just an archive of your data, you will be able to see them only by querying and creating custom
-dashboards.
+The third option is just an archive of your data, you will be able to see them only by querying the DB (in which you
+exported your metrics) and implementing custom dashboards.
 
 ## What you'll learn in this step
 
