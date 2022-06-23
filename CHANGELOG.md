@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Fix cgroups netdev chart labels [\#13200](https://github.com/netdata/netdata/pull/13200) ([vlvkobal](https://github.com/vlvkobal))
+- Allow for an easy way to do metadata migrations [\#13196](https://github.com/netdata/netdata/pull/13196) ([stelfrag](https://github.com/stelfrag))
+- Clean sqlite prepared statements on thread shutdown [\#13193](https://github.com/netdata/netdata/pull/13193) ([stelfrag](https://github.com/stelfrag))
+- Update dashboard to version v2.26.5. [\#13192](https://github.com/netdata/netdata/pull/13192) ([netdatabot](https://github.com/netdatabot))
+- feat\(python.d/smartd\_log\): add 2nd job that tries to read from '/var/lib/smartmontools/' [\#13188](https://github.com/netdata/netdata/pull/13188) ([ilyam8](https://github.com/ilyam8))
+- Add type label for network interfaces [\#13187](https://github.com/netdata/netdata/pull/13187) ([vlvkobal](https://github.com/vlvkobal))
 - fix\(freebsd.plugin\): fix wired/cached/avail memory calculation on FreeBSD with ZFS [\#13183](https://github.com/netdata/netdata/pull/13183) ([ilyam8](https://github.com/ilyam8))
 - add k8s\_state dashboard\_info [\#13181](https://github.com/netdata/netdata/pull/13181) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.26.2. [\#13177](https://github.com/netdata/netdata/pull/13177) ([netdatabot](https://github.com/netdatabot))
@@ -22,6 +28,7 @@
 - Fix data query on stale chart [\#13159](https://github.com/netdata/netdata/pull/13159) ([stelfrag](https://github.com/stelfrag))
 - enable ml by default [\#13158](https://github.com/netdata/netdata/pull/13158) ([andrewm4894](https://github.com/andrewm4894))
 - Fix labels unit test [\#13156](https://github.com/netdata/netdata/pull/13156) ([stelfrag](https://github.com/stelfrag))
+- Query Engine multi-granularity support \(and MC improvements\) [\#13155](https://github.com/netdata/netdata/pull/13155) ([ktsaou](https://github.com/ktsaou))
 - add CAP\_SYS\_RAWIO to Netdata's systemd unit CapabilityBoundingSet [\#13154](https://github.com/netdata/netdata/pull/13154) ([ilyam8](https://github.com/ilyam8))
 - Update docs on what to do if collector not there [\#13152](https://github.com/netdata/netdata/pull/13152) ([cakrit](https://github.com/cakrit))
 - revert to default of `host anomaly rate threshold=0.01` [\#13150](https://github.com/netdata/netdata/pull/13150) ([andrewm4894](https://github.com/andrewm4894))
@@ -349,11 +356,6 @@
 - reduce min `dbengine anomaly rate every` 60s-\>30s [\#12543](https://github.com/netdata/netdata/pull/12543) ([andrewm4894](https://github.com/andrewm4894))
 - Explicitly use debhelper to enable systemd service [\#12542](https://github.com/netdata/netdata/pull/12542) ([ralphm](https://github.com/ralphm))
 - Allocate buffer and release on callback when executing agent CLI commands [\#12540](https://github.com/netdata/netdata/pull/12540) ([stelfrag](https://github.com/stelfrag))
-- Make sure registered static threads are unique. [\#12538](https://github.com/netdata/netdata/pull/12538) ([vkalintiris](https://github.com/vkalintiris))
-- packaging: upgrage protocol buffer version to 3.19.4 [\#12537](https://github.com/netdata/netdata/pull/12537) ([surajnpn](https://github.com/surajnpn))
-- feat\(collectors\): update go.d.plugin version to v0.32.0 [\#12536](https://github.com/netdata/netdata/pull/12536) ([ilyam8](https://github.com/ilyam8))
-- Improve ACLK sync logging  [\#12534](https://github.com/netdata/netdata/pull/12534) ([stelfrag](https://github.com/stelfrag))
-- Socket connections \(eBPF\) and bug fix [\#12532](https://github.com/netdata/netdata/pull/12532) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
