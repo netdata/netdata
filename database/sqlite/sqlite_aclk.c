@@ -421,7 +421,7 @@ static void timer_cb(uv_timer_t* handle)
 
     if (aclk_connected) {
 
-        if (wc->update_node_after && wc->update_node_after < now && wc->host && wc->host != localhost) {
+        if (wc->update_node_after > 0 && wc->update_node_after < now && wc->host && wc->host != localhost) {
             cmd.opcode = ACLK_DATABASE_UPDATE_NODE_STATE;
             if (!aclk_database_enq_cmd_noblock(wc, &cmd))
                 wc->update_node_after = 0;
@@ -681,7 +681,7 @@ void aclk_database_worker(void *arg)
                     RRDHOST *host = wc->host;
                     if (likely(host)) {
                         aclk_host_state_update(host, host == localhost || host->receiver ? 1 : 0);
-                        wc->update_node_after = 0;
+                        wc->update_node_after = -1;
                     }
                     break;
 #ifdef ENABLE_ACLK

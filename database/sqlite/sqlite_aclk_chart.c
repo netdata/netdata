@@ -19,6 +19,7 @@ sql_queue_chart_payload(struct aclk_database_worker_config *wc, void *data, enum
     cmd.opcode = opcode;
     cmd.data = data;
     rc = aclk_database_enq_cmd_noblock(wc, &cmd);
+    wc->update_node_after = now_realtime_sec() + ACLK_NODE_UPDATE_DELAY;
     return rc;
 }
 

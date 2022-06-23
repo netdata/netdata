@@ -725,10 +725,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdcontext_host_child_disconnected(rpt->host);
 
 #ifdef ENABLE_ACLK
-    // in case we have cloud connection we inform cloud
-    // new child connected
-    if (netdata_cloud_setting)
-        aclk_host_state_update(rpt->host, 0);
+    // Child disconnection
+    if (netdata_cloud_setting) {
+        struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *)rpt->host->dbsync_worker;
+        if (!wc || wc->update_node_after == -1)
+            aclk_host_state_update(rpt->host, 0);
+    }
 #endif
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
