@@ -848,6 +848,8 @@ while [ -n "${1}" ]; do
     --not-running-from-cron) NETDATA_NOT_RUNNING_FROM_CRON=1 ;;
     --no-updater-self-update) NETDATA_NO_UPDATER_SELF_UPDATE=1 ;;
     --force-update) NETDATA_FORCE_UPDATE=1 ;;
+    --non-interactive) INTERACTIVE=0 ;;
+    --interactive) INTERACTIVE=1 ;;
     --tmpdir-path)
         NETDATA_TMPDIR_PATH="${2}"
         shift 1
