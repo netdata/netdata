@@ -13,6 +13,8 @@
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
 extern int db_engine_use_malloc;
+extern int default_rrdeng_page_fetch_timeout;
+extern int default_rrdeng_page_fetch_retries;
 extern int default_rrdeng_page_cache_mb;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
