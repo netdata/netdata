@@ -1412,6 +1412,171 @@ static void dictionary_unittest_null_dfe(DICTIONARY *dict, char **names, char **
     dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop", names, values, entries, errors, dictionary_unittest_foreach);
 }
 
+
+static int check_dictionary_callback(const char *name, void *value, void *data) {
+    (void)name;
+    (void)value;
+    (void)data;
+    return 1;
+}
+
+static size_t check_dictionary(DICTIONARY *dict, size_t entries, size_t linked_list_members) {
+    size_t errors = 0;
+
+    fprintf(stderr, "dictionary entries %zu, expected %zu... ", dictionary_stats_entries(dict), entries);
+    if (dictionary_stats_entries(dict) != entries) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    size_t ll = 0;
+    void *t;
+    dfe_start_read(dict, t)
+        ll++;
+    dfe_done(t);
+
+    fprintf(stderr, "dictionary foreach entries %zu, expected %zu... ", ll, entries);
+    if(ll != entries) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    ll = dictionary_walkthrough_read(dict, check_dictionary_callback, NULL);
+    fprintf(stderr, "dictionary walkthrough entries %zu, expected %zu... ", ll, entries);
+    if(ll != entries) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    ll = dictionary_sorted_walkthrough_read(dict, check_dictionary_callback, NULL);
+    fprintf(stderr, "dictionary sorted walkthrough entries %zu, expected %zu... ", ll, entries);
+    if(ll != entries) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    NAME_VALUE *nv;
+    for(ll = 0, nv = dict->first_item; nv ;nv = nv->next)
+        ll++;
+
+    fprintf(stderr, "dictionary linked list entries %zu, expected %zu... ", ll, linked_list_members);
+    if(ll != linked_list_members) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    return errors;
+}
+
+static int check_name_value_callback(const char *name, void *value, void *data) {
+    (void)name;
+    return value == data;
+}
+
+static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *name, const char *value, int refcount, NAME_VALUE_FLAGS flags, bool searchable, bool browsable, bool linked) {
+    size_t errors = 0;
+
+    fprintf(stderr, "NAME_VALUE name is '%s', expected '%s'... ", nv->name, name);
+    if(strcmp(nv->name, name) != 0) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    fprintf(stderr, "NAME_VALUE value is '%s', expected '%s'... ", (const char *)nv->value, value);
+    if(strcmp((const char *)nv->value, value) != 0) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    fprintf(stderr, "NAME_VALUE refcount is %d, expected %d... ", nv->refcount, refcount);
+    if (nv->refcount != refcount) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    fprintf(stderr, "NAME_VALUE flags is %u, expected %u... ", nv->flags, flags);
+    if (nv->flags != flags) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    void *v = dictionary_get(dict, name);
+    bool found = v == nv->value;
+    fprintf(stderr, "NAME_VALUE %s searchable, expected %s... ", found?"is":"is not", searchable?"is":"is not");
+    if(found != searchable) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    found = false;
+    void *t;
+    dfe_start_read(dict, t) {
+        if(t == nv->value) found = true;
+    }
+    dfe_done(t);
+
+    fprintf(stderr, "NAME_VALUE %s dfe browsable, expected %s... ", found?"is":"is not", browsable?"is":"is not");
+    if(found != browsable) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    found = dictionary_walkthrough_read(dict, check_name_value_callback, nv->value);
+    fprintf(stderr, "NAME_VALUE %s walkthrough browsable, expected %s... ", found?"is":"is not", browsable?"is":"is not");
+    if(found != browsable) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    found = dictionary_sorted_walkthrough_read(dict, check_name_value_callback, nv->value);
+    fprintf(stderr, "NAME_VALUE %s sorted walkthrough browsable, expected %s... ", found?"is":"is not", browsable?"is":"is not");
+    if(found != browsable) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    found = false;
+    NAME_VALUE *n;
+    for(n = dict->first_item; n ;n = n->next)
+        if(n == nv) found = true;
+
+    fprintf(stderr, "NAME_VALUE %s linked, expected %s... ", found?"is":"is not", linked?"is":"is not");
+    if(found != linked) {
+        fprintf(stderr, "FAILED\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "OK\n");
+
+    return errors;
+}
+
 int dictionary_unittest(size_t entries) {
     if(entries < 10) entries = 10;
 
@@ -1475,6 +1640,64 @@ int dictionary_unittest(size_t entries) {
     dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
     dictionary_unittest_null_dfe(dict, names, values, entries, &errors);
     dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
+
+    // check reference counters
+    {
+        fprintf(stderr, "\nTesting reference counters:\n");
+        dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        errors += check_dictionary(dict, 0, 0);
+
+        fprintf(stderr, "\nAdding test item to dictionary and acquiring it\n");
+        dictionary_set(dict, "test", "ITEM1", 6);
+        NAME_VALUE *nv = dictionary_acquire_item(dict, "test");
+
+        errors += check_dictionary(dict, 1, 1);
+        errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
+
+        fprintf(stderr, "\nChecking that reference counters are increased:\n");
+        void *t;
+        dfe_start_read(dict, t) {
+            errors += check_dictionary(dict, 1, 1);
+            errors += check_name_value(dict, nv, "test", "ITEM1", 2, NAME_VALUE_FLAG_NONE, true, true, true);
+        }
+        dfe_done(t);
+
+        fprintf(stderr, "\nChecking that reference counters are decreased:\n");
+        errors += check_dictionary(dict, 1, 1);
+        errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
+
+        fprintf(stderr, "\nDeleting the item we have acquired:\n");
+        dictionary_del(dict, "test");
+
+        errors += check_dictionary(dict, 0, 1);
+        errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
+
+        fprintf(stderr, "\nAdding another item with the same name of the item we deleted, while being acquired:\n");
+        dictionary_set(dict, "test", "ITEM2", 6);
+        errors += check_dictionary(dict, 1, 2);
+
+        fprintf(stderr, "\nAcquiring the second item:\n");
+        NAME_VALUE *nv2 = dictionary_acquire_item(dict, "test");
+        errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
+        errors += check_name_value(dict, nv2, "test", "ITEM2", 1, NAME_VALUE_FLAG_NONE,    true,  true,  true);
+
+        fprintf(stderr, "\nReleasing the second item (the first is still acquired):\n");
+        dictionary_acquired_item_release(dict, nv2);
+        errors += check_dictionary(dict, 1, 2);
+        errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
+        errors += check_name_value(dict, nv2, "test", "ITEM2", 0, NAME_VALUE_FLAG_NONE,    true,  true,  true);
+
+        fprintf(stderr, "\nDeleting the second item (the first is still acquired):\n");
+        dictionary_del(dict, "test");
+        errors += check_dictionary(dict, 0, 1);
+        errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
+
+        fprintf(stderr, "\nReleasing the first item (which we have already deleted):\n");
+        dictionary_acquired_item_release(dict, nv);
+        errors += check_dictionary(dict, 0, 0);
+
+        dictionary_destroy(dict);
+    }
 
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
