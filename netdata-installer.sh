@@ -1859,7 +1859,6 @@ echo >&2
 
 # -----------------------------------------------------------------------------
 progress "Installing (but not enabling) the netdata updater tool"
-cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
 install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
 # -----------------------------------------------------------------------------
