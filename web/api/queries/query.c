@@ -509,12 +509,16 @@ static inline void rrd2rrdr_do_dimension(
             }
 
             if(unlikely(new_point_start_time == new_point_end_time)) {
+#ifdef NETDATA_INTERNAL_CHECKS
                 error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point start time %ld, end time %ld, that are both equal", rd->rrdset->name, rd->name, new_point_start_time, new_point_end_time);
+#endif
                 new_point_start_time = new_point_end_time - rd->update_every;
             }
 
             if(unlikely(new_point_start_time < last_point_start_time && new_point_end_time < last_point_end_time)) {
+#ifdef NETDATA_INTERNAL_CHECKS
                 error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point start time %ld, end time %ld, before the last point start time %ld, end time %ld", rd->rrdset->name, rd->name, new_point_start_time, new_point_end_time, last_point_start_time, last_point_end_time);
+#endif
                 new_point_value      = last_point_value;
                 new_point_flags      = last_point_flags;
                 new_point_start_time = last_point_start_time;
@@ -522,7 +526,9 @@ static inline void rrd2rrdr_do_dimension(
             }
 
             if(unlikely(new_point_end_time < last_point_end_time)) {
+#ifdef NETDATA_INTERNAL_CHECKS
                 error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point end time %ld, before the last point end time %ld", rd->rrdset->name, rd->name, new_point_end_time, last_point_end_time);
+#endif
                 new_point_value      = last_point_value;
                 new_point_flags      = last_point_flags;
                 new_point_start_time = last_point_start_time;
@@ -530,7 +536,9 @@ static inline void rrd2rrdr_do_dimension(
             }
 
             if(unlikely(new_point_end_time < now)) {
+#ifdef NETDATA_INTERNAL_CHECKS
                 error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld)", rd->rrdset->name, rd->name, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted, dt);
+#endif
                 new_point_end_time   = now;
             }
         }
