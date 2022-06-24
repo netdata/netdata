@@ -6,10 +6,13 @@
 
 **Merged pull requests:**
 
+- Print INTERNAL BUG messages only when NETDATA\_INTERNAL\_CHECKS is enabled [\#13207](https://github.com/netdata/netdata/pull/13207) ([MrZammler](https://github.com/MrZammler))
 - Fix cgroups netdev chart labels [\#13200](https://github.com/netdata/netdata/pull/13200) ([vlvkobal](https://github.com/vlvkobal))
 - Allow for an easy way to do metadata migrations [\#13196](https://github.com/netdata/netdata/pull/13196) ([stelfrag](https://github.com/stelfrag))
+- Add configuration for dbengine page fetch timeout and retry count [\#13194](https://github.com/netdata/netdata/pull/13194) ([stelfrag](https://github.com/stelfrag))
 - Clean sqlite prepared statements on thread shutdown [\#13193](https://github.com/netdata/netdata/pull/13193) ([stelfrag](https://github.com/stelfrag))
 - Update dashboard to version v2.26.5. [\#13192](https://github.com/netdata/netdata/pull/13192) ([netdatabot](https://github.com/netdatabot))
+- chore\(netdata-installer\): remove a call to 'cleanup\_old\_netdata\_updater\(\)' because it is no longer exists [\#13189](https://github.com/netdata/netdata/pull/13189) ([ilyam8](https://github.com/ilyam8))
 - feat\(python.d/smartd\_log\): add 2nd job that tries to read from '/var/lib/smartmontools/' [\#13188](https://github.com/netdata/netdata/pull/13188) ([ilyam8](https://github.com/ilyam8))
 - Add type label for network interfaces [\#13187](https://github.com/netdata/netdata/pull/13187) ([vlvkobal](https://github.com/vlvkobal))
 - fix\(freebsd.plugin\): fix wired/cached/avail memory calculation on FreeBSD with ZFS [\#13183](https://github.com/netdata/netdata/pull/13183) ([ilyam8](https://github.com/ilyam8))
@@ -354,8 +357,6 @@
 - add --reinstall-clean flag for kickstart.sh and update documentation [\#12548](https://github.com/netdata/netdata/pull/12548) ([maneamarius](https://github.com/maneamarius))
 - Don't send alert events without wc-\>host [\#12547](https://github.com/netdata/netdata/pull/12547) ([MrZammler](https://github.com/MrZammler))
 - reduce min `dbengine anomaly rate every` 60s-\>30s [\#12543](https://github.com/netdata/netdata/pull/12543) ([andrewm4894](https://github.com/andrewm4894))
-- Explicitly use debhelper to enable systemd service [\#12542](https://github.com/netdata/netdata/pull/12542) ([ralphm](https://github.com/ralphm))
-- Allocate buffer and release on callback when executing agent CLI commands [\#12540](https://github.com/netdata/netdata/pull/12540) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
