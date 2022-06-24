@@ -206,16 +206,24 @@ static inline size_t DICTIONARY_STATS_PENDING_DELETES_MINUS1(DICTIONARY *dict) {
     return __atomic_sub_fetch(&dict->pending_deletion_items, 1, __ATOMIC_SEQ_CST);
 }
 
+static inline size_t DICTIONARY_STATS_PENDING_DELETES_GET(DICTIONARY *dict) {
+    return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_SEQ_CST);
+}
+
+static inline int DICTIONARY_NAME_VALUE_REFCOUNT_GET(NAME_VALUE *nv) {
+    return __atomic_load_n(&nv->refcount, __ATOMIC_SEQ_CST);
+}
+
 // ----------------------------------------------------------------------------
 // garbage collector
 // it is called every time someone gets a write lock to the dictionary
 
 static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
-    if(likely(!dict->pending_deletion_items)) return;
+    if(likely(!DICTIONARY_STATS_PENDING_DELETES_GET(dict))) return;
 
     NAME_VALUE *nv = dict->first_item;
     while(nv) {
-        if(nv->flags & NAME_VALUE_FLAG_DELETED && nv->refcount == 0) {
+        if(nv->flags & NAME_VALUE_FLAG_DELETED && DICTIONARY_NAME_VALUE_REFCOUNT_GET(nv) == 0) {
             NAME_VALUE *nv_next = nv->next;
 
             linkedlist_namevalue_unlink_unsafe(dict, nv);
@@ -245,6 +253,7 @@ static inline size_t dictionary_lock_init(DICTIONARY *dict) {
             return sizeof(netdata_rwlock_t);
     }
 
+    // we are single threaded
     dict->flags |= DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
     dict->rwlock = NULL;
     return 0;
@@ -311,36 +320,44 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
 
 static int reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
     int refcount = __atomic_add_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
-    if(refcount == 1)
+
+    if(refcount == 1) {
+        // referenced items counts number of unique items referenced
+        // so, we increase it only when refcount == 1
         DICTIONARY_STATS_REFERENCED_ITEMS_PLUS1(dict);
+
+        // if this is a deleted item, but the counter increased to 1
+        // we need to remove it from the pending items to delete
+        if (nv->flags & NAME_VALUE_FLAG_DELETED)
+            DICTIONARY_STATS_PENDING_DELETES_MINUS1(dict);
+    }
 
     return refcount;
 }
 
 static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_get_write_lock) {
+    // this function may be called without any lock on the dictionary
+    // or even when someone else has a write lock on the dictionary
+    // so, we cannot check for EXCLUSIVE ACCESS
+
     int refcount = __atomic_sub_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
 
-    if(!refcount) {
-        if((nv->flags & NAME_VALUE_FLAG_DELETED)) {
-            bool got_write_lock = false;
+    if(refcount == 0) {
+        if((nv->flags & NAME_VALUE_FLAG_DELETED))
+            DICTIONARY_STATS_PENDING_DELETES_PLUS1(dict);
 
-            if(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) && can_get_write_lock) {
-                dictionary_lock_wrlock(dict);
-                got_write_lock = true;
-            }
-
-            if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
-                linkedlist_namevalue_unlink_unsafe(dict, nv);
-                namevalue_destroy_unsafe(dict, nv);
-            }
-            else
-                DICTIONARY_STATS_PENDING_DELETES_PLUS1(dict);
-
-            if(got_write_lock)
-                dictionary_unlock(dict);
-        }
-
+        // referenced items counts number of unique items referenced
+        // so, we decrease it only when refcount == 0
         DICTIONARY_STATS_REFERENCED_ITEMS_MINUS1(dict);
+    }
+
+    if(can_get_write_lock && DICTIONARY_STATS_PENDING_DELETES_GET(dict)) {
+        // we can garbage collect now
+
+        dictionary_lock_wrlock(dict);
+        // the above will run it, but let's have it for clarity here too
+        garbage_collect_pending_deletes_unsafe(dict);
+        dictionary_unlock(dict);
     }
 
     return refcount;
@@ -350,8 +367,7 @@ static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_
 // otherwise return 0
 static int reference_counter_mark_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
     (void)dict;
-    int refcount = __atomic_load_n(&nv->refcount, __ATOMIC_SEQ_CST);
-    if(refcount) {
+    if(DICTIONARY_NAME_VALUE_REFCOUNT_GET(nv) > 0) {
         nv->flags |= NAME_VALUE_FLAG_DELETED;
         return 1;
     }
@@ -1444,7 +1460,7 @@ static size_t dictionary_unittest_destroy(DICTIONARY *dict, char **names, char *
 }
 
 static usec_t dictionary_unittest_run_and_measure_time(DICTIONARY *dict, char *message, char **names, char **values, size_t entries, size_t *errors, size_t (*callback)(DICTIONARY *dict, char **names, char **values, size_t entries)) {
-    fprintf(stderr, "%-40s... ", message);
+    fprintf(stderr, "%40s ... ", message);
 
     usec_t started = now_realtime_usec();
     size_t errs = callback(dict, names, values, entries);
@@ -1545,7 +1561,7 @@ static int check_dictionary_callback(const char *name, void *value, void *data) 
 static size_t check_dictionary(DICTIONARY *dict, size_t entries, size_t linked_list_members) {
     size_t errors = 0;
 
-    fprintf(stderr, "dictionary entries %zu, expected %zu... ", dictionary_stats_entries(dict), entries);
+    fprintf(stderr, "dictionary entries %zu, expected %zu...\t\t\t\t\t", dictionary_stats_entries(dict), entries);
     if (dictionary_stats_entries(dict) != entries) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1559,7 +1575,7 @@ static size_t check_dictionary(DICTIONARY *dict, size_t entries, size_t linked_l
         ll++;
     dfe_done(t);
 
-    fprintf(stderr, "dictionary foreach entries %zu, expected %zu... ", ll, entries);
+    fprintf(stderr, "dictionary foreach entries %zu, expected %zu...\t\t\t\t", ll, entries);
     if(ll != entries) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1568,7 +1584,7 @@ static size_t check_dictionary(DICTIONARY *dict, size_t entries, size_t linked_l
         fprintf(stderr, "OK\n");
 
     ll = dictionary_walkthrough_read(dict, check_dictionary_callback, NULL);
-    fprintf(stderr, "dictionary walkthrough entries %zu, expected %zu... ", ll, entries);
+    fprintf(stderr, "dictionary walkthrough entries %zu, expected %zu...\t\t\t\t", ll, entries);
     if(ll != entries) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1577,7 +1593,7 @@ static size_t check_dictionary(DICTIONARY *dict, size_t entries, size_t linked_l
         fprintf(stderr, "OK\n");
 
     ll = dictionary_sorted_walkthrough_read(dict, check_dictionary_callback, NULL);
-    fprintf(stderr, "dictionary sorted walkthrough entries %zu, expected %zu... ", ll, entries);
+    fprintf(stderr, "dictionary sorted walkthrough entries %zu, expected %zu...\t\t\t", ll, entries);
     if(ll != entries) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1589,7 +1605,7 @@ static size_t check_dictionary(DICTIONARY *dict, size_t entries, size_t linked_l
     for(ll = 0, nv = dict->first_item; nv ;nv = nv->next)
         ll++;
 
-    fprintf(stderr, "dictionary linked list entries %zu, expected %zu... ", ll, linked_list_members);
+    fprintf(stderr, "dictionary linked list entries %zu, expected %zu...\t\t\t\t", ll, linked_list_members);
     if(ll != linked_list_members) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1608,7 +1624,7 @@ static int check_name_value_callback(const char *name, void *value, void *data) 
 static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *name, const char *value, int refcount, NAME_VALUE_FLAGS flags, bool searchable, bool browsable, bool linked) {
     size_t errors = 0;
 
-    fprintf(stderr, "NAME_VALUE name is '%s', expected '%s'... ", nv->name, name);
+    fprintf(stderr, "NAME_VALUE name is '%s', expected '%s'...\t\t\t\t", nv->name, name);
     if(strcmp(nv->name, name) != 0) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1616,7 +1632,7 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE value is '%s', expected '%s'... ", (const char *)nv->value, value);
+    fprintf(stderr, "NAME_VALUE value is '%s', expected '%s'...\t\t\t", (const char *)nv->value, value);
     if(strcmp((const char *)nv->value, value) != 0) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1624,7 +1640,7 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE refcount is %d, expected %d... ", nv->refcount, refcount);
+    fprintf(stderr, "NAME_VALUE refcount is %d, expected %d...\t\t\t\t\t", nv->refcount, refcount);
     if (nv->refcount != refcount) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1632,7 +1648,7 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE flags is %u, expected %u... ", nv->flags, flags);
+    fprintf(stderr, "NAME_VALUE flags is %u, expected %u...\t\t\t\t\t", nv->flags, flags);
     if (nv->flags != flags) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1642,7 +1658,7 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
 
     void *v = dictionary_get(dict, name);
     bool found = v == nv->value;
-    fprintf(stderr, "NAME_VALUE %s searchable, expected %s... ", found?"is":"is not", searchable?"is":"is not");
+    fprintf(stderr, "NAME_VALUE searchable %5s, expected %5s...\t\t\t\t", found?"true":"false", searchable?"true":"false");
     if(found != searchable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1657,7 +1673,7 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
     }
     dfe_done(t);
 
-    fprintf(stderr, "NAME_VALUE %s dfe browsable, expected %s... ", found?"is":"is not", browsable?"is":"is not");
+    fprintf(stderr, "NAME_VALUE dfe browsable %5s, expected %5s...\t\t\t", found?"true":"false", browsable?"true":"false");
     if(found != browsable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1666,7 +1682,7 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
         fprintf(stderr, "OK\n");
 
     found = dictionary_walkthrough_read(dict, check_name_value_callback, nv->value);
-    fprintf(stderr, "NAME_VALUE %s walkthrough browsable, expected %s... ", found?"is":"is not", browsable?"is":"is not");
+    fprintf(stderr, "NAME_VALUE walkthrough browsable %5s, expected %5s...\t\t", found?"true":"false", browsable?"true":"false");
     if(found != browsable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1675,7 +1691,7 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
         fprintf(stderr, "OK\n");
 
     found = dictionary_sorted_walkthrough_read(dict, check_name_value_callback, nv->value);
-    fprintf(stderr, "NAME_VALUE %s sorted walkthrough browsable, expected %s... ", found?"is":"is not", browsable?"is":"is not");
+    fprintf(stderr, "NAME_VALUE sorted walkthrough browsable %5s, expected %5s...\t", found?"true":"false", browsable?"true":"false");
     if(found != browsable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -1688,7 +1704,7 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
     for(n = dict->first_item; n ;n = n->next)
         if(n == nv) found = true;
 
-    fprintf(stderr, "NAME_VALUE %s linked, expected %s... ", found?"is":"is not", linked?"is":"is not");
+    fprintf(stderr, "NAME_VALUE linked %5s, expected %5s...\t\t\t\t", found?"true":"false", linked?"true":"false");
     if(found != linked) {
         fprintf(stderr, "FAILED\n");
         errors++;
