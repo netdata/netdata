@@ -151,6 +151,7 @@ available for the plugin to use.
 |`NETDATA_USER_CONFIG_DIR`|The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).|
 |`NETDATA_STOCK_CONFIG_DIR`|The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).|
 |`NETDATA_PLUGINS_DIR`|The directory where all Netdata plugins are stored.|
+|`NETDATA_USER_PLUGINS_DIRS`|The list of directories where custom plugins are stored.|
 |`NETDATA_WEB_DIR`|The directory where the web files of Netdata are saved.|
 |`NETDATA_CACHE_DIR`|The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.|
 |`NETDATA_LOG_DIR`|The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.|
