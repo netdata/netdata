@@ -680,7 +680,14 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Update node info for %s", wc->uuid_str);
                     RRDHOST *host = wc->host;
                     if (likely(host)) {
-                        aclk_host_state_update(host, host == localhost || host->receiver ? 1 : 0);
+                        int live_status = (host == localhost || host->receiver ? 1 : 0);
+                        if (wc->live_status != live_status) {
+                            internal_error(true, "%s: Updating node info for host \"%s\" live = %d", __FUNCTION__, host->hostname, live_status);
+                            aclk_host_state_update(host, live_status);
+                            wc->live_status = live_status;
+                        }
+                        else
+                            internal_error(true, "%s: Not updating node info for host \"%s\" live = %d", __FUNCTION__, host->hostname, live_status);
                         wc->update_node_after = -1;
                     }
                     break;

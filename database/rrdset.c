@@ -1318,7 +1318,7 @@ void rrdset_done(RRDSET *st) {
 #ifdef ENABLE_ACLK
     if (likely(!st->state->is_ar_chart)) {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-            if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
+            if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st)))
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }
     }

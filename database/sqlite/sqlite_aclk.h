@@ -180,6 +180,7 @@ struct aclk_database_worker_config {
     time_t startup_time;           // When the sync thread started
     time_t rotation_after;
     time_t update_node_after;
+    int live_status;                // Last live status sent to cloud
     uint64_t batch_id;    // batch id to use
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from

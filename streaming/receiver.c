@@ -703,9 +703,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // new child connected
-    if (netdata_cloud_setting)
-        aclk_host_state_update(rpt->host, 1);
-    // new slave connected
     if (netdata_cloud_setting) {
         struct aclk_database_worker_config *wc = rpt->host->dbsync_worker;
         if (likely(wc))
@@ -729,7 +726,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if (netdata_cloud_setting) {
         struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *)rpt->host->dbsync_worker;
         if (!wc || wc->update_node_after == -1)
-            aclk_host_state_update(rpt->host, 0);
+            wc->update_node_after = now_realtime_sec() + ACLK_NODE_UPDATE_DELAY * 3;
     }
 #endif
 
