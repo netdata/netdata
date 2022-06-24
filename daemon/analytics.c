@@ -848,17 +848,17 @@ void set_global_environment()
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
     {
-        BUFFER *user_plugin_dirs = buffer_create(FILENAME_MAX);
+        BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX);
 
         for (size_t i = 1; i < PLUGINSD_MAX_DIRECTORIES && plugin_directories[i]; i++) {
             if (i > 1)
-                buffer_strcat(user_plugin_dirs, " ");
-            buffer_strcat(user_plugin_dirs, plugin_directories[i]);
+                buffer_strcat(user_plugins_dirs, " ");
+            buffer_strcat(user_plugins_dirs, plugin_directories[i]);
         }
 
-        setenv("NETDATA_USER_PLUGINS_DIR", buffer_tostring(user_plugin_dirs), 1);
+        setenv("NETDATA_USER_PLUGINS_DIRS", buffer_tostring(user_plugins_dirs), 1);
 
-        buffer_free(user_plugin_dirs);
+        buffer_free(user_plugins_dirs);
     }
 
     analytics_data.data_length = 0;
