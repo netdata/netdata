@@ -20,61 +20,15 @@ typedef struct dictionary DICTIONARY;
 #include <Judy.h>
 #endif
 
-/*
- * This version uses JudyHS arrays to index the dictionary
- *
- * The following output is from the unit test, at the end of this file:
- *
- * This is the JudyHS version:
- *
- * 1000000 x dictionary_set() (dictionary size 0 entries, 0 KB)...
- * 1000000 x dictionary_get(existing) (dictionary size 1000000 entries, 74001 KB)...
- * 1000000 x dictionary_get(non-existing) (dictionary size 1000000 entries, 74001 KB)...
- * Walking through the dictionary (dictionary size 1000000 entries, 74001 KB)...
- * 1000000 x dictionary_del(existing) (dictionary size 1000000 entries, 74001 KB)...
- * 1000000 x dictionary_set() (dictionary size 0 entries, 0 KB)...
- * Destroying dictionary (dictionary size 1000000 entries, 74001 KB)...
- *
- * TIMINGS:
- * adding 316027 usec, positive search 156740 usec, negative search 84524, walk through 15036 usec, deleting 361444, destroy 107394 usec
- *
- * This is from the JudySL version:
- *
- * Creating dictionary of 1000000 entries...
- * Checking index of 1000000 entries...
- * Walking 1000000 entries and checking name-value pairs...
- * Created and checked 1000000 entries, found 0 errors - used 58376 KB of memory
- * Destroying dictionary of 1000000 entries...
- * Deleted 1000000 entries
- * create 338975 usec, check 156080 usec, walk 80764 usec, destroy 444569 usec
- *
- * This is the AVL version:
- *
- * Creating dictionary of 1000000 entries...
- * Checking index of 1000000 entries...
- * Walking 1000000 entries and checking name-value pairs...
- * Created and checked 1000000 entries, found 0 errors - used 89626 KB of memory
- * Destroying dictionary of 1000000 entries...
- * create 413892 usec, check 220006 usec, walk 34247 usec, destroy 98062 usec
- *
- * So, the JudySL is a lot slower to WALK and DESTROY (DESTROY does a WALK)
- * It is slower, because for every item, JudySL copies the KEY/NAME to a
- * caller supplied buffer (Index). So, by just walking over 1 million items,
- * JudySL does 1 million strcpy() !!!
- *
- * It also seems that somehow JudySLDel() is unbelievably slow too!
- *
- */
-
 typedef enum name_value_flags {
     NAME_VALUE_FLAG_NONE                   = 0,
     NAME_VALUE_FLAG_DELETED                = (1 << 0), // this item is deleted
 } NAME_VALUE_FLAGS;
 
-
 /*
  * Every item in the dictionary has the following structure.
  */
+
 typedef struct name_value {
 #ifdef DICTIONARY_WITH_AVL
     avl_t avl_node;
@@ -119,15 +73,22 @@ struct dictionary {
     void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data);
     void *conflict_callback_data;
 
-    size_t inserts;
-    size_t deletes;
-    size_t searches;
-    size_t resets;
-    size_t entries;
-    size_t walkthroughs;
-    size_t referenced_items;
-    size_t memory;
+    size_t inserts;                 // how many index insertions have been performed
+    size_t deletes;                 // how many index deletions have been performed
+    size_t searches;                // how many index searches have been performed
+    size_t resets;                  // how many times items have reset their values
+    size_t walkthroughs;            // how many walkthroughs have been done
+    size_t memory;                  // how much memory the dictionary has currently allocated
+    size_t entries;                 // how many items are currently in the index (the linked list may have more)
+    size_t referenced_items;        // how many items of the dictionary are currently being used by 3rd parties
+    size_t pending_deletion_items;  // how many items of the dictionary have been deleted, but have not been removed yet
 };
+
+static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
+static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
+
+// ----------------------------------------------------------------------------
+// callbacks registration
 
 void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const char *name, void *value, void *data), void *data) {
     dict->ins_callback = ins_callback;
@@ -229,21 +190,44 @@ static inline void DICTIONARY_STATS_WALKTHROUGHS_PLUS1(DICTIONARY *dict) {
     }
 }
 
-static inline void DICTIONARY_STATS_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
-    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
-        dict->referenced_items++;
-    }
-    else {
-        __atomic_fetch_add(&dict->referenced_items, 1, __ATOMIC_RELAXED);
-    }
+static inline size_t DICTIONARY_STATS_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
+    return __atomic_add_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
 }
 
-static inline void DICTIONARY_STATS_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
-    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
-        dict->referenced_items--;
-    }
-    else {
-        __atomic_fetch_sub(&dict->referenced_items, 1, __ATOMIC_RELAXED);
+static inline size_t DICTIONARY_STATS_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
+    return __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
+}
+
+static inline size_t DICTIONARY_STATS_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
+    return __atomic_add_fetch(&dict->pending_deletion_items, 1, __ATOMIC_SEQ_CST);
+}
+
+static inline size_t DICTIONARY_STATS_PENDING_DELETES_MINUS1(DICTIONARY *dict) {
+    return __atomic_sub_fetch(&dict->pending_deletion_items, 1, __ATOMIC_SEQ_CST);
+}
+
+// ----------------------------------------------------------------------------
+// garbage collector
+// it is called every time someone gets a write lock to the dictionary
+
+static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
+    if(likely(!dict->pending_deletion_items)) return;
+
+    NAME_VALUE *nv = dict->first_item;
+    while(nv) {
+        if(nv->flags & NAME_VALUE_FLAG_DELETED && nv->refcount == 0) {
+            NAME_VALUE *nv_next = nv->next;
+
+            linkedlist_namevalue_unlink_unsafe(dict, nv);
+            namevalue_destroy_unsafe(dict, nv);
+
+            size_t pending = DICTIONARY_STATS_PENDING_DELETES_MINUS1(dict);
+            if(!pending) break;
+
+            nv = nv_next;
+        }
+        else
+            nv = nv->next;
     }
 }
 
@@ -292,6 +276,8 @@ static inline void dictionary_lock_wrlock(DICTIONARY *dict) {
 
         dict->flags |= DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
     }
+
+    garbage_collect_pending_deletes_unsafe(dict);
 }
 
 static inline void dictionary_unlock(DICTIONARY *dict) {
@@ -331,9 +317,6 @@ static int reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
     return refcount;
 }
 
-static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
-static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
-
 static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_get_write_lock) {
     int refcount = __atomic_sub_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
 
@@ -350,6 +333,8 @@ static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_
                 linkedlist_namevalue_unlink_unsafe(dict, nv);
                 namevalue_destroy_unsafe(dict, nv);
             }
+            else
+                DICTIONARY_STATS_PENDING_DELETES_PLUS1(dict);
 
             if(got_write_lock)
                 dictionary_unlock(dict);
@@ -361,6 +346,8 @@ static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_
     return refcount;
 }
 
+// if a dictionary item is referenced, mark it as deleted and return 1
+// otherwise return 0
 static int reference_counter_mark_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
     (void)dict;
     int refcount = __atomic_load_n(&nv->refcount, __ATOMIC_SEQ_CST);
@@ -895,6 +882,10 @@ void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, void *item) {
 }
 
 void dictionary_acquired_item_release(DICTIONARY *dict, void *item) {
+    // no need to get a lock here
+    // we pass the last parameter to reference_counter_release() as true
+    // so that the release may get a write lock if required to cleanup
+
     if(!item) return;
     NAME_VALUE *nv = (NAME_VALUE *)item;
     reference_counter_release(dict, nv, true);
