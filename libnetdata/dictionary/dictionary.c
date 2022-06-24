@@ -413,6 +413,11 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
 }
 
 static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)))
+        error("DICTIONARY: INTERNAL ERROR: inserting to the index without exclusive access to the dictionary.");
+#endif
+
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&dict->JudyHSArray, (void *)name, name_len, &J_Error);
     if (unlikely(Rc == PJERR)) {
@@ -431,8 +436,12 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char 
 }
 
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
-    (void)nv;
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)))
+        error("DICTIONARY: INTERNAL ERROR: deleting from the index without exclusive access to the dictionary.");
+#endif
 
+    (void)nv;
     if(unlikely(!dict->JudyHSArray)) return 0;
 
     JError_t J_Error;
@@ -487,6 +496,11 @@ static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, const 
 // linked list management
 
 static inline void linkedlist_namevalue_link_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)))
+        error("DICTIONARY: INTERNAL ERROR: adding item to the linked-list without exclusive access to the dictionary.");
+#endif
+
     if (unlikely(!dict->first_item)) {
         // we are the only ones here
         nv->next = NULL;
@@ -514,6 +528,11 @@ static inline void linkedlist_namevalue_link_unsafe(DICTIONARY *dict, NAME_VALUE
 }
 
 static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)))
+        error("DICTIONARY: INTERNAL ERROR: removing item from the linked-list without exclusive access to the dictionary.");
+#endif
+
     if(nv->next) nv->next->prev = nv->prev;
     if(nv->prev) nv->prev->next = nv->next;
     if(dict->first_item == nv) dict->first_item = nv->next;
