@@ -49,6 +49,7 @@ typedef enum dictionary_flags {
 
     // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
     DICTIONARY_FLAG_RESERVED1              = (1 << 29), // this is reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
+    DICTIONARY_FLAG_RESERVED2              = (1 << 30), // this is reserved for DICTIONARY_FLAG_DESTROYED
 } DICTIONARY_FLAGS;
 
 // Create a dictionary

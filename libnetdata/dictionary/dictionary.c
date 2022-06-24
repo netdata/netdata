@@ -2,6 +2,7 @@
 
 // NOT TO BE USED BY USERS YET
 #define DICTIONARY_FLAG_EXCLUSIVE_ACCESS   (1 << 29) // there is only one thread accessing the dictionary
+#define DICTIONARY_FLAG_DESTROYED          (1 << 30) // this dictionary has been destroyed
 
 typedef struct dictionary DICTIONARY;
 #define DICTIONARY_INTERNALS
@@ -124,6 +125,7 @@ struct dictionary {
     size_t resets;
     size_t entries;
     size_t walkthroughs;
+    size_t referenced_items;
     size_t memory;
 };
 
@@ -227,6 +229,24 @@ static inline void DICTIONARY_STATS_WALKTHROUGHS_PLUS1(DICTIONARY *dict) {
     }
 }
 
+static inline void DICTIONARY_STATS_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->referenced_items++;
+    }
+    else {
+        __atomic_fetch_add(&dict->referenced_items, 1, __ATOMIC_RELAXED);
+    }
+}
+
+static inline void DICTIONARY_STATS_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->referenced_items--;
+    }
+    else {
+        __atomic_fetch_sub(&dict->referenced_items, 1, __ATOMIC_RELAXED);
+    }
+}
+
 // ----------------------------------------------------------------------------
 // dictionary locks
 
@@ -304,20 +324,38 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
 }
 
 static int reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
-    (void)dict;
-    return __atomic_add_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
+    int refcount = __atomic_add_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
+    if(refcount == 1)
+        DICTIONARY_STATS_REFERENCED_ITEMS_PLUS1(dict);
+
+    return refcount;
 }
 
 static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
 static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
 
-static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv) {
-    (void)dict;
+static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_get_write_lock) {
     int refcount = __atomic_sub_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
 
-    if((nv->flags & NAME_VALUE_FLAG_DELETED) && !refcount) {
-        linkedlist_namevalue_unlink_unsafe(dict, nv);
-        namevalue_destroy_unsafe(dict, nv);
+    if(!refcount) {
+        if((nv->flags & NAME_VALUE_FLAG_DELETED)) {
+            bool got_write_lock = false;
+
+            if(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) && can_get_write_lock) {
+                dictionary_lock_wrlock(dict);
+                got_write_lock = true;
+            }
+
+            if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+                linkedlist_namevalue_unlink_unsafe(dict, nv);
+                namevalue_destroy_unsafe(dict, nv);
+            }
+
+            if(got_write_lock)
+                dictionary_unlock(dict);
+        }
+
+        DICTIONARY_STATS_REFERENCED_ITEMS_MINUS1(dict);
     }
 
     return refcount;
@@ -679,6 +717,11 @@ DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
 size_t dictionary_destroy(DICTIONARY *dict) {
     if(!dict) return 0;
 
+    if(dict->referenced_items) {
+        dict->flags |= DICTIONARY_FLAG_DESTROYED;
+        return 0;
+    }
+
     debug(D_DICTIONARY, "Destroying dictionary.");
 
     dictionary_lock_wrlock(dict);
@@ -716,7 +759,16 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
 void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
     if(unlikely(!name || !*name)) {
-        error("Attempted to dictionary_set() a dictionary item without a name");
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_set() a dictionary item without a name");
+#endif
+        return NULL;
+    }
+
+    if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_set() on a destroyed dictionary");
+#endif
         return NULL;
     }
 
@@ -771,6 +823,13 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 static NAME_VALUE *dictionary_get_name_value_unsafe(DICTIONARY *dict, const char *name) {
     if(unlikely(!name || !*name)) {
         error("Attempted to dictionary_get() without a name");
+        return NULL;
+    }
+
+    if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_get() on a destroyed dictionary");
+#endif
         return NULL;
     }
 
@@ -832,14 +891,26 @@ void *dictionary_acquired_item_value(DICTIONARY *dict, void *item) {
 void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, void *item) {
     if(!item) return;
     NAME_VALUE *nv = (NAME_VALUE *)item;
-    reference_counter_release(dict, nv);
+    reference_counter_release(dict, nv, false);
 }
 
 void dictionary_acquired_item_release(DICTIONARY *dict, void *item) {
-    dictionary_acquired_item_release_unsafe(dict, item);
+    if(!item) return;
+    NAME_VALUE *nv = (NAME_VALUE *)item;
+    reference_counter_release(dict, nv, true);
+
+    if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED))
+        dictionary_destroy(dict);
 }
 
 int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
+    if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_del() on a destroyed dictionary");
+#endif
+        return -1;
+    }
+
     if(unlikely(!name || !*name)) {
         error("Attempted to dictionary_det() without a name");
         return -1;
@@ -893,6 +964,16 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
 void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
     if(unlikely(!dfe || !dict)) return NULL;
 
+    if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_foreach_start_rw() on a destroyed dictionary");
+#endif
+        dfe->last_position_index = NULL;
+        dfe->name = NULL;
+        dfe->value = NULL;
+        return NULL;
+    }
+
     dfe->dict = dict;
     dfe->started_ut = now_realtime_usec();
 
@@ -928,6 +1009,16 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
 void *dictionary_foreach_next(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return NULL;
 
+    if(unlikely(dfe->dict->flags & DICTIONARY_FLAG_DESTROYED)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_foreach_next() on a destroyed dictionary");
+#endif
+        dfe->last_position_index = NULL;
+        dfe->name = NULL;
+        dfe->value = NULL;
+        return NULL;
+    }
+
     // the item we just did
     NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
 
@@ -940,7 +1031,7 @@ void *dictionary_foreach_next(DICTFE *dfe) {
 
     // release the old, so that it can possibly be deleted
     if(likely(nv))
-        reference_counter_release(dfe->dict, nv);
+        reference_counter_release(dfe->dict, nv, false);
 
     if(likely(nv = nv_next)) {
         dfe->last_position_index = nv;
@@ -960,12 +1051,19 @@ void *dictionary_foreach_next(DICTFE *dfe) {
 usec_t dictionary_foreach_done(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return 0;
 
+    if(unlikely(dfe->dict->flags & DICTIONARY_FLAG_DESTROYED)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_foreach_next() on a destroyed dictionary");
+#endif
+        return 0;
+    }
+
     // the item we just did
     NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
 
     // release it, so that it can possibly be deleted
     if(likely(nv))
-        reference_counter_release(dfe->dict, nv);
+        reference_counter_release(dfe->dict, nv, false);
 
     dictionary_unlock((DICTIONARY *)dfe->dict);
     dfe->dict = NULL;
@@ -986,6 +1084,13 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
 
 int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
     if(unlikely(!dict)) return 0;
+
+    if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_walkthrough_rw() on a destroyed dictionary");
+#endif
+        return 0;
+    }
 
     if(rw == 'r' || rw == 'R')
         dictionary_lock_rdlock(dict);
@@ -1015,7 +1120,7 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
         // since we have a reference counter, this item cannot be deleted
         // until we release the reference counter, so the pointers are there
         nv_next = nv->next;
-        reference_counter_release(dict, nv);
+        reference_counter_release(dict, nv, false);
 
         if(unlikely(r < 0)) {
             ret = r;
@@ -1041,6 +1146,13 @@ static int dictionary_sort_compar(const void *nv1, const void *nv2) {
 
 int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
     if(unlikely(!dict || !dict->entries)) return 0;
+
+    if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("DICTIONARY: Attempted to dictionary_sorted_walkthrough_rw() on a destroyed dictionary");
+#endif
+        return 0;
+    }
 
     if(rw == 'r' || rw == 'R')
         dictionary_lock_rdlock(dict);
@@ -1074,7 +1186,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
         nv = array[i];
         reference_counter_acquire(dict, nv);
         int r = callback(nv->name, nv->value, data);
-        reference_counter_release(dict, nv);
+        reference_counter_release(dict, nv, false);
         if(r < 0) { ret = r; break; }
         ret += r;
     }
@@ -1663,7 +1775,7 @@ int dictionary_unittest(size_t entries) {
     // check reference counters
     {
         fprintf(stderr, "\nTesting reference counters:\n");
-        dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        dict = dictionary_create(DICTIONARY_FLAG_NONE);
         errors += check_dictionary(dict, 0, 0);
 
         fprintf(stderr, "\nAdding test item to dictionary and acquiring it\n");
@@ -1715,7 +1827,20 @@ int dictionary_unittest(size_t entries) {
         dictionary_acquired_item_release(dict, nv);
         errors += check_dictionary(dict, 0, 0);
 
+        fprintf(stderr, "\nAdding again the test item to dictionary and acquiring it\n");
+        dictionary_set(dict, "test", "ITEM1", 6);
+        nv = dictionary_acquire_item(dict, "test");
+
+        errors += check_dictionary(dict, 1, 1);
+        errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
+
+        fprintf(stderr, "\nDestroying the dictionary while we have acquired an item\n");
         dictionary_destroy(dict);
+
+        fprintf(stderr, "Releasing the item (on a destroyed dictionary)\n");
+        dictionary_acquired_item_release(dict, nv);
+        nv = NULL;
+        dict = NULL;
     }
 
     dictionary_unittest_free_char_pp(names, entries);
