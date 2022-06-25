@@ -47,10 +47,6 @@ extern "C" {
 #define D_ACLK_SYNC         0x0000000800000000
 #define D_SYSTEM            0x8000000000000000
 
-//#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
-//#define DEBUG 0xffffffff
-#define DEBUG (0)
-
 extern int web_server_is_multithreaded;
 
 extern uint64_t debug_flags;
@@ -86,8 +82,10 @@ static inline void debug_dummy(void) {}
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define internal_error(condition, args...) do { if(unlikely(condition)) error_int("INTERNAL ERROR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
 #define debug(type, args...) debug_dummy()
+#define internal_checks_error(args...) debug_dummy()
 #endif
 
 #define info(args...)    info_int(__FILE__, __FUNCTION__, __LINE__, ##args)

@@ -97,6 +97,8 @@ This call is used to get the value of an item, given its name. It utilizes the `
 
 For **multi-threaded** operation, the `dictionary_get()` call gets a shared read lock on the dictionary.
 
+In clone mode, the value returned is not guaranteed to be valid, as any other thread may delete the item from the dictionary at any time. To ensure the value will be available, use `dictionary_acquire_item()`, which uses a reference counter to defer deletes until the item is released.
+
 The format is:
 
 ```c
@@ -131,6 +133,41 @@ Where:
 
 > **IMPORTANT**<br/>There is also an **unsafe** version (without locks) of this call. This is to be used when traversing the dictionary, to delete the current item. It should never be called without an active lock on the dictionary, which can only be acquired while traversing.
 
+### dictionary_acquire_item()
+
+This call can be used the search and get a dictionary item, while ensuring that it will be available for use, until `dictionary_acquired_item_release()` is called.
+
+This call **does not return the value** of the dictionary item. It returns an internal pointer to a structure that maintains the reference counter used to protect the actual value. To get the value of the item (the same value as returned by `dictionary_get()`), the function `dictionary_acquired_item_value()` has to be called.
+
+Example:
+
+```c
+// create the dictionary
+DICTIONARY *dict = dictionary_create(DICTIONARY_FLAGS_NONE);
+
+// add an item to it
+dictionary_set(dict, "name", "value", 6);
+
+// find the item we added and acquire it
+void *item = dictionary_acquire_item(dict, "name");
+
+// extract its value
+char *value = (char *)dictionary_acquired_item_value(dict, item);
+
+// now value points to the string "value"
+printf("I got value = '%s'\n", value);
+
+// release the item, so that it can deleted
+dictionary_acquired_item_release(dict, item);
+
+// destroy the dictionary
+dictionary_destroy(dict);
+```
+
+When items are acquired, a reference counter is maintained to keep track of how many users exist for it. If an item with a non-zero number of users is deleted, it is removed from the index, it can be added again to the index (without conflict), and although it exists in the linked-list, it is not offered during traversal. Garbage collection to actually delete the item happens every time a write-locked dictionary is unlocked (just before the unlock) and items are deleted only if no users are using them.
+
+If any item is still acquired when the dictionary is destroyed, the destruction of the dictionary is also deferred until all the acquired items are released. When the dictionary is destroyed like that, all operations on the dictionary fail (traversals do not traverse, insertions do not insert, deletions do not delete, searches do not find any items, etc). Once the last item in the dictionary is released, the dictionary is automatically destroyed too.
+
 ## Traversal
 
 Dictionaries offer 3 ways to traverse the entire dictionary:
@@ -150,9 +187,9 @@ While traversing the dictionary with any of these methods, all calls to the dict
 There are 4 calls:
 
 - `dictionary_walkthrough_read()` and `dictionary_sorted_walkthrough_read()` that acquire a shared read lock, and they call a callback function for every item of the dictionary. The callback function may use the unsafe versions of the `dictionary_get()` calls to lookup other items in the dictionary, but it should not attempt to add or remove items to/from the dictionary.
-- `dictionary_walkthrough_write()` and `dictionary_sorted_walkthrough_write()` that acquire an exclusive write lock, and they call a callback function for every item of the dictionary. This is to be used when items need to be added to or removed from the dictionary. **IMPORTANT: Although the plain version can be used to delete any or all the items from the dictionary, including the currently working one, the sorted version MUST NEVER be used to delete items from the dictionary. The sorted version maintains an ephemeral copy of pointers to the items in the dictionary, which will be invalid if items after the current one are deleted.** 
+- `dictionary_walkthrough_write()` and `dictionary_sorted_walkthrough_write()` that acquire an exclusive write lock, and they call a callback function for every item of the dictionary. This is to be used when items need to be added to or removed from the dictionary. The `write` versions can be used to delete any or all the items from the dictionary, including the currently working one. For the `sorted` version, all items in the dictionary maintain a reference counter, so all deletions are deferred until the sorted walkthrough finishes.** 
 
-The non sorted versions traverse the items in the same order they have been added to the dictionary (or the reverse order if the flag `DICTIONARY_FLAG_ADD_IN_FRONT` is set during dictionary creation). The sorted versions first alphabetically sort the items based on their name, and then they traverse them in the sorted order.
+The non sorted versions traverse the items in the same order they have been added to the dictionary (or the reverse order if the flag `DICTIONARY_FLAG_ADD_IN_FRONT` is set during dictionary creation). The sorted versions sort alphabetically the items based on their name, and then they traverse them in the sorted order.
 
 The callback function returns an `int`. If this value is negative, traversal of the dictionary is stopped immediately and the negative value is returned to the caller. If the returned value of all callback calls is zero or positive, the walkthrough functions return the sum of the return values of all callbacks. So, if you are just interested to know how many items fall into some condition, write a callback function that returns 1 when the item satisfies that condition and 0 when it does not and the walkthrough function will return how many tested positive.
 
@@ -194,7 +231,7 @@ There are 2 versions of `dfe_start`:
 - `dfe_start_read()` that acquires a shared read lock to the dictionary.
 - `dfe_start_write()` that acquires an exclusive write lock to the dictionary.
 
-While in the loop, depending on the read or write versions of `dfe_start`, the caller may lookup or manipulate the dictionary. The rules are the same with the unsorted walkthrough callback functions.
+While in the loop, depending on the read or write versions of `dfe_start`, the caller may lookup or manipulate the dictionary using the unsafe functions. The rules are the same with the unsorted walkthrough callback functions.
 
 PS: DFE is Dictionary For Each.
 

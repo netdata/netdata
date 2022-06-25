@@ -48,8 +48,9 @@ typedef enum dictionary_flags {
     DICTIONARY_FLAG_ADD_IN_FRONT           = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
 
     // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
-    DICTIONARY_FLAG_RESERVED1              = (1 << 29), // this is reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
-    DICTIONARY_FLAG_RESERVED2              = (1 << 30), // this is reserved for DICTIONARY_FLAG_DESTROYED
+    DICTIONARY_FLAG_RESERVED1              = (1 << 29), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
+    DICTIONARY_FLAG_RESERVED2              = (1 << 30), // reserved for DICTIONARY_FLAG_DESTROYED
+    DICTIONARY_FLAG_RESERVED3              = (1 << 31), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
@@ -164,6 +165,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
                                 // same as the return value of dictfe_start() and dictfe_next()
 
     // the following are for internal use only - to keep track of the point we are
+    char rw;                    // the lock mode 'r' or 'w'
     usec_t started_ut;          // the time the caller started iterating (now_realtime_usec())
     DICTIONARY *dict;           // the dictionary upon we work
     void *last_position_index;  // the internal position index, to remember the position we are at
@@ -190,9 +192,8 @@ extern void * dictionary_foreach_next(DICTFE *dfe);
 extern usec_t dictionary_foreach_done(DICTFE *dfe);
 
 // Get statistics about the dictionary
-// If DICTIONARY_FLAG_WITH_STATISTICS is not set, these return zero
-extern size_t dictionary_stats_allocated_memory(DICTIONARY *dict);
-extern size_t dictionary_stats_entries(DICTIONARY *dict);
+extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
+extern long int dictionary_stats_entries(DICTIONARY *dict);
 extern size_t dictionary_stats_inserts(DICTIONARY *dict);
 extern size_t dictionary_stats_searches(DICTIONARY *dict);
 extern size_t dictionary_stats_deletes(DICTIONARY *dict);
