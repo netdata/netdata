@@ -85,7 +85,7 @@ static inline void debug_dummy(void) {}
 #define internal_error(condition, args...) do { if(unlikely(condition)) error_int("INTERNAL ERROR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
 #define debug(type, args...) debug_dummy()
-#define internal_checks_error(args...) debug_dummy()
+#define internal_error(args...) debug_dummy()
 #endif
 
 #define info(args...)    info_int(__FILE__, __FUNCTION__, __LINE__, ##args)

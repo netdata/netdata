@@ -5,6 +5,9 @@
 #define DICTIONARY_FLAG_DESTROYED           (1 << 30) // this dictionary has been destroyed
 #define DICTIONARY_FLAG_DEFER_ALL_DELETIONS (1 << 31) // defer all deletions of items in the dictionary
 
+// our reserved flags that cannot be set by users
+#define DICTIONARY_FLAGS_RESERVED (DICTIONARY_FLAG_EXCLUSIVE_ACCESS|DICTIONARY_FLAG_DESTROYED|DICTIONARY_FLAG_DEFER_ALL_DELETIONS)
+
 typedef struct dictionary DICTIONARY;
 #define DICTIONARY_INTERNALS
 
@@ -748,6 +751,9 @@ static bool name_value_can_be_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
 DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
     debug(D_DICTIONARY, "Creating dictionary.");
 
+    if(unlikely(flags & DICTIONARY_FLAGS_RESERVED))
+        flags &= ~DICTIONARY_FLAGS_RESERVED;
+
     DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
     size_t allocated = sizeof(DICTIONARY);
 
@@ -756,7 +762,7 @@ DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
 
     allocated += dictionary_lock_init(dict);
     allocated += reference_counter_init(dict);
-    dict->memory = allocated;
+    dict->memory = (long)allocated;
 
     hashtable_init_unsafe(dict);
     return (DICTIONARY *)dict;
@@ -921,28 +927,24 @@ void *dictionary_acquire_item(DICTIONARY *dict, const char *name) {
     return ret;
 }
 
-void *dictionary_acquired_item_value(DICTIONARY *dict, void *item) {
-    (void)dict;
-    if(!item) return NULL;
-
-    NAME_VALUE *nv = (NAME_VALUE *)item;
-    return nv->value;
+void *dictionary_acquired_item_value(DICTIONARY *dict __maybe_unused, void *item) {
+    if(unlikely(!item)) return NULL;
+    return ((NAME_VALUE *)item)->value;
 }
 
 void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, void *item) {
-    if(!item) return;
-    NAME_VALUE *nv = (NAME_VALUE *)item;
-    reference_counter_release(dict, nv, false);
+    if(unlikely(!item)) return;
+    reference_counter_release(dict, (NAME_VALUE *)item, false);
 }
 
 void dictionary_acquired_item_release(DICTIONARY *dict, void *item) {
+    if(unlikely(!item)) return;
+
     // no need to get a lock here
     // we pass the last parameter to reference_counter_release() as true
-    // so that the release may get a write lock if required to cleanup
+    // so that the release may get a write-lock if required to clean up
 
-    if(!item) return;
-    NAME_VALUE *nv = (NAME_VALUE *)item;
-    reference_counter_release(dict, nv, true);
+    reference_counter_release(dict, (NAME_VALUE *)item, true);
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED))
         dictionary_destroy(dict);
