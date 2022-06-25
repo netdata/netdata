@@ -23,7 +23,7 @@ void signals_unblock(void){};
 void signals_reset(void){};
 
 // callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result)
+int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, NETDATA_DOUBLE *result)
 {
     (void)variable;
     (void)hash;

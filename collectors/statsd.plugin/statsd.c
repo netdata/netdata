@@ -35,7 +35,7 @@
 // data specific to each metric type
 
 typedef struct statsd_metric_gauge {
-    LONG_DOUBLE value;
+    NETDATA_DOUBLE value;
 } STATSD_METRIC_GAUGE;
 
 typedef struct statsd_metric_counter { // counter and meter
@@ -64,7 +64,7 @@ typedef struct statsd_histogram_extensions {
 
     size_t size;
     size_t used;
-    LONG_DOUBLE *values;   // dynamic array of values collected
+    NETDATA_DOUBLE *values;   // dynamic array of values collected
 } STATSD_METRIC_HISTOGRAM_EXTENSIONS;
 
 typedef struct statsd_metric_histogram { // histogram and timer
@@ -431,12 +431,12 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing numbers
 
-static inline LONG_DOUBLE statsd_parse_float(const char *v, LONG_DOUBLE def) {
-    LONG_DOUBLE value;
+static inline NETDATA_DOUBLE statsd_parse_float(const char *v, NETDATA_DOUBLE def) {
+    NETDATA_DOUBLE value;
 
     if(likely(v && *v)) {
         char *e = NULL;
-        value = str2ld(v, &e);
+        value = str2ndd(v, &e);
         if(unlikely(e && *e))
             error("STATSD: excess data '%s' after value '%s'", e, v);
     }
@@ -446,8 +446,8 @@ static inline LONG_DOUBLE statsd_parse_float(const char *v, LONG_DOUBLE def) {
     return value;
 }
 
-static inline LONG_DOUBLE statsd_parse_sampling_rate(const char *v) {
-    LONG_DOUBLE sampling_rate = statsd_parse_float(v, 1.0);
+static inline NETDATA_DOUBLE statsd_parse_sampling_rate(const char *v) {
+    NETDATA_DOUBLE sampling_rate = statsd_parse_float(v, 1.0);
     if(unlikely(isless(sampling_rate, 0.001))) sampling_rate = 0.001;
     if(unlikely(isgreater(sampling_rate, 1.0))) sampling_rate = 1.0;
     return sampling_rate;
@@ -522,7 +522,7 @@ static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char 
         // magic loading of metric, without affecting anything
     }
     else {
-        m->counter.value += llrintl((LONG_DOUBLE) statsd_parse_int(value, 1) / statsd_parse_sampling_rate(sampling));
+        m->counter.value += llrintndd((NETDATA_DOUBLE) statsd_parse_int(value, 1) / statsd_parse_sampling_rate(sampling));
 
         m->events++;
         m->count++;
@@ -549,18 +549,18 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
         // magic loading of metric, without affecting anything
     }
     else {
-        LONG_DOUBLE v = statsd_parse_float(value, 1.0);
-        LONG_DOUBLE sampling_rate = statsd_parse_sampling_rate(sampling);
+        NETDATA_DOUBLE v = statsd_parse_float(value, 1.0);
+        NETDATA_DOUBLE sampling_rate = statsd_parse_sampling_rate(sampling);
         if(unlikely(isless(sampling_rate, 0.01))) sampling_rate = 0.01;
         if(unlikely(isgreater(sampling_rate, 1.0))) sampling_rate = 1.0;
 
-        long long samples = llrintl(1.0 / sampling_rate);
+        long long samples = llrintndd(1.0 / sampling_rate);
         while(samples-- > 0) {
 
             if(unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
                 netdata_mutex_lock(&m->histogram.ext->mutex);
                 m->histogram.ext->size += statsd.histogram_increase_step;
-                m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(LONG_DOUBLE) * m->histogram.ext->size);
+                m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(NETDATA_DOUBLE) * m->histogram.ext->size);
                 netdata_mutex_unlock(&m->histogram.ext->mutex);
             }
 
@@ -1945,21 +1945,21 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         netdata_mutex_lock(&m->histogram.ext->mutex);
 
         size_t len = m->histogram.ext->used;
-        LONG_DOUBLE *series = m->histogram.ext->values;
+        NETDATA_DOUBLE *series = m->histogram.ext->values;
         sort_series(series, len);
 
-        m->histogram.ext->last_min = (collected_number)roundl(series[0] * statsd.decimal_detail);
-        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * statsd.decimal_detail);
-        m->last = (collected_number)roundl(average(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_min = (collected_number)roundndd(series[0] * statsd.decimal_detail);
+        m->histogram.ext->last_max = (collected_number)roundndd(series[len - 1] * statsd.decimal_detail);
+        m->last = (collected_number)roundndd(average(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_median = (collected_number)roundndd(median_on_sorted_series(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_stddev = (collected_number)roundndd(standard_deviation(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_sum = (collected_number)roundndd(sum(series, len) * statsd.decimal_detail);
 
         size_t pct_len = (size_t)floor((double)len * statsd.histogram_percentile / 100.0);
         if(pct_len < 1)
             m->histogram.ext->last_percentile = (collected_number)(series[0] * statsd.decimal_detail);
         else
-            m->histogram.ext->last_percentile = (collected_number)roundl(series[pct_len - 1] * statsd.decimal_detail);
+            m->histogram.ext->last_percentile = (collected_number)roundndd(series[pct_len - 1] * statsd.decimal_detail);
 
         netdata_mutex_unlock(&m->histogram.ext->mutex);
 

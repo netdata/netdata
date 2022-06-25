@@ -993,7 +993,8 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         if(unlikely(since_last_usec < 0)) {
             // oops! the database is in the future
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+            info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
+                " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (NETDATA_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
@@ -1012,7 +1013,8 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
             // oops! the database is too far behind
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+            info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
+                " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
             microseconds = (usec_t)since_last_usec;
@@ -1069,7 +1071,7 @@ static inline usec_t rrdset_init_last_collected_time(RRDSET *st) {
     usec_t last_collect_ut = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "initialized last collected time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_collect_ut / USEC_PER_SEC);
+    rrdset_debug(st, "initialized last collected time to %0.3" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)last_collect_ut / USEC_PER_SEC);
     #endif
 
     return last_collect_ut;
@@ -1082,7 +1084,7 @@ static inline usec_t rrdset_update_last_collected_time(RRDSET *st) {
     st->last_collected_time.tv_usec = (suseconds_t) (ut % USEC_PER_SEC);
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "updated last collected time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_collect_ut / USEC_PER_SEC);
+    rrdset_debug(st, "updated last collected time to %0.3" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)last_collect_ut / USEC_PER_SEC);
     #endif
 
     return last_collect_ut;
@@ -1101,7 +1103,7 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     usec_t last_updated_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "initialized last updated time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_updated_ut / USEC_PER_SEC);
+    rrdset_debug(st, "initialized last updated time to %0.3" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)last_updated_ut / USEC_PER_SEC);
     #endif
 
     return last_updated_ut;
@@ -1139,8 +1141,8 @@ static inline size_t rrdset_done_interpolate(
 
         #ifdef NETDATA_INTERNAL_CHECKS
         if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
-        rrdset_debug(st, "last_stored_ut = %0.3" LONG_DOUBLE_MODIFIER " (last updated time)", (LONG_DOUBLE)last_stored_ut/USEC_PER_SEC);
-        rrdset_debug(st, "next_store_ut  = %0.3" LONG_DOUBLE_MODIFIER " (next interpolation point)", (LONG_DOUBLE)next_store_ut/USEC_PER_SEC);
+        rrdset_debug(st, "last_stored_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last updated time)", (NETDATA_DOUBLE)last_stored_ut/USEC_PER_SEC);
+        rrdset_debug(st, "next_store_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
         #endif
 
         last_ut = next_store_ut;
@@ -1149,20 +1151,19 @@ static inline size_t rrdset_done_interpolate(
             if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
                 continue;
 
-            calculated_number new_value;
+            NETDATA_DOUBLE new_value;
 
             switch(rd->algorithm) {
                 case RRD_ALGORITHM_INCREMENTAL:
-                    new_value = (calculated_number)
+                    new_value = (NETDATA_DOUBLE)
                             (      rd->calculated_value
-                                   * (calculated_number)(next_store_ut - last_collect_ut)
-                                   / (calculated_number)(now_collect_ut - last_collect_ut)
+                                   * (NETDATA_DOUBLE)(next_store_ut - last_collect_ut)
+                                   / (NETDATA_DOUBLE)(now_collect_ut - last_collect_ut)
                             );
 
                     #ifdef NETDATA_INTERNAL_CHECKS
-                    rrdset_debug(st, "%s: CALC2 INC "
-                                CALCULATED_NUMBER_FORMAT " = "
-                                CALCULATED_NUMBER_FORMAT
+                    rrdset_debug(st, "%s: CALC2 INC " NETDATA_DOUBLE_FORMAT " = "
+                                 NETDATA_DOUBLE_FORMAT
                                 " * (%llu - %llu)"
                                 " / (%llu - %llu)"
                               , rd->name
@@ -1176,18 +1177,18 @@ static inline size_t rrdset_done_interpolate(
                     rd->calculated_value -= new_value;
                     new_value += rd->last_calculated_value;
                     rd->last_calculated_value = 0;
-                    new_value /= (calculated_number)st->update_every;
+                    new_value /= (NETDATA_DOUBLE)st->update_every;
 
                     if(unlikely(next_store_ut - last_stored_ut < update_every_ut)) {
 
                         #ifdef NETDATA_INTERNAL_CHECKS
-                        rrdset_debug(st, "%s: COLLECTION POINT IS SHORT " CALCULATED_NUMBER_FORMAT " - EXTRAPOLATING",
+                        rrdset_debug(st, "%s: COLLECTION POINT IS SHORT " NETDATA_DOUBLE_FORMAT " - EXTRAPOLATING",
                                     rd->name
-                                  , (calculated_number)(next_store_ut - last_stored_ut)
+                                  , (NETDATA_DOUBLE)(next_store_ut - last_stored_ut)
                         );
                         #endif
 
-                        new_value = new_value * (calculated_number)(st->update_every * USEC_PER_SEC) / (calculated_number)(next_store_ut - last_stored_ut);
+                        new_value = new_value * (NETDATA_DOUBLE)(st->update_every * USEC_PER_SEC) / (NETDATA_DOUBLE)(next_store_ut - last_stored_ut);
                     }
                     break;
 
@@ -1206,21 +1207,19 @@ static inline size_t rrdset_done_interpolate(
                         // we have missed an update
                         // interpolate in the middle values
 
-                        new_value = (calculated_number)
+                        new_value = (NETDATA_DOUBLE)
                                 (   (     (rd->calculated_value - rd->last_calculated_value)
-                                          * (calculated_number)(next_store_ut - last_collect_ut)
-                                          / (calculated_number)(now_collect_ut - last_collect_ut)
+                                          * (NETDATA_DOUBLE)(next_store_ut - last_collect_ut)
+                                          / (NETDATA_DOUBLE)(now_collect_ut - last_collect_ut)
                                     )
                                     +  rd->last_calculated_value
                                 );
 
                         #ifdef NETDATA_INTERNAL_CHECKS
-                        rrdset_debug(st, "%s: CALC2 DEF "
-                                    CALCULATED_NUMBER_FORMAT " = ((("
-                                            "(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
+                        rrdset_debug(st, "%s: CALC2 DEF " NETDATA_DOUBLE_FORMAT " = ((("
+                                            "(" NETDATA_DOUBLE_FORMAT " - " NETDATA_DOUBLE_FORMAT ")"
                                             " * %llu"
-                                            " / %llu) + " CALCULATED_NUMBER_FORMAT
-                                  , rd->name
+                                            " / %llu) + " NETDATA_DOUBLE_FORMAT, rd->name
                                   , new_value
                                   , rd->calculated_value, rd->last_calculated_value
                                   , (next_store_ut - first_ut)
@@ -1362,7 +1361,8 @@ void rrdset_done(RRDSET *st) {
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
                 st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && st->rrd_memory_mode != RRD_MEMORY_MODE_NONE)) {
-        info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" LONG_DOUBLE_MODIFIER " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (LONG_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
+        info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" NETDATA_DOUBLE_MODIFIER
+            " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
         store_this_entry = 0;
@@ -1499,10 +1499,10 @@ after_first_database_work:
     }
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "last_collect_ut = %0.3" LONG_DOUBLE_MODIFIER " (last collection time)", (LONG_DOUBLE)last_collect_ut/USEC_PER_SEC);
-    rrdset_debug(st, "now_collect_ut  = %0.3" LONG_DOUBLE_MODIFIER " (current collection time)", (LONG_DOUBLE)now_collect_ut/USEC_PER_SEC);
-    rrdset_debug(st, "last_stored_ut  = %0.3" LONG_DOUBLE_MODIFIER " (last updated time)", (LONG_DOUBLE)last_stored_ut/USEC_PER_SEC);
-    rrdset_debug(st, "next_store_ut   = %0.3" LONG_DOUBLE_MODIFIER " (next interpolation point)", (LONG_DOUBLE)next_store_ut/USEC_PER_SEC);
+    rrdset_debug(st, "last_collect_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last collection time)", (NETDATA_DOUBLE)last_collect_ut/USEC_PER_SEC);
+    rrdset_debug(st, "now_collect_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (current collection time)", (NETDATA_DOUBLE)now_collect_ut/USEC_PER_SEC);
+    rrdset_debug(st, "last_stored_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (last updated time)", (NETDATA_DOUBLE)last_stored_ut/USEC_PER_SEC);
+    rrdset_debug(st, "next_store_ut   = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
     #endif
 
     // calculate totals and count the dimensions
@@ -1539,9 +1539,8 @@ after_first_database_work:
         rrdset_debug(st, "%s: START "
                 " last_collected_value = " COLLECTED_NUMBER_FORMAT
                 " collected_value = " COLLECTED_NUMBER_FORMAT
-                " last_calculated_value = " CALCULATED_NUMBER_FORMAT
-                " calculated_value = " CALCULATED_NUMBER_FORMAT
-                                      , rd->name
+                " last_calculated_value = " NETDATA_DOUBLE_FORMAT
+                " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
                                       , rd->last_collected_value
                                       , rd->collected_value
                                       , rd->last_calculated_value
@@ -1551,21 +1550,19 @@ after_first_database_work:
 
         switch(rd->algorithm) {
             case RRD_ALGORITHM_ABSOLUTE:
-                rd->calculated_value = (calculated_number)rd->collected_value
-                                       * (calculated_number)rd->multiplier
-                                       / (calculated_number)rd->divisor;
+                rd->calculated_value = (NETDATA_DOUBLE)rd->collected_value
+                                       * (NETDATA_DOUBLE)rd->multiplier
+                                       / (NETDATA_DOUBLE)rd->divisor;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC ABS/ABS-NO-IN "
-                            CALCULATED_NUMBER_FORMAT " = "
+                rrdset_debug(st, "%s: CALC ABS/ABS-NO-IN " NETDATA_DOUBLE_FORMAT " = "
                             COLLECTED_NUMBER_FORMAT
-                            " * " CALCULATED_NUMBER_FORMAT
-                            " / " CALCULATED_NUMBER_FORMAT
-                          , rd->name
+                            " * " NETDATA_DOUBLE_FORMAT
+                            " / " NETDATA_DOUBLE_FORMAT, rd->name
                           , rd->calculated_value
                           , rd->collected_value
-                          , (calculated_number)rd->multiplier
-                          , (calculated_number)rd->divisor
+                          , (NETDATA_DOUBLE)rd->multiplier
+                          , (NETDATA_DOUBLE)rd->divisor
                 );
                 #endif
 
@@ -1578,13 +1575,12 @@ after_first_database_work:
                     // the percentage of the current value
                     // over the total of all dimensions
                     rd->calculated_value =
-                            (calculated_number)100
-                            * (calculated_number)rd->collected_value
-                            / (calculated_number)st->collected_total;
+                            (NETDATA_DOUBLE)100
+                            * (NETDATA_DOUBLE)rd->collected_value
+                            / (NETDATA_DOUBLE)st->collected_total;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC PCENT-ROW "
-                            CALCULATED_NUMBER_FORMAT " = 100"
+                rrdset_debug(st, "%s: CALC PCENT-ROW " NETDATA_DOUBLE_FORMAT " = 100"
                             " * " COLLECTED_NUMBER_FORMAT
                             " / " COLLECTED_NUMBER_FORMAT
                           , rd->name
@@ -1635,34 +1631,32 @@ after_first_database_work:
                     // TODO: remember recent history of rates and compare with current rate to reduce this chance.
                     if (delta < max_acceptable_rate) {
                         rd->calculated_value +=
-                                (calculated_number) delta
-                                * (calculated_number) rd->multiplier
-                                / (calculated_number) rd->divisor;
+                                (NETDATA_DOUBLE) delta
+                                * (NETDATA_DOUBLE) rd->multiplier
+                                / (NETDATA_DOUBLE) rd->divisor;
                     } else {
                         // This is a reset. Any overflow with a rate greater than MAX_INCREMENTAL_PERCENT_RATE will also
                         // be detected as a reset instead.
-                        rd->calculated_value += (calculated_number)0;
+                        rd->calculated_value += (NETDATA_DOUBLE)0;
                     }
                 }
                 else {
                     rd->calculated_value +=
-                            (calculated_number) (rd->collected_value - rd->last_collected_value)
-                            * (calculated_number) rd->multiplier
-                            / (calculated_number) rd->divisor;
+                            (NETDATA_DOUBLE) (rd->collected_value - rd->last_collected_value)
+                            * (NETDATA_DOUBLE) rd->multiplier
+                            / (NETDATA_DOUBLE) rd->divisor;
                 }
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC INC PRE "
-                            CALCULATED_NUMBER_FORMAT " = ("
+                rrdset_debug(st, "%s: CALC INC PRE " NETDATA_DOUBLE_FORMAT " = ("
                             COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
                             ")"
-                                    " * " CALCULATED_NUMBER_FORMAT
-                            " / " CALCULATED_NUMBER_FORMAT
-                          , rd->name
+                                    " * " NETDATA_DOUBLE_FORMAT
+                            " / " NETDATA_DOUBLE_FORMAT, rd->name
                           , rd->calculated_value
                           , rd->collected_value, rd->last_collected_value
-                          , (calculated_number)rd->multiplier
-                          , (calculated_number)rd->divisor
+                          , (NETDATA_DOUBLE)rd->multiplier
+                          , (NETDATA_DOUBLE)rd->divisor
                 );
                 #endif
 
@@ -1695,13 +1689,12 @@ after_first_database_work:
                     rd->calculated_value = 0;
                 else
                     rd->calculated_value =
-                            (calculated_number)100
-                            * (calculated_number)(rd->collected_value - rd->last_collected_value)
-                            / (calculated_number)(st->collected_total - st->last_collected_total);
+                            (NETDATA_DOUBLE)100
+                            * (NETDATA_DOUBLE)(rd->collected_value - rd->last_collected_value)
+                            / (NETDATA_DOUBLE)(st->collected_total - st->last_collected_total);
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC PCENT-DIFF "
-                            CALCULATED_NUMBER_FORMAT " = 100"
+                rrdset_debug(st, "%s: CALC PCENT-DIFF " NETDATA_DOUBLE_FORMAT " = 100"
                             " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
                             " / (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
                           , rd->name
@@ -1719,8 +1712,7 @@ after_first_database_work:
                 rd->calculated_value = 0;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC "
-                            CALCULATED_NUMBER_FORMAT " = 0"
+                rrdset_debug(st, "%s: CALC " NETDATA_DOUBLE_FORMAT " = 0"
                           , rd->name
                           , rd->calculated_value
                 );
@@ -1733,9 +1725,8 @@ after_first_database_work:
         rrdset_debug(st, "%s: PHASE2 "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
-                    " last_calculated_value = " CALCULATED_NUMBER_FORMAT
-                    " calculated_value = " CALCULATED_NUMBER_FORMAT
-                                      , rd->name
+                    " last_calculated_value = " NETDATA_DOUBLE_FORMAT
+                    " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
                                       , rd->last_collected_value
                                       , rd->collected_value
                                       , rd->last_calculated_value
@@ -1795,7 +1786,8 @@ after_second_database_work:
             case RRD_ALGORITHM_INCREMENTAL:
                 if(unlikely(!first_entry)) {
                     #ifdef NETDATA_INTERNAL_CHECKS
-                    rrdset_debug(st, "%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", rd->name, rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
+                    rrdset_debug(st, "%s: setting last_calculated_value (old: " NETDATA_DOUBLE_FORMAT
+                        ") to last_calculated_value (new: " NETDATA_DOUBLE_FORMAT ")", rd->name, rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
                     #endif
 
                     rd->last_calculated_value += rd->calculated_value;
@@ -1811,7 +1803,8 @@ after_second_database_work:
             case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
             case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", rd->name, rd->last_calculated_value, rd->calculated_value);
+                rrdset_debug(st, "%s: setting last_calculated_value (old: " NETDATA_DOUBLE_FORMAT
+                    ") to last_calculated_value (new: " NETDATA_DOUBLE_FORMAT ")", rd->name, rd->last_calculated_value, rd->calculated_value);
                 #endif
 
                 rd->last_calculated_value = rd->calculated_value;
@@ -1826,9 +1819,8 @@ after_second_database_work:
         rrdset_debug(st, "%s: END "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
-                    " last_calculated_value = " CALCULATED_NUMBER_FORMAT
-                    " calculated_value = " CALCULATED_NUMBER_FORMAT
-                                      , rd->name
+                    " last_calculated_value = " NETDATA_DOUBLE_FORMAT
+                    " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
                                       , rd->last_collected_value
                                       , rd->collected_value
                                       , rd->last_calculated_value

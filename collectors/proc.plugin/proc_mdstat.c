@@ -263,7 +263,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
             word = procfile_lineword(ff, l, 3);
             remove_trailing_chars(word, '%');
 
-            unsigned long long percentage = (unsigned long long)(str2ld(word, NULL) * 100);
+            unsigned long long percentage = (unsigned long long)(str2ndd(word, NULL) * 100);
             // possible operations: check, resync, recovery, reshape
             // 4-th character is unique for each operation so it is checked
             switch (procfile_lineword(ff, l, 1)[3]) {
@@ -287,7 +287,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
             word += 7; // skip leading "finish="
 
             if (likely(s > word))
-                raid->finish_in = (unsigned long long)(str2ld(word, NULL) * 60);
+                raid->finish_in = (unsigned long long)(str2ndd(word, NULL) * 60);
 
             word = procfile_lineword(ff, l, 6);
             s = remove_trailing_chars(word, 'K'); // remove trailing "K/sec"

@@ -6,7 +6,7 @@
 // sum
 
 struct grouping_sum {
-    calculated_number sum;
+    NETDATA_DOUBLE sum;
     size_t count;
 };
 
@@ -27,16 +27,16 @@ void grouping_free_sum(RRDR *r) {
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_sum(RRDR *r, calculated_number value) {
+void grouping_add_sum(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
     g->sum += value;
     g->count++;
 }
 
-calculated_number grouping_flush_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(unlikely(!g->count)) {
         value = 0.0;

@@ -89,16 +89,16 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 }
 
 static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
-    calculated_number *value = (calculated_number *)rv->value;
+    NETDATA_DOUBLE *value = (NETDATA_DOUBLE *)rv->value;
 
     buffer_sprintf(
             host->sender->build
-            , "VARIABLE HOST %s = " CALCULATED_NUMBER_FORMAT "\n"
+            , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
             , rv->name
             , *value
     );
 
-    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
+    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rv->name, *value);
 }
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {

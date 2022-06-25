@@ -520,8 +520,8 @@ static void perf_send_metrics() {
                , "instructions_per_cycle"
                );
 
-        calculated_number result = ((calculated_number)perf_events[EV_ID_INSTRUCTIONS].value /
-                                    (calculated_number)perf_events[EV_ID_CPU_CYCLES].value) * 100.0;
+        NETDATA_DOUBLE result = ((NETDATA_DOUBLE)perf_events[EV_ID_INSTRUCTIONS].value /
+                                    (NETDATA_DOUBLE)perf_events[EV_ID_CPU_CYCLES].value) * 100.0;
         printf("SET %s = %lld\n"
                , "ipc"
                , (collected_number) result

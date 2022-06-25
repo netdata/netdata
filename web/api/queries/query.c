@@ -41,7 +41,7 @@ static struct {
 
     // Add a single value into the calculation.
     // The module may decide to cache it, or use it in the fly.
-    void (*add)(struct rrdresult *r, calculated_number value);
+    void (*add)(struct rrdresult *r, NETDATA_DOUBLE value);
 
     // Generate a single result for the values added so far.
     // More values and points may be requested later.
@@ -49,7 +49,7 @@ static struct {
     // when flushing it (so for a few modules it may be better to
     // continue after a flush as if nothing changed, for others a
     // cleanup of the internal structures may be required).
-    calculated_number (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+    NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
         {.name = "average",
                 .hash  = 0,
@@ -399,7 +399,7 @@ static inline RRDR_VALUE_FLAGS *UNUSED_FUNCTION(rrdr_line_options)(RRDR *r, long
     return &r->o[ rrdr_line * r->d ];
 }
 
-static inline calculated_number *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rrdr_line) {
+static inline NETDATA_DOUBLE *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rrdr_line) {
     return &r->v[ rrdr_line * r->d ];
 }
 
@@ -454,21 +454,21 @@ static inline void rrd2rrdr_do_dimension(
 
     struct rrddim_query_handle handle;
 
-    calculated_number min = r->min, max = r->max;
+    NETDATA_DOUBLE min = r->min, max = r->max;
     size_t db_points_read = 0;
 
     // cache the function pointers we need in the loop
-    calculated_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) = rd->state->query_ops.next_metric;
-    void (*grouping_add)(struct rrdresult *r, calculated_number value) = r->internal.grouping_add;
-    calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) = r->internal.grouping_flush;
+    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) = rd->state->query_ops.next_metric;
+    void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value) = r->internal.grouping_add;
+    NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) = r->internal.grouping_flush;
 
-    calculated_number last_point_value;
+    NETDATA_DOUBLE last_point_value;
     SN_FLAGS last_point_flags;
     time_t last_point_start_time;
     time_t last_point_end_time;
     size_t last_point_anomaly;
 
-    calculated_number new_point_value = NAN;
+    NETDATA_DOUBLE new_point_value = NAN;
     SN_FLAGS new_point_flags = SN_EMPTY_SLOT;
     time_t new_point_start_time = 0;
     time_t new_point_end_time = 0;
@@ -496,11 +496,11 @@ static inline void rrd2rrdr_do_dimension(
             // fetch the new point
             new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags);
 
-            if(likely(calculated_number_isnumber(new_point_value))) {
+            if(likely(netdata_double_isnumber(new_point_value))) {
                 new_point_anomaly = (new_point_flags & SN_ANOMALY_BIT) ? 0 : 100;
 
                 if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
-                    new_point_value = (calculated_number)new_point_anomaly;
+                    new_point_value = (NETDATA_DOUBLE)new_point_anomaly;
             }
             else {
                 new_point_flags   = SN_EMPTY_SLOT;
@@ -551,8 +551,7 @@ static inline void rrd2rrdr_do_dimension(
 
         size_t iterations = 0;
         for ( ; now <= new_point_end_time && points_added < points_wanted; now += dt, iterations++) {
-
-            calculated_number current_point_value;
+            NETDATA_DOUBLE current_point_value;
             SN_FLAGS current_point_flags;
             size_t current_point_anomaly;
             //time_t current_point_start_time;
@@ -583,7 +582,7 @@ static inline void rrd2rrdr_do_dimension(
                 //current_point_end_time   = now;
             }
 
-            if(likely(calculated_number_isnumber(current_point_value))) {
+            if(likely(netdata_double_isnumber(current_point_value))) {
                 if(likely(current_point_value != 0.0))
                     group_points_non_zero++;
 
@@ -615,7 +614,7 @@ static inline void rrd2rrdr_do_dimension(
                 *rrdr_value_options_ptr = group_value_flags;
 
                 // store the group value
-                calculated_number group_value = grouping_flush(r, rrdr_value_options_ptr);
+                NETDATA_DOUBLE group_value = grouping_flush(r, rrdr_value_options_ptr);
                 r->v[rrdr_o_v_index] = group_value;
 
                 // we only store uint8_t anomaly rates,
@@ -856,7 +855,7 @@ static RRDR *rrd2rrdr_do_chart(
         group++;
 
     // resampling_time_requested enforces a certain grouping multiple
-    calculated_number resampling_divisor = 1.0;
+    NETDATA_DOUBLE resampling_divisor = 1.0;
     long resampling_group = 1;
     if(unlikely(resampling_time_requested > update_every)) {
         if (unlikely(resampling_time_requested > duration)) {
@@ -900,7 +899,7 @@ static RRDR *rrd2rrdr_do_chart(
         if(unlikely(group % resampling_group)) group += resampling_group - (group % resampling_group); // make sure group is multiple of resampling_group
 
         //resampling_divisor = group / resampling_group;
-        resampling_divisor = (calculated_number)(group * update_every) / (calculated_number)resampling_time_requested;
+        resampling_divisor = (NETDATA_DOUBLE)(group * update_every) / (NETDATA_DOUBLE)resampling_time_requested;
     }
 
     // now that we have group,

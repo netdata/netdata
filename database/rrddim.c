@@ -529,7 +529,7 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM 
     collected_number v = (value >= 0) ? value : -value;
     if(unlikely(v > rd->collected_value_max)) rd->collected_value_max = v;
 
-    // fprintf(stderr, "%s.%s %llu " COLLECTED_NUMBER_FORMAT " dt %0.6f" " rate " CALCULATED_NUMBER_FORMAT "\n", st->name, rd->name, st->usec_since_last_update, value, (float)((double)st->usec_since_last_update / (double)1000000), (calculated_number)((value - rd->last_collected_value) * (calculated_number)rd->multiplier / (calculated_number)rd->divisor * 1000000.0 / (calculated_number)st->usec_since_last_update));
+    // fprintf(stderr, "%s.%s %llu " COLLECTED_NUMBER_FORMAT " dt %0.6f" " rate " NETDATA_DOUBLE_FORMAT "\n", st->name, rd->name, st->usec_since_last_update, value, (float)((double)st->usec_since_last_update / (double)1000000), (NETDATA_DOUBLE)((value - rd->last_collected_value) * (NETDATA_DOUBLE)rd->multiplier / (NETDATA_DOUBLE)rd->divisor * 1000000.0 / (NETDATA_DOUBLE)st->usec_since_last_update));
 
     return rd->last_collected_value;
 }

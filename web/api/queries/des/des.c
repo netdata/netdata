@@ -8,13 +8,13 @@
 // single exponential smoothing
 
 struct grouping_des {
-    calculated_number alpha;
-    calculated_number alpha_other;
-    calculated_number beta;
-    calculated_number beta_other;
+    NETDATA_DOUBLE alpha;
+    NETDATA_DOUBLE alpha_other;
+    NETDATA_DOUBLE beta;
+    NETDATA_DOUBLE beta_other;
 
-    calculated_number level;
-    calculated_number trend;
+    NETDATA_DOUBLE level;
+    NETDATA_DOUBLE trend;
 
     size_t count;
 };
@@ -31,10 +31,10 @@ void grouping_init_des(void) {
     }
 }
 
-static inline calculated_number window(RRDR *r, struct grouping_des *g) {
+static inline NETDATA_DOUBLE window(RRDR *r, struct grouping_des *g) {
     (void)g;
 
-    calculated_number points;
+    NETDATA_DOUBLE points;
     if(r->group == 1) {
         // provide a running DES
         points = r->internal.points_wanted;
@@ -96,7 +96,7 @@ void grouping_free_des(RRDR *r) {
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_des(RRDR *r, calculated_number value) {
+void grouping_add_des(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
 
     if(likely(g->count > 0)) {
@@ -109,7 +109,7 @@ void grouping_add_des(RRDR *r, calculated_number value) {
         }
 
         // for the values, except the first
-        calculated_number last_level = g->level;
+        NETDATA_DOUBLE last_level = g->level;
         g->level = (g->alpha * value) + (g->alpha_other * (g->level + g->trend));
         g->trend = (g->beta * (g->level - last_level)) + (g->beta_other * g->trend);
     }
@@ -123,10 +123,10 @@ void grouping_add_des(RRDR *r, calculated_number value) {
     //fprintf(stderr, "value: " CALCULATED_NUMBER_FORMAT ", level: " CALCULATED_NUMBER_FORMAT ", trend: " CALCULATED_NUMBER_FORMAT "\n", value, g->level, g->trend);
 }
 
-calculated_number grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
 
-    if(unlikely(!g->count || !calculated_number_isnumber(g->level))) {
+    if(unlikely(!g->count || !netdata_double_isnumber(g->level))) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         return 0.0;
     }

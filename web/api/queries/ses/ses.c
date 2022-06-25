@@ -7,9 +7,9 @@
 // single exponential smoothing
 
 struct grouping_ses {
-    calculated_number alpha;
-    calculated_number alpha_other;
-    calculated_number level;
+    NETDATA_DOUBLE alpha;
+    NETDATA_DOUBLE alpha_other;
+    NETDATA_DOUBLE level;
     size_t count;
 };
 
@@ -25,10 +25,10 @@ void grouping_init_ses(void) {
     }
 }
 
-static inline calculated_number window(RRDR *r, struct grouping_ses *g) {
+static inline NETDATA_DOUBLE window(RRDR *r, struct grouping_ses *g) {
     (void)g;
 
-    calculated_number points;
+    NETDATA_DOUBLE points;
     if(r->group == 1) {
         // provide a running DES
         points = r->internal.points_wanted;
@@ -68,7 +68,7 @@ void grouping_free_ses(RRDR *r) {
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_ses(RRDR *r, calculated_number value) {
+void grouping_add_ses(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
 
     if(unlikely(!g->count))
@@ -78,10 +78,10 @@ void grouping_add_ses(RRDR *r, calculated_number value) {
     g->count++;
 }
 
-calculated_number grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
 
-    if(unlikely(!g->count || !calculated_number_isnumber(g->level))) {
+    if(unlikely(!g->count || !netdata_double_isnumber(g->level))) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         return 0.0;
     }

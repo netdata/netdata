@@ -11,7 +11,7 @@
 
 struct grouping_stddev {
     long count;
-    calculated_number m_oldM, m_newM, m_oldS, m_newS;
+    NETDATA_DOUBLE m_oldM, m_newM, m_oldS, m_newS;
 };
 
 void grouping_create_stddev(RRDR *r, const char *options __maybe_unused) {
@@ -30,7 +30,7 @@ void grouping_free_stddev(RRDR *r) {
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_stddev(RRDR *r, calculated_number value) {
+void grouping_add_stddev(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
     g->count++;
@@ -50,26 +50,26 @@ void grouping_add_stddev(RRDR *r, calculated_number value) {
     }
 }
 
-static inline calculated_number mean(struct grouping_stddev *g) {
+static inline NETDATA_DOUBLE mean(struct grouping_stddev *g) {
     return (g->count > 0) ? g->m_newM : 0.0;
 }
 
-static inline calculated_number variance(struct grouping_stddev *g) {
+static inline NETDATA_DOUBLE variance(struct grouping_stddev *g) {
     return ( (g->count > 1) ? g->m_newS/(g->count - 1) : 0.0 );
 }
-static inline calculated_number stddev(struct grouping_stddev *g) {
-    return sqrtl(variance(g));
+static inline NETDATA_DOUBLE stddev(struct grouping_stddev *g) {
+    return sqrtndd(variance(g));
 }
 
-calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(likely(g->count > 1)) {
         value = stddev(g);
 
-        if(!calculated_number_isnumber(value)) {
+        if(!netdata_double_isnumber(value)) {
             value = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
@@ -88,16 +88,16 @@ calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_op
 }
 
 // https://en.wikipedia.org/wiki/Coefficient_of_variation
-calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(likely(g->count > 1)) {
-        calculated_number m = mean(g);
+        NETDATA_DOUBLE m = mean(g);
         value = 100.0 * stddev(g) / ((m < 0)? -m : m);
 
-        if(unlikely(!calculated_number_isnumber(value))) {
+        if(unlikely(!netdata_double_isnumber(value))) {
             value = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
@@ -121,10 +121,10 @@ calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FL
 /*
  * Mean = average
  *
-calculated_number grouping_flush_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(unlikely(!g->count)) {
         value = 0.0;
@@ -148,10 +148,10 @@ calculated_number grouping_flush_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_opti
 /*
  * It is not advised to use this version of variance directly
  *
-calculated_number grouping_flush_variance(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_variance(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(unlikely(!g->count)) {
         value = 0.0;

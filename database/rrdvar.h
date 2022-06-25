@@ -52,13 +52,13 @@ extern int rrdvar_fix_name(char *variable);
 #include "rrd.h"
 
 extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
-extern void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value);
+extern void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, NETDATA_DOUBLE value);
 extern int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data);
 extern void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_lock);
 
 extern int  rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data);
 
-extern calculated_number rrdvar2number(RRDVAR *rv);
+extern NETDATA_DOUBLE rrdvar2number(RRDVAR *rv);
 
 extern RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value);
 extern void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv);

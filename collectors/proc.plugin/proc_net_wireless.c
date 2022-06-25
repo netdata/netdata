@@ -24,9 +24,9 @@ static struct netwireless {
     kernel_uint_t status;
 
     // Quality
-    calculated_number link;
-    calculated_number level;
-    calculated_number noise;
+    NETDATA_DOUBLE link;
+    NETDATA_DOUBLE level;
+    NETDATA_DOUBLE noise;
 
     // Discarded packets
     kernel_uint_t nwid;
@@ -281,9 +281,9 @@ int do_proc_net_wireless(int update_every, usec_t dt)
         }
 
         if (likely(do_quality != CONFIG_BOOLEAN_NO)) {
-            wireless_dev->link = str2ld(procfile_lineword(ff, l, 2), NULL);
-            wireless_dev->level = str2ld(procfile_lineword(ff, l, 3), NULL);
-            wireless_dev->noise = str2ld(procfile_lineword(ff, l, 4), NULL);
+            wireless_dev->link = str2ndd(procfile_lineword(ff, l, 2), NULL);
+            wireless_dev->level = str2ndd(procfile_lineword(ff, l, 3), NULL);
+            wireless_dev->noise = str2ndd(procfile_lineword(ff, l, 4), NULL);
 
             if (unlikely(!wireless_dev->st_link)) {
                 wireless_dev->st_link = rrdset_create_localhost("wireless",

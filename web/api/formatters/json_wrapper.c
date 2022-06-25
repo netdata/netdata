@@ -257,7 +257,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         if(i) buffer_strcat(wb, ", ");
         i++;
 
-        calculated_number value = rd->last_stored_value;
+        NETDATA_DOUBLE value = rd->last_stored_value;
         if (NAN == value)
             buffer_strcat(wb, "null");
         else
@@ -282,13 +282,13 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     i = 0;
     if(rows) {
-        calculated_number total = 1;
+        NETDATA_DOUBLE total = 1;
 
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-                calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
-                calculated_number n = cn[c];
+                NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
+                NETDATA_DOUBLE n = cn[c];
 
                 if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                     n = -n;
@@ -306,9 +306,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             if(i) buffer_strcat(wb, ", ");
             i++;
 
-            calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
+            NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
             RRDR_VALUE_FLAGS *co = &r->o[ (rrdr_rows(r) - 1) * r->d ];
-            calculated_number n = cn[c];
+            NETDATA_DOUBLE n = cn[c];
 
             if(co[c] & RRDR_VALUE_EMPTY) {
                 if(options & RRDR_OPTION_NULL2ZERO)

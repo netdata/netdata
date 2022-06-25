@@ -6,33 +6,33 @@
 // countif
 
 struct grouping_countif {
-    size_t (*comparison)(calculated_number, calculated_number);
-    calculated_number target;
+    size_t (*comparison)(NETDATA_DOUBLE, NETDATA_DOUBLE);
+    NETDATA_DOUBLE target;
     size_t count;
     size_t matched;
 };
 
-static size_t countif_equal(calculated_number v, calculated_number target) {
+static size_t countif_equal(NETDATA_DOUBLE v, NETDATA_DOUBLE target) {
     return (v == target);
 }
 
-static size_t countif_notequal(calculated_number v, calculated_number target) {
+static size_t countif_notequal(NETDATA_DOUBLE v, NETDATA_DOUBLE target) {
     return (v != target);
 }
 
-static size_t countif_less(calculated_number v, calculated_number target) {
+static size_t countif_less(NETDATA_DOUBLE v, NETDATA_DOUBLE target) {
     return (v < target);
 }
 
-static size_t countif_lessequal(calculated_number v, calculated_number target) {
+static size_t countif_lessequal(NETDATA_DOUBLE v, NETDATA_DOUBLE target) {
     return (v <= target);
 }
 
-static size_t countif_greater(calculated_number v, calculated_number target) {
+static size_t countif_greater(NETDATA_DOUBLE v, NETDATA_DOUBLE target) {
     return (v > target);
 }
 
-static size_t countif_greaterequal(calculated_number v, calculated_number target) {
+static size_t countif_greaterequal(NETDATA_DOUBLE v, NETDATA_DOUBLE target) {
     return (v >= target);
 }
 
@@ -89,7 +89,7 @@ void grouping_create_countif(RRDR *r, const char *options __maybe_unused) {
         // skip everything up to the first digit
         while(isspace(*options)) options++;
 
-        g->target = str2ld(options, NULL);
+        g->target = str2ndd(options, NULL);
     }
     else {
         g->target = 0.0;
@@ -110,23 +110,23 @@ void grouping_free_countif(RRDR *r) {
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_countif(RRDR *r, calculated_number value) {
+void grouping_add_countif(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_countif *g = (struct grouping_countif *)r->internal.grouping_data;
     g->matched += g->comparison(value, g->target);
     g->count++;
 }
 
-calculated_number grouping_flush_countif(RRDR *r,  RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_countif(RRDR *r,  RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_countif *g = (struct grouping_countif *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(unlikely(!g->count)) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        value = (calculated_number)g->matched * 100 / (calculated_number)g->count;
+        value = (NETDATA_DOUBLE)g->matched * 100 / (NETDATA_DOUBLE)g->count;
     }
 
     g->matched = 0;

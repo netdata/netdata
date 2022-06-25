@@ -30,7 +30,7 @@ static void rrdr_dump(RRDR *r)
 
     // for each line in the array
     for(i = 0; i < r->rows ;i++) {
-        calculated_number *cn = &r->v[ i * r->d ];
+        NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
         RRDR_DIMENSION_FLAGS *co = &r->o[ i * r->d ];
 
         // print the id and the timestamp of the line
@@ -44,7 +44,7 @@ static void rrdr_dump(RRDR *r)
             if(co[c] & RRDR_EMPTY)
                 fprintf(stderr, "null ");
             else
-                fprintf(stderr, CALCULATED_NUMBER_FORMAT " %s%s%s%s "
+                fprintf(stderr, NETDATA_DOUBLE_FORMAT " %s%s%s%s "
                     , cn[c]
                     , (co[c] & RRDR_EMPTY)?"E":" "
                     , (co[c] & RRDR_RESET)?"R":" "
@@ -124,7 +124,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_pa
     r->n = n;
 
     r->t = onewayalloc_callocz(owa, (size_t)n, sizeof(time_t));
-    r->v = onewayalloc_mallocz(owa, n * r->d * sizeof(calculated_number));
+    r->v = onewayalloc_mallocz(owa, n * r->d * sizeof(NETDATA_DOUBLE));
     r->o = onewayalloc_mallocz(owa, n * r->d * sizeof(RRDR_VALUE_FLAGS));
     r->ar = onewayalloc_mallocz(owa, n * r->d * sizeof(uint8_t));
     r->od = onewayalloc_mallocz(owa, r->d * sizeof(RRDR_DIMENSION_FLAGS));

@@ -9,7 +9,7 @@ void rrddim_collect_init(RRDDIM *rd) {
     rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
     rd->state->handle = calloc(1, sizeof(struct mem_collect_handle));
 }
-void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, calculated_number number, SN_FLAGS flags) {
+void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, SN_FLAGS flags) {
     (void)point_in_time;
     rd->values[rd->rrdset->current_entry] = pack_storage_number(number, flags);
 }
@@ -42,7 +42,8 @@ void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t st
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-calculated_number rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
+NETDATA_DOUBLE
+rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     size_t entries = rd->rrdset->entries;

@@ -462,15 +462,15 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     return strtoll(s, NULL, 0);
 }
 
-LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
+NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value)
 {
     char buffer[100], *s;
-    sprintf(buffer, "%0.5" LONG_DOUBLE_MODIFIER, value);
+    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
     s = appconfig_get(root, section, name, buffer);
     if(!s) return value;
 
-    return str2ld(s, NULL);
+    return str2ndd(s, NULL);
 }
 
 static inline int appconfig_test_boolean_value(char *s) {
@@ -588,10 +588,10 @@ long long appconfig_set_number(struct config *root, const char *section, const c
     return value;
 }
 
-LONG_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
+NETDATA_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value)
 {
     char buffer[100];
-    sprintf(buffer, "%0.5" LONG_DOUBLE_MODIFIER, value);
+    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
     appconfig_set(root, section, name, buffer);
 
@@ -916,7 +916,7 @@ int config_parse_duration(const char* string, int* result) {
     if(!(isdigit(*string) || *string == '+' || *string == '-')) goto fallback;
 
     char *e = NULL;
-    calculated_number n = str2ld(string, &e);
+    NETDATA_DOUBLE n = str2ndd(string, &e);
     if(e && *e) {
         switch (*e) {
             case 'Y':

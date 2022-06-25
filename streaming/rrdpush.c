@@ -272,11 +272,11 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     RRDSETVAR *rs;
     for(rs = st->variables; rs ;rs = rs->next) {
         if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
-            calculated_number *value = (calculated_number *) rs->value;
+            NETDATA_DOUBLE *value = (NETDATA_DOUBLE *) rs->value;
 
             buffer_sprintf(
                     host->sender->build
-                    , "VARIABLE CHART %s = " CALCULATED_NUMBER_FORMAT "\n"
+                    , "VARIABLE CHART %s = " NETDATA_DOUBLE_FORMAT "\n"
                     , rs->variable
                     , *value
             );

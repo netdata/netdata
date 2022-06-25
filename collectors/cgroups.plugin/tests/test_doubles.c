@@ -109,7 +109,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name)
     return NULL;
 }
 
-void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, calculated_number value)
+void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value)
 {
     UNUSED(rs);
     UNUSED(value);

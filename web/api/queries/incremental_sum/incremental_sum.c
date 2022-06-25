@@ -6,8 +6,8 @@
 // incremental sum
 
 struct grouping_incremental_sum {
-    calculated_number first;
-    calculated_number last;
+    NETDATA_DOUBLE first;
+    NETDATA_DOUBLE last;
     size_t count;
 };
 
@@ -29,7 +29,7 @@ void grouping_free_incremental_sum(RRDR *r) {
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_incremental_sum(RRDR *r, calculated_number value) {
+void grouping_add_incremental_sum(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
 
     if(unlikely(!g->count)) {
@@ -42,10 +42,10 @@ void grouping_add_incremental_sum(RRDR *r, calculated_number value) {
     }
 }
 
-calculated_number grouping_flush_incremental_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_incremental_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(unlikely(!g->count)) {
         value = 0.0;

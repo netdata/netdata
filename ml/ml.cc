@@ -186,10 +186,10 @@ void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {
     if (MaxAnomalyRates < 1 || MaxAnomalyRates >= R->d)
         return;
 
-    calculated_number *CNs = R->v;
+    NETDATA_DOUBLE *CNs = R->v;
     RRDR_DIMENSION_FLAGS *DimFlags = R->od;
 
-    std::vector<std::pair<calculated_number, int>> V;
+    std::vector<std::pair<NETDATA_DOUBLE, int>> V;
 
     V.reserve(R->d);
     for (int Idx = 0; Idx != R->d; Idx++)

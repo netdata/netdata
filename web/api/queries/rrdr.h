@@ -67,15 +67,15 @@ typedef struct rrdresult {
     RRDR_DIMENSION_FLAGS *od; // the options for the dimensions
 
     time_t *t;                // array of n timestamps
-    calculated_number *v;     // array n x d values
+    NETDATA_DOUBLE *v;     // array n x d values
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
     uint8_t *ar;              // array n x d of anomaly rates (0 - 200)
 
     long group;               // how many collected values were grouped for each row
     int update_every;         // what is the suggested update frequency in seconds
 
-    calculated_number min;
-    calculated_number max;
+    NETDATA_DOUBLE min;
+    NETDATA_DOUBLE max;
 
     time_t before;
     time_t after;
@@ -87,13 +87,13 @@ typedef struct rrdresult {
     struct {
         long points_wanted;
         long resampling_group;
-        calculated_number resampling_divisor;
+        NETDATA_DOUBLE resampling_divisor;
 
         void (*grouping_create)(struct rrdresult *r, const char *options);
         void (*grouping_reset)(struct rrdresult *r);
         void (*grouping_free)(struct rrdresult *r);
-        void (*grouping_add)(struct rrdresult *r, calculated_number value);
-        calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+        void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value);
+        NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
         void *grouping_data;
 
         #ifdef NETDATA_INTERNAL_CHECKS

@@ -271,18 +271,19 @@ struct rrddim {
                                                     // this is actual date time we updated the last_collected_value
                                                     // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
-    calculated_number calculated_value;             // the current calculated value, after applying the algorithm - resets to zero after being used
-    calculated_number last_calculated_value;        // the last calculated value processed
+    NETDATA_DOUBLE
+        calculated_value;             // the current calculated value, after applying the algorithm - resets to zero after being used
+        NETDATA_DOUBLE last_calculated_value;        // the last calculated value processed
 
-    calculated_number last_stored_value;            // the last value as stored in the database (after interpolation)
+        NETDATA_DOUBLE last_stored_value;            // the last value as stored in the database (after interpolation)
 
     collected_number collected_value;               // the current value, as collected - resets to 0 after being used
     collected_number last_collected_value;          // the last value that was collected, after being processed
 
     // the *_volume members are used to calculate the accuracy of the rounding done by the
     // storage number - they are printed to debug.log when debug is enabled for a set.
-    calculated_number collected_volume;             // the sum of all collected values so far
-    calculated_number stored_volume;                // the sum of all stored values so far
+    NETDATA_DOUBLE collected_volume;             // the sum of all collected values so far
+    NETDATA_DOUBLE stored_volume;                // the sum of all stored values so far
 
     struct rrddim *next;                            // linking of dimensions within the same data set
     struct rrdset *rrdset;
@@ -332,7 +333,7 @@ struct rrddim_collect_ops {
     void (*init)(RRDDIM *rd);
 
     // run this to store each metric into the database
-    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, calculated_number number, SN_FLAGS flags);
+    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, SN_FLAGS flags);
 
     // an finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
@@ -345,7 +346,7 @@ struct rrddim_query_ops {
     void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 
     // run this to load each metric number from the database
-    calculated_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags);
+    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags);
 
     // run this to test if the series of next_metric() database queries is finished
     int (*is_finished)(struct rrddim_query_handle *handle);
@@ -527,8 +528,8 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // local variables
 
-    calculated_number green;                        // green threshold for this chart
-    calculated_number red;                          // red threshold for this chart
+    NETDATA_DOUBLE green;                        // green threshold for this chart
+    NETDATA_DOUBLE red;                          // red threshold for this chart
 
     avl_tree_lock rrdvar_root_index;                // RRDVAR index for this chart
     RRDSETVAR *variables;                           // RRDSETVAR linked list for this chart (one RRDSETVAR, many RRDVARs)
@@ -630,8 +631,8 @@ struct alarm_entry {
     char *units;
     char *info;
 
-    calculated_number old_value;
-    calculated_number new_value;
+    NETDATA_DOUBLE old_value;
+    NETDATA_DOUBLE new_value;
 
     char *old_value_string;
     char *new_value_string;

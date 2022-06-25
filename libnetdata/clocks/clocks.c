@@ -393,7 +393,7 @@ static inline collected_number read_proc_uptime(char *filename) {
         return 0;
     }
 
-    return (collected_number)(strtold(procfile_lineword(read_proc_uptime_ff, 0, 0), NULL) * 1000.0);
+    return (collected_number)(strtondd(procfile_lineword(read_proc_uptime_ff, 0, 0), NULL) * 1000.0);
 }
 
 inline collected_number uptime_msec(char *filename){

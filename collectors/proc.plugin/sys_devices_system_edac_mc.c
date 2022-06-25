@@ -74,7 +74,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
     }
 
     static int do_ce = -1, do_ue = -1;
-    calculated_number ce_sum = 0, ue_sum = 0;
+    NETDATA_DOUBLE ce_sum = 0, ue_sum = 0;
     struct mc *m;
 
     if(unlikely(do_ce == -1)) {
