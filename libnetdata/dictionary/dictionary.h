@@ -168,7 +168,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
     char rw;                    // the lock mode 'r' or 'w'
     usec_t started_ut;          // the time the caller started iterating (now_realtime_usec())
     DICTIONARY *dict;           // the dictionary upon we work
-    void *last_position_index;  // the internal position index, to remember the position we are at
+    void *last_item;            // the item we work on, to remember the position we are at
 } DICTFE;
 
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, 'r')

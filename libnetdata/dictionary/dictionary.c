@@ -369,7 +369,11 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
 }
 
 static int reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
-    int refcount = __atomic_add_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
+    int refcount;
+    if(likely(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))
+        refcount = ++nv->refcount;
+    else
+        refcount = __atomic_add_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
 
     if(refcount == 1) {
         // referenced items counts number of unique items referenced
@@ -390,7 +394,11 @@ static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_
     // or even when someone else has a write lock on the dictionary
     // so, we cannot check for EXCLUSIVE ACCESS
 
-    int refcount = __atomic_sub_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
+    int refcount;
+    if(likely(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))
+        refcount = --nv->refcount;
+    else
+        refcount = __atomic_sub_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
 
     if(refcount == 0) {
         if((nv->flags & NAME_VALUE_FLAG_DELETED))
@@ -1003,7 +1011,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_start_rw() on a destroyed dictionary");
-        dfe->last_position_index = NULL;
+        dfe->last_item = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
         return NULL;
@@ -1025,13 +1033,13 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
         nv = nv->next;
 
     if(likely(nv)) {
-        dfe->last_position_index = nv;
+        dfe->last_item = nv;
         dfe->name = nv->name;
         dfe->value = nv->value;
         reference_counter_acquire(dict, nv);
     }
     else {
-        dfe->last_position_index = NULL;
+        dfe->last_item = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
     }
@@ -1044,14 +1052,14 @@ void *dictionary_foreach_next(DICTFE *dfe) {
 
     if(unlikely(dfe->dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_next() on a destroyed dictionary");
-        dfe->last_position_index = NULL;
+        dfe->last_item = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
         return NULL;
     }
 
     // the item we just did
-    NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
+    NAME_VALUE *nv = (NAME_VALUE *)dfe->last_item;
 
     // get the next item from the list
     NAME_VALUE *nv_next = (nv) ? nv->next : NULL;
@@ -1065,13 +1073,13 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         reference_counter_release(dfe->dict, nv, false);
 
     if(likely(nv = nv_next)) {
-        dfe->last_position_index = nv;
+        dfe->last_item = nv;
         dfe->name = nv->name;
         dfe->value = nv->value;
         reference_counter_acquire(dfe->dict, nv);
     }
     else {
-        dfe->last_position_index = NULL;
+        dfe->last_item = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
     }
@@ -1088,7 +1096,7 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
     }
 
     // the item we just did
-    NAME_VALUE *nv = (NAME_VALUE *)dfe->last_position_index;
+    NAME_VALUE *nv = (NAME_VALUE *)dfe->last_item;
 
     // release it, so that it can possibly be deleted
     if(likely(nv))
@@ -1096,7 +1104,7 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
 
     dictionary_unlock(dfe->dict, dfe->rw);
     dfe->dict = NULL;
-    dfe->last_position_index = NULL;
+    dfe->last_item = NULL;
     dfe->name = NULL;
     dfe->value = NULL;
 
@@ -1130,7 +1138,7 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
     while(nv) {
 
         // skip the deleted items
-        if(nv->flags & NAME_VALUE_FLAG_DELETED) {
+        if(unlikely(nv->flags & NAME_VALUE_FLAG_DELETED)) {
             nv = nv->next;
             continue;
         }
@@ -1203,7 +1211,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
     int ret = 0;
     for(i = 0; i < count ;i++) {
         nv = array[i];
-        if(!(nv->flags & NAME_VALUE_FLAG_DELETED)) {
+        if(likely(!(nv->flags & NAME_VALUE_FLAG_DELETED))) {
             reference_counter_acquire(dict, nv);
             int r = callback(nv->name, nv->value, data);
             reference_counter_release(dict, nv, false);
