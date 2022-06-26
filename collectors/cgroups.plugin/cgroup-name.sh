@@ -530,7 +530,7 @@ if [ -z "${NAME}" ]; then
     NAME="lxc/$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-lxc//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
   elif [[ ${CGROUP} =~ machine.slice_machine.*-qemu ]]; then
     # libvirtd / qemu virtual machines
-    # NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
+    # machine.slice_machine-qemu_x2d1_x2dopnsense.scope => qemu_opnsense
     NAME="qemu_$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-qemu//; s/[\/_]x2d[[:digit:]]*//; s/[\/_]x2d//g; s/\.scope//g')"
 
   elif [[ ${CGROUP} =~ machine_.*\.libvirt-qemu ]]; then
