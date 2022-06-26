@@ -294,20 +294,27 @@ void rrdset_reset(RRDSET *st) {
 // RRDSET - helpers for rrdset_create()
 
 inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
-    if(unlikely(entries < 5)) entries = 5;
-    if(unlikely(entries > RRD_HISTORY_ENTRIES_MAX)) entries = RRD_HISTORY_ENTRIES_MAX;
+    if(mode == RRD_MEMORY_MODE_DBENGINE) return 0;
+    if(mode == RRD_MEMORY_MODE_NONE) return 5;
 
-    if(unlikely(mode == RRD_MEMORY_MODE_NONE || mode == RRD_MEMORY_MODE_ALLOC))
-        return entries;
+    if(entries < 5) entries = 5;
+    if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
 
-    long page = (size_t)sysconf(_SC_PAGESIZE);
-    long size = sizeof(RRDDIM) + entries * sizeof(storage_number);
-    if(unlikely(size % page)) {
-        size -= (size % page);
-        size += page;
+    if(mode == RRD_MEMORY_MODE_MAP || mode == RRD_MEMORY_MODE_SAVE || mode == RRD_MEMORY_MODE_RAM) {
+        long header_size = 0;
 
-        long n = (size - sizeof(RRDDIM)) / sizeof(storage_number);
-        return n;
+        if(mode == RRD_MEMORY_MODE_MAP || mode == RRD_MEMORY_MODE_SAVE)
+            header_size = (long)rrddim_memory_file_header_size();
+
+        long page = (long)sysconf(_SC_PAGESIZE);
+        long size = (long)(header_size + entries * sizeof(storage_number));
+        if (unlikely(size % page)) {
+            size -= (size % page);
+            size += page;
+
+            long n = (long)((size - header_size) / sizeof(storage_number));
+            return n;
+        }
     }
 
     return entries;
@@ -435,8 +442,13 @@ void rrdset_save(RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
-            debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-            memory_file_save(rd->cache_filename, rd, rd->memsize);
+            const char *cache_filename = rrddim_cache_filename(rd);
+            if(cache_filename) {
+                debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, cache_filename);
+                memory_file_save(cache_filename, rd, rd->memsize);
+            }
+            else
+                error("Cannot find the cache filename for memory mode save of chart '%s', dimension '%s'", rd->rrdset->name, rd->name);
         }
     }
 }
@@ -457,11 +469,12 @@ void rrdset_delete_custom(RRDSET *st, int db_rotated) {
     }
 
     rrddim_foreach_read(rd, st) {
-        if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
-            info("Deleting dimension file '%s'.", rd->cache_filename);
-            if(unlikely(unlink(rd->cache_filename) == -1))
-                error("Cannot delete dimension file '%s'", rd->cache_filename);
-        }
+        const char *cache_filename = rrddim_cache_filename(rd);
+        if(!cache_filename) continue;
+
+        info("Deleting dimension file '%s'.", cache_filename);
+        if(unlikely(unlink(cache_filename) == -1))
+            error("Cannot delete dimension file '%s'", cache_filename);
     }
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
@@ -483,11 +496,11 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
 
     rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
-            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
-                info("Deleting dimension file '%s'.", rd->cache_filename);
-                if(unlikely(unlink(rd->cache_filename) == -1))
-                    error("Cannot delete dimension file '%s'", rd->cache_filename);
-            }
+            const char *cache_filename = rrddim_cache_filename(rd);
+            if(!cache_filename) continue;
+            info("Deleting dimension file '%s'.", cache_filename);
+            if(unlikely(unlink(cache_filename) == -1))
+                error("Cannot delete dimension file '%s'", cache_filename);
         }
     }
 }
@@ -1300,7 +1313,7 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
         long current_entry = st->current_entry;
 
         for(c = 0; c < entries && next_store_ut <= now_collect_ut ; next_store_ut += update_every_ut, c++) {
-            rd->values[current_entry] = SN_EMPTY_SLOT;
+            rd->db[current_entry] = SN_EMPTY_SLOT;
             current_entry = ((current_entry + 1) >= entries) ? 0 : current_entry + 1;
 
             #ifdef NETDATA_INTERNAL_CHECKS
@@ -1853,10 +1866,11 @@ after_second_database_work:
                              && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
                     info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
-                    if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
-                        info("Deleting dimension file '%s'.", rd->cache_filename);
-                        if(unlikely(unlink(rd->cache_filename) == -1))
-                            error("Cannot delete dimension file '%s'", rd->cache_filename);
+                    const char *cache_filename = rrddim_cache_filename(rd);
+                    if(cache_filename) {
+                        info("Deleting dimension file '%s'.", cache_filename);
+                        if (unlikely(unlink(cache_filename) == -1))
+                            error("Cannot delete dimension file '%s'", cache_filename);
                     }
 
 #ifdef ENABLE_DBENGINE

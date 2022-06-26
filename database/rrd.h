@@ -237,45 +237,36 @@ struct rrddim {
                                                     // this is a pointer to the config structure
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
-                                                    // DO NOT FREE THIS - IT IS ALLOCATED IN CONFIG
+    uint32_t hash;                                  // a simple hash of the id, to speed up searching / indexing
+                                                    // instead of strcmp() every item in the binary index
+                                                    // we first compare the hashes
+    uint32_t hash_name;                             // a simple hash of the name
+
 
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
+    RRDDIM_FLAGS flags;                             // configuration flags for the dimension
+
+    unsigned int updated:1;                         // 1 when the dimension has been updated since the last processing
+    unsigned int exposed:1;                         // 1 when set what have sent this dimension to the central netdata
 
     collected_number multiplier;                    // the multiplier of the collected values
     collected_number divisor;                       // the divider of the collected values
 
-    uint32_t flags;                                 // configuration flags for the dimension
-
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
-
-    uint32_t hash;                                  // a simple hash of the id, to speed up searching / indexing
-                                                    // instead of strcmp() every item in the binary index
-                                                    // we first compare the hashes
-
-    uint32_t hash_name;                             // a simple hash of the name
-
-    char *cache_filename;                           // the filename we load/save from/to this set
-
-    size_t collections_counter;                     // the number of times we added values to this rrdim
-    struct rrddim_volatile *state;                  // volatile state that is not persistently stored
-    size_t unused[8];
-
-    collected_number collected_value_max;           // the absolute maximum of the collected value
-
-    unsigned int updated:1;                         // 1 when the dimension has been updated since the last processing
-    unsigned int exposed:1;                         // 1 when set what have sent this dimension to the central netdata
 
     struct timeval last_collected_time;             // when was this dimension last updated
                                                     // this is actual date time we updated the last_collected_value
                                                     // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
-    NETDATA_DOUBLE
-        calculated_value;             // the current calculated value, after applying the algorithm - resets to zero after being used
-        NETDATA_DOUBLE last_calculated_value;        // the last calculated value processed
+    struct rrddim_volatile *state;                  // volatile state that is not persistently stored
+    size_t collections_counter;                     // the number of times we added values to this rrdim
+    collected_number collected_value_max;           // the absolute maximum of the collected value
 
-        NETDATA_DOUBLE last_stored_value;            // the last value as stored in the database (after interpolation)
+    NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
+    NETDATA_DOUBLE last_calculated_value;           // the last calculated value processed
+    NETDATA_DOUBLE last_stored_value;               // the last value as stored in the database (after interpolation)
 
     collected_number collected_value;               // the current value, as collected - resets to 0 after being used
     collected_number last_collected_value;          // the last value that was collected, after being processed
@@ -299,15 +290,28 @@ struct rrddim {
 
     size_t memsize;                                 // the memory allocated for this dimension
 
-    char magic[sizeof(RRDDIMENSION_MAGIC) + 1];     // a string to be saved, used to identify our data file
-
     struct rrddimvar *variables;
 
     // ------------------------------------------------------------------------
     // the values stored in this dimension, using our floating point numbers
 
-    storage_number values[];                        // the array of values - THIS HAS TO BE THE LAST MEMBER
+    void *rd_on_file;                               // pointer to the header written on disk
+    storage_number *db;                             // the array of values
 };
+
+// returns the RRDDIM cache filename, or NULL if it does not exist
+extern const char *rrddim_cache_filename(RRDDIM *rd);
+
+// updated the header with the latest RRDDIM value, for memory mode MAP and SAVE
+extern void rrddim_memory_file_update(RRDDIM *rd);
+
+// free the memory file structures for memory mode MAP and SAVE
+extern void rrddim_memory_file_free(RRDDIM *rd);
+
+extern bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MODE memory_mode);
+
+// return the v019 header size of RRDDIM files
+extern size_t rrddim_memory_file_header_size(void);
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection

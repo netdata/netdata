@@ -20,7 +20,7 @@ reload-health
 reload-labels
     Reload all labels.
 save-database
-    Save internal DB to disk for memory mode save.
+    Save internal DB to disk for database mode save.
 reopen-logs
     Close and reopen log files.
 shutdown-agent

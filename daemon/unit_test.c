@@ -1226,7 +1226,7 @@ int run_test(struct test *test)
 
     unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
     for(c = 0 ; c < max ; c++) {
-        NETDATA_DOUBLE v = unpack_storage_number(rd->values[c]);
+        NETDATA_DOUBLE v = unpack_storage_number(rd->db[c]);
         NETDATA_DOUBLE n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
         int same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
@@ -1238,7 +1238,7 @@ int run_test(struct test *test)
         if(!same) errors++;
 
         if(rd2) {
-            v = unpack_storage_number(rd2->values[c]);
+            v = unpack_storage_number(rd2->db[c]);
             n = test->results2[c];
             same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
@@ -1487,7 +1487,7 @@ int unit_test(long delay, long shift)
         fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
         for(rd = st->dimensions ; rd ; rd = rd->next) {
-            sn = rd->values[c];
+            sn = rd->db[c];
             cn = unpack_storage_number(sn);
             fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rd->id, cn, sn);
 

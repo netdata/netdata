@@ -7,63 +7,62 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/database/engine/
 # Database engine
 
 The Database Engine works like a traditional database. It dedicates a certain amount of RAM to data caching and
-indexing, while the rest of the data resides compressed on disk. Unlike other [memory modes](/database/README.md), the
+indexing, while the rest of the data resides compressed on disk. Unlike other [database modes](/database/README.md), the
 amount of historical metrics stored is based on the amount of disk space you allocate and the effective compression
 ratio, not a fixed number of metrics collected.
 
 By using both RAM and disk space, the database engine allows for long-term storage of per-second metrics inside of the
 Agent itself.
 
-In addition, the database engine is the only memory mode that supports changing the data collection update frequency
-(`update_every`) without losing the metrics your Agent already gathered and stored.
+In addition, the dbengine is the only mode that supports changing the data collection update frequency
+(`granularity secs`) without losing the metrics your Agent already gathered and stored.
 
 ## Configuration
 
-To use the database engine, open `netdata.conf` and set `memory mode` to `dbengine`.
+To use the database engine, open `netdata.conf` and set `[db].mode` to `dbengine`.
 
 ```conf
-[global]
-    memory mode = dbengine
+[db]
+    mode = dbengine
 ```
 
-To configure the database engine, look for the `page cache size` and `dbengine multihost disk space` settings in the
-`[global]` section of your `netdata.conf`. The Agent ignores the `history` setting when using the database engine.
+To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in the
+`[db]` section of your `netdata.conf`. The Agent ignores the `[db].retention` setting when using the dbengine.
 
 ```conf
-[global]
-    page cache size = 32
-    dbengine multihost disk space = 256
+[db]
+    page cache size MB = 32
+    dbengine multihost disk space MB = 256
 ```
 
-The above values are the default values for Page Cache size and DB engine disk space quota. Both numbers are
-in **MiB**.
+The above values are the default values for Page Cache size and DB engine disk space quota.
 
-The `page cache size` option determines the amount of RAM in **MiB** dedicated to caching Netdata metric values. The
+The `page cache size MB` option determines the amount of RAM dedicated to caching Netdata metric values. The
 actual page cache size will be slightly larger than this figure—see the [memory requirements](#memory-requirements)
 section for details.
 
-The `dbengine multihost disk space` option determines the amount of disk space in **MiB** that is dedicated to storing
+The `dbengine multihost disk space MB` option determines the amount of disk space that is dedicated to storing
 Netdata metric values and all related metadata describing them. You can use the [**database engine
 calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-to correctly set `dbengine multihost disk space` based on your metrics retention policy. The calculator gives an
+to correctly set `dbengine multihost disk space MB` based on your metrics retention policy. The calculator gives an
 accurate estimate based on how many child nodes you have, how many metrics your Agent collects, and more.
 
 ### Legacy configuration
 
-The deprecated `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing
+The deprecated `dbengine disk space MB` option determines the amount of disk space that is dedicated to storing
 Netdata metric values per legacy database engine instance (see [details on the legacy mode](#legacy-mode) below).
 
 ```conf
-[global]
-    dbengine disk space = 256
+[db]
+    dbengine disk space MB = 256
 ```
 
 ### Streaming metrics to the database engine
 
-When using the multihost database engine, all parent and child nodes share the same `page cache size` and `dbengine
-multihost disk space` in a single dbengine instance. The [**database engine
+When using the multihost database engine, all parent and child nodes share the same `page cache size MB` and `dbengine
+multihost disk space MB` in a single dbengine instance. The [**database engine
 calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-helps you properly set `page cache size` and `dbengine multihost disk space` on your parent node to allocate enough
+helps you properly set `page cache size MB` and `dbengine multihost disk space MB` on your parent node to allocate enough
 resources based on your metrics retention policy and how many child nodes you have.
 
 #### Legacy mode
@@ -72,8 +71,8 @@ _For Netdata Agents earlier than v1.23.2_, the Agent on the parent node uses one
 another instance for every child node it receives metrics from. If you had four streaming nodes, you would have five
 instances in total (`1 parent + 4 child nodes = 5 instances`).
 
-The Agent allocates resources for each instance separately using the `dbengine disk space` (**deprecated**) setting. If
-`dbengine disk space`(**deprecated**) is set to the default `256`, each instance is given 256 MiB in disk space, which
+The Agent allocates resources for each instance separately using the `dbengine disk space MB` (**deprecated**) setting. If
+`dbengine disk space MB`(**deprecated**) is set to the default `256`, each instance is given 256 MiB in disk space, which
 means the total disk space required to store all instances is, roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`.
 
 #### Backward compatibility
@@ -88,18 +87,18 @@ Agent.
 
 ##### Information
 
-For more information about setting `memory mode` on your nodes, in addition to other streaming configurations, see
+For more information about setting `[db].mode` on your nodes, in addition to other streaming configurations, see
 [streaming](/streaming/README.md).
 
 ### Memory requirements
 
-Using memory mode `dbengine` we can overcome most memory restrictions and store a dataset that is much larger than the
+Using database mode `dbengine` we can overcome most memory restrictions and store a dataset that is much larger than the
 available memory.
 
 There are explicit memory requirements **per** DB engine **instance**:
 
 -   The total page cache memory footprint will be an additional `#dimensions-being-collected x 4096 x 2` bytes over what
-    the user configured with `page cache size`.
+    the user configured with `page cache size MB`.
 
 -   an additional `#pages-on-disk x 4096 x 0.03` bytes of RAM are allocated for metadata.
 
@@ -132,7 +131,7 @@ Netdata allocates 25% of the available file descriptors to its Database Engine i
 the file descriptors that are available to the Netdata service are accessible by dbengine instances. You should take
 that into account when configuring your service or system-wide file descriptor limits. You can roughly estimate that the
 Netdata service needs 2048 file descriptors for every 10 streaming child hosts when streaming is configured to use
-`memory mode = dbengine`.
+`[db].mode = dbengine`.
 
 If for example one wants to allocate 65536 file descriptors to the Netdata service on a systemd system one needs to
 override the Netdata service by running `sudo systemctl edit netdata` and creating a file with contents:
@@ -166,7 +165,7 @@ You can apply the settings by running `sysctl -p` or by rebooting.
 
 ## Files
 
-With the DB engine memory mode the metric data are stored in database files. These files are organized in pairs, the
+With the DB engine mode the metric data are stored in database files. These files are organized in pairs, the
 datafiles and their corresponding journalfiles, e.g.:
 
 ```sh
@@ -232,10 +231,10 @@ so as to avoid all disk bottlenecks.
 The reported numbers are the following:
 
 | device | page cache | dataset | reads/sec | writes/sec |
-| :----: | :--------: | ------: | --------: | ---------: |
-| HDD    | 64 MiB     | 4.1 GiB | 813K      | 18.0M      |
-| SSD    | 64 MiB     | 9.8 GiB | 1.7M      | 43.0M      |
-| N/A    | 16 GiB     | 6.8 GiB | 118.2M    | 30.2M      |
+|:------:|:----------:|--------:|----------:|-----------:|
+|  HDD   |   64 MiB   | 4.1 GiB |      813K |      18.0M |
+|  SSD   |   64 MiB   | 9.8 GiB |      1.7M |      43.0M |
+|  N/A   |   16 GiB   | 6.8 GiB |    118.2M |      30.2M |
 
 where "reads/sec" is the number of metric data points being read from the database via its API per second and
 "writes/sec" is the number of metric data points being written to the database per second. 

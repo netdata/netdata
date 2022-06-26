@@ -13,7 +13,7 @@ Netdata is fully capable of long-term metrics storage, at per-second granularity
     traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data
     reside compressed on disk. The number of history entries is not fixed in this case, but depends on the configured
     disk space and the effective compression ratio of the data stored. This is the **only mode** that supports changing
-    the data collection update frequency (`update_every`) **without losing** the previously stored metrics. For more
+    the data collection update frequency (`granularity secs`) **without losing** the previously stored metrics. For more
     details see [here](/database/engine/README.md).
 
 2.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
@@ -32,15 +32,12 @@ Netdata is fully capable of long-term metrics storage, at per-second granularity
 6.  `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all
     others except `none`.
 
-You can select the memory mode by editing `netdata.conf` and setting:
+You can select the database mode by editing `netdata.conf` and setting:
 
 ```conf
-[global]
+[db]
   # dbengine (default), ram, save (the default if dbengine not available), map (swap like), none, alloc
-  memory mode = dbengine
-
-  # the directory where data are saved
-  cache directory = /var/cache/netdata
+  mode = dbengine
 ```
 
 ## Running Netdata in embedded devices
@@ -49,26 +46,23 @@ Embedded devices usually have very limited RAM resources available.
 
 There are 2 settings for you to tweak:
 
-1.  `update every`, which controls the data collection frequency
-2.  `history`, which controls the size of the database in RAM (except for `memory mode = dbengine`)
+1.  `[db].granularity secs`, which controls the data collection frequency
+2.  `[db].retention`, which controls the size of the database in memory (except for `[db].mode = dbengine`)
 
-By default `update every = 1` and `history = 3600`. This gives you an hour of data with per second updates.
+By default `[db].granularity secs = 1` and `[db].retention = 3600`. This gives you an hour of data with per second updates.
 
-If you set `update every = 2` and `history = 1800`, you will still have an hour of data, but collected once every 2
+If you set `[db].granularity secs = 2` and `[db].retention = 1800`, you will still have an hour of data, but collected once every 2
 seconds. This will **cut in half** both CPU and RAM resources consumed by Netdata. Of course experiment a bit. On very
-weak devices you might have to use `update every = 5` and `history = 720` (still 1 hour of data, but 1/5 of the CPU and
+weak devices you might have to use `[db].granularity secs = 5` and `[db].retention = 720` (still 1 hour of data, but 1/5 of the CPU and
 RAM resources).
 
 You can also disable [data collection plugins](/collectors/README.md) you don't need. Disabling such plugins will also free both
 CPU and RAM resources.
 
-## Running a dedicated central Netdata server
+## Running a dedicated parent Netdata server
 
-Netdata allows streaming data between Netdata nodes. This allows us to have a central Netdata server that will maintain
-the entire database for all nodes, and will also run health checks/alarms for all nodes.
-
-For this central Netdata, memory size can be a problem. Fortunately, Netdata supports several memory modes. **One
-interesting option** for this setup is `memory mode = map`.
+Netdata allows streaming data between Netdata nodes in real-time. This allows having one or more parent Netdata servers that will maintain
+the entire database for all the nodes that connect to them (their children), and will also run health checks/alarms for all these nodes.
 
 ### map
 
@@ -77,8 +71,7 @@ in memory, but the kernel automatically loads and saves memory pages from/to dis
 
 **We suggest _not_ to use this mode on nodes that run other applications.** There will always be dirty memory to be
 synced and this syncing process may influence the way other applications work. This mode however is useful when we need
-a central Netdata server that would normally need huge amounts of memory. Using memory mode `map` we can overcome all
-memory restrictions.
+a parent Netdata server that would normally need huge amounts of memory.
 
 There are a few kernel options that provide finer control on the way this syncing works. But before explaining them, a
 brief introduction of how Netdata database works is needed.
@@ -142,8 +135,8 @@ vm.dirty_ratio = 90
 vm.dirty_writeback_centisecs = 0
 ```
 
-There is another memory mode to help overcome the memory size problem. What is **most interesting for this setup** is
-`memory mode = dbengine`.
+There is another mode to help overcome the memory size problem. What is **most interesting for this setup** is
+`[db].mode = dbengine`.
 
 ### dbengine
 
@@ -154,12 +147,12 @@ configured disk space and the effective compression ratio of the data stored.
 
 We suggest to use **this** mode on nodes that also run other applications. The Database Engine uses direct I/O to avoid
 polluting the OS filesystem caches and does not generate excessive I/O traffic so as to create the minimum possible
-interference with other applications. Using memory mode `dbengine` we can overcome most memory restrictions. For more
+interference with other applications. Using mode `dbengine` we can overcome most memory restrictions. For more
 details see [here](/database/engine/README.md).
 
 ## KSM
 
-Netdata offers all its round robin database to kernel for deduplication (except for `memory mode = dbengine`).
+Netdata offers all its in-memory database to kernel for deduplication.
 
 In the past KSM has been criticized for consuming a lot of CPU resources. Although this is true when KSM is used for
 deduplicating certain applications, it is not true with netdata, since the Netdata memory is written very infrequently
