@@ -80,17 +80,9 @@ static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, ui
     tmp.name = name;
     tmp.hash_name = (hash)?hash:simple_hash(tmp.name);
 
-    // fprintf(stderr, "SEARCHING: %s\n", name);
     result = avl_search_lock(&host->rrdset_root_index_name, (avl_t *) (&(tmp.avlname)));
-    if(result) {
-        RRDSET *st = rrdset_from_avlname(result);
-        if(strcmp(st->magic, RRDSET_MAGIC) != 0)
-            error("Search for RRDSET %s returned an invalid RRDSET %s (name %s)", name, st->id, st->name);
+    if(result) return rrdset_from_avlname(result);
 
-        // fprintf(stderr, "FOUND: %s\n", name);
-        return rrdset_from_avlname(result);
-    }
-    // fprintf(stderr, "NOT FOUND: %s\n", name);
     return NULL;
 }
 
@@ -412,49 +404,18 @@ void rrdset_free(RRDSET *st) {
     freez(st->state);
     freez(st->chart_uuid);
 
-    switch(st->rrd_memory_mode) {
-        case RRD_MEMORY_MODE_SAVE:
-        case RRD_MEMORY_MODE_MAP:
-        case RRD_MEMORY_MODE_RAM:
-            debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
-            munmap(st, st->memsize);
-            break;
-
-        case RRD_MEMORY_MODE_ALLOC:
-        case RRD_MEMORY_MODE_NONE:
-        case RRD_MEMORY_MODE_DBENGINE:
-            freez(st);
-            break;
-    }
-
+    rrdset_memory_file_free(st);
+    freez(st);
 }
 
 void rrdset_save(RRDSET *st) {
     rrdset_check_rdlock(st);
 
-    // info("Saving chart '%s' ('%s')", st->id, st->name);
-
-    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
-        debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
-        memory_file_save(st->cache_filename, st, st->memsize);
-    }
+    rrdset_memory_file_save(st);
 
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
-            const char *cache_filename = rrddim_cache_filename(rd);
-            if(cache_filename) {
-                debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, cache_filename);
-                rrddim_memory_file_update(rd);
-                memory_file_save(cache_filename, rd, rd->memsize);
-            }
-            else
-                error("Cannot find the cache filename for memory mode save of chart '%s', dimension '%s'", rd->rrdset->name, rd->name);
-        }
-        else if(rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-            rrddim_memory_file_update(rd);
-        }
-    }
+    rrddim_foreach_read(rd, st)
+        rrddim_memory_file_save(rd);
 }
 
 void rrdset_delete_custom(RRDSET *st, int db_rotated) {
@@ -467,9 +428,14 @@ void rrdset_delete_custom(RRDSET *st, int db_rotated) {
     info("Deleting chart '%s' ('%s') from disk...", st->id, st->name);
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-        info("Deleting chart header file '%s'.", st->cache_filename);
-        if(unlikely(unlink(st->cache_filename) == -1))
-            error("Cannot delete chart header file '%s'", st->cache_filename);
+        const char *cache_filename = rrdset_cache_filename(st);
+        if(cache_filename) {
+            info("Deleting chart header file '%s'.", cache_filename);
+            if (unlikely(unlink(cache_filename) == -1))
+                error("Cannot delete chart header file '%s'", cache_filename);
+        }
+        else
+            error("Cannot find the cache filename of chart '%s'", st->id);
     }
 
     rrddim_foreach_read(rd, st) {
@@ -741,8 +707,6 @@ RRDSET *rrdset_create_custom(
         return st;
     }
 
-    char fullfilename[FILENAME_MAX + 1];
-
     // ------------------------------------------------------------------------
     // get the options from the config, we need to create it
 
@@ -750,126 +714,37 @@ RRDSET *rrdset_create_custom(
     if (memory_mode != RRD_MEMORY_MODE_DBENGINE)
         entries = align_entries_to_pagesize(memory_mode, history_entries);
 
-    unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid);
-
-    time_t now = now_realtime_sec();
 
     // ------------------------------------------------------------------------
     // load it or allocate it
 
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
-       memory_mode == RRD_MEMORY_MODE_RAM) {
-        st = (RRDSET *)netdata_mmap(
-            (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename,
-            size,
-            ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE),
-            0);
-
-        if(st) {
-            memset(&st->avl, 0, sizeof(avl_t));
-            memset(&st->avlname, 0, sizeof(avl_t));
-            memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
-            memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
-            memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
-
-            st->name = NULL;
-            st->type = NULL;
-            st->family = NULL;
-            st->title = NULL;
-            st->units = NULL;
-            st->context = NULL;
-            st->cache_dir = NULL;
-            st->plugin_name = NULL;
-            st->module_name = NULL;
-            st->dimensions = NULL;
-            st->rrdfamily = NULL;
-            st->rrdhost = NULL;
-            st->next = NULL;
-            st->variables = NULL;
-            st->alarms = NULL;
-            st->flags = 0x00000000;
-            st->exporting_flags = NULL;
-
-            if(memory_mode == RRD_MEMORY_MODE_RAM) {
-                memset(st, 0, size);
-            }
-            else {
-                if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
-                    info("Initializing file %s.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(strcmp(st->id, fullid) != 0) {
-                    error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
-                    // munmap(st, size);
-                    // st = NULL;
-                    memset(st, 0, size);
-                }
-                else if(st->memsize != size || st->entries != entries) {
-                    error("File %s does not have the desired size. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(st->update_every != update_every) {
-                    error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if((now - st->last_updated.tv_sec) > update_every * entries) {
-                    info("File %s is too old. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(st->last_updated.tv_sec > now + update_every) {
-                    error("File %s refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st->last_updated.tv_sec - now));
-                    st->last_updated.tv_sec = now;
-                }
-
-                // make sure the database is aligned
-                if(st->last_updated.tv_sec) {
-                    st->update_every = update_every;
-                    last_updated_time_align(st);
-                }
-            }
-
-            // make sure we have the right memory mode
-            // even if we cleared the memory
-            st->rrd_memory_mode = memory_mode;
-        }
-    }
-
-    if(unlikely(!st)) {
-        st = callocz(1, size);
-        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            st->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        else
-            st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
-    }
-
-    st->plugin_name = plugin?strdupz(plugin):NULL;
-    st->module_name = module?strdupz(module):NULL;
-
-    st->rrdhost = host;
-    st->memsize = size;
-    st->entries = entries;
-    st->update_every = update_every;
-
-    if(st->current_entry >= st->entries) st->current_entry = 0;
-
-    strcpy(st->cache_filename, fullfilename);
-    strcpy(st->magic, RRDSET_MAGIC);
+    st = callocz(1, sizeof(RRDSET));
+    st->state = callocz(1, sizeof(*st->state));
 
     strcpy(st->id, fullid);
     st->hash = simple_hash(st->id);
 
+    st->rrdhost = host;
     st->cache_dir = cache_dir;
+    st->entries = entries;
+    st->update_every = update_every;
 
-    st->chart_type = chart_type;
-    st->type       = strdupz(type);
+    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP) {
+        if(!rrdset_memory_load_or_create_map_save(st, memory_mode)) {
+            info("Failed to use memory mode %s for chart '%s', falling back to ram", (memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", st->name);
+            memory_mode = RRD_MEMORY_MODE_RAM;
+        }
+    }
+    st->rrd_memory_mode = memory_mode;
 
-    st->state = callocz(1, sizeof(*st->state));
-
-    st->family = family ? strdupz(family) : strdupz(st->type);
+    st->plugin_name = plugin?strdupz(plugin):NULL;
+    st->module_name = module?strdupz(module):NULL;
+    st->chart_type  = chart_type;
+    st->type        = strdupz(type);
+    st->family      = family ? strdupz(family) : strdupz(st->type);
     json_fix_string(st->family);
 
     st->state->is_ar_chart = strcmp(st->id, ML_ANOMALY_RATES_CHART_ID) == 0;
@@ -890,15 +765,7 @@ RRDSET *rrdset_create_custom(
     st->green = NAN;
     st->red = NAN;
 
-    st->last_collected_time.tv_sec = 0;
-    st->last_collected_time.tv_usec = 0;
-    st->counter_done = 0;
-    st->rrddim_page_alignment = 0;
-
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
-
-    st->last_accessed_time = 0;
-    st->upstream_resync_time = 0;
 
     avl_init_lock(&st->dimensions_index, rrddim_compare);
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
@@ -1924,4 +1791,208 @@ after_second_database_work:
     rrdset_unlock(st);
 
     netdata_thread_enable_cancelability();
+}
+
+
+// ----------------------------------------------------------------------------
+// compatibility layer for RRDSET files v019
+
+#define RRDSET_MAGIC_V019 "NETDATA RRD SET FILE V019"
+
+struct avl_element_v019 {
+    void *avl_link[2];
+    signed char avl_balance;
+};
+struct avl_tree_type_v019 {
+    void *root;
+    int (*compar)(void *a, void *b);
+};
+struct avl_tree_lock_v019 {
+    struct avl_tree_type_v019 avl_tree;
+    pthread_rwlock_t rwlock;
+};
+struct rrdset_map_save_v019 {
+    struct avl_element_v019 avl;                    // ignored
+    struct avl_element_v019 avlname;                // ignored
+    char id[RRD_ID_LENGTH_MAX + 1];                 // check to reset all - update on load
+    void *name;                                     // ignored
+    void *unused_ptr;                               // ignored
+    void *type;                                     // ignored
+    void *family;                                   // ignored
+    void *title;                                    // ignored
+    void *units;                                    // ignored
+    void *context;                                  // ignored
+    uint32_t hash_context;                          // ignored
+    uint32_t chart_type;                            // ignored
+    int update_every;                               // check to reset all - update on load
+    long entries;                                   // check to reset all - update on load
+    long current_entry;                             // NEEDS TO BE UPDATED - FIXED ON LOAD
+    uint32_t flags;                                 // ignored
+    void *exporting_flags;                          // ignored
+    int gap_when_lost_iterations_above;             // ignored
+    long priority;                                  // ignored
+    uint32_t rrd_memory_mode;                       // ignored
+    void *cache_dir;                                // ignored
+    char cache_filename[FILENAME_MAX+1];            // ignored - update on load
+    pthread_rwlock_t rrdset_rwlock;                 // ignored
+    size_t counter;                                 // NEEDS TO BE UPDATED - maintained on load
+    size_t counter_done;                            // ignored
+    union {                                         //
+        time_t last_accessed_time;                  // ignored
+        time_t last_entry_t;                        // ignored
+    };                                              //
+    time_t upstream_resync_time;                    // ignored
+    void *plugin_name;                              // ignored
+    void *module_name;                              // ignored
+    void *chart_uuid;                               // ignored
+    void *state;                                    // ignored
+    size_t unused[3];                               // ignored
+    size_t rrddim_page_alignment;                   // ignored
+    uint32_t hash;                                  // ignored
+    uint32_t hash_name;                             // ignored
+    usec_t usec_since_last_update;                  // NEEDS TO BE UPDATED - maintained on load
+    struct timeval last_updated;                    // NEEDS TO BE UPDATED - check to reset all - fixed on load
+    struct timeval last_collected_time;             // ignored
+    long long collected_total;                      // NEEDS TO BE UPDATED - maintained on load
+    long long last_collected_total;                 // NEEDS TO BE UPDATED - maintained on load
+    void *rrdfamily;                                // ignored
+    void *rrdhost;                                  // ignored
+    void *next;                                     // ignored
+    long double green;                              // ignored
+    long double red;                                // ignored
+    struct avl_tree_lock_v019 rrdvar_root_index;    // ignored
+    void *variables;                                // ignored
+    void *alarms;                                   // ignored
+    unsigned long memsize;                          // check to reset all - update on load
+    char magic[sizeof(RRDSET_MAGIC_V019) + 1];      // check to reset all - update on load
+    struct avl_tree_lock_v019 dimensions_index;     // ignored
+    void *dimensions;                               // ignored
+};
+
+void rrdset_memory_file_update(RRDSET *st) {
+    if(!st->st_on_file) return;
+    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+
+    st_on_file->current_entry = st->current_entry;
+    st_on_file->counter = st->counter;
+    st_on_file->usec_since_last_update = st->usec_since_last_update;
+    st_on_file->last_updated.tv_sec = st->last_updated.tv_sec;
+    st_on_file->last_updated.tv_usec = st->last_updated.tv_usec;
+    st_on_file->collected_total = st->collected_total;
+    st_on_file->last_collected_total = st->last_collected_total;
+}
+
+const char *rrdset_cache_filename(RRDSET *st) {
+    if(!st->st_on_file) return NULL;
+    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    return st_on_file->cache_filename;
+}
+
+void rrdset_memory_file_free(RRDSET *st) {
+    if(!st->st_on_file) return;
+
+    // needed for memory mode map, to save the latest state
+    rrdset_memory_file_update(st);
+
+    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    munmap(st_on_file, st_on_file->memsize);
+
+    // remove the pointers from the RRDDIM
+    st->st_on_file = NULL;
+}
+
+void rrdset_memory_file_save(RRDSET *st) {
+    if(!st->st_on_file) return;
+
+    rrdset_memory_file_update(st);
+
+    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    if(st_on_file->rrd_memory_mode != RRD_MEMORY_MODE_SAVE) return;
+
+    memory_file_save(st_on_file->cache_filename, st->st_on_file, st_on_file->memsize);
+}
+
+bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mode) {
+    if(memory_mode != RRD_MEMORY_MODE_SAVE && memory_mode != RRD_MEMORY_MODE_MAP)
+        return false;
+
+    char fullfilename[FILENAME_MAX + 1];
+    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", st->cache_dir);
+
+    unsigned long size = sizeof(struct rrdset_map_save_v019);
+    struct rrdset_map_save_v019 *st_on_file = (struct rrdset_map_save_v019 *)netdata_mmap(
+        fullfilename, size,
+        ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE),
+        0);
+
+    if(!st_on_file) return false;
+
+    time_t now = now_realtime_sec();
+
+    if(strcmp(st_on_file->magic, RRDSET_MAGIC_V019) != 0) {
+        info("Initializing file '%s'.", fullfilename);
+        memset(st_on_file, 0, size);
+    }
+    else if(strcmp(st_on_file->id, st->id) != 0) {
+        error("File '%s' contents are not for chart '%s'. Clearing it.", fullfilename, st->id);
+        memset(st_on_file, 0, size);
+    }
+    else if(st_on_file->memsize != size || st_on_file->entries != st->entries) {
+        error("File '%s' does not have the desired size. Clearing it.", fullfilename);
+        memset(st_on_file, 0, size);
+    }
+    else if(st_on_file->update_every != st->update_every) {
+        error("File '%s' does not have the desired granularity. Clearing it.", fullfilename);
+        memset(st_on_file, 0, size);
+    }
+    else if((now - st_on_file->last_updated.tv_sec) > st->update_every * st->entries) {
+        info("File '%s' is too old. Clearing it.", fullfilename);
+        memset(st_on_file, 0, size);
+    }
+    else if(st_on_file->last_updated.tv_sec > now + st->update_every) {
+        error("File '%s' refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st_on_file->last_updated.tv_sec - now));
+        st_on_file->last_updated.tv_sec = now;
+    }
+
+    if(st_on_file->current_entry >= st_on_file->entries)
+        st_on_file->current_entry = 0;
+
+    // make sure the database is aligned
+    bool align_last_updated = false;
+    if(st_on_file->last_updated.tv_sec) {
+        st_on_file->update_every = st->update_every;
+        align_last_updated = true;
+    }
+
+    // copy the useful values to st
+    st->current_entry = st_on_file->current_entry;
+    st->counter = st_on_file->counter;
+    st->usec_since_last_update = st_on_file->usec_since_last_update;
+    st->last_updated.tv_sec = st_on_file->last_updated.tv_sec;
+    st->last_updated.tv_usec = st_on_file->last_updated.tv_usec;
+    st->collected_total = st_on_file->collected_total;
+    st->last_collected_total = st_on_file->last_collected_total;
+
+    // link it to st
+    st->st_on_file = st_on_file;
+
+    // clear everything
+    memset(st_on_file, 0, size);
+
+    // set the values we need
+    strcpy(st_on_file->id, st->id);
+    strcpy(st_on_file->cache_filename, fullfilename);
+    strcpy(st_on_file->magic, RRDSET_MAGIC_V019);
+    st_on_file->memsize = size;
+    st_on_file->entries = st->entries;
+    st_on_file->update_every = st->update_every;
+    st_on_file->rrd_memory_mode = memory_mode;
+
+    if(align_last_updated)
+        last_updated_time_align(st);
+
+    // copy the useful values back to st_on_file
+    rrdset_memory_file_update(st);
+
+    return true;
 }

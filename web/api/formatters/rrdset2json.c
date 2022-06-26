@@ -85,14 +85,14 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         "\t\t\t\"dimensions\": {\n",
         st->update_every);
 
-    unsigned long memory = st->memsize;
+    unsigned long memory = sizeof(RRDSET) + st->memsize;
 
     size_t dimensions = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
 
-        memory += rd->memsize;
+        memory += sizeof(RRDDIM) + rd->memsize;
 
         if (dimensions)
             buffer_strcat(wb, ",\n\t\t\t\t\"");

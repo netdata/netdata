@@ -238,7 +238,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     if(memory_mode == RRD_MEMORY_MODE_ALLOC || memory_mode == RRD_MEMORY_MODE_NONE) {
         size_t entries = st->entries;
-        if(!entries) entries = 5;
+        if(entries < 5) entries = 5;
 
         rd->db = callocz(entries, sizeof(storage_number));
         rd->memsize = entries * sizeof(storage_number);
@@ -460,8 +460,13 @@ collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) 
 
 #define RRDDIMENSION_MAGIC_V019  "NETDATA RRD DIMENSION FILE V019"
 
+struct avl_element_v019 {
+    void *avl_link[2];
+    signed char avl_balance;
+};
+
 struct rrddim_map_save_v019 {
-    avl_t avl;                                      // ignored
+    struct avl_element_v019 avl;                    // ignored
     void *id;                                       // ignored
     void *name;                                     // ignored
     uint32_t algorithm;                             // print warning on mismatch - update on load
@@ -529,6 +534,17 @@ const char *rrddim_cache_filename(RRDDIM *rd) {
     return rd_on_file->cache_filename;
 }
 
+void rrddim_memory_file_save(RRDDIM *rd) {
+    if(!rd->rd_on_file) return;
+
+    rrddim_memory_file_update(rd);
+
+    struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
+    if(rd_on_file->rrd_memory_mode != RRD_MEMORY_MODE_SAVE) return;
+
+    memory_file_save(rd_on_file->cache_filename, rd_on_file, rd_on_file->memsize);
+}
+
 bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MODE memory_mode) {
     if(memory_mode != RRD_MEMORY_MODE_SAVE && memory_mode != RRD_MEMORY_MODE_MAP)
         return false;
@@ -551,7 +567,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     now_realtime_timeval(&now);
 
     int reset = 0;
-    if(strcmp(rd_on_file->magic, RRDDIMENSION_MAGIC) != 0) {
+    if(strcmp(rd_on_file->magic, RRDDIMENSION_MAGIC_V019) != 0) {
         info("Initializing file %s.", fullfilename);
         memset(rd_on_file, 0, size);
         reset = 1;
@@ -588,13 +604,14 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     memset(rd_on_file, 0, sizeof(struct rrddim_map_save_v019));
 
     // set the important fields
-    strcpy(rd_on_file->magic, RRDDIMENSION_MAGIC);
+    strcpy(rd_on_file->magic, RRDDIMENSION_MAGIC_V019);
     rd_on_file->algorithm = rd->algorithm;
     rd_on_file->multiplier = rd->multiplier;
     rd_on_file->divisor = rd->divisor;
     rd_on_file->entries = st->entries;
     rd_on_file->update_every = rd->update_every;
     rd_on_file->memsize = size;
+    rd_on_file->rrd_memory_mode = memory_mode;
     rd_on_file->cache_filename = strdupz(fullfilename);
 
     rd->db = &rd_on_file->values[0];

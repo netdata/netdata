@@ -288,7 +288,7 @@ struct rrddim {
 
     int update_every;                               // every how many seconds is this updated
 
-    size_t memsize;                                 // the memory allocated for this dimension
+    size_t memsize;                                 // the memory allocated for this dimension (without RRDDIM)
 
     struct rrddimvar *variables;
 
@@ -312,6 +312,8 @@ extern bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_ME
 
 // return the v019 header size of RRDDIM files
 extern size_t rrddim_memory_file_header_size(void);
+
+extern void rrddim_memory_file_save(RRDDIM *rd);
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
@@ -455,8 +457,6 @@ struct rrdset {
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
 
-    void *unused_ptr;                               // Unused field (previously it held the config section of the chart)
-
     char *type;                                     // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     char *family;                                   // grouping sets under the same family
     char *title;                                    // title shown to user
@@ -489,7 +489,6 @@ struct rrdset {
     RRD_MEMORY_MODE rrd_memory_mode;                // if set to 1, this is memory mapped
 
     char *cache_dir;                                // the directory to store dimensions
-    char cache_filename[FILENAME_MAX+1];            // the filename to store this set
 
     netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
 
@@ -507,7 +506,6 @@ struct rrdset {
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
                                                     // this object.
     struct rrdset_volatile *state;                  // volatile state that is not persistently stored
-    size_t unused[3];
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
@@ -544,14 +542,13 @@ struct rrdset {
 
     unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
 
-    char magic[sizeof(RRDSET_MAGIC) + 1];           // our magic
-
     // ------------------------------------------------------------------------
     // the dimensions
 
     avl_tree_lock dimensions_index;                 // the root of the dimensions index
     RRDDIM *dimensions;                             // the actual data for every dimension
 
+    void *st_on_file;                               // compatibility with V019 RRDSET files
 };
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
@@ -568,6 +565,12 @@ struct rrdset {
 #define rrdset_foreach_write(st, host) \
     for((st) = (host)->rrdset_root, rrdhost_check_wrlock(host); st ; (st) = (st)->next)
 
+
+extern void rrdset_memory_file_save(RRDSET *st);
+extern void rrdset_memory_file_free(RRDSET *st);
+extern void rrdset_memory_file_update(RRDSET *st);
+extern const char *rrdset_cache_filename(RRDSET *st);
+extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags
