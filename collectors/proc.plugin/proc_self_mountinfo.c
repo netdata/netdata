@@ -199,10 +199,20 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
     struct mountinfo *root = NULL, *last = NULL, *mi = NULL;
 
+    // create a dictionary to track uniqueness
+    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE);
+
     unsigned long l, lines = procfile_lines(ff);
     for(l = 0; l < lines ;l++) {
         if(unlikely(procfile_linewords(ff, l) < 5))
             continue;
+
+        // make sure we don't add the same item twice
+        char *v = (char *)dictionary_set(dict, procfile_lineword(ff, l, 4), "N", 2);
+        if(v) {
+            if(*v == 'O') continue;
+            *v = 'O';
+        }
 
         mi = mallocz(sizeof(struct mountinfo));
 
@@ -411,6 +421,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
     }
 */
 
+    dictionary_destroy(dict);
     procfile_close(ff);
     return root;
 }
