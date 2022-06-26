@@ -399,6 +399,11 @@ struct engine *read_exporting_config()
         else
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
 
+        if (exporter_get_boolean(instance_name, "send variables", CONFIG_BOOLEAN_YES))
+            tmp_instance->config.options |= EXPORTING_OPTION_SEND_VARIABLES;
+        else 
+            tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_VARIABLES;
+
         if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
             struct prometheus_remote_write_specific_config *connector_specific_config =
                 callocz(1, sizeof(struct prometheus_remote_write_specific_config));

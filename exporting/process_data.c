@@ -262,6 +262,27 @@ void end_chart_formatting(struct engine *engine, RRDSET *st)
 }
 
 /**
+ * Format variables for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @param host a data collecting host.
+  */
+void variables_formatting(struct engine *engine, RRDHOST *host)
+{
+    for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
+        if (instance->scheduled && !instance->skip_host && should_send_variables(instance)) {
+            if (instance->variables_formatting && instance->variables_formatting(instance, host) != 0){ 
+                error("EXPORTING: cannot format variables for %s", instance->config.name);
+                disable_instance(instance);
+                continue;
+            }
+            // sum all variables as one metrics
+            instance->stats.buffered_metrics++;
+        }
+    }
+}
+
+/**
  * End host formatting for every connector instance's buffer
  *
  * @param engine an engine data structure.
@@ -337,7 +358,7 @@ void prepare_buffers(struct engine *engine)
             end_chart_formatting(engine, st);
             rrdset_unlock(st);
         }
-
+        variables_formatting(engine, host);
         end_host_formatting(engine, host);
         rrdhost_unlock(host);
     }

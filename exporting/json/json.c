@@ -29,6 +29,7 @@ int init_json_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_json_plaintext;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = simple_connector_end_batch;
 
@@ -87,6 +88,7 @@ int init_json_http_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_json_plaintext;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = close_batch_json_http;
 

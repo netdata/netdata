@@ -138,6 +138,38 @@ void add_metric(
 }
 
 /**
+ * Adds a metric to a write request
+ *
+ * @param write_request_p the write request
+ * @param name the name of the metric
+ * @param instance the name of the host, the metric belongs to
+ * @param value the value of the metric
+ * @param timestamp the timestamp for the metric in milliseconds
+ */
+void add_variable(
+    void *write_request_p, const char *name, const char *instance, const double value, const int64_t timestamp)
+{
+    WriteRequest *write_request = (WriteRequest *)write_request_p;
+    TimeSeries *timeseries;
+    Sample *sample;
+    Label *label;
+
+    timeseries = write_request->add_timeseries();
+
+    label = timeseries->add_labels();
+    label->set_name("__name__");
+    label->set_value(name);
+
+    label = timeseries->add_labels();
+    label->set_name("instance");
+    label->set_value(instance);
+
+    sample = timeseries->add_samples();
+    sample->set_value(value);
+    sample->set_timestamp(timestamp);
+}
+
+/**
  * Gets the size of a write request
  *
  * @param write_request_p the write request
