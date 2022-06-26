@@ -524,7 +524,7 @@ if [ -z "${NAME}" ]; then
     # libvirtd / lxc containers
     # machine.slice machine-lxc/x2d969/x2dhubud0xians01.scope => lxc/hubud0xians01
     # machine.slice_machine-lxc/x2d969/x2dhubud0xians01.scope/libvirt_init.scope => lxc/hubud0xians01/libvirt_init
-    NAME="lxc/$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-lxc//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
+    NAME="lxc/$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-lxc//; s/[\/_]/x2d[[:digit:]]*//; s/[\/_]/x2d//g; s/\.scope//g')"
   elif [[ ${CGROUP} =~ machine.slice_machine.*-qemu ]]; then
     # libvirtd / qemu virtual machines
     # machine.slice_machine-qemu_x2d1_x2dopnsense.scope => qemu_opnsense
