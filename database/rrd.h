@@ -74,9 +74,6 @@ extern time_t rrdset_free_obsolete_time;
 
 #define RRD_ID_LENGTH_MAX 200
 
-#define RRDSET_MAGIC        "NETDATA RRD SET FILE V019"
-#define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V019"
-
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
 
@@ -541,14 +538,13 @@ struct rrdset {
     // members for checking the data when loading from disk
 
     unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
+    void *st_on_file;                               // compatibility with V019 RRDSET files
 
     // ------------------------------------------------------------------------
     // the dimensions
 
     avl_tree_lock dimensions_index;                 // the root of the dimensions index
     RRDDIM *dimensions;                             // the actual data for every dimension
-
-    void *st_on_file;                               // compatibility with V019 RRDSET files
 };
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))

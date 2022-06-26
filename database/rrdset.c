@@ -1373,6 +1373,7 @@ void rrdset_done(RRDSET *st) {
             #endif
         }
     }
+
 after_first_database_work:
     st->counter_done++;
 
@@ -1395,7 +1396,9 @@ after_first_database_work:
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
+
         dimensions++;
+
         if(likely(rd->updated))
             st->collected_total += rd->collected_value;
     }
@@ -1717,15 +1720,24 @@ after_second_database_work:
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
 
-    // find if there are any obsolete dimensions
-    time_t now = now_realtime_sec();
+    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+        // update the memory mapped files with the latest values
 
+        rrdset_memory_file_update(st);
+        rrddim_foreach_read(rd, st) {
+            rrddim_memory_file_update(rd);
+        }
+    }
+
+    // find if there are any obsolete dimensions
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
         rrddim_foreach_read(rd, st)
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
                 break;
 
         if(unlikely(rd)) {
+            time_t now = now_realtime_sec();
+
             RRDDIM *last;
             // there is a dimension to free
             // upgrade our read lock to a write lock
