@@ -445,10 +445,14 @@ void rrdset_save(RRDSET *st) {
             const char *cache_filename = rrddim_cache_filename(rd);
             if(cache_filename) {
                 debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, cache_filename);
+                rrddim_memory_file_update(rd);
                 memory_file_save(cache_filename, rd, rd->memsize);
             }
             else
                 error("Cannot find the cache filename for memory mode save of chart '%s', dimension '%s'", rd->rrdset->name, rd->name);
+        }
+        else if(rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
+            rrddim_memory_file_update(rd);
         }
     }
 }
