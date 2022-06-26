@@ -173,7 +173,8 @@ static kernel_uint_t
         global_gtime = 0;
 
 // the normalization ratios, as calculated by normalize_utilization()
-double  utime_fix_ratio = 1.0,
+NETDATA_DOUBLE
+        utime_fix_ratio = 1.0,
         stime_fix_ratio = 1.0,
         gtime_fix_ratio = 1.0,
         minflt_fix_ratio = 1.0,
@@ -501,7 +502,8 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
-        long double currentmaxfds = 0;
+
+long currentmaxfds = 0;
 
 // ----------------------------------------------------------------------------
 // read users and groups from files
@@ -3021,7 +3023,7 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(u);
     reallocate_target_fds(g);
 
-    long double currentfds = 0;
+    long currentfds = 0;
     size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -3373,7 +3375,7 @@ static void normalize_utilization(struct target *root) {
             gtime_fix_ratio  =
             cutime_fix_ratio =
             cstime_fix_ratio =
-            cgtime_fix_ratio = 1.0; //(double)(global_utime + global_stime) / (double)(utime + cutime + stime + cstime);
+            cgtime_fix_ratio = 1.0; //(NETDATA_DOUBLE)(global_utime + global_stime) / (NETDATA_DOUBLE)(utime + cutime + stime + cstime);
         }
         else if((global_utime + global_stime > utime + stime) && (cutime || cstime)) {
             // children resources are too high
@@ -3383,7 +3385,7 @@ static void normalize_utilization(struct target *root) {
             gtime_fix_ratio  = 1.0;
             cutime_fix_ratio =
             cstime_fix_ratio =
-            cgtime_fix_ratio = (double)((global_utime + global_stime) - (utime + stime)) / (double)(cutime + cstime);
+            cgtime_fix_ratio = (NETDATA_DOUBLE)((global_utime + global_stime) - (utime + stime)) / (NETDATA_DOUBLE)(cutime + cstime);
         }
         else if(utime || stime) {
             // even running processes are unrealistic
@@ -3391,7 +3393,7 @@ static void normalize_utilization(struct target *root) {
             // lower the running processes resources
             utime_fix_ratio  =
             stime_fix_ratio  =
-            gtime_fix_ratio  = (double)(global_utime + global_stime) / (double)(utime + stime);
+            gtime_fix_ratio  = (NETDATA_DOUBLE)(global_utime + global_stime) / (NETDATA_DOUBLE)(utime + stime);
             cutime_fix_ratio =
             cstime_fix_ratio =
             cgtime_fix_ratio = 0.0;
@@ -3439,14 +3441,14 @@ static void normalize_utilization(struct target *root) {
 
     if(utime || stime || gtime)
         majflt_fix_ratio =
-        minflt_fix_ratio = (double)(utime * utime_fix_ratio + stime * stime_fix_ratio + gtime * gtime_fix_ratio) / (double)(utime + stime + gtime);
+        minflt_fix_ratio = (NETDATA_DOUBLE)(utime * utime_fix_ratio + stime * stime_fix_ratio + gtime * gtime_fix_ratio) / (NETDATA_DOUBLE)(utime + stime + gtime);
     else
         minflt_fix_ratio =
         majflt_fix_ratio = 1.0;
 
     if(cutime || cstime || cgtime)
         cmajflt_fix_ratio =
-        cminflt_fix_ratio = (double)(cutime * cutime_fix_ratio + cstime * cstime_fix_ratio + cgtime * cgtime_fix_ratio) / (double)(cutime + cstime + cgtime);
+        cminflt_fix_ratio = (NETDATA_DOUBLE)(cutime * cutime_fix_ratio + cstime * cstime_fix_ratio + cgtime * cgtime_fix_ratio) / (NETDATA_DOUBLE)(cutime + cstime + cgtime);
     else
         cminflt_fix_ratio =
         cmajflt_fix_ratio = 1.0;
