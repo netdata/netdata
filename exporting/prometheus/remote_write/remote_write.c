@@ -360,7 +360,7 @@ int format_variable_prometheus_remote_write_callback(RRDVAR *rv, void *data) {
         char *suffix = "";
 
         prometheus_name_copy(context, rv->name, PROMETHEUS_ELEMENT_MAX);
-        snprintf(name, PROMETHEUS_VARIABLE_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
+        snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
         calculated_number value = rrdvar2number(rv);
         add_variable(connector_specific_data->write_request, name,
