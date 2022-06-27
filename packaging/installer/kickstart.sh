@@ -705,11 +705,17 @@ update() {
       return 0
     fi
 
+    if [ "${INTERACTIVE}" -eq 0 ]; then
+        opts="--non-interactive"
+    else
+        opts="--interactive"
+    fi
+
     export NETDATA_SAVE_WARNINGS=1
     export NETDATA_PROPAGATE_WARNINGS=1
     # shellcheck disable=SC2090
     export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
-    if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
+    if run ${ROOTCMD} "${updater}" ${opts} --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
     else
