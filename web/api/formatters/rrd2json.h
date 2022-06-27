@@ -83,8 +83,7 @@ extern int rrdset2anything_api_v1(
 extern int rrdset2value_api_v1(
           RRDSET *st
         , BUFFER *wb
-        ,
-    NETDATA_DOUBLE *n
+        , NETDATA_DOUBLE *n
         , const char *dimensions
         , long points
         , long long after

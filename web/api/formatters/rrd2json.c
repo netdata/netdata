@@ -152,8 +152,7 @@ void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
 int rrdset2value_api_v1(
           RRDSET *st
         , BUFFER *wb
-        ,
-    NETDATA_DOUBLE *n
+        , NETDATA_DOUBLE *n
         , const char *dimensions
         , long points
         , long long after
