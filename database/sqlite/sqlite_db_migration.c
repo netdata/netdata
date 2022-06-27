@@ -2,6 +2,33 @@
 
 #include "sqlite_db_migration.h"
 
+static int return_int_cb(void *data, int argc, char **argv, char **column)
+{
+    int *status = data;
+    UNUSED(argc);
+    UNUSED(column);
+    *status = str2uint32_t(argv[0]);
+    return 0;
+}
+
+static int column_exists_in_table(const char *table, const char *column)
+{
+    char *err_msg = NULL;
+    char sql[128];
+
+    int exists = 0;
+
+    snprintf(sql, 127, "SELECT 1 FROM pragma_table_info('%s') where name = '%s';", table, column);
+
+    int rc = sqlite3_exec(db_meta, sql, return_int_cb, (void *) &exists, &err_msg);
+    if (rc != SQLITE_OK) {
+        info("Error checking column existence; %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    return exists;
+}
+
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
