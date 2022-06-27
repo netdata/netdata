@@ -16,7 +16,16 @@ DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
 DOCS_URL="https://learn.netdata.cloud/docs/"
 FORUM_URL="https://community.netdata.cloud/"
 KICKSTART_OPTIONS="${*}"
-KICKSTART_SOURCE="$(realpath "$0")"
+KICKSTART_SOURCE="$(
+    self=${0}
+    while [ -L "${self}" ]
+    do
+        cd "${self%/*}" || exit 1
+        self=$(readlink "${self}")
+    done
+    cd "${self%/*}" || exit 1
+    echo "$(pwd -P)/${self##*/}"
+)"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
