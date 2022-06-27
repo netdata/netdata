@@ -120,6 +120,7 @@ int __mock_start_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_start_chart_formatting(struct instance *instance, RRDSET *st);
 int __mock_metric_formatting(struct instance *instance, RRDDIM *rd);
 int __mock_end_chart_formatting(struct instance *instance, RRDSET *st);
+int __mock_variables_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_batch_formatting(struct instance *instance);
 

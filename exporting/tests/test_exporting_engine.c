@@ -1221,7 +1221,43 @@ static void test_format_host_prometheus_remote_write(void **state)
     expect_function_call(__wrap_add_host_info);
     expect_value(__wrap_add_host_info, write_request_p, 0xff);
     expect_string(__wrap_add_host_info, name, "netdata_info");
+    expect_string(__wrap_add_host_info, instance, "test-host");
+    expect_string(__wrap_add_host_info, application, "test_program");
+    expect_string(__wrap_add_host_info, version, "test_version");
+    expect_in_range(
+        __wrap_add_host_info, timestamp, now_realtime_usec() / USEC_PER_MS - 1000, now_realtime_usec() / USEC_PER_MS);
+
+    expect_function_call(__wrap_add_label);
+    expect_value(__wrap_add_label, write_request_p, 0xff);
+    expect_string(__wrap_add_label, key, "key1");
+    expect_string(__wrap_add_label, value, "value1");
+
+    expect_function_call(__wrap_add_label);
+    expect_value(__wrap_add_label, write_request_p, 0xff);
+    expect_string(__wrap_add_label, key, "key2");
+    expect_string(__wrap_add_label, value, "value2");
+
+    expect_function_call(__wrap_add_host_info);
+    expect_value(__wrap_add_host_info, write_request_p, 0xff);
     expect_string(__wrap_add_host_info, name, "netdata_host_tags");
+    expect_string(__wrap_add_host_info, instance, "test-host");
+    expect_string(__wrap_add_host_info, application, "test_program");
+    expect_string(__wrap_add_host_info, version, "test_version");
+    expect_in_range(
+        __wrap_add_host_info, timestamp, now_realtime_usec() / USEC_PER_MS - 1000, now_realtime_usec() / USEC_PER_MS);
+    
+    expect_function_call(__wrap_add_label);
+    expect_value(__wrap_add_label, write_request_p, 0xff);
+    expect_string(__wrap_add_label, key, "key1");
+    expect_string(__wrap_add_label, value, "value1");
+
+    expect_function_call(__wrap_add_label);
+    expect_value(__wrap_add_label, write_request_p, 0xff);
+    expect_string(__wrap_add_label, key, "key2");
+    expect_string(__wrap_add_label, value, "value2");
+
+    expect_function_call(__wrap_add_host_info);
+    expect_value(__wrap_add_host_info, write_request_p, 0xff);
     expect_string(__wrap_add_host_info, name, "netdata_host_tags_info");
     expect_string(__wrap_add_host_info, instance, "test-host");
     expect_string(__wrap_add_host_info, application, "test_program");
