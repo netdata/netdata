@@ -420,7 +420,9 @@ self_update() {
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
-      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update --tmpdir-path "$(pwd)"
+      force_update=""
+      [ "$NETDATA_FORCE_UPDATE" = "1" ] && force_update="--force-update"
+      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update "$force_update" --tmpdir-path "$(pwd)"
     else
       error "Failed to download newest version of updater script, continuing with current version."
     fi
@@ -551,7 +553,11 @@ update_build() {
       NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
       tar -xf netdata-latest.tar.gz >&3 2>&3
       rm netdata-latest.tar.gz >&3 2>&3
-      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
+      if [ -z "$path_version" ]; then
+        latest_tag="$(get_latest_version)"
+        path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
+      fi
+      cd "$(find . -maxdepth 1 -type d -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
       RUN_INSTALLER=1
     fi
   fi
