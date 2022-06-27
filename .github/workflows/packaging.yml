@@ -72,7 +72,7 @@ jobs:
                               'arch': arch
                           })
 
-          entries.sort(key=lambda k: (k['arch'], k['distro'], k['version']))
+          entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
           matrix = json.dumps({'include': entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
           print('::set-output name=matrix::' + matrix)

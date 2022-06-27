@@ -1,10 +1,21 @@
 # This defines the full set of distros we run CI on.
 ---
 platform_map: # map packaging architectures to docker platforms
-  i386: linux/i386
+  aarch64: linux/arm64/v8
   amd64: linux/amd64
-  armhf: linux/arm/v7
   arm64: linux/arm64/v8
+  armhf: linux/arm/v7
+  armhfp: linux/arm/v7
+  i386: linux/i386
+  x86_64: linux/amd64
+arch_order: # sort order for per-architecture jobs in CI
+  - amd64
+  - x86_64
+  - i386
+  - armhf
+  - armhfp
+  - arm64
+  - aarch64
 include:
   - &alpine
     distro: alpine
@@ -37,8 +48,8 @@ include:
       type: rpm
       repo_distro: el/9
       arches:
-        - amd64
-        - arm64
+        - x86_64
+        - aarch64
   - <<: *alma
     version: "8"
     packages:
@@ -51,7 +62,7 @@ include:
       type: rpm
       repo_distro: el/7
       arches:
-        - amd64
+        - x86_64
 
   - &debian
     distro: debian
@@ -88,9 +99,9 @@ include:
       type: rpm
       repo_distro: fedora/36
       arches:
-        - amd64
-        - armhf
-        - arm64
+        - x86_64
+        - armhfp
+        - aarch64
   - <<: *fedora
     version: "35"
     packages:
@@ -107,8 +118,8 @@ include:
       type: rpm
       repo_distro: opensuse/15.4
       arches:
-        - amd64
-        - arm64
+        - x86_64
+        - aarch64
   - <<: *opensuse
     version: "15.3"
     packages:
@@ -123,8 +134,8 @@ include:
       type: rpm
       repo_distro: ol/8
       arches:
-        - amd64
-        - arm64
+        - x86_64
+        - aarch64
 
   - &ubuntu
     distro: ubuntu

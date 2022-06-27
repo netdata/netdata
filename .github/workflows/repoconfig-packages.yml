@@ -50,11 +50,10 @@ jobs:
                       'pkgclouddistro': data['include'][i]['packages']['repo_distro'],
                       'format': data['include'][i]['packages']['type'],
                       'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
-                      'platform': data['platform_map']['amd64'],
-                      'arch': 'amd64'
+                      'platform': data['platform_map']['amd64']
                   })
 
-          entries.sort(key=lambda k: (k['arch'], k['distro'], k['version']))
+          entries.sort(key=lambda k: (k['distro'], k['version']))
           matrix = json.dumps({'include': entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
           print('::set-output name=matrix::' + matrix)
