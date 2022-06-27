@@ -21,9 +21,6 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
 extern struct aclk_shared_state {
-    ACLK_AGENT_STATE agent_state;
-    time_t last_popcorn_interrupt;
-
     // To wait for `disconnect` message PUBACK
     // when shutting down
     // at the same time if > 0 we know link is
@@ -32,21 +29,8 @@ extern struct aclk_shared_state {
     int mqtt_shutdown_msg_rcvd;
 } aclk_shared_state;
 
-void aclk_alarm_reload(void);
-int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
-
-/* Informs ACLK about created/deleted chart
- * @param create 0 - if chart was deleted, other if chart created
- */
-int aclk_update_chart(RRDHOST *host, char *chart_name, int create);
-
-void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
-void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
-
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_host_state_update(RRDHOST *host, int cmd);
 void aclk_send_node_instances(void);
-#endif
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 

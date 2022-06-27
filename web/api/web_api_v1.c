@@ -3,7 +3,6 @@
 #include "web_api_v1.h"
 
 char *api_secret;
-extern int aclk_use_new_cloud_arch;
 
 static struct {
     const char *name;
@@ -1062,11 +1061,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
     buffer_strcat(wb, "\t\"aclk-ng-available\": true,\n");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": true,\n");
-#else
-    buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": false,\n");
-#endif
     buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
     buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
 #else
@@ -1084,12 +1079,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef ENABLE_ACLK
     if (aclk_connected) {
         buffer_strcat(wb, "\t\"aclk-available\": true,\n");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        if (aclk_use_new_cloud_arch)
-            buffer_strcat(wb, "\t\"aclk-available-protocol\": \"New\",\n");
-        else
-#endif
-            buffer_strcat(wb, "\t\"aclk-available-protocol\": \"Legacy\",\n");
+        buffer_strcat(wb, "\t\"aclk-available-protocol\": \"New\",\n");
     }
     else
 #endif

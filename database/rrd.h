@@ -724,10 +724,6 @@ struct rrdhost {
     const char *tags;                               // tags for this host
     const char *timezone;                           // the timezone of the host
 
-#ifdef ENABLE_ACLK
-    long    deleted_charts_count;
-#endif
-
     const char *abbrev_timezone;                    // the abbriviated timezone of the host
     int32_t utc_offset;                             // the offset in seconds from utc
 
@@ -1263,7 +1259,7 @@ extern void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
 
 extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
 extern time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
 #endif
 extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
@@ -1301,8 +1297,7 @@ extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
 extern void rrdset_save(RRDSET *st);
-#define rrdset_delete(st) rrdset_delete_custom(st, 0)
-extern void rrdset_delete_custom(RRDSET *st, int db_rotated);
+extern void rrdset_delete(RRDSET *st);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern RRDHOST *rrdhost_create(

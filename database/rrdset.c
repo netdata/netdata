@@ -441,11 +441,8 @@ void rrdset_save(RRDSET *st) {
     }
 }
 
-void rrdset_delete_custom(RRDSET *st, int db_rotated) {
+void rrdset_delete(RRDSET *st) {
     RRDDIM *rd;
-#ifndef ENABLE_ACLK
-    UNUSED(db_rotated);
-#endif
     rrdset_check_rdlock(st);
 
     info("Deleting chart '%s' ('%s') from disk...", st->id, st->name);
@@ -465,13 +462,6 @@ void rrdset_delete_custom(RRDSET *st, int db_rotated) {
     }
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
-#ifdef ENABLE_ACLK
-    if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)) {
-        aclk_del_collector(st->rrdhost, st->plugin_name, st->module_name);
-        st->rrdhost->deleted_charts_count++;
-    }
-#endif
-
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
@@ -659,22 +649,7 @@ RRDSET *rrdset_create_custom(
         }
 
         if (mark_rebuild) {
-#ifdef ENABLE_ACLK
-            if (netdata_cloud_setting) {
-                if (mark_rebuild & META_CHART_ACTIVATED) {
-                    aclk_add_collector(host, st->plugin_name, st->module_name);
-                }
-                else {
-                    if (mark_rebuild & (META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
-                        aclk_del_collector(
-                            host, mark_rebuild & META_PLUGIN_UPDATED ? old_plugin : st->plugin_name,
-                            mark_rebuild & META_MODULE_UPDATED ? old_module : st->module_name);
-                        aclk_add_collector(host, st->plugin_name, st->module_name);
-                    }
-                }
-                rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-            }
-#endif
+            rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
             freez(old_plugin);
             freez(old_module);
             freez(old_title);
@@ -929,11 +904,6 @@ RRDSET *rrdset_create_custom(
     compute_chart_hash(st);
 
     rrdhost_unlock(host);
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_setting)
-        aclk_add_collector(host, plugin, module);
-    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-#endif
     return(st);
 }
 
@@ -1769,14 +1739,14 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
     time_t mark = now_realtime_sec();
 #endif
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
         if (likely(!st->state->is_ar_chart)) {
             if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
                 queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
@@ -1881,7 +1851,7 @@ after_second_database_work:
                             delete_dimension_uuid(&rd->state->metric_uuid);
                         } else {
                             /* Do not delete this dimension */
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
                             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
 #endif
                             last = rd;

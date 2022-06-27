@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_chart.h"
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
 #include "../../aclk/aclk_charts_api.h"
 #include "../../aclk/aclk.h"
 
@@ -212,7 +212,7 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
     int rc = 0;
     sqlite3_stmt *res = NULL;
 
-    if (!aclk_use_new_cloud_arch || !aclk_connected)
+    if (!aclk_connected)
         return;
 
     if (unlikely(!db_meta))
@@ -843,7 +843,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
 {
     int rc;
 
-    if (!aclk_use_new_cloud_arch || !aclk_connected)
+    if (!aclk_connected)
         return;
 
     char *claim_id = is_agent_claimed();
@@ -1146,9 +1146,6 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
 
 void aclk_send_dimension_update(RRDDIM *rd)
 {
-    if (!aclk_use_new_cloud_arch)
-        return;
-
     char *claim_id = is_agent_claimed();
     if (unlikely(!claim_id))
         return;
@@ -1316,24 +1313,11 @@ void sql_check_chart_liveness(RRDSET *st) {
     rrdset_unlock(st);
 }
 
-#endif //ENABLE_NEW_CLOUD_PROTOCOL
-
 // ST is read locked
 int queue_chart_to_aclk(RRDSET *st)
 {
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
-#ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id, 1);
-#else
-    UNUSED(st);
-#endif
-    return 0;
-#else
-    if (!aclk_use_new_cloud_arch && aclk_connected) {
-        aclk_update_chart(st->rrdhost, st->id, 1);
-        return 0;
-    }
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                        st, ACLK_DATABASE_ADD_CHART);
-#endif
 }
+
+#endif //ENABLE_ACLK

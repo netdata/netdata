@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_alert.h"
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
 #include "../../aclk/aclk_alarm_api.h"
 #include "../../aclk/aclk.h"
 #endif
@@ -123,21 +123,6 @@ done:
 // and handle both cases
 int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
 {
-    //check aclk architecture and handle old json alarm update to cloud
-    //include also the valid statuses for this case
-#ifdef ENABLE_ACLK
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (!aclk_use_new_cloud_arch && aclk_connected) {
-#endif
-
-        if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
-            ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
-            aclk_update_alarm(host, ae);
-        }
-#endif
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    }
-
     if (!claimed())
         return 0;
 
@@ -196,17 +181,11 @@ bind_fail:
 
     buffer_free(sql);
     return 0;
-#else
-    UNUSED(host);
-    UNUSED(ae);
-    UNUSED(skip_filter);
-#endif
-    return 0;
 }
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
 {
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
             return ALARM_STATUS_REMOVED;
@@ -234,7 +213,7 @@ int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
 
 void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
+#ifndef ENABLE_ACLK
     UNUSED(wc);
     UNUSED(cmd);
 #else
@@ -470,7 +449,7 @@ void aclk_send_alarm_health_log(char *node_id)
 void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(cmd);
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
+#ifndef ENABLE_ACLK
     UNUSED(wc);
 #else
     int rc;
@@ -595,7 +574,7 @@ void aclk_send_alarm_configuration(char *config_hash)
 int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(wc);
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
+#ifndef ENABLE_ACLK
     UNUSED(cmd);
 #else
     int rc = 0;
@@ -708,7 +687,6 @@ bind_fail:
 // Start streaming alerts
 void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start_seq_id)
 {
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!node_id))
         return;
 
@@ -749,20 +727,13 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     else
         log_access("ACLK STA [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
 
-#else
-    UNUSED(node_id);
-    UNUSED(start_seq_id);
-    UNUSED(batch_id);
-#endif
     return;
 }
 
 void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(cmd);
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
-    UNUSED(wc);
-#else
+
     BUFFER *sql = buffer_create(1024);
 
     buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created) " \
@@ -778,13 +749,11 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
     buffer_free(sql);
 
     wc->pause_alert_updates = 0;
-#endif
     return;
 }
 
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
 {
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!host->dbsync_worker))
         return;
 
@@ -798,15 +767,11 @@ void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
     cmd.data_param = NULL;
     cmd.completion = NULL;
     aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
-#else
-    UNUSED(host);
-#endif
 }
 
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t snapshot_id, uint64_t sequence_id)
 {
     UNUSED(claim_id);
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!node_id))
         return;
 
@@ -843,11 +808,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t sn
         aclk_database_enq_cmd(wc, &cmd);
     } else
         log_access("ACLK STA [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
-#else
-    UNUSED(node_id);
-    UNUSED(snapshot_id);
-    UNUSED(sequence_id);
-#endif
+
     return;
 }
 
@@ -867,7 +828,7 @@ void aclk_mark_alert_cloud_ack(char *uuid_str, uint64_t alerts_ack_sequence_id)
     buffer_free(sql);
 }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
 void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_ENTRY *ae, RRDHOST *host)
 {
     char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
@@ -917,7 +878,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 }
 #endif
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
 static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
 {
     ALARM_ENTRY *ae = host->health_log.alarms;
@@ -936,7 +897,7 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
 #define ALARM_EVENTS_PER_CHUNK 10
 void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
-#ifndef ENABLE_NEW_CLOUD_PROTOCOL
+#ifndef ENABLE_ACLK
     UNUSED(wc);
     UNUSED(cmd);
 #else
@@ -1055,7 +1016,6 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
 
 void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 {
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!claimed())
         return;
 
@@ -1075,9 +1035,6 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
         sqlite3_free(err_msg);
     }
     buffer_free(sql);
-#else
-    UNUSED(host);
-#endif
 }
 
 int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert_status)

@@ -641,11 +641,7 @@ ACLK_FILES = \
     mqtt_websockets/c-rbuf/include/ringbuffer.h \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/MQTT-C/src/mqtt.c \
-    mqtt_websockets/MQTT-C/include/mqtt.h
-    $(NULL)
-
-if ENABLE_NEW_CLOUD_PROTOCOL
-ACLK_FILES += \
+    mqtt_websockets/MQTT-C/include/mqtt.h \
     aclk/aclk_charts_api.c \
     aclk/aclk_charts_api.h \
     aclk/aclk_alarm_api.c \
@@ -768,16 +764,7 @@ aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h: aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
-endif #ENABLE_NEW_CLOUD_PROTOCOL
-
 endif #ENABLE_ACLK
-
-if ENABLE_ACLK
-ACLK_COMMON_FILES = \
-    aclk/aclk_collector_list.c \
-    aclk/aclk_collector_list.h \
-    $(NULL)
-endif
 
 ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_rrdhost_state.h \
@@ -885,7 +872,6 @@ NETDATA_FILES = \
     $(CLAIM_FILES) \
     $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
-    $(ACLK_COMMON_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \

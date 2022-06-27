@@ -139,7 +139,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 //   0 : Dimension is live
 //   last collected time : Dimension is not live
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
 time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
 {
     time_t last_updated = rd->last_collected_time.tv_sec;
@@ -184,7 +184,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
             (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                                       rd->algorithm);
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
 #endif
             rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -427,7 +427,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rd->id, st->id);
 
     // free(rd->annotations);
-//#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+//#ifdef ENABLE_ACLK
 //    if (!netdata_exit)
 //        aclk_send_dimension_update(rd);
 //#endif
