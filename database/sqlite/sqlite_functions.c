@@ -7,7 +7,7 @@
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
-    "registry_hostname text, update_every int, os text, timezone text, tags text);",
+    "registry_hostname text, update_every int, os text, timezone text, tags text, hops INT);",
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
     "chart_type int, memory_mode int, history_entries);",
