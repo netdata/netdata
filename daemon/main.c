@@ -524,7 +524,7 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_DB,      "retention");
 
     config_move(CONFIG_SECTION_GLOBAL,  "update every",
-                CONFIG_SECTION_DB,      "granularity secs");
+                CONFIG_SECTION_DB,      "update every");
 
     config_move(CONFIG_SECTION_GLOBAL,  "page cache size",
                 CONFIG_SECTION_DB,      "page cache size MB");
@@ -587,11 +587,11 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "granularity secs", UPDATE_EVERY);
+    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
     if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
-        error("Invalid data collection frequency (granularity) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
+        error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
         default_rrd_update_every = UPDATE_EVERY;
-        config_set_number(CONFIG_SECTION_DB, "granularity secs", default_rrd_update_every);
+        config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
     }
 
     // ------------------------------------------------------------------------

@@ -15,7 +15,7 @@ By using both RAM and disk space, the database engine allows for long-term stora
 Agent itself.
 
 In addition, the dbengine is the only mode that supports changing the data collection update frequency
-(`granularity secs`) without losing the metrics your Agent already gathered and stored.
+(`update every`) without losing the metrics your Agent already gathered and stored.
 
 ## Configuration
 

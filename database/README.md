@@ -13,7 +13,7 @@ Netdata is fully capable of long-term metrics storage, at per-second granularity
     traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data
     reside compressed on disk. The number of history entries is not fixed in this case, but depends on the configured
     disk space and the effective compression ratio of the data stored. This is the **only mode** that supports changing
-    the data collection update frequency (`granularity secs`) **without losing** the previously stored metrics. For more
+    the data collection update frequency (`update every`) **without losing** the previously stored metrics. For more
     details see [here](/database/engine/README.md).
 
 2.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
@@ -46,14 +46,14 @@ Embedded devices usually have very limited RAM resources available.
 
 There are 2 settings for you to tweak:
 
-1.  `[db].granularity secs`, which controls the data collection frequency
+1.  `[db].update every`, which controls the data collection frequency
 2.  `[db].retention`, which controls the size of the database in memory (except for `[db].mode = dbengine`)
 
-By default `[db].granularity secs = 1` and `[db].retention = 3600`. This gives you an hour of data with per second updates.
+By default `[db].update every = 1` and `[db].retention = 3600`. This gives you an hour of data with per second updates.
 
-If you set `[db].granularity secs = 2` and `[db].retention = 1800`, you will still have an hour of data, but collected once every 2
+If you set `[db].update every = 2` and `[db].retention = 1800`, you will still have an hour of data, but collected once every 2
 seconds. This will **cut in half** both CPU and RAM resources consumed by Netdata. Of course experiment a bit. On very
-weak devices you might have to use `[db].granularity secs = 5` and `[db].retention = 720` (still 1 hour of data, but 1/5 of the CPU and
+weak devices you might have to use `[db].update every = 5` and `[db].retention = 720` (still 1 hour of data, but 1/5 of the CPU and
 RAM resources).
 
 You can also disable [data collection plugins](/collectors/README.md) you don't need. Disabling such plugins will also free both
