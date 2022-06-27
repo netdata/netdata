@@ -522,16 +522,13 @@ if [ -z "${NAME}" ]; then
 
   elif [[ ${CGROUP} =~ machine.slice_machine.*-lxc ]]; then
     # libvirtd / lxc containers
-	# examples:
-	# before: machine.slice machine-lxc/x2d969/x2dhubud0xians01.scope
-    # after:  lxc/hubud0xians01
-	# before: machine.slice_machine-lxc/x2d969/x2dhubud0xians01.scope/libvirt_init.scope
-	# after:  lxc/hubud0xians01/libvirt_init
-    NAME="lxc/$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-lxc//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
+    # machine.slice machine-lxc/x2d969/x2dhubud0xians01.scope => lxc/hubud0xians01
+    # machine.slice_machine-lxc/x2d969/x2dhubud0xians01.scope/libvirt_init.scope => lxc/hubud0xians01/libvirt_init
+    NAME="lxc/$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-lxc//; s/[\/_]x2d[[:digit:]]*//; s/[\/_]x2d//g; s/\.scope//g')"
   elif [[ ${CGROUP} =~ machine.slice_machine.*-qemu ]]; then
     # libvirtd / qemu virtual machines
-    # NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
-    NAME="qemu_$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-qemu//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
+    # machine.slice_machine-qemu_x2d1_x2dopnsense.scope => qemu_opnsense
+    NAME="qemu_$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-qemu//; s/[\/_]x2d[[:digit:]]*//; s/[\/_]x2d//g; s/\.scope//g')"
 
   elif [[ ${CGROUP} =~ machine_.*\.libvirt-qemu ]]; then
     # libvirtd / qemu virtual machines
