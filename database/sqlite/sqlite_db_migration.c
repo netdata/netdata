@@ -47,21 +47,12 @@ static struct database_func_migration_list {
 };
 
 
-static int perform_database_migration_cb(void *data, int argc, char **argv, char **column)
-{
-    int *status = data;
-    UNUSED(argc);
-    UNUSED(column);
-    *status = str2uint32_t(argv[0]);
-    return 0;
-}
-
 int perform_database_migration(sqlite3 *database, int target_version)
 {
     int user_version = 0;
     char *err_msg = NULL;
 
-    int rc = sqlite3_exec(database, "PRAGMA user_version;", perform_database_migration_cb, (void *) &user_version, &err_msg);
+    int rc = sqlite3_exec(database, "PRAGMA user_version;", return_int_cb, (void *) &user_version, &err_msg);
     if (rc != SQLITE_OK) {
         info("Error checking the database version; %s", err_msg);
         sqlite3_free(err_msg);
