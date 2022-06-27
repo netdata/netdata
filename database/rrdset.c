@@ -1810,6 +1810,7 @@ after_second_database_work:
 // compatibility layer for RRDSET files v019
 
 #define RRDSET_MAGIC_V019 "NETDATA RRD SET FILE V019"
+#define RRD_ID_LENGTH_MAX_V019 200
 
 struct avl_element_v019 {
     void *avl_link[2];
@@ -1826,7 +1827,7 @@ struct avl_tree_lock_v019 {
 struct rrdset_map_save_v019 {
     struct avl_element_v019 avl;                    // ignored
     struct avl_element_v019 avlname;                // ignored
-    char id[RRD_ID_LENGTH_MAX + 1];                 // check to reset all - update on load
+    char id[RRD_ID_LENGTH_MAX_V019 + 1];            // check to reset all - update on load
     void *name;                                     // ignored
     void *unused_ptr;                               // ignored
     void *type;                                     // ignored
@@ -1945,7 +1946,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         info("Initializing file '%s'.", fullfilename);
         memset(st_on_file, 0, size);
     }
-    else if(strcmp(st_on_file->id, st->id) != 0) {
+    else if(strncmp(st_on_file->id, st->id, RRD_ID_LENGTH_MAX_V019) != 0) {
         error("File '%s' contents are not for chart '%s'. Clearing it.", fullfilename, st->id);
         memset(st_on_file, 0, size);
     }
@@ -1992,7 +1993,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     memset(st_on_file, 0, size);
 
     // set the values we need
-    strcpy(st_on_file->id, st->id);
+    strncpyz(st_on_file->id, st->id, RRD_ID_LENGTH_MAX_V019 + 1);
     strcpy(st_on_file->cache_filename, fullfilename);
     strcpy(st_on_file->magic, RRDSET_MAGIC_V019);
     st_on_file->memsize = size;
