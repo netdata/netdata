@@ -760,6 +760,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         fatal("Failed to initialize dbengine");
     }
 #endif
+    migrate_localhost(&localhost->host_uuid);
     sql_aclk_sync_init();
     rrd_unlock();
 

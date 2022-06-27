@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 1
+#define DB_METADATA_VERSION 2
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
@@ -731,7 +731,49 @@ uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
     return uuid;
 }
 
-// Functions to create host, chart, dimension in the database
+static int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
+{
+    int rc, result = 1;
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement %s, rc = %d", sql, rc);
+        return 1;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to %s, rc = %d", sql, rc);
+        goto failed;
+    }
+
+    rc = execute_insert(res);
+    if (likely(rc == SQLITE_DONE))
+        result = 0;
+    else
+        error_report("Failed to execute %s, rc = %d", sql, rc);
+
+failed:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement %s, rc = %d", sql, rc);
+    return result;
+}
+
+
+// Migrate all hosts with hops zero to this host_uuid
+void migrate_localhost(uuid_t *host_uuid)
+{
+    int rc;
+
+    rc = exec_statement_with_uuid("UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0); ", host_uuid);
+    if (!rc)
+        rc = exec_statement_with_uuid("DELETE FROM host WHERE hops = 0 AND host_id <> @host_id; ", host_uuid);
+    if (!rc)
+        db_execute("DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);");
+
+}
 
 int sql_store_host(
     uuid_t *host_uuid, const char *hostname, const char *registry_hostname, int update_every, const char *os,

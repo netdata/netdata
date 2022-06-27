@@ -105,4 +105,5 @@ extern int sql_set_dimension_option(uuid_t *dim_uuid, char *option);
 char *get_hostname_by_node_id(char *node_id);
 void free_temporary_host(RRDHOST *host);
 int init_database_batch(int rebuild, int init_type, const char *batch[]);
+void migrate_localhost(uuid_t *host_uuid);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
