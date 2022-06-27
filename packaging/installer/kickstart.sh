@@ -771,6 +771,8 @@ uninstall() {
 }
 
 detect_existing_install() {
+  set_tmpdir
+
   progress "Checking for existing installations of Netdata..."
 
   if pkg_installed netdata; then
@@ -936,6 +938,8 @@ handle_existing_install() {
 }
 
 soft_disable_cloud() {
+  set_tmpdir
+
   cloud_prefix="${INSTALL_PREFIX}/var/lib/netdata/cloud.d"
 
   run ${ROOTCMD} mkdir -p "${cloud_prefix}"
@@ -1226,6 +1230,8 @@ try_package_install() {
     warning "Unable to determine Linux distribution for native packages."
     return 2
   fi
+
+  set_tmpdir
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install using native packages..."
@@ -1585,6 +1591,7 @@ set_source_archive_urls() {
 }
 
 install_local_build_dependencies() {
+  set_tmpdir
   bash="$(command -v bash 2> /dev/null)"
 
   if [ -z "${bash}" ] || [ ! -x "${bash}" ]; then
@@ -1665,6 +1672,8 @@ build_and_install() {
 }
 
 try_build_install() {
+  set_tmpdir
+
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install by building locally..."
   else
