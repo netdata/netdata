@@ -4,6 +4,7 @@ on:
   issues:
     types:
       - opened
+      - transferred
 
 jobs:
   add-to-project:
