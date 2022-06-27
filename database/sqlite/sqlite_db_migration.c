@@ -29,6 +29,23 @@ static int column_exists_in_table(const char *table, const char *column)
     return exists;
 }
 
+const char *database_migrate_v1_v2[] = {
+    "ALTER TABLE host ADD hops INTEGER;",
+    NULL
+};
+
+static int do_migration_v1_v2(sqlite3 *database, const char *name)
+{
+    UNUSED(database);
+    UNUSED(name);
+    info("Running database migration %s", name);
+
+    if (!column_exists_in_table("host", "hops"))
+        return init_database_batch(DB_CHECK_NONE, 0, &database_migrate_v1_v2[0]);
+    return 0;
+}
+
+
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
@@ -42,6 +59,7 @@ static struct database_func_migration_list {
     int (*func)(sqlite3 *database, const char *name);
 } migration_action[] = {
     {.name = "v0 to v1",  .func = do_migration_noop},
+    {.name = "v1 to v2",  .func = do_migration_v1_v2},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };

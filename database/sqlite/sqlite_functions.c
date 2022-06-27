@@ -345,7 +345,7 @@ static int attempt_database_fix()
     return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
 }
 
-static int init_database_batch(int rebuild, int init_type, const char *batch[])
+int init_database_batch(int rebuild, int init_type, const char *batch[])
 {
     int rc;
     char *err_msg = NULL;
