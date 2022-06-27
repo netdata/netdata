@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- deduplicate mountinfo based on mount point [\#13215](https://github.com/netdata/netdata/pull/13215) ([ktsaou](https://github.com/ktsaou))
 - Print INTERNAL BUG messages only when NETDATA\_INTERNAL\_CHECKS is enabled [\#13207](https://github.com/netdata/netdata/pull/13207) ([MrZammler](https://github.com/MrZammler))
 - Add user plugin dirs to environment [\#13203](https://github.com/netdata/netdata/pull/13203) ([vlvkobal](https://github.com/vlvkobal))
 - Fix cgroups netdev chart labels [\#13200](https://github.com/netdata/netdata/pull/13200) ([vlvkobal](https://github.com/vlvkobal))
