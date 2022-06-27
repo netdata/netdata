@@ -1,0 +1,17 @@
+name: Add issues to Agent Board
+
+on:
+  issues:
+    types:
+      - opened
+      - transferred
+
+jobs:
+  add-to-project:
+    name: Add issue to project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v0.0.5
+        with:
+          project-url: https://github.com/orgs/netdata/projects/32
+          github-token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
