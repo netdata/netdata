@@ -12,6 +12,9 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
+extern int db_engine_use_malloc;
+extern int default_rrdeng_page_fetch_timeout;
+extern int default_rrdeng_page_fetch_retries;
 extern int default_rrdeng_page_cache_mb;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
@@ -39,14 +42,14 @@ extern void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN +
 extern void rrdeng_metric_init(RRDDIM *rd);
 extern void rrdeng_store_metric_init(RRDDIM *rd);
 extern void rrdeng_store_metric_flush_current_page(RRDDIM *rd);
-extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number);
+extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, calculated_number number, SN_FLAGS flags);
 extern int rrdeng_store_metric_finalize(RRDDIM *rd);
 extern unsigned
     rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
                                     struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
 extern void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle,
                                     time_t start_time, time_t end_time);
-extern storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time);
+extern calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags);
 extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
 extern time_t rrdeng_metric_latest_time(RRDDIM *rd);

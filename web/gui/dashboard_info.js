@@ -1123,8 +1123,7 @@ const netDuplexInfo = '<p>The interface\'s latest or current ' +
     '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to.</p>' +
     '<p><b>Unknown</b> - the duplex mode can not be determined. ' +
     '<b>Half duplex</b> - the communication is one direction at a time. ' +
-    '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>' +
-    '<p><b>State map</b>: 0 - unknown, 1 - half, 2 - full.</p>'
+    '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>'
 const netOperstateInfo = '<p>The current ' +
     '<a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface.</p>' +
     '<p><b>Unknown</b> - the state can not be determined. ' +
@@ -1133,10 +1132,8 @@ const netOperstateInfo = '<p>The current ' +
     '<b>LowerLayerDown</b> - the interface is down due to state of lower-layer interface(s). ' +
     '<b>Testing</b> - the interface is in testing mode, e.g. cable test. It can’t be used for normal traffic until tests complete. ' +
     '<b>Dormant</b> - the interface is L1 up, but waiting for an external event, e.g. for a protocol to establish. ' +
-    '<b>Up</b> - the interface is ready to pass packets and can be used.</p>' +
-    '<p><b>State map</b>: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up.</p>'
-const netCarrierInfo = '<p>The current physical link state of the interface.</p>' +
-    '<p><b>State map</b>: 0 - down, 1 - up.</p>'
+    '<b>Up</b> - the interface is ready to pass packets and can be used.</p>'
+const netCarrierInfo = 'The current physical link state of the interface.'
 const netSpeedInfo = 'The interface\'s latest or current speed that the network adapter ' +
     '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. ' +
     'This does not give the max supported speed of the NIC.'
@@ -1734,7 +1731,12 @@ netdataDashboard.context = {
     },
 
     'mem.available': {
-        info: 'Available Memory is estimated by the kernel, as the amount of RAM that can be used by userspace processes, without causing swapping.'
+        info: function (os) {
+            if (os === "freebsd")
+                return 'The amount of memory that can be used by user-space processes without causing swapping. Calculated as the sum of free, cached, and inactive memory.';
+            else
+                return 'Available Memory is estimated by the kernel, as the amount of RAM that can be used by userspace processes, without causing swapping.';
+        }
     },
 
     'mem.writeback': {
@@ -6830,5 +6832,193 @@ netdataDashboard.context = {
     'fail2ban.banned_ips': {
         info: '<p>The number of banned IP addresses.</p>'
     },
+
+    // ------------------------------------------------------------------------
+    // K8s state: Node.
+
+    'k8s_state.node_allocatable_cpu_requests_utilization': {
+        info: 'The percentage of allocated CPU resources used by Pod requests. '+
+        'A Pod is scheduled to run on a Node only if the Node has enough CPU resources available to satisfy the Pod CPU request.'
+    },
+    'k8s_state.node_allocatable_cpu_requests_used': {
+        info: 'The amount of allocated CPU resources used by Pod requests. ' +
+        '1000 millicpu is equivalent to '+
+        '<a href="https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/#cpu-units" target="_blank">1 physical or virtual CPU core</a>.'
+    },
+    'k8s_state.node_allocatable_cpu_limits_utilization': {
+        info: 'The percentage of allocated CPU resources used by Pod limits. '+
+        'Total limits may be over 100 percent (overcommitted).'
+    },
+    'k8s_state.node_allocatable_cpu_limits_used': {
+        info: 'The amount of allocated CPU resources used by Pod limits. ' +
+        '1000 millicpu is equivalent to '+
+        '<a href="https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/#cpu-units" target="_blank">1 physical or virtual CPU core</a>.'
+    },
+    'k8s_state.node_allocatable_mem_requests_utilization': {
+        info: 'The percentage of allocated memory resources used by Pod requests. '+
+        'A Pod is scheduled to run on a Node only if the Node has enough memory resources available to satisfy the Pod memory request.'
+    },
+    'k8s_state.node_allocatable_mem_requests_used': {
+        info: 'The amount of allocated memory resources used by Pod requests.'
+    },
+    'k8s_state.node_allocatable_mem_limits_utilization': {
+        info: 'The percentage of allocated memory resources used by Pod limits. '+
+        'Total limits may be over 100 percent (overcommitted).'
+    },
+    'k8s_state.node_allocatable_mem_limits_used': {
+        info: 'The amount of allocated memory resources used by Pod limits.'
+    },
+    'k8s_state.node_allocatable_pods_utilization': {
+        info: 'Pods limit utilization.'
+    },
+    'k8s_state.node_allocatable_pods_usage': {
+        info: '<p>Pods limit usage.</p>'+
+        '<p><b>Available</b> - the number of Pods available for scheduling. '+
+        '<b>Allocated</b> - the number of Pods that have been scheduled.</p>'
+    },
+    'k8s_state.node_condition': {
+        info: 'Health status. '+
+        'If the status of the Ready condition remains False for longer than the <code>pod-eviction-timeout</code> (the default is 5 minutes), '+
+        'then the node controller triggers API-initiated eviction for all Pods assigned to that node. '+
+        '<a href="https://kubernetes.io/docs/concepts/architecture/nodes/#condition" target="_blank">More info.</a>'
+    },
+    'k8s_state.node_pods_readiness': {
+        info: 'The percentage of Pods that are ready to serve requests.'
+    },
+    'k8s_state.node_pods_readiness_state': {
+        info: '<p>Pods readiness state.</p>'+
+        '<p><b>Ready</b> - the Pod has passed its readiness probe and ready to serve requests. '+
+        '<b>Unready</b> - the Pod has not passed its readiness probe yet.</p>'
+    },
+    'k8s_state.node_pods_condition': {
+        info: '<p>Pods state. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions" target="_blank">More info.</a></p>'+
+        '<b>PodReady</b> -  the Pod is able to serve requests and should be added to the load balancing pools of all matching Services. '+
+        '<b>PodScheduled</b> - the Pod has been scheduled to a node. '+
+        '<b>PodInitialized</b> - all init containers have completed successfully. '+
+        '<b>ContainersReady</b> - all containers in the Pod are ready.</p>'
+    },
+    'k8s_state.node_pods_phase': {
+        info: '<p>Pods phase. The phase of a Pod is a high-level summary of where the Pod is in its lifecycle. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase" target="_blank">More info.</a></p>'+
+        '<p><b>Running</b> - the Pod has been bound to a node, and all of the containers have been created. '+
+        'At least one container is still running, or is in the process of starting or restarting. ' +
+        '<b>Failed</b> - all containers in the Pod have terminated, and at least one container has terminated in failure. '+
+        'That is, the container either exited with non-zero status or was terminated by the system. ' +
+        '<b>Succedeed</b> - all containers in the Pod have terminated in success, and will not be restarted. ' +
+        '<b>Pending</b> - the Pod has been accepted by the Kubernetes cluster, but one or more of the containers has not been set up and made ready to run.</p>'
+    },
+    'k8s_state.node_containers': {
+        info: 'The total number of containers and init containers.'
+    },
+    'k8s_state.node_containers_state': {
+        info: '<p>The number of containers in different lifecycle states. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states" target="_blank">More info.</a></p>'+
+        '<p><b>Running</b> - a container is executing without issues. '+
+        '<b>Waiting</b> - a container is still running the operations it requires in order to complete start up. '+
+        '<b>Terminated</b> - a container began execution and then either ran to completion or failed for some reason.</p>'
+    },
+    'k8s_state.node_init_containers_state': {
+        info: '<p>The number of init containers in different lifecycle states. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states" target="_blank">More info.</a></p>'+
+        '<p><b>Running</b> - a container is executing without issues. '+
+        '<b>Waiting</b> - a container is still running the operations it requires in order to complete start up. '+
+        '<b>Terminated</b> - a container began execution and then either ran to completion or failed for some reason.</p>'
+    },
+    'k8s_state.node_age': {
+        info: 'The lifetime of the Node.'
+    },
+
+    // K8s state: Pod.
+
+    'k8s_state.pod_cpu_requests_used': {
+        info: 'The overall CPU resource requests for a Pod. '+
+        'This is the sum of the CPU requests for all the Containers in the Pod. '+
+        'Provided the system has CPU time free, a container is guaranteed to be allocated as much CPU as it requests. '+
+        '1000 millicpu is equivalent to '+
+        '<a href="https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/#cpu-units" target="_blank">1 physical or virtual CPU core</a>.'
+    },
+    'k8s_state.pod_cpu_limits_used': {
+        info: 'The overall CPU resource limits for a Pod. '+
+        'This is the sum of the CPU limits for all the Containers in the Pod. '+
+        'If set, containers cannot use more CPU than the configured limit. '+
+        '1000 millicpu is equivalent to '+
+        '<a href="https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/#cpu-units" target="_blank">1 physical or virtual CPU core</a>.'
+    },
+    'k8s_state.pod_mem_requests_used': {
+        info: 'The overall memory resource requests for a Pod. '+
+        'This is the sum of the memory requests for all the Containers in the Pod.'
+    },
+    'k8s_state.pod_mem_limits_used': {
+        info: 'The overall memory resource limits for a Pod. '+
+        'This is the sum of the memory limits for all the Containers in the Pod. '+
+        'If set, containers cannot use more RAM than the configured limit.'
+    },
+    'k8s_state.pod_condition': {
+        info: 'The current state of the Pod. ' +
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions" target="_blank">More info.</a></p>'+
+        '<p><b>PodReady</b> - the Pod is able to serve requests and should be added to the load balancing pools of all matching Services. ' +
+        '<b>PodScheduled</b> - the Pod has been scheduled to a node. ' +
+        '<b>PodInitialized</b> - all init containers have completed successfully. ' +
+        '<b>ContainersReady</b> - all containers in the Pod are ready. '
+    },
+    'k8s_state.pod_phase': {
+        info: 'High-level summary of where the Pod is in its lifecycle. ' +
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase" target="_blank">More info.</a></p>'+
+        '<p><b>Running</b> - the Pod has been bound to a node, and all of the containers have been created. '+
+        'At least one container is still running, or is in the process of starting or restarting. ' +
+        '<b>Failed</b> - all containers in the Pod have terminated, and at least one container has terminated in failure. '+
+        'That is, the container either exited with non-zero status or was terminated by the system. ' +
+        '<b>Succedeed</b> - all containers in the Pod have terminated in success, and will not be restarted. ' +
+        '<b>Pending</b> - the Pod has been accepted by the Kubernetes cluster, but one or more of the containers has not been set up and made ready to run. '+
+        'This includes time a Pod spends waiting to be scheduled as well as the time spent downloading container images over the network. '
+    },
+    'k8s_state.pod_age': {
+        info: 'The <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-lifetime" target="_blank">lifetime</a> of the Pod. '
+    },
+    'k8s_state.pod_containers': {
+        info: 'The number of containers and init containers belonging to the Pod.'
+    },
+    'k8s_state.pod_containers_state': {
+        info: 'The state of each container inside this Pod. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states" target="_blank">More info.</a> '+
+        '<p><b>Running</b> - a container is executing without issues. '+
+        '<b>Waiting</b> - a container is still running the operations it requires in order to complete start up. '+
+        '<b>Terminated</b> - a container began execution and then either ran to completion or failed for some reason.</p>'
+    },
+    'k8s_state.pod_init_containers_state': {
+        info: 'The state of each init container inside this Pod. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states" target="_blank">More info.</a> '+
+        '<p><b>Running</b> - a container is executing without issues. '+
+        '<b>Waiting</b> - a container is still running the operations it requires in order to complete start up. '+
+        '<b>Terminated</b> - a container began execution and then either ran to completion or failed for some reason.</p>'
+    },
+
+    // K8s state: Pod container.
+
+    'k8s_state.pod_container_readiness_state': {
+        info: 'Specifies whether the container has passed its readiness probe. '+
+        'Kubelet uses readiness probes to know when a container is ready to start accepting traffic.'
+    },
+    'k8s_state.pod_container_restarts': {
+        info: 'The number of times the container has been restarted.'
+    },
+    'k8s_state.pod_container_state': {
+        info: 'Current state of the container. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states" target="_blank">More info.</a> '+
+        '<p><b>Running</b> - a container is executing without issues. '+
+        '<b>Waiting</b> - a container is still running the operations it requires in order to complete start up. '+
+        '<b>Terminated</b> - a container began execution and then either ran to completion or failed for some reason.</p>'
+    },
+    'k8s_state.pod_container_waiting_state_reason': {
+        info: 'Reason the container is not yet running. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-state-waiting" target="_blank">More info.</a> '
+    },
+    'k8s_state.pod_container_terminated_state_reason': {
+        info: 'Reason from the last termination of the container. '+
+        '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-state-terminated" target="_blank">More info.</a>'
+    },
+
+    // ------------------------------------------------------------------------
 
 };

@@ -9,35 +9,36 @@ static struct {
     uint32_t hash;
     RRDR_OPTIONS value;
 } api_v1_data_options[] = {
-        {  "nonzero"         , 0    , RRDR_OPTION_NONZERO}
-        , {"flip"            , 0    , RRDR_OPTION_REVERSED}
-        , {"reversed"        , 0    , RRDR_OPTION_REVERSED}
-        , {"reverse"         , 0    , RRDR_OPTION_REVERSED}
-        , {"jsonwrap"        , 0    , RRDR_OPTION_JSON_WRAP}
-        , {"min2max"         , 0    , RRDR_OPTION_MIN2MAX}
-        , {"ms"              , 0    , RRDR_OPTION_MILLISECONDS}
-        , {"milliseconds"    , 0    , RRDR_OPTION_MILLISECONDS}
-        , {"abs"             , 0    , RRDR_OPTION_ABSOLUTE}
-        , {"absolute"        , 0    , RRDR_OPTION_ABSOLUTE}
-        , {"absolute_sum"    , 0    , RRDR_OPTION_ABSOLUTE}
-        , {"absolute-sum"    , 0    , RRDR_OPTION_ABSOLUTE}
-        , {"display_absolute", 0    , RRDR_OPTION_DISPLAY_ABS}
-        , {"display-absolute", 0    , RRDR_OPTION_DISPLAY_ABS}
-        , {"seconds"         , 0    , RRDR_OPTION_SECONDS}
-        , {"null2zero"       , 0    , RRDR_OPTION_NULL2ZERO}
-        , {"objectrows"      , 0    , RRDR_OPTION_OBJECTSROWS}
-        , {"google_json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
-        , {"google-json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
-        , {"percentage"      , 0    , RRDR_OPTION_PERCENTAGE}
-        , {"unaligned"       , 0    , RRDR_OPTION_NOT_ALIGNED}
-        , {"match_ids"       , 0    , RRDR_OPTION_MATCH_IDS}
-        , {"match-ids"       , 0    , RRDR_OPTION_MATCH_IDS}
-        , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
-        , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
-        , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
-        , {"anomaly-bit"     , 0    , RRDR_OPTION_ANOMALY_BIT}
-        , {"raw"             , 0    , RRDR_OPTION_RETURN_RAW}
-        , {NULL              , 0    , 0}
+        {  "nonzero"           , 0    , RRDR_OPTION_NONZERO}
+        , {"flip"              , 0    , RRDR_OPTION_REVERSED}
+        , {"reversed"          , 0    , RRDR_OPTION_REVERSED}
+        , {"reverse"           , 0    , RRDR_OPTION_REVERSED}
+        , {"jsonwrap"          , 0    , RRDR_OPTION_JSON_WRAP}
+        , {"min2max"           , 0    , RRDR_OPTION_MIN2MAX}
+        , {"ms"                , 0    , RRDR_OPTION_MILLISECONDS}
+        , {"milliseconds"      , 0    , RRDR_OPTION_MILLISECONDS}
+        , {"abs"               , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute"          , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute_sum"      , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute-sum"      , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"display_absolute"  , 0    , RRDR_OPTION_DISPLAY_ABS}
+        , {"display-absolute"  , 0    , RRDR_OPTION_DISPLAY_ABS}
+        , {"seconds"           , 0    , RRDR_OPTION_SECONDS}
+        , {"null2zero"         , 0    , RRDR_OPTION_NULL2ZERO}
+        , {"objectrows"        , 0    , RRDR_OPTION_OBJECTSROWS}
+        , {"google_json"       , 0    , RRDR_OPTION_GOOGLE_JSON}
+        , {"google-json"       , 0    , RRDR_OPTION_GOOGLE_JSON}
+        , {"percentage"        , 0    , RRDR_OPTION_PERCENTAGE}
+        , {"unaligned"         , 0    , RRDR_OPTION_NOT_ALIGNED}
+        , {"match_ids"         , 0    , RRDR_OPTION_MATCH_IDS}
+        , {"match-ids"         , 0    , RRDR_OPTION_MATCH_IDS}
+        , {"match_names"       , 0    , RRDR_OPTION_MATCH_NAMES}
+        , {"match-names"       , 0    , RRDR_OPTION_MATCH_NAMES}
+        , {"showcustomvars"    , 0    , RRDR_OPTION_CUSTOM_VARS}
+        , {"anomaly-bit"       , 0    , RRDR_OPTION_ANOMALY_BIT}
+        , {"raw"               , 0    , RRDR_OPTION_RETURN_RAW}
+        , {"jw-anomaly-rates"  , 0    , RRDR_OPTION_RETURN_JWAR}
+        , {NULL                , 0    , 0}
 };
 
 static struct {
@@ -433,6 +434,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *context = NULL;
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
+    char *group_options = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
     int show_dimensions = 0;
@@ -467,6 +469,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "timeout")) timeout_str = value;
         else if(!strcmp(name, "gtime")) group_time_str = value;
+        else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
         }
@@ -674,7 +677,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         .wb = w->response.data};
 
     ret = rrdset2anything_api_v1(owa, st, &query_params, dimensions, format,
-            points, after, before, group, group_time, options, &last_timestamp_in_data);
+            points, after, before, group, group_options, group_time, options, &last_timestamp_in_data);
 
     free_context_param_list(owa, &context_param_list);
 
@@ -1327,6 +1330,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     METRIC_CORRELATIONS_METHOD method = default_metric_correlations_method;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
+    const char *group_options = NULL;
 
     while (url) {
         char *value = mystrsep(&url, "&");
@@ -1373,7 +1377,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    return metric_correlations(host, wb, method, group, baseline_after, baseline_before, after, before, points, options, timeout);
+    return metric_correlations(host, wb, method, group, group_options, baseline_after, baseline_before, after, before, points, options, timeout);
 }
 
 static struct api_command {

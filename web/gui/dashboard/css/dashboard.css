@@ -770,7 +770,7 @@ body {
 .dygraph__history-tip {
     position: absolute;
     transform: translateY(-50%);
-    display: none; /* overriden in js */
+    display: none; /* overridden in js */
     margin-right: 25px;
     direction: rtl;
     overflow: hidden;

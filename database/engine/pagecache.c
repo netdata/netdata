@@ -238,8 +238,7 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
  */
 unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
 {
-    /* it's twice the number of producers since we pin 2 pages per producer */
-    return ctx->max_cache_pages + 2 * (unsigned long)ctx->metric_API_max_producers;
+    return ctx->max_cache_pages + (unsigned long)ctx->metric_API_max_producers;
 }
 
 /*
@@ -248,8 +247,7 @@ unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
  */
 unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
 {
-    /* it's twice the number of producers since we pin 2 pages per producer */
-    return ctx->cache_pages_low_watermark + 2 * (unsigned long)ctx->metric_API_max_producers;
+    return ctx->cache_pages_low_watermark + (unsigned long)ctx->metric_API_max_producers;
 }
 
 /*
@@ -1069,9 +1067,9 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     int retry_count = 0;
     while (1) {
         descr = find_first_page_in_time_range(page_index, start_time, end_time);
-        if (NULL == descr || 0 == descr->page_length || retry_count == MAX_PAGE_CACHE_RETRY_WAIT) {
+        if (NULL == descr || 0 == descr->page_length || retry_count == default_rrdeng_page_fetch_retries) {
             /* non-empty page not found */
-            if (retry_count == MAX_PAGE_CACHE_RETRY_WAIT)
+            if (retry_count == default_rrdeng_page_fetch_retries)
                 error_report("Page cache timeout while waiting for page %p : returning FAIL", descr);
             uv_rwlock_rdunlock(&page_index->lock);
 
@@ -1117,7 +1115,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         if (!(flags & RRD_PAGE_POPULATED))
             page_not_in_cache = 1;
 
-        if (pg_cache_timedwait_event_unsafe(descr, 1) == UV_ETIMEDOUT) {
+        if (pg_cache_timedwait_event_unsafe(descr, default_rrdeng_page_fetch_timeout) == UV_ETIMEDOUT) {
             error_report("Page cache timeout while waiting for page %p : retry count = %d", descr, retry_count);
             ++retry_count;
         }

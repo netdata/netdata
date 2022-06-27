@@ -11,7 +11,7 @@ struct grouping_incremental_sum {
     size_t count;
 };
 
-void grouping_create_incremental_sum(RRDR *r) {
+void grouping_create_incremental_sum(RRDR *r, const char *options __maybe_unused) {
     r->internal.grouping_data = callocz(1, sizeof(struct grouping_incremental_sum));
 }
 

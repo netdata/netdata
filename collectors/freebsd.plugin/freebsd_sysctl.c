@@ -1005,9 +1005,9 @@ int do_system_ram(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        static RRDSET *st = NULL;
+        static RRDSET *st = NULL, *st_mem_available = NULL;
         static RRDDIM *rd_free = NULL, *rd_active = NULL, *rd_inactive = NULL, *rd_wired = NULL,
-                      *rd_cache = NULL, *rd_buffers = NULL;
+                      *rd_cache = NULL, *rd_buffers = NULL, *rd_avail = NULL;
 
 #if defined(NETDATA_COLLECT_LAUNDRY)
         static RRDDIM *rd_laundry = NULL;
@@ -1044,9 +1044,9 @@ int do_system_ram(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_free,     vmmeter_data.v_free_count);
         rrddim_set_by_pointer(st, rd_active,   vmmeter_data.v_active_count);
         rrddim_set_by_pointer(st, rd_inactive, vmmeter_data.v_inactive_count);
-        rrddim_set_by_pointer(st, rd_wired,    vmmeter_data.v_wire_count * system_pagesize - zfs_arcstats_shrinkable_cache_size_bytes);
+        rrddim_set_by_pointer(st, rd_wired,    (unsigned long long)vmmeter_data.v_wire_count * (unsigned long long)system_pagesize - zfs_arcstats_shrinkable_cache_size_bytes);
 #if __FreeBSD_version < 1200016
-        rrddim_set_by_pointer(st, rd_cache,    vmmeter_data.v_cache_count * system_pagesize + zfs_arcstats_shrinkable_cache_size_bytes);
+        rrddim_set_by_pointer(st, rd_cache,    (unsigned long long)vmmeter_data.v_cache_count * (unsigned long long)system_pagesize + zfs_arcstats_shrinkable_cache_size_bytes);
 #else
         rrddim_set_by_pointer(st, rd_cache,    zfs_arcstats_shrinkable_cache_size_bytes);
 #endif
@@ -1055,6 +1055,34 @@ int do_system_ram(int update_every, usec_t dt) {
 #endif
         rrddim_set_by_pointer(st, rd_buffers,  vfs_bufspace_count);
         rrdset_done(st);
+
+        if (unlikely(!st_mem_available)) {
+            st_mem_available = rrdset_create_localhost(
+                    "mem",
+                    "available",
+                    NULL,
+                    "system",
+                    NULL,
+                    "Available RAM for applications",
+                    "MiB",
+                    "freebsd.plugin",
+                    "system.ram",
+                    NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE,
+                    update_every,
+                    RRDSET_TYPE_AREA
+            );
+
+            rd_avail   = rrddim_add(st_mem_available, "MemAvailable", "avail", system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st_mem_available);
+
+#if __FreeBSD_version < 1200016
+        rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + vmmeter_data.v_cache_count + zfs_arcstats_shrinkable_cache_size_bytes / system_pagesize);
+#else
+        rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + zfs_arcstats_shrinkable_cache_size_bytes / system_pagesize);
+#endif
+
+        rrdset_done(st_mem_available);
     }
 
     return 0;

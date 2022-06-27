@@ -7,19 +7,39 @@
 
 #define STATE_LENGTH_MAX 32
 
-// As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
-const char *operstate_names[] = { "unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up" };
+enum {
+    NETDEV_DUPLEX_UNKNOWN,
+    NETDEV_DUPLEX_HALF,
+    NETDEV_DUPLEX_FULL
+};
+
+enum {
+    NETDEV_OPERSTATE_UNKNOWN,
+    NETDEV_OPERSTATE_NOTPRESENT,
+    NETDEV_OPERSTATE_DOWN,
+    NETDEV_OPERSTATE_LOWERLAYERDOWN,
+    NETDEV_OPERSTATE_TESTING,
+    NETDEV_OPERSTATE_DORMANT,
+    NETDEV_OPERSTATE_UP
+};
 
 static inline int get_operstate(char *operstate)
 {
-    int i;
+    // As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
+    if (!strcmp(operstate, "up"))
+        return NETDEV_OPERSTATE_UP;
+    if (!strcmp(operstate, "down"))
+        return NETDEV_OPERSTATE_DOWN;
+    if (!strcmp(operstate, "notpresent"))
+        return NETDEV_OPERSTATE_NOTPRESENT;
+    if (!strcmp(operstate, "lowerlayerdown"))
+        return NETDEV_OPERSTATE_LOWERLAYERDOWN;
+    if (!strcmp(operstate, "testing"))
+        return NETDEV_OPERSTATE_TESTING;
+    if (!strcmp(operstate, "dormant"))
+        return NETDEV_OPERSTATE_DORMANT;
 
-    for (i = 0; i < (int) (sizeof(operstate_names) / sizeof(char *)); i++) {
-        if (!strcmp(operstate, operstate_names[i])) {
-            return i;
-        }
-    }
-    return 0;
+    return NETDEV_OPERSTATE_UNKNOWN;
 }
 
 // ----------------------------------------------------------------------------
@@ -153,9 +173,18 @@ static struct netdev {
     RRDDIM *rd_tcompressed;
 
     RRDDIM *rd_speed;
-    RRDDIM *rd_duplex;
-    RRDDIM *rd_operstate;
-    RRDDIM *rd_carrier;
+    RRDDIM *rd_duplex_full;
+    RRDDIM *rd_duplex_half;
+    RRDDIM *rd_duplex_unknown;
+    RRDDIM *rd_operstate_unknown;
+    RRDDIM *rd_operstate_notpresent;
+    RRDDIM *rd_operstate_down;
+    RRDDIM *rd_operstate_lowerlayerdown;
+    RRDDIM *rd_operstate_testing;
+    RRDDIM *rd_operstate_dormant;
+    RRDDIM *rd_operstate_up;
+    RRDDIM *rd_carrier_up;
+    RRDDIM *rd_carrier_down;
     RRDDIM *rd_mtu;
 
     char *filename_speed;
@@ -219,10 +248,20 @@ static void netdev_charts_release(struct netdev *d) {
     d->rd_tcompressed = NULL;
 
     d->rd_speed       = NULL;
-    d->rd_duplex      = NULL;
-    d->rd_operstate   = NULL;
-    d->rd_carrier     = NULL;
+    d->rd_duplex_full = NULL;
+    d->rd_duplex_half = NULL;
+    d->rd_duplex_unknown = NULL;
+    d->rd_carrier_up = NULL;
+    d->rd_carrier_down = NULL;
     d->rd_mtu         = NULL;
+
+    d->rd_operstate_unknown = NULL;
+    d->rd_operstate_notpresent = NULL;
+    d->rd_operstate_down = NULL;
+    d->rd_operstate_lowerlayerdown = NULL;
+    d->rd_operstate_testing = NULL;
+    d->rd_operstate_dormant = NULL;
+    d->rd_operstate_up = NULL;
 
     d->chart_var_speed     = NULL;
 }
@@ -448,7 +487,7 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
     d->chart_family = strdupz(buffer);
 
-    rrdlabels_migrate_to_these(d->chart_labels, r->chart_labels);
+    rrdlabels_copy(d->chart_labels, r->chart_labels);
 
     d->priority = NETDATA_CHART_PRIO_CGROUP_NET_IFACE;
     d->flipped = 1;
@@ -702,11 +741,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             char buffer[FILENAME_MAX + 1];
 
             snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
-            if(likely(access(buffer, R_OK) == 0)) {
+            if (likely(access(buffer, R_OK) == 0)) {
                 d->virtual = 1;
-            }
-            else
+                rrdlabels_add(d->chart_labels, "type", "virtual", RRDLABEL_SRC_AUTO);
+            } else {
                 d->virtual = 0;
+                rrdlabels_add(d->chart_labels, "type", "real", RRDLABEL_SRC_AUTO);
+            }
 
             if(likely(!d->virtual)) {
                 // set the filename to get the interface speed
@@ -813,11 +854,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             } else {
                 // values can be unknown, half or full -- just check the first letter for speed
                 if (buffer[0] == 'f')
-                    d->duplex = 2;
+                    d->duplex = NETDEV_DUPLEX_FULL;
                 else if (buffer[0] == 'h')
-                    d->duplex = 1;
+                    d->duplex = NETDEV_DUPLEX_HALF;
                 else
-                    d->duplex = 0;
+                    d->duplex = NETDEV_DUPLEX_UNKNOWN;
             }
         } else {
             d->duplex = 0;
@@ -984,11 +1025,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_update_rrdlabels(d->st_duplex, d->chart_labels);
 
-                d->rd_duplex = rrddim_add(d->st_duplex, "duplex",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_full = rrddim_add(d->st_duplex, "full", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_half = rrddim_add(d->st_duplex, "half", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_unknown = rrddim_add(d->st_duplex, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_duplex);
 
-            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex, (collected_number)d->duplex);
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_full, (collected_number)(d->duplex == NETDEV_DUPLEX_FULL));
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_half, (collected_number)(d->duplex == NETDEV_DUPLEX_HALF));
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_unknown, (collected_number)(d->duplex == NETDEV_DUPLEX_UNKNOWN));
             rrdset_done(d->st_duplex);
         }
 
@@ -1015,11 +1060,23 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_update_rrdlabels(d->st_operstate, d->chart_labels);
 
-                d->rd_operstate = rrddim_add(d->st_operstate, "state",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_up = rrddim_add(d->st_operstate, "up", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_down = rrddim_add(d->st_operstate, "down", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_notpresent = rrddim_add(d->st_operstate, "notpresent", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_lowerlayerdown = rrddim_add(d->st_operstate, "lowerlayerdown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_testing = rrddim_add(d->st_operstate, "testing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_dormant = rrddim_add(d->st_operstate, "dormant", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_unknown = rrddim_add(d->st_operstate, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_operstate);
 
-            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate, (collected_number)d->operstate);
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_up, (collected_number)(d->operstate == NETDEV_OPERSTATE_UP));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_down, (collected_number)(d->operstate == NETDEV_OPERSTATE_DOWN));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_notpresent, (collected_number)(d->operstate == NETDEV_OPERSTATE_NOTPRESENT));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_lowerlayerdown, (collected_number)(d->operstate == NETDEV_OPERSTATE_LOWERLAYERDOWN));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_testing, (collected_number)(d->operstate == NETDEV_OPERSTATE_TESTING));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_dormant, (collected_number)(d->operstate == NETDEV_OPERSTATE_DORMANT));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_unknown, (collected_number)(d->operstate == NETDEV_OPERSTATE_UNKNOWN));
             rrdset_done(d->st_operstate);
         }
 
@@ -1046,11 +1103,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_update_rrdlabels(d->st_carrier, d->chart_labels);
 
-                d->rd_carrier = rrddim_add(d->st_carrier, "carrier",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_carrier_up = rrddim_add(d->st_carrier, "up",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_carrier_down = rrddim_add(d->st_carrier, "down",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_carrier);
 
-            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier, (collected_number)d->carrier);
+            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_up, (collected_number)(d->carrier == 1));
+            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_down, (collected_number)(d->carrier != 1));
             rrdset_done(d->st_carrier);
         }
 

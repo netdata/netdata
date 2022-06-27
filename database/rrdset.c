@@ -1100,7 +1100,7 @@ static inline size_t rrdset_done_interpolate(
     size_t counter = st->counter;
     long current_entry = st->current_entry;
 
-    uint32_t storage_flags = SN_DEFAULT_FLAGS;
+    SN_FLAGS storage_flags = SN_DEFAULT_FLAGS;
 
     if (has_reset_value)
         storage_flags |= SN_EXISTS_RESET;
@@ -1204,8 +1204,7 @@ static inline size_t rrdset_done_interpolate(
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT);
-//                rd->values[current_entry] = SN_EMPTY_SLOT;
+                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 continue;
             }
 
@@ -1217,18 +1216,8 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
                 }
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, pack_storage_number(new_value, dim_storage_flags));
-//                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
+                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, dim_storage_flags);
                 rd->last_stored_value = new_value;
-
-                #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: STORE[%ld] "
-                            CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
-                          , rd->name
-                          , current_entry
-                          , unpack_storage_number(rd->values[current_entry]), new_value
-                );
-                #endif
             }
             else {
                 (void) ml_is_anomalous(rd, 0, false);
@@ -1240,42 +1229,11 @@ static inline size_t rrdset_done_interpolate(
                 );
                 #endif
 
-//                rd->values[current_entry] = SN_EMPTY_SLOT;
-                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 rd->last_stored_value = NAN;
             }
 
             stored_entries++;
-
-            #ifdef NETDATA_INTERNAL_CHECKS
-            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
-                calculated_number t1 = new_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor;
-                calculated_number t2 = unpack_storage_number(rd->values[current_entry]);
-
-                calculated_number accuracy = accuracy_loss(t1, t2);
-                debug(D_RRD_STATS, "%s/%s: UNPACK[%ld] = " CALCULATED_NUMBER_FORMAT " (original = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s)"
-                      , st->id, rd->name
-                      , current_entry
-                      , t2
-                      , t1
-                      , accuracy
-                      , (accuracy > ACCURACY_LOSS_ACCEPTED_PERCENT) ? " **TOO BIG** " : ""
-                );
-
-                rd->collected_volume += t1;
-                rd->stored_volume += t2;
-
-                accuracy = accuracy_loss(rd->collected_volume, rd->stored_volume);
-                debug(D_RRD_STATS, "%s/%s: VOLUME[%ld] = " CALCULATED_NUMBER_FORMAT ", calculated  = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s"
-                      , st->id, rd->name
-                      , current_entry
-                      , rd->stored_volume
-                      , rd->collected_volume
-                      , accuracy
-                      , (accuracy > ACCURACY_LOSS_ACCEPTED_PERCENT) ? " **TOO BIG** " : ""
-                );
-            }
-            #endif
         }
         // reset the storage flags for the next point, if any;
         storage_flags = SN_DEFAULT_FLAGS;
@@ -1473,6 +1431,7 @@ void rrdset_done(RRDSET *st) {
         // and we have collected metrics for this chart in the past (st->counter != 0)
         // fill the gap (the chart has been just loaded from disk)
         if(unlikely(st->counter) && st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+            // TODO this should be inside the storage engine
             rrdset_done_fill_the_gap(st);
             last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
             next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;

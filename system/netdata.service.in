@@ -43,7 +43,7 @@ CapabilityBoundingSet=CAP_DAC_OVERRIDE
 # is required for apps plugin
 CapabilityBoundingSet=CAP_DAC_READ_SEARCH
 # is required for freeipmi plugin
-CapabilityBoundingSet=CAP_FOWNER
+CapabilityBoundingSet=CAP_FOWNER CAP_SYS_RAWIO
 # is required for apps, perf and slabinfo plugins
 CapabilityBoundingSet=CAP_SETPCAP
 # is required for perf plugin

@@ -796,7 +796,7 @@ static void dbengine_statistics_charts(void) {
                 static RRDDIM *rd_index_metadata = NULL;
                 static RRDDIM *rd_pages_metadata = NULL;
 
-                collected_number cached_pages, pinned_pages, API_producers, populated_pages, cache_metadata, pages_on_disk,
+                collected_number API_producers, populated_pages, cache_metadata, pages_on_disk,
                     page_cache_descriptors, index_metadata, pages_metadata;
 
                 if (unlikely(!st_ram_usage)) {
@@ -827,13 +827,6 @@ static void dbengine_statistics_charts(void) {
                 populated_pages = (collected_number)stats_array[3];
                 page_cache_descriptors = (collected_number)stats_array[27];
 
-                if (API_producers * 2 > populated_pages) {
-                    pinned_pages = API_producers;
-                } else {
-                    pinned_pages = API_producers * 2;
-                }
-                cached_pages = populated_pages - pinned_pages;
-
                 cache_metadata = page_cache_descriptors * sizeof(struct page_cache_descr);
 
                 pages_metadata = pages_on_disk * sizeof(struct rrdeng_page_descr);
@@ -841,8 +834,8 @@ static void dbengine_statistics_charts(void) {
                 /* This is an empirical estimation for Judy array indexing and extent structures */
                 index_metadata = pages_on_disk * 58;
 
-                rrddim_set_by_pointer(st_ram_usage, rd_cached, cached_pages);
-                rrddim_set_by_pointer(st_ram_usage, rd_pinned, pinned_pages);
+                rrddim_set_by_pointer(st_ram_usage, rd_cached, populated_pages - API_producers);
+                rrddim_set_by_pointer(st_ram_usage, rd_pinned, API_producers);
                 rrddim_set_by_pointer(st_ram_usage, rd_cache_metadata, cache_metadata);
                 rrddim_set_by_pointer(st_ram_usage, rd_pages_metadata, pages_metadata);
                 rrddim_set_by_pointer(st_ram_usage, rd_index_metadata, index_metadata);

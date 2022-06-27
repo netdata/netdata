@@ -4,6 +4,9 @@
 /* Default global database instance */
 struct rrdengine_instance multidb_ctx;
 
+int db_engine_use_malloc = 0;
+int default_rrdeng_page_fetch_timeout = 3;
+int default_rrdeng_page_fetch_retries = 3;
 int default_rrdeng_page_cache_mb = 32;
 int default_rrdeng_disk_quota_mb = 256;
 int default_multidb_disk_quota_mb = 256;
@@ -130,7 +133,6 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
     handle->ctx = ctx;
     handle->descr = NULL;
-    handle->prev_descr = NULL;
     handle->unaligned_page = 0;
     rd->state->handle = (STORAGE_COLLECT_HANDLE *)handle;
 
@@ -176,10 +178,6 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
 
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
-        if (handle->prev_descr) {
-            /* unpin old second page */
-            pg_cache_put(ctx, handle->prev_descr);
-        }
         page_is_empty = page_has_only_empty_metrics(descr);
         if (page_is_empty) {
             debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
@@ -187,21 +185,8 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
                 print_page_cache_descr(descr);
             pg_cache_put(ctx, descr);
             pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
-            handle->prev_descr = NULL;
-        } else {
-            /*
-             * Disable pinning for now as it leads to deadlocks. When a collector stops collecting the extra pinned page
-             * eventually gets rotated but it cannot be destroyed due to the extra reference.
-             */
-            /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
-/*          rrdeng_page_descr_mutex_lock(ctx, descr);
-            ret = pg_cache_try_get_unsafe(descr, 0);
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
-            fatal_assert(1 == ret);*/
-
+        } else
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
-            /* handle->prev_descr = descr;*/
-        }
     } else {
         dbengine_page_free(descr->pg_cache_descr->page);
         rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
@@ -210,8 +195,10 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     handle->descr = NULL;
 }
 
-void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number)
+void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, calculated_number n, SN_FLAGS flags)
 {
+    storage_number number = pack_storage_number(n, flags);
+
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->state->handle;
     struct rrdengine_instance *ctx;
     struct page_cache *pg_cache;
@@ -297,18 +284,12 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 int rrdeng_store_metric_finalize(RRDDIM *rd)
 {
     struct rrdeng_collect_handle *handle;
-    struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
     uint8_t can_delete_metric = 0;
 
     handle = (struct rrdeng_collect_handle *)rd->state->handle;
-    ctx = handle->ctx;
     page_index = rd->state->page_index;
     rrdeng_store_metric_flush_current_page(rd);
-    if (handle->prev_descr) {
-        /* unpin old second page */
-        pg_cache_put(ctx, handle->prev_descr);
-    }
     uv_rwlock_wrlock(&page_index->lock);
     if (!--page_index->writers && !page_index->page_count) {
         can_delete_metric = 1;
@@ -532,6 +513,8 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
  */
 void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time)
 {
+    // fprintf(stderr, "%s: %s/%s start time %ld, end time %ld\n", __FUNCTION__ , rd->rrdset->name, rd->name, start_time, end_time);
+
     struct rrdeng_query_handle *handle;
     struct rrdengine_instance *ctx;
     unsigned pages_nr;
@@ -543,6 +526,8 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
+    handle->dt = rd->update_every * USEC_PER_SEC;
+    handle->dt_sec = rd->update_every;
     handle->position = 0;
     handle->ctx = ctx;
     handle->descr = NULL;
@@ -550,7 +535,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     pages_nr = pg_cache_preload(ctx, rd->state->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
                                 NULL, &handle->page_index);
     if (unlikely(NULL == handle->page_index || 0 == pages_nr))
-        /* there are no metrics to load */
+        // there are no metrics to load
         handle->next_page_time = INVALID_TIME;
 }
 
@@ -608,40 +593,50 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     usec_t entries = handle->entries = page_length / sizeof(storage_number);
     if (likely(entries > 1))
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
-    else
-        handle->dt = 0;
 
-    handle->dt_sec = handle->dt / USEC_PER_SEC;
+    handle->dt_sec = (time_t)(handle->dt / USEC_PER_SEC);
     handle->position = position;
 
     return 0;
 }
 
-/* Returns the metric and sets its timestamp into current_time */
-storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time) {
+// Returns the metric and sets its timestamp into current_time
+// IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
+// IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
+calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
-
-    if (unlikely(INVALID_TIME == handle->next_page_time))
-        return SN_EMPTY_SLOT;
 
     struct rrdeng_page_descr *descr = handle->descr;
     unsigned position = handle->position + 1;
     time_t now = handle->now + handle->dt_sec;
+
+    if (unlikely(INVALID_TIME == handle->next_page_time)) {
+        handle->next_page_time = INVALID_TIME;
+        handle->now = now;
+        *start_time = now - handle->dt_sec;
+        *end_time = now;
+        *flags = SN_EMPTY_SLOT;
+        return NAN;
+    }
 
     if (unlikely(!descr || position >= handle->entries)) {
         // We need to get a new page
         if(rrdeng_load_page_next(rrdimm_handle)) {
             // next calls will not load any more metrics
             handle->next_page_time = INVALID_TIME;
-            return SN_EMPTY_SLOT;
+            handle->now = now;
+            *start_time = now - handle->dt_sec;
+            *end_time = now;
+            *flags = SN_EMPTY_SLOT;
+            return NAN;
         }
 
         descr = handle->descr;
         position = handle->position;
-        now = (descr->start_time + position * handle->dt) / USEC_PER_SEC;
+        now = (time_t)((descr->start_time + position * handle->dt) / USEC_PER_SEC);
     }
 
-    storage_number ret = handle->page[position];
+    storage_number n = handle->page[position];
     handle->position = position;
     handle->now = now;
 
@@ -650,8 +645,10 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         handle->next_page_time = INVALID_TIME;
     }
 
-    *current_time = now;
-    return ret;
+    *flags = n & SN_ALL_FLAGS;
+    *start_time = now - handle->dt_sec;
+    *end_time = now;
+    return unpack_storage_number(n);
 }
 
 int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)

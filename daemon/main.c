@@ -584,6 +584,7 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
+    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_GLOBAL, "page cache uses malloc", CONFIG_BOOLEAN_NO);
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
@@ -887,6 +888,10 @@ int main(int argc, char **argv) {
                             if(test_dbengine()) return 1;
 #endif
                             if(test_sqlite()) return 1;
+                            if (dictionary_unittest(10000))
+                                return 1;
+                            if (rrdlabels_unittest())
+                                return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
@@ -1225,6 +1230,20 @@ int main(int argc, char **argv) {
         error_log_limit_unlimited();
         // initialize the log files
         open_all_log_files();
+
+#ifdef ENABLE_DBENGINE
+        default_rrdeng_page_fetch_timeout = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine page fetch timeout", PAGE_CACHE_FETCH_WAIT_TIMEOUT);
+        if (default_rrdeng_page_fetch_timeout < 1) {
+            info("\"dbengine page fetch timeout\" found in netdata.conf cannot be %d, using 1", default_rrdeng_page_fetch_timeout);
+            default_rrdeng_page_fetch_timeout = 1;
+        }
+
+        default_rrdeng_page_fetch_retries = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine page fetch retries", MAX_PAGE_CACHE_FETCH_RETRIES);
+        if (default_rrdeng_page_fetch_retries < 1) {
+            info("\"dbengine page fetch retries\" found in netdata.conf cannot be %d, using 1", default_rrdeng_page_fetch_retries);
+            default_rrdeng_page_fetch_retries = 1;
+        }
+#endif
 
         get_system_timezone();
         // --------------------------------------------------------------------

@@ -81,7 +81,6 @@ calculated_number exporting_calculate_value_from_stored_data(
     time_t last_t = rd->state->query_ops.latest_time(rd);
     time_t update_every = st->update_every;
     struct rrddim_query_handle handle;
-    storage_number n;
 
     // step back a little, to make sure we have complete data collection
     // for all metrics
@@ -125,17 +124,18 @@ calculated_number exporting_calculate_value_from_stored_data(
 
     size_t counter = 0;
     calculated_number sum = 0;
+    calculated_number value;
 
     for (rd->state->query_ops.init(rd, &handle, after, before); !rd->state->query_ops.is_finished(&handle);) {
-        time_t curr_t;
-        n = rd->state->query_ops.next_metric(&handle, &curr_t);
+        time_t curr_t, end_t;
+        SN_FLAGS flags;
+        value = rd->state->query_ops.next_metric(&handle, &curr_t, &end_t, &flags);
 
-        if (unlikely(!does_storage_number_exist(n))) {
+        if (unlikely(!calculated_number_isnumber(value))) {
             // not collected
             continue;
         }
 
-        calculated_number value = unpack_storage_number(n);
         sum += value;
 
         counter++;

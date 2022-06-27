@@ -111,7 +111,7 @@ jobs:
     name: Trigger artifact builds
     runs-on: ubuntu-latest
     needs: update-changelogs
-    if: ${{ needs.update-changelogs.outputs.run }} == 'true'
+    if: needs.update-changelogs.outputs.run == 'true'
     steps:
       - name: Checkout
         id: checkout
@@ -146,7 +146,7 @@ jobs:
     name: Trigger docker builds
     runs-on: ubuntu-latest
     needs: update-changelogs
-    if: ${{ needs.update-changelogs.outputs.run }} == 'true'
+    if: needs.update-changelogs.outputs.run == 'true'
     steps:
       - name: Checkout
         id: checkout
@@ -181,7 +181,7 @@ jobs:
     name: Trigger package builds
     runs-on: ubuntu-latest
     needs: update-changelogs
-    if: ${{ needs.update-changelogs.outputs.run }} == 'true'
+    if: needs.update-changelogs.outputs.run == 'true'
     steps:
       - name: Checkout
         id: checkout

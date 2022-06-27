@@ -332,7 +332,7 @@ struct rrddim_collect_ops {
     void (*init)(RRDDIM *rd);
 
     // run this to store each metric into the database
-    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, storage_number number);
+    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, calculated_number number, SN_FLAGS flags);
 
     // an finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
@@ -345,7 +345,7 @@ struct rrddim_query_ops {
     void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 
     // run this to load each metric number from the database
-    storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time);
+    calculated_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags);
 
     // run this to test if the series of next_metric() database queries is finished
     int (*is_finished)(struct rrddim_query_handle *handle);
@@ -1180,10 +1180,10 @@ static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
             ret = rrdset_first_slot(st);
         }
         else {
-            if(rrdset_last_slot(st) >= ((last_entry_t - t) / (size_t)(st->update_every)))
-                ret = rrdset_last_slot(st) - ((last_entry_t - t) / (size_t)(st->update_every));
+            if(rrdset_last_slot(st) >= (size_t)((last_entry_t - t) / st->update_every))
+                ret = rrdset_last_slot(st) - ((last_entry_t - t) / st->update_every);
             else
-                ret = rrdset_last_slot(st) - ((last_entry_t - t) / (size_t)(st->update_every)) + (unsigned long)st->entries;
+                ret = rrdset_last_slot(st) - ((last_entry_t - t) / st->update_every) + st->entries;
         }
     }
 
@@ -1207,12 +1207,10 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
         slot = (size_t)st->entries - 1;
     }
 
-    if(slot > rrdset_last_slot(st)) {
-        ret = last_entry_t - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
-    }
-    else {
-        ret = last_entry_t - (size_t)st->update_every;
-    }
+    if(slot > rrdset_last_slot(st))
+        ret = last_entry_t - (time_t)(st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries));
+    else
+        ret = last_entry_t - (time_t)(st->update_every * (rrdset_last_slot(st) - slot));
 
     if(unlikely(ret < first_entry_t)) {
         error("INTERNAL ERROR: rrdset_slot2time() on %s returns time too far in the past", st->name);

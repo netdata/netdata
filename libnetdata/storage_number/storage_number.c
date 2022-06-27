@@ -2,12 +2,7 @@
 
 #include "../libnetdata.h"
 
-#define get_storage_number_flags(value) \
-    ((((storage_number)(value)) & (1 << 24)) | \
-     (((storage_number)(value)) & (1 << 25)) | \
-     (((storage_number)(value)) & (1 << 26)))
-
-storage_number pack_storage_number(calculated_number value, uint32_t flags) {
+storage_number pack_storage_number(calculated_number value, SN_FLAGS flags) {
     // bit 32 = sign 0:positive, 1:negative
     // bit 31 = 0:divide, 1:multiply
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
@@ -16,8 +11,11 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     // bit 25 SN_ANOMALY_BIT = 0: anomalous, 1: not anomalous
     // bit 24 to bit 1 = the value
 
-    storage_number r = get_storage_number_flags(flags);
-    if(!value)
+    storage_number r = flags & SN_ALL_FLAGS;
+
+    // The isnormal() macro shall determine whether its argument value
+    // is normal (neither zero, subnormal, infinite, nor NaN).
+    if(unlikely(!isnormal(value)))
         goto RET_SN;
 
     int m = 0;

@@ -8,9 +8,9 @@ keywords: [machine learning, anomaly detection, Netdata ML]
 
 ## Overview
 
-As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0), Netdata comes with some ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box, with minimal configuration required.
+As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0), Netdata comes with some ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box, with zero configuration required (ML was enabled by default in `v1.35.0-29-nightly` in [this PR](https://github.com/netdata/netdata/pull/13158), previously it required a one line config change).
 
-🚧 **Note**: This functionality is still under active development and considered experimental. Changes might cause the feature to break. We dogfood it internally and among early adopters within the Netdata community to build the feature. If you would like to get involved and help us with some feedback, email us at analytics-ml-team@netdata.cloud, comment on the [beta launch post](https://community.netdata.cloud/t/anomaly-advisor-beta-launch/2717) in the Netdata community, or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
+🚧 **Note**: If you would like to get involved and help us with some feedback, email us at analytics-ml-team@netdata.cloud, comment on the [beta launch post](https://community.netdata.cloud/t/anomaly-advisor-beta-launch/2717) in the Netdata community, or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 
 Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of potentially anomalous patterns in recent observations as opposed to just point anomalies like big spikes or drops. ([This infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies.) 
 
@@ -145,9 +145,11 @@ The query returns a list of dimension anomaly rates for all dimensions that were
 
 ## Configuration
 
-To enable anomaly detection:
+If you are running a netdata version after `v1.35.0-29-nightly` then ML will be enabled by default. 
+
+To enable or disable anomaly detection:
 1. Find and open the Netdata configuration file `netdata.conf`.
-2. In the `[ml]` section, set `enabled = yes`.
+2. In the `[ml]` section, set `enabled = yes` to enable or `enabled = no` to disable.
 3. Restart netdata (typically `sudo systemctl restart netdata`).
 
 **Note**: If you would like to learn more about configuring Netdata please see [the configuration guide](https://learn.netdata.cloud/guides/step-by-step/step-04).
@@ -156,7 +158,7 @@ Below is a list of all the available configuration params and their default valu
 
 ```
 [ml]
-	# enabled = no
+	# enabled = yes
 	# maximum num samples to train = 14400
 	# minimum num samples to train = 3600
 	# train every = 3600
@@ -181,43 +183,34 @@ Below is a list of all the available configuration params and their default valu
 
 If you would like to run ML on a parent instead of at the edge, some configuration options are illustrated below.
 
-This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/agent/streaming) to 1 parent node and illustrates the main ways you might want to configure running ml for the children on the parent, running ML on the children themselves, or even a mix of approaches.
+This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/agent/streaming) to 1 parent node and illustrates the main ways you might want to configure running ML for the children on the parent, running ML on the children themselves, or even a mix of approaches.
 
 ![parent_child_options](https://user-images.githubusercontent.com/2178292/164439761-8fb7dddd-c4d8-4329-9f44-9a794937a086.png)
 
 ```
-# parent will run ml for itself and child 1,2.
-# child 0 will run its own ml at the edge and just stream its ml charts to parent.
-# child 1 will run its own ml at the edge, even though parent will also run ml for it, a bit wasteful potentially to run ml in both places but is possible.
-# child 2 will not run ml at the edge, it will be run in the parent only.
+# parent will run ML for itself and child 1,2, it will skip running ML for child 0.
+# child 0 will run its own ML at the edge.
+# child 1 will run its own ML at the edge, even though parent will also run ML for it, a bit wasteful potentially to run ML in both places but is possible (Netdata Cloud will essentially average any overlapping models).
+# child 2 will not run ML at the edge, it will be run in the parent only.
 
-# parent-ml-ml-stress-0
-# run ml on all hosts apart from child-ml-ml-stress-0
+# parent-ml-enabled
+# run ML on all hosts apart from child-ml-enabled
 [ml]
         enabled = yes
-        minimum num samples to train = 900
-        train every = 900
-        charts to skip from training = !*
-        hosts to skip from training = child-ml-ml-stress-0
+        hosts to skip from training = child-0-ml-enabled
 
-# child-ml-ml-stress-0
-# run ml on child-ml-ml-stress-0 and stream ml charts to parent
+# child-0-ml-enabled
+# run ML on child-0-ml-enabled
 [ml]
         enabled = yes
-        minimum num samples to train = 900
-        train every = 900
-        stream anomaly detection charts = yes
 
-# child-ml-ml-stress-1
-# run ml on child-ml-ml-stress-1 and stream ml charts to parent
+# child-1-ml-enabled
+# run ML on child-1-ml-enabled
 [ml]
         enabled = yes
-        minimum num samples to train = 900
-        train every = 900
-        stream anomaly detection charts = yes
 
-# child-ml-ml-stress-2
-# don't run ml on child-ml-ml-stress-2, it will instead run on parent-ml-ml-stress-0
+# child-2-ml-disabled
+# do not run ML on child-2-ml-disabled
 [ml]
         enabled = no
 ```
@@ -226,7 +219,7 @@ This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/
 
 - `enabled`: `yes` to enable, `no` to disable.
 - `maximum num samples to train`: (`3600`/`86400`) This is the maximum amount of time you would like to train each model on. For example, the default of `14400` trains on the preceding 4 hours of data, assuming an `update every` of 1 second.
-- `minimum num samples to train`: (`900`/`21600`) This is the minimum amount of data required to be able to train a model. For example, the default of `3600` implies that once at least 1 hour of data is available for training, a model is trained, otherwise it is skipped and checked again at the next training run.
+- `minimum num samples to train`: (`900`/`21600`) This is the minimum amount of data required to be able to train a model. For example, the default of `900` implies that once at least 15 minutes of data is available for training, a model is trained, otherwise it is skipped and checked again at the next training run.
 - `train every`: (`1800`/`21600`) This is how often each model will be retrained. For example, the default of `3600` means that each model is retrained every hour. Note: The training of all models is spread out across the `train every` period for efficiency, so in reality, it means that each model will be trained in a staggered manner within each `train every` period.
 - `dbengine anomaly rate every`: (`30`/`900`) This is how often netdata will aggregate all the anomaly bits into a single chart (`anomaly_detection.anomaly_rates`). The aggregation into a single chart allows enabling anomaly rate ranking over _all_ metrics with one API call as opposed to a call per chart.
 - `num samples to diff`: (`0`/`1`) This is a `0` or `1` to determine if you want the model to operate on differences of the raw data or just the raw data. For example, the default of `1` means that we take differences of the raw values. Using differences is more general and works on dimensions that might naturally tend to have some trends or cycles in them that is normal behavior to which we don't want to be too sensitive.

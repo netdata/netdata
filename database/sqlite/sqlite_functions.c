@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_functions.h"
+#include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION "1"
+#define DB_METADATA_VERSION 1
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
@@ -52,7 +53,6 @@ const char *database_config[] = {
     "INSERT INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id) "
     "on conflict (chart_id, hash_id) do nothing; END; ",
 
-    "PRAGMA user_version="DB_METADATA_VERSION";",
     NULL
 };
 
@@ -67,6 +67,9 @@ const char *database_cleanup[] = {
 };
 
 sqlite3 *db_meta = NULL;
+
+#define MAX_PREPARED_STATEMENTS (32)
+pthread_key_t key_pool[MAX_PREPARED_STATEMENTS];
 
 static uv_mutex_t sqlite_transaction_lock;
 
@@ -96,6 +99,10 @@ static void add_stmt_to_list(sqlite3_stmt *res)
     static sqlite3_stmt *statements[MAX_OPEN_STATEMENTS];
 
     if (unlikely(!res)) {
+        if (idx)
+            info("Finilizing %d statements", idx);
+        else
+            info("No statements pending to finalize");
         while (idx > 0) {
             int rc;
             rc = sqlite3_finalize(statements[--idx]);
@@ -107,13 +114,39 @@ static void add_stmt_to_list(sqlite3_stmt *res)
 
     if (unlikely(idx == MAX_OPEN_STATEMENTS))
         return;
-    statements[idx++] = res;
 }
 
-int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement) {
+static void release_statement(void *statement)
+{
+    int rc;
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Thread %d: Cleaning prepared statement on %p", gettid(), statement);
+#endif
+    if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK))
+        error_report("Failed to finalize statement, rc = %d", rc);
+}
+
+int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement)
+{
+    static __thread uint32_t keys_used = 0;
+
+    pthread_key_t *key = NULL;
+    int ret = 1;
+
+    if (likely(keys_used < MAX_PREPARED_STATEMENTS))
+        key = &key_pool[keys_used++];
+
     int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
-    if (likely(rc == SQLITE_OK))
-        add_stmt_to_list(*statement);
+    if (likely(rc == SQLITE_OK)) {
+        if (likely(key)) {
+            ret = pthread_setspecific(*key, *statement);
+#ifdef NETDATA_INTERNAL_CHECKS
+            info("Thread %d: Using key %u on statement %p", gettid(), keys_used, *statement);
+#endif
+        }
+        if (ret)
+            add_stmt_to_list(*statement);
+    }
     return rc;
 }
 
@@ -404,6 +437,8 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
 
+    int target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
+
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
     snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
@@ -435,6 +470,9 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
     if(init_database_batch(rebuild, 0, list)) return 1;
 
+    snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
+    if(init_database_batch(rebuild, 0, list)) return 1;
+
     if (init_database_batch(rebuild, 0, &database_config[0]))
         return 1;
 
@@ -443,6 +481,10 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     fatal_assert(0 == uv_mutex_init(&sqlite_transaction_lock));
     info("SQLite database initialization completed");
+
+    for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
+        (void)pthread_key_create(&key_pool[i], release_statement);
+
     return 0;
 }
 

@@ -1,7 +1,9 @@
 #include "onewayalloc.h"
 
 static size_t OWA_NATURAL_PAGE_SIZE = 0;
-static size_t OWA_NATURAL_ALIGNMENT = sizeof(int*);
+
+// https://www.gnu.org/software/libc/manual/html_node/Aligned-Memory-Blocks.html
+#define OWA_NATURAL_ALIGNMENT  (sizeof(void *) * 2)
 
 typedef struct owa_page {
     size_t stats_pages;
@@ -28,15 +30,20 @@ static inline size_t natural_alignment(size_t size) {
 // any number of times, for any amount of memory.
 
 static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
-    if(unlikely(!OWA_NATURAL_PAGE_SIZE))
-        OWA_NATURAL_PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
+    if(unlikely(!OWA_NATURAL_PAGE_SIZE)) {
+        long int page_size = sysconf(_SC_PAGE_SIZE);
+        if (unlikely(page_size == -1))
+            OWA_NATURAL_PAGE_SIZE = 4096;
+        else
+            OWA_NATURAL_PAGE_SIZE = page_size;
+    }
 
     // our default page size
     size_t size = OWA_NATURAL_PAGE_SIZE;
 
     // make sure the new page will fit both the requested size
     // and the OWA_PAGE structure at its beginning
-    size_hint += sizeof(OWA_PAGE);
+    size_hint += natural_alignment(sizeof(OWA_PAGE));
 
     // prefer the user size if it is bigger than our size
     if(size_hint > size) size = size_hint;

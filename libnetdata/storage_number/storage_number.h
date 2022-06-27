@@ -3,6 +3,7 @@
 #ifndef NETDATA_STORAGE_NUMBER_H
 #define NETDATA_STORAGE_NUMBER_H 1
 
+#include <math.h>
 #include "../libnetdata.h"
 
 #ifdef NETDATA_WITHOUT_LONG_DOUBLE
@@ -59,18 +60,29 @@ typedef long double collected_number;
 
 #define calculated_number_equal(a, b) (calculated_number_fabs((a) - (b)) < calculated_number_epsilon)
 
-#define calculated_number_isnumber(a) (!(fpclassify(a) & (FP_NAN|FP_INFINITE)))
+#if defined(HAVE_ISFINITE) || defined(isfinite)
+// The isfinite() macro shall determine whether its argument has a
+// finite value (zero, subnormal, or normal, and not infinite or NaN).
+#define calculated_number_isnumber(a) (isfinite(a))
+#elif defined(HAVE_FINITE) || defined(finite)
+#define calculated_number_isnumber(a) (finite(a))
+#else
+#define calculated_number_isnumber(a) (fpclassify(a) != FP_NAN && fpclassify(a) != FP_INFINITE)
+#endif
 
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
 
-#define SN_ANOMALY_BIT      (1 << 24) // the anomaly bit of the value
-#define SN_EXISTS_RESET     (1 << 25) // the value has been overflown
-#define SN_EXISTS_100       (1 << 26) // very large value (multiplier is 100 instead of 10)
+typedef enum {
+    SN_ANOMALY_BIT   = (1 << 24), // the anomaly bit of the value
+    SN_EXISTS_RESET  = (1 << 25), // the value has been overflown
+    SN_EXISTS_100    = (1 << 26)  // very large value (multiplier is 100 instead of 10)
+} SN_FLAGS;
 
-#define SN_DEFAULT_FLAGS    SN_ANOMALY_BIT
+#define SN_ALL_FLAGS (SN_ANOMALY_BIT|SN_EXISTS_RESET|SN_EXISTS_100)
 
 #define SN_EMPTY_SLOT 0x00000000
+#define SN_DEFAULT_FLAGS SN_ANOMALY_BIT
 
 // When the calculated number is zero and the value is anomalous (ie. it's bit
 // is zero) we want to return a storage_number representation that is
@@ -83,7 +95,7 @@ typedef uint32_t storage_number;
 #define does_storage_number_exist(value) (((storage_number) (value)) != SN_EMPTY_SLOT)
 #define did_storage_number_reset(value)  ((((storage_number) (value)) & SN_EXISTS_RESET) != 0)
 
-storage_number pack_storage_number(calculated_number value, uint32_t flags);
+storage_number pack_storage_number(calculated_number value, SN_FLAGS flags);
 static inline calculated_number unpack_storage_number(storage_number value) __attribute__((const));
 
 int print_calculated_number(char *str, calculated_number value);
@@ -106,7 +118,8 @@ int print_calculated_number(char *str, calculated_number value);
 static inline calculated_number unpack_storage_number(storage_number value) {
     extern calculated_number unpack_storage_number_lut10x[4 * 8];
 
-    if(!value) return 0;
+    if(unlikely(value == SN_EMPTY_SLOT))
+        return NAN;
 
     int sign = 1, exp = 0;
     int factor = 0;
@@ -127,7 +140,7 @@ static inline calculated_number unpack_storage_number(storage_number value) {
     // bit 25 SN_ANOMALY_BIT
 
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
-    int mul = (value & ((1<<29)|(1<<28)|(1<<27))) >> 27;
+    int mul = (int)((value & ((1<<29)|(1<<28)|(1<<27))) >> 27);
 
     // bit 24 to bit 1 = the value, so remove all other bits
     value ^= value & ((1<<31)|(1<<30)|(1<<29)|(1<<28)|(1<<27)|(1<<26)|(1<<25)|(1<<24));

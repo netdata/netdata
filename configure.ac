@@ -355,6 +355,8 @@ else
 fi
 AC_MSG_RESULT([${with_math}])
 
+AC_CHECK_FUNCS([isfinite])
+AC_CHECK_FUNCS([finite])
 
 # -----------------------------------------------------------------------------
 # libuv multi-platform support library with a focus on asynchronous I/O
@@ -1762,6 +1764,7 @@ AC_CONFIG_FILES([
     web/api/formatters/value/Makefile
     web/api/queries/Makefile
     web/api/queries/average/Makefile
+    web/api/queries/countif/Makefile
     web/api/queries/des/Makefile
     web/api/queries/incremental_sum/Makefile
     web/api/queries/max/Makefile

@@ -26,6 +26,10 @@ typedef enum rrdr_options {
     RRDR_OPTION_ALLOW_PAST   = 0x00020000, // The after parameter can extend in the past before the first entry
     RRDR_OPTION_ANOMALY_BIT  = 0x00040000, // Return the anomaly bit stored in each collected_number
     RRDR_OPTION_RETURN_RAW   = 0x00080000, // Return raw data for aggregating across multiple nodes
+    RRDR_OPTION_RETURN_JWAR  = 0x00100000, // Return anomaly rates in jsonwrap
+
+    // internal ones - not to be exposed to the API
+    RRDR_OPTION_INTERNAL_AR  = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate
 } RRDR_OPTIONS;
 
 typedef enum rrdr_value_flag {
@@ -65,6 +69,7 @@ typedef struct rrdresult {
     time_t *t;                // array of n timestamps
     calculated_number *v;     // array n x d values
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
+    uint8_t *ar;              // array n x d of anomaly rates (0 - 200)
 
     long group;               // how many collected values were grouped for each row
     int update_every;         // what is the suggested update frequency in seconds
@@ -84,7 +89,7 @@ typedef struct rrdresult {
         long resampling_group;
         calculated_number resampling_divisor;
 
-        void (*grouping_create)(struct rrdresult *r);
+        void (*grouping_create)(struct rrdresult *r, const char *options);
         void (*grouping_reset)(struct rrdresult *r);
         void (*grouping_free)(struct rrdresult *r);
         void (*grouping_add)(struct rrdresult *r, calculated_number value);
@@ -113,7 +118,7 @@ extern RRDR *rrd2rrdr(
     ONEWAYALLOC *owa,
     RRDSET *st, long points_requested, long long after_requested, long long before_requested,
     RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
-    struct context_param *context_param_list, int timeout);
+    struct context_param *context_param_list, const char *group_options, int timeout);
 
 extern int rrdr_relative_window_to_absolute(long long *after, long long *before, int update_every, long points);
 

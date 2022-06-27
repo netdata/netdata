@@ -3,10 +3,16 @@
 #include "../proc.plugin/plugin_proc.h"
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
+#define THREAD_DISKSPACE_SLOW_NAME "PLUGIN[diskspace slow]"
 
 #define DEFAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
+
+#define MAX_STAT_USEC 10000LU
+#define SLOW_UPDATE_EVERY 5
+
+static netdata_thread_t *diskspace_slow_thread = NULL;
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
@@ -34,6 +40,7 @@ struct mount_point_metadata {
     int do_inodes;
     int shown_error;
     int updated;
+    int slow;
 
     size_t collected; // the number of times this has been collected
 
@@ -52,12 +59,14 @@ static DICTIONARY *dict_mountpoints = NULL;
 
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
 
-int mount_point_cleanup(const char *name, void *entry, void *data) {
+int mount_point_cleanup(const char *name, void *entry, int slow) {
     (void)name;
-    (void)data;
-
+    
     struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
     if(!mp) return 0;
+
+    if (slow != mp->slow)
+        return 0;
 
     if(likely(mp->updated)) {
         mp->updated = 0;
@@ -84,6 +93,12 @@ int mount_point_cleanup(const char *name, void *entry, void *data) {
     return 0;
 }
 
+int mount_point_cleanup_cb(const char *name, void *entry, void *data) {
+    UNUSED(data);
+
+    return mount_point_cleanup(name, (struct mount_point_metadata *)entry, 0);
+}
+
 // for the full list of protected mount points look at
 // https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L142-L149
 // https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L180-L194
@@ -106,148 +121,84 @@ int mount_point_is_protected(char *mount_point)
     return 0;
 }
 
-static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+// a copy of basic mountinfo fields
+struct basic_mountinfo {
+    char *persistent_id;    
+    char *root;             
+    char *mount_point;      
+    char *filesystem;       
+
+    struct basic_mountinfo *next;
+};
+
+static struct basic_mountinfo *slow_mountinfo_tmp_root = NULL;
+static netdata_mutex_t slow_mountinfo_mutex;
+
+static struct basic_mountinfo *basic_mountinfo_create_and_copy(struct mountinfo* mi)
+{
+    struct basic_mountinfo *bmi = callocz(1, sizeof(struct basic_mountinfo));
+    
+    if (mi) {
+        bmi->persistent_id = strdupz(mi->persistent_id);
+        bmi->root          = strdupz(mi->root);
+        bmi->mount_point   = strdupz(mi->mount_point);
+        bmi->filesystem    = strdupz(mi->filesystem);
+    }
+
+    return bmi;
+}
+
+static void add_basic_mountinfo(struct basic_mountinfo **root, struct mountinfo *mi)
+{
+    if (!root)
+        return;
+
+    struct basic_mountinfo *bmi = basic_mountinfo_create_and_copy(mi);
+
+    bmi->next = *root;
+    *root = bmi;
+};
+
+static void free_basic_mountinfo(struct basic_mountinfo *bmi)
+{
+    if (bmi) {
+        freez(bmi->persistent_id);
+        freez(bmi->root);
+        freez(bmi->mount_point);
+        freez(bmi->filesystem);
+
+        freez(bmi);
+    }
+};
+
+static void free_basic_mountinfo_list(struct basic_mountinfo *root)
+{
+    struct basic_mountinfo *bmi = root, *next;
+
+    while (bmi) {
+        next = bmi->next;
+        free_basic_mountinfo(bmi);
+        bmi = next;
+    }
+}
+
+static void calculate_values_and_show_charts(
+    struct basic_mountinfo *mi,
+    struct mount_point_metadata *m,
+    struct statvfs *buff_statvfs,
+    int update_every)
+{
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
 
-    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
-    static SIMPLE_PATTERN *excluded_filesystems = NULL;
-    int do_space, do_inodes;
-
-    if(unlikely(!dict_mountpoints)) {
-        SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
-
-        if(config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
-            // old configuration, enable backwards compatibility
-            mode = SIMPLE_PATTERN_PREFIX;
-        }
-
-        excluded_mountpoints = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS)
-                , NULL
-                , mode
-        );
-
-        excluded_filesystems = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
-
-        dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
-    }
-
-    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
-    if(unlikely(!m)) {
-        char var_name[4096 + 1];
-        snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
-
-        int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
-        int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
-
-        if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
-            def_space = CONFIG_BOOLEAN_NO;
-            def_inodes = CONFIG_BOOLEAN_NO;
-        }
-
-        if(unlikely(simple_pattern_matches(excluded_filesystems, mi->filesystem))) {
-            def_space = CONFIG_BOOLEAN_NO;
-            def_inodes = CONFIG_BOOLEAN_NO;
-        }
-
-        // check if the mount point is a directory #2407
-        // but only when it is enabled by default #4491
-        if(def_space != CONFIG_BOOLEAN_NO || def_inodes != CONFIG_BOOLEAN_NO) {
-            struct stat bs;
-            if(stat(mi->mount_point, &bs) == -1) {
-                error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
-                      , mi->mount_point
-                      , disk
-                      , mi->filesystem?mi->filesystem:""
-                      , mi->root?mi->root:""
-                );
-                def_space = CONFIG_BOOLEAN_NO;
-                def_inodes = CONFIG_BOOLEAN_NO;
-            }
-            else {
-                if((bs.st_mode & S_IFMT) != S_IFDIR) {
-                    error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
-                          , mi->mount_point
-                          , disk
-                          , mi->filesystem?mi->filesystem:""
-                          , mi->root?mi->root:""
-                    );
-                    def_space = CONFIG_BOOLEAN_NO;
-                    def_inodes = CONFIG_BOOLEAN_NO;
-                }
-            }
-        }
-
-        do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
-        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
-
-        struct mount_point_metadata mp = {
-                .do_space = do_space,
-                .do_inodes = do_inodes,
-                .shown_error = 0,
-                .updated = 0,
-
-                .collected = 0,
-
-                .st_space = NULL,
-                .rd_space_avail = NULL,
-                .rd_space_used = NULL,
-                .rd_space_reserved = NULL,
-
-                .st_inodes = NULL,
-                .rd_inodes_avail = NULL,
-                .rd_inodes_used = NULL,
-                .rd_inodes_reserved = NULL
-        };
-
-        m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
-    }
-
-    m->updated = 1;
-
-    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
-        return;
-
-    if (unlikely(
-            mi->flags & MOUNTINFO_READONLY &&
-            !mount_point_is_protected(mi->mount_point) &&
-            !m->collected &&
-            m->do_space != CONFIG_BOOLEAN_YES &&
-            m->do_inodes != CONFIG_BOOLEAN_YES))
-        return;
-
-    struct statvfs buff_statvfs;
-    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
-        if(!m->shown_error) {
-            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
-                  , mi->mount_point
-                  , disk
-                  , mi->filesystem?mi->filesystem:""
-                  , mi->root?mi->root:""
-            );
-            m->shown_error = 1;
-        }
-        return;
-    }
-    m->shown_error = 0;
-
     // logic found at get_fs_usage() in coreutils
-    unsigned long bsize = (buff_statvfs.f_frsize) ? buff_statvfs.f_frsize : buff_statvfs.f_bsize;
+    unsigned long bsize = (buff_statvfs->f_frsize) ? buff_statvfs->f_frsize : buff_statvfs->f_bsize;
 
-    fsblkcnt_t bavail         = buff_statvfs.f_bavail;
-    fsblkcnt_t btotal         = buff_statvfs.f_blocks;
-    fsblkcnt_t bavail_root    = buff_statvfs.f_bfree;
+    fsblkcnt_t bavail         = buff_statvfs->f_bavail;
+    fsblkcnt_t btotal         = buff_statvfs->f_blocks;
+    fsblkcnt_t bavail_root    = buff_statvfs->f_bfree;
     fsblkcnt_t breserved_root = bavail_root - bavail;
-    fsblkcnt_t bused;
-    if(likely(btotal >= bavail_root))
-        bused = btotal - bavail_root;
-    else
-        bused = bavail_root - btotal;
+    fsblkcnt_t bused = likely(btotal >= bavail_root) ? btotal - bavail_root : bavail_root - btotal;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
@@ -256,9 +207,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     // --------------------------------------------------------------------------
 
-    fsfilcnt_t favail         = buff_statvfs.f_favail;
-    fsfilcnt_t ftotal         = buff_statvfs.f_files;
-    fsfilcnt_t favail_root    = buff_statvfs.f_ffree;
+    fsfilcnt_t favail         = buff_statvfs->f_favail;
+    fsfilcnt_t ftotal         = buff_statvfs->f_files;
+    fsfilcnt_t favail_root    = buff_statvfs->f_ffree;
     fsfilcnt_t freserved_root = favail_root - favail;
     fsfilcnt_t fused          = ftotal - favail_root;
 
@@ -280,10 +231,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
                                              (bavail || breserved_root || bused ||
                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        if(unlikely(!m->st_space)) {
+        if(unlikely(!m->st_space) || m->st_space->update_every != update_every) {
             m->do_space = CONFIG_BOOLEAN_YES;
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
-            if(unlikely(!m->st_space)) {
+            if(unlikely(!m->st_space || m->st_space->update_every != update_every)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Space Usage");
                 m->st_space = rrdset_create_localhost(
@@ -322,10 +273,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
                                               (favail || freserved_root || fused ||
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        if(unlikely(!m->st_inodes)) {
+        if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
             m->do_inodes = CONFIG_BOOLEAN_YES;
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
-            if(unlikely(!m->st_inodes)) {
+            if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Files (inodes) Usage");
                 m->st_inodes = rrdset_create_localhost(
@@ -365,6 +316,281 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         m->collected++;
 }
 
+static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+    const char *disk = mi->persistent_id;
+
+    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
+    static SIMPLE_PATTERN *excluded_filesystems = NULL;
+
+    usec_t slow_timeout = MAX_STAT_USEC * update_every;
+
+    int do_space, do_inodes;
+
+    if(unlikely(!dict_mountpoints)) {
+        SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
+
+        if(config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
+            // old configuration, enable backwards compatibility
+            mode = SIMPLE_PATTERN_PREFIX;
+        }
+
+        excluded_mountpoints = simple_pattern_create(
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS)
+                , NULL
+                , mode
+        );
+
+        excluded_filesystems = simple_pattern_create(
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
+        );
+
+        dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    }
+
+    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
+    if(unlikely(!m)) {
+        int slow = 0;
+        char var_name[4096 + 1];
+        snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
+
+        int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
+        int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
+
+        if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
+            def_space = CONFIG_BOOLEAN_NO;
+            def_inodes = CONFIG_BOOLEAN_NO;
+        }
+
+        if(unlikely(simple_pattern_matches(excluded_filesystems, mi->filesystem))) {
+            def_space = CONFIG_BOOLEAN_NO;
+            def_inodes = CONFIG_BOOLEAN_NO;
+        }
+
+        // check if the mount point is a directory #2407
+        // but only when it is enabled by default #4491
+        if(def_space != CONFIG_BOOLEAN_NO || def_inodes != CONFIG_BOOLEAN_NO) {
+            usec_t start_time = now_monotonic_high_precision_usec();
+            struct stat bs;
+
+            if(stat(mi->mount_point, &bs) == -1) {
+                error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
+                      , mi->mount_point
+                      , disk
+                      , mi->filesystem?mi->filesystem:""
+                      , mi->root?mi->root:""
+                );
+                def_space = CONFIG_BOOLEAN_NO;
+                def_inodes = CONFIG_BOOLEAN_NO;
+            }
+            else {
+                if((bs.st_mode & S_IFMT) != S_IFDIR) {
+                    error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                          , mi->mount_point
+                          , disk
+                          , mi->filesystem?mi->filesystem:""
+                          , mi->root?mi->root:""
+                    );
+                    def_space = CONFIG_BOOLEAN_NO;
+                    def_inodes = CONFIG_BOOLEAN_NO;
+                }
+            }
+
+            if ((now_monotonic_high_precision_usec() - start_time) > slow_timeout)
+                slow = 1;
+        }
+
+        do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
+        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
+
+        struct mount_point_metadata mp = {
+                .do_space = do_space,
+                .do_inodes = do_inodes,
+                .shown_error = 0,
+                .updated = 0,
+                .slow = 0,
+
+                .collected = 0,
+
+                .st_space = NULL,
+                .rd_space_avail = NULL,
+                .rd_space_used = NULL,
+                .rd_space_reserved = NULL,
+
+                .st_inodes = NULL,
+                .rd_inodes_avail = NULL,
+                .rd_inodes_used = NULL,
+                .rd_inodes_reserved = NULL
+        };
+
+        m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
+
+        m->slow = slow;
+    }
+
+    if (m->slow) {
+        add_basic_mountinfo(&slow_mountinfo_tmp_root, mi);
+        return;
+    }
+
+    m->updated = 1;
+
+    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
+        return;
+
+    if (unlikely(
+            mi->flags & MOUNTINFO_READONLY &&
+            !mount_point_is_protected(mi->mount_point) &&
+            !m->collected &&
+            m->do_space != CONFIG_BOOLEAN_YES &&
+            m->do_inodes != CONFIG_BOOLEAN_YES))
+        return;
+
+    usec_t start_time = now_monotonic_high_precision_usec();
+    struct statvfs buff_statvfs;
+
+    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+        if(!m->shown_error) {
+            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
+                  , mi->mount_point
+                  , disk
+                  , mi->filesystem?mi->filesystem:""
+                  , mi->root?mi->root:""
+            );
+            m->shown_error = 1;
+        }
+        return;
+    }
+
+    if ((now_monotonic_high_precision_usec() - start_time) > slow_timeout)
+        m->slow = 1;
+
+    m->shown_error = 0;
+
+    struct basic_mountinfo bmi;
+    bmi.mount_point = mi->mount_point;
+    bmi.persistent_id = mi->persistent_id;
+    bmi.filesystem = mi->filesystem;
+    bmi.root = mi->root;
+
+    calculate_values_and_show_charts(&bmi, m, &buff_statvfs, update_every);
+}
+
+static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int update_every) {
+    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
+
+    m->updated = 1;
+
+    struct statvfs buff_statvfs;
+    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+        if(!m->shown_error) {
+            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
+                  , mi->mount_point
+                  , mi->persistent_id
+                  , mi->filesystem?mi->filesystem:""
+                  , mi->root?mi->root:""
+            );
+            m->shown_error = 1;
+        }
+        return;
+    }
+    m->shown_error = 0;
+
+    calculate_values_and_show_charts(mi, m, &buff_statvfs, update_every);
+}
+
+static void diskspace_slow_worker_cleanup(void *ptr)
+{
+    UNUSED(ptr);
+
+    info("cleaning up...");
+
+    worker_unregister();
+}
+
+#define WORKER_JOB_SLOW_MOUNTPOINT 0
+#define WORKER_JOB_SLOW_CLEANUP 1
+
+struct slow_worker_data {
+    netdata_thread_t *slow_thread;
+    int update_every;
+};
+
+void *diskspace_slow_worker(void *ptr)
+{
+    struct slow_worker_data *data = (struct slow_worker_data *)ptr;
+    
+    worker_register("DISKSPACE_SLOW");
+    worker_register_job_name(WORKER_JOB_SLOW_MOUNTPOINT, "mountpoint");
+    worker_register_job_name(WORKER_JOB_SLOW_CLEANUP, "cleanup");
+
+    struct basic_mountinfo *slow_mountinfo_root = NULL;
+
+    int slow_update_every = data->update_every > SLOW_UPDATE_EVERY ? data->update_every : SLOW_UPDATE_EVERY;
+
+    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, data->slow_thread);
+
+    usec_t step = slow_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    while(!netdata_exit) {
+        worker_is_idle();
+        heartbeat_next(&hb, step);
+
+        usec_t start_time = now_monotonic_high_precision_usec();
+
+        if (!dict_mountpoints)
+            continue;
+
+        if(unlikely(netdata_exit)) break;
+
+        // --------------------------------------------------------------------------
+        // disk space metrics
+
+        worker_is_busy(WORKER_JOB_SLOW_MOUNTPOINT);
+
+        netdata_mutex_lock(&slow_mountinfo_mutex);
+        free_basic_mountinfo_list(slow_mountinfo_root);
+        slow_mountinfo_root = slow_mountinfo_tmp_root;
+        slow_mountinfo_tmp_root = NULL;
+        netdata_mutex_unlock(&slow_mountinfo_mutex);
+
+        struct basic_mountinfo *bmi;
+        for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
+            do_slow_disk_space_stats(bmi, slow_update_every);
+            
+            if(unlikely(netdata_exit)) break;
+        }
+
+        if(unlikely(netdata_exit)) break;
+
+        worker_is_busy(WORKER_JOB_SLOW_CLEANUP);
+
+        for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
+            struct mount_point_metadata *m = dictionary_get(dict_mountpoints, bmi->mount_point);
+
+            if (m)
+                mount_point_cleanup(bmi->mount_point, m, 1);
+        }
+
+        usec_t dt = now_monotonic_high_precision_usec() - start_time;
+        if (dt > step) {
+            slow_update_every = (dt / USEC_PER_SEC) * 3 / 2;
+            if (slow_update_every % SLOW_UPDATE_EVERY)
+                slow_update_every += SLOW_UPDATE_EVERY - slow_update_every % SLOW_UPDATE_EVERY;
+            step = slow_update_every * USEC_PER_SEC;
+        }
+    }
+
+    netdata_thread_cleanup_pop(1);
+
+    free_basic_mountinfo_list(slow_mountinfo_root);
+
+    return NULL;
+}
+
 static void diskspace_main_cleanup(void *ptr) {
     worker_unregister();
 
@@ -372,6 +598,13 @@ static void diskspace_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     info("cleaning up...");
+
+    if (diskspace_slow_thread) {
+        netdata_thread_join(*diskspace_slow_thread, NULL);
+        freez(diskspace_slow_thread);
+    }
+
+    free_basic_mountinfo_list(slow_mountinfo_tmp_root);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -402,6 +635,19 @@ void *diskspace_main(void *ptr) {
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
+    netdata_mutex_init(&slow_mountinfo_mutex);
+
+    diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
+
+    struct slow_worker_data slow_worker_data = {.slow_thread = diskspace_slow_thread, .update_every = update_every};
+
+    netdata_thread_create(
+        diskspace_slow_thread,
+        THREAD_DISKSPACE_SLOW_NAME,
+        NETDATA_THREAD_OPTION_JOINABLE,
+        diskspace_slow_worker,
+        &slow_worker_data);
+
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -410,7 +656,6 @@ void *diskspace_main(void *ptr) {
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
         if(unlikely(netdata_exit)) break;
-
 
         // --------------------------------------------------------------------------
         // this is smart enough not to reload it every time
@@ -421,9 +666,12 @@ void *diskspace_main(void *ptr) {
         // --------------------------------------------------------------------------
         // disk space metrics
 
+        netdata_mutex_lock(&slow_mountinfo_mutex);
+        free_basic_mountinfo_list(slow_mountinfo_tmp_root);
+        slow_mountinfo_tmp_root = NULL;
+
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
-
             if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
                 continue;
 
@@ -435,12 +683,13 @@ void *diskspace_main(void *ptr) {
             do_disk_space_stats(mi, update_every);
             if(unlikely(netdata_exit)) break;
         }
+        netdata_mutex_unlock(&slow_mountinfo_mutex);
 
         if(unlikely(netdata_exit)) break;
 
         if(dict_mountpoints) {
             worker_is_busy(WORKER_JOB_CLEANUP);
-            dictionary_walkthrough_read(dict_mountpoints, mount_point_cleanup, NULL);
+            dictionary_walkthrough_read(dict_mountpoints, mount_point_cleanup_cb, NULL);
         }
 
     }

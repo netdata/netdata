@@ -1043,8 +1043,9 @@ int rrdlabels_unittest_add_pairs() {
     errors += rrdlabels_unittest_add_a_pair("\"tag=1\": country:\"Gre\\\"ece\"", "tag_1", "country:Gre_ece");
     errors += rrdlabels_unittest_add_a_pair("\"tag=1\" = country:\"Gre\\\"ece\"", "tag_1", "country:Gre_ece");
 
-    errors += rrdlabels_unittest_add_a_pair("\t'LABE=L'\t=\t\"World\" peace", "labe_l", "World_peace");
+    errors += rrdlabels_unittest_add_a_pair("\t'LABE=L'\t=\t\"World\" peace", "labe_l", "World peace");
     errors += rrdlabels_unittest_add_a_pair("\t'LA\\'B:EL'\t=\tcountry:\"World\":\"Europe\":\"Greece\"", "la_b_el", "country:World:Europe:Greece");
+    errors += rrdlabels_unittest_add_a_pair("\t'LA\\'B:EL'\t=\tcountry\\\"World\"\\\"Europe\"\\\"Greece\"", "la_b_el", "country/World/Europe/Greece");
 
     errors += rrdlabels_unittest_add_a_pair("NAME=\"VALUE\"", "name", "VALUE");
     errors += rrdlabels_unittest_add_a_pair("\"NAME\" : \"VALUE\"", "name", "VALUE");
@@ -1113,22 +1114,22 @@ int rrdlabels_unittest_sanitization() {
 
     errors += rrdlabels_unittest_sanitize_value("", "");
     errors += rrdlabels_unittest_sanitize_value("1", "1");
-    errors += rrdlabels_unittest_sanitize_value("  hello   world   ", "hello_world");
+    errors += rrdlabels_unittest_sanitize_value("  hello   world   ", "hello world");
 
     // 2-byte UTF-8
     errors += rrdlabels_unittest_sanitize_value(" Ελλάδα ", "Ελλάδα");
     errors += rrdlabels_unittest_sanitize_value("aŰbŲcŴ", "aŰbŲcŴ");
-    errors += rrdlabels_unittest_sanitize_value("Ű b Ų c Ŵ", "Ű_b_Ų_c_Ŵ");
+    errors += rrdlabels_unittest_sanitize_value("Ű b Ų c Ŵ", "Ű b Ų c Ŵ");
 
     // 3-byte UTF-8
     errors += rrdlabels_unittest_sanitize_value("‱", "‱");
     errors += rrdlabels_unittest_sanitize_value("a‱b", "a‱b");
-    errors += rrdlabels_unittest_sanitize_value("a ‱ b", "a_‱_b");
+    errors += rrdlabels_unittest_sanitize_value("a ‱ b", "a ‱ b");
 
     // 4-byte UTF-8
     errors += rrdlabels_unittest_sanitize_value("𩸽", "𩸽");
     errors += rrdlabels_unittest_sanitize_value("a𩸽b", "a𩸽b");
-    errors += rrdlabels_unittest_sanitize_value("a 𩸽 b", "a_𩸽_b");
+    errors += rrdlabels_unittest_sanitize_value("a 𩸽 b", "a 𩸽 b");
 
     // mixed multi-byte
     errors += rrdlabels_unittest_sanitize_value("Ű‱𩸽‱Ű", "Ű‱𩸽‱Ű");
