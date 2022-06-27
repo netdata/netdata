@@ -308,7 +308,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-        int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+        int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags,
+                                host->system_info->hops);
         if (unlikely(rc))
             error_report("Failed to store machine GUID to the database");
         sql_load_node_id(host);

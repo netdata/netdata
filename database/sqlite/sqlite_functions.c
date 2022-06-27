@@ -735,7 +735,7 @@ uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
 
 int sql_store_host(
     uuid_t *host_uuid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
-    const char *tzone, const char *tags)
+    const char *tzone, const char *tags, int hops)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc;
@@ -780,6 +780,10 @@ int sql_store_host(
         goto bind_fail;
 
     rc = sqlite3_bind_text(res, 7, tags, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 8, hops);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

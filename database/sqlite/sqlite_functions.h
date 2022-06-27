@@ -27,7 +27,8 @@ typedef enum db_check_action_type {
 #define SQL_MAX_RETRY (100)
 #define SQLITE_INSERT_DELAY (50)        // Insert delay in case of lock
 
-#define SQL_STORE_HOST "insert or replace into host (host_id,hostname,registry_hostname,update_every,os,timezone,tags) values (?1,?2,?3,?4,?5,?6,?7);"
+#define SQL_STORE_HOST "insert or replace into host (host_id,hostname,registry_hostname,update_every,os,timezone,tags, hops) " \
+        "values (?1,?2,?3,?4,?5,?6,?7,?8);"
 
 #define SQL_STORE_CHART "insert or replace into chart (chart_id, host_id, type, id, " \
     "name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , " \
@@ -60,7 +61,8 @@ typedef enum db_check_action_type {
 extern int sql_init_database(db_check_action_type_t rebuild, int memory);
 extern void sql_close_database(void);
 
-extern int sql_store_host(uuid_t *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os, const char *timezone, const char *tags);
+extern int sql_store_host(uuid_t *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
+                          const char *timezone, const char *tags, int hops);
 extern int sql_store_chart(
     uuid_t *chart_uuid, uuid_t *host_uuid, const char *type, const char *id, const char *name, const char *family,
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
