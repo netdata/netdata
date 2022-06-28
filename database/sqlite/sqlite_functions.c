@@ -437,7 +437,10 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
 
-    int target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
+    int target_version = DB_METADATA_VERSION;
+
+    if (likely(!memory))
+        target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
