@@ -16,7 +16,6 @@ jobs:
       matrix:
         repos:
           - stable
-          - edge
           - devel
     steps:
       - name: Checkout
@@ -33,4 +32,4 @@ jobs:
         env:
           PKGCLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
         run: |
-          python3 .github/scripts/netdata-pkgcloud-cleanup.py -r ${{ matrix.repos }} --dry-run
+          python3 .github/scripts/netdata-pkgcloud-cleanup.py -r ${{ matrix.repos }}
