@@ -19,7 +19,11 @@ mkdir -p "${staging}"
 
 case "${format}" in
     deb)
-        exit 0
+        src="${staging}/pool/"
+
+        for pkg in ${packages}; do
+            cp "${pkg}" "${src}"
+        done
         ;;
     rpm)
         src="${staging}/${distro}/${arch}/"
