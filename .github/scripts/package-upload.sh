@@ -10,7 +10,7 @@ arch="${2}"
 format="${3}"
 repo="${4}"
 
-staging="/tmp/package-staging/"
+staging="${TMPDIR:-/tmp}/package-staging/"
 prefix="/var/www/html/repos/${repo}/"
 
 packages="$(find artifacts -name "*.${format}")"
