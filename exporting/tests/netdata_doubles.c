@@ -177,7 +177,7 @@ const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
     return RRD_MEMORY_MODE_NONE_NAME;
 }
 
-calculated_number rrdvar2number(RRDVAR *rv)
+NETDATA_DOUBLE rrdvar2number(RRDVAR *rv)
 {
     (void)rv;
     return 0;
@@ -230,7 +230,7 @@ int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle)
     return mock_type(int);
 }
 
-calculated_number __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags)
+NETDATA_DOUBLE __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags)
 {
     (void)handle;
     (void)start_time;
@@ -239,7 +239,7 @@ calculated_number __mock_rrddim_query_next_metric(struct rrddim_query_handle *ha
 
 
     function_called();
-    return mock_type(calculated_number);
+    return mock_type(NETDATA_DOUBLE);
 }
 
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)

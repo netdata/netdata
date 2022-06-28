@@ -28,11 +28,11 @@ typedef struct eval_expression {
     const char *parsed_as;
 
     RRDCALC_STATUS *status;
-    calculated_number *myself;
+    NETDATA_DOUBLE *myself;
     time_t *after;
     time_t *before;
 
-    calculated_number result;
+    NETDATA_DOUBLE result;
 
     int error;
     BUFFER *error_msg;
@@ -83,6 +83,6 @@ extern const char *expression_strerror(int error);
 // 2 = FAILED, the error message is in: buffer_tostring(expression->error_msg)
 extern int expression_evaluate(EVAL_EXPRESSION *expression);
 
-extern int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result);
+extern int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, NETDATA_DOUBLE *result);
 
 #endif //NETDATA_EVAL_H

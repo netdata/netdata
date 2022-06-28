@@ -58,9 +58,9 @@ void print_node(EVAL_NODE *op, int level) {
 	while(i--) print_value(&op->ops[i], level + 1);
 }
 
-calculated_number evaluate(EVAL_NODE *op, int depth);
+NETDATA_DOUBLE evaluate(EVAL_NODE *op, int depth);
 
-calculated_number evaluate_value(EVAL_VALUE *v, int depth) {
+NETDATA_DOUBLE evaluate_value(EVAL_VALUE *v, int depth) {
 	switch(v->type) {
 		case EVAL_VALUE_NUMBER:
 			return v->number;
@@ -80,8 +80,8 @@ void print_depth(int depth) {
 	while(depth--) printf("    ");
 }
 
-calculated_number evaluate(EVAL_NODE *op, int depth) {
-	calculated_number n1, n2, r;
+NETDATA_DOUBLE evaluate(EVAL_NODE *op, int depth) {
+	NETDATA_DOUBLE n1, n2, r;
 
 	switch(op->operator) {
 		case EVAL_OPERATOR_SIGN_PLUS:
@@ -249,7 +249,7 @@ void print_expression(EVAL_NODE *op, const char *failed_at, int error) {
 		evaluate(op, 0);
 		
 		int error;
-		calculated_number ret = expression_evaluate(op, &error);
+		NETDATA_DOUBLE ret = expression_evaluate(op, &error);
 		printf("\ninternal evaluator:\nSTATUS: %d, RESULT = %Lf\n", error, ret);
 
 		expression_free(op);

@@ -1146,7 +1146,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         if(wu->workers_cpu_registered == 0)
             rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, 0);
         else
-            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( wu->workers_cpu_total * 10000ULL / (calculated_number)wu->workers_cpu_registered ));
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( wu->workers_cpu_total * 10000ULL / (NETDATA_DOUBLE)wu->workers_cpu_registered ));
 
         rrdset_done(wu->st_workers_cpu);
     }

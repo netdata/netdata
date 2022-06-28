@@ -17,7 +17,7 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
     // for each line in the array
     for(i = start; i != end ;i += step) {
         int all_values_are_null = 0;
-        calculated_number v = rrdr2value(r, i, options, &all_values_are_null, NULL, temp_rd);
+        NETDATA_DOUBLE v = rrdr2value(r, i, options, &all_values_are_null, NULL, temp_rd);
 
         if(likely(i != start)) {
             if(r->min > v) r->min = v;

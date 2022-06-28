@@ -86,7 +86,7 @@ void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_lis
     (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t_nolock(st));
 
     rrddim_foreach_read(rd1, st) {
-        RRDDIM *rd = onewayalloc_memdupz(owa, rd1, rd1->memsize);
+        RRDDIM *rd = onewayalloc_memdupz(owa, rd1, sizeof(RRDDIM));
         rd->id = onewayalloc_strdupz(owa, rd1->id);
         rd->name = onewayalloc_strdupz(owa, rd1->name);
         rd->state = onewayalloc_memdupz(owa, rd1->state, sizeof(*rd->state));
@@ -152,7 +152,7 @@ void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
 int rrdset2value_api_v1(
           RRDSET *st
         , BUFFER *wb
-        , calculated_number *n
+        , NETDATA_DOUBLE *n
         , const char *dimensions
         , long points
         , long long after

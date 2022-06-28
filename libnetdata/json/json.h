@@ -31,12 +31,12 @@ typedef struct json_entry {
     char name[JSON_NAME_LEN + 1];
     char fullname[JSON_FULLNAME_LEN + 1];
     union {
-        char *string;			// type == JSON_STRING
-        long double number;		// type == JSON_NUMBER
-        int boolean;			// type == JSON_BOOLEAN
-        size_t items;			// type == JSON_ARRAY
+        char *string;           // type == JSON_STRING
+        NETDATA_DOUBLE number;  // type == JSON_NUMBER
+        int boolean;            // type == JSON_BOOLEAN
+        size_t items;           // type == JSON_ARRAY
     } data;
-    size_t pos;					// the position of this item in its parent
+    size_t pos;                 // the position of this item in its parent
 
     char *original_string;
 

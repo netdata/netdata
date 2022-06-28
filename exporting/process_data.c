@@ -64,7 +64,7 @@ int mark_scheduled_instances(struct engine *engine)
  * @param last_timestamp the timestamp that should be reported to the exporting connector instance.
  * @return Returns the value, calculated over the given period.
  */
-calculated_number exporting_calculate_value_from_stored_data(
+NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     struct instance *instance,
     RRDDIM *rd,
     time_t *last_timestamp)
@@ -123,15 +123,15 @@ calculated_number exporting_calculate_value_from_stored_data(
     *last_timestamp = before;
 
     size_t counter = 0;
-    calculated_number sum = 0;
-    calculated_number value;
+    NETDATA_DOUBLE sum = 0;
+    NETDATA_DOUBLE value;
 
     for (rd->state->query_ops.init(rd, &handle, after, before); !rd->state->query_ops.is_finished(&handle);) {
         time_t curr_t, end_t;
         SN_FLAGS flags;
         value = rd->state->query_ops.next_metric(&handle, &curr_t, &end_t, &flags);
 
-        if (unlikely(!calculated_number_isnumber(value))) {
+        if (unlikely(!netdata_double_isnumber(value))) {
             // not collected
             continue;
         }
@@ -156,7 +156,7 @@ calculated_number exporting_calculate_value_from_stored_data(
     if (unlikely(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_SUM))
         return sum;
 
-    return sum / (calculated_number)counter;
+    return sum / (NETDATA_DOUBLE)counter;
 }
 
 /**

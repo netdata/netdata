@@ -6,7 +6,7 @@
 // min
 
 struct grouping_min {
-    calculated_number min;
+    NETDATA_DOUBLE min;
     size_t count;
 };
 
@@ -27,19 +27,19 @@ void grouping_free_min(RRDR *r) {
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_min(RRDR *r, calculated_number value) {
+void grouping_add_min(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_min *g = (struct grouping_min *)r->internal.grouping_data;
 
-    if(!g->count || calculated_number_fabs(value) < calculated_number_fabs(g->min)) {
+    if(!g->count || fabsndd(value) < fabsndd(g->min)) {
         g->min = value;
         g->count++;
     }
 }
 
-calculated_number grouping_flush_min(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_min(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_min *g = (struct grouping_min *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(unlikely(!g->count)) {
         value = 0.0;

@@ -67,8 +67,8 @@ extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 extern int rrdset2anything_api_v1(
           ONEWAYALLOC *owa
         , RRDSET *st
-        ,
-    QUERY_PARAMS *query_params, BUFFER *dimensions
+        , QUERY_PARAMS *query_params
+        , BUFFER *dimensions
         , uint32_t format
         , long points
         , long long after
@@ -83,7 +83,7 @@ extern int rrdset2anything_api_v1(
 extern int rrdset2value_api_v1(
           RRDSET *st
         , BUFFER *wb
-        , calculated_number *n
+        , NETDATA_DOUBLE *n
         , const char *dimensions
         , long points
         , long long after

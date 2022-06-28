@@ -224,7 +224,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
     RRDHOST *host = st->rrdhost;
 
     time_t last_t;
-    calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+    NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     if(isnan(value))
         return 0;
@@ -265,7 +265,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
 
         "\"id\":\"%s\","
         "\"name\":\"%s\","
-        "\"value\":" CALCULATED_NUMBER_FORMAT ","
+        "\"value\":" NETDATA_DOUBLE_FORMAT ","
 
         "\"timestamp\": %llu}",
 

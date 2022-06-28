@@ -6,7 +6,7 @@
 // max
 
 struct grouping_max {
-    calculated_number max;
+    NETDATA_DOUBLE max;
     size_t count;
 };
 
@@ -27,19 +27,19 @@ void grouping_free_max(RRDR *r) {
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_max(RRDR *r, calculated_number value) {
+void grouping_add_max(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_max *g = (struct grouping_max *)r->internal.grouping_data;
 
-    if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->max)) {
+    if(!g->count || fabsndd(value) > fabsndd(g->max)) {
         g->max = value;
         g->count++;
     }
 }
 
-calculated_number grouping_flush_max(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+NETDATA_DOUBLE grouping_flush_max(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_max *g = (struct grouping_max *)r->internal.grouping_data;
 
-    calculated_number value;
+    NETDATA_DOUBLE value;
 
     if(unlikely(!g->count)) {
         value = 0.0;

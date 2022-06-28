@@ -56,7 +56,7 @@ extern void buffer_reset(BUFFER *wb);
 
 extern void buffer_strcat(BUFFER *wb, const char *txt);
 extern void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len);
-extern void buffer_rrd_value(BUFFER *wb, calculated_number value);
+extern void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value);
 
 extern void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 extern void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);

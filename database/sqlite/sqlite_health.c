@@ -751,8 +751,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae->old_status  = (RRDCALC_STATUS)sqlite3_column_int(res, 23);
         ae->delay       = (int) sqlite3_column_int(res, 24);
 
-        ae->new_value   = (calculated_number) sqlite3_column_double(res, 25);
-        ae->old_value   = (calculated_number) sqlite3_column_double(res, 26);
+        ae->new_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 25);
+        ae->old_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 26);
 
         ae->last_repeat = last_repeat;
 

@@ -2,7 +2,7 @@
 
 #include "../libnetdata.h"
 
-storage_number pack_storage_number(calculated_number value, SN_FLAGS flags) {
+storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // bit 32 = sign 0:positive, 1:negative
     // bit 31 = 0:divide, 1:multiply
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
@@ -19,7 +19,7 @@ storage_number pack_storage_number(calculated_number value, SN_FLAGS flags) {
         goto RET_SN;
 
     int m = 0;
-    calculated_number n = value, factor = 10;
+    NETDATA_DOUBLE n = value, factor = 10;
 
     // if the value is negative
     // add the sign bit and make it positive
@@ -36,7 +36,7 @@ storage_number pack_storage_number(calculated_number value, SN_FLAGS flags) {
     // make its integer part fit in 0x00ffffff
     // by dividing it by 10 up to 7 times
     // and increasing the multiplier
-    while(m < 7 && n > (calculated_number)0x00ffffff) {
+    while(m < 7 && n > (NETDATA_DOUBLE)0x00ffffff) {
         n /= factor;
         m++;
     }
@@ -46,9 +46,9 @@ storage_number pack_storage_number(calculated_number value, SN_FLAGS flags) {
         // so we add a multiplier to unpack it
         r += (1 << 30) + (m << 27); // the multiplier m
 
-        if(n > (calculated_number)0x00ffffff) {
+        if(n > (NETDATA_DOUBLE)0x00ffffff) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            error("Number " CALCULATED_NUMBER_FORMAT " is too big.", value);
+            error("Number " NETDATA_DOUBLE_FORMAT " is too big.", value);
             #endif
             r += 0x00ffffff;
             goto RET_SN;
@@ -60,12 +60,12 @@ storage_number pack_storage_number(calculated_number value, SN_FLAGS flags) {
         // while the value is below 0x0019999e we can
         // multiply it by 10, up to 7 times, increasing
         // the multiplier
-        while(m < 7 && n < (calculated_number)0x0019999e) {
+        while(m < 7 && n < (NETDATA_DOUBLE)0x0019999e) {
             n *= 10;
             m++;
         }
 
-        if (unlikely(n > (calculated_number) (0x00ffffff))) {
+        if (unlikely(n > (NETDATA_DOUBLE) (0x00ffffff))) {
             n /= 10;
             m--;
         }
@@ -90,7 +90,7 @@ RET_SN:
 }
 
 // Lookup table to make storage number unpacking efficient.
-calculated_number unpack_storage_number_lut10x[4 * 8];
+NETDATA_DOUBLE unpack_storage_number_lut10x[4 * 8];
 
 __attribute__((constructor)) void initialize_lut(void) {
     // The lookup table is partitioned in 4 subtables based on the
@@ -107,7 +107,7 @@ __attribute__((constructor)) void initialize_lut(void) {
 }
 
 /*
-int print_calculated_number(char *str, calculated_number value)
+int print_netdata_double(char *str, NETDATA_DOUBLE value)
 {
     char *wstr = str;
 
@@ -117,9 +117,9 @@ int print_calculated_number(char *str, calculated_number value)
 #ifdef STORAGE_WITH_MATH
     // without llrintl() there are rounding problems
     // for example 0.9 becomes 0.89
-    unsigned long long uvalue = (unsigned long long int) llrintl(value * (calculated_number)100000);
+    unsigned long long uvalue = (unsigned long long int) llrintl(value * (NETDATA_DOUBLE)100000);
 #else
-    unsigned long long uvalue = value * (calculated_number)100000;
+    unsigned long long uvalue = value * (NETDATA_DOUBLE)100000;
 #endif
 
     wstr = print_number_llu_r_smart(str, uvalue);
@@ -163,8 +163,8 @@ int print_calculated_number(char *str, calculated_number value)
 }
 */
 
-int print_calculated_number(char *str, calculated_number value) {
-    // info("printing number " CALCULATED_NUMBER_FORMAT, value);
+int print_netdata_double(char *str, NETDATA_DOUBLE value) {
+    // info("printing number " NETDATA_DOUBLE_FORMAT, value);
     char integral_str[50], fractional_str[50];
 
     char *wstr = str;
@@ -174,22 +174,22 @@ int print_calculated_number(char *str, calculated_number value) {
         value = -value;
     }
 
-    calculated_number integral, fractional;
+    NETDATA_DOUBLE integral, fractional;
 
 #ifdef STORAGE_WITH_MATH
-    fractional = calculated_number_modf(value, &integral) * 10000000.0;
+    fractional = modfndd(value, &integral) * 10000000.0;
 #else
     fractional = ((unsigned long long)(value * 10000000ULL) % 10000000ULL);
 #endif
 
     unsigned long long integral_int = (unsigned long long)integral;
-    unsigned long long fractional_int = (unsigned long long)calculated_number_llrint(fractional);
+    unsigned long long fractional_int = (unsigned long long)llrintndd(fractional);
     if(unlikely(fractional_int >= 10000000)) {
         integral_int += 1;
         fractional_int -= 10000000;
     }
 
-    // info("integral " CALCULATED_NUMBER_FORMAT " (%llu), fractional " CALCULATED_NUMBER_FORMAT " (%llu)", integral, integral_int, fractional, fractional_int);
+    // info("integral " NETDATA_DOUBLE_FORMAT " (%llu), fractional " NETDATA_DOUBLE_FORMAT " (%llu)", integral, integral_int, fractional, fractional_int);
 
     char *istre;
     if(unlikely(integral_int == 0)) {

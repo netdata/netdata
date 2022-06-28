@@ -11,7 +11,7 @@ extern void grouping_init_ses(void);
 extern void grouping_create_ses(RRDR *r, const char *options __maybe_unused);
 extern void grouping_reset_ses(RRDR *r);
 extern void grouping_free_ses(RRDR *r);
-extern void grouping_add_ses(RRDR *r, calculated_number value);
-extern calculated_number grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+extern void grouping_add_ses(RRDR *r, NETDATA_DOUBLE value);
+extern NETDATA_DOUBLE grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 
 #endif //NETDATA_API_QUERIES_SES_H

@@ -55,19 +55,19 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
             break;
         case JSON_NUMBER:
             if (!strcmp(e->name, "version")) {
-                data->version = e->data.number;
+                data->version = (int)e->data.number;
                 break;
             }
             if (!strcmp(e->name, "timeout")) {
-                data->timeout = e->data.number;
+                data->timeout = (int)e->data.number;
                 break;
             }
             if (!strcmp(e->name, "min-version")) {
-                data->min_version = e->data.number;
+                data->min_version = (int)e->data.number;
                 break;
             }
             if (!strcmp(e->name, "max-version")) {
-                data->max_version = e->data.number;
+                data->max_version = (int)e->data.number;
                 break;
             }
 

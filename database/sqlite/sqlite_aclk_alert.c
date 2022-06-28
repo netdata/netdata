@@ -336,8 +336,8 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
                 strdupz((char *)format_value_and_unit(
                     old_value_string, 100, sqlite3_column_double(res, 24), (char *)sqlite3_column_text(res, 17), -1));
 
-        alarm_log.value = (calculated_number) sqlite3_column_double(res, 23);
-        alarm_log.old_value = (calculated_number) sqlite3_column_double(res, 24);
+        alarm_log.value = (NETDATA_DOUBLE) sqlite3_column_double(res, 23);
+        alarm_log.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 24);
 
         alarm_log.updated = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
         alarm_log.rendered_info = sqlite3_column_type(res, 18) == SQLITE_NULL ?
@@ -868,8 +868,8 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->value_string = strdupz(ae->new_value_string);
     alarm_log->old_value_string = strdupz(ae->old_value_string);
 
-    alarm_log->value = (!isnan(ae->new_value)) ? (calculated_number)ae->new_value : 0;
-    alarm_log->old_value = (!isnan(ae->old_value)) ? (calculated_number)ae->old_value : 0;
+    alarm_log->value = (!isnan(ae->new_value)) ? (NETDATA_DOUBLE)ae->new_value : 0;
+    alarm_log->old_value = (!isnan(ae->old_value)) ? (NETDATA_DOUBLE)ae->old_value : 0;
 
     alarm_log->updated = (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
     alarm_log->rendered_info = ae->info ? strdupz(ae->info) : strdupz((char *)"");

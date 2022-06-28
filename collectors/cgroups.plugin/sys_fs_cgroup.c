@@ -835,7 +835,7 @@ struct cgroup {
     unsigned long long cpu_cfs_quota;
 
     RRDSETVAR *chart_var_cpu_limit;
-    calculated_number prev_cpu_usage;
+    NETDATA_DOUBLE prev_cpu_usage;
 
     char *filename_memory_limit;
     unsigned long long memory_limit;
@@ -1012,7 +1012,7 @@ static unsigned long long calc_percentage(unsigned long long value, unsigned lon
     if (total == 0) {
         return 0;
     }
-    return (calculated_number)value / (calculated_number)total * 100;
+    return (NETDATA_DOUBLE)value / (NETDATA_DOUBLE)total * 100;
 }
 
 static int calc_cgroup_depth(const char *id) {
@@ -3686,7 +3686,7 @@ static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, u
                     *filename = NULL;
                 }
                 else {
-                    rrdsetvar_custom_chart_variable_set(*chart_var, (calculated_number)(*value / (1024 * 1024)));
+                    rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                     return 1;
                 }
             } else {
@@ -3701,11 +3701,11 @@ static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, u
                 char *s = "max\n\0";
                 if(strcmp(s, buffer) == 0){
                     *value = UINT64_MAX;
-                    rrdsetvar_custom_chart_variable_set(*chart_var, (calculated_number)(*value / (1024 * 1024)));
+                    rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                     return 1;
                 }
                 *value = str2ull(buffer);
-                rrdsetvar_custom_chart_variable_set(*chart_var, (calculated_number)(*value / (1024 * 1024)));
+                rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                 return 1;
             }
         }
@@ -3814,17 +3814,17 @@ void update_cgroup_charts(int update_every) {
                     }
                 }
                 else {
-                    calculated_number value = 0, quota = 0;
+                    NETDATA_DOUBLE value = 0, quota = 0;
 
                     if(likely( ((!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) && (cg->filename_cpuset_cpus || (cg->filename_cpu_cfs_period && cg->filename_cpu_cfs_quota)))
                             || ((cg->options & CGROUP_OPTIONS_IS_UNIFIED) && cg->filename_cpu_cfs_quota))) {
                         if(unlikely(cg->cpu_cfs_quota > 0))
-                            quota = (calculated_number)cg->cpu_cfs_quota / (calculated_number)cg->cpu_cfs_period;
+                            quota = (NETDATA_DOUBLE)cg->cpu_cfs_quota / (NETDATA_DOUBLE)cg->cpu_cfs_period;
 
                         if(unlikely(quota > 0 && quota < cg->cpuset_cpus))
                             value = quota * 100;
                         else
-                            value = (calculated_number)cg->cpuset_cpus * 100;
+                            value = (NETDATA_DOUBLE)cg->cpuset_cpus * 100;
                     }
                     if(likely(value)) {
                         rrdsetvar_custom_chart_variable_set(cg->chart_var_cpu_limit, value);
@@ -3853,14 +3853,14 @@ void update_cgroup_charts(int update_every) {
                                 rrddim_add(cg->st_cpu_limit, "used", NULL, 1, system_hz, RRD_ALGORITHM_ABSOLUTE);
                             else
                                 rrddim_add(cg->st_cpu_limit, "used", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
-                            cg->prev_cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
+                            cg->prev_cpu_usage = (NETDATA_DOUBLE)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
                         }
                         else
                             rrdset_next(cg->st_cpu_limit);
 
-                        calculated_number cpu_usage = 0;
-                        cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
-                        calculated_number cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (value * update_every);
+                        NETDATA_DOUBLE cpu_usage = 0;
+                        cpu_usage = (NETDATA_DOUBLE)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
+                        NETDATA_DOUBLE cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (value * update_every);
 
                         rrdset_isnot_obsolete(cg->st_cpu_limit);
 

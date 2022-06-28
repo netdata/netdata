@@ -63,8 +63,8 @@ struct rrdcalc {
     int update_every;               // update frequency for the alarm
 
     // the red and green threshold of this alarm (to be set to the chart)
-    calculated_number green;
-    calculated_number red;
+    NETDATA_DOUBLE green;
+    NETDATA_DOUBLE red;
 
     // ------------------------------------------------------------------------
     // database lookup settings
@@ -112,8 +112,8 @@ struct rrdcalc {
     RRDCALC_STATUS old_status; // the old status of the alarm
     RRDCALC_STATUS status;          // the current status of the alarm
 
-    calculated_number value;        // the current value of the alarm
-    calculated_number old_value;    // the previous value of the alarm
+    NETDATA_DOUBLE value;        // the current value of the alarm
+    NETDATA_DOUBLE old_value;    // the previous value of the alarm
 
     uint32_t rrdcalc_flags;         // check RRDCALC_FLAG_*
 

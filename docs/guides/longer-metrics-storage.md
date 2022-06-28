@@ -25,14 +25,14 @@ available disk space for long-term metrics storage. This feature of the database
 larger dataset than your system's available RAM.
 
 The database engine is currently the default method of storing metrics, but if you're not sure which database you're
-using, check out your `netdata.conf` file and look for the `memory mode` setting:
+using, check out your `netdata.conf` file and look for the `[db].mode` setting:
 
 ```conf
-[global]
-    memory mode = dbengine
+[db]
+    mode = dbengine
 ```
 
-If `memory mode` is set to anything but `dbengine`, change it and restart Netdata using the standard command for
+If `[db].mode` is set to anything but `dbengine`, change it and restart Netdata using the standard command for
 restarting services on your system. You're now using the database engine!
 
 What makes the database engine efficient? While it's structured like a traditional database, the database engine splits
@@ -43,22 +43,22 @@ When the Netdata dashboard queries for historical metrics, the database engine w
 return relevant metrics for visualization in charts.
 
 Now, given that the database engine uses _both_ RAM and disk, there are two other settings to consider: `page cache
-size` and `dbengine multihost disk space`.
+size MB` and `dbengine multihost disk space MB`.
 
 ```conf
-[global]
-    page cache size = 32
-    dbengine multihost disk space = 256
+[db]
+    page cache size MB = 32
+    dbengine multihost disk space MB = 256
 ```
 
-`page cache size` sets the maximum amount of RAM (in MiB) the database engine will use for caching and indexing.
-`dbengine multihost disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing
-compressed metrics. The default settings retain about two day's worth of metrics on a system collecting 2,000 metrics
+`[db].page cache size MB` sets the maximum amount of RAM the database engine will use for caching and indexing.
+`[db].dbengine multihost disk space MB` sets the maximum disk space the database engine will use for storing
+compressed metrics. The default settings retain about four day's worth of metrics on a system collecting 2,000 metrics
 every second.
 
 [**See our database engine
 calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-to help you correctly set `dbengine multihost disk space` based on your needs. The calculator gives an accurate estimate
+to help you correctly set `[db].dbengine multihost disk space MB` based on your needs. The calculator gives an accurate estimate
 based on how many child nodes you have, how many metrics your Agent collects, and more.
 
 With the database engine active, you can back up your `/var/cache/netdata/dbengine/` folder to another location for
@@ -72,26 +72,26 @@ aren't ready to make the move.
 In previous versions, Netdata used a round-robin database to store 1 hour of per-second metrics. 
 
 To see if you're still using this database, or if you would like to switch to it, open your `netdata.conf` file and see
-if `memory mode` option is set to `save`.
+if `[db].mode` option is set to `save`.
 
 ```conf
-[global]
-    memory mode = save
+[db]
+    mode = save
 ```
 
-If `memory mode` is set to `save`, then you're using the round-robin database. If so, the `history` option is set to
+If `[db].mode` is set to `save`, then you're using the round-robin database. If so, the `[db].retention` option is set to
 `3600`, which is the equivalent to 3,600 seconds, or one hour. 
 
-To increase your historical metrics, you can increase `history` to the number of seconds you'd like to store:
+To increase your historical metrics, you can increase `[db].retention` to the number of seconds you'd like to store:
 
 ```conf
-[global]
+[db]
     # 2 hours = 2 * 60 * 60 = 7200 seconds
-    history = 7200
+    retention = 7200
     # 4 hours = 4 * 60 * 60 = 14440 seconds
-    history = 14440
+    retention = 14440
     # 24 hours = 24 * 60 * 60 = 86400 seconds
-    history = 86400
+    retention = 86400
 ```
 
 And so on.
@@ -105,20 +105,10 @@ dashboard and look at the bottom-right corner of the interface. You'll find a se
 On this desktop system, using a Ryzen 5 1600 and 16GB of RAM, the round-robin databases uses 25 MB of RAM to store just
 over an hour's worth of data for nearly 2,000 metrics.
 
-To increase the `history` option, you need to edit your `netdata.conf` file and increase the `history` setting. In most
-installations, you'll find it at `/etc/netdata/netdata.conf`, but some operating systems place it at
-`/opt/netdata/etc/netdata/netdata.conf`. 
-
-Use `/etc/netdata/edit-config netdata.conf`, or your favorite text editor, to replace `3600` with the number of seconds
-you'd like to store.
-
 You should base this number on two things: How much history you need for your use case, and how much RAM you're willing
 to dedicate to Netdata.
 
-> Take care when you change the `history` option on production systems. Netdata is configured to stop its process if
-> your system starts running out of RAM, but you can never be too careful. Out of memory situations are very bad.
-
-How much RAM will a longer history use? Let's use a little math.
+How much RAM will a longer retention use? Let's use a little math.
 
 The round-robin database needs 4 bytes for every value Netdata collects. If Netdata collects metrics every second,
 that's 4 bytes, per second, per metric.

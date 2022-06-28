@@ -163,7 +163,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
 
     // not found, allocate one
 
-    calculated_number *v = mallocz(sizeof(calculated_number));
+    NETDATA_DOUBLE *v = mallocz(sizeof(NETDATA_DOUBLE));
     *v = NAN;
 
     rs = rrdsetvar_create(st, n, RRDVAR_TYPE_CALCULATED, v, RRDVAR_OPTION_ALLOCATED|RRDVAR_OPTION_CUSTOM_CHART_VAR);
@@ -173,12 +173,13 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
     return rs;
 }
 
-void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, calculated_number value) {
+void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value) {
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) || !(rs->options & RRDVAR_OPTION_ALLOCATED)) {
-        error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom chart one.", rs->variable, rs->rrdset->id, rs->rrdset->rrdhost->hostname, value);
+        error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
+            " but the variable is not a custom chart one.", rs->variable, rs->rrdset->id, rs->rrdset->rrdhost->hostname, value);
     }
     else {
-        calculated_number *v = rs->value;
+        NETDATA_DOUBLE *v = rs->value;
         if(*v != value) {
             *v = value;
 

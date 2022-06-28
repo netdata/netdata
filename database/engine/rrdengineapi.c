@@ -195,7 +195,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     handle->descr = NULL;
 }
 
-void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, calculated_number n, SN_FLAGS flags)
+void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n, SN_FLAGS flags)
 {
     storage_number number = pack_storage_number(n, flags);
 
@@ -603,7 +603,8 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-calculated_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
+NETDATA_DOUBLE
+rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdeng_page_descr *descr = handle->descr;

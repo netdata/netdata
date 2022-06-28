@@ -238,7 +238,7 @@ void health_reload(void) {
 // ----------------------------------------------------------------------------
 // health main thread and friends
 
-static inline RRDCALC_STATUS rrdcalc_value2status(calculated_number n) {
+static inline RRDCALC_STATUS rrdcalc_value2status(NETDATA_DOUBLE n) {
     if(isnan(n) || isinf(n)) return RRDCALC_STATUS_UNDEFINED;
     if(n) return RRDCALC_STATUS_RAISED;
     return RRDCALC_STATUS_CLEAR;
@@ -346,7 +346,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" NETDATA_DOUBLE_FORMAT_ZERO
+        "' '" NETDATA_DOUBLE_FORMAT_ZERO
+        "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -411,7 +413,7 @@ static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
 }
 
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
-    debug(D_HEALTH, "Health alarm '%s.%s' = " CALCULATED_NUMBER_FORMAT_AUTO " - changed status from %s to %s",
+    debug(D_HEALTH, "Health alarm '%s.%s' = " NETDATA_DOUBLE_FORMAT_AUTO " - changed status from %s to %s",
          ae->chart?ae->chart:"NOCHART", ae->name,
          ae->new_value,
          rrdcalc_status2string(ae->old_status),
@@ -892,8 +894,7 @@ void *health_main(void *ptr) {
                     } else
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_NAN;
 
-                    debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value "
-                          CALCULATED_NUMBER_FORMAT, host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
+                    debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT, host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
                           rc->value
                     );
                 }
@@ -917,7 +918,7 @@ void *health_main(void *ptr) {
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
-                              CALCULATED_NUMBER_FORMAT
+                              NETDATA_DOUBLE_FORMAT
                               ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
                               rc->calculation->parsed_as, rc->calculation->result,
                               buffer_tostring(rc->calculation->error_msg), rc->source
@@ -966,7 +967,7 @@ void *health_main(void *ptr) {
                         } else {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value "
-                                  CALCULATED_NUMBER_FORMAT
+                                  NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART",
                                   rc->name, rc->warning->result, buffer_tostring(rc->warning->error_msg), rc->source
                             );
@@ -992,7 +993,7 @@ void *health_main(void *ptr) {
                         } else {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression gave value "
-                                  CALCULATED_NUMBER_FORMAT
+                                  NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART",
                                   rc->name, rc->critical->result, buffer_tostring(rc->critical->error_msg),
                                   rc->source

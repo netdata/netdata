@@ -75,7 +75,8 @@ int rrdpush_init() {
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
-    rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
+    rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time);
+
 #ifdef ENABLE_COMPRESSION
     default_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
         "enable compression", default_compression_enabled);
@@ -97,10 +98,10 @@ int rrdpush_init() {
         }
     }
 
-    char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", "no");
+    bool invalid_certificate = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", CONFIG_BOOLEAN_NO);
 
-    if ( !strcmp(invalid_certificate,"yes")){
-        if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
+    if(invalid_certificate == CONFIG_BOOLEAN_YES){
+        if(netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
             info("Netdata is configured to accept invalid SSL certificate.");
             netdata_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
         }
@@ -272,11 +273,11 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     RRDSETVAR *rs;
     for(rs = st->variables; rs ;rs = rs->next) {
         if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
-            calculated_number *value = (calculated_number *) rs->value;
+            NETDATA_DOUBLE *value = (NETDATA_DOUBLE *) rs->value;
 
             buffer_sprintf(
                     host->sender->build
-                    , "VARIABLE CHART %s = " CALCULATED_NUMBER_FORMAT "\n"
+                    , "VARIABLE CHART %s = " NETDATA_DOUBLE_FORMAT "\n"
                     , rs->variable
                     , *value
             );
