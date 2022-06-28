@@ -349,6 +349,12 @@ int help(int exitcode) {
 #endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
+            "  -W buildinfo             Print the version, the configure options,\n"
+            "                           a list of optional features, and whether they\n"
+            "                           are enabled or not.\n\n"
+            "  -W buildinfojson         Print the version, the configure options,\n"
+            "                           a list of optional features, and whether they\n"
+            "                           are enabled or not, in JSON format.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
             "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
