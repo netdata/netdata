@@ -384,6 +384,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                           long long points, RRDR_OPTIONS options,
                                           RRDR_GROUPING group, const char *group_options,
                                           uint32_t shifts, int timeout, MC_STATS *stats) {
+    options |= RRDR_OPTION_NATURAL_POINTS;
+
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
 
@@ -518,7 +520,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              long long after, long long before,
                                              RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
                                              int timeout, MC_STATS *stats) {
-    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE;
+    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
     long group_time = 0;
 
     int correlated_dimensions = 0;

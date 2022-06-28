@@ -595,11 +595,12 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
 
 /* If index is NULL lookup by UUID (descr->id) */
 void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
-                     struct rrdeng_page_descr *descr)
+                     struct rrdeng_page_descr *descr, int dt)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index;
+    Word_t Index;
     unsigned long pg_cache_descr_state = descr->pg_cache_descr_state;
 
     if (0 != pg_cache_descr_state) {
@@ -625,6 +626,7 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     }
 
     uv_rwlock_wrlock(&page_index->lock);
+    Index = (Word_t)(descr->start_time / USEC_PER_SEC) - dt;
     PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
     *PValue = descr;
     ++page_index->page_count;

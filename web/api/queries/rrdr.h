@@ -6,27 +6,27 @@
 #include "libnetdata/libnetdata.h"
 
 typedef enum rrdr_options {
-    RRDR_OPTION_NONZERO      = 0x00000001, // don't output dimensions with just zero values
-    RRDR_OPTION_REVERSED     = 0x00000002, // output the rows in reverse order (oldest to newest)
-    RRDR_OPTION_ABSOLUTE     = 0x00000004, // values positive, for DATASOURCE_SSV before summing
-    RRDR_OPTION_MIN2MAX      = 0x00000008, // when adding dimensions, use max - min, instead of sum
-    RRDR_OPTION_SECONDS      = 0x00000010, // output seconds, instead of dates
-    RRDR_OPTION_MILLISECONDS = 0x00000020, // output milliseconds, instead of dates
-    RRDR_OPTION_NULL2ZERO    = 0x00000040, // do not show nulls, convert them to zeros
-    RRDR_OPTION_OBJECTSROWS  = 0x00000080, // each row of values should be an object, not an array
-    RRDR_OPTION_GOOGLE_JSON  = 0x00000100, // comply with google JSON/JSONP specs
-    RRDR_OPTION_JSON_WRAP    = 0x00000200, // wrap the response in a JSON header with info about the result
-    RRDR_OPTION_LABEL_QUOTES = 0x00000400, // in CSV output, wrap header labels in double quotes
-    RRDR_OPTION_PERCENTAGE   = 0x00000800, // give values as percentage of total
-    RRDR_OPTION_NOT_ALIGNED  = 0x00001000, // do not align charts for persistent timeframes
-    RRDR_OPTION_DISPLAY_ABS  = 0x00002000, // for badges, display the absolute value, but calculate colors with sign
-    RRDR_OPTION_MATCH_IDS    = 0x00004000, // when filtering dimensions, match only IDs
-    RRDR_OPTION_MATCH_NAMES  = 0x00008000, // when filtering dimensions, match only names
-    RRDR_OPTION_CUSTOM_VARS  = 0x00010000, // when wrapping response in a JSON, return custom variables in response
-    RRDR_OPTION_ALLOW_PAST   = 0x00020000, // The after parameter can extend in the past before the first entry
-    RRDR_OPTION_ANOMALY_BIT  = 0x00040000, // Return the anomaly bit stored in each collected_number
-    RRDR_OPTION_RETURN_RAW   = 0x00080000, // Return raw data for aggregating across multiple nodes
-    RRDR_OPTION_RETURN_JWAR  = 0x00100000, // Return anomaly rates in jsonwrap
+    RRDR_OPTION_NONZERO        = 0x00000001, // don't output dimensions with just zero values
+    RRDR_OPTION_REVERSED       = 0x00000002, // output the rows in reverse order (oldest to newest)
+    RRDR_OPTION_ABSOLUTE       = 0x00000004, // values positive, for DATASOURCE_SSV before summing
+    RRDR_OPTION_MIN2MAX        = 0x00000008, // when adding dimensions, use max - min, instead of sum
+    RRDR_OPTION_SECONDS        = 0x00000010, // output seconds, instead of dates
+    RRDR_OPTION_MILLISECONDS   = 0x00000020, // output milliseconds, instead of dates
+    RRDR_OPTION_NULL2ZERO      = 0x00000040, // do not show nulls, convert them to zeros
+    RRDR_OPTION_OBJECTSROWS    = 0x00000080, // each row of values should be an object, not an array
+    RRDR_OPTION_GOOGLE_JSON    = 0x00000100, // comply with google JSON/JSONP specs
+    RRDR_OPTION_JSON_WRAP      = 0x00000200, // wrap the response in a JSON header with info about the result
+    RRDR_OPTION_LABEL_QUOTES   = 0x00000400, // in CSV output, wrap header labels in double quotes
+    RRDR_OPTION_PERCENTAGE     = 0x00000800, // give values as percentage of total
+    RRDR_OPTION_NOT_ALIGNED    = 0x00001000, // do not align charts for persistent timeframes
+    RRDR_OPTION_DISPLAY_ABS    = 0x00002000, // for badges, display the absolute value, but calculate colors with sign
+    RRDR_OPTION_MATCH_IDS      = 0x00004000, // when filtering dimensions, match only IDs
+    RRDR_OPTION_MATCH_NAMES    = 0x00008000, // when filtering dimensions, match only names
+    RRDR_OPTION_CUSTOM_VARS    = 0x00010000, // when wrapping response in a JSON, return custom variables in response
+    RRDR_OPTION_NATURAL_POINTS = 0x00020000, // return the natural points of the database
+    RRDR_OPTION_ANOMALY_BIT    = 0x00040000, // Return the anomaly bit stored in each collected_number
+    RRDR_OPTION_RETURN_RAW     = 0x00080000, // Return raw data for aggregating across multiple nodes
+    RRDR_OPTION_RETURN_JWAR    = 0x00100000, // Return anomaly rates in jsonwrap
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_INTERNAL_AR  = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate
@@ -116,7 +116,7 @@ extern RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct con
 
 extern RRDR *rrd2rrdr(
     ONEWAYALLOC *owa,
-    RRDSET *st, long points_requested, long long after_requested, long long before_requested,
+    RRDSET *st, long points_wanted, long long after_wanted, long long before_wanted,
     RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
     struct context_param *context_param_list, const char *group_options, int timeout);
 

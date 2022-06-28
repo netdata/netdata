@@ -166,7 +166,7 @@ extern int pg_cache_try_get_unsafe(struct rrdeng_page_descr *descr, int exclusiv
 extern void pg_cache_put_unsafe(struct rrdeng_page_descr *descr);
 extern void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 extern void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
-                            struct rrdeng_page_descr *descr);
+                            struct rrdeng_page_descr *descr, int dt);
 extern uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
                                    uint8_t remove_dirty, uint8_t is_exclusive_holder, uuid_t *metric_id);
 extern usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
