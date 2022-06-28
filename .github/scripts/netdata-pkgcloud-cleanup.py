@@ -45,6 +45,7 @@ class PackageCloud:
                 break
             else:
                 pkg_list = requests.get(url, auth=self.auth, headers=self.headers).json()
+                print(pkg_list)
                 if len(pkg_list) == 0:
                     break
                 else:
