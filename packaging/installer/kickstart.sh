@@ -807,7 +807,10 @@ detect_existing_install() {
     fi
 
     if [ -n "${ndpath}" ]; then
-      ndprefix="$(dirname "$(dirname "${ndpath}")")"
+      case "${ndpath}" in
+        */usr/bin/netdata|*/usr/sbin/netdata) ndprefix="$(dirname "$(dirname "$(dirname "${ndpath}")")")" ;;
+        *) ndprefix="$(dirname "$(dirname "${ndpath}")")" ;;
+      esac
     fi
 
     if echo "${ndprefix}" | grep -Eq '^/usr$'; then
