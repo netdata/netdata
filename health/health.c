@@ -787,6 +787,11 @@ void *health_main(void *ptr) {
                 host->health_delay_up_to = 0;
             }
 
+            //wait unitl cleanup of obsolete charts on children is complete
+            if (host != localhost)
+                if (unlikely(host->trigger_chart_obsoletion_check == 1))
+                    continue;
+
             if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
                 sql_health_alarm_log_cleanup(host);
 
