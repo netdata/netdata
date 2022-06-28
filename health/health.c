@@ -787,7 +787,7 @@ void *health_main(void *ptr) {
                 host->health_delay_up_to = 0;
             }
 
-            //wait unitl cleanup of obsolete charts on children is complete
+            // wait until cleanup of obsolete charts on children is complete
             if (host != localhost)
                 if (unlikely(host->trigger_chart_obsoletion_check == 1))
                     continue;
