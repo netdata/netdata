@@ -627,7 +627,7 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
 
     uv_rwlock_wrlock(&page_index->lock);
     Index = (Word_t)(descr->start_time / USEC_PER_SEC) - dt;
-    PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
+    PValue = JudyLIns(&page_index->JudyL_array, Index, PJE0);
     *PValue = descr;
     ++page_index->page_count;
     pg_cache_add_new_metric_time(page_index, descr);
