@@ -93,7 +93,7 @@ static int load_private_key()
                                               NULL, NULL);
 
     if (!aclk_dctx) {
-        error("Claimed agent cannot establish ACLK - no suitable potential decoders found.");
+        error("Loading private key (from claiming) failed - no OpenSSL Decoders found");
         goto biofailed;
     }
 
