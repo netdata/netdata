@@ -1399,10 +1399,11 @@ void rrd_cleanup_obsolete_charts()
             rrdhost_unlock(host);
         }
 
-        if (host != localhost &&
-            host->trigger_chart_obsoletion_check &&
-            host->senders_last_chart_command &&
-            host->senders_last_chart_command + 120 < now_realtime_sec()) {
+        if ( host != localhost &&
+             host->trigger_chart_obsoletion_check &&
+             ((host->senders_last_chart_command &&
+             host->senders_last_chart_command + host->health_delay_up_to < now_realtime_sec())
+              || (host->senders_connect_time + 300 < now_realtime_sec())) ) {
             rrdhost_rdlock(host);
             rrdset_check_obsoletion(host);
             rrdhost_unlock(host);
