@@ -390,7 +390,7 @@ static void dictionary_metric_insert_callback(const char *name, void *value, voi
         netdata_mutex_init(&m->histogram.ext->mutex);
     }
 
-    __atomic_fetch_add(&index->metrics, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&index->metrics, 1, __ATOMIC_RELAXED);
 }
 
 static void dictionary_metric_delete_callback(const char *name, void *value, void *data) {

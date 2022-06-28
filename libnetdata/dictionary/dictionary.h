@@ -46,7 +46,11 @@ typedef enum dictionary_flags {
     DICTIONARY_FLAG_NAME_LINK_DONT_CLONE   = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
     DICTIONARY_FLAG_DONT_OVERWRITE_VALUE   = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICTIONARY_FLAG_ADD_IN_FRONT           = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
-    DICTIONARY_FLAG_RESERVED1              = (1 << 5), // this is reserved for DICTIONARY_FLAG_REFERENCE_COUNTERS
+
+    // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
+    DICTIONARY_FLAG_RESERVED1              = (1 << 29), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
+    DICTIONARY_FLAG_RESERVED2              = (1 << 30), // reserved for DICTIONARY_FLAG_DESTROYED
+    DICTIONARY_FLAG_RESERVED3              = (1 << 31), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
@@ -94,6 +98,12 @@ extern void *dictionary_get(DICTIONARY *dict, const char *name);
 // returns 0 if the item was found and has been deleted
 // returns -1 if the item was not found in the index
 extern int dictionary_del(DICTIONARY *dict, const char *name);
+
+extern void *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name);
+extern void *dictionary_acquire_item(DICTIONARY *dict, const char *name);
+extern void *dictionary_acquired_item_value(DICTIONARY *dict, void *item);
+extern void dictionary_acquired_item_release(DICTIONARY *dict, void *item);
+extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, void *item);
 
 // UNSAFE functions, without locks
 // to be used when the user is traversing with the right lock type
@@ -155,10 +165,10 @@ typedef DICTFE_CONST struct dictionary_foreach {
                                 // same as the return value of dictfe_start() and dictfe_next()
 
     // the following are for internal use only - to keep track of the point we are
+    char rw;                    // the lock mode 'r' or 'w'
     usec_t started_ut;          // the time the caller started iterating (now_realtime_usec())
     DICTIONARY *dict;           // the dictionary upon we work
-    void *last_position_index;  // the internal position index, to remember the position we are at
-    void *next_position_index;  // the internal position index, of the next item
+    void *last_item;            // the item we work on, to remember the position we are at
 } DICTFE;
 
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, 'r')
@@ -182,9 +192,8 @@ extern void * dictionary_foreach_next(DICTFE *dfe);
 extern usec_t dictionary_foreach_done(DICTFE *dfe);
 
 // Get statistics about the dictionary
-// If DICTIONARY_FLAG_WITH_STATISTICS is not set, these return zero
-extern size_t dictionary_stats_allocated_memory(DICTIONARY *dict);
-extern size_t dictionary_stats_entries(DICTIONARY *dict);
+extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
+extern long int dictionary_stats_entries(DICTIONARY *dict);
 extern size_t dictionary_stats_inserts(DICTIONARY *dict);
 extern size_t dictionary_stats_searches(DICTIONARY *dict);
 extern size_t dictionary_stats_deletes(DICTIONARY *dict);

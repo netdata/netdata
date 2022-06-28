@@ -611,20 +611,15 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
 // rrdlabels_get_to_buffer_or_null()
 
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
-    // Get a read lock on the dictionary
-    // to copy the value into the buffer
-    void *v;
-    dfe_start_read(labels, v) {
-        RRDLABEL *lb = dictionary_get_having_read_lock(labels, key);
+    void *acquired_item = dictionary_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(labels, acquired_item);
 
-        if(lb && lb->value)
-            buffer_sprintf(wb, "%s%s%s", quote, lb->value, quote);
-        else
-            buffer_strcat(wb, null);
+    if(lb && lb->value)
+        buffer_sprintf(wb, "%s%s%s", quote, lb->value, quote);
+    else
+        buffer_strcat(wb, null);
 
-        break;
-    }
-    dfe_done(v);
+    dictionary_acquired_item_release(labels, acquired_item);
 }
 
 
