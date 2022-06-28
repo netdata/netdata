@@ -229,6 +229,7 @@ jobs:
           done
       - name: SSH setup
         id: ssh-setup
+        if: github.event_name == 'workflow_dispatch'
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
@@ -259,6 +260,8 @@ jobs:
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
               Publish: ${{ steps.upload.outcome }}
+              Import SSH Key: ${{ steps.ssh-setup.outcome }}
+              Publish: ${{ steps.package-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
