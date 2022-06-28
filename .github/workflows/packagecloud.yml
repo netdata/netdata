@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     strategy:
+      fail-fast: false
       matrix:
         repos:
           - stable
