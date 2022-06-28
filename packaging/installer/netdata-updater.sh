@@ -28,7 +28,7 @@
 # Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 # Author: Austin S. Hemmelgarn <austin@netdata.cloud>
 
-# Next unused error code: U001B
+# Next unused error code: U001C
 
 set -e
 
@@ -716,6 +716,7 @@ update_binpkg() {
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="dpkg -s"
+      post_update_cmd="dpkg-reconfigure netdata"
       INSTALL_TYPE="binpkg-deb"
       ;;
     ubuntu)
@@ -725,6 +726,7 @@ update_binpkg() {
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="dpkg -s"
+      post_update_cmd="dpkg-reconfigure netdata"
       INSTALL_TYPE="binpkg-deb"
       ;;
     centos)
@@ -783,6 +785,11 @@ update_binpkg() {
       fi
     fi
   done
+
+  if [ -n "${post_update_cmd}" ]; then
+    # shellcheck disable=SC2086
+    env ${env} ${post_update_cmd} >&3 2>&3 || fatal "Failed to run post-update commands." U001B
+  fi
 
   # shellcheck disable=SC2086
   env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
