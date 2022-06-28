@@ -10,7 +10,7 @@ arch="${2}"
 format="${3}"
 repo="${4}"
 
-staging="${TMPDIR:-/tmp}/package-staging/"
+staging="${TMPDIR:-/tmp}/package-staging"
 prefix="/var/www/html/repos/${repo}/"
 
 packages="$(find artifacts -name "*.${format}")"
@@ -20,6 +20,7 @@ mkdir -p "${staging}"
 case "${format}" in
     deb)
         src="${staging}/pool/"
+        mkdir -p "${src}"
 
         for pkg in ${packages}; do
             cp "${pkg}" "${src}"
@@ -27,6 +28,7 @@ case "${format}" in
         ;;
     rpm)
         src="${staging}/${distro}/${arch}/"
+        mkdir -p "${src}"
 
         for pkg in ${packages}; do
             cp "${pkg}" "${src}"
@@ -38,4 +40,4 @@ case "${format}" in
         ;;
 esac
 
-rsync -vrlp --omit-dir-times --omit-link-times --inplace "${src}" "${user}@${host}:${prefix}"
+rsync -vrptO "${staging}/" "${user}@${host}:${prefix}"
