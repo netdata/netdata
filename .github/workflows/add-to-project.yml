@@ -14,4 +14,4 @@ jobs:
       - uses: actions/add-to-project@v0.0.5
         with:
           project-url: https://github.com/orgs/netdata/projects/32
-          github-token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          github-token: ${{ secrets.NETDATABOT_ORG_GITHUB_TOKEN }}
