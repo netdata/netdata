@@ -37,7 +37,7 @@ typedef enum db_check_action_type {
     "select chart_id from chart where host_id = @host and type=@type and id=@id and (name is null or name=@name);"
 
 #define SQL_STORE_ACTIVE_CHART                                                                                         \
-    "insert or replace into chart_active (chart_id, date_created) values (@id, strftime('%s'));"
+    "insert or replace into chart_active (chart_id, date_created) values (@id, unixepoch());"
 
 #define SQL_STORE_DIMENSION                                                                                           \
     "INSERT OR REPLACE into dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) values (?0001,?0002,?0003,?0004,?0005,?0006,?0007);"
@@ -46,7 +46,7 @@ typedef enum db_check_action_type {
     "select dim_id from dimension where chart_id=@chart and id=@id and name=@name and length(dim_id)=16;"
 
 #define SQL_STORE_ACTIVE_DIMENSION \
-    "insert or replace into dimension_active (dim_id, date_created) values (@id, strftime('%s'));"
+    "insert or replace into dimension_active (dim_id, date_created) values (@id, unixepoch());"
 
 #define CHECK_SQLITE_CONNECTION(db_meta)                                                                               \
     if (unlikely(!db_meta)) {                                                                                          \

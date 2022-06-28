@@ -87,7 +87,7 @@ static int aclk_add_chart_payload(
         char sql[ACLK_SYNC_QUERY_SIZE];
         snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,
                   "INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
-                  "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s','now'), @type, @payload);", wc->uuid_str);
+                  "VALUES (@unique_id, @uuid, @claim_id, unixepoch(), @type, @payload);", wc->uuid_str);
         rc = prepare_statement(db_meta, sql, &res_chart);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to store chart payload data");
@@ -398,7 +398,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         if (likely(first_sequence)) {
 
             db_lock();
-            snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "UPDATE aclk_chart_%s SET status = NULL, date_submitted=strftime('%%s','now') "
+            snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "UPDATE aclk_chart_%s SET status = NULL, date_submitted=unixepoch() "
                                 "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                                 wc->uuid_str, first_sequence, last_sequence);
             db_execute(sql);
@@ -540,7 +540,7 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
 
     char sql[ACLK_SYNC_QUERY_SIZE];
 
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"UPDATE aclk_chart_%s SET date_updated=strftime('%%s','now') WHERE sequence_id <= @sequence_id "
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"UPDATE aclk_chart_%s SET date_updated=unixepoch() WHERE sequence_id <= @sequence_id "
             "AND date_submitted IS NOT NULL AND date_updated IS NULL;", wc->uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);

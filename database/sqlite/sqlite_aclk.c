@@ -23,11 +23,11 @@ const char *aclk_sync_config[] = {
 
     "CREATE TRIGGER IF NOT EXISTS tr_dim_del AFTER DELETE ON dimension BEGIN INSERT INTO dimension_delete "
     "(dimension_id, dimension_name, chart_type_id, dim_id, chart_id, host_id, date_created)"
-    " select old.id, old.name, c.type||\".\"||c.id, old.dim_id, old.chart_id, c.host_id, strftime('%s') FROM"
+    " select old.id, old.name, c.type||\".\"||c.id, old.dim_id, old.chart_id, c.host_id, unixepoch() FROM"
     " chart c WHERE c.chart_id = old.chart_id; END;",
 
     "DELETE FROM dimension_delete WHERE host_id NOT IN"
-    " (SELECT host_id FROM host) OR strftime('%s') - date_created > 604800;",
+    " (SELECT host_id FROM host) OR unixepoch() - date_created > 604800;",
 
     NULL,
 };
@@ -773,7 +773,7 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
 
     buffer_sprintf(sql,"DELETE FROM aclk_chart_%s WHERE date_submitted IS NOT NULL AND "
-        "date_updated < strftime('%%s','now','-%d seconds');", wc->uuid_str, ACLK_DELETE_ACK_INTERNAL);
+        "date_updated < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_INTERNAL);
     db_execute(buffer_tostring(sql));
     buffer_flush(sql);
 
@@ -784,7 +784,7 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
     buffer_flush(sql);
 
     buffer_sprintf(sql,"DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
-        "date_cloud_ack < strftime('%%s','now','-%d seconds');", wc->uuid_str, ACLK_DELETE_ACK_ALERTS_INTERNAL);
+        "date_cloud_ack < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_ALERTS_INTERNAL);
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
@@ -910,7 +910,7 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
         sqlite3_free(err_msg);
     }
     db_execute("DELETE FROM dimension_delete WHERE host_id NOT IN (SELECT host_id FROM host) "
-               " OR strftime('%s') - date_created > 604800;");
+               " OR unixepoch() - date_created > 604800;");
     return;
 }
 

@@ -149,7 +149,7 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     buffer_sprintf(
         sql,
         "INSERT INTO aclk_alert_%s (alert_unique_id, date_created) "
-        "VALUES (@alert_unique_id, strftime('%%s')) on conflict (alert_unique_id) do nothing; ",
+        "VALUES (@alert_unique_id, unixepoch()) on conflict (alert_unique_id) do nothing; ",
         uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res_alert, 0);
@@ -239,9 +239,9 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         buffer_sprintf(
             sql,
             "UPDATE aclk_alert_%s SET date_submitted = NULL, date_cloud_ack = NULL WHERE sequence_id >= %"PRIu64
-            "; UPDATE aclk_alert_%s SET date_cloud_ack = strftime('%%s','now') WHERE sequence_id < %"PRIu64
+            "; UPDATE aclk_alert_%s SET date_cloud_ack = unixepoch() WHERE sequence_id < %"PRIu64
             " and date_cloud_ack is null "
-            "; UPDATE aclk_alert_%s SET date_submitted = strftime('%%s','now') WHERE sequence_id < %"PRIu64
+            "; UPDATE aclk_alert_%s SET date_submitted = unixepoch() WHERE sequence_id < %"PRIu64
             " and date_submitted is null",
             wc->uuid_str,
             wc->alerts_start_seq_id,
@@ -361,7 +361,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
     if (first_sequence_id) {
         buffer_flush(sql);
-        buffer_sprintf(sql, "UPDATE aclk_alert_%s SET date_submitted=strftime('%%s') "
+        buffer_sprintf(sql, "UPDATE aclk_alert_%s SET date_submitted=unixepoch() "
                             "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                        wc->uuid_str, first_sequence_id, last_sequence_id);
         db_execute(buffer_tostring(sql));
@@ -397,7 +397,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     BUFFER *sql = buffer_create(1024);
 
     buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created) " \
-                       "select unique_id alert_unique_id, strftime('%%s') date_created from health_log_%s " \
+                       "select unique_id alert_unique_id, unixepoch() from health_log_%s " \
                        "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
                        "order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str, uuid_str);
 
@@ -737,7 +737,7 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
     BUFFER *sql = buffer_create(1024);
 
     buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created) " \
-        "select unique_id alert_unique_id, strftime('%%s') date_created from health_log_%s " \
+        "select unique_id alert_unique_id, unixepoch() from health_log_%s " \
         "where new_status = -2 and updated_by_id = 0 and unique_id not in " \
         "(select alert_unique_id from aclk_alert_%s) order by unique_id asc " \
         "on conflict (alert_unique_id) do nothing;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
@@ -819,7 +819,7 @@ void aclk_mark_alert_cloud_ack(char *uuid_str, uint64_t alerts_ack_sequence_id)
     if (alerts_ack_sequence_id != 0) {
         buffer_sprintf(
             sql,
-            "UPDATE aclk_alert_%s SET date_cloud_ack = strftime('%%s','now') WHERE sequence_id <= %" PRIu64 "",
+            "UPDATE aclk_alert_%s SET date_cloud_ack = unixepoch() WHERE sequence_id <= %" PRIu64 "",
             uuid_str,
             alerts_ack_sequence_id);
         db_execute(buffer_tostring(sql));
