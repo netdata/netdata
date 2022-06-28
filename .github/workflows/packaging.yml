@@ -65,7 +65,7 @@ jobs:
                           entries.append({
                               'distro': data['include'][i]['distro'],
                               'version': data['include'][i]['version'],
-                              'pkgclouddistro': data['include'][i]['packages']['repo_distro'],
+                              'repo_distro': data['include'][i]['packages']['repo_distro'],
                               'format': data['include'][i]['packages']['type'],
                               'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
                               'platform': data['platform_map'][arch],
@@ -223,10 +223,26 @@ jobs:
         run: |
           printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank ${{ needs.version-check.outputs.repo }}/${{ matrix.pkgclouddistro }} \
+            .github/scripts/package_cloud_wrapper.sh yank ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} \
             "$(basename "${pkgfile}")" || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.pkgclouddistro }} "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} "${pkgfile}"
           done
+      - name: SSH setup
+        id: ssh-setup
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Upload to packages.netdata.cloud
+        id: package-upload
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          .github/scripts/package-upload.sh \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -235,7 +251,7 @@ jobs:
           SLACK_TITLE: 'Package Build failed:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: ${{ matrix.pkgclouddistro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed.
+              ${{ github.repository }}: ${{ matrix.repo_distro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed.
               Checkout: ${{ steps.checkout.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup Docker: ${{ steps.docker-config.outcome }}
