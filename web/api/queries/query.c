@@ -316,14 +316,12 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_GROUPING group_method) {
     }
     if(!found) {
         errno = 0;
-#ifdef NETDATA_INTERNAL_CHECKS
-        error("INTERNAL ERROR: grouping method %u not found. Using 'average'", (unsigned int)group_method);
-#endif
-        r->internal.grouping_create= grouping_create_average;
-        r->internal.grouping_reset = grouping_reset_average;
-        r->internal.grouping_free  = grouping_free_average;
-        r->internal.grouping_add   = grouping_add_average;
-        r->internal.grouping_flush = grouping_flush_average;
+        internal_error(true, "QUERY: grouping method %u not found. Using 'average'", (unsigned int)group_method);
+        r->internal.grouping_create = grouping_create_average;
+        r->internal.grouping_reset  = grouping_reset_average;
+        r->internal.grouping_free   = grouping_free_average;
+        r->internal.grouping_add    = grouping_add_average;
+        r->internal.grouping_flush  = grouping_flush_average;
     }
 }
 
@@ -406,15 +404,13 @@ static inline NETDATA_DOUBLE *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rr
 static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
     rrdr_line++;
 
-    #ifdef NETDATA_INTERNAL_CHECKS
+    internal_error(rrdr_line >= r->n,
+                   "QUERY: requested to step above RRDR size for chart '%s'",
+                   r->st->name);
 
-    if(unlikely(rrdr_line >= r->n))
-        error("INTERNAL ERROR: requested to step above RRDR size for chart '%s'", r->st->name);
-
-    if(unlikely(r->t[rrdr_line] != 0 && r->t[rrdr_line] != t))
-        error("INTERNAL ERROR: overwriting the timestamp of RRDR line %zu from %zu to %zu, of chart '%s'", (size_t)rrdr_line, (size_t)r->t[rrdr_line], (size_t)t, r->st->name);
-
-    #endif
+    internal_error(r->t[rrdr_line] != 0 && r->t[rrdr_line] != t,
+                   "QUERY: overwriting the timestamp of RRDR line %zu from %zu to %zu, of chart '%s'",
+                   (size_t)rrdr_line, (size_t)r->t[rrdr_line], (size_t)t, r->st->name);
 
     // save the time
     r->t[rrdr_line] = t;
@@ -496,9 +492,9 @@ static inline void rrd2rrdr_do_dimension(
             // a point that is just before the wanted one.
             // So, here we fetch the next one.
             if(unlikely(new_point_end_time < now)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                error("QUERY: next_metric(%s, %s) returned point %zu from %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld). Fetching the next one.", rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted, query_granularity);
-#endif
+                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld). Fetching the next one.",
+                               rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted, query_granularity);
+
                 new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags);
                 db_points_read++;
             }
@@ -516,16 +512,17 @@ static inline void rrd2rrdr_do_dimension(
             }
 
             if(unlikely(new_point_start_time == new_point_end_time)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point %zu start time %ld, end time %ld, that are both equal", rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time);
-#endif
+                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu start time %ld, end time %ld, that are both equal",
+                               rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time);
+
                 new_point_start_time = new_point_end_time - rd->update_every;
             }
 
             if(unlikely(new_point_start_time < last_point_start_time && new_point_end_time < last_point_end_time)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point %zu start time %ld, end time %ld, before the last point start time %ld, end time %ld", rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time, last_point_start_time, last_point_end_time);
-#endif
+                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu start time %ld, end time %ld, before the last point start time %ld, end time %ld",
+                               rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time,
+                               last_point_start_time, last_point_end_time);
+
                 new_point_value      = last_point_value;
                 new_point_flags      = last_point_flags;
                 new_point_start_time = last_point_start_time;
@@ -533,9 +530,9 @@ static inline void rrd2rrdr_do_dimension(
             }
 
             if(unlikely(new_point_end_time < last_point_end_time)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point %zu end time %ld, before the last point end time %ld", rd->rrdset->name, rd->name, db_points_read, new_point_end_time, last_point_end_time);
-#endif
+                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu end time %ld, before the last point end time %ld",
+                               rd->rrdset->name, rd->name, db_points_read, new_point_end_time, last_point_end_time);
+
                 new_point_value      = last_point_value;
                 new_point_flags      = last_point_flags;
                 new_point_start_time = last_point_start_time;
@@ -543,10 +540,10 @@ static inline void rrd2rrdr_do_dimension(
             }
 
             if(unlikely(new_point_end_time < now)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                error("QUERY: INTERNAL BUG: next_metric(%s, %s) returned point %zu from %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld)", rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted,
-                    query_granularity);
-#endif
+                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld)",
+                               rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time,
+                               now, after_wanted, before_wanted, query_granularity);
+
                 new_point_end_time   = now;
             }
         }
@@ -668,8 +665,9 @@ static inline void rrd2rrdr_do_dimension(
     r->after = min_date - (r->group - 1) * query_granularity;
     rrdr_done(r, rrdr_line);
 
-    if(unlikely(points_wanted != points_added))
-        error("QUERY: INTERNAL ERROR: query on %s/%s requested %zu points, but RRDR added %zu (%zu db points read).", r->st->name, rd->name, (size_t)points_wanted, (size_t)points_added, db_points_read);
+    internal_error(points_wanted != points_added,
+                   "QUERY: query on %s/%s requested %zu points, but RRDR added %zu (%zu db points read).",
+                   r->st->name, rd->name, (size_t)points_wanted, (size_t)points_added, db_points_read);
 }
 
 // ----------------------------------------------------------------------------
@@ -1033,16 +1031,17 @@ RRDR *rrd2rrdr(
             return NULL;
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(points_wanted != duration / (query_granularity * group) + 1)
-        error("INTERNAL CHECK: points_wanted %ld is not points %ld", points_wanted, duration / (query_granularity * group) + 1);
+    internal_error(points_wanted != duration / (query_granularity * group) + 1,
+                   "QUERY: points_wanted %ld is not points %ld",
+                   points_wanted, duration / (query_granularity * group) + 1);
 
-    if(group < resampling_group)
-        error("INTERNAL CHECK: group %ld is less than the desired group points %ld", group, resampling_group);
+    internal_error(group < resampling_group,
+                   "QUERY: group %ld is less than the desired group points %ld",
+                   group, resampling_group);
 
-    if(group > resampling_group && group % resampling_group)
-        error("INTERNAL CHECK: group %ld is not a multiple of the desired group points %ld", group, resampling_group);
-#endif
+    internal_error(group > resampling_group && group % resampling_group,
+                   "QUERY: group %ld is not a multiple of the desired group points %ld",
+                   group, resampling_group);
 
     // -------------------------------------------------------------------------
     // initialize our result set
@@ -1050,16 +1049,14 @@ RRDR *rrd2rrdr(
 
     RRDR *r = rrdr_create(owa, st, points_wanted, context_param_list);
     if(unlikely(!r)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
-#endif
+        internal_error(true, "QUERY: cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld",
+                       st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
         return NULL;
     }
 
     if(unlikely(!r->d || !points_wanted)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        error("INTERNAL CHECK: Returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%zu, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (size_t)duration, points_wanted);
-#endif
+        internal_error(true, "QUERY: returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%zu, points=%ld",
+                       st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (size_t)duration, points_wanted);
         return r;
     }
 
@@ -1143,26 +1140,23 @@ RRDR *rrd2rrdr(
         }
         else {
             if(r->after != max_after) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                error("INTERNAL ERROR: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                      st->name, (size_t)max_after, rd->name, (size_t)r->after);
-#endif
+                internal_error(true, "QUERY: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
+                               st->name, (size_t)max_after, rd->name, (size_t)r->after);
+
                 r->after = (r->after > max_after) ? r->after : max_after;
             }
 
             if(r->before != min_before) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                error("INTERNAL ERROR: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                      st->name, (size_t)min_before, rd->name, (size_t)r->before);
-#endif
+                internal_error(true, "QUERY: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
+                               st->name, (size_t)min_before, rd->name, (size_t)r->before);
+
                 r->before = (r->before < min_before) ? r->before : min_before;
             }
 
             if(r->rows != max_rows) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                error("INTERNAL ERROR: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                      st->name, (size_t)max_rows, rd->name, (size_t)r->rows);
-#endif
+                internal_error(true, "QUERY: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
+                               st->name, (size_t)max_rows, rd->name, (size_t)r->rows);
+
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }
         }
