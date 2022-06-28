@@ -16,6 +16,7 @@ jobs:
       matrix:
         repos:
           - stable
+          - edge
           - devel
     steps:
       - name: Checkout
