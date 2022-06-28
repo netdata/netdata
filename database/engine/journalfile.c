@@ -332,12 +332,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->id = &page_index->id;
         descr->extent = extent;
         extent->pages[valid_pages++] = descr;
-        int dt;
-        if (unlikely(descr->end_time == descr->start_time))
-            dt = 0;
-        else
-            dt = -((descr->end_time - descr->start_time) / (descr->page_length / sizeof(storage_number) - 1)) + 1;
-        pg_cache_insert(ctx, page_index, descr, dt);
+        pg_cache_insert(ctx, page_index, descr);
     }
 
     extent->number_of_pages = valid_pages;

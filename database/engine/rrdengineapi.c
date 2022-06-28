@@ -271,7 +271,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
             }
         }
 
-        pg_cache_insert(ctx, rd->state->page_index, descr, -rd->update_every + 1);
+        pg_cache_insert(ctx, rd->state->page_index, descr);
     } else {
         pg_cache_add_new_metric_time(rd->state->page_index, descr);
     }
