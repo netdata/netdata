@@ -227,15 +227,6 @@ jobs:
             "$(basename "${pkgfile}")" || true
             .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.pkgclouddistro }} "${pkgfile}"
           done
-      - name: Clean
-        id: cleanup
-        if: github.event_name == 'workflow_dispatch'
-        shell: bash
-        env:
-          REPO: ${{ needs.version-check.outputs.repo }}
-          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
-          PACKAGE_CLOUD_RETENTION_DAYS: ${{ needs.version-check.outputs.retention }}
-        run: .github/scripts/old_package_purging.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -252,7 +243,6 @@ jobs:
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
               Publish: ${{ steps.upload.outcome }}
-              Cleanup: ${{ steps.cleanup.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
