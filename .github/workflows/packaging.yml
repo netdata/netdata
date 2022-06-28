@@ -243,7 +243,6 @@ jobs:
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
               Publish: ${{ steps.upload.outcome }}
-              Cleanup: ${{ steps.cleanup.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
