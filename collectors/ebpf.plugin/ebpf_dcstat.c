@@ -252,20 +252,6 @@ void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access,
  *****************************************************************/
 
 /**
- * Clean PID structures
- *
- * Clean the allocated structures.
- */
-void clean_dcstat_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(dcstat_pid[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
-/**
  *  Clean names
  *
  *  Clean the optional names allocated during startup.
