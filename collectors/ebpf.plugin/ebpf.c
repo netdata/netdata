@@ -219,34 +219,6 @@ static void ebpf_exit(int sig)
         return;
     }
 
-    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
-    }
-
-    if (ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled = 0;
-    }
-
-    if (ebpf_modules[EBPF_MODULE_DCSTAT_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_DCSTAT_IDX].enabled = 0;
-    }
-
-    if (ebpf_modules[EBPF_MODULE_SWAP_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_SWAP_IDX].enabled = 0;
-    }
-
-    if (ebpf_modules[EBPF_MODULE_VFS_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_VFS_IDX].enabled = 0;
-    }
-
-    if (ebpf_modules[EBPF_MODULE_FD_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_FD_IDX].enabled = 0;
-    }
-
-    if (ebpf_modules[EBPF_MODULE_SHM_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_SHM_IDX].enabled = 0;
-    }
-
     ebpf_close_cgroup_shm();
 
     ebpf_clean_cgroup_pids();
