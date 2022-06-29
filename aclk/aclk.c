@@ -99,7 +99,7 @@ static int load_private_key()
 
     // this is necesseary to avoid RSA key with wrong size
     if (!OSSL_DECODER_from_bio(aclk_dctx, key_bio)) {
-        error("Claimed agent cannot establish ACLK - Decode failure.");
+        error("Decoding private key (from claiming) failed - invalid format.");
         goto biofailed;
     }
 #else
