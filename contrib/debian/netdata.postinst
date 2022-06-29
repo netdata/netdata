@@ -16,7 +16,7 @@ dpkg-maintscript-helper dir_to_symlink \
   /var/lib/netdata/www/static /usr/share/netdata/www/static 1.18.1~ netdata -- "$@"
 
 case "$1" in
-  configure)
+  configure|recnfigure)
     if [ -z "$2" ]; then
       if ! getent group netdata > /dev/null; then
         addgroup --quiet --system netdata
