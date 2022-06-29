@@ -248,6 +248,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
 
+    size_t storage_size = ctx->storage_size;
+
+
     if (descr) {
         /* Make alignment decisions */
 
@@ -256,7 +259,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
             perfect_page_alignment = 1;
         }
         /* is the metric far enough out of alignment with the others? */
-        if (unlikely(descr->page_length + sizeof(number) < rd->rrdset->rrddim_page_alignment)) {
+        if (unlikely(descr->page_length + storage_size < rd->rrdset->rrddim_page_alignment)) {
             handle->unaligned_page = 1;
             debug(D_RRDENGINE, "Metric page is not aligned with chart:");
             if (unlikely(debug_flags & D_RRDENGINE))
@@ -264,14 +267,14 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
         }
         if (unlikely(handle->unaligned_page &&
                      /* did the other metrics change page? */
-                     rd->rrdset->rrddim_page_alignment <= sizeof(number))) {
+                     rd->rrdset->rrddim_page_alignment <= storage_size)) {
             debug(D_RRDENGINE, "Flushing unaligned metric page.");
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
         }
     }
     if (unlikely(NULL == descr ||
-                 descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE ||
+                 descr->page_length + storage_size > RRDENG_BLOCK_SIZE ||
                  must_flush_unaligned_page)) {
         rrdeng_store_metric_flush_current_page(rd, tier);
 
@@ -288,8 +291,8 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
         }
     }
     page = descr->pg_cache_descr->page;
-    page[descr->page_length / sizeof(number)] = number;
-    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + sizeof(number));
+    page[descr->page_length / storage_size] = number;
+    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + storage_size);
 
     if (perfect_page_alignment)
         rd->rrdset->rrddim_page_alignment = descr->page_length;

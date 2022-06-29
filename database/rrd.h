@@ -337,7 +337,7 @@ struct rrddim_collect_ops {
     void (*init)(RRDDIM *rd, int tier);
 
     // run this to store each metric into the database
-    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value, uint32_t count, SN_FLAGS flags, int tier);
+    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value, NETDATA_DOUBLE sum_value, uint32_t count, SN_FLAGS flags, int tier);
 
     // an finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
