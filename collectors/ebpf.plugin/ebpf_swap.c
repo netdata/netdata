@@ -196,18 +196,6 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  *****************************************************************/
 
 /**
- * Clean swap structure
- */
-void clean_swap_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(swap_pid[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
-/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
