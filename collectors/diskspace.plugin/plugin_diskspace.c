@@ -42,6 +42,8 @@ struct mount_point_metadata {
     int updated;
     int slow;
 
+    DICTIONARY *chart_labels;
+
     size_t collected; // the number of times this has been collected
 
     RRDSET *st_space;
@@ -253,6 +255,8 @@ static void calculate_values_and_show_charts(
                 );
             }
 
+            rrdset_update_rrdlabels(m->st_space, m->chart_labels);
+
             m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root", (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -294,6 +298,8 @@ static void calculate_values_and_show_charts(
                         , RRDSET_TYPE_STACKED
                 );
             }
+
+            rrdset_update_rrdlabels(m->st_inodes, m->chart_labels);
 
             m->rd_inodes_avail    = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             m->rd_inodes_used     = rrddim_add(m->st_inodes, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -423,6 +429,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .rd_inodes_used = NULL,
                 .rd_inodes_reserved = NULL
         };
+
+        mp.chart_labels = rrdlabels_create();
+        rrdlabels_add(mp.chart_labels, "fstype", mi->filesystem, RRDLABEL_SRC_AUTO);
 
         m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
 
