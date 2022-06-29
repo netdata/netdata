@@ -227,8 +227,6 @@ static void ebpf_exit(int sig)
 
     if (ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled) {
         ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled = 0;
-        clean_cachestat_pid_structures();
-        freez(cachestat_pid);
     }
 
     if (ebpf_modules[EBPF_MODULE_DCSTAT_IDX].enabled) {
