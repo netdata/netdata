@@ -146,13 +146,13 @@ PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name
     if (likely(unhide_dimension)) {
         rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-            (void)sql_set_dimension_option(&rd->state->metric_uuid, NULL);
+            (void)sql_set_dimension_option(&rd->metric_uuid, NULL);
             rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
         }
     } else {
         rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-           (void)sql_set_dimension_option(&rd->state->metric_uuid, "hidden");
+           (void)sql_set_dimension_option(&rd->metric_uuid, "hidden");
             rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
         }
     }

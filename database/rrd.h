@@ -228,6 +228,8 @@ struct rrddim {
 
     avl_t avl;                                      // the binary index - this has to be first member!
 
+    uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
+
     // ------------------------------------------------------------------------
     // the dimension definition
 
@@ -371,7 +373,7 @@ struct rrddim_query_ops {
 // volatile state per RRD dimension
 struct rrddim_volatile {
 #ifdef ENABLE_DBENGINE
-    uuid_t *rrdeng_uuid;                 // database engine metric UUID
+    uuid_t *rrdeng_uuid;                            // database engine metric UUID
     struct pg_cache_page_index *page_index;
 #endif
 #ifdef ENABLE_ACLK
@@ -382,7 +384,6 @@ struct rrddim_volatile {
     NETDATA_DOUBLE max_value;
     uint16_t count;
     time_t last_tier_time;
-    uuid_t metric_uuid;                 // global UUID for this metric (unique_across hosts)
     STORAGE_COLLECT_HANDLE* handle;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;

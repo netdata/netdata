@@ -95,16 +95,16 @@ void rrdeng_metric_init(RRDDIM *rd, int tier)
          * Drop legacy support, normal path */
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &state->metric_uuid, sizeof(uuid_t));
+        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &rd->metric_uuid, sizeof(uuid_t));
         if (likely(NULL != PValue)) {
             page_index = *PValue;
         }
         uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
         if (NULL == PValue) {
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
-            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &state->metric_uuid, sizeof(uuid_t), PJE0);
+            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
             fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(&state->metric_uuid);
+            *PValue = page_index = create_page_index(&rd->metric_uuid);
             page_index->prev = pg_cache->metrics_index.last_page_index;
             pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
@@ -115,12 +115,12 @@ void rrdeng_metric_init(RRDDIM *rd, int tier)
         rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
                                                 &multihost_legacy_uuid);
 
-        int need_to_store = uuid_compare(state->metric_uuid, multihost_legacy_uuid);
+        int need_to_store = uuid_compare(rd->metric_uuid, multihost_legacy_uuid);
 
-        uuid_copy(rd->state->metric_uuid, multihost_legacy_uuid);
+        uuid_copy(rd->metric_uuid, multihost_legacy_uuid);
 
         if (unlikely(need_to_store && !tier))
-            (void)sql_store_dimension(&state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
+            (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                 rd->algorithm);
 
     }

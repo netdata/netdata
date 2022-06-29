@@ -169,7 +169,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            store_active_dimension(&rd->state->metric_uuid);
+            store_active_dimension(&rd->metric_uuid);
             rd->state->collect_ops.init(rd, 0);
             rd->state_tier1->collect_ops.init(rd, 1);
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
@@ -183,7 +183,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         }
         if (unlikely(rc)) {
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
-            (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
+            (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                                       rd->algorithm);
 #ifdef ENABLE_ACLK
             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
@@ -251,7 +251,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 #ifdef ENABLE_ACLK
     rd->state->aclk_live_status = -1;
 #endif
-    (void) find_dimension_uuid(st, rd, &(rd->state->metric_uuid));
+    (void) find_dimension_uuid(st, rd, &(rd->metric_uuid));
 
     STORAGE_ENGINE* eng = storage_engine_get(memory_mode);
     rd->state->collect_ops = eng->api.collect_ops;
@@ -265,7 +265,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rrdeng_metric_init(rd, 1);
     }
 #endif
-    store_active_dimension(&rd->state->metric_uuid);
+    store_active_dimension(&rd->metric_uuid);
     rd->state->collect_ops.init(rd, 0);
     rd->state_tier1->collect_ops.init(rd, 1);
     // append this dimension
@@ -327,7 +327,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         (void ) rd->state_tier1->collect_ops.finalize(rd, 1);
         if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             /* This metric has no data and no references */
-            delete_dimension_uuid(&rd->state->metric_uuid);
+            delete_dimension_uuid(&rd->metric_uuid);
         }
     }
 
@@ -388,7 +388,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
         return 1;
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
-        (void)sql_set_dimension_option(&rd->state->metric_uuid, "hidden");
+        (void)sql_set_dimension_option(&rd->metric_uuid, "hidden");
 
     rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
@@ -405,7 +405,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
         return 1;
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
-        (void)sql_set_dimension_option(&rd->state->metric_uuid, NULL);
+        (void)sql_set_dimension_option(&rd->metric_uuid, NULL);
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);

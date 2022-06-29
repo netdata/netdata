@@ -1124,7 +1124,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
         return;
 
     struct aclk_chart_dimension_data *aclk_cd_data = mallocz(sizeof(*aclk_cd_data));
-    uuid_copy(aclk_cd_data->uuid, rd->state->metric_uuid);
+    uuid_copy(aclk_cd_data->uuid, rd->metric_uuid);
     aclk_cd_data->payload = payload;
     aclk_cd_data->payload_size = size;
     aclk_cd_data->check_payload = 1;
@@ -1160,7 +1160,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
         (void)aclk_upd_dimension_event(
             rd->rrdset->rrdhost->dbsync_worker,
             claim_id,
-            &rd->state->metric_uuid,
+            &rd->metric_uuid,
             rd->id,
             rd->name,
             rd->rrdset->id,

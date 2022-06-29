@@ -1547,7 +1547,7 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
     rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
     rd->state->rrdeng_uuid = onewayalloc_mallocz(owa, sizeof(uuid_t));
     uuid_copy(*rd->state->rrdeng_uuid, *metric_uuid);
-    uuid_copy(rd->state->metric_uuid, *metric_uuid);
+    uuid_copy(rd->metric_uuid, *metric_uuid);
     rd->id = onewayalloc_strdupz(owa, id);
     rd->name = onewayalloc_strdupz(owa, name);
     return rd;

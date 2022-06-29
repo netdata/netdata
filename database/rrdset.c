@@ -1775,7 +1775,7 @@ after_second_database_work:
                         (void) rd->state_tier1->collect_ops.finalize(rd, 1);
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
-                            delete_dimension_uuid(&rd->state->metric_uuid);
+                            delete_dimension_uuid(&rd->metric_uuid);
                         } else {
                             /* Do not delete this dimension */
 #ifdef ENABLE_ACLK
