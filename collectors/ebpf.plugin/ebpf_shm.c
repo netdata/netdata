@@ -274,7 +274,8 @@ static void ebpf_shm_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else if (bpf_obj)

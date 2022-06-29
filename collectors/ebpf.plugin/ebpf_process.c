@@ -1146,7 +1146,8 @@ static void ebpf_process_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
 
     freez(cgroup_thread.thread);

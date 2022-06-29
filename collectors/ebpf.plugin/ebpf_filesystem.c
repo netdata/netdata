@@ -381,7 +381,8 @@ void ebpf_filesystem_cleanup_ebpf_data()
                 bpf_link__destroy(probe_links[j]);
                 j++;
             }
-            bpf_object__close(efp->objects);
+            if (efp->objects)
+                bpf_object__close(efp->objects);
         }
     }
 }

@@ -459,7 +459,8 @@ void ebpf_sync_cleanup_objects()
                 bpf_link__destroy(w->probe_links[j]);
                 j++;
             }
-            bpf_object__close(w->objects);
+            if (w->objects)
+                bpf_object__close(w->objects);
         }
 #ifdef LIBBPF_MAJOR_VERSION
         else if (w->sync_obj)
