@@ -12,15 +12,15 @@ public:
     }
 
     time_t latestTime() {
-        return Ops->latest_time(RD);
+        return Ops->latest_time(RD, 0);
     }
 
     time_t oldestTime() {
-        return Ops->oldest_time(RD);
+        return Ops->oldest_time(RD, 0);
     }
 
     void init(time_t AfterT, time_t BeforeT) {
-        Ops->init(RD, &Handle, AfterT, BeforeT);
+        Ops->init(RD, &Handle, AfterT, BeforeT, 0);
     }
 
     bool isFinished() {
@@ -30,7 +30,7 @@ public:
     std::pair<time_t, CalculatedNumber> nextMetric() {
         time_t CurrT, EndT;
         SN_FLAGS Flags;
-        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags);
+        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags, NULL);
         return { CurrT, Value };
     }
 
