@@ -964,6 +964,40 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     return last_updated_ut;
 }
 
+static void store_metric (RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_FLAGS flags)
+{
+
+    rd->state->collect_ops.store_metric(rd, next_store_ut, n, 0, 0, 1, flags, 0);
+
+    if (likely(n != NAN)) {
+        if (!rd->state->last_tier_time) {
+            rd->state->sum_value = n;
+            rd->state->min_value = n;
+            rd->state->max_value = n;
+            rd->state->count = 1;
+            rd->state->last_tier_time = next_store_ut / USEC_PER_SEC;
+        } else {
+            rd->state->sum_value += n;
+            rd->state->min_value = MIN(rd->state->min_value, n);
+            rd->state->max_value = MAX(rd->state->max_value, n);
+            rd->state->count++;
+        }
+    }
+
+    if (rd->state->count == TIER1_GROUPING) {
+        rd->state->collect_ops.store_metric(
+            rd,
+            next_store_ut,
+            rd->state->sum_value / rd->state->count,
+            rd->state->min_value,
+            rd->state->max_value,
+            rd->state->count,
+            flags,
+            1);
+        rd->state->last_tier_time = 0;
+    }
+}
+
 static inline size_t rrdset_done_interpolate(
         RRDSET *st
         , usec_t update_every_ut
@@ -1087,8 +1121,8 @@ static inline size_t rrdset_done_interpolate(
 
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 1);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
+                store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 continue;
             }
 
@@ -1100,8 +1134,8 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
                 }
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, 0, 0, 1, dim_storage_flags, 0);
-                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, 0, 0, 1, dim_storage_flags, 1);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, 0, 0, 1, dim_storage_flags, 0);
+                store_metric(rd, next_store_ut, new_value, dim_storage_flags);
                 rd->last_stored_value = new_value;
             }
             else {
@@ -1114,8 +1148,8 @@ static inline size_t rrdset_done_interpolate(
                 );
                 #endif
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 1);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
+                store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 rd->last_stored_value = NAN;
             }
 

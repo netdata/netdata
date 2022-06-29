@@ -32,6 +32,8 @@ struct rrdengine_instance;
 struct pg_cache_page_index;
 #endif
 
+#define TIER1_GROUPING (5)
+
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
 #include "rrdvar.h"
@@ -375,6 +377,11 @@ struct rrddim_volatile {
 #ifdef ENABLE_ACLK
     int aclk_live_status;
 #endif
+    NETDATA_DOUBLE sum_value;
+    NETDATA_DOUBLE min_value;
+    NETDATA_DOUBLE max_value;
+    uint16_t count;
+    time_t last_tier_time;
     uuid_t metric_uuid;                 // global UUID for this metric (unique_across hosts)
     STORAGE_COLLECT_HANDLE* handle;
     struct rrddim_collect_ops collect_ops;

@@ -390,8 +390,14 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
-    handle->dt = rd->update_every * USEC_PER_SEC;
-    handle->dt_sec = rd->update_every;
+    if (tier) {
+        handle->dt = TIER1_GROUPING * rd->update_every * USEC_PER_SEC;
+        handle->dt_sec = TIER1_GROUPING * rd->update_every;
+    }
+    else {
+        handle->dt = rd->update_every * USEC_PER_SEC;
+        handle->dt_sec = rd->update_every;
+    }
     handle->position = 0;
     handle->ctx = ctx;
     handle->descr = NULL;
