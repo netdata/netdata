@@ -221,7 +221,6 @@ static void ebpf_exit(int sig)
 
     ebpf_close_cgroup_shm();
 
-    ebpf_clean_cgroup_pids();
     /*
     int ret = fork();
     if (ret < 0) // error
