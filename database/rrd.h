@@ -264,6 +264,7 @@ struct rrddim {
 #ifdef ENABLE_ACLK
     int aclk_live_status;
 #endif
+    ml_dimension_t ml_dimension;
 
     struct rrddim_volatile *state;                  // volatile state that is not persistently stored
     struct rrddim_volatile *state_tier1;            // volatile state for tier1
@@ -388,7 +389,6 @@ struct rrddim_volatile {
     STORAGE_COLLECT_HANDLE* handle;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
-    ml_dimension_t ml_dimension;
 };
 
 // ----------------------------------------------------------------------------
