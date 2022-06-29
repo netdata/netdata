@@ -56,10 +56,12 @@ void netdata_cleanup_and_exit(int ret) {
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         rrdeng_prepare_exit(&multidb_ctx);
+        rrdeng_prepare_exit(&multidb_ctx_tier1);
 #endif
         rrdhost_free_all();
 #ifdef ENABLE_DBENGINE
         rrdeng_exit(&multidb_ctx);
+        rrdeng_exit(&multidb_ctx_tier1);
 #endif
     }
     sql_close_database();

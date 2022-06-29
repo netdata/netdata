@@ -83,8 +83,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, sq, context_mode && temp_rd?r->st->context:r->st->name, sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
-                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->first_entry_t : rrdset_first_entry_t_nolock(r->st))
-                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->last_entry_t : rrdset_last_entry_t_nolock(r->st))
+                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->first_entry_t : rrdset_first_entry_t_nolock(r->st, 0))
+                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->last_entry_t : rrdset_last_entry_t_nolock(r->st, 0))
                    , kq, kq, (uint32_t)r->before
                    , kq, kq, (uint32_t)r->after
                    , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq

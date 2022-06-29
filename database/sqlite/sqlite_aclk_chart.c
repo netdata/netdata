@@ -927,7 +927,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
 #ifdef ENABLE_DBENGINE
         if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
             rc =
-                rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &first_entry_t, &last_entry_t);
+                rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &first_entry_t, &last_entry_t, 0);
         else
 #endif
         {
@@ -935,8 +935,8 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
                 RRDSET *st = NULL;
                 rc = (st = rrdset_find(wc->host, (const char *)sqlite3_column_text(res, 2))) ? 0 : 1;
                 if (!rc) {
-                    first_entry_t = rrdset_first_entry_t(st);
-                    last_entry_t = rrdset_last_entry_t(st);
+                    first_entry_t = rrdset_first_entry_t(st, 0);
+                    last_entry_t = rrdset_last_entry_t(st, 0);
                 }
             } else {
                 rc = 0;
@@ -1091,7 +1091,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     if (likely(rd->state->aclk_live_status == live))
         return;
 
-    time_t created_at = rd->state->query_ops.oldest_time(rd);
+    time_t created_at = rd->state->query_ops.oldest_time(rd, 0);
 
     if (unlikely(!created_at && rd->updated))
        created_at = rd->last_collected_time.tv_sec;
@@ -1150,8 +1150,8 @@ void aclk_send_dimension_update(RRDDIM *rd)
     if (unlikely(!claim_id))
         return;
 
-    time_t first_entry_t = rrddim_first_entry_t(rd);
-    time_t last_entry_t = rrddim_last_entry_t(rd);
+    time_t first_entry_t = rrddim_first_entry_t(rd, 0);
+    time_t last_entry_t = rrddim_last_entry_t(rd, 0);
 
     time_t now = now_realtime_sec();
     int live = ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every));

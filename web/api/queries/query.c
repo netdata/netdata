@@ -474,7 +474,7 @@ static inline void rrd2rrdr_do_dimension(
     time_t new_point_end_time = 0;
     size_t new_point_anomaly = 0;
 
-    for(rd->state->query_ops.init(rd, &handle, now, before_wanted) ; points_added < points_wanted ; now += dt) {
+    for(rd->state->query_ops.init(rd, &handle, now, before_wanted, 0) ; points_added < points_wanted ; now += dt) {
 
         // TODO - should be removed when before and after are always respected
         // independently of the databaase first and last time and points_wanted
@@ -706,19 +706,19 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          , (size_t)r->after
          , (size_t)after_wanted
          , (size_t)after_requested
-         , (size_t)rrdset_first_entry_t_nolock(r->st)
+         , (size_t)rrdset_first_entry_t_nolock(r->st, 0)
 
          // before
          , (size_t)r->before
          , (size_t)before_wanted
          , (size_t)before_requested
-         , (size_t)rrdset_last_entry_t_nolock(r->st)
+         , (size_t)rrdset_last_entry_t_nolock(r->st, 0)
 
          // duration
          , (size_t)(r->before - r->after + r->st->update_every)
          , (size_t)(before_wanted - after_wanted + r->st->update_every)
          , (size_t)(before_requested - after_requested)
-         , (size_t)((rrdset_last_entry_t_nolock(r->st) - rrdset_first_entry_t_nolock(r->st)) + r->st->update_every)
+         , (size_t)((rrdset_last_entry_t_nolock(r->st, 0) - rrdset_first_entry_t_nolock(r->st,0)) + r->st->update_every)
 
          // slot
          /*
@@ -1182,8 +1182,8 @@ RRDR *rrd2rrdr(
     }
     else {
         rrdset_rdlock(st);
-        first_entry_t = rrdset_first_entry_t_nolock(st);
-        last_entry_t  = rrdset_last_entry_t_nolock(st);
+        first_entry_t = rrdset_first_entry_t_nolock(st, 0);
+        last_entry_t  = rrdset_last_entry_t_nolock(st, 0);
         rrdset_unlock(st);
     }
 

@@ -258,6 +258,7 @@ struct rrddim {
                                                     // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
     struct rrddim_volatile *state;                  // volatile state that is not persistently stored
+    struct rrddim_volatile *state_tier1;            // volatile state for tier1
     size_t collections_counter;                     // the number of times we added values to this rrdim
     collected_number collected_value_max;           // the absolute maximum of the collected value
 
@@ -333,20 +334,20 @@ struct rrddim_query_handle {
 // function pointers that handle data collection
 struct rrddim_collect_ops {
     // an initialization function to run before starting collection
-    void (*init)(RRDDIM *rd);
+    void (*init)(RRDDIM *rd, int tier);
 
     // run this to store each metric into the database
-    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, SN_FLAGS flags);
+    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value, uint32_t count, SN_FLAGS flags, int tier);
 
     // an finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
-    int (*finalize)(RRDDIM *rd);
+    int (*finalize)(RRDDIM *rd, int tier);
 };
 
 // function pointers that handle database queries
 struct rrddim_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+    void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, int tier);
 
     // run this to load each metric number from the database
     NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags);
@@ -358,10 +359,10 @@ struct rrddim_query_ops {
     void (*finalize)(struct rrddim_query_handle *handle);
 
     // get the timestamp of the last entry of this metric
-    time_t (*latest_time)(RRDDIM *rd);
+    time_t (*latest_time)(RRDDIM *rd, int tier);
 
     // get the timestamp of the first entry of this metric
-    time_t (*oldest_time)(RRDDIM *rd);
+    time_t (*oldest_time)(RRDDIM *rd, int tier);
 };
 
 // ----------------------------------------------------------------------------
@@ -856,6 +857,7 @@ struct rrdhost {
 
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
+    struct rrdengine_instance *rrdeng_ctx_tier1;          // DB engine instance for this host tier1
 #endif
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
@@ -1071,14 +1073,14 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
 
 // get the timestamp of the last entry in the round robin database
-static inline time_t rrdset_last_entry_t_nolock(RRDSET *st)
+static inline time_t rrdset_last_entry_t_nolock(RRDSET *st, int tier)
 {
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t last_entry_t  = 0;
 
         rrddim_foreach_read(rd, st) {
-            last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd));
+            last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd, tier));
         }
 
         return last_entry_t;
@@ -1087,19 +1089,19 @@ static inline time_t rrdset_last_entry_t_nolock(RRDSET *st)
     }
 }
 
-static inline time_t rrdset_last_entry_t(RRDSET *st)
+static inline time_t rrdset_last_entry_t(RRDSET *st, int tier)
 {
     time_t last_entry_t;
 
     netdata_rwlock_rdlock(&st->rrdset_rwlock);
-    last_entry_t = rrdset_last_entry_t_nolock(st);
+    last_entry_t = rrdset_last_entry_t_nolock(st, tier);
     netdata_rwlock_unlock(&st->rrdset_rwlock);
 
     return last_entry_t;
 }
 
 // get the timestamp of first entry in the round robin database
-static inline time_t rrdset_first_entry_t_nolock(RRDSET *st)
+static inline time_t rrdset_first_entry_t_nolock(RRDSET *st, int tier)
 {
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
@@ -1108,38 +1110,38 @@ static inline time_t rrdset_first_entry_t_nolock(RRDSET *st)
         rrddim_foreach_read(rd, st) {
             first_entry_t =
                 MIN(first_entry_t,
-                    rd->state->query_ops.oldest_time(rd) > st->update_every ?
-                        rd->state->query_ops.oldest_time(rd) - st->update_every : 0);
+                    rd->state->query_ops.oldest_time(rd, tier) > st->update_every ?
+                        rd->state->query_ops.oldest_time(rd, tier) - st->update_every : 0);
         }
 
         if (unlikely(LONG_MAX == first_entry_t)) return 0;
         return first_entry_t;
     } else {
-        return (time_t)(rrdset_last_entry_t_nolock(st) - rrdset_duration(st));
+        return (time_t)(rrdset_last_entry_t_nolock(st, tier) - rrdset_duration(st));
     }
 }
 
-static inline time_t rrdset_first_entry_t(RRDSET *st)
+static inline time_t rrdset_first_entry_t(RRDSET *st, int tier)
 {
     time_t first_entry_t;
 
     netdata_rwlock_rdlock(&st->rrdset_rwlock);
-    first_entry_t = rrdset_first_entry_t_nolock(st);
+    first_entry_t = rrdset_first_entry_t_nolock(st, tier);
     netdata_rwlock_unlock(&st->rrdset_rwlock);
 
     return first_entry_t;
 }
 
 // get the timestamp of the last entry in the round robin database
-static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
+static inline time_t rrddim_last_entry_t(RRDDIM *rd, int tier) {
     if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        return rd->state->query_ops.latest_time(rd);
+        return rd->state->query_ops.latest_time(rd, tier);
     return (time_t)rd->rrdset->last_updated.tv_sec;
 }
 
-static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
+static inline time_t rrddim_first_entry_t(RRDDIM *rd, int tier) {
     if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        return rd->state->query_ops.oldest_time(rd);
+        return rd->state->query_ops.oldest_time(rd, tier);
     return (time_t)(rd->rrdset->last_updated.tv_sec - rrdset_duration(rd->rrdset));
 }
 
@@ -1171,8 +1173,8 @@ static inline size_t rrdset_first_slot(RRDSET *st) {
 // only valid when not using dbengine
 static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
     size_t ret = 0;
-    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
-    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
+    time_t last_entry_t = rrdset_last_entry_t_nolock(st, 0);
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st, 0);
 
     if(t >= last_entry_t) {
         // the requested time is after the last entry we have
@@ -1203,8 +1205,8 @@ static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
 // only valid when not using dbengine
 static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
     time_t ret;
-    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
-    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
+    time_t last_entry_t = rrdset_last_entry_t_nolock(st, 0);
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st, 0);
 
     if(slot >= (size_t)st->entries) {
         error("INTERNAL ERROR: caller of rrdset_slot2time() gives invalid slot %zu", slot);

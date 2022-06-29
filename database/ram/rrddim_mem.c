@@ -5,15 +5,31 @@
 // ----------------------------------------------------------------------------
 // RRDDIM legacy data collection functions
 
-void rrddim_collect_init(RRDDIM *rd) {
+void rrddim_collect_init(RRDDIM *rd, int tier) {
+    UNUSED(tier);
     rd->db[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
     rd->state->handle = calloc(1, sizeof(struct mem_collect_handle));
 }
-void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, SN_FLAGS flags) {
+
+void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number,
+        NETDATA_DOUBLE min_value,
+        NETDATA_DOUBLE max_value,
+        NETDATA_DOUBLE sum_value,
+        uint32_t count,
+        SN_FLAGS flags, int tier)
+{
+    UNUSED(min_value);
+    UNUSED(max_value);
+    UNUSED(sum_value);
+    UNUSED(count);
+    UNUSED(tier);
+
     (void)point_in_time;
     rd->db[rd->rrdset->current_entry] = pack_storage_number(number, flags);
 }
-int rrddim_collect_finalize(RRDDIM *rd) {
+int rrddim_collect_finalize(RRDDIM *rd, int tier)
+{
+    UNUSED(tier);
     free((struct mem_collect_handle*)rd->state->handle);
     return 0;
 }
@@ -21,7 +37,8 @@ int rrddim_collect_finalize(RRDDIM *rd) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
+void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, int tier) {
+    UNUSED(tier);
     handle->rd = rd;
     handle->start_time = start_time;
     handle->end_time = end_time;
@@ -89,10 +106,10 @@ void rrddim_query_finalize(struct rrddim_query_handle *handle) {
     freez(handle->handle);
 }
 
-time_t rrddim_query_latest_time(RRDDIM *rd) {
-    return rrdset_last_entry_t_nolock(rd->rrdset);
+time_t rrddim_query_latest_time(RRDDIM *rd, int tier) {
+    return rrdset_last_entry_t_nolock(rd->rrdset, tier);
 }
 
-time_t rrddim_query_oldest_time(RRDDIM *rd) {
-    return rrdset_first_entry_t_nolock(rd->rrdset);
+time_t rrddim_query_oldest_time(RRDDIM *rd, int tier) {
+    return rrdset_first_entry_t_nolock(rd->rrdset, tier);
 }

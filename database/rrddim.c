@@ -170,7 +170,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_divisor(st, rd, divisor);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             store_active_dimension(&rd->state->metric_uuid);
-            rd->state->collect_ops.init(rd);
+            rd->state->collect_ops.init(rd, 0);
+            rd->state_tier1->collect_ops.init(rd, 1);
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
             rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
             rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
@@ -255,14 +256,18 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     STORAGE_ENGINE* eng = storage_engine_get(memory_mode);
     rd->state->collect_ops = eng->api.collect_ops;
     rd->state->query_ops = eng->api.query_ops;
+    rd->state_tier1 = mallocz(sizeof(*rd->state_tier1));
+    memcpy(rd->state_tier1, rd->state, sizeof(*rd->state));
 
 #ifdef ENABLE_DBENGINE
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        rrdeng_metric_init(rd);
+        rrdeng_metric_init(rd, 0);
+        rrdeng_metric_init(rd, 1);
     }
 #endif
     store_active_dimension(&rd->state->metric_uuid);
-    rd->state->collect_ops.init(rd);
+    rd->state->collect_ops.init(rd, 0);
+    rd->state_tier1->collect_ops.init(rd, 1);
     // append this dimension
     if(!st->dimensions)
         st->dimensions = rd;
@@ -318,7 +323,8 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
+        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd, 0);
+        (void ) rd->state_tier1->collect_ops.finalize(rd, 1);
         if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             /* This metric has no data and no references */
             delete_dimension_uuid(&rd->state->metric_uuid);

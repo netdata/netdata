@@ -1232,7 +1232,7 @@ int run_test(struct test *test)
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
             ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
             test->name, rd->name, c+1,
-            (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
+            (int64_t)((rrdset_first_entry_t(st, 0) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
@@ -1244,7 +1244,7 @@ int run_test(struct test *test)
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
                 ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
                 test->name, rd2->name, c+1,
-                (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
+                (int64_t)((rrdset_first_entry_t(st, 0) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
@@ -1704,7 +1704,7 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Fluh pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page(rd[i][j], 0);
         }
     }
 }
@@ -1767,7 +1767,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH * update_every);
+                rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH * update_every, 0);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
@@ -1910,7 +1910,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page(rd[i][j], 0);
         }
     }
 
@@ -1929,7 +1929,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page(rd[i][j], 0);
         }
     }
 
@@ -2087,7 +2087,7 @@ static void generate_dbengine_chart(void *arg)
         thread_info->time_max = time_current;
     }
     for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize(rd[j]);
+        rrdeng_store_metric_finalize(rd[j], 0);
     }
 }
 
@@ -2208,7 +2208,7 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        rd->state->query_ops.init(rd, &handle, time_after, time_before);
+        rd->state->query_ops.init(rd, &handle, time_after, time_before, 0);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);

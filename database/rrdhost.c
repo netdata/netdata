@@ -345,9 +345,11 @@ RRDHOST *rrdhost_create(const char *hostname,
         else ret = 0; // succeed
         if (is_legacy) // initialize legacy dbengine instance as needed
             ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, default_rrdeng_page_cache_mb,
-                              default_rrdeng_disk_quota_mb); // may fail here for legacy dbengine initialization
-        else
+                              default_rrdeng_disk_quota_mb, 0); // may fail here for legacy dbengine initialization
+        else {
             host->rrdeng_ctx = &multidb_ctx;
+            host->rrdeng_ctx_tier1 = &multidb_ctx_tier1;
+        }
         if (ret) { // check legacy or multihost initialization success
             error(
                 "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
@@ -366,6 +368,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     else {
 #ifdef ENABLE_DBENGINE
         host->rrdeng_ctx = &multidb_ctx;
+        host->rrdeng_ctx_tier1 = &multidb_ctx_tier1;
 #endif
     }
 
@@ -751,8 +754,16 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     ret = mkdir(dbenginepath, 0775);
     if (ret != 0 && errno != EEXIST)
         error("Host '%s': cannot create directory '%s'", localhost->hostname, dbenginepath);
-    else  // Unconditionally create multihost db to support on demand host creation
-        ret = rrdeng_init(NULL, NULL, dbenginepath, default_rrdeng_page_cache_mb, default_multidb_disk_quota_mb);
+    else {
+        // Unconditionally create multihost db to support on demand host creation
+        ret = rrdeng_init(NULL, NULL, dbenginepath, default_rrdeng_page_cache_mb, default_multidb_disk_quota_mb, 0);
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine_tier1", localhost->cache_dir);
+        ret = mkdir(dbenginepath, 0775);
+        if (ret != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", localhost->hostname, dbenginepath);
+        else
+            ret = rrdeng_init(NULL, NULL, dbenginepath, default_rrdeng_page_cache_mb, default_multidb_disk_quota_mb, 1);
+    }
     if (ret) {
         error(
             "Host '%s' with machine guid '%s' failed to initialize multi-host DB engine instance at '%s'.",
@@ -911,6 +922,8 @@ void rrdhost_free(RRDHOST *host) {
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         if (host->rrdeng_ctx != &multidb_ctx)
             rrdeng_prepare_exit(host->rrdeng_ctx);
+        if (host->rrdeng_ctx_tier1 != &multidb_ctx_tier1)
+            rrdeng_prepare_exit(host->rrdeng_ctx_tier1);
     }
 #endif
     while(host->rrdset_root)
@@ -1321,7 +1334,8 @@ restart_after_removal:
                     if (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
+                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd, 0);
+                        (void) rd->state_tier1->collect_ops.finalize(rd, 1);
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
                             delete_dimension_uuid(&rd->state->metric_uuid);
@@ -1379,7 +1393,7 @@ void rrdset_check_obsoletion(RRDHOST *host)
     RRDSET *st;
     time_t last_entry_t;
     rrdset_foreach_read(st, host) {
-        last_entry_t = rrdset_last_entry_t(st);
+        last_entry_t = rrdset_last_entry_t(st, 0);
         if (last_entry_t && last_entry_t < host->senders_connect_time) {
             rrdset_is_obsolete(st);
         }
@@ -1597,7 +1611,7 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
     RRDSET *st;
     time_t result = 0;
     rrdset_foreach_read(st, h) {
-        time_t st_last = rrdset_last_entry_t(st);
+        time_t st_last = rrdset_last_entry_t(st, 0);
         if (st_last > result)
             result = st_last;
     }

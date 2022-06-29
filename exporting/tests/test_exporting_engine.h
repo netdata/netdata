@@ -59,7 +59,7 @@ void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, c
 void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
 time_t __mock_rrddim_query_oldest_time(RRDDIM *rd);
 time_t __mock_rrddim_query_latest_time(RRDDIM *rd);
-void __mock_rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+void __mock_rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, int tier);
 int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle);
 NETDATA_DOUBLE __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags);
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle);

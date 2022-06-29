@@ -276,7 +276,8 @@ void rrdset_reset(RRDSET *st) {
         // memset(rd->values, 0, rd->entries * sizeof(storage_number));
 #ifdef ENABLE_DBENGINE
         if (RRD_MEMORY_MODE_DBENGINE == st->rrd_memory_mode && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            rrdeng_store_metric_flush_current_page(rd);
+            rrdeng_store_metric_flush_current_page(rd, 0);
+            rrdeng_store_metric_flush_current_page(rd, 1);
         }
 #endif
     }
@@ -1086,8 +1087,7 @@ static inline size_t rrdset_done_interpolate(
 
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
-
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 0, SN_EMPTY_SLOT, 0);
                 continue;
             }
 
@@ -1099,7 +1099,8 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
                 }
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, dim_storage_flags);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, 0, 0, 0, dim_storage_flags, 0);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, 0, 0, 0, dim_storage_flags, 1);
                 rd->last_stored_value = new_value;
             }
             else {
@@ -1112,7 +1113,7 @@ static inline size_t rrdset_done_interpolate(
                 );
                 #endif
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 0, SN_EMPTY_SLOT, 0);
                 rd->last_stored_value = NAN;
             }
 
@@ -1734,7 +1735,8 @@ after_second_database_work:
 
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
+                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd, 0);
+                        (void) rd->state_tier1->collect_ops.finalize(rd, 1);
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
                             delete_dimension_uuid(&rd->state->metric_uuid);

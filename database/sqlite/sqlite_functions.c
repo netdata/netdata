@@ -1489,7 +1489,7 @@ failed:
 }
 
 int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id,
-                                uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t, uuid_t *rrdeng_uuid)
+                                uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t, uuid_t *rrdeng_uuid, int tier)
 {
 #ifdef ENABLE_DBENGINE
     int rc;
@@ -1497,13 +1497,13 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
     uuid_t  multihost_legacy_uuid;
     time_t dim_first_entry_t, dim_last_entry_t;
 
-    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t);
+    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t, tier);
     if (unlikely(rc)) {
         rrdeng_generate_legacy_uuid(dim_id, chart_id, &legacy_uuid);
-        rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
+        rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t, tier);
         if (likely(rc)) {
             rrdeng_convert_legacy_uuid_to_multihost(machine_guid, &legacy_uuid, &multihost_legacy_uuid);
-            rc = rrdeng_metric_latest_time_by_uuid(&multihost_legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
+            rc = rrdeng_metric_latest_time_by_uuid(&multihost_legacy_uuid, &dim_first_entry_t, &dim_last_entry_t, tier);
             if (likely(!rc))
                 uuid_copy(*rrdeng_uuid, multihost_legacy_uuid);
         }
@@ -1648,7 +1648,7 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
 
         if (unlikely(find_dimension_first_last_t(machine_guid, (char *)st->name, (char *)sqlite3_column_text(res, 1),
                 (uuid_t *)sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t,
-                &rrdeng_uuid)))
+                &rrdeng_uuid, 0)))
             continue;
 
         st->counter++;

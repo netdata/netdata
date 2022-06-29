@@ -53,7 +53,7 @@ void rebuild_context_param_list(ONEWAYALLOC *owa, struct context_param *context_
     while (temp_rd) {
         t = temp_rd->next;
         RRDSET *st = temp_rd->rrdset;
-        time_t last_entry_t = is_archived ? st->last_entry_t : rrdset_last_entry_t(st);
+        time_t last_entry_t = is_archived ? st->last_entry_t : rrdset_last_entry_t(st, 0);
 
         if (last_entry_t >= after_requested) {
             temp_rd->next = new_rd_list;
@@ -82,8 +82,8 @@ void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_lis
     st->last_accessed_time = now_realtime_sec();
     rrdset_rdlock(st);
 
-    (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t_nolock(st));
-    (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t_nolock(st));
+    (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t_nolock(st, 0));
+    (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t_nolock(st, 0));
 
     rrddim_foreach_read(rd1, st) {
         RRDDIM *rd = onewayalloc_memdupz(owa, rd1, sizeof(RRDDIM));

@@ -239,6 +239,8 @@ struct rrdengine_instance {
     char machine_guid[GUID_LEN + 1]; /* the unique ID of the corresponding host, or localhost for multihost DB */
     uint64_t disk_space;
     uint64_t max_disk_space;
+    int tier;
+    size_t storage_size;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;

@@ -2,6 +2,7 @@
 #include "rrdengine.h"
 
 /* Default global database instance */
+struct rrdengine_instance multidb_ctx_tier1;
 struct rrdengine_instance multidb_ctx;
 
 int db_engine_use_malloc = 0;
@@ -13,9 +14,12 @@ int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
-static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host)
+static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host, int tier)
 {
-    return host->rrdeng_ctx;
+    if (!tier)
+        return host->rrdeng_ctx;
+    else
+        return host->rrdeng_ctx_tier1;
 }
 
 /* This UUID is not unique across hosts */
@@ -52,7 +56,7 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-void rrdeng_metric_init(RRDDIM *rd)
+void rrdeng_metric_init(RRDDIM *rd, int tier)
 {
     struct page_cache *pg_cache;
     struct rrdengine_instance *ctx;
@@ -62,8 +66,14 @@ void rrdeng_metric_init(RRDDIM *rd)
     struct pg_cache_page_index *page_index = NULL;
     int is_multihost_child = 0;
     RRDHOST *host = rd->rrdset->rrdhost;
+    struct rrddim_volatile *state;
 
-    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+    if (!tier)
+        state = rd->state;
+    else
+        state = rd->state_tier1;
+
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost, tier);
     if (unlikely(!ctx)) {
         error("Failed to fetch multidb context");
         return;
@@ -85,16 +95,16 @@ void rrdeng_metric_init(RRDDIM *rd)
          * Drop legacy support, normal path */
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &rd->state->metric_uuid, sizeof(uuid_t));
+        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &state->metric_uuid, sizeof(uuid_t));
         if (likely(NULL != PValue)) {
             page_index = *PValue;
         }
         uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
         if (NULL == PValue) {
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
-            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &rd->state->metric_uuid, sizeof(uuid_t), PJE0);
+            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &state->metric_uuid, sizeof(uuid_t), PJE0);
             fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(&rd->state->metric_uuid);
+            *PValue = page_index = create_page_index(&state->metric_uuid);
             page_index->prev = pg_cache->metrics_index.last_page_index;
             pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
@@ -105,52 +115,57 @@ void rrdeng_metric_init(RRDDIM *rd)
         rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
                                                 &multihost_legacy_uuid);
 
-        int need_to_store = uuid_compare(rd->state->metric_uuid, multihost_legacy_uuid);
+        int need_to_store = uuid_compare(state->metric_uuid, multihost_legacy_uuid);
 
         uuid_copy(rd->state->metric_uuid, multihost_legacy_uuid);
 
-        if (unlikely(need_to_store))
-            (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
+        if (unlikely(need_to_store && !tier))
+            (void)sql_store_dimension(&state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                 rd->algorithm);
 
     }
-    rd->state->rrdeng_uuid = &page_index->id;
-    rd->state->page_index = page_index;
+    state->rrdeng_uuid = &page_index->id;
+    state->page_index = page_index;
 }
 
 /*
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
  */
-void rrdeng_store_metric_init(RRDDIM *rd)
+void rrdeng_store_metric_init(RRDDIM *rd, int tier)
 {
     struct rrdeng_collect_handle *handle;
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
+    struct rrddim_volatile *state;
 
-    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+    if (!tier)
+        state = rd->state;
+    else
+        state = rd->state_tier1;
+
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost, tier);
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
     handle->ctx = ctx;
     handle->descr = NULL;
     handle->unaligned_page = 0;
-    rd->state->handle = (STORAGE_COLLECT_HANDLE *)handle;
-
-    page_index = rd->state->page_index;
+    state->handle = (STORAGE_COLLECT_HANDLE *)handle;
+    page_index = state->page_index;
     uv_rwlock_wrlock(&page_index->lock);
     ++page_index->writers;
     uv_rwlock_wrunlock(&page_index->lock);
 }
 
 /* The page must be populated and referenced */
-static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
+static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr, size_t storage_size)
 {
     unsigned i;
     uint8_t has_only_empty_metrics = 1;
     storage_number *page;
 
     page = descr->pg_cache_descr->page;
-    for (i = 0 ; i < descr->page_length / sizeof(storage_number); ++i) {
+    for (i = 0 ; i < descr->page_length / storage_size; ++i) {
         if (SN_EMPTY_SLOT != page[i]) {
             has_only_empty_metrics = 0;
             break;
@@ -159,13 +174,19 @@ static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
     return has_only_empty_metrics;
 }
 
-void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
+void rrdeng_store_metric_flush_current_page(RRDDIM *rd, int tier)
 {
     struct rrdeng_collect_handle *handle;
     struct rrdengine_instance *ctx;
     struct rrdeng_page_descr *descr;
+    struct rrddim_volatile *state;
 
-    handle = (struct rrdeng_collect_handle *)rd->state->handle;
+    if (!tier)
+        state = rd->state;
+    else
+        state = rd->state_tier1;
+
+    handle = (struct rrdeng_collect_handle *)state->handle;
     ctx = handle->ctx;
     if (unlikely(!ctx))
         return;
@@ -178,7 +199,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
 
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
-        page_is_empty = page_has_only_empty_metrics(descr);
+        page_is_empty = page_has_only_empty_metrics(descr, ctx->storage_size);
         if (page_is_empty) {
             debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
             if (unlikely(debug_flags & D_RRDENGINE))
@@ -195,11 +216,28 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     handle->descr = NULL;
 }
 
-void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n, SN_FLAGS flags)
+void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n,
+                              NETDATA_DOUBLE min_value,
+                              NETDATA_DOUBLE max_value,
+                              NETDATA_DOUBLE sum_value,
+                              uint32_t count,
+                              SN_FLAGS flags, int tier)
 {
+    struct rrddim_volatile *state;
+    UNUSED(min_value);
+    UNUSED(max_value);
+    UNUSED(sum_value);
+    UNUSED(count);
+
+    if (!tier)
+        state = rd->state;
+    else
+        state = rd->state_tier1;
+
+    // TODO: Pack the number based on tiering
     storage_number number = pack_storage_number(n, flags);
 
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->state->handle;
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *) state->handle;
     struct rrdengine_instance *ctx;
     struct page_cache *pg_cache;
     struct rrdeng_page_descr *descr;
@@ -235,9 +273,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
     if (unlikely(NULL == descr ||
                  descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE ||
                  must_flush_unaligned_page)) {
-        rrdeng_store_metric_flush_current_page(rd);
+        rrdeng_store_metric_flush_current_page(rd, tier);
 
-        page = rrdeng_create_page(ctx, &rd->state->page_index->id, &descr);
+        page = rrdeng_create_page(ctx, &state->page_index->id, &descr);
         fatal_assert(page);
 
         handle->descr = descr;
@@ -271,9 +309,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
             }
         }
 
-        pg_cache_insert(ctx, rd->state->page_index, descr);
+        pg_cache_insert(ctx, state->page_index, descr);
     } else {
-        pg_cache_add_new_metric_time(rd->state->page_index, descr);
+        pg_cache_add_new_metric_time(state->page_index, descr);
     }
 }
 
@@ -281,15 +319,21 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
  * Releases the database reference from the handle for storing metrics.
  * Returns 1 if it's safe to delete the dimension.
  */
-int rrdeng_store_metric_finalize(RRDDIM *rd)
+int rrdeng_store_metric_finalize(RRDDIM *rd, int tier)
 {
     struct rrdeng_collect_handle *handle;
     struct pg_cache_page_index *page_index;
     uint8_t can_delete_metric = 0;
+    struct rrddim_volatile *state;
 
-    handle = (struct rrdeng_collect_handle *)rd->state->handle;
-    page_index = rd->state->page_index;
-    rrdeng_store_metric_flush_current_page(rd);
+    if (!tier)
+        state = rd->state;
+    else
+        state = rd->state_tier1;
+
+    handle = (struct rrdeng_collect_handle *)state->handle;
+    page_index = state->page_index;
+    rrdeng_store_metric_flush_current_page(rd, tier);
     uv_rwlock_wrlock(&page_index->lock);
     if (!--page_index->writers && !page_index->page_count) {
         can_delete_metric = 1;
@@ -300,226 +344,35 @@ int rrdeng_store_metric_finalize(RRDDIM *rd)
    return can_delete_metric;
 }
 
-/* Returns 1 if the data collection interval is well defined, 0 otherwise */
-static int metrics_with_known_interval(struct rrdeng_page_descr *descr)
-{
-    unsigned page_entries;
-
-    if (unlikely(INVALID_TIME == descr->start_time || INVALID_TIME == descr->end_time))
-        return 0;
-    page_entries = descr->page_length / sizeof(storage_number);
-    if (likely(page_entries > 1)) {
-        return 1;
-    }
-    return 0;
-}
-
-static inline uint32_t *pginfo_to_dt(struct rrdeng_page_info *page_info)
-{
-    return (uint32_t *)&page_info->scratch[0];
-}
-
-static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
-{
-    return (uint32_t *)&page_info->scratch[sizeof(uint32_t)];
-}
-
-/**
- * Calculates the regions of different data collection intervals in a netdata chart in the time range
- * [start_time,end_time]. This call takes the netdata chart read lock.
- * @param st the netdata chart whose data collection interval boundaries are calculated.
- * @param start_time inclusive starting time in usec
- * @param end_time inclusive ending time in usec
- * @param region_info_arrayp It allocates (*region_info_arrayp) and populates it with information of regions of a
- *         reference dimension that that have different data collection intervals and overlap with the time range
- *         [start_time,end_time]. The caller must free (*region_info_arrayp) with freez(). If region_info_arrayp is set
- *         to NULL nothing was allocated.
- * @param max_intervalp is dereferenced and set to be the largest data collection interval of all regions.
- * @return number of regions with different data collection intervals.
- */
-unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
-                                         struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list)
-{
-    struct pg_cache_page_index *page_index;
-    struct rrdengine_instance *ctx;
-    unsigned pages_nr;
-    RRDDIM *rd_iter, *rd;
-    struct rrdeng_page_info *page_info_array, *curr, *prev, *old_prev;
-    unsigned i, j, page_entries, region_points, page_points, regions, max_interval;
-    time_t now;
-    usec_t dt, current_position_time, max_time = 0, min_time, curr_time, first_valid_time_in_page;
-    struct rrdeng_region_info *region_info_array;
-    uint8_t is_first_region_initialized;
-
-    ctx = get_rrdeng_ctx_from_host(st->rrdhost);
-    regions = 1;
-    *max_intervalp = max_interval = 0;
-    region_info_array = NULL;
-    *region_info_arrayp = NULL;
-    page_info_array = NULL;
-
-    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-    rrdset_rdlock(st);
-    for(rd_iter = temp_rd?temp_rd:st->dimensions, rd = NULL, min_time = (usec_t)-1 ; rd_iter ; rd_iter = rd_iter->next) {
-        /*
-         * Choose oldest dimension as reference. This is not equivalent to the union of all dimensions
-         * but it is a best effort approximation with a bias towards older metrics in a chart. It
-         * matches netdata behaviour in the sense that dimensions are generally aligned in a chart
-         * and older dimensions contain more information about the time range. It does not work well
-         * for metrics that have recently stopped being collected.
-         */
-        curr_time = pg_cache_oldest_time_in_range(ctx, rd_iter->state->rrdeng_uuid,
-                                                  start_time * USEC_PER_SEC, end_time * USEC_PER_SEC);
-        if (INVALID_TIME != curr_time && curr_time < min_time) {
-            rd = rd_iter;
-            min_time = curr_time;
-        }
-    }
-    rrdset_unlock(st);
-    if (NULL == rd) {
-        return 1;
-    }
-    pages_nr = pg_cache_preload(ctx, rd->state->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
-                                &page_info_array, &page_index);
-    if (pages_nr) {
-        /* conservative allocation, will reduce the size later if necessary */
-        region_info_array = mallocz(sizeof(*region_info_array) * pages_nr);
-    }
-    is_first_region_initialized = 0;
-    region_points = 0;
-
-    int is_out_of_order_reported = 0;
-    /* pages loop */
-    for (i = 0, curr = NULL, prev = NULL ; i < pages_nr ; ++i) {
-        old_prev = prev;
-        prev = curr;
-        curr = &page_info_array[i];
-        *pginfo_to_points(curr) = 0; /* initialize to invalid page */
-        *pginfo_to_dt(curr) = 0; /* no known data collection interval yet */
-        if (unlikely(INVALID_TIME == curr->start_time || INVALID_TIME == curr->end_time ||
-                     curr->end_time < curr->start_time)) {
-            info("Ignoring page with invalid timestamps.");
-            prev = old_prev;
-            continue;
-        }
-        page_entries = curr->page_length / sizeof(storage_number);
-        fatal_assert(0 != page_entries);
-        if (likely(1 != page_entries)) {
-            dt = (curr->end_time - curr->start_time) / (page_entries - 1);
-            *pginfo_to_dt(curr) = ROUND_USEC_TO_SEC(dt);
-            if (unlikely(0 == *pginfo_to_dt(curr)))
-                *pginfo_to_dt(curr) = 1;
-        } else {
-            dt = 0;
-        }
-        for (j = 0, page_points = 0 ; j < page_entries ; ++j) {
-            uint8_t is_metric_out_of_order, is_metric_earlier_than_range;
-
-            is_metric_earlier_than_range = 0;
-            is_metric_out_of_order = 0;
-
-            current_position_time = curr->start_time + j * dt;
-            now = current_position_time / USEC_PER_SEC;
-            if (now > end_time) { /* there will be no more pages in the time range */
-                break;
-            }
-            if (now < start_time)
-                is_metric_earlier_than_range = 1;
-            if (unlikely(current_position_time < max_time)) /* just went back in time */
-                is_metric_out_of_order = 1;
-            if (is_metric_earlier_than_range || unlikely(is_metric_out_of_order)) {
-                if (unlikely(is_metric_out_of_order))
-                    is_out_of_order_reported++;
-                continue; /* next entry */
-            }
-            /* here is a valid metric */
-            ++page_points;
-            region_info_array[regions - 1].points = ++region_points;
-            max_time = current_position_time;
-            if (1 == page_points)
-                first_valid_time_in_page = current_position_time;
-            if (unlikely(!is_first_region_initialized)) {
-                fatal_assert(1 == regions);
-                /* this is the first region */
-                region_info_array[0].start_time = current_position_time;
-                is_first_region_initialized = 1;
-            }
-        }
-        *pginfo_to_points(curr) = page_points;
-        if (0 == page_points) {
-            prev = old_prev;
-            continue;
-        }
-
-        if (unlikely(0 == *pginfo_to_dt(curr))) { /* unknown data collection interval */
-            fatal_assert(1 == page_points);
-
-            if (likely(NULL != prev)) { /* get interval from previous page */
-                *pginfo_to_dt(curr) = *pginfo_to_dt(prev);
-            } else { /* there is no previous page in the query */
-                struct rrdeng_page_info db_page_info;
-
-                /* go to database */
-                pg_cache_get_filtered_info_prev(ctx, page_index, curr->start_time,
-                                                metrics_with_known_interval, &db_page_info);
-                if (unlikely(db_page_info.start_time == INVALID_TIME || db_page_info.end_time == INVALID_TIME ||
-                             0 == db_page_info.page_length)) { /* nothing in the database, default to update_every */
-                    *pginfo_to_dt(curr) = rd->update_every;
-                } else {
-                    unsigned db_entries;
-                    usec_t db_dt;
-
-                    db_entries = db_page_info.page_length / sizeof(storage_number);
-                    db_dt = (db_page_info.end_time - db_page_info.start_time) / (db_entries - 1);
-                    *pginfo_to_dt(curr) = ROUND_USEC_TO_SEC(db_dt);
-                    if (unlikely(0 == *pginfo_to_dt(curr)))
-                        *pginfo_to_dt(curr) = 1;
-
-                }
-            }
-        }
-        if (likely(prev) && unlikely(*pginfo_to_dt(curr) != *pginfo_to_dt(prev))) {
-            info("Data collection interval change detected in query: %"PRIu32" -> %"PRIu32,
-                 *pginfo_to_dt(prev), *pginfo_to_dt(curr));
-            region_info_array[regions++ - 1].points -= page_points;
-            region_info_array[regions - 1].points = region_points = page_points;
-            region_info_array[regions - 1].start_time = first_valid_time_in_page;
-        }
-        if (*pginfo_to_dt(curr) > max_interval)
-            max_interval = *pginfo_to_dt(curr);
-        region_info_array[regions - 1].update_every = *pginfo_to_dt(curr);
-    }
-    if (page_info_array)
-        freez(page_info_array);
-    if (region_info_array) {
-        if (likely(is_first_region_initialized)) {
-            /* free unnecessary memory */
-            region_info_array = reallocz(region_info_array, sizeof(*region_info_array) * regions);
-            *region_info_arrayp = region_info_array;
-            *max_intervalp = max_interval;
-        } else {
-            /* empty result */
-            freez(region_info_array);
-        }
-    }
-    if (is_out_of_order_reported)
-        info("Ignored %d metrics with out of order timestamp in %u regions.", is_out_of_order_reported, regions);
-    return regions;
-}
-
+//static inline uint32_t *pginfo_to_dt(struct rrdeng_page_info *page_info)
+//{
+//    return (uint32_t *)&page_info->scratch[0];
+//}
+//
+//static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
+//{
+//    return (uint32_t *)&page_info->scratch[sizeof(uint32_t)];
+//}
+//
 /*
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time)
+void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time, int tier)
 {
     // fprintf(stderr, "%s: %s/%s start time %ld, end time %ld\n", __FUNCTION__ , rd->rrdset->name, rd->name, start_time, end_time);
 
     struct rrdeng_query_handle *handle;
     struct rrdengine_instance *ctx;
     unsigned pages_nr;
+    struct rrddim_volatile *state;
 
-    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
+    if (!tier)
+        state = rd->state;
+    else
+        state = rd->state_tier1;
+
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost, tier);
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
 
@@ -532,7 +385,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     handle->ctx = ctx;
     handle->descr = NULL;
     rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
-    pages_nr = pg_cache_preload(ctx, rd->state->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
+    pages_nr = pg_cache_preload(ctx, state->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
                                 NULL, &handle->page_index);
     if (unlikely(NULL == handle->page_index || 0 == pages_nr))
         // there are no metrics to load
@@ -580,7 +433,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 
     if (unlikely(descr->start_time != page_end_time && next_page_time > descr->start_time)) {
         // we're in the middle of the page somewhere
-        unsigned entries = page_length / sizeof(storage_number);
+        unsigned entries = page_length / ctx->storage_size;
         position = ((uint64_t)(next_page_time - descr->start_time)) * (entries - 1) /
                    (page_end_time - descr->start_time);
     }
@@ -590,7 +443,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     handle->page_end_time = page_end_time;
     handle->page_length = page_length;
     handle->page = descr->pg_cache_descr->page;
-    usec_t entries = handle->entries = page_length / sizeof(storage_number);
+    usec_t entries = handle->entries = page_length / ctx->storage_size;
     if (likely(entries > 1))
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
 
@@ -679,31 +532,43 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
     rrdimm_handle->handle = NULL;
 }
 
-time_t rrdeng_metric_latest_time(RRDDIM *rd)
+time_t rrdeng_metric_latest_time(RRDDIM *rd, int tier)
 {
     struct pg_cache_page_index *page_index;
+    struct rrddim_volatile *state;
 
-    page_index = rd->state->page_index;
+    if (!tier)
+        state = rd->state;
+    else
+        state = rd->state_tier1;
+
+    page_index = state->page_index;
 
     return page_index->latest_time / USEC_PER_SEC;
 }
-time_t rrdeng_metric_oldest_time(RRDDIM *rd)
+time_t rrdeng_metric_oldest_time(RRDDIM *rd, int tier)
 {
     struct pg_cache_page_index *page_index;
+    struct rrddim_volatile *state;
 
-    page_index = rd->state->page_index;
+    if (!tier)
+        state = rd->state;
+    else
+        state = rd->state_tier1;
+
+    page_index = state->page_index;
 
     return page_index->oldest_time / USEC_PER_SEC;
 }
 
-int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t)
+int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t, int tier)
 {
     struct page_cache *pg_cache;
     struct rrdengine_instance *ctx;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index = NULL;
 
-    ctx = get_rrdeng_ctx_from_host(localhost);
+    ctx = get_rrdeng_ctx_from_host(localhost, tier);
     if (unlikely(!ctx)) {
         error("Failed to fetch multidb context");
         return 1;
@@ -899,7 +764,7 @@ void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
  * Returns 0 on success, negative on error
  */
 int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
-                unsigned disk_space_mb)
+                unsigned disk_space_mb, int tier)
 {
     struct rrdengine_instance *ctx;
     int error;
@@ -912,7 +777,8 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     if (rrdeng_reserved_file_descriptors > max_open_files) {
         error(
             "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
-            (unsigned)rrdeng_reserved_file_descriptors, (unsigned)max_open_files);
+            (unsigned)rrdeng_reserved_file_descriptors,
+            (unsigned)max_open_files);
 
         rrd_stat_atomic_add(&global_fs_errors, 1);
         rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
@@ -920,10 +786,19 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     }
 
     if (NULL == ctxp) {
-        ctx = &multidb_ctx;
-        memset(ctx, 0, sizeof(*ctx));
+        if (!tier) {
+            ctx = &multidb_ctx;
+            memset(ctx, 0, sizeof(*ctx));
+            ctx->storage_size = sizeof(storage_number);
+        }
+        else {
+            ctx = &multidb_ctx_tier1;
+            memset(ctx, 0, sizeof(*ctx));
+            ctx->storage_size = sizeof(storage_number);
+        }
     } else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));
+        ctx->storage_size = sizeof(storage_number);
     }
     ctx->global_compress_alg = RRD_LZ4;
     if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
@@ -1006,7 +881,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     //metalog_exit(ctx->metalog_ctx);
     free_page_cache(ctx);
 
-    if (ctx != &multidb_ctx) {
+    if (ctx != &multidb_ctx && ctx != &multidb_ctx_tier1) {
         freez(ctx);
     }
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
