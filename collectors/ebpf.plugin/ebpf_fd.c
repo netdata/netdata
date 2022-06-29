@@ -48,20 +48,6 @@ netdata_fd_stat_t **fd_pid = NULL;
  *****************************************************************/
 
 /**
- * Clean PID structures
- *
- * Clean the allocated structures.
- */
-void clean_fd_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(fd_pid[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
-/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
