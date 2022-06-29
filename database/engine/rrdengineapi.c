@@ -219,14 +219,12 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd, int tier)
 void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n,
                               NETDATA_DOUBLE min_value,
                               NETDATA_DOUBLE max_value,
-                              NETDATA_DOUBLE sum_value,
                               uint16_t count,
                               SN_FLAGS flags, int tier)
 {
     struct rrddim_volatile *state;
     UNUSED(min_value);
     UNUSED(max_value);
-    UNUSED(sum_value);
     UNUSED(count);
     storage_number number;
     storage_number_tier1_t number_tier1;
@@ -239,10 +237,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
     }
     else {
         state = rd->state_tier1;
-        number_tier1.value = pack_storage_number(n, flags);
+        number_tier1.sum_value = pack_storage_number(n, flags);
         number_tier1.min_value = pack_storage_number(n, flags);
         number_tier1.max_value = pack_storage_number(n, flags);
-        number_tier1.sum_value = pack_storage_number(n, flags);
         number_tier1.count = count;
     }
 
@@ -471,7 +468,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
 NETDATA_DOUBLE
-rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result) {
+rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdeng_page_descr *descr = handle->descr;
@@ -508,7 +505,7 @@ rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start
 
     if (handle->ctx->tier) {
         tier1_value = ((storage_number_tier1_t *)handle->page)[position];
-        n = tier1_value.value;
+        n = tier1_value.sum_value;
     }
     else
         n = handle->page[position];

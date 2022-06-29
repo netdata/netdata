@@ -46,7 +46,6 @@ extern void rrdeng_store_metric_flush_current_page(RRDDIM *rd, int tier);
 extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n,
                                      NETDATA_DOUBLE min_value,
                                      NETDATA_DOUBLE max_value,
-                                     NETDATA_DOUBLE sum_value,
                                      uint16_t count,
                                      SN_FLAGS flags, int tier);
 extern int rrdeng_store_metric_finalize(RRDDIM *rd, int tier);

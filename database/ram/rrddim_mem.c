@@ -14,13 +14,11 @@ void rrddim_collect_init(RRDDIM *rd, int tier) {
 void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number,
         NETDATA_DOUBLE min_value,
         NETDATA_DOUBLE max_value,
-        NETDATA_DOUBLE sum_value,
-        uint32_t count,
+        uint16_t count,
         SN_FLAGS flags, int tier)
 {
     UNUSED(min_value);
     UNUSED(max_value);
-    UNUSED(sum_value);
     UNUSED(count);
     UNUSED(tier);
 
@@ -60,7 +58,7 @@ void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t st
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
 NETDATA_DOUBLE
-rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
+rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier1_number __maybe_unused) {
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     size_t entries = rd->rrdset->entries;
