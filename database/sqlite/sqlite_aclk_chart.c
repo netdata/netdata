@@ -611,7 +611,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
                 rrddim_foreach_read(rd, st)
                 {
                     rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
-                    rd->state->aclk_live_status = (rd->state->aclk_live_status == 0);
+                    rd->aclk_live_status = (rd->aclk_live_status == 0);
                 }
                 rrdset_unlock(st);
             }
@@ -1088,7 +1088,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
 {
     int live = !last_updated;
 
-    if (likely(rd->state->aclk_live_status == live))
+    if (likely(rd->aclk_live_status == live))
         return;
 
     time_t created_at = rd->state->query_ops.oldest_time(rd, 0);
@@ -1096,7 +1096,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     if (unlikely(!created_at && rd->updated))
        created_at = rd->last_collected_time.tv_sec;
 
-    rd->state->aclk_live_status = live;
+    rd->aclk_live_status = live;
 
     struct aclk_database_worker_config *wc = rd->rrdset->rrdhost->dbsync_worker;
     if (unlikely(!wc))
@@ -1139,7 +1139,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     if (unlikely(rc)) {
         freez(aclk_cd_data->payload);
         freez(aclk_cd_data);
-        rd->state->aclk_live_status = !live;
+        rd->aclk_live_status = !live;
     }
     return;
 }
@@ -1156,7 +1156,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
     time_t now = now_realtime_sec();
     int live = ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every));
 
-    if (!live || rd->state->aclk_live_status != live || !first_entry_t) {
+    if (!live || rd->aclk_live_status != live || !first_entry_t) {
         (void)aclk_upd_dimension_event(
             rd->rrdset->rrdhost->dbsync_worker,
             claim_id,
@@ -1189,7 +1189,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
                 first_entry_t,
                 last_entry_t,
                 now - last_entry_t);
-        rd->state->aclk_live_status = live;
+        rd->aclk_live_status = live;
     }
 
     freez(claim_id);

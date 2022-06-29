@@ -261,6 +261,10 @@ struct rrddim {
                                                     // this is actual date time we updated the last_collected_value
                                                     // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
+#ifdef ENABLE_ACLK
+    int aclk_live_status;
+#endif
+
     struct rrddim_volatile *state;                  // volatile state that is not persistently stored
     struct rrddim_volatile *state_tier1;            // volatile state for tier1
     size_t collections_counter;                     // the number of times we added values to this rrdim
@@ -375,9 +379,6 @@ struct rrddim_volatile {
 #ifdef ENABLE_DBENGINE
     uuid_t *rrdeng_uuid;                            // database engine metric UUID
     struct pg_cache_page_index *page_index;
-#endif
-#ifdef ENABLE_ACLK
-    int aclk_live_status;
 #endif
     NETDATA_DOUBLE sum_value;
     NETDATA_DOUBLE min_value;

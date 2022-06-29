@@ -144,7 +144,7 @@ time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
 {
     time_t last_updated = rd->last_collected_time.tv_sec;
     int live;
-    if (rd->state->aclk_live_status == 1)
+    if (rd->aclk_live_status == 1)
         live =
             ((now - last_updated) <
              MIN(rrdset_free_obsolete_time, RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER * rd->update_every));
@@ -247,12 +247,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     rd->rrd_memory_mode = memory_mode;
 
-    rd->state = callocz(1, sizeof(*rd->state));
 #ifdef ENABLE_ACLK
-    rd->state->aclk_live_status = -1;
+    rd->aclk_live_status = -1;
 #endif
     (void) find_dimension_uuid(st, rd, &(rd->metric_uuid));
 
+    rd->state = callocz(1, sizeof(*rd->state));
     STORAGE_ENGINE* eng = storage_engine_get(memory_mode);
     rd->state->collect_ops = eng->api.collect_ops;
     rd->state->query_ops = eng->api.query_ops;
