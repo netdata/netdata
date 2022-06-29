@@ -49,7 +49,7 @@ void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t st
     h->slot_timestamp = rrdset_slot2time(rd->rrdset, h->slot);
     h->last_timestamp = rrdset_slot2time(rd->rrdset, h->last_slot);
 
-    // info("QUERY: start %ld, end %ld, next %ld, first %ld, last %ld", start_time, end_time, h->next_timestamp, h->slot_timestamp, h->last_timestamp);
+    // info("RRDDIM QUERY INIT: start %ld, end %ld, next %ld, first %ld, last %ld, dt %ld", start_time, end_time, h->next_timestamp, h->slot_timestamp, h->last_timestamp, h->dt);
 
     handle->handle = (STORAGE_QUERY_HANDLE *)h;
 }

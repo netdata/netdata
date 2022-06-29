@@ -39,6 +39,7 @@ static struct {
         , {"tier1"             , 0    , RRDR_OPTION_TIER1}
         , {"raw"               , 0    , RRDR_OPTION_RETURN_RAW}
         , {"jw-anomaly-rates"  , 0    , RRDR_OPTION_RETURN_JWAR}
+        , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
         , {NULL                , 0    , 0}
 };
 
@@ -1327,7 +1328,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO | RRDR_OPTION_ALLOW_PAST;
+    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
     METRIC_CORRELATIONS_METHOD method = default_metric_correlations_method;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
