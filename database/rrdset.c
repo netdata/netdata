@@ -1088,6 +1088,7 @@ static inline size_t rrdset_done_interpolate(
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
                 rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 0, 1, SN_EMPTY_SLOT, 0);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 0, 1, SN_EMPTY_SLOT, 1);
                 continue;
             }
 
@@ -1114,6 +1115,7 @@ static inline size_t rrdset_done_interpolate(
                 #endif
 
                 rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 0, 1, SN_EMPTY_SLOT, 0);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 0, 1, SN_EMPTY_SLOT, 1);
                 rd->last_stored_value = NAN;
             }
 

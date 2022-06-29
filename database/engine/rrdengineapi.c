@@ -220,7 +220,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
                               NETDATA_DOUBLE min_value,
                               NETDATA_DOUBLE max_value,
                               NETDATA_DOUBLE sum_value,
-                              uint32_t count,
+                              uint16_t count,
                               SN_FLAGS flags, int tier)
 {
     struct rrddim_volatile *state;
@@ -228,20 +228,29 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
     UNUSED(max_value);
     UNUSED(sum_value);
     UNUSED(count);
+    storage_number number;
+    storage_number_tier1_t number_tier1;
 
-    if (!tier)
+    number = pack_storage_number(n, flags);
+
+    if (!tier) {
         state = rd->state;
-    else
+        number = pack_storage_number(n, flags);
+    }
+    else {
         state = rd->state_tier1;
-
-    // TODO: Pack the number based on tiering
-    storage_number number = pack_storage_number(n, flags);
+        number_tier1.value = pack_storage_number(n, flags);
+        number_tier1.min_value = pack_storage_number(n, flags);
+        number_tier1.max_value = pack_storage_number(n, flags);
+        number_tier1.sum_value = pack_storage_number(n, flags);
+        number_tier1.count = count;
+    }
 
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *) state->handle;
     struct rrdengine_instance *ctx;
     struct page_cache *pg_cache;
     struct rrdeng_page_descr *descr;
-    storage_number *page;
+    void *page;
     uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
 
     ctx = handle->ctx;
@@ -249,7 +258,6 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
     descr = handle->descr;
 
     size_t storage_size = ctx->storage_size;
-
 
     if (descr) {
         /* Make alignment decisions */
@@ -291,7 +299,10 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
         }
     }
     page = descr->pg_cache_descr->page;
-    page[descr->page_length / storage_size] = number;
+    if (!tier)
+        ((storage_number *) page)[descr->page_length / storage_size] = number;
+    else
+        ((storage_number_tier1_t *) page)[descr->page_length / storage_size] = number_tier1;
     pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + storage_size);
 
     if (perfect_page_alignment)
@@ -344,7 +355,7 @@ int rrdeng_store_metric_finalize(RRDDIM *rd, int tier)
     uv_rwlock_wrunlock(&page_index->lock);
     freez(handle);
 
-   return can_delete_metric;
+    return can_delete_metric;
 }
 
 //static inline uint32_t *pginfo_to_dt(struct rrdeng_page_info *page_info)
@@ -460,12 +471,13 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
 NETDATA_DOUBLE
-rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags) {
+rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdeng_page_descr *descr = handle->descr;
     unsigned position = handle->position + 1;
     time_t now = handle->now + handle->dt_sec;
+    storage_number_tier1_t tier1_value;
 
     if (unlikely(INVALID_TIME == handle->next_page_time)) {
         handle->next_page_time = INVALID_TIME;
@@ -492,8 +504,15 @@ rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start
         position = handle->position;
         now = (time_t)((descr->start_time + position * handle->dt) / USEC_PER_SEC);
     }
+    storage_number n;
 
-    storage_number n = handle->page[position];
+    if (handle->ctx->tier) {
+        tier1_value = ((storage_number_tier1_t *)handle->page)[position];
+        n = tier1_value.value;
+    }
+    else
+        n = handle->page[position];
+
     handle->position = position;
     handle->now = now;
 
@@ -797,7 +816,8 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
         else {
             ctx = &multidb_ctx_tier1;
             memset(ctx, 0, sizeof(*ctx));
-            ctx->storage_size = sizeof(storage_number);
+            ctx->storage_size = sizeof(storage_number_tier1_t);
+            ctx->tier = 1;
         }
     } else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));

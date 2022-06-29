@@ -238,6 +238,9 @@ int rrdset2anything_api_v1(
     if (query_params->context_param_list && !(query_params->context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
         st->last_accessed_time = now_realtime_sec();
 
+    if (options & RRDR_OPTION_TIER1)
+        info("DEBUG: TIER1 QUERY");
+
     RRDR *r = rrd2rrdr(
         owa,
         st,

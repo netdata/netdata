@@ -27,6 +27,7 @@ typedef enum rrdr_options {
     RRDR_OPTION_ANOMALY_BIT  = 0x00040000, // Return the anomaly bit stored in each collected_number
     RRDR_OPTION_RETURN_RAW   = 0x00080000, // Return raw data for aggregating across multiple nodes
     RRDR_OPTION_RETURN_JWAR  = 0x00100000, // Return anomaly rates in jsonwrap
+    RRDR_OPTION_TIER1        = 0x00200000, // Return anomaly rates in jsonwrap
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_INTERNAL_AR  = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate

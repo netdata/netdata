@@ -36,6 +36,7 @@ static struct {
         , {"match-names"       , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"    , 0    , RRDR_OPTION_CUSTOM_VARS}
         , {"anomaly-bit"       , 0    , RRDR_OPTION_ANOMALY_BIT}
+        , {"tier1"             , 0    , RRDR_OPTION_TIER1}
         , {"raw"               , 0    , RRDR_OPTION_RETURN_RAW}
         , {"jw-anomaly-rates"  , 0    , RRDR_OPTION_RETURN_JWAR}
         , {NULL                , 0    , 0}

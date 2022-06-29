@@ -458,7 +458,7 @@ static inline void rrd2rrdr_do_dimension(
     size_t db_points_read = 0;
 
     // cache the function pointers we need in the loop
-    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags) = rd->state->query_ops.next_metric;
+    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result) = rd->state->query_ops.next_metric;
     void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value) = r->internal.grouping_add;
     NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) = r->internal.grouping_flush;
 
@@ -469,12 +469,13 @@ static inline void rrd2rrdr_do_dimension(
     size_t last_point_anomaly;
 
     NETDATA_DOUBLE new_point_value = NAN;
+    storage_number_tier1_t tier_new_point_value;
     SN_FLAGS new_point_flags = SN_EMPTY_SLOT;
     time_t new_point_start_time = 0;
     time_t new_point_end_time = 0;
     size_t new_point_anomaly = 0;
 
-    for(rd->state->query_ops.init(rd, &handle, now, before_wanted, 0) ; points_added < points_wanted ; now += dt) {
+    for(rd->state->query_ops.init(rd, &handle, now, before_wanted, options & RRDR_OPTION_TIER1 ? 1 : 0) ; points_added < points_wanted ; now += dt) {
 
         // TODO - should be removed when before and after are always respected
         // independently of the databaase first and last time and points_wanted
@@ -494,7 +495,7 @@ static inline void rrd2rrdr_do_dimension(
 
         if(likely(!rd->state->query_ops.is_finished(&handle))) {
             // fetch the new point
-            new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags);
+            new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &tier_new_point_value);
 
             if(likely(netdata_double_isnumber(new_point_value))) {
                 new_point_anomaly = (new_point_flags & SN_ANOMALY_BIT) ? 0 : 100;
