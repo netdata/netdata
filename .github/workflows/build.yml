@@ -189,7 +189,7 @@ jobs:
               entries[i]['distro'] = ':'.join([entries[i]['distro'], str(entries[i]['version'])])
               del entries[i]['version']
 
-          entries.sort(key=lambda k: (k['distro'], k['version']))
+          entries.sort(key=lambda k: k['distro'])
           matrix = json.dumps({include: entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
           print('::set-output name=matrix::' + matrix)
