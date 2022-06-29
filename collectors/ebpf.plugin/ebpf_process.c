@@ -1093,20 +1093,6 @@ static void process_collector(ebpf_module_t *em)
  *
  *****************************************************************/
 
-void clean_global_memory() {
-    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        uint32_t pid = pids->pid;
-        freez(global_process_stats[pid]);
-
-        bpf_map_delete_elem(pid_fd, &pid);
-        freez(current_apps_data[pid]);
-
-        pids = pids->next;
-    }
-}
-
 /**
  * Process disable tracepoints
  *
@@ -1150,10 +1136,6 @@ static void ebpf_process_cleanup(void *ptr)
 
     ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_hash_values);
-
-    clean_global_memory();
-    freez(global_process_stats);
-    freez(current_apps_data);
 
     ebpf_process_disable_tracepoints();
 
