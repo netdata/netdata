@@ -173,19 +173,24 @@ jobs:
           from ruamel.yaml import YAML
           import json
           yaml = YAML(typ='safe')
+          entries = list()
+
           with open('.github/data/distros.yml') as f:
               data = yaml.load(f)
-          del data['platform_map']
+
           for i, v in enumerate(data['include']):
-              data['include'][i]['artifact_key'] = data['include'][i]['distro'] + str(data['include'][i]['version']).replace('.', '')
-              if 'packages' in data['include'][i]:
-                  del data['include'][i]['packages']
-              if 'base_image' in data['include'][i]:
-                  data['include'][i]['distro'] = data['include'][i]['base_image']
-                  del data['include'][i]['base_image']
-              data['include'][i]['distro'] = ':'.join([data['include'][i]['distro'], str(data['include'][i]['version'])])
-              del data['include'][i]['version']
-          matrix = json.dumps(data, sort_keys=True)
+              entries.append(data['include'][i])
+              entries[i]['artifact_key'] = entries[i]['distro'] + str(entries[i]['version']).replace('.', '')
+              if 'packages' in entries[i]:
+                  del entries[i]['packages']
+              if 'base_image' in entries[i]:
+                  entries[i]['distro'] = entries[i]['base_image']
+                  del entries[i]['base_image']
+              entries[i]['distro'] = ':'.join([entries[i]['distro'], str(entries[i]['version'])])
+              del entries[i]['version']
+
+          entries.sort(key=lambda k: (k['distro'], k['version']))
+          matrix = json.dumps({include: entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
           print('::set-output name=matrix::' + matrix)
       - name: Failure Notification
