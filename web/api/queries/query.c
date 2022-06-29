@@ -520,7 +520,7 @@ static inline void rrd2rrdr_do_dimension(
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld). Fetching the next one.",
                                rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted, query_granularity);
 
-                new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags);
+                new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &tier_new_point_value);
                 db_points_read++;
             }
 
@@ -919,8 +919,8 @@ RRDR *rrd2rrdr(
             relative_period_requested = true;
 
             rrdset_rdlock(st);
-            time_t first_entry_t = rrdset_first_entry_t_nolock(st);
-            time_t last_entry_t = rrdset_last_entry_t_nolock(st);
+            time_t first_entry_t = rrdset_first_entry_t_nolock(st, options & RRDR_OPTION_TIER1? 1 : 0);
+            time_t last_entry_t = rrdset_last_entry_t_nolock(st, options & RRDR_OPTION_TIER1? 1 : 0);
             rrdset_unlock(st);
 
             query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_t, last_entry_t);
