@@ -6,9 +6,16 @@
 
 **Merged pull requests:**
 
+- Delay health until obsoletions check is complete [\#13239](https://github.com/netdata/netdata/pull/13239) ([MrZammler](https://github.com/MrZammler))
+- Implement PackageCloud cleanup [\#13236](https://github.com/netdata/netdata/pull/13236) ([maneamarius](https://github.com/maneamarius))
+- Bump repoconfig package version used in kickstart.sh [\#13235](https://github.com/netdata/netdata/pull/13235) ([Ferroin](https://github.com/Ferroin))
+- Updates the sqlite version in the agent [\#13233](https://github.com/netdata/netdata/pull/13233) ([stelfrag](https://github.com/stelfrag))
+- Add more sqlite unittests [\#13227](https://github.com/netdata/netdata/pull/13227) ([stelfrag](https://github.com/stelfrag))
 - ci: add issues to the Agent Board project workflow [\#13225](https://github.com/netdata/netdata/pull/13225) ([ilyam8](https://github.com/ilyam8))
 - fix\(cgroups.plugin\): fix qemu VMs and LXC containers name resolution [\#13220](https://github.com/netdata/netdata/pull/13220) ([ilyam8](https://github.com/ilyam8))
+- netdata doubles [\#13217](https://github.com/netdata/netdata/pull/13217) ([ktsaou](https://github.com/ktsaou))
 - deduplicate mountinfo based on mount point [\#13215](https://github.com/netdata/netdata/pull/13215) ([ktsaou](https://github.com/ktsaou))
+- feat\(python.d\): load modules from user plugin directories \(NETDATA\_USER\_PLUGINS\_DIRS\) [\#13214](https://github.com/netdata/netdata/pull/13214) ([ilyam8](https://github.com/ilyam8))
 - Properly handle interactivity in the updater code. [\#13209](https://github.com/netdata/netdata/pull/13209) ([Ferroin](https://github.com/Ferroin))
 - Don’t use realpath to find kickstart source path. [\#13208](https://github.com/netdata/netdata/pull/13208) ([Ferroin](https://github.com/Ferroin))
 - Print INTERNAL BUG messages only when NETDATA\_INTERNAL\_CHECKS is enabled [\#13207](https://github.com/netdata/netdata/pull/13207) ([MrZammler](https://github.com/MrZammler))
@@ -16,6 +23,7 @@
 - Add user plugin dirs to environment [\#13203](https://github.com/netdata/netdata/pull/13203) ([vlvkobal](https://github.com/vlvkobal))
 - Fix cgroups netdev chart labels [\#13200](https://github.com/netdata/netdata/pull/13200) ([vlvkobal](https://github.com/vlvkobal))
 - Allow for an easy way to do metadata migrations [\#13196](https://github.com/netdata/netdata/pull/13196) ([stelfrag](https://github.com/stelfrag))
+- Dictionaries with reference counters and full deletion support during traversal [\#13195](https://github.com/netdata/netdata/pull/13195) ([ktsaou](https://github.com/ktsaou))
 - Add configuration for dbengine page fetch timeout and retry count [\#13194](https://github.com/netdata/netdata/pull/13194) ([stelfrag](https://github.com/stelfrag))
 - Clean sqlite prepared statements on thread shutdown [\#13193](https://github.com/netdata/netdata/pull/13193) ([stelfrag](https://github.com/stelfrag))
 - Update dashboard to version v2.26.5. [\#13192](https://github.com/netdata/netdata/pull/13192) ([netdatabot](https://github.com/netdatabot))
@@ -68,6 +76,7 @@
 - docs\(statsd.plugin\): fix indentation [\#13096](https://github.com/netdata/netdata/pull/13096) ([ilyam8](https://github.com/ilyam8))
 - Statistics on bytes recvd and sent [\#13091](https://github.com/netdata/netdata/pull/13091) ([underhood](https://github.com/underhood))
 - fix virtualization detection on FreeBSD [\#13087](https://github.com/netdata/netdata/pull/13087) ([ilyam8](https://github.com/ilyam8))
+- Update netdata commands [\#13080](https://github.com/netdata/netdata/pull/13080) ([tkatsoulas](https://github.com/tkatsoulas))
 - Labels with dictionary [\#13070](https://github.com/netdata/netdata/pull/13070) ([ktsaou](https://github.com/ktsaou))
 - Use a separate thread for slow mountpoints in the diskspace plugin [\#13067](https://github.com/netdata/netdata/pull/13067) ([vlvkobal](https://github.com/vlvkobal))
 - Fix coverity 378587 [\#13024](https://github.com/netdata/netdata/pull/13024) ([MrZammler](https://github.com/MrZammler))
@@ -352,12 +361,6 @@
 - Check if libatomic can be linked [\#12583](https://github.com/netdata/netdata/pull/12583) ([MrZammler](https://github.com/MrZammler))
 - Update links to documentation \(eBPF\) [\#12581](https://github.com/netdata/netdata/pull/12581) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix: re-add setuid bit to ioping after installing Debian package [\#12580](https://github.com/netdata/netdata/pull/12580) ([ilyam8](https://github.com/ilyam8))
-- Kickstart improved messaging [\#12577](https://github.com/netdata/netdata/pull/12577) ([Ferroin](https://github.com/Ferroin))
-- add some new ml params to README [\#12575](https://github.com/netdata/netdata/pull/12575) ([andrewm4894](https://github.com/andrewm4894))
-- Update ML-related charts [\#12574](https://github.com/netdata/netdata/pull/12574) ([vkalintiris](https://github.com/vkalintiris))
-- update anonymous-statistics readme for PH Cloud [\#12571](https://github.com/netdata/netdata/pull/12571) ([andrewm4894](https://github.com/andrewm4894))
-- Respect dimension hidden option when executing a query  [\#12570](https://github.com/netdata/netdata/pull/12570) ([stelfrag](https://github.com/stelfrag))
-- \[Agent crash on api/v1/info call\] - fixes \#12559 [\#12565](https://github.com/netdata/netdata/pull/12565) ([erdem2000](https://github.com/erdem2000))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
