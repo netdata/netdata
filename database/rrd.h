@@ -7,6 +7,11 @@
 extern "C" {
 #endif
 
+// non-existing structs instead of voids
+// to enable type checking at compile time
+typedef struct storage_instance STORAGE_INSTANCE;
+typedef struct storage_metric_handle STORAGE_METRIC_HANDLE;
+
 // forward typedefs
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
@@ -347,24 +352,24 @@ struct rrddim_query_handle {
 // function pointers that handle data collection
 struct rrddim_collect_ops {
     // an initialization function to run before starting collection
-    void *(*init)(void *db_metric_handle);
+    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle);
 
     // run this to store each metric into the database
-    void (*store_metric)(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
+    void (*store_metric)(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
                          NETDATA_DOUBLE max_value, uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
 
     // run this to flush / reset the current data collection sequence
-    void (*flush)(void *collection_handle);
+    void (*flush)(STORAGE_COLLECT_HANDLE *collection_handle);
 
     // an finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
-    int (*finalize)(void *collection_handle);
+    int (*finalize)(STORAGE_COLLECT_HANDLE *collection_handle);
 };
 
 // function pointers that handle database queries
 struct rrddim_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(void *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
+    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
 
     // run this to load each metric number from the database
     NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count);
@@ -376,17 +381,18 @@ struct rrddim_query_ops {
     void (*finalize)(struct rrddim_query_handle *handle);
 
     // get the timestamp of the last entry of this metric
-    time_t (*latest_time)(void *db_metric_handle);
+    time_t (*latest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
 
     // get the timestamp of the first entry of this metric
-    time_t (*oldest_time)(void *db_metric_handle);
+    time_t (*oldest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
 };
+
 
 // ----------------------------------------------------------------------------
 // volatile state per RRD dimension
 struct rrddim_tier {
     RRD_MEMORY_MODE mode;                           // the memory mode of this tier
-    void *db_metric_handle;                         // the metric handle inside the database
+    STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     NETDATA_DOUBLE sum_value;
     NETDATA_DOUBLE min_value;
@@ -873,7 +879,7 @@ struct rrdhost {
     avl_tree_lock rrdfamily_root_index;             // the host's chart families index
     avl_tree_lock rrdvar_root_index;                // the host's chart variables index
 
-    void *storage_instance[RRD_STORAGE_TIERS];      // the database instances of the storage tiers
+    STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];      // the database instances of the storage tiers
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
@@ -918,7 +924,7 @@ extern netdata_rwlock_t rrd_rwlock;
 
 // ----------------------------------------------------------------------------
 
-extern bool is_storage_engine_shared(void *engine);
+extern bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
 
 // ----------------------------------------------------------------------------
 

@@ -17,7 +17,7 @@ uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host, int tier) {
     if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
     if(!host->storage_instance[tier]) tier = 0;
-    return host->storage_instance[tier];
+    return (struct rrdengine_instance *)host->storage_instance[tier];
 }
 
 /* This UUID is not unique across hosts */
@@ -61,11 +61,11 @@ struct rrdeng_metric_handle {
     struct pg_cache_page_index *page_index;
 };
 
-void rrdeng_metric_free(void *metric_handle) {
-    freez(metric_handle);
+void rrdeng_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle) {
+    freez(db_metric_handle);
 }
 
-void *rrdeng_metric_init(RRDDIM *rd, void *db_instance) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     struct page_cache *pg_cache;
     uuid_t legacy_uuid;
@@ -78,7 +78,7 @@ void *rrdeng_metric_init(RRDDIM *rd, void *db_instance) {
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-    if (host != localhost && is_storage_engine_shared(ctx))
+    if (host != localhost && is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
         is_multihost_child = 1;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -126,14 +126,14 @@ void *rrdeng_metric_init(RRDDIM *rd, void *db_instance) {
     mh->ctx = ctx;
     mh->rrdeng_uuid = &page_index->id;
     mh->page_index = page_index;
-    return mh;
+    return (STORAGE_METRIC_HANDLE *)mh;
 }
 
 /*
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
  */
-void *rrdeng_store_metric_init(void *db_metric_handle) {
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle) {
     struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
 
     struct rrdeng_collect_handle *handle;
@@ -150,7 +150,7 @@ void *rrdeng_store_metric_init(void *db_metric_handle) {
     ++page_index->writers;
     uv_rwlock_wrunlock(&page_index->lock);
 
-    return handle;
+    return (STORAGE_COLLECT_HANDLE *)handle;
 }
 
 /* The page must be populated and referenced */
@@ -170,7 +170,7 @@ static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr, size_t s
     return has_only_empty_metrics;
 }
 
-void rrdeng_store_metric_flush_current_page(void *collection_handle) {
+void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     // struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
     struct rrdengine_instance *ctx = handle->ctx;
@@ -201,7 +201,7 @@ void rrdeng_store_metric_flush_current_page(void *collection_handle) {
     handle->descr = NULL;
 }
 
-void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
+void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
                               NETDATA_DOUBLE min_value,
                               NETDATA_DOUBLE max_value,
                               uint16_t count,
@@ -314,7 +314,7 @@ void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_time, NET
  * Releases the database reference from the handle for storing metrics.
  * Returns 1 if it's safe to delete the dimension.
  */
-int rrdeng_store_metric_finalize(void *collection_handle) {
+int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
     struct pg_cache_page_index *page_index = metric_handle->page_index;
@@ -346,7 +346,7 @@ int rrdeng_store_metric_finalize(void *collection_handle) {
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type)
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type)
 {
     struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
     struct rrdengine_instance *ctx = metric_handle->ctx;
@@ -449,8 +449,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-NETDATA_DOUBLE
-rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) {
+NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
     // struct rrdeng_metric_handle *metric_handle = handle->metric_handle;
 
@@ -557,13 +556,13 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
     rrdimm_handle->handle = NULL;
 }
 
-time_t rrdeng_metric_latest_time(void *db_metric_handle) {
+time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
 
     struct pg_cache_page_index *page_index = metric_handle->page_index;
     return page_index->latest_time / USEC_PER_SEC;
 }
-time_t rrdeng_metric_oldest_time(void *db_metric_handle) {
+time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
 
     struct pg_cache_page_index *page_index = metric_handle->page_index;
@@ -891,7 +890,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     //metalog_exit(ctx->metalog_ctx);
     free_page_cache(ctx);
 
-    if(!is_storage_engine_shared(ctx))
+    if(!is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
         freez(ctx);
 
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);

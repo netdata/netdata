@@ -40,29 +40,30 @@ extern void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN +
                                                     uuid_t *ret_uuid);
 
 
-extern void *rrdeng_metric_init(RRDDIM *rd, void *db_instance);
-extern void rrdeng_metric_free(void *metric_handle);
+extern STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
+extern void rrdeng_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle);
 
-extern void *rrdeng_store_metric_init(void *db_metric_handle);
-extern void rrdeng_store_metric_flush_current_page(void *collection_handle);
-extern void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
+extern STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle);
+extern void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
+extern void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
                                      NETDATA_DOUBLE min_value,
                                      NETDATA_DOUBLE max_value,
                                      uint16_t count,
                                      uint16_t anomaly_count,
                                      SN_FLAGS flags);
-extern int rrdeng_store_metric_finalize(void *collection_handle);
-extern unsigned
-    rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
+extern int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
+
+extern unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
                                     struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
-extern void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
+
+extern void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
                                     time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
 extern NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count);
 
 extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
-extern time_t rrdeng_metric_latest_time(void *db_metric_handle);
-extern time_t rrdeng_metric_oldest_time(void *db_metric_handle);
+extern time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+extern time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 
 extern void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 

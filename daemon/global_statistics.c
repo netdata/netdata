@@ -465,7 +465,7 @@ static void dbengine_statistics_charts(void) {
                 for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
                     if(!host->storage_instance[tier]) continue;
 
-                    rrdeng_get_37_statistics(host->storage_instance[tier], local_stats_array);
+                    rrdeng_get_37_statistics((struct rrdengine_instance *)host->storage_instance[tier], local_stats_array);
                     for (i = 0; i < RRDENG_NR_STATS; ++i) {
                         /* aggregate statistics across hosts */
                         stats_array[i] += local_stats_array[i];

@@ -1322,10 +1322,10 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
 
 #ifdef ENABLE_DBENGINE
-    host->storage_instance[0] = &multidb_ctx;
+    host->storage_instance[0] = (STORAGE_INSTANCE *)&multidb_ctx;
 
     if(RRD_STORAGE_TIERS == 2)
-        host->storage_instance[1] = &multidb_ctx_tier1;
+        host->storage_instance[1] = (STORAGE_INSTANCE *)&multidb_ctx_tier1;
 #endif
 
 failed:

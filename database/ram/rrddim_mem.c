@@ -5,23 +5,23 @@
 // ----------------------------------------------------------------------------
 // RRDDIM legacy data collection functions
 
-void *rrddim_metric_init(RRDDIM *rd, void *db_instance __maybe_unused) {
-    return rd;
+STORAGE_METRIC_HANDLE *rrddim_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_unused) {
+    return (STORAGE_METRIC_HANDLE *)rd;
 }
 
-void rrddim_metric_free(void *metric_handle __maybe_unused) {
+void rrddim_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) {
     ;
 }
 
-void *rrddim_collect_init(void *db_metric_handle) {
+STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     rd->db[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
     struct mem_collect_handle *ch = calloc(1, sizeof(struct mem_collect_handle));
     ch->rd = rd;
-    return ch;
+    return (STORAGE_COLLECT_HANDLE *)ch;
 }
 
-void rrddim_collect_store_metric(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number,
+void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number,
         NETDATA_DOUBLE min_value,
         NETDATA_DOUBLE max_value,
         uint16_t count,
@@ -39,13 +39,13 @@ void rrddim_collect_store_metric(void *collection_handle, usec_t point_in_time, 
     rd->db[rd->rrdset->current_entry] = pack_storage_number(number, flags);
 }
 
-void rrddim_store_metric_flush(void *collection_handle) {
+void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
     RRDDIM *rd = ch->rd;
     memset(rd->db, 0, rd->entries * sizeof(storage_number));
 }
 
-int rrddim_collect_finalize(void *collection_handle) {
+int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     free(collection_handle);
     return 0;
 }
@@ -53,7 +53,9 @@ int rrddim_collect_finalize(void *collection_handle) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(void *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
+void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type) {
+    UNUSED(tier_query_fetch_type);
+
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
 
     handle->rd = rd;
@@ -76,10 +78,7 @@ void rrddim_query_init(void *db_metric_handle, struct rrddim_query_handle *handl
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-NETDATA_DOUBLE
-rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count, TIER_QUERY_FETCH tier_query_fetch_type) {
-    UNUSED(tier_query_fetch_type);
-
+NETDATA_DOUBLE rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) {
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     size_t entries = rd->rrdset->entries;
@@ -129,12 +128,12 @@ void rrddim_query_finalize(struct rrddim_query_handle *handle) {
     freez(handle->handle);
 }
 
-time_t rrddim_query_latest_time(void *db_metric_handle) {
+time_t rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     return rd->rrdset->last_updated.tv_sec;
 }
 
-time_t rrddim_query_oldest_time(void *db_metric_handle) {
+time_t rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     return (time_t)(rd->rrdset->last_updated.tv_sec - rrdset_duration(rd->rrdset));
 }

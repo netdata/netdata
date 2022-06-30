@@ -10,10 +10,11 @@ netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 time_t rrdset_free_obsolete_time = 3600;
 time_t rrdhost_free_orphan_time = 3600;
 
-bool is_storage_engine_shared(void *engine) {
+bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 #ifdef ENABLE_DBENGINE
-if(engine == &multidb_ctx || engine == &multidb_ctx_tier1)
-    return true;
+    if(engine == (STORAGE_INSTANCE *)&multidb_ctx
+        || engine == (STORAGE_INSTANCE *)&multidb_ctx_tier1)
+        return true;
 #endif
 
     return false;
@@ -357,10 +358,10 @@ RRDHOST *rrdhost_create(const char *hostname,
             ret = rrdeng_init(host, (struct rrdengine_instance **)&host->storage_instance[0], dbenginepath, default_rrdeng_page_cache_mb,
                               default_rrdeng_disk_quota_mb, 0); // may fail here for legacy dbengine initialization
         else {
-            host->storage_instance[0] = &multidb_ctx;
+            host->storage_instance[0] = (STORAGE_INSTANCE *)&multidb_ctx;
 
             if(RRD_STORAGE_TIERS == 2)
-                host->storage_instance[1] = &multidb_ctx_tier1;
+                host->storage_instance[1] = (STORAGE_INSTANCE *)&multidb_ctx_tier1;
         }
         if (ret) { // check legacy or multihost initialization success
             error(
@@ -379,10 +380,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     else {
 #ifdef ENABLE_DBENGINE
-        host->storage_instance[0] = &multidb_ctx;
+        host->storage_instance[0] = (STORAGE_INSTANCE *)&multidb_ctx;
 
         if(RRD_STORAGE_TIERS == 2)
-            host->storage_instance[1] = &multidb_ctx_tier1;
+            host->storage_instance[1] = (STORAGE_INSTANCE *)&multidb_ctx_tier1;
 #endif
     }
 
@@ -937,7 +938,7 @@ void rrdhost_free(RRDHOST *host) {
         if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
             host->storage_instance[tier] &&
             !is_storage_engine_shared(host->storage_instance[tier]))
-            rrdeng_prepare_exit(host->storage_instance[tier]);
+            rrdeng_prepare_exit((struct rrdengine_instance *)host->storage_instance[tier]);
     }
 #endif
 
@@ -976,7 +977,7 @@ void rrdhost_free(RRDHOST *host) {
         if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
             host->storage_instance[tier] &&
             !is_storage_engine_shared(host->storage_instance[tier]))
-            rrdeng_exit(host->storage_instance[tier]);
+            rrdeng_exit((struct rrdengine_instance *)host->storage_instance[tier]);
     }
 #endif
 
