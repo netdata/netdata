@@ -843,7 +843,7 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before, int up
 #define query_debug_log_init() BUFFER *debug_log = buffer_create(1000)
 #define query_debug_log(args...) buffer_sprintf(debug_log, ##args)
 #define query_debug_log_fin() { \
-        info("QUERY: chart '%s', after:%lld, before:%lld, points:%ld, res:%ld - wanted => after:%lld, before:%lld, points:%ld, group:%ld, granularity:%ld, resgroup:%ld, resdiv:" NETDATA_DOUBLE_FORMAT_AUTO " %s", st->name, after_requested, before_requested, points_requested, resampling_time_requested, after_wanted, before_wanted, points_wanted, group, query_granularity, resampling_group, resampling_divisor, buffer_tostring(debug_log)); \
+        info("QUERY: chart '%s', after:%lld, before:%lld, duration:%lld, points:%ld, res:%ld - wanted => after:%lld, before:%lld, points:%ld, group:%ld, granularity:%ld, resgroup:%ld, resdiv:" NETDATA_DOUBLE_FORMAT_AUTO " %s", st->name, after_requested, before_requested, before_requested - after_requested, points_requested, resampling_time_requested, after_wanted, before_wanted, points_wanted, group, query_granularity, resampling_group, resampling_divisor, buffer_tostring(debug_log)); \
         buffer_free(debug_log); \
         debug_log = NULL; \
     }
@@ -1015,6 +1015,21 @@ RRDR *rrd2rrdr(
         group++;
 
     query_debug_log(":group %ld", group);
+
+    if(points_wanted * group * query_granularity < duration) {
+        // the grouping we are going to do, is not enough
+        // to cover the entire duration requested, so
+        // we have to change the number of points, to make sure we will
+        // respect the timeframe as closely as possibly
+
+        // let's see how many points are the optimal
+        points_wanted = points_available / group;
+
+        if(points_wanted * group < points_available)
+            points_wanted++;
+
+        query_debug_log(":optimal points %ld", points_wanted);
+    }
 
     // resampling_time_requested enforces a certain grouping multiple
     NETDATA_DOUBLE resampling_divisor = 1.0;
