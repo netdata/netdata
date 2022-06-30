@@ -186,7 +186,7 @@ jobs:
               }
 
               if 'base_image' in v:
-                e['distro'] = ':'.join([v['base_image', str(v['version'])])
+                e['distro'] = ':'.join([v['base_image'], str(v['version'])])
               else:
                 e['distro'] = ':'.join([v['distro'], str(v['version'])])
 
