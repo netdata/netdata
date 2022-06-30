@@ -1189,7 +1189,7 @@ static int vbi_parser_parse(struct mqtt_vbi_parser_ctx *ctx, rbuf_t data, mqtt_w
         ctx->bytes++;
         rbuf_pop(data, &ctx->data[ctx->bytes-1], 1);
         if ( ctx->data[ctx->bytes-1] & MQTT_VBI_CONTINUATION_FLAG )
-            return MQTT_NG_CLIENT_NEED_MORE_BYTES;
+            return MQTT_NG_CLIENT_OK_CALL_AGAIN;
     }
 
     if (mqtt_vbi_to_uint32(ctx->data, &ctx->result)) {
