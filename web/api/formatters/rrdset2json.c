@@ -14,7 +14,7 @@ void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 
     tabs[0] = '\0';
     while (indentation) {
-        strcat(tabs, "\t");
+        strcat(tabs, "\t\t");
         indentation--;
     }
 
