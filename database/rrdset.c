@@ -968,7 +968,8 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
     rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, next_store_ut, n, 0, 0, 1, 0, flags);
 
     for(int tier = 1; tier < RRD_STORAGE_TIERS ;tier++) {
-        if (!rd->tiers[tier]) continue;
+        if (!rd->tiers[tier])
+            continue;
         struct rrddim_tier *t = rd->tiers[tier];
 
         time_t now = (time_t)(next_store_ut / USEC_PER_SEC);
@@ -986,37 +987,38 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
                 if (!(flags & SN_ANOMALY_BIT))
                     t->anomaly_count = 1;
                 t->count = 1;
-            }
-            else {
+            } else {
                 t->sum_value += n;
                 t->min_value = MIN(t->min_value, n);
                 t->max_value = MAX(t->max_value, n);
                 if (!(flags & SN_ANOMALY_BIT))
                     t->anomaly_count++;
                 t->count++;
-        }
-
-        t->iterations++;
-
-        if (now >= t->next_point_time) {
-            if (!t->count)
-                t->collect_ops.store_metric(t->db_collection_handle, next_store_ut, NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT);
-            } else {
-                t->collect_ops.store_metric(
-                    t->db_collection_handle,
-                    next_store_ut,
-                    t->sum_value,
-                    t->min_value,
-                    t->max_value,
-                    t->count,
-                    t->anomaly_count,
-                    flags);
             }
-            t->iterations = 0;
-            t->count = 0;
 
-            time_t loop = rd->update_every * TIER1_GROUPING;
-            t->next_point_time = now + loop - ((now + loop) % loop);
+            t->iterations++;
+
+            if (now >= t->next_point_time) {
+                if (!t->count)
+                    t->collect_ops.store_metric(
+                        t->db_collection_handle, next_store_ut, NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT);
+                else {
+                    t->collect_ops.store_metric(
+                        t->db_collection_handle,
+                        next_store_ut,
+                        t->sum_value,
+                        t->min_value,
+                        t->max_value,
+                        t->count,
+                        t->anomaly_count,
+                        flags);
+                }
+                t->iterations = 0;
+                t->count = 0;
+
+                time_t loop = rd->update_every * TIER1_GROUPING;
+                t->next_point_time = now + loop - ((now + loop) % loop);
+            }
         }
     }
 }
