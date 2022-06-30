@@ -385,8 +385,9 @@ struct rrddim_volatile {
     NETDATA_DOUBLE sum_value;
     NETDATA_DOUBLE min_value;
     NETDATA_DOUBLE max_value;
-    uint16_t count;
-    time_t last_tier_time;
+    size_t count;
+    size_t iterations;
+    time_t next_point_time;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
 };

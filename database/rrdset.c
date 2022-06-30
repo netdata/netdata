@@ -968,7 +968,13 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
     rd->state->collect_ops.store_metric(rd->state->db_collection_handle, next_store_ut, n, 0, 0, 1, flags);
 
     if(rd->state_tier1) {
+        time_t now = (time_t)(next_store_ut / USEC_PER_SEC);
         struct rrddim_volatile *tier1 = rd->state_tier1;
+
+        if(!tier1->next_point_time) {
+            time_t loop = rd->update_every * TIER1_GROUPING;
+            tier1->next_point_time = now + loop - ((now + loop) % loop);
+        }
 
         if (likely(netdata_double_isnumber(n))) {
             if (!tier1->count) {
@@ -985,9 +991,9 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
             }
         }
 
-        tier1->last_tier_time = next_store_ut / USEC_PER_SEC;
+        tier1->iterations++;
 
-        if ((tier1->last_tier_time % TIER1_GROUPING) == 0) {
+        if (now >= tier1->next_point_time) {
             if(!tier1->count) {
                 tier1->collect_ops.store_metric(
                     tier1->db_collection_handle,
@@ -1008,8 +1014,11 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
                     tier1->count,
                     flags);
             }
-            tier1->last_tier_time = 0;
+            tier1->iterations = 0;
             tier1->count = 0;
+
+            time_t loop = rd->update_every * TIER1_GROUPING;
+            tier1->next_point_time = now + loop - ((now + loop) % loop);
         }
     }
 }
