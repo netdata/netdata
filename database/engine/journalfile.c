@@ -302,8 +302,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         Pvoid_t *PValue;
         struct pg_cache_page_index *page_index = NULL;
 
-        if (PAGE_METRICS != jf_metric_data->descr[i].type) {
-            error("Unknown page type encountered.");
+        if (jf_metric_data->descr[i].type > PAGE_TYPE_MAX) {
+            error("Unknown page type %d encountered.", jf_metric_data->descr[i].type );
             continue;
         }
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
