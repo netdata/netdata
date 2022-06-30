@@ -808,7 +808,11 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before, int up
         if(after_requested == 0)
             after_requested = -(points * update_every);
 
-        after_requested = before_requested + after_requested;
+        // since the query engine now returns inclusive timestamps
+        // it is awkward to return 6 points when after=-5 is given
+        // so for relative queries we add 1 second, to give
+        // more predictable results to users.
+        after_requested = before_requested + after_requested + 1;
         absolute_period_requested = 0;
     }
 
@@ -843,7 +847,7 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before, int up
 #define query_debug_log_init() BUFFER *debug_log = buffer_create(1000)
 #define query_debug_log(args...) buffer_sprintf(debug_log, ##args)
 #define query_debug_log_fin() { \
-        info("QUERY: chart '%s', after:%lld, before:%lld, points:%ld, res:%ld - wanted => after:%lld, before:%lld, points:%ld, group:%ld, granularity:%ld, resgroup:%ld, resdiv:" NETDATA_DOUBLE_FORMAT_AUTO " %s", st->name, after_requested, before_requested, points_requested, resampling_time_requested, after_wanted, before_wanted, points_wanted, group, query_granularity, resampling_group, resampling_divisor, buffer_tostring(debug_log)); \
+        info("QUERY: chart '%s', after:%lld, before:%lld, duration:%lld, points:%ld, res:%ld - wanted => after:%lld, before:%lld, points:%ld, group:%ld, granularity:%ld, resgroup:%ld, resdiv:" NETDATA_DOUBLE_FORMAT_AUTO " %s", st->name, after_requested, before_requested, before_requested - after_requested, points_requested, resampling_time_requested, after_wanted, before_wanted, points_wanted, group, query_granularity, resampling_group, resampling_divisor, buffer_tostring(debug_log)); \
         buffer_free(debug_log); \
         debug_log = NULL; \
     }
@@ -889,6 +893,7 @@ RRDR *rrd2rrdr(
     bool automatic_natural_points = (points_wanted == 0);
     bool relative_period_requested = false;
     bool natural_points = (options & RRDR_OPTION_NATURAL_POINTS) || automatic_natural_points;
+    bool before_is_aligned_to_db_end = false;
 
     query_debug_log_init();
 
@@ -931,6 +936,7 @@ RRDR *rrd2rrdr(
 
             if (before_wanted == 0) {
                 before_wanted = last_entry_t;
+                before_is_aligned_to_db_end = true;
                 query_debug_log(":zero before_wanted %lld", before_wanted);
             }
 
@@ -1014,6 +1020,21 @@ RRDR *rrd2rrdr(
 
     query_debug_log(":group %ld", group);
 
+    if(points_wanted * group * query_granularity < duration) {
+        // the grouping we are going to do, is not enough
+        // to cover the entire duration requested, so
+        // we have to change the number of points, to make sure we will
+        // respect the timeframe as closely as possibly
+
+        // let's see how many points are the optimal
+        points_wanted = points_available / group;
+
+        if(points_wanted * group < points_available)
+            points_wanted++;
+
+        query_debug_log(":optimal points %ld", points_wanted);
+    }
+
     // resampling_time_requested enforces a certain grouping multiple
     NETDATA_DOUBLE resampling_divisor = 1.0;
     long resampling_group = 1;
@@ -1042,8 +1063,10 @@ RRDR *rrd2rrdr(
 
     // now that we have group, align the requested timeframe to fit it.
     if(aligned && before_wanted % (group * query_granularity)) {
-        // alignment has been requested, so align the end timestamp
-        before_wanted += (group * query_granularity) - before_wanted % (group * query_granularity);
+        if(before_is_aligned_to_db_end)
+            before_wanted -= before_wanted % (group * query_granularity);
+        else
+            before_wanted += (group * query_granularity) - before_wanted % (group * query_granularity);
         query_debug_log(":align before_wanted %lld", before_wanted);
     }
 
@@ -1051,7 +1074,7 @@ RRDR *rrd2rrdr(
     query_debug_log(":final after_wanted %lld", after_wanted);
 
     duration = before_wanted - after_wanted;
-    query_debug_log(":final duration %ld", duration);
+    query_debug_log(":final duration %ld", duration + 1);
 
     // check the context query based on the starting time of the query
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
@@ -1204,45 +1227,45 @@ RRDR *rrd2rrdr(
 #ifdef NETDATA_INTERNAL_CHECKS
     if (dimensions_used) {
         if(r->internal.log)
-            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted,
-                after_wanted, before_wanted,
-                before_wanted,
-                points_wanted, points_wanted, /*after_slot, before_slot,*/ r->internal.log);
+            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group,
+                                                   after_wanted, after_requested, before_wanted, before_requested,
+                                                   points_requested, points_wanted, /*after_slot, before_slot,*/
+                                                   r->internal.log);
 
         if(r->rows != points_wanted)
-            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted,
-                after_wanted, before_wanted,
-                before_wanted,
-                points_wanted, points_wanted, /*after_slot, before_slot,*/ "got 'points' is not wanted 'points'");
+            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group,
+                                                   after_wanted, after_requested, before_wanted, before_requested,
+                                                   points_requested, points_wanted, /*after_slot, before_slot,*/
+                                                   "got 'points' is not wanted 'points'");
 
         if(aligned && (r->before % (group * query_granularity)) != 0)
-            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted,
-                after_wanted, before_wanted,
-                before_wanted,
-                points_wanted, points_wanted, /*after_slot, before_slot,*/ "'before' is not aligned but alignment is required");
+            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group,
+                                                   after_wanted, after_requested, before_wanted,before_wanted,
+                                                   points_requested, points_wanted, /*after_slot, before_slot,*/
+                                                   "'before' is not aligned but alignment is required");
 
         // 'after' should not be aligned, since we start inside the first group
         //if(aligned && (r->after % group) != 0)
         //    rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
 
         if(r->before != before_wanted)
-            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted,
-                after_wanted, before_wanted,
-                before_wanted,
-                points_wanted, points_wanted, /*after_slot, before_slot,*/ "chart is not aligned to requested 'before'");
+            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group,
+                                                   after_wanted, after_requested, before_wanted, before_requested,
+                                                   points_requested, points_wanted, /*after_slot, before_slot,*/
+                                                   "chart is not aligned to requested 'before'");
 
         if(r->before != before_wanted)
-            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted,
-                after_wanted, before_wanted,
-                before_wanted,
-                points_wanted, points_wanted, /*after_slot, before_slot,*/ "got 'before' is not wanted 'before'");
+            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group,
+                                                   after_wanted, after_requested, before_wanted, before_requested,
+                                                   points_requested, points_wanted, /*after_slot, before_slot,*/
+                                                   "got 'before' is not wanted 'before'");
 
         // reported 'after' varies, depending on group
         if(r->after != after_wanted)
-            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted,
-                after_wanted, before_wanted,
-                before_wanted,
-                points_wanted, points_wanted, /*after_slot, before_slot,*/ "got 'after' is not wanted 'after'");
+            rrd2rrdr_log_request_response_metadata(r, group_method, aligned, group, resampling_time_requested, resampling_group,
+                                                   after_wanted, after_requested, before_wanted, before_requested,
+                                                   points_requested, points_wanted, /*after_slot, before_slot,*/
+                                                   "got 'after' is not wanted 'after'");
     }
 #endif
 
