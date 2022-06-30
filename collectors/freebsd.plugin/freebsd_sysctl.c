@@ -178,15 +178,15 @@ int do_vm_loadavg(int update_every, usec_t dt){
 
 int do_vm_vmtotal(int update_every, usec_t dt) {
     (void)dt;
-    static int do_all_processes = -1, do_processes = -1, do_committed = -1;
+    static int do_all_processes = -1, do_processes = -1, do_mem_real = -1;
 
     if (unlikely(do_all_processes == -1)) {
         do_all_processes    = config_get_boolean("plugin:freebsd:vm.vmtotal", "enable total processes", 1);
         do_processes        = config_get_boolean("plugin:freebsd:vm.vmtotal", "processes running", 1);
-        do_committed        = config_get_boolean("plugin:freebsd:vm.vmtotal", "committed memory", 1);
+        do_mem_real         = config_get_boolean("plugin:freebsd:vm.vmtotal", "real memory", 1);
     }
 
-    if (likely(do_all_processes | do_processes | do_committed)) {
+    if (likely(do_all_processes | do_processes | do_mem_real)) {
         static int mib[2] = {0, 0};
         struct vmtotal vmtotal_data;
 
@@ -195,8 +195,8 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
             error("DISABLED: system.active_processes chart");
             do_processes = 0;
             error("DISABLED: system.processes chart");
-            do_committed = 0;
-            error("DISABLED: mem.committed chart");
+            do_mem_real = 0;
+            error("DISABLED: mem.real chart");
             error("DISABLED: vm.vmtotal module");
             return 1;
         } else {
@@ -264,18 +264,18 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (likely(do_committed)) {
+            if (likely(do_mem_real)) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd = NULL;
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "mem",
-                            "committed",
+                            "real",
                             NULL,
                             "system",
                             NULL,
-                            "Committed (Allocated) Memory",
+                            "Total Real Memory In Use",
                             "MiB",
                             "freebsd.plugin",
                             "vm.vmtotal",
@@ -285,7 +285,7 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                     );
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rd = rrddim_add(st, "Committed_AS", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                    rd = rrddim_add(st, "used", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
