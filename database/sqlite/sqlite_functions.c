@@ -1322,10 +1322,8 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
 
 #ifdef ENABLE_DBENGINE
-    host->storage_instance[0] = (STORAGE_INSTANCE *)&multidb_ctx;
-
-    if(RRD_STORAGE_TIERS == 2)
-        host->storage_instance[1] = (STORAGE_INSTANCE *)&multidb_ctx_tier1;
+    for(int tier = 0; tier < storage_tiers ; tier++)
+        host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
 #endif
 
 failed:
@@ -1547,7 +1545,7 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
     rd->id = onewayalloc_strdupz(owa, id);
     rd->name = onewayalloc_strdupz(owa, name);
 
-    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+    for(int tier = 0; tier < storage_tiers ;tier++) {
         rd->tiers[tier] = onewayalloc_mallocz(owa, sizeof(*rd->tiers[tier]));
         rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
         rd->tiers[tier]->query_ops.init = rrdeng_load_metric_init;

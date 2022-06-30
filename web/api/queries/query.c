@@ -753,19 +753,19 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          , (size_t)r->after
          , (size_t)after_wanted
          , (size_t)after_requested
-         , (size_t)rrdset_first_entry_t_nolock(r->st, options & RRDR_OPTION_TIER1? 1 : 0)
+         , (size_t)rrdset_first_entry_t_nolock(r->st)
 
          // before
          , (size_t)r->before
          , (size_t)before_wanted
          , (size_t)before_requested
-         , (size_t)rrdset_last_entry_t_nolock(r->st, options & RRDR_OPTION_TIER1? 1 : 0)
+         , (size_t)rrdset_last_entry_t_nolock(r->st)
 
          // duration
          , (size_t)(r->before - r->after + r->st->update_every)
          , (size_t)(before_wanted - after_wanted + r->st->update_every)
          , (size_t)(before_requested - after_requested)
-         , (size_t)((rrdset_last_entry_t_nolock(r->st, 0) - rrdset_first_entry_t_nolock(r->st,0)) + r->st->update_every)
+         , (size_t)((rrdset_last_entry_t_nolock(r->st) - rrdset_first_entry_t_nolock(r->st)) + r->st->update_every)
 
          // slot
          /*
@@ -933,8 +933,8 @@ RRDR *rrd2rrdr(
             relative_period_requested = true;
 
             rrdset_rdlock(st);
-            time_t first_entry_t = rrdset_first_entry_t_nolock(st, options & RRDR_OPTION_TIER1? 1 : 0);
-            time_t last_entry_t = rrdset_last_entry_t_nolock(st, options & RRDR_OPTION_TIER1? 1 : 0);
+            time_t first_entry_t = rrdset_first_entry_t_nolock(st);
+            time_t last_entry_t = rrdset_last_entry_t_nolock(st);
             rrdset_unlock(st);
 
             query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_t, last_entry_t);

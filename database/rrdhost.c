@@ -3,6 +3,8 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
+int storage_tiers = RRD_STORAGE_TIERS;
+
 RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
 netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
@@ -12,9 +14,10 @@ time_t rrdhost_free_orphan_time = 3600;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 #ifdef ENABLE_DBENGINE
-    if(engine == (STORAGE_INSTANCE *)&multidb_ctx
-        || engine == (STORAGE_INSTANCE *)&multidb_ctx_tier1)
-        return true;
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        if (engine == (STORAGE_INSTANCE *)multidb_ctx[tier])
+            return true;
+    }
 #endif
 
     return false;
@@ -354,14 +357,27 @@ RRDHOST *rrdhost_create(const char *hostname,
         if (ret != 0 && errno != EEXIST)
             error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
         else ret = 0; // succeed
-        if (is_legacy) // initialize legacy dbengine instance as needed
-            ret = rrdeng_init(host, (struct rrdengine_instance **)&host->storage_instance[0], dbenginepath, default_rrdeng_page_cache_mb,
-                              default_rrdeng_disk_quota_mb, 0); // may fail here for legacy dbengine initialization
-        else {
-            host->storage_instance[0] = (STORAGE_INSTANCE *)&multidb_ctx;
+        if (is_legacy) {
+            // initialize legacy dbengine instance as needed
 
-            if(RRD_STORAGE_TIERS == 2)
-                host->storage_instance[1] = (STORAGE_INSTANCE *)&multidb_ctx_tier1;
+            ret = rrdeng_init(
+                host,
+                (struct rrdengine_instance **)&host->storage_instance[0],
+                dbenginepath,
+                default_rrdeng_page_cache_mb,
+                default_rrdeng_disk_quota_mb,
+                0); // may fail here for legacy dbengine initialization
+
+            if(ret == 0) {
+                // assign the rest of the shared storage instances to it
+                // to allow them collect its metrics too
+                for(int tier = 1; tier < storage_tiers ; tier++)
+                    host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+            }
+        }
+        else {
+            for(int tier = 0; tier < storage_tiers ; tier++)
+                host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
         }
         if (ret) { // check legacy or multihost initialization success
             error(
@@ -380,10 +396,9 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     else {
 #ifdef ENABLE_DBENGINE
-        host->storage_instance[0] = (STORAGE_INSTANCE *)&multidb_ctx;
-
-        if(RRD_STORAGE_TIERS == 2)
-            host->storage_instance[1] = (STORAGE_INSTANCE *)&multidb_ctx_tier1;
+        // the first tier is reserved for the non-dbengine modes
+        for(int tier = 1; tier < storage_tiers ; tier++)
+            host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
 #endif
     }
 
@@ -763,32 +778,76 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     }
 
 #ifdef ENABLE_DBENGINE
-    char dbenginepath[FILENAME_MAX + 1];
-    int ret;
-    snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
-    ret = mkdir(dbenginepath, 0775);
-    if (ret != 0 && errno != EEXIST)
-        error("Host '%s': cannot create directory '%s'", localhost->hostname, dbenginepath);
-    else {
-        // Unconditionally create multihost db to support on demand host creation
-        ret = rrdeng_init(NULL, NULL, dbenginepath, default_rrdeng_page_cache_mb, default_multidb_disk_quota_mb, 0);
-        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine_tier1", localhost->cache_dir);
-        ret = mkdir(dbenginepath, 0775);
-        if (ret != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", localhost->hostname, dbenginepath);
-        else
-            ret = rrdeng_init(NULL, NULL, dbenginepath, default_rrdeng_page_cache_mb, default_multidb_disk_quota_mb, 1);
+    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
+    if(storage_tiers < 1) {
+        error("At least 1 storage tier is required. Assuming 1.");
+        storage_tiers = 1;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
-    if (ret) {
-        error(
-            "Host '%s' with machine guid '%s' failed to initialize multi-host DB engine instance at '%s'.",
-            localhost->hostname, localhost->machine_guid, localhost->cache_dir);
+    if(storage_tiers > RRD_STORAGE_TIERS) {
+        error("Up to %d storage tier are supported. Assuming %d.", RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
+        storage_tiers = RRD_STORAGE_TIERS;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
+    }
+
+    int created_tiers = 0;
+    char dbenginepath[FILENAME_MAX + 1];
+    char dbengineconfig[200 + 1];
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        if(tier == 0)
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
+        else
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%d", localhost->cache_dir, tier);
+
+        int ret = mkdir(dbenginepath, 0775);
+        if (ret != 0 && errno != EEXIST) {
+            error("DBENGINE on '%s': cannot create directory '%s'", localhost->hostname, dbenginepath);
+            break;
+        }
+
+        int page_cache_mb = default_rrdeng_page_cache_mb;
+        int disk_space_mb = default_multidb_disk_quota_mb;
+
+        if(tier > 0) {
+            snprintfz(dbengineconfig, 200, "dbengine tier %d page cache size MB", tier);
+            page_cache_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, page_cache_mb);
+
+            snprintfz(dbengineconfig, 200, "dbengine tier %d multihost disk space MB", tier);
+            disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
+        }
+
+        ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
+        if(ret != 0) {
+            error("DBENGINE on '%s': Failed to initialize multi-host database tier %d on path '%s'",
+                  localhost->hostname, tier, dbenginepath);
+            break;
+        }
+        else
+            created_tiers++;
+    }
+
+    if(created_tiers && created_tiers < storage_tiers) {
+        error("DBENGINE on '%s': Managed to create %d tiers instead of %d. Continuing with %d available.",
+              localhost->hostname, created_tiers, storage_tiers, created_tiers);
+        storage_tiers = created_tiers;
+    }
+    else if(!created_tiers) {
+        error("DBENGINE on '%s', with machine guid '%s', failed to initialize databases at '%s'.",
+              localhost->hostname, localhost->machine_guid, localhost->cache_dir);
         rrdhost_free(localhost);
         localhost = NULL;
         rrd_unlock();
-        fatal("Failed to initialize dbengine");
+        fatal("DBENGINE: Failed to be initialized.");
+    }
+#else
+    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
+    if(storage_tiers != 1) {
+        error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", localhost->hostname);
+        storage_tiers = 1;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 #endif
+
     sql_aclk_sync_init();
     rrd_unlock();
 
@@ -1357,7 +1416,7 @@ restart_after_removal:
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
 
                         size_t tiers_available = 0, tiers_said_yes = 0;
-                        for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+                        for(int tier = 0; tier < storage_tiers ;tier++) {
                             if(rd->tiers[tier]) {
                                 tiers_available++;
 
@@ -1425,7 +1484,7 @@ void rrdset_check_obsoletion(RRDHOST *host)
     RRDSET *st;
     time_t last_entry_t;
     rrdset_foreach_read(st, host) {
-        last_entry_t = rrdset_last_entry_t(st, 0);
+        last_entry_t = rrdset_last_entry_t(st);
         if (last_entry_t && last_entry_t < host->senders_connect_time) {
             rrdset_is_obsolete(st);
         }
@@ -1643,7 +1702,7 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
     RRDSET *st;
     time_t result = 0;
     rrdset_foreach_read(st, h) {
-        time_t st_last = rrdset_last_entry_t(st, 0);
+        time_t st_last = rrdset_last_entry_t(st);
         if (st_last > result)
             result = st_last;
     }

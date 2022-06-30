@@ -172,7 +172,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             store_active_dimension(&rd->metric_uuid);
 
-            for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+            for(int tier = 0; tier < storage_tiers ;tier++) {
                 if (rd->tiers[tier])
                     rd->tiers[tier]->db_collection_handle =
                         rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
@@ -263,7 +263,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     {
         size_t initialized = 0;
         RRD_MEMORY_MODE wanted_mode = memory_mode;
-        for(int tier = 0; tier < RRD_STORAGE_TIERS ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
             STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
             if(!eng) continue;
 
@@ -288,7 +288,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     // initialize data collection for all tiers
     {
         size_t initialized = 0;
-        for (int tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        for (int tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier]) {
                 rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
                 initialized++;
@@ -356,7 +356,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
 
         size_t tiers_available = 0, tiers_said_yes = 0;
-        for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+        for(int tier = 0; tier < storage_tiers ;tier++) {
             if(rd->tiers[tier]) {
                 tiers_available++;
 
@@ -401,7 +401,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     // this will free MEMORY_MODE_SAVE and MEMORY_MODE_MAP structures
     rrddim_memory_file_free(rd);
 
-    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+    for(int tier = 0; tier < storage_tiers ;tier++) {
         if(!rd->tiers[tier]) continue;
 
         STORAGE_ENGINE* eng = storage_engine_get(rd->tiers[tier]->mode);
@@ -412,7 +412,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     freez((void *)rd->id);
     freez((void *)rd->name);
 
-    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+    for(int tier = 0; tier < storage_tiers ;tier++) {
         freez(rd->tiers[tier]);
         rd->tiers[tier] = NULL;
     }

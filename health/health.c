@@ -523,8 +523,8 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
 
     int update_every = rc->rrdset->update_every;
     rrdset_rdlock(rc->rrdset);
-    time_t first = rrdset_first_entry_t_nolock(rc->rrdset, 0);
-    time_t last = rrdset_last_entry_t_nolock(rc->rrdset, 0);
+    time_t first = rrdset_first_entry_t_nolock(rc->rrdset);
+    time_t last = rrdset_last_entry_t_nolock(rc->rrdset);
     rrdset_unlock(rc->rrdset);
 
     if(unlikely(now + update_every < first /* || now - update_every > last */)) {

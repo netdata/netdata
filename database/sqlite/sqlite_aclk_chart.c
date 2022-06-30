@@ -935,8 +935,8 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
                 RRDSET *st = NULL;
                 rc = (st = rrdset_find(wc->host, (const char *)sqlite3_column_text(res, 2))) ? 0 : 1;
                 if (!rc) {
-                    first_entry_t = rrdset_first_entry_t(st, 0);
-                    last_entry_t = rrdset_last_entry_t(st, 0);
+                    first_entry_t = rrdset_first_entry_t(st);
+                    last_entry_t = rrdset_last_entry_t(st);
                 }
             } else {
                 rc = 0;
@@ -1150,8 +1150,8 @@ void aclk_send_dimension_update(RRDDIM *rd)
     if (unlikely(!claim_id))
         return;
 
-    time_t first_entry_t = rrddim_first_entry_t(rd, 0);
-    time_t last_entry_t = rrddim_last_entry_t(rd, 0);
+    time_t first_entry_t = rrddim_first_entry_t(rd);
+    time_t last_entry_t = rrddim_last_entry_t(rd);
 
     time_t now = now_realtime_sec();
     int live = ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every));

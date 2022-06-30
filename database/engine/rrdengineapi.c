@@ -2,8 +2,13 @@
 #include "rrdengine.h"
 
 /* Default global database instance */
-struct rrdengine_instance multidb_ctx_tier1;
-struct rrdengine_instance multidb_ctx;
+struct rrdengine_instance multidb_ctx_storage[RRD_STORAGE_TIERS] = { 0 };
+struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS] = { 0 };
+
+__attribute__((constructor)) void initialize_multidb_ctx(void) {
+    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++)
+        multidb_ctx[tier] = &multidb_ctx_storage[RRD_STORAGE_TIERS];
+}
 
 int db_engine_use_malloc = 0;
 int default_rrdeng_page_fetch_timeout = 3;
@@ -772,8 +777,7 @@ void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
  * Returns 0 on success, negative on error
  */
 int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
-                unsigned disk_space_mb, int tier)
-{
+                unsigned disk_space_mb, int tier) {
     struct rrdengine_instance *ctx;
     int error;
     uint32_t max_open_files;
@@ -793,19 +797,13 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
         return UV_EMFILE;
     }
 
-    if (NULL == ctxp) {
-        if (!tier) {
-            ctx = &multidb_ctx;
-            memset(ctx, 0, sizeof(*ctx));
-            ctx->storage_size = sizeof(storage_number);
-        }
-        else {
-            ctx = &multidb_ctx_tier1;
-            memset(ctx, 0, sizeof(*ctx));
-            ctx->storage_size = sizeof(storage_number_tier1_t);
-            ctx->tier = 1;
-        }
-    } else {
+    if(NULL == ctxp) {
+        ctx = multidb_ctx[tier];
+        memset(ctx, 0, sizeof(*ctx));
+        ctx->storage_size = (tier == 0) ? sizeof(storage_number) : sizeof(storage_number_tier1_t);
+        ctx->tier = tier;
+    }
+    else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));
         ctx->storage_size = sizeof(storage_number);
     }
@@ -861,7 +859,7 @@ error_after_rrdeng_worker:
     finalize_rrd_files(ctx);
 error_after_init_rrd_files:
     free_page_cache(ctx);
-    if (ctx != &multidb_ctx) {
+    if (!is_storage_engine_shared((STORAGE_INSTANCE *)ctx)) {
         freez(ctx);
         *ctxp = NULL;
     }

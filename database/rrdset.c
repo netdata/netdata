@@ -275,7 +275,7 @@ void rrdset_reset(RRDSET *st) {
         rd->collections_counter = 0;
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+            for(int tier = 0; tier < storage_tiers ;tier++) {
                 if(rd->tiers[tier])
                     rd->tiers[tier]->collect_ops.flush(rd->tiers[tier]->db_collection_handle);
             }
@@ -967,7 +967,7 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
 static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
     rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, next_store_ut, n, 0, 0, 1, 0, flags);
 
-    for(int tier = 1; tier < RRD_STORAGE_TIERS ;tier++) {
+    for(int tier = 1; tier < storage_tiers ;tier++) {
         if (!rd->tiers[tier])
             continue;
         struct rrddim_tier *t = rd->tiers[tier];
@@ -1798,7 +1798,7 @@ after_second_database_work:
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
 
                         size_t tiers_available = 0, tiers_said_yes = 0;
-                        for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+                        for(int tier = 0; tier < storage_tiers ;tier++) {
                             if(rd->tiers[tier]) {
                                 tiers_available++;
 

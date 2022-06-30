@@ -1105,7 +1105,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
         // if the collected value is too old, don't calculate its value
-        if (rrdset_last_entry_t(st, 0) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
+        if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
             ret = rrdset2value_api_v1(st, w->response.data, &n,
                                       (dimensions) ? buffer_tostring(dimensions) : NULL,
                                       points, after, before, group, group_options, 0, options,

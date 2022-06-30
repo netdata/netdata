@@ -1232,7 +1232,7 @@ int run_test(struct test *test)
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
             ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
             test->name, rd->name, c+1,
-            (int64_t)((rrdset_first_entry_t(st, 0) + c * st->update_every) - time_start),
+            (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
@@ -1244,7 +1244,7 @@ int run_test(struct test *test)
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
                 ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
                 test->name, rd2->name, c+1,
-                (int64_t)((rrdset_first_entry_t(st, 0) + c * st->update_every) - time_start),
+                (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
