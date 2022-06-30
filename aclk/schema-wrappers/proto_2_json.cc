@@ -38,6 +38,10 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new nodeinstance::info::v1::UpdateNodeInfo;
     if (!strcmp(msgname, "AlarmLogHealth"))
         return new alarms::v1::AlarmLogHealth;
+    if (!strcmp(msgname, "ProvideAlarmConfiguration"))
+        return new alarms::v1::ProvideAlarmConfiguration;
+    if (!strcmp(msgname, "AlarmSnapshot"))
+        return new alarms::v1::AlarmSnapshot;
 
     return NULL;
 }
