@@ -182,7 +182,6 @@ jobs:
               e = {
                 'artifact_key': v['distro'] + str(v['version']).replace('.', ''),
                 'version': v['version'],
-                'jsonc_removal': v['jsonc_removal'],
               }
 
               if 'base_image' in v:
@@ -192,6 +191,9 @@ jobs:
 
               if 'env_prep' in v:
                 e['env_prep'] = v['env_prep']
+
+              if 'jsonc_removal' in v:
+                e['jsonc_removal'] = v['jsonc_removal']
 
               entries.append(e)
 
