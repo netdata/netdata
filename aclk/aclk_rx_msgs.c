@@ -6,6 +6,8 @@
 #include "aclk_query_queue.h"
 #include "aclk.h"
 
+#include "schema-wrappers/proto_2_json.h"
+
 #define ACLK_V2_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
 #define ACLK_CLOUD_REQ_V2_PREFIX "GET /"
 
@@ -478,7 +480,7 @@ unsigned int aclk_init_rx_msg_handlers(void)
     return i;
 }
 
-void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len)
+void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic)
 {
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
@@ -496,6 +498,15 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         }
         return;
     }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char *json = protomsg_to_json(msg, msg_len, msg_descriptor->name);
+    if (json) {
+        log_aclk_message_bin(json, strlen(json), 0, topic, msg_descriptor->name);
+        freez(json);
+    }
+#endif
+
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
         aclk_proto_rx_msgs_sample[msg_descriptor-rx_msgs]++;

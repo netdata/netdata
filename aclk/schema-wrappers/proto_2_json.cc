@@ -48,7 +48,7 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
     return NULL;
 }
 
-char *protomsg_to_json(void *protobin, size_t len, const char *msgname)
+char *protomsg_to_json(const void *protobin, size_t len, const char *msgname)
 {
     google::protobuf::Message *msg = msg_name_to_protomsg(msgname);
     if (msg == NULL)

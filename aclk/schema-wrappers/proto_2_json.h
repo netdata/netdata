@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-char *protomsg_to_json(void *protobin, size_t len, const char *msgname);
+char *protomsg_to_json(const void *protobin, size_t len, const char *msgname);
 
 #ifdef __cplusplus
 }
