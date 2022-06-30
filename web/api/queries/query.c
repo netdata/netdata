@@ -516,7 +516,7 @@ static inline void rrd2rrdr_do_dimension(
 
         if(likely(!tier->query_ops.is_finished(&handle))) {
             // fetch the new point
-            new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &anomaly_count, &count);
+            new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &count, &anomaly_count);
             db_points_read++;
 
             // dbengine does not take into account the starting time of points
@@ -527,12 +527,13 @@ static inline void rrd2rrdr_do_dimension(
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld). Fetching the next one.",
                                rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted, query_granularity);
 
-                new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &anomaly_count, &count);
+                new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &count, &anomaly_count);
                 db_points_read++;
             }
 
             if(likely(netdata_double_isnumber(new_point_value))) {
-                new_point_anomaly = (new_point_flags & SN_ANOMALY_BIT) ? 0 : 100;
+
+                new_point_anomaly =  anomaly_count ? 100 : 0;
 
                 if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
                     new_point_value = (NETDATA_DOUBLE)new_point_anomaly;

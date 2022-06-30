@@ -513,8 +513,13 @@ rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start
                 return tier1_value.sum_value;
         }
     }
-    else
+    else {
         n = handle->page[position];
+        if (likely(count))
+            *count = 1;
+        if (likely(anomaly_count))
+            *anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
+    }
 
     if (unlikely(now >= rrdimm_handle->end_time)) {
         // next calls will not load any more metrics
