@@ -808,6 +808,10 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before, int up
         if(after_requested == 0)
             after_requested = -(points * update_every);
 
+        // since the query engine now returns inclusive timestamps
+        // it is awkward to return 6 points when after=-5 is given
+        // so for relative queries we add 1 second, to give
+        // more predictable results to users.
         after_requested = before_requested + after_requested + 1;
         absolute_period_requested = 0;
     }
