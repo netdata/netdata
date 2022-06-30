@@ -380,17 +380,13 @@ struct rrddim_query_ops {
 // ----------------------------------------------------------------------------
 // volatile state per RRD dimension
 struct rrddim_volatile {
-    void *db_metric_handle;
-#ifdef ENABLE_DBENGINE
-    uuid_t *rrdeng_uuid;                            // database engine metric UUID
-    struct pg_cache_page_index *page_index;
-#endif
+    void *db_metric_handle;                         // the metric handle inside the database
+    STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     NETDATA_DOUBLE sum_value;
     NETDATA_DOUBLE min_value;
     NETDATA_DOUBLE max_value;
     uint16_t count;
     time_t last_tier_time;
-    STORAGE_COLLECT_HANDLE *db_collection_handle;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
 };
