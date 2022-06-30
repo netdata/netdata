@@ -112,6 +112,35 @@ jobs:
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --platform ${{ matrix.platform }} \
               -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Upload to packages.netdata.cloud
+        id: package-upload
+        continue-on-error: true
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          .github/scripts/package-upload.sh \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          netdata/netdata
+          .github/scripts/package-upload.sh \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          netdata/netdata-edge
+          .github/scripts/package-upload.sh \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          netdata/netdata-repoconfig
       - name: Upload Packages
         id: publish
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
@@ -145,5 +174,7 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Fetch images: ${{ steps.fetch-images.outcome }}
               Build: ${{ steps.build.outcome }}
-              Publish: ${{ steps.publish.outcome }}
+              Import SSH Key: ${{ steps.ssh-setup.outcome }}
+              Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Publish to PackageCloud: ${{ steps.publish.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
