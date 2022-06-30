@@ -20,6 +20,7 @@ using namespace google::protobuf::util;
 
 static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
 {
+//tx side
     if (!strcmp(msgname, "UpdateAgentConnection"))
         return new agent::v1::UpdateAgentConnection;
     if (!strcmp(msgname, "UpdateNodeInstanceConnection"))
@@ -44,6 +45,28 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new alarms::v1::AlarmSnapshot;
     if (!strcmp(msgname, "AlarmLogEntry"))
         return new alarms::v1::AlarmLogEntry;
+
+//rx side
+    if (!strcmp(msgname, "CreateNodeInstanceResult"))
+        return new nodeinstance::create::v1::CreateNodeInstanceResult;
+    if (!strcmp(msgname, "SendNodeInstances"))
+        return new agent::v1::SendNodeInstances;
+    if (!strcmp(msgname, "StreamChartsAndDimensions"))
+        return new chart::v1::StreamChartsAndDimensions;
+    if (!strcmp(msgname, "ChartsAndDimensionsAck"))
+        return new chart::v1::ChartsAndDimensionsAck;
+    if (!strcmp(msgname, "UpdateChartConfigs"))
+        return new chart::v1::UpdateChartConfigs;
+    if (!strcmp(msgname, "StartAlarmStreaming"))
+        return new alarms::v1::StartAlarmStreaming;
+    if (!strcmp(msgname, "SendAlarmLogHealth"))
+        return new alarms::v1::SendAlarmLogHealth;
+    if (!strcmp(msgname, "SendAlarmConfiguration"))
+        return new alarms::v1::SendAlarmConfiguration;
+    if (!strcmp(msgname, "SendAlarmSnapshot"))
+        return new alarms::v1::SendAlarmSnapshot;
+    if (!strcmp(msgname, "DisconnectReq"))
+        return new agent::v1::DisconnectReq;
 
     return NULL;
 }
