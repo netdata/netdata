@@ -134,26 +134,6 @@ static inline void ebpf_clean_specific_cgroup_pids(struct pid_on_target2 *pt)
 }
 
 /**
- * Cleanup link list
- */
-void ebpf_clean_cgroup_pids()
-{
-    if (!ebpf_cgroup_pids)
-        return;
-
-    ebpf_cgroup_target_t *ect = ebpf_cgroup_pids;
-    while (ect) {
-        ebpf_cgroup_target_t *next_cgroup = ect->next;
-
-        ebpf_clean_specific_cgroup_pids(ect->pids);
-        freez(ect);
-
-        ect = next_cgroup;
-    }
-    ebpf_cgroup_pids = NULL;
-}
-
-/**
  * Remove Cgroup Update Target Update List
  *
  * Remove from cgroup target and update the link list
