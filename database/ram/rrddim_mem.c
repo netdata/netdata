@@ -25,12 +25,14 @@ void rrddim_collect_store_metric(void *collection_handle, usec_t point_in_time, 
         NETDATA_DOUBLE min_value,
         NETDATA_DOUBLE max_value,
         uint16_t count,
+        uint16_t anomaly_count,
         SN_FLAGS flags)
 {
     UNUSED(point_in_time);
     UNUSED(min_value);
     UNUSED(max_value);
     UNUSED(count);
+    UNUSED(anomaly_count);
 
     struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
     RRDDIM *rd = ch->rd;
@@ -75,11 +77,14 @@ void rrddim_query_init(void *db_metric_handle, struct rrddim_query_handle *handl
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
 NETDATA_DOUBLE
-rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier1_number __maybe_unused) {
+rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count, TIER_QUERY_FETCH tier_query_fetch_type) {
+    UNUSED(tier_query_fetch_type);
+
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     size_t entries = rd->rrdset->entries;
     size_t slot = h->slot;
+    *count = 1;
 
     time_t this_timestamp = h->next_timestamp;
     h->next_timestamp += h->dt;
@@ -90,11 +95,13 @@ rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time,
 
     if(unlikely(this_timestamp < h->slot_timestamp)) {
         *flags = SN_EMPTY_SLOT;
+        *anomaly_count = 0;
         return NAN;
     }
 
     if(unlikely(this_timestamp > h->last_timestamp)) {
         *flags = SN_EMPTY_SLOT;
+        *anomaly_count = 0;
         return NAN;
     }
 
@@ -104,6 +111,7 @@ rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time,
     h->slot = slot;
     h->slot_timestamp += h->dt;
 
+    *anomaly_count = (!(n & SN_ANOMALY_BIT));
     *flags = (n & SN_ALL_FLAGS);
     return unpack_storage_number(n);
 }

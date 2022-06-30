@@ -3,6 +3,13 @@
 #ifndef NETDATA_API_DATA_QUERY_H
 #define NETDATA_API_DATA_QUERY_H
 
+typedef enum tier_query_fetch {
+    TIER_QUERY_FETCH_SUM,
+    TIER_QUERY_FETCH_MIN,
+    TIER_QUERY_FETCH_MAX,
+    TIER_QUERY_FETCH_AVERAGE
+} TIER_QUERY_FETCH;
+
 typedef enum rrdr_grouping {
     RRDR_GROUPING_UNDEFINED = 0,
     RRDR_GROUPING_AVERAGE,

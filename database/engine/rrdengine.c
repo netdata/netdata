@@ -781,10 +781,8 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         xt_io_descr->descr_commit_idx_array[i] = descr_commit_idx_array[i];
 
         descr = xt_io_descr->descr_array[i];
-       if (ctx->tier) {
+       if (ctx->tier)
             header->descr[i].type = 1; // TODO: Page 1 will be tier 1
-            info("DEBUG: WRITING page type 1");
-        }
         else
             header->descr[i].type = PAGE_METRICS;
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);

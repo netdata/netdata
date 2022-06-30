@@ -339,6 +339,7 @@ struct rrddim_query_handle {
     RRDDIM *rd;
     time_t start_time;
     time_t end_time;
+    TIER_QUERY_FETCH tier_query_fetch_type;
     STORAGE_QUERY_HANDLE* handle;
 };
 
@@ -349,7 +350,8 @@ struct rrddim_collect_ops {
     void *(*init)(void *db_metric_handle);
 
     // run this to store each metric into the database
-    void (*store_metric)(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value, uint16_t count, SN_FLAGS flags);
+    void (*store_metric)(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
+                         NETDATA_DOUBLE max_value, uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
 
     // run this to flush / reset the current data collection sequence
     void (*flush)(void *collection_handle);
@@ -362,10 +364,10 @@ struct rrddim_collect_ops {
 // function pointers that handle database queries
 struct rrddim_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(void *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+    void (*init)(void *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
 
     // run this to load each metric number from the database
-    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier1_number);
+    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count);
 
     // run this to test if the series of next_metric() database queries is finished
     int (*is_finished)(struct rrddim_query_handle *handle);
@@ -392,6 +394,8 @@ struct rrddim_tier {
     size_t count;
     size_t iterations;
     time_t next_point_time;
+    size_t anomaly_count;
+    time_t last_tier_time;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
 };

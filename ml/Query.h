@@ -20,7 +20,7 @@ public:
     }
 
     void init(time_t AfterT, time_t BeforeT) {
-        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT);
+        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT, TIER_QUERY_FETCH_SUM);
     }
 
     bool isFinished() {
@@ -30,7 +30,7 @@ public:
     std::pair<time_t, CalculatedNumber> nextMetric() {
         time_t CurrT, EndT;
         SN_FLAGS Flags;
-        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags, NULL);
+        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags, NULL, NULL);
         return { CurrT, Value };
     }
 

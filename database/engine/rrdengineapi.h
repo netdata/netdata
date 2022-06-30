@@ -49,14 +49,16 @@ extern void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_ti
                                      NETDATA_DOUBLE min_value,
                                      NETDATA_DOUBLE max_value,
                                      uint16_t count,
+                                     uint16_t anomaly_count,
                                      SN_FLAGS flags);
 extern int rrdeng_store_metric_finalize(void *collection_handle);
 extern unsigned
     rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
                                     struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
 extern void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
-                                    time_t start_time, time_t end_time);
-extern NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result);
+                                    time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
+extern NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count);
+
 extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
 extern time_t rrdeng_metric_latest_time(void *db_metric_handle);

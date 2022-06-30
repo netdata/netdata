@@ -445,6 +445,7 @@ static inline void rrd2rrdr_do_dimension(
         , time_t after_wanted
         , time_t before_wanted
         , RRDR_OPTIONS options
+        , TIER_QUERY_FETCH tier_query_fetch_type
 ){
     time_t now = after_wanted,
            query_granularity = r->update_every / r->group,
@@ -469,7 +470,7 @@ static inline void rrd2rrdr_do_dimension(
     struct rrddim_tier *tier = ((options & RRDR_OPTION_TIER1) && rd->tiers[1]) ? rd->tiers[1] : rd->tiers[0];
 
     // cache the function pointers we need in the loop
-    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result) = tier->query_ops.next_metric;
+    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) = tier->query_ops.next_metric;
     void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value) = r->internal.grouping_add;
     NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) = r->internal.grouping_flush;
 
@@ -486,14 +487,18 @@ static inline void rrd2rrdr_do_dimension(
     time_t last1_point_end_time = 0;
 
     NETDATA_DOUBLE new_point_value = NAN;
-    storage_number_tier1_t tier_new_point_value;
+//    storage_number_tier1_t tier_new_point_value;
+    uint16_t anomaly_count;
+    uint16_t count;
     SN_FLAGS new_point_flags = SN_EMPTY_SLOT;
     size_t new_point_anomaly = 0;
     time_t new_point_start_time = 0;
     time_t new_point_end_time = 0;
 
     // select the right tier to query
-    for(tier->query_ops.init(tier->db_metric_handle, &handle, now, before_wanted) ; points_added < points_wanted ; now += query_granularity) {
+    for(tier->query_ops.init(tier->db_metric_handle, &handle, now, before_wanted, tier_query_fetch_type) ; points_added < points_wanted ; now += query_granularity) {
+//    struct rrddim_volatile *state = (rd->state_tier1 && (options & RRDR_OPTION_TIER1)) ? rd->state_tier1 : rd->state;
+//    for(tier->query_ops.init(tier->db_metric_handle, &handle, now, before_wanted, tier_query_fetch_type) ; points_added < points_wanted ; now += query_granularity) {
 
         if(unlikely(now > before_wanted))
             break;
@@ -512,7 +517,7 @@ static inline void rrd2rrdr_do_dimension(
 
         if(likely(!tier->query_ops.is_finished(&handle))) {
             // fetch the new point
-            new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &tier_new_point_value);
+            new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &anomaly_count, &count);
             db_points_read++;
 
             // dbengine does not take into account the starting time of points
@@ -523,7 +528,7 @@ static inline void rrd2rrdr_do_dimension(
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld). Fetching the next one.",
                                rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted, query_granularity);
 
-                new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &tier_new_point_value);
+                new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &anomaly_count, &count);
                 db_points_read++;
             }
 
@@ -1149,6 +1154,7 @@ RRDR *rrd2rrdr(
     struct timeval query_current_time;
     if (timeout) now_realtime_timeval(&query_start_time);
 
+    TIER_QUERY_FETCH tier_query_fetch_type = TIER_QUERY_FETCH_AVERAGE;
     for(rd = first_rd, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
 
         // if we need a percentage, we need to calculate all dimensions
@@ -1161,7 +1167,7 @@ RRDR *rrd2rrdr(
         // reset the grouping for the new dimension
         r->internal.grouping_reset(r);
 
-        rrd2rrdr_do_dimension(r, points_wanted, rd, c, after_wanted, before_wanted, options);
+        rrd2rrdr_do_dimension(r, points_wanted, rd, c, after_wanted, before_wanted, options, tier_query_fetch_type);
         if (timeout)
             now_realtime_timeval(&query_current_time);
 

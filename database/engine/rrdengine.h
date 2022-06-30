@@ -52,6 +52,7 @@ struct rrdeng_query_handle {
     time_t now;
     unsigned position;
     unsigned entries;
+    TIER_QUERY_FETCH tier_query_fetch_type;
     storage_number *page;
     usec_t page_end_time;
     uint32_t page_length;

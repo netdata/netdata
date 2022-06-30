@@ -205,6 +205,7 @@ void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_time, NET
                               NETDATA_DOUBLE min_value,
                               NETDATA_DOUBLE max_value,
                               uint16_t count,
+                              uint16_t anomaly_count,
                               SN_FLAGS flags)
 {
     UNUSED(min_value);
@@ -228,9 +229,10 @@ void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_time, NET
         number = pack_storage_number(n, flags);
     }
     else {
-        number_tier1.sum_value = pack_storage_number(n, flags);
-        number_tier1.min_value = pack_storage_number(n, flags);
-        number_tier1.max_value = pack_storage_number(n, flags);
+        number_tier1.sum_value = n; //pack_storage_number(n, flags);
+        number_tier1.min_value = min_value; //pack_storage_number(n, flags);
+        number_tier1.max_value = max_value; //pack_storage_number(n, flags);
+        number_tier1.anomaly_count = anomaly_count;
         number_tier1.count = count;
     }
 
@@ -344,7 +346,8 @@ int rrdeng_store_metric_finalize(void *collection_handle) {
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time) {
+void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type)
+{
     struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
     struct rrdengine_instance *ctx = metric_handle->ctx;
     RRDDIM *rd = metric_handle->rd;
@@ -360,6 +363,7 @@ void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle 
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
+    handle->tier_query_fetch_type = tier_query_fetch_type;
     if(ctx->tier) {
         handle->dt = TIER1_GROUPING * rd->update_every * USEC_PER_SEC;
         handle->dt_sec = TIER1_GROUPING * rd->update_every;
@@ -445,7 +449,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
 NETDATA_DOUBLE
-rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result __maybe_unused) {
+rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
     // struct rrdeng_metric_handle *metric_handle = handle->metric_handle;
 
@@ -481,16 +485,35 @@ rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start
     }
 
     storage_number n;
-
-    if (handle->ctx->tier) {
-        tier1_value = ((storage_number_tier1_t *)handle->page)[position];
-        n = tier1_value.sum_value;
-    }
-    else
-        n = handle->page[position];
+    *start_time = now - handle->dt_sec;
+    *end_time = now;
 
     handle->position = position;
     handle->now = now;
+
+    if (handle->ctx->tier) {
+        tier1_value = ((storage_number_tier1_t *)handle->page)[position];
+        *flags = 0;
+        if (likely(count))
+            *count = tier1_value.count;
+        if (likely(anomaly_count))
+                *anomaly_count = tier1_value.anomaly_count;
+
+        switch (handle->tier_query_fetch_type) {
+            case TIER_QUERY_FETCH_SUM:
+                return tier1_value.sum_value;
+            case TIER_QUERY_FETCH_MIN:
+                return tier1_value.min_value;
+            case TIER_QUERY_FETCH_MAX:
+                return tier1_value.max_value;
+            case TIER_QUERY_FETCH_AVERAGE:
+                return (double ) (tier1_value.sum_value / tier1_value.count);
+            default:
+                return tier1_value.sum_value;
+        }
+    }
+    else
+        n = handle->page[position];
 
     if (unlikely(now >= rrdimm_handle->end_time)) {
         // next calls will not load any more metrics
@@ -498,8 +521,6 @@ rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start
     }
 
     *flags = n & SN_ALL_FLAGS;
-    *start_time = now - handle->dt_sec;
-    *end_time = now;
     return unpack_storage_number(n);
 }
 
