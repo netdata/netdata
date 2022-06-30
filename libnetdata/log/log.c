@@ -937,7 +937,7 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
 
         char date[LOG_DATE_LENGTH];
         log_date(date, LOG_DATE_LENGTH);
-        fprintf(aclklog, "> %s, Msg:\"%s\"(%s), MQTT-topic:\"%s\":\n", date, message_name, tx ? "tx" : "rx", mqtt_topic);
+        fprintf(aclklog, "A %s C %s, Msg:\"%s\"(%s), MQTT-topic:\"%s\":\n", tx ? "->" : "<-", date, message_name, tx ? "tx" : "rx", mqtt_topic);
 
         fwrite(data, data_len, 1, aclklog);
 
