@@ -268,6 +268,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             if(!eng) continue;
 
             rd->tiers[tier] = callocz(1, sizeof(*rd->tiers[tier]));
+            rd->tiers[tier]->tier_grouping = TIER1_GROUPING;
             rd->tiers[tier]->mode = eng->id;
             rd->tiers[tier]->collect_ops = eng->api.collect_ops;
             rd->tiers[tier]->query_ops = eng->api.query_ops;

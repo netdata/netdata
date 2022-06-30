@@ -975,7 +975,7 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
         time_t now = (time_t)(next_store_ut / USEC_PER_SEC);
 
         if (!t->next_point_time) {
-            time_t loop = rd->update_every * TIER1_GROUPING;
+            time_t loop = rd->update_every * t->tier_grouping;
             t->next_point_time = now + loop - ((now + loop) % loop);
         }
 
@@ -1016,7 +1016,7 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
                 t->iterations = 0;
                 t->count = 0;
 
-                time_t loop = rd->update_every * TIER1_GROUPING;
+                time_t loop = rd->update_every * t->tier_grouping;
                 t->next_point_time = now + loop - ((now + loop) % loop);
             }
         }

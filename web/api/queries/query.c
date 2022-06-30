@@ -497,9 +497,6 @@ static inline void rrd2rrdr_do_dimension(
 
     // select the right tier to query
     for(tier->query_ops.init(tier->db_metric_handle, &handle, now, before_wanted, tier_query_fetch_type) ; points_added < points_wanted ; now += query_granularity) {
-//    struct rrddim_volatile *state = (rd->state_tier1 && (options & RRDR_OPTION_TIER1)) ? rd->state_tier1 : rd->state;
-//    for(tier->query_ops.init(tier->db_metric_handle, &handle, now, before_wanted, tier_query_fetch_type) ; points_added < points_wanted ; now += query_granularity) {
-
         if(unlikely(now > before_wanted))
             break;
 

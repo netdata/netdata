@@ -364,11 +364,12 @@ void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle 
     handle->next_page_time = start_time;
     handle->now = start_time;
     handle->tier_query_fetch_type = tier_query_fetch_type;
-    if(ctx->tier) {
-        handle->dt = TIER1_GROUPING * rd->update_every * USEC_PER_SEC;
-        handle->dt_sec = TIER1_GROUPING * rd->update_every;
-    }
-    else {
+//    if(ctx->tier) {
+//        handle->dt = TIER1_GROUPING * rd->update_every * USEC_PER_SEC;
+//        handle->dt_sec = TIER1_GROUPING * rd->update_every;
+//    }
+//    else
+    {
         handle->dt = rd->update_every * USEC_PER_SEC;
         handle->dt_sec = rd->update_every;
     }
