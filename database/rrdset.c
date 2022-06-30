@@ -970,13 +970,12 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
     if(rd->state_tier1) {
         struct rrddim_volatile *tier1 = rd->state_tier1;
 
-        if (likely(n != NAN)) {
-            if (!tier1->last_tier_time) {
+        if (likely(netdata_double_isnumber(n))) {
+            if (!tier1->count) {
                 tier1->sum_value = n;
                 tier1->min_value = n;
                 tier1->max_value = n;
                 tier1->count = 1;
-                tier1->last_tier_time = next_store_ut / USEC_PER_SEC;
             }
             else {
                 tier1->sum_value += n;
@@ -986,16 +985,31 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
             }
         }
 
-        if (tier1->count == TIER1_GROUPING) {
-            tier1->collect_ops.store_metric(
-                tier1->db_collection_handle,
-                next_store_ut,
-                tier1->sum_value / tier1->count,
-                tier1->min_value,
-                tier1->max_value,
-                tier1->count,
-                flags);
+        tier1->last_tier_time = next_store_ut / USEC_PER_SEC;
+
+        if ((tier1->last_tier_time % TIER1_GROUPING) == 0) {
+            if(!tier1->count) {
+                tier1->collect_ops.store_metric(
+                    tier1->db_collection_handle,
+                    next_store_ut,
+                    NAN,
+                    NAN,
+                    NAN,
+                    0,
+                    SN_EMPTY_SLOT);
+            }
+            else {
+                tier1->collect_ops.store_metric(
+                    tier1->db_collection_handle,
+                    next_store_ut,
+                    tier1->sum_value / tier1->count,
+                    tier1->min_value,
+                    tier1->max_value,
+                    tier1->count,
+                    flags);
+            }
             tier1->last_tier_time = 0;
+            tier1->count = 0;
         }
     }
 }

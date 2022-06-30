@@ -118,7 +118,7 @@ void *rrdeng_metric_init(RRDDIM *rd, void *db_instance) {
 
         uuid_copy(rd->metric_uuid, multihost_legacy_uuid);
 
-        if (unlikely(need_to_store && ctx == &multidb_ctx))
+        if (unlikely(need_to_store && !ctx->tier))
             (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                 rd->algorithm);
     }
