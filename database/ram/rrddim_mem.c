@@ -36,6 +36,13 @@ void rrddim_collect_store_metric(void *collection_handle, usec_t point_in_time, 
     RRDDIM *rd = ch->rd;
     rd->db[rd->rrdset->current_entry] = pack_storage_number(number, flags);
 }
+
+void rrddim_store_metric_flush(void *collection_handle) {
+    struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+    RRDDIM *rd = ch->rd;
+    memset(rd->db, 0, rd->entries * sizeof(storage_number));
+}
+
 int rrddim_collect_finalize(void *collection_handle) {
     free(collection_handle);
     return 0;

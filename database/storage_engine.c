@@ -8,8 +8,8 @@
 
 #define im_collect_ops { \
     .init = rrddim_collect_init,\
-    .store_metric = rrddim_collect_store_metric, \
-    .flush = NULL,\
+    .store_metric = rrddim_collect_store_metric,\
+    .flush = rrddim_store_metric_flush,\
     .finalize = rrddim_collect_finalize\
 }
 

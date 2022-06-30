@@ -274,13 +274,10 @@ void rrdset_reset(RRDSET *st) {
         rd->last_collected_time.tv_usec = 0;
         rd->collections_counter = 0;
 
-        // memset(rd->db, 0, rd->entries * sizeof(storage_number));
-
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            if (rd->state->collect_ops.flush)
-                rd->state->collect_ops.flush(rd->state->db_collection_handle);
+            rd->state->collect_ops.flush(rd->state->db_collection_handle);
 
-            if (rd->state_tier1 && rd->state_tier1->collect_ops.flush)
+            if (rd->state_tier1)
                 rd->state_tier1->collect_ops.flush(rd->state_tier1->db_collection_handle);
         }
     }
