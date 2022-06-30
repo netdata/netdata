@@ -125,8 +125,8 @@ Netdata parses 9 lines starting with:
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
--    `CLABEL` - Define label for a specific chart
--    `CLABEL_COMMIT` - merge label definition for a chart.
+-    `CLABEL` - add a label to a chart
+-    `CLABEL_COMMIT` - commit added labels to the chart.
 
 a single program can produce any number of charts with any number of dimensions each.
 
@@ -328,7 +328,7 @@ Variables are transferred to upstream Netdata servers (streaming and database re
 
 `CLABEL` defines a label used to organize and identify a chart.
 
-Name and value accept characters according the following table:
+Name and value accept characters according to the following table:
 
 | Character           | Symbol | Label Name | Label Value |
 |---------------------|:------:|:----------:|:-----------:|
@@ -353,9 +353,9 @@ Name and value accept characters according the following table:
 | Anything else       |        |     _      |      _      |
 
 The `source` is an integer field that can have the following values:
-- `1`: The value was set automatically
-- `2`: The value was set manually
-- `4`: This is a K8 label
+- `1`: The value was set automatically.
+- `2`: The value was set manually.
+- `4`: This is a K8 label.
 - `8`: This is a label defined using `netdata` agent cloud link.
 
 #### CLABEL_COMMIT
