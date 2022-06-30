@@ -11,7 +11,7 @@ format="${3}"
 repo="${4}"
 
 staging="${TMPDIR:-/tmp}/package-staging"
-prefix="/var/www/html/repos/${repo}/"
+prefix="/home/netdatabot/incoming/${repo}/"
 
 packages="$(find artifacts -name "*.${format}")"
 

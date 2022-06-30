@@ -214,6 +214,25 @@ jobs:
                      -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
                      /netdata/.github/scripts/pkg-test.sh
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Upload to packages.netdata.cloud
+        id: package-upload
+        continue-on-error: true
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          .github/scripts/package-upload.sh \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
       - name: Upload to PackageCloud
         id: upload
         if: github.event_name == 'workflow_dispatch'
@@ -227,23 +246,6 @@ jobs:
             "$(basename "${pkgfile}")" || true
             .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} "${pkgfile}"
           done
-      - name: SSH setup
-        id: ssh-setup
-        if: github.event_name == 'workflow_dispatch'
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
-          name: id_ecdsa
-          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
-      - name: Upload to packages.netdata.cloud
-        id: package-upload
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          .github/scripts/package-upload.sh \
-          ${{ matrix.repo_distro }} \
-          ${{ matrix.arch }} \
-          ${{ matrix.format }} \
-          ${{ needs.version-check.outputs.repo }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -259,9 +261,9 @@ jobs:
               Fetch images: ${{ steps.fetch-images.outcome }}
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
-              Publish: ${{ steps.upload.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
-              Publish: ${{ steps.package-upload.outcome }}
+              Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Publish to PackageCloud: ${{ steps.upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
