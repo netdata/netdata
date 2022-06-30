@@ -1533,7 +1533,7 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
     return 1;
 #endif
 }
-
+#include "../storage_engine.h"
 #ifdef ENABLE_DBENGINE
 static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *name, uuid_t *metric_uuid)
 {
@@ -1541,6 +1541,11 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
     rd->rrdset = st;
     rd->last_stored_value = NAN;
     rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
+    STORAGE_ENGINE *eng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
+
+    uuid_copy(rd->metric_uuid, *metric_uuid);
+    rd->id = onewayalloc_strdupz(owa, id);
+    rd->name = onewayalloc_strdupz(owa, name);
 
     for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
         rd->tiers[tier] = onewayalloc_mallocz(owa, sizeof(*rd->tiers[tier]));
@@ -1551,11 +1556,9 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
         rd->tiers[tier]->query_ops.finalize = rrdeng_load_metric_finalize;
         rd->tiers[tier]->query_ops.latest_time = rrdeng_metric_latest_time;
         rd->tiers[tier]->query_ops.oldest_time = rrdeng_metric_oldest_time;
+        rd->tiers[tier]->db_metric_handle = eng->api.init(rd, st->rrdhost->storage_instance[tier]);
     }
 
-    uuid_copy(rd->metric_uuid, *metric_uuid);
-    rd->id = onewayalloc_strdupz(owa, id);
-    rd->name = onewayalloc_strdupz(owa, name);
     return rd;
 }
 #endif
