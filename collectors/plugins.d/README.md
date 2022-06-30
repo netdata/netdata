@@ -322,6 +322,22 @@ The `value` is floating point (Netdata used `long double`).
 
 Variables are transferred to upstream Netdata servers (streaming and database replication).
 
+#### CLABEL
+
+> CLABEL name value source
+
+`CLABEL` defines a label used to organize and identify a chart.
+
+Label names should use alphanumeric characters.
+
+Value is also a alphanumeric field and when more than one word is needed, it is necessary to use quotes.
+
+The `source` is an integer field that can have the following values:
+- `1`: The value was set automatically
+- `2`: The value was set manually
+- `4`: This is a K8 label
+- `8`: This is a label defined using `netdata` agent cloud link.
+
 #### CLABEL_COMMIT
 
 `CLABEL_COMMIT` will indicate to netdata that all labels were defined and chart can be updated.
