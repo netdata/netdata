@@ -75,10 +75,10 @@ char *protomsg_to_json(const void *protobin, size_t len, const char *msgname)
 {
     google::protobuf::Message *msg = msg_name_to_protomsg(msgname);
     if (msg == NULL)
-        return strdupz("Can't decode the message");
+        return strdupz("Don't know this message type by name.");
 
     if (!msg->ParseFromArray(protobin, len))
-        return NULL;
+        return strdupz("Can't parse this message. Malformed or wrong parser used.");
 
     JsonPrintOptions options;
     options.add_whitespace = true;
