@@ -36,8 +36,10 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
     char *json = protomsg_to_json(msg, msg_len, msgname);
-    if (json)
+    if (json) {
         log_aclk_message_bin(json, strlen(json), 1, topic, msgname);
+        freez(json);
+    }
 #endif
 
     return packet_id;

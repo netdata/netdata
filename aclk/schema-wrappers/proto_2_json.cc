@@ -31,7 +31,7 @@ char *protomsg_to_json(void *protobin, size_t len, const char *msgname)
 {
     google::protobuf::Message *msg = msg_name_to_protomsg(msgname);
     if (msg == NULL)
-        return NULL;
+        return strdupz("Can't decode the message");
 
     if (!msg->ParseFromArray(protobin, len))
         return NULL;
@@ -41,5 +41,6 @@ char *protomsg_to_json(void *protobin, size_t len, const char *msgname)
 
     std::string output;
     google::protobuf::util::MessageToJsonString(*msg, &output, options);
+    delete msg;
     return strdupz(output.c_str());
 }
