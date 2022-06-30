@@ -105,7 +105,7 @@ extern void fatal_int( const char *file, const char *function, const unsigned lo
 extern void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-extern void log_aclk_message_bin( const char *data, const size_t data_len, int tx);
+extern void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);
 #endif
 
 # ifdef __cplusplus

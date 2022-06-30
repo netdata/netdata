@@ -930,14 +930,14 @@ void log_access( const char *fmt, ... ) {
 }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-void log_aclk_message_bin( const char *data, const size_t data_len, int tx) {
+void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name) {
     if (aclklog) {
         static netdata_mutex_t aclklog_mutex = NETDATA_MUTEX_INITIALIZER;
         netdata_mutex_lock(&aclklog_mutex);
 
         char date[LOG_DATE_LENGTH];
         log_date(date, LOG_DATE_LENGTH);
-        fprintf(aclklog, "> MESSAGE (%s) %s:\n", tx ? "tx" : "rx", date);
+        fprintf(aclklog, "> %s, Msg:\"%s\"(%s), MQTT-topic:\"%s\":\n", date, message_name, tx ? "tx" : "rx", mqtt_topic);
 
         fwrite(data, data_len, 1, aclklog);
 
