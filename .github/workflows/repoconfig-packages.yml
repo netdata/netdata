@@ -7,12 +7,14 @@ on:
     paths:
       - packaging/repoconfig/**
       - .github/workflows/repoconfig-packages.yml
+      - .github/data/distros.yml
   push:
     branches:
       - master
     paths:
       - packaging/repoconfig/**
       - .github/workflows/repoconfig-packages.yml
+      - .github/data/distros.yml
 env:
   DISABLE_TELEMETRY: 1
   REPO_PREFIX: netdata/netdata
