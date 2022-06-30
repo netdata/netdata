@@ -1091,7 +1091,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     if (likely(rd->aclk_live_status == live))
         return;
 
-    time_t created_at = rd->state->query_ops.oldest_time(rd->state->db_metric_handle);
+    time_t created_at = rd->tiers[0]->query_ops.oldest_time(rd->tiers[0]->db_metric_handle);
 
     if (unlikely(!created_at && rd->updated))
        created_at = rd->last_collected_time.tv_sec;

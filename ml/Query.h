@@ -8,19 +8,19 @@ namespace ml {
 class Query {
 public:
     Query(RRDDIM *RD) : RD(RD) {
-        Ops = &RD->state->query_ops;
+        Ops = &RD->tiers[0]->query_ops;
     }
 
     time_t latestTime() {
-        return Ops->latest_time(RD->state->db_metric_handle);
+        return Ops->latest_time(RD->tiers[0]->db_metric_handle);
     }
 
     time_t oldestTime() {
-        return Ops->oldest_time(RD->state->db_metric_handle);
+        return Ops->oldest_time(RD->tiers[0]->db_metric_handle);
     }
 
     void init(time_t AfterT, time_t BeforeT) {
-        Ops->init(RD->state->db_metric_handle, &Handle, AfterT, BeforeT);
+        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT);
     }
 
     bool isFinished() {

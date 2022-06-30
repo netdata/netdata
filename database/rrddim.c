@@ -168,11 +168,15 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_algorithm(st, rd, algorithm);
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
+
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             store_active_dimension(&rd->metric_uuid);
 
-            rd->state->db_collection_handle = rd->state->collect_ops.init(rd->state->db_metric_handle);
-            rd->state_tier1->db_collection_handle = rd->state_tier1->collect_ops.init(rd->state_tier1->db_metric_handle);
+            for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+                if (rd->tiers[tier])
+                    rd->tiers[tier]->db_collection_handle =
+                        rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
+            }
 
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
             rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
@@ -183,6 +187,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
             rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
         }
+
         if (unlikely(rc)) {
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
             (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
@@ -254,28 +259,44 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 #endif
     (void) find_dimension_uuid(st, rd, &(rd->metric_uuid));
 
-    rd->state = callocz(1, sizeof(*rd->state));
-    STORAGE_ENGINE* eng = storage_engine_get(memory_mode);
-    rd->state->collect_ops = eng->api.collect_ops;
-    rd->state->query_ops = eng->api.query_ops;
-    rd->state->db_metric_handle = eng->api.init(rd, host->rrdeng_ctx);
+    // initialize the db tiers
+    {
+        size_t initialized = 0;
+        RRD_MEMORY_MODE wanted_mode = memory_mode;
+        for(int tier = 0; tier < RRD_STORAGE_TIERS ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
+            if(!eng) continue;
 
-#ifdef ENABLE_DBENGINE
-    if(host->rrdeng_ctx_tier1) {
-        STORAGE_ENGINE *dbeng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
-        rd->state_tier1 = callocz(1, sizeof(*rd->state_tier1));
-        rd->state_tier1->collect_ops = dbeng->api.collect_ops;
-        rd->state_tier1->query_ops = dbeng->api.query_ops;
-        rd->state_tier1->db_metric_handle = dbeng->api.init(rd, host->rrdeng_ctx_tier1);
+            rd->tiers[tier] = callocz(1, sizeof(*rd->tiers[tier]));
+            rd->tiers[tier]->mode = eng->id;
+            rd->tiers[tier]->collect_ops = eng->api.collect_ops;
+            rd->tiers[tier]->query_ops = eng->api.query_ops;
+            rd->tiers[tier]->db_metric_handle = eng->api.init(rd, host->storage_instance[tier]);
+            initialized++;
+        }
+
+        if(!initialized)
+            error("Failed to initialize all db tiers for chart '%s', dimension '%s", st->name, rd->name);
+
+        if(!rd->tiers[0])
+            error("Failed to initialize the first db tier for chart '%s', dimension '%s", st->name, rd->name);
     }
-#endif
 
     store_active_dimension(&rd->metric_uuid);
 
-    rd->state->db_collection_handle = rd->state->collect_ops.init(rd->state->db_metric_handle);
+    // initialize data collection for all tiers
+    {
+        size_t initialized = 0;
+        for (int tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+            if (rd->tiers[tier]) {
+                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
+                initialized++;
+            }
+        }
 
-    if(rd->state_tier1)
-        rd->state_tier1->db_collection_handle = rd->state_tier1->collect_ops.init(rd->state_tier1->db_metric_handle);
+        if(!initialized)
+            error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", st->name, rd->name);
+    }
 
     // append this dimension
     if(!st->dimensions)
@@ -332,15 +353,20 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd->state->db_collection_handle);
-        rd->state->db_collection_handle = NULL;
 
-        if(rd->state_tier1) {
-            rd->state_tier1->collect_ops.finalize(rd->state_tier1->db_collection_handle);
-            rd->state->db_collection_handle = NULL;
+        size_t tiers_available = 0, tiers_said_yes = 0;
+        for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+            if(rd->tiers[tier]) {
+                tiers_available++;
+
+                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
+                    tiers_said_yes++;
+
+                rd->tiers[tier]->db_collection_handle = NULL;
+            }
         }
 
-        if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        if (tiers_available == tiers_said_yes && tiers_said_yes && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             /* This metric has no data and no references */
             delete_dimension_uuid(&rd->metric_uuid);
         }
@@ -374,21 +400,21 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     // this will free MEMORY_MODE_SAVE and MEMORY_MODE_MAP structures
     rrddim_memory_file_free(rd);
 
-    if(rd->state->db_metric_handle) {
-        STORAGE_ENGINE* eng = storage_engine_get(rd->rrd_memory_mode);
-        if(eng->api.free)
-            eng->api.free(rd->state->db_metric_handle);
-    }
+    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+        if(!rd->tiers[tier]) continue;
 
-    if(rd->state_tier1 && rd->state_tier1->db_metric_handle) {
-        STORAGE_ENGINE* eng = storage_engine_get(rd->rrd_memory_mode);
-        if(eng->api.free)
-            eng->api.free(rd->state_tier1->db_metric_handle);
+        STORAGE_ENGINE* eng = storage_engine_get(rd->tiers[tier]->mode);
+        if(eng && eng->api.free)
+            eng->api.free(rd->tiers[tier]->db_metric_handle);
     }
 
     freez((void *)rd->id);
     freez((void *)rd->name);
-    freez(rd->state);
+
+    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+        freez(rd->tiers[tier]);
+        rd->tiers[tier] = NULL;
+    }
 
     if(rd->db) {
         if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)

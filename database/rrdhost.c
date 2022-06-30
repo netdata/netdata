@@ -10,6 +10,16 @@ netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 time_t rrdset_free_obsolete_time = 3600;
 time_t rrdhost_free_orphan_time = 3600;
 
+bool is_storage_engine_shared(void *engine) {
+#ifdef ENABLE_DBENGINE
+if(engine == &multidb_ctx || engine == &multidb_ctx_tier1)
+    return true;
+#endif
+
+    return false;
+}
+
+
 // ----------------------------------------------------------------------------
 // RRDHOST index
 
@@ -344,11 +354,13 @@ RRDHOST *rrdhost_create(const char *hostname,
             error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
         else ret = 0; // succeed
         if (is_legacy) // initialize legacy dbengine instance as needed
-            ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, default_rrdeng_page_cache_mb,
+            ret = rrdeng_init(host, (struct rrdengine_instance **)&host->storage_instance[0], dbenginepath, default_rrdeng_page_cache_mb,
                               default_rrdeng_disk_quota_mb, 0); // may fail here for legacy dbengine initialization
         else {
-            host->rrdeng_ctx = &multidb_ctx;
-            host->rrdeng_ctx_tier1 = &multidb_ctx_tier1;
+            host->storage_instance[0] = &multidb_ctx;
+
+            if(RRD_STORAGE_TIERS == 2)
+                host->storage_instance[1] = &multidb_ctx_tier1;
         }
         if (ret) { // check legacy or multihost initialization success
             error(
@@ -367,8 +379,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     else {
 #ifdef ENABLE_DBENGINE
-        host->rrdeng_ctx = &multidb_ctx;
-        host->rrdeng_ctx_tier1 = &multidb_ctx_tier1;
+        host->storage_instance[0] = &multidb_ctx;
+
+        if(RRD_STORAGE_TIERS == 2)
+            host->storage_instance[1] = &multidb_ctx_tier1;
 #endif
     }
 
@@ -675,7 +689,7 @@ restart_after_removal:
             if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
 #ifdef ENABLE_DBENGINE
                 /* don't delete multi-host DB host files */
-                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx == &multidb_ctx)
+                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
 #endif
             )
                 rrdhost_delete_charts(host);
@@ -919,13 +933,14 @@ void rrdhost_free(RRDHOST *host) {
     // release its children resources
 
 #ifdef ENABLE_DBENGINE
-    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        if (host->rrdeng_ctx != &multidb_ctx)
-            rrdeng_prepare_exit(host->rrdeng_ctx);
-        if (host->rrdeng_ctx_tier1 != &multidb_ctx_tier1)
-            rrdeng_prepare_exit(host->rrdeng_ctx_tier1);
+    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
+            host->storage_instance[tier] &&
+            !is_storage_engine_shared(host->storage_instance[tier]))
+            rrdeng_prepare_exit(host->storage_instance[tier]);
     }
 #endif
+
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
 
@@ -957,8 +972,12 @@ void rrdhost_free(RRDHOST *host) {
     health_alarm_log_free(host);
 
 #ifdef ENABLE_DBENGINE
-    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx != &multidb_ctx)
-        rrdeng_exit(host->rrdeng_ctx);
+    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
+            host->storage_instance[tier] &&
+            !is_storage_engine_shared(host->storage_instance[tier]))
+            rrdeng_exit(host->storage_instance[tier]);
+    }
 #endif
 
     // ------------------------------------------------------------------------
@@ -1277,7 +1296,7 @@ void rrdhost_cleanup_all(void) {
         if (host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST) && !host->receiver
 #ifdef ENABLE_DBENGINE
             /* don't delete multi-host DB host files */
-            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx == &multidb_ctx)
+            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
 #endif
         )
             rrdhost_delete_charts(host);
@@ -1333,16 +1352,22 @@ restart_after_removal:
 
                     if (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
-                        /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd->state->db_collection_handle);
-                        rd->state->db_collection_handle = NULL;
 
-                        if(rd->state_tier1) {
-                            rd->state_tier1->collect_ops.finalize(rd->state_tier1->db_collection_handle);
-                            rd->state_tier1->db_collection_handle = NULL;
+                        /* only a collector can mark a chart as obsolete, so we must remove the reference */
+
+                        size_t tiers_available = 0, tiers_said_yes = 0;
+                        for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+                            if(rd->tiers[tier]) {
+                                tiers_available++;
+
+                                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
+                                    tiers_said_yes++;
+
+                                rd->tiers[tier]->db_collection_handle = NULL;
+                            }
                         }
 
-                        if (can_delete_metric) {
+                        if (tiers_available == tiers_said_yes && tiers_said_yes) {
                             /* This metric has no data and no references */
                             delete_dimension_uuid(&rd->metric_uuid);
                             rrddim_free(st, rd);

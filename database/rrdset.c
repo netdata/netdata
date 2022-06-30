@@ -275,10 +275,10 @@ void rrdset_reset(RRDSET *st) {
         rd->collections_counter = 0;
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            rd->state->collect_ops.flush(rd->state->db_collection_handle);
-
-            if (rd->state_tier1)
-                rd->state_tier1->collect_ops.flush(rd->state_tier1->db_collection_handle);
+            for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+                if(rd->tiers[tier])
+                    rd->tiers[tier]->collect_ops.flush(rd->tiers[tier]->db_collection_handle);
+            }
         }
     }
 }
@@ -965,60 +965,53 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
 }
 
 static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
-    rd->state->collect_ops.store_metric(rd->state->db_collection_handle, next_store_ut, n, 0, 0, 1, flags);
+    rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, next_store_ut, n, 0, 0, 1, flags);
 
-    if(rd->state_tier1) {
+    for(int tier = 1; tier < RRD_STORAGE_TIERS ;tier++) {
+        if (!rd->tiers[tier]) continue;
+        struct rrddim_tier *t = rd->tiers[tier];
+
         time_t now = (time_t)(next_store_ut / USEC_PER_SEC);
-        struct rrddim_volatile *tier1 = rd->state_tier1;
 
-        if(!tier1->next_point_time) {
+        if (!t->next_point_time) {
             time_t loop = rd->update_every * TIER1_GROUPING;
-            tier1->next_point_time = now + loop - ((now + loop) % loop);
+            t->next_point_time = now + loop - ((now + loop) % loop);
         }
 
         if (likely(netdata_double_isnumber(n))) {
-            if (!tier1->count) {
-                tier1->sum_value = n;
-                tier1->min_value = n;
-                tier1->max_value = n;
-                tier1->count = 1;
-            }
-            else {
-                tier1->sum_value += n;
-                tier1->min_value = MIN(tier1->min_value, n);
-                tier1->max_value = MAX(tier1->max_value, n);
-                tier1->count++;
+            if (!t->count) {
+                t->sum_value = n;
+                t->min_value = n;
+                t->max_value = n;
+                t->count = 1;
+            } else {
+                t->sum_value += n;
+                t->min_value = MIN(t->min_value, n);
+                t->max_value = MAX(t->max_value, n);
+                t->count++;
             }
         }
 
-        tier1->iterations++;
+        t->iterations++;
 
-        if (now >= tier1->next_point_time) {
-            if(!tier1->count) {
-                tier1->collect_ops.store_metric(
-                    tier1->db_collection_handle,
+        if (now >= t->next_point_time) {
+            if (!t->count) {
+                t->collect_ops.store_metric(t->db_collection_handle, next_store_ut, NAN, NAN, NAN, 0, SN_EMPTY_SLOT);
+            } else {
+                t->collect_ops.store_metric(
+                    t->db_collection_handle,
                     next_store_ut,
-                    NAN,
-                    NAN,
-                    NAN,
-                    0,
-                    SN_EMPTY_SLOT);
-            }
-            else {
-                tier1->collect_ops.store_metric(
-                    tier1->db_collection_handle,
-                    next_store_ut,
-                    tier1->sum_value / tier1->count,
-                    tier1->min_value,
-                    tier1->max_value,
-                    tier1->count,
+                    t->sum_value / t->count,
+                    t->min_value,
+                    t->max_value,
+                    t->count,
                     flags);
             }
-            tier1->iterations = 0;
-            tier1->count = 0;
+            t->iterations = 0;
+            t->count = 0;
 
             time_t loop = rd->update_every * TIER1_GROUPING;
-            tier1->next_point_time = now + loop - ((now + loop) % loop);
+            t->next_point_time = now + loop - ((now + loop) % loop);
         }
     }
 }
@@ -1796,15 +1789,20 @@ after_second_database_work:
 
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd->state->db_collection_handle);
-                        rd->state->db_collection_handle = NULL;
 
-                        if(rd->state_tier1) {
-                            rd->state_tier1->collect_ops.finalize(rd->state_tier1->db_collection_handle);
-                            rd->state_tier1->db_collection_handle = NULL;
+                        size_t tiers_available = 0, tiers_said_yes = 0;
+                        for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+                            if(rd->tiers[tier]) {
+                                tiers_available++;
+
+                                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
+                                    tiers_said_yes++;
+
+                                rd->tiers[tier]->db_collection_handle = NULL;
+                            }
                         }
 
-                        if (can_delete_metric) {
+                        if (tiers_available == tiers_said_yes && tiers_said_yes) {
                             /* This metric has no data and no references */
                             delete_dimension_uuid(&rd->metric_uuid);
                         } else {

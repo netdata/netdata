@@ -1704,7 +1704,7 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Fluh pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->state->db_collection_handle);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 }
@@ -1767,14 +1767,14 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                rd[i][j]->state->query_ops.init(rd[i][j]->state->db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every);
+                rd[i][j]->tiers[0]->query_ops.init(rd[i][j]->tiers[0]->db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
                     expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
                     time_t end_time;
-                    value = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, NULL);
+                    value = rd[i][j]->tiers[0]->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, NULL);
 
                     same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
@@ -1793,7 +1793,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                         errors++;
                     }
                 }
-                rd[i][j]->state->query_ops.finalize(&handle);
+                rd[i][j]->tiers[0]->query_ops.finalize(&handle);
             }
         }
     }
@@ -1913,7 +1913,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->state->db_collection_handle);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 
@@ -1932,7 +1932,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->state->db_collection_handle);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 
@@ -2005,9 +2005,9 @@ int test_dbengine(void)
     }
 error_out:
     rrd_wrlock();
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    rrdeng_prepare_exit(host->storage_instance[0]);
     rrdhost_delete_charts(host);
-    rrdeng_exit(host->rrdeng_ctx);
+    rrdeng_exit(host->storage_instance[0]);
     rrd_unlock();
 
     return errors + value_errors + time_errors;
@@ -2092,7 +2092,7 @@ static void generate_dbengine_chart(void *arg)
         thread_info->time_max = time_current;
     }
     for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize((rd[j])->state->db_collection_handle);
+        rrdeng_store_metric_finalize((rd[j])->tiers[0]->db_collection_handle);
     }
 }
 
@@ -2213,13 +2213,13 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        rd->state->query_ops.init(rd->state->db_metric_handle, &handle, time_after, time_before);
+        rd->tiers[0]->query_ops.init(rd->tiers[0]->db_metric_handle, &handle, time_after, time_before);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);
             expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE) generatedv, SN_DEFAULT_FLAGS));
 
-            if (unlikely(rd->state->query_ops.is_finished(&handle))) {
+            if (unlikely(rd->tiers[0]->query_ops.is_finished(&handle))) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                         ", found data gap, ### E R R O R ###\n",
@@ -2229,7 +2229,7 @@ static void query_dbengine_chart(void *arg)
                 break;
             }
             time_t end_time;
-            value = rd->state->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, NULL);
+            value = rd->tiers[0]->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, NULL);
             if (!netdata_double_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
@@ -2263,7 +2263,7 @@ static void query_dbengine_chart(void *arg)
                 }
             }
         }
-        rd->state->query_ops.finalize(&handle);
+        rd->tiers[0]->query_ops.finalize(&handle);
     } while(!thread_info->done);
 
     if(value_errors)
@@ -2411,9 +2411,9 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     }
     freez(query_threads);
     rrd_wrlock();
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    rrdeng_prepare_exit(host->storage_instance[0]);
     rrdhost_delete_charts(host);
-    rrdeng_exit(host->rrdeng_ctx);
+    rrdeng_exit(host->storage_instance[0]);
     rrd_unlock();
 }
 

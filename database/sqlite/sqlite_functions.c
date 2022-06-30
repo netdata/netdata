@@ -1320,8 +1320,12 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
 
     host->system_info = callocz(1, sizeof(*host->system_info));;
     rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+
 #ifdef ENABLE_DBENGINE
-    host->rrdeng_ctx = &multidb_ctx;
+    host->storage_instance[0] = &multidb_ctx;
+
+    if(RRD_STORAGE_TIERS == 2)
+        host->storage_instance[1] = &multidb_ctx_tier1;
 #endif
 
 failed:
@@ -1537,14 +1541,18 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
     rd->rrdset = st;
     rd->last_stored_value = NAN;
     rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
-    rd->state = onewayalloc_mallocz(owa, sizeof(*rd->state));
-    rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-    rd->state->query_ops.init = rrdeng_load_metric_init;
-    rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-    rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-    rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-    rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-    rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
+
+    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+        rd->tiers[tier] = onewayalloc_mallocz(owa, sizeof(*rd->tiers[tier]));
+        rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        rd->tiers[tier]->query_ops.init = rrdeng_load_metric_init;
+        rd->tiers[tier]->query_ops.next_metric = rrdeng_load_metric_next;
+        rd->tiers[tier]->query_ops.is_finished = rrdeng_load_metric_is_finished;
+        rd->tiers[tier]->query_ops.finalize = rrdeng_load_metric_finalize;
+        rd->tiers[tier]->query_ops.latest_time = rrdeng_metric_latest_time;
+        rd->tiers[tier]->query_ops.oldest_time = rrdeng_metric_oldest_time;
+    }
+
     uuid_copy(rd->metric_uuid, *metric_uuid);
     rd->id = onewayalloc_strdupz(owa, id);
     rd->name = onewayalloc_strdupz(owa, name);

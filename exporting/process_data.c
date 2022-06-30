@@ -77,8 +77,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t before = instance->before;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rd->state->query_ops.oldest_time(rd->state->db_metric_handle);
-    time_t last_t = rd->state->query_ops.latest_time(rd->state->db_metric_handle);
+    time_t first_t = rd->tiers[0]->query_ops.oldest_time(rd->tiers[0]->db_metric_handle);
+    time_t last_t = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
     time_t update_every = st->update_every;
     struct rrddim_query_handle handle;
 
@@ -126,10 +126,10 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     NETDATA_DOUBLE sum = 0;
     NETDATA_DOUBLE value;
 
-    for (rd->state->query_ops.init(rd->state->db_metric_handle, &handle, after, before); !rd->state->query_ops.is_finished(&handle);) {
+    for (rd->tiers[0]->query_ops.init(rd->tiers[0]->db_metric_handle, &handle, after, before); !rd->tiers[0]->query_ops.is_finished(&handle);) {
         time_t curr_t, end_t;
         SN_FLAGS flags;
-        value = rd->state->query_ops.next_metric(&handle, &curr_t, &end_t, &flags, NULL);
+        value = rd->tiers[0]->query_ops.next_metric(&handle, &curr_t, &end_t, &flags, NULL);
 
         if (unlikely(!netdata_double_isnumber(value))) {
             // not collected
@@ -140,7 +140,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
 
         counter++;
     }
-    rd->state->query_ops.finalize(&handle);
+    rd->tiers[0]->query_ops.finalize(&handle);
     if (unlikely(!counter)) {
         debug(
             D_EXPORTING,

@@ -455,17 +455,21 @@ static void dbengine_statistics_charts(void) {
 
         rrdhost_foreach_read(host) {
             if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-                if (&multidb_ctx == host->rrdeng_ctx) {
+                if (is_storage_engine_shared(host->storage_instance[0])) {
                     if (counted_multihost_db)
                         continue; /* Only count multi-host DB once */
                     counted_multihost_db = 1;
                 }
                 ++dbengine_contexts;
                 /* get localhost's DB engine's statistics */
-                rrdeng_get_37_statistics(host->rrdeng_ctx, local_stats_array);
-                for (i = 0; i < RRDENG_NR_STATS; ++i) {
-                    /* aggregate statistics across hosts */
-                    stats_array[i] += local_stats_array[i];
+                for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+                    if(!host->storage_instance[tier]) continue;
+
+                    rrdeng_get_37_statistics(host->storage_instance[tier], local_stats_array);
+                    for (i = 0; i < RRDENG_NR_STATS; ++i) {
+                        /* aggregate statistics across hosts */
+                        stats_array[i] += local_stats_array[i];
+                    }
                 }
             }
         }

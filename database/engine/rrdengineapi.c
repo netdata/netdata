@@ -14,12 +14,10 @@ int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
-static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host, int tier)
-{
-    if (!tier)
-        return host->rrdeng_ctx;
-    else
-        return host->rrdeng_ctx_tier1;
+static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host, int tier) {
+    if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
+    if(!host->storage_instance[tier]) tier = 0;
+    return host->storage_instance[tier];
 }
 
 /* This UUID is not unique across hosts */
@@ -80,7 +78,7 @@ void *rrdeng_metric_init(RRDDIM *rd, void *db_instance) {
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-    if (host != localhost && host->rrdeng_ctx == &multidb_ctx)
+    if (host != localhost && is_storage_engine_shared(ctx))
         is_multihost_child = 1;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -866,9 +864,9 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     //metalog_exit(ctx->metalog_ctx);
     free_page_cache(ctx);
 
-    if (ctx != &multidb_ctx && ctx != &multidb_ctx_tier1) {
+    if(!is_storage_engine_shared(ctx))
         freez(ctx);
-    }
+
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;
 }

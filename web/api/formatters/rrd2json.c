@@ -18,7 +18,9 @@ static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int arc
         }
     }
 
-    onewayalloc_freez(owa, temp_rd->state);
+    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++)
+        onewayalloc_freez(owa, temp_rd->tiers[tier]);
+
     onewayalloc_freez(owa, temp_rd);
 }
 
@@ -89,7 +91,12 @@ void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_lis
         RRDDIM *rd = onewayalloc_memdupz(owa, rd1, sizeof(RRDDIM));
         rd->id = onewayalloc_strdupz(owa, rd1->id);
         rd->name = onewayalloc_strdupz(owa, rd1->name);
-        rd->state = onewayalloc_memdupz(owa, rd1->state, sizeof(*rd->state));
+        for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+            if(rd1->tiers[tier])
+                rd->tiers[tier] = onewayalloc_memdupz(owa, rd1->tiers[tier], sizeof(*rd->tiers[tier]));
+            else
+                rd->tiers[tier] = NULL;
+        }
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }

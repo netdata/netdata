@@ -23,9 +23,12 @@ typedef void *ml_host_t;
 typedef void *ml_dimension_t;
 
 // forward declarations
-struct rrddim_volatile;
+struct rrddim_tier;
 struct rrdset_volatile;
 struct context_param;
+
+#define RRD_STORAGE_TIERS 2
+
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -266,8 +269,8 @@ struct rrddim {
 #endif
     ml_dimension_t ml_dimension;
 
-    struct rrddim_volatile *state;                  // volatile state that is not persistently stored
-    struct rrddim_volatile *state_tier1;            // volatile state for tier1
+    struct rrddim_tier *tiers[RRD_STORAGE_TIERS];   // our tiers of databases
+
     size_t collections_counter;                     // the number of times we added values to this rrdim
     collected_number collected_value_max;           // the absolute maximum of the collected value
 
@@ -379,7 +382,8 @@ struct rrddim_query_ops {
 
 // ----------------------------------------------------------------------------
 // volatile state per RRD dimension
-struct rrddim_volatile {
+struct rrddim_tier {
+    RRD_MEMORY_MODE mode;                           // the memory mode of this tier
     void *db_metric_handle;                         // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     NETDATA_DOUBLE sum_value;
@@ -865,10 +869,8 @@ struct rrdhost {
     avl_tree_lock rrdfamily_root_index;             // the host's chart families index
     avl_tree_lock rrdvar_root_index;                // the host's chart variables index
 
-#ifdef ENABLE_DBENGINE
-    struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
-    struct rrdengine_instance *rrdeng_ctx_tier1;          // DB engine instance for this host tier1
-#endif
+    void *storage_instance[RRD_STORAGE_TIERS];      // the database instances of the storage tiers
+
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
 
@@ -909,6 +911,10 @@ extern netdata_rwlock_t rrd_rwlock;
 #define rrd_rdlock() netdata_rwlock_rdlock(&rrd_rwlock)
 #define rrd_wrlock() netdata_rwlock_wrlock(&rrd_rwlock)
 #define rrd_unlock() netdata_rwlock_unlock(&rrd_rwlock)
+
+// ----------------------------------------------------------------------------
+
+extern bool is_storage_engine_shared(void *engine);
 
 // ----------------------------------------------------------------------------
 
@@ -1083,14 +1089,15 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
 
 // get the timestamp of the last entry in the round robin database
-static inline time_t rrdset_last_entry_t_nolock(RRDSET *st, int tier)
-{
+static inline time_t rrdset_last_entry_t_nolock(RRDSET *st, int tier) {
+    if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
+
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t last_entry_t  = 0;
 
         rrddim_foreach_read(rd, st) {
-            struct rrddim_volatile *state = (tier && rd->state_tier1) ? rd->state_tier1 : rd->state;
+            struct rrddim_tier *state = (!rd->tiers[tier]) ? rd->tiers[0] : rd->tiers[tier];
             last_entry_t = MAX(last_entry_t, state->query_ops.latest_time(state->db_metric_handle));
         }
 
@@ -1112,14 +1119,15 @@ static inline time_t rrdset_last_entry_t(RRDSET *st, int tier)
 }
 
 // get the timestamp of first entry in the round robin database
-static inline time_t rrdset_first_entry_t_nolock(RRDSET *st, int tier)
-{
+static inline time_t rrdset_first_entry_t_nolock(RRDSET *st, int tier) {
+    if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
+
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t first_entry_t = LONG_MAX;
 
         rrddim_foreach_read(rd, st) {
-            struct rrddim_volatile *state = (tier && rd->state_tier1) ? rd->state_tier1 : rd->state;
+            struct rrddim_tier *state = (!rd->tiers[tier]) ? rd->tiers[0] : rd->tiers[tier];
 
             first_entry_t =
                 MIN(first_entry_t,
@@ -1147,13 +1155,15 @@ static inline time_t rrdset_first_entry_t(RRDSET *st, int tier)
 
 // get the timestamp of the last entry in the round robin database
 static inline time_t rrddim_last_entry_t(RRDDIM *rd, int tier) {
-    struct rrddim_volatile *state = (tier && rd->state_tier1) ? rd->state_tier1 : rd->state;
-    return state->query_ops.latest_time(state->db_metric_handle);
+    if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
+    if(!rd->tiers[tier]) tier = 0;
+    return rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
 }
 
 static inline time_t rrddim_first_entry_t(RRDDIM *rd, int tier) {
-    struct rrddim_volatile *state = (tier && rd->state_tier1) ? rd->state_tier1 : rd->state;
-    return state->query_ops.oldest_time(state->db_metric_handle);
+    if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
+    if(!rd->tiers[tier]) tier = 0;
+    return rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
 }
 
 time_t rrdhost_last_entry_t(RRDHOST *h);

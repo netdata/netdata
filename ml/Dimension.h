@@ -12,13 +12,13 @@ namespace ml {
 
 class RrdDimension {
 public:
-    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->state->query_ops) { }
+    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->tiers[0]->query_ops) { }
 
     RRDDIM *getRD() const { return RD; }
 
-    time_t latestTime() { return Ops->latest_time(RD->state->db_metric_handle); }
+    time_t latestTime() { return Ops->latest_time(RD->tiers[0]->db_metric_handle); }
 
-    time_t oldestTime() { return Ops->oldest_time(RD->state->db_metric_handle); }
+    time_t oldestTime() { return Ops->oldest_time(RD->tiers[0]->db_metric_handle); }
 
     unsigned updateEvery() const { return RD->update_every; }
 

@@ -466,8 +466,10 @@ static inline void rrd2rrdr_do_dimension(
     NETDATA_DOUBLE min = r->min, max = r->max;
     size_t db_points_read = 0;
 
+    struct rrddim_tier *state = ((options & RRDR_OPTION_TIER1) && rd->tiers[1]) ? rd->tiers[1] : rd->tiers[0];
+
     // cache the function pointers we need in the loop
-    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result) = rd->state->query_ops.next_metric;
+    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result) = state->query_ops.next_metric;
     void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value) = r->internal.grouping_add;
     NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) = r->internal.grouping_flush;
 
@@ -491,7 +493,6 @@ static inline void rrd2rrdr_do_dimension(
     time_t new_point_end_time = 0;
 
     // select the right tier to query
-    struct rrddim_volatile *state = (rd->state_tier1 && (options & RRDR_OPTION_TIER1)) ? rd->state_tier1 : rd->state;
     for(state->query_ops.init(state->db_metric_handle, &handle, now, before_wanted) ; points_added < points_wanted ; now += query_granularity) {
 
         if(unlikely(now > before_wanted))
@@ -509,7 +510,7 @@ static inline void rrd2rrdr_do_dimension(
         last1_point_start_time = new_point_start_time;
         last1_point_end_time   = new_point_end_time;
 
-        if(likely(!rd->state->query_ops.is_finished(&handle))) {
+        if(likely(!state->query_ops.is_finished(&handle))) {
             // fetch the new point
             new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &tier_new_point_value);
             db_points_read++;
@@ -688,7 +689,7 @@ static inline void rrd2rrdr_do_dimension(
         if(iterations)
             now -= query_granularity;
     }
-    rd->state->query_ops.finalize(&handle);
+    state->query_ops.finalize(&handle);
 
     r->internal.db_points_read += db_points_read;
     r->internal.result_points_generated += points_added;
