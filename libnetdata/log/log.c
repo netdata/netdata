@@ -20,6 +20,13 @@ const char *stderr_filename = NULL;
 const char *stdout_filename = NULL;
 const char *facility_log = NULL;
 
+#ifdef NETDATA_INTERNAL_CHECKS
+const char *aclklog_filename = NULL;
+int aclklog_fd = -1;
+FILE *aclklog = NULL;
+int aclklog_syslog = 1;
+#endif
+
 // ----------------------------------------------------------------------------
 // Log facility(https://tools.ietf.org/html/rfc5424)
 //
@@ -562,6 +569,10 @@ void reopen_all_log_files() {
     if(stderr_filename)
         open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, &access_log_syslog, 0, &aclklog_fd);
+#endif
+
     if(stdaccess_filename)
          stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
 }
@@ -572,6 +583,11 @@ void open_all_log_files() {
 
     open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
     open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, &access_log_syslog, 0, &aclklog_fd);
+#endif
+
     stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
 }
 
@@ -912,3 +928,22 @@ void log_access( const char *fmt, ... ) {
             netdata_mutex_unlock(&access_mutex);
     }
 }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+void log_aclk_message_bin( const char *data, const size_t data_len, int tx) {
+    if (aclklog) {
+        static netdata_mutex_t aclklog_mutex = NETDATA_MUTEX_INITIALIZER;
+        netdata_mutex_lock(&aclklog_mutex);
+
+        char date[LOG_DATE_LENGTH];
+        log_date(date, LOG_DATE_LENGTH);
+        fprintf(aclklog, "> MESSAGE (%s) %s:\n", tx ? "tx" : "rx", date);
+
+        fwrite(data, data_len, 1, aclklog);
+
+        fputc('\n', aclklog);
+
+        netdata_mutex_unlock(&aclklog_mutex);
+    }
+}
+#endif
