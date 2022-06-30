@@ -24,6 +24,21 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new agent::v1::UpdateAgentConnection;
     if (!strcmp(msgname, "UpdateNodeInstanceConnection"))
         return new nodeinstance::v1::UpdateNodeInstanceConnection;
+    if (!strcmp(msgname, "CreateNodeInstance"))
+        return new nodeinstance::create::v1::CreateNodeInstance;
+    if (!strcmp(msgname, "ChartsAndDimensionsUpdated"))
+        return new chart::v1::ChartsAndDimensionsUpdated;
+    if (!strcmp(msgname, "ChartConfigsUpdated"))
+        return new chart::v1::ChartConfigsUpdated;
+    if (!strcmp(msgname, "ResetChartMessages"))
+        return new chart::v1::ResetChartMessages;
+    if (!strcmp(msgname, "RetentionUpdated"))
+        return new chart::v1::RetentionUpdated;
+    if (!strcmp(msgname, "UpdateNodeInfo"))
+        return new nodeinstance::info::v1::UpdateNodeInfo;
+    if (!strcmp(msgname, "AlarmLogHealth"))
+        return new alarms::v1::AlarmLogHealth;
+
     return NULL;
 }
 
