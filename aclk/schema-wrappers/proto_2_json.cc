@@ -42,6 +42,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new alarms::v1::ProvideAlarmConfiguration;
     if (!strcmp(msgname, "AlarmSnapshot"))
         return new alarms::v1::AlarmSnapshot;
+    if (!strcmp(msgname, "AlarmLogEntry"))
+        return new alarms::v1::AlarmLogEntry;
 
     return NULL;
 }
