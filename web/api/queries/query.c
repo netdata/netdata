@@ -468,6 +468,8 @@ static inline void rrd2rrdr_do_dimension(
     size_t db_points_read = 0;
 
     struct rrddim_tier *tier = ((options & RRDR_OPTION_TIER1) && rd->tiers[1]) ? rd->tiers[1] : rd->tiers[0];
+    if (options & RRDR_OPTION_TIER1)
+        query_granularity = tier->tier_grouping / r->group;
 
     // cache the function pointers we need in the loop
     NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) = tier->query_ops.next_metric;
