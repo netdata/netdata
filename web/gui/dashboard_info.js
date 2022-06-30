@@ -1703,6 +1703,11 @@ netdataDashboard.context = {
         info: 'Committed Memory, is the sum of all memory which has been allocated by processes.'
     },
 
+    'mem.real': {
+        colors: NETDATA.colors[3],
+        info: 'Total amount of real (physical) memory used.'
+    },
+
     'mem.oom_kill': {
         info: 'The number of processes killed by '+
         '<a href="https://en.wikipedia.org/wiki/Out_of_memory" target="_blank">Out of Memory</a> Killer. '+
