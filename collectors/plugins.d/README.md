@@ -328,9 +328,29 @@ Variables are transferred to upstream Netdata servers (streaming and database re
 
 `CLABEL` defines a label used to organize and identify a chart.
 
-Label names should use alphanumeric characters.
+Name and value accept characters according the following table:
 
-Value is also a alphanumeric field and when more than one word is needed, it is necessary to use quotes.
+| Character           | Symbol | Label Name | Label Value |
+|---------------------|:------:|:----------:|:-----------:|
+| UTF-8 character     | UTF-8  |     _      |    keep     |
+| Lower case letter   | [a-z]  |    keep    |    keep     |
+| Upper case letter   | [A-Z]  |    keep    |    [a-z]    |
+| Digit               | [0-9]  |    keep    |    keep     |
+| Underscore          |   _    |    keep    |    keep     |
+| Minus               |   -    |    keep    |    keep     |
+| Plus                |   +    |     _      |    keep     |
+| Colon               |   :    |     _      |    keep     |
+| Semicolon           |   ;    |     _      |      :      |
+| Equal               |   =    |     _      |      :      |
+| Period              |   .    |    keep    |    keep     |
+| Comma               |   ,    |     .      |      .      |
+| Slash               |   /    |    keep    |    keep     |
+| Backslash           |   \    |     /      |      /      |
+| At                  |   @    |     _      |    keep     |
+| Space               |  ' '   |     _      |    keep     |
+| Opening parenthesis |   (    |     _      |    keep     |
+| Closing parenthesis |   )    |     _      |    keep     |
+| Anything else       |        |     _      |      _      |
 
 The `source` is an integer field that can have the following values:
 - `1`: The value was set automatically
