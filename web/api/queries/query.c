@@ -533,7 +533,7 @@ static inline void rrd2rrdr_do_dimension(
 
             if(likely(netdata_double_isnumber(new_point_value))) {
 
-                new_point_anomaly =  anomaly_count ? 100 : 0;
+                new_point_anomaly = count ? anomaly_count * 100 / count : 0;
 
                 if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
                     new_point_value = (NETDATA_DOUBLE)new_point_anomaly;
