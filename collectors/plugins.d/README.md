@@ -360,7 +360,7 @@ The `source` is an integer field that can have the following values:
 
 #### CLABEL_COMMIT
 
-`CLABEL_COMMIT` will indicate to netdata that all labels were defined and chart can be updated.
+`CLABEL_COMMIT` indicates that all labels were defined and the chart can be updated.
 
 ## Data collection
 
