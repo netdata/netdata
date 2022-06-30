@@ -10,7 +10,7 @@ typedef struct storage_engine STORAGE_ENGINE;
 // ------------------------------------------------------------------------
 // function pointers for all APIs provided by a storge engine
 typedef struct storage_engine_api {
-    void *(*init)(RRDDIM *rd, void *instance, int type);
+    void *(*init)(RRDDIM *rd, void *instance);
     void (*free)(void *);
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;

@@ -40,7 +40,7 @@ extern void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN +
                                                     uuid_t *ret_uuid);
 
 
-extern void *rrdeng_metric_init(RRDDIM *rd, void *db_instance, int type);
+extern void *rrdeng_metric_init(RRDDIM *rd, void *db_instance);
 extern void rrdeng_metric_free(void *metric_handle);
 
 extern void *rrdeng_store_metric_init(void *db_metric_handle);
@@ -54,8 +54,8 @@ extern int rrdeng_store_metric_finalize(void *collection_handle);
 extern unsigned
     rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
                                     struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
-extern void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle,
-                                    time_t start_time, time_t end_time, int tier);
+extern void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
+                                    time_t start_time, time_t end_time);
 extern NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result);
 extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);

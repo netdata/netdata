@@ -258,14 +258,16 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     STORAGE_ENGINE* eng = storage_engine_get(memory_mode);
     rd->state->collect_ops = eng->api.collect_ops;
     rd->state->query_ops = eng->api.query_ops;
-    rd->state->db_metric_handle = eng->api.init(rd, host->rrdeng_ctx, 0);
+    rd->state->db_metric_handle = eng->api.init(rd, host->rrdeng_ctx);
 
 #ifdef ENABLE_DBENGINE
-    STORAGE_ENGINE* dbeng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
-    rd->state_tier1 = callocz(1, sizeof(*rd->state_tier1));
-    rd->state_tier1->collect_ops = dbeng->api.collect_ops;
-    rd->state_tier1->query_ops = dbeng->api.query_ops;
-    rd->state_tier1->db_metric_handle = dbeng->api.init(rd, host->rrdeng_ctx_tier1, 1);
+    if(host->rrdeng_ctx_tier1) {
+        STORAGE_ENGINE *dbeng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
+        rd->state_tier1 = callocz(1, sizeof(*rd->state_tier1));
+        rd->state_tier1->collect_ops = dbeng->api.collect_ops;
+        rd->state_tier1->query_ops = dbeng->api.query_ops;
+        rd->state_tier1->db_metric_handle = dbeng->api.init(rd, host->rrdeng_ctx_tier1);
+    }
 #endif
 
     store_active_dimension(&rd->metric_uuid);

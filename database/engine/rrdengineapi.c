@@ -58,7 +58,6 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
 
 struct rrdeng_metric_handle {
     RRDDIM *rd;
-    int tier;
     struct rrdengine_instance *ctx;
     uuid_t *rrdeng_uuid;                            // database engine metric UUID
     struct pg_cache_page_index *page_index;
@@ -68,7 +67,7 @@ void rrdeng_metric_free(void *metric_handle) {
     freez(metric_handle);
 }
 
-void *rrdeng_metric_init(RRDDIM *rd, void *db_instance, int type) {
+void *rrdeng_metric_init(RRDDIM *rd, void *db_instance) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     struct page_cache *pg_cache;
     uuid_t legacy_uuid;
@@ -126,7 +125,6 @@ void *rrdeng_metric_init(RRDDIM *rd, void *db_instance, int type) {
 
     struct rrdeng_metric_handle *mh = mallocz(sizeof(struct rrdeng_metric_handle));
     mh->rd = rd;
-    mh->tier = type;
     mh->ctx = ctx;
     mh->rrdeng_uuid = &page_index->id;
     mh->page_index = page_index;
@@ -221,7 +219,7 @@ void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_time, NET
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = handle->descr;
     RRDDIM *rd = metric_handle->rd;
-    int tier = metric_handle->tier;
+    int tier = ctx->tier;
 
     storage_number number;
     storage_number_tier1_t number_tier1;
@@ -348,28 +346,23 @@ int rrdeng_store_metric_finalize(void *collection_handle) {
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time, int tier)
-{
+void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time) {
+    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
+    struct rrdengine_instance *ctx = metric_handle->ctx;
+    RRDDIM *rd = metric_handle->rd;
+
     // fprintf(stderr, "%s: %s/%s start time %ld, end time %ld\n", __FUNCTION__ , rd->rrdset->name, rd->name, start_time, end_time);
 
     struct rrdeng_query_handle *handle;
-    struct rrdengine_instance *ctx;
     unsigned pages_nr;
-    struct rrddim_volatile *state;
 
-    if (!tier)
-        state = rd->state;
-    else
-        state = rd->state_tier1;
-
-    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost, tier);
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
 
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
-    if (tier) {
+    if(ctx->tier) {
         handle->dt = TIER1_GROUPING * rd->update_every * USEC_PER_SEC;
         handle->dt_sec = TIER1_GROUPING * rd->update_every;
     }
@@ -379,9 +372,10 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     }
     handle->position = 0;
     handle->ctx = ctx;
+    handle->metric_handle = metric_handle;
     handle->descr = NULL;
     rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
-    pages_nr = pg_cache_preload(ctx, state->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
+    pages_nr = pg_cache_preload(ctx, metric_handle->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
                                 NULL, &handle->page_index);
     if (unlikely(NULL == handle->page_index || 0 == pages_nr))
         // there are no metrics to load
@@ -455,6 +449,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 NETDATA_DOUBLE
 rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
+    // struct rrdeng_metric_handle *metric_handle = handle->metric_handle;
 
     struct rrdeng_page_descr *descr = handle->descr;
     unsigned position = handle->position + 1;
@@ -486,6 +481,7 @@ rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start
         position = handle->position;
         now = (time_t)((descr->start_time + position * handle->dt) / USEC_PER_SEC);
     }
+
     storage_number n;
 
     if (handle->ctx->tier) {

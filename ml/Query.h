@@ -20,7 +20,7 @@ public:
     }
 
     void init(time_t AfterT, time_t BeforeT) {
-        Ops->init(RD, &Handle, AfterT, BeforeT, 0);
+        Ops->init(RD->state->db_metric_handle, &Handle, AfterT, BeforeT);
     }
 
     bool isFinished() {

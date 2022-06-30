@@ -359,7 +359,7 @@ struct rrddim_collect_ops {
 // function pointers that handle database queries
 struct rrddim_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, int tier);
+    void (*init)(void *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 
     // run this to load each metric number from the database
     NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier1_number);

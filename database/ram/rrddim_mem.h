@@ -20,7 +20,7 @@ struct mem_query_handle {
     size_t last_slot;
 };
 
-extern void *rrddim_metric_init(RRDDIM *rd, void *db_instance, int type);
+extern void *rrddim_metric_init(RRDDIM *rd, void *db_instance);
 extern void rrddim_metric_free(void *metric_handle);
 
 extern void *rrddim_collect_init(void *db_metric_handle);
@@ -32,7 +32,7 @@ extern void rrddim_collect_store_metric(void *collection_handle, usec_t point_in
 extern void rrddim_store_metric_flush(void *collection_handle);
 extern int rrddim_collect_finalize(void *collection_handle);
 
-extern void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, int tier);
+extern void rrddim_query_init(void *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 extern NETDATA_DOUBLE
 rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier1_number);
 extern int rrddim_query_is_finished(struct rrddim_query_handle *handle);

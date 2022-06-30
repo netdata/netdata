@@ -1767,7 +1767,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH * update_every, 0);
+                rd[i][j]->state->query_ops.init(rd[i][j]->state->db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
@@ -2213,7 +2213,7 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        rd->state->query_ops.init(rd, &handle, time_after, time_before, 0);
+        rd->state->query_ops.init(rd->state->db_metric_handle, &handle, time_after, time_before);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);

@@ -44,6 +44,7 @@ struct rrdeng_collect_handle {
 };
 
 struct rrdeng_query_handle {
+    struct rrdeng_metric_handle *metric_handle;
     struct rrdeng_page_descr *descr;
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;

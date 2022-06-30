@@ -5,7 +5,7 @@
 // ----------------------------------------------------------------------------
 // RRDDIM legacy data collection functions
 
-void *rrddim_metric_init(RRDDIM *rd, void *db_instance __maybe_unused, int type __maybe_unused) {
+void *rrddim_metric_init(RRDDIM *rd, void *db_instance __maybe_unused) {
     return rd;
 }
 
@@ -51,8 +51,9 @@ int rrddim_collect_finalize(void *collection_handle) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, int tier) {
-    UNUSED(tier);
+void rrddim_query_init(void *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
+    RRDDIM *rd = (RRDDIM *)db_metric_handle;
+
     handle->rd = rd;
     handle->start_time = start_time;
     handle->end_time = end_time;

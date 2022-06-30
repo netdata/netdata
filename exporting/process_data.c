@@ -126,7 +126,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     NETDATA_DOUBLE sum = 0;
     NETDATA_DOUBLE value;
 
-    for (rd->state->query_ops.init(rd, &handle, after, before, 0); !rd->state->query_ops.is_finished(&handle);) {
+    for (rd->state->query_ops.init(rd->state->db_metric_handle, &handle, after, before); !rd->state->query_ops.is_finished(&handle);) {
         time_t curr_t, end_t;
         SN_FLAGS flags;
         value = rd->state->query_ops.next_metric(&handle, &curr_t, &end_t, &flags, NULL);
