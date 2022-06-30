@@ -322,6 +322,10 @@ The `value` is floating point (Netdata used `long double`).
 
 Variables are transferred to upstream Netdata servers (streaming and database replication).
 
+#### CLABEL_COMMIT
+
+`CLABEL_COMMIT` will indicate to netdata that all labels were defined and chart can be updated.
+
 ## Data collection
 
 data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
