@@ -343,14 +343,17 @@ struct rrddim_query_handle {
 // function pointers that handle data collection
 struct rrddim_collect_ops {
     // an initialization function to run before starting collection
-    void (*init)(RRDDIM *rd, int tier);
+    void *(*init)(void *db_metric_handle);
 
     // run this to store each metric into the database
-    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value, uint16_t count, SN_FLAGS flags, int tier);
+    void (*store_metric)(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value, uint16_t count, SN_FLAGS flags);
+
+    // run this to flush / reset the current data collection sequence
+    void (*flush)(void *collection_handle);
 
     // an finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
-    int (*finalize)(RRDDIM *rd, int tier);
+    int (*finalize)(void *collection_handle);
 };
 
 // function pointers that handle database queries
@@ -377,6 +380,7 @@ struct rrddim_query_ops {
 // ----------------------------------------------------------------------------
 // volatile state per RRD dimension
 struct rrddim_volatile {
+    void *db_metric_handle;
 #ifdef ENABLE_DBENGINE
     uuid_t *rrdeng_uuid;                            // database engine metric UUID
     struct pg_cache_page_index *page_index;
@@ -386,7 +390,7 @@ struct rrddim_volatile {
     NETDATA_DOUBLE max_value;
     uint16_t count;
     time_t last_tier_time;
-    STORAGE_COLLECT_HANDLE* handle;
+    STORAGE_COLLECT_HANDLE *db_collection_handle;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
 };

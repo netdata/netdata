@@ -40,15 +40,17 @@ extern void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN +
                                                     uuid_t *ret_uuid);
 
 
-extern void rrdeng_metric_init(RRDDIM *rd, int tier);
-extern void rrdeng_store_metric_init(RRDDIM *rd, int tier);
-extern void rrdeng_store_metric_flush_current_page(RRDDIM *rd, int tier);
-extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n,
+extern void *rrdeng_metric_init(RRDDIM *rd, void *db_instance, int type);
+extern void rrdeng_metric_free(void *metric_handle);
+
+extern void *rrdeng_store_metric_init(void *db_metric_handle);
+extern void rrdeng_store_metric_flush_current_page(void *collection_handle);
+extern void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
                                      NETDATA_DOUBLE min_value,
                                      NETDATA_DOUBLE max_value,
                                      uint16_t count,
-                                     SN_FLAGS flags, int tier);
-extern int rrdeng_store_metric_finalize(RRDDIM *rd, int tier);
+                                     SN_FLAGS flags);
+extern int rrdeng_store_metric_finalize(void *collection_handle);
 extern unsigned
     rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
                                     struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);

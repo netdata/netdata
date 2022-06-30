@@ -6,6 +6,7 @@
 #include "database/rrd.h"
 
 struct mem_collect_handle {
+    RRDDIM *rd;
     long slot;
     long entries;
 };
@@ -19,13 +20,16 @@ struct mem_query_handle {
     size_t last_slot;
 };
 
-extern void rrddim_collect_init(RRDDIM *rd, int tier);
-void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number,
+extern void *rrddim_metric_init(RRDDIM *rd, void *db_instance, int type);
+extern void rrddim_metric_free(void *metric_handle);
+
+extern void *rrddim_collect_init(void *db_metric_handle);
+extern void rrddim_collect_store_metric(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number,
                                  NETDATA_DOUBLE min_value,
                                  NETDATA_DOUBLE max_value,
                                  uint16_t count,
-                                 SN_FLAGS flags, int tier);
-extern int rrddim_collect_finalize(RRDDIM *rd, int tier);
+                                 SN_FLAGS flags);
+extern int rrddim_collect_finalize(void *collection_handle);
 
 extern void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, int tier);
 extern NETDATA_DOUBLE

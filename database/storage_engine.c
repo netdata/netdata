@@ -8,7 +8,8 @@
 
 #define im_collect_ops { \
     .init = rrddim_collect_init,\
-    .store_metric = rrddim_collect_store_metric,\
+    .store_metric = rrddim_collect_store_metric, \
+    .flush = NULL,\
     .finalize = rrddim_collect_finalize\
 }
 
@@ -26,6 +27,8 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_NONE,
         .name = RRD_MEMORY_MODE_NONE_NAME,
         .api = {
+            .init = rrddim_metric_init,
+            .free = rrddim_metric_free,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -34,6 +37,8 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_RAM,
         .name = RRD_MEMORY_MODE_RAM_NAME,
         .api = {
+            .init = rrddim_metric_init,
+            .free = rrddim_metric_free,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -42,6 +47,8 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_MAP,
         .name = RRD_MEMORY_MODE_MAP_NAME,
         .api = {
+            .init = rrddim_metric_init,
+            .free = rrddim_metric_free,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -50,6 +57,8 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_SAVE,
         .name = RRD_MEMORY_MODE_SAVE_NAME,
         .api = {
+            .init = rrddim_metric_init,
+            .free = rrddim_metric_free,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -58,6 +67,8 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_ALLOC,
         .name = RRD_MEMORY_MODE_ALLOC_NAME,
         .api = {
+            .init = rrddim_metric_init,
+            .free = rrddim_metric_free,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -67,9 +78,12 @@ static STORAGE_ENGINE engines[] = {
         .id = RRD_MEMORY_MODE_DBENGINE,
         .name = RRD_MEMORY_MODE_DBENGINE_NAME,
         .api = {
+            .init = rrdeng_metric_init,
+            .free = rrdeng_metric_free,
             .collect_ops = {
                 .init = rrdeng_store_metric_init,
                 .store_metric = rrdeng_store_metric_next,
+                .flush = rrdeng_store_metric_flush_current_page,
                 .finalize = rrdeng_store_metric_finalize
             },
             .query_ops = {

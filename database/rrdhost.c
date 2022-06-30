@@ -1334,8 +1334,14 @@ restart_after_removal:
                     if (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd, 0);
-                        (void) rd->state_tier1->collect_ops.finalize(rd, 1);
+                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd->state->db_collection_handle);
+                        rd->state->db_collection_handle = NULL;
+
+                        if(rd->state_tier1) {
+                            rd->state_tier1->collect_ops.finalize(rd->state_tier1->db_collection_handle);
+                            rd->state_tier1->db_collection_handle = NULL;
+                        }
+
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
                             delete_dimension_uuid(&rd->metric_uuid);

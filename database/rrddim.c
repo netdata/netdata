@@ -170,8 +170,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_divisor(st, rd, divisor);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             store_active_dimension(&rd->metric_uuid);
-            rd->state->collect_ops.init(rd, 0);
-            rd->state_tier1->collect_ops.init(rd, 1);
+
+            rd->state->db_collection_handle = rd->state->collect_ops.init(rd->state->db_metric_handle);
+            rd->state_tier1->db_collection_handle = rd->state_tier1->collect_ops.init(rd->state_tier1->db_metric_handle);
+
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
             rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
             rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
@@ -256,18 +258,23 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     STORAGE_ENGINE* eng = storage_engine_get(memory_mode);
     rd->state->collect_ops = eng->api.collect_ops;
     rd->state->query_ops = eng->api.query_ops;
-    rd->state_tier1 = mallocz(sizeof(*rd->state_tier1));
-    memcpy(rd->state_tier1, rd->state, sizeof(*rd->state));
+    rd->state->db_metric_handle = eng->api.init(rd, host->rrdeng_ctx, 0);
 
 #ifdef ENABLE_DBENGINE
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        rrdeng_metric_init(rd, 0);
-        rrdeng_metric_init(rd, 1);
-    }
+    STORAGE_ENGINE* dbeng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
+    rd->state_tier1 = callocz(1, sizeof(*rd->state_tier1));
+    rd->state_tier1->collect_ops = dbeng->api.collect_ops;
+    rd->state_tier1->query_ops = dbeng->api.query_ops;
+    rd->state_tier1->db_metric_handle = dbeng->api.init(rd, host->rrdeng_ctx_tier1, 1);
 #endif
+
     store_active_dimension(&rd->metric_uuid);
-    rd->state->collect_ops.init(rd, 0);
-    rd->state_tier1->collect_ops.init(rd, 1);
+
+    rd->state->db_collection_handle = rd->state->collect_ops.init(rd->state->db_metric_handle);
+
+    if(rd->state_tier1)
+        rd->state_tier1->db_collection_handle = rd->state_tier1->collect_ops.init(rd->state_tier1->db_metric_handle);
+
     // append this dimension
     if(!st->dimensions)
         st->dimensions = rd;
@@ -323,8 +330,14 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd, 0);
-        (void ) rd->state_tier1->collect_ops.finalize(rd, 1);
+        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd->state->db_collection_handle);
+        rd->state->db_collection_handle = NULL;
+
+        if(rd->state_tier1) {
+            rd->state_tier1->collect_ops.finalize(rd->state_tier1->db_collection_handle);
+            rd->state->db_collection_handle = NULL;
+        }
+
         if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             /* This metric has no data and no references */
             delete_dimension_uuid(&rd->metric_uuid);
@@ -356,12 +369,24 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 //        aclk_send_dimension_update(rd);
 //#endif
 
+    // this will free MEMORY_MODE_SAVE and MEMORY_MODE_MAP structures
+    rrddim_memory_file_free(rd);
+
+    if(rd->state->db_metric_handle) {
+        STORAGE_ENGINE* eng = storage_engine_get(rd->rrd_memory_mode);
+        if(eng->api.free)
+            eng->api.free(rd->state->db_metric_handle);
+    }
+
+    if(rd->state_tier1 && rd->state_tier1->db_metric_handle) {
+        STORAGE_ENGINE* eng = storage_engine_get(rd->rrd_memory_mode);
+        if(eng->api.free)
+            eng->api.free(rd->state_tier1->db_metric_handle);
+    }
+
     freez((void *)rd->id);
     freez((void *)rd->name);
     freez(rd->state);
-
-    // this will free MEMORY_MODE_SAVE and MEMORY_MODE_MAP structures
-    rrddim_memory_file_free(rd);
 
     if(rd->db) {
         if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)

@@ -56,28 +56,28 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-void rrdeng_metric_init(RRDDIM *rd, int tier)
-{
-    struct page_cache *pg_cache;
+struct rrdeng_metric_handle {
+    RRDDIM *rd;
+    int tier;
     struct rrdengine_instance *ctx;
+    uuid_t *rrdeng_uuid;                            // database engine metric UUID
+    struct pg_cache_page_index *page_index;
+};
+
+void rrdeng_metric_free(void *metric_handle) {
+    freez(metric_handle);
+}
+
+void *rrdeng_metric_init(RRDDIM *rd, void *db_instance, int type) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    struct page_cache *pg_cache;
     uuid_t legacy_uuid;
     uuid_t multihost_legacy_uuid;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index = NULL;
     int is_multihost_child = 0;
     RRDHOST *host = rd->rrdset->rrdhost;
-    struct rrddim_volatile *state;
 
-    if (!tier)
-        state = rd->state;
-    else
-        state = rd->state_tier1;
-
-    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost, tier);
-    if (unlikely(!ctx)) {
-        error("Failed to fetch multidb context");
-        return;
-    }
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
@@ -119,42 +119,42 @@ void rrdeng_metric_init(RRDDIM *rd, int tier)
 
         uuid_copy(rd->metric_uuid, multihost_legacy_uuid);
 
-        if (unlikely(need_to_store && !tier))
+        if (unlikely(need_to_store && ctx == &multidb_ctx))
             (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                 rd->algorithm);
-
     }
-    state->rrdeng_uuid = &page_index->id;
-    state->page_index = page_index;
+
+    struct rrdeng_metric_handle *mh = mallocz(sizeof(struct rrdeng_metric_handle));
+    mh->rd = rd;
+    mh->tier = type;
+    mh->ctx = ctx;
+    mh->rrdeng_uuid = &page_index->id;
+    mh->page_index = page_index;
+    return mh;
 }
 
 /*
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
  */
-void rrdeng_store_metric_init(RRDDIM *rd, int tier)
-{
+void *rrdeng_store_metric_init(void *db_metric_handle) {
+    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
+
     struct rrdeng_collect_handle *handle;
-    struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
-    struct rrddim_volatile *state;
-
-    if (!tier)
-        state = rd->state;
-    else
-        state = rd->state_tier1;
-
-    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost, tier);
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
-    handle->ctx = ctx;
+    handle->metric_handle = metric_handle;
+    handle->ctx = metric_handle->ctx;
     handle->descr = NULL;
     handle->unaligned_page = 0;
-    state->handle = (STORAGE_COLLECT_HANDLE *)handle;
-    page_index = state->page_index;
+
+    page_index = metric_handle->page_index;
     uv_rwlock_wrlock(&page_index->lock);
     ++page_index->writers;
     uv_rwlock_wrunlock(&page_index->lock);
+
+    return handle;
 }
 
 /* The page must be populated and referenced */
@@ -174,26 +174,15 @@ static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr, size_t s
     return has_only_empty_metrics;
 }
 
-void rrdeng_store_metric_flush_current_page(RRDDIM *rd, int tier)
-{
-    struct rrdeng_collect_handle *handle;
-    struct rrdengine_instance *ctx;
-    struct rrdeng_page_descr *descr;
-    struct rrddim_volatile *state;
+void rrdeng_store_metric_flush_current_page(void *collection_handle) {
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+    // struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
+    struct rrdengine_instance *ctx = handle->ctx;
+    struct rrdeng_page_descr *descr = handle->descr;
 
-    if (!tier)
-        state = rd->state;
-    else
-        state = rd->state_tier1;
+    if (unlikely(!ctx)) return;
+    if (unlikely(!descr)) return;
 
-    handle = (struct rrdeng_collect_handle *)state->handle;
-    ctx = handle->ctx;
-    if (unlikely(!ctx))
-        return;
-    descr = handle->descr;
-    if (unlikely(NULL == descr)) {
-        return;
-    }
     if (likely(descr->page_length)) {
         int page_is_empty;
 
@@ -216,44 +205,41 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd, int tier)
     handle->descr = NULL;
 }
 
-void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n,
+void rrdeng_store_metric_next(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
                               NETDATA_DOUBLE min_value,
                               NETDATA_DOUBLE max_value,
                               uint16_t count,
-                              SN_FLAGS flags, int tier)
+                              SN_FLAGS flags)
 {
-    struct rrddim_volatile *state;
     UNUSED(min_value);
     UNUSED(max_value);
     UNUSED(count);
+
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
+    struct rrdengine_instance *ctx = handle->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    struct rrdeng_page_descr *descr = handle->descr;
+    RRDDIM *rd = metric_handle->rd;
+    int tier = metric_handle->tier;
+
     storage_number number;
     storage_number_tier1_t number_tier1;
 
     number = pack_storage_number(n, flags);
 
     if (!tier) {
-        state = rd->state;
         number = pack_storage_number(n, flags);
     }
     else {
-        state = rd->state_tier1;
         number_tier1.sum_value = pack_storage_number(n, flags);
         number_tier1.min_value = pack_storage_number(n, flags);
         number_tier1.max_value = pack_storage_number(n, flags);
         number_tier1.count = count;
     }
 
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *) state->handle;
-    struct rrdengine_instance *ctx;
-    struct page_cache *pg_cache;
-    struct rrdeng_page_descr *descr;
     void *page;
     uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
-
-    ctx = handle->ctx;
-    pg_cache = &ctx->pg_cache;
-    descr = handle->descr;
-
     size_t storage_size = ctx->storage_size;
 
     if (descr) {
@@ -281,9 +267,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
     if (unlikely(NULL == descr ||
                  descr->page_length + storage_size > RRDENG_BLOCK_SIZE ||
                  must_flush_unaligned_page)) {
-        rrdeng_store_metric_flush_current_page(rd, tier);
+        rrdeng_store_metric_flush_current_page(collection_handle);
 
-        page = rrdeng_create_page(ctx, &state->page_index->id, &descr);
+        page = rrdeng_create_page(ctx, &metric_handle->page_index->id, &descr);
         fatal_assert(page);
 
         handle->descr = descr;
@@ -320,9 +306,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
             }
         }
 
-        pg_cache_insert(ctx, state->page_index, descr);
+        pg_cache_insert(ctx, metric_handle->page_index, descr);
     } else {
-        pg_cache_add_new_metric_time(state->page_index, descr);
+        pg_cache_add_new_metric_time(metric_handle->page_index, descr);
     }
 }
 
@@ -330,21 +316,14 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE n
  * Releases the database reference from the handle for storing metrics.
  * Returns 1 if it's safe to delete the dimension.
  */
-int rrdeng_store_metric_finalize(RRDDIM *rd, int tier)
-{
-    struct rrdeng_collect_handle *handle;
-    struct pg_cache_page_index *page_index;
+int rrdeng_store_metric_finalize(void *collection_handle) {
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
+    struct pg_cache_page_index *page_index = metric_handle->page_index;
+
     uint8_t can_delete_metric = 0;
-    struct rrddim_volatile *state;
 
-    if (!tier)
-        state = rd->state;
-    else
-        state = rd->state_tier1;
-
-    handle = (struct rrdeng_collect_handle *)state->handle;
-    page_index = state->page_index;
-    rrdeng_store_metric_flush_current_page(rd, tier);
+    rrdeng_store_metric_flush_current_page(collection_handle);
     uv_rwlock_wrlock(&page_index->lock);
     if (!--page_index->writers && !page_index->page_count) {
         can_delete_metric = 1;

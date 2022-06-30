@@ -5,30 +5,39 @@
 // ----------------------------------------------------------------------------
 // RRDDIM legacy data collection functions
 
-void rrddim_collect_init(RRDDIM *rd, int tier) {
-    UNUSED(tier);
-    rd->db[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
-    rd->state->handle = calloc(1, sizeof(struct mem_collect_handle));
+void *rrddim_metric_init(RRDDIM *rd, void *db_instance __maybe_unused, int type __maybe_unused) {
+    return rd;
 }
 
-void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, NETDATA_DOUBLE number,
+void rrddim_metric_free(void *metric_handle __maybe_unused) {
+    ;
+}
+
+void *rrddim_collect_init(void *db_metric_handle) {
+    RRDDIM *rd = (RRDDIM *)db_metric_handle;
+    rd->db[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
+    struct mem_collect_handle *ch = calloc(1, sizeof(struct mem_collect_handle));
+    ch->rd = rd;
+    return ch;
+}
+
+void rrddim_collect_store_metric(void *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number,
         NETDATA_DOUBLE min_value,
         NETDATA_DOUBLE max_value,
         uint16_t count,
-        SN_FLAGS flags, int tier)
+        SN_FLAGS flags)
 {
+    UNUSED(point_in_time);
     UNUSED(min_value);
     UNUSED(max_value);
     UNUSED(count);
-    UNUSED(tier);
 
-    (void)point_in_time;
+    struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+    RRDDIM *rd = ch->rd;
     rd->db[rd->rrdset->current_entry] = pack_storage_number(number, flags);
 }
-int rrddim_collect_finalize(RRDDIM *rd, int tier)
-{
-    UNUSED(tier);
-    free((struct mem_collect_handle*)rd->state->handle);
+int rrddim_collect_finalize(void *collection_handle) {
+    free(collection_handle);
     return 0;
 }
 

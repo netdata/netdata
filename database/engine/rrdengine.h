@@ -35,6 +35,7 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
 struct rrdeng_collect_handle {
+    struct rrdeng_metric_handle *metric_handle;
     struct rrdeng_page_descr *descr;
     unsigned long page_correlation_id;
     struct rrdengine_instance *ctx;

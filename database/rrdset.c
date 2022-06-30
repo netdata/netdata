@@ -273,13 +273,16 @@ void rrdset_reset(RRDSET *st) {
         rd->last_collected_time.tv_sec = 0;
         rd->last_collected_time.tv_usec = 0;
         rd->collections_counter = 0;
-        // memset(rd->values, 0, rd->entries * sizeof(storage_number));
-#ifdef ENABLE_DBENGINE
-        if (RRD_MEMORY_MODE_DBENGINE == st->rrd_memory_mode && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            rrdeng_store_metric_flush_current_page(rd, 0);
-            rrdeng_store_metric_flush_current_page(rd, 1);
+
+        // memset(rd->db, 0, rd->entries * sizeof(storage_number));
+
+        if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+            if (rd->state->collect_ops.flush)
+                rd->state->collect_ops.flush(rd->state->db_collection_handle);
+
+            if (rd->state_tier1 && rd->state_tier1->collect_ops.flush)
+                rd->state_tier1->collect_ops.flush(rd->state_tier1->db_collection_handle);
         }
-#endif
     }
 }
 
@@ -964,37 +967,39 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     return last_updated_ut;
 }
 
-static void store_metric (RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_FLAGS flags)
-{
+static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+    rd->state->collect_ops.store_metric(rd->state->db_collection_handle, next_store_ut, n, 0, 0, 1, flags);
 
-    rd->state->collect_ops.store_metric(rd, next_store_ut, n, 0, 0, 1, flags, 0);
+    if(rd->state_tier1) {
+        struct rrddim_volatile *tier1 = rd->state_tier1;
 
-    if (likely(n != NAN)) {
-        if (!rd->state->last_tier_time) {
-            rd->state->sum_value = n;
-            rd->state->min_value = n;
-            rd->state->max_value = n;
-            rd->state->count = 1;
-            rd->state->last_tier_time = next_store_ut / USEC_PER_SEC;
-        } else {
-            rd->state->sum_value += n;
-            rd->state->min_value = MIN(rd->state->min_value, n);
-            rd->state->max_value = MAX(rd->state->max_value, n);
-            rd->state->count++;
+        if (likely(n != NAN)) {
+            if (!tier1->last_tier_time) {
+                tier1->sum_value = n;
+                tier1->min_value = n;
+                tier1->max_value = n;
+                tier1->count = 1;
+                tier1->last_tier_time = next_store_ut / USEC_PER_SEC;
+            }
+            else {
+                tier1->sum_value += n;
+                tier1->min_value = MIN(tier1->min_value, n);
+                tier1->max_value = MAX(tier1->max_value, n);
+                tier1->count++;
+            }
         }
-    }
 
-    if (rd->state->count == TIER1_GROUPING) {
-        rd->state->collect_ops.store_metric(
-            rd,
-            next_store_ut,
-            rd->state->sum_value / rd->state->count,
-            rd->state->min_value,
-            rd->state->max_value,
-            rd->state->count,
-            flags,
-            1);
-        rd->state->last_tier_time = 0;
+        if (tier1->count == TIER1_GROUPING) {
+            tier1->collect_ops.store_metric(
+                tier1->db_collection_handle,
+                next_store_ut,
+                tier1->sum_value / tier1->count,
+                tier1->min_value,
+                tier1->max_value,
+                tier1->count,
+                flags);
+            tier1->last_tier_time = 0;
+        }
     }
 }
 
@@ -1771,8 +1776,14 @@ after_second_database_work:
 
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd, 0);
-                        (void) rd->state_tier1->collect_ops.finalize(rd, 1);
+                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd->state->db_collection_handle);
+                        rd->state->db_collection_handle = NULL;
+
+                        if(rd->state_tier1) {
+                            rd->state_tier1->collect_ops.finalize(rd->state_tier1->db_collection_handle);
+                            rd->state_tier1->db_collection_handle = NULL;
+                        }
+
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
                             delete_dimension_uuid(&rd->metric_uuid);
