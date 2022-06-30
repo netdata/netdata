@@ -116,15 +116,17 @@ For example, if your plugin wants to monitor `squid`, you can search for it on p
 
 Any program that can print a few values to its standard output can become a Netdata external plugin.
 
-Netdata parses 7 lines starting with:
+Netdata parses 9 lines starting with:
 
--   `CHART` - create or update a chart
--   `DIMENSION` - add or update a dimension to the chart just created
--   `BEGIN` - initialize data collection for a chart
--   `SET` - set the value of a dimension for the initialized chart
--   `END` - complete data collection for the initialized chart
--   `FLUSH` - ignore the last collected values
--   `DISABLE` - disable this plugin
+-    `CHART` - create or update a chart
+-    `DIMENSION` - add or update a dimension to the chart just created
+-    `BEGIN` - initialize data collection for a chart
+-    `SET` - set the value of a dimension for the initialized chart
+-    `END` - complete data collection for the initialized chart
+-    `FLUSH` - ignore the last collected values
+-    `DISABLE` - disable this plugin
+-    `CLABEL` - Define label for a specific chart
+-    `CLABEL_COMMIT` - merge label definition for a chart.
 
 a single program can produce any number of charts with any number of dimensions each.
 
