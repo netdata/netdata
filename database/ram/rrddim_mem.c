@@ -121,10 +121,12 @@ void rrddim_query_finalize(struct rrddim_query_handle *handle) {
     freez(handle->handle);
 }
 
-time_t rrddim_query_latest_time(RRDDIM *rd, int tier) {
-    return rrdset_last_entry_t_nolock(rd->rrdset, tier);
+time_t rrddim_query_latest_time(void *db_metric_handle) {
+    RRDDIM *rd = (RRDDIM *)db_metric_handle;
+    return rd->rrdset->last_updated.tv_sec;
 }
 
-time_t rrddim_query_oldest_time(RRDDIM *rd, int tier) {
-    return rrdset_first_entry_t_nolock(rd->rrdset, tier);
+time_t rrddim_query_oldest_time(void *db_metric_handle) {
+    RRDDIM *rd = (RRDDIM *)db_metric_handle;
+    return (time_t)(rd->rrdset->last_updated.tv_sec - rrdset_duration(rd->rrdset));
 }

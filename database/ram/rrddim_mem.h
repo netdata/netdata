@@ -37,7 +37,7 @@ extern NETDATA_DOUBLE
 rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier1_number);
 extern int rrddim_query_is_finished(struct rrddim_query_handle *handle);
 extern void rrddim_query_finalize(struct rrddim_query_handle *handle);
-extern time_t rrddim_query_latest_time(RRDDIM *rd, int tier);
-extern time_t rrddim_query_oldest_time(RRDDIM *rd, int tier);
+extern time_t rrddim_query_latest_time(void *db_metric_handle);
+extern time_t rrddim_query_oldest_time(void *db_metric_handle);
 
 #endif

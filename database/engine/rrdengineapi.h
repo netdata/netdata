@@ -59,8 +59,9 @@ extern void rrdeng_load_metric_init(void *db_metric_handle, struct rrddim_query_
 extern NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, storage_number_tier1_t *tier_result);
 extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
-extern time_t rrdeng_metric_latest_time(RRDDIM *rd, int tier);
-extern time_t rrdeng_metric_oldest_time(RRDDIM *rd, int tier);
+extern time_t rrdeng_metric_latest_time(void *db_metric_handle);
+extern time_t rrdeng_metric_oldest_time(void *db_metric_handle);
+
 extern void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 /* must call once before using anything */

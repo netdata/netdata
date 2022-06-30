@@ -12,11 +12,11 @@ public:
     }
 
     time_t latestTime() {
-        return Ops->latest_time(RD, 0);
+        return Ops->latest_time(RD->state->db_metric_handle);
     }
 
     time_t oldestTime() {
-        return Ops->oldest_time(RD, 0);
+        return Ops->oldest_time(RD->state->db_metric_handle);
     }
 
     void init(time_t AfterT, time_t BeforeT) {

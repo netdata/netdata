@@ -532,32 +532,16 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
     rrdimm_handle->handle = NULL;
 }
 
-time_t rrdeng_metric_latest_time(RRDDIM *rd, int tier)
-{
-    struct pg_cache_page_index *page_index;
-    struct rrddim_volatile *state;
+time_t rrdeng_metric_latest_time(void *db_metric_handle) {
+    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
 
-    if (!tier)
-        state = rd->state;
-    else
-        state = rd->state_tier1;
-
-    page_index = state->page_index;
-
+    struct pg_cache_page_index *page_index = metric_handle->page_index;
     return page_index->latest_time / USEC_PER_SEC;
 }
-time_t rrdeng_metric_oldest_time(RRDDIM *rd, int tier)
-{
-    struct pg_cache_page_index *page_index;
-    struct rrddim_volatile *state;
+time_t rrdeng_metric_oldest_time(void *db_metric_handle) {
+    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
 
-    if (!tier)
-        state = rd->state;
-    else
-        state = rd->state_tier1;
-
-    page_index = state->page_index;
-
+    struct pg_cache_page_index *page_index = metric_handle->page_index;
     return page_index->oldest_time / USEC_PER_SEC;
 }
 

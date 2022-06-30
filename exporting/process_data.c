@@ -77,8 +77,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t before = instance->before;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rd->state->query_ops.oldest_time(rd, 0);
-    time_t last_t = rd->state->query_ops.latest_time(rd, 0);
+    time_t first_t = rd->state->query_ops.oldest_time(rd->state->db_metric_handle);
+    time_t last_t = rd->state->query_ops.latest_time(rd->state->db_metric_handle);
     time_t update_every = st->update_every;
     struct rrddim_query_handle handle;
 

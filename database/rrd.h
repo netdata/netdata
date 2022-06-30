@@ -371,10 +371,10 @@ struct rrddim_query_ops {
     void (*finalize)(struct rrddim_query_handle *handle);
 
     // get the timestamp of the last entry of this metric
-    time_t (*latest_time)(RRDDIM *rd, int tier);
+    time_t (*latest_time)(void *db_metric_handle);
 
     // get the timestamp of the first entry of this metric
-    time_t (*oldest_time)(RRDDIM *rd, int tier);
+    time_t (*oldest_time)(void *db_metric_handle);
 };
 
 // ----------------------------------------------------------------------------
@@ -1093,7 +1093,8 @@ static inline time_t rrdset_last_entry_t_nolock(RRDSET *st, int tier)
         time_t last_entry_t  = 0;
 
         rrddim_foreach_read(rd, st) {
-            last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd, tier));
+            struct rrddim_volatile *state = (tier && rd->state_tier1) ? rd->state_tier1 : rd->state;
+            last_entry_t = MAX(last_entry_t, state->query_ops.latest_time(state->db_metric_handle));
         }
 
         return last_entry_t;
@@ -1121,10 +1122,12 @@ static inline time_t rrdset_first_entry_t_nolock(RRDSET *st, int tier)
         time_t first_entry_t = LONG_MAX;
 
         rrddim_foreach_read(rd, st) {
+            struct rrddim_volatile *state = (tier && rd->state_tier1) ? rd->state_tier1 : rd->state;
+
             first_entry_t =
                 MIN(first_entry_t,
-                    rd->state->query_ops.oldest_time(rd, tier) > st->update_every ?
-                        rd->state->query_ops.oldest_time(rd, tier) - st->update_every : 0);
+                    state->query_ops.oldest_time(state->db_metric_handle) > st->update_every ?
+                        state->query_ops.oldest_time(state->db_metric_handle) - st->update_every : 0);
         }
 
         if (unlikely(LONG_MAX == first_entry_t)) return 0;
@@ -1147,15 +1150,13 @@ static inline time_t rrdset_first_entry_t(RRDSET *st, int tier)
 
 // get the timestamp of the last entry in the round robin database
 static inline time_t rrddim_last_entry_t(RRDDIM *rd, int tier) {
-    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        return rd->state->query_ops.latest_time(rd, tier);
-    return (time_t)rd->rrdset->last_updated.tv_sec;
+    struct rrddim_volatile *state = (tier && rd->state_tier1) ? rd->state_tier1 : rd->state;
+    return state->query_ops.latest_time(state->db_metric_handle);
 }
 
 static inline time_t rrddim_first_entry_t(RRDDIM *rd, int tier) {
-    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        return rd->state->query_ops.oldest_time(rd, tier);
-    return (time_t)(rd->rrdset->last_updated.tv_sec - rrdset_duration(rd->rrdset));
+    struct rrddim_volatile *state = (tier && rd->state_tier1) ? rd->state_tier1 : rd->state;
+    return state->query_ops.oldest_time(state->db_metric_handle);
 }
 
 time_t rrdhost_last_entry_t(RRDHOST *h);

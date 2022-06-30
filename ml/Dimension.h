@@ -16,9 +16,9 @@ public:
 
     RRDDIM *getRD() const { return RD; }
 
-    time_t latestTime() { return Ops->latest_time(RD, 0); }
+    time_t latestTime() { return Ops->latest_time(RD->state->db_metric_handle); }
 
-    time_t oldestTime() { return Ops->oldest_time(RD, 0); }
+    time_t oldestTime() { return Ops->oldest_time(RD->state->db_metric_handle); }
 
     unsigned updateEvery() const { return RD->update_every; }
 
