@@ -239,7 +239,6 @@ USAGE: ${PROGRAM} [options]
   --enable-ml                Enable anomaly detection with machine learning. Default: autodetect.
   --disable-ml               Explicitly disable anomaly detection with machine learning.
   --disable-x86-sse          Disable SSE instructions & optimizations. Default: enabled.
-  --use-system-lws           Use a system copy of libwebsockets instead of bundled copy. Default: bundled.
   --use-system-protobuf      Use a system copy of libprotobuf instead of bundled copy. Default: bundled.
   --zlib-is-really-here
   --libs-are-really-here     If you see errors about missing zlib or libuuid but you know it is available, you might

@@ -6,6 +6,12 @@
 #define PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME "systemd"
 #define PLUGIN_CGROUPS_MODULE_CGROUPS_NAME "/sys/fs/cgroup"
 
+#ifdef NETDATA_INTERNAL_CHECKS
+#define CGROUP_PROCFILE_FLAG PROCFILE_FLAG_DEFAULT
+#else
+#define CGROUP_PROCFILE_FLAG PROCFILE_FLAG_NO_ERROR_ON_FILE_IO
+#endif
+
 // main cgroups thread worker jobs
 #define WORKER_CGROUPS_LOCK 0
 #define WORKER_CGROUPS_READ 1
@@ -949,7 +955,7 @@ static int k8s_get_container_first_proc_comm(const char *id, char *comm) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/%s/cgroup.procs", cgroup_cpuacct_base, id);
 
-    ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
+    ff = procfile_reopen(ff, filename, NULL, CGROUP_PROCFILE_FLAG);
     if (unlikely(!ff)) {
         debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
@@ -1031,7 +1037,7 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
     static procfile *ff = NULL;
 
     if(likely(cp->filename)) {
-        ff = procfile_reopen(ff, cp->filename, NULL, PROCFILE_FLAG_DEFAULT);
+        ff = procfile_reopen(ff, cp->filename, NULL, CGROUP_PROCFILE_FLAG);
         if(unlikely(!ff)) {
             cp->updated = 0;
             cgroups_check = 1;
@@ -1078,7 +1084,7 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
     }
 
     static procfile *ff = NULL;
-    ff = procfile_reopen(ff, cp->filename, NULL, PROCFILE_FLAG_DEFAULT);
+    ff = procfile_reopen(ff, cp->filename, NULL, CGROUP_PROCFILE_FLAG);
     if (unlikely(!ff)) {
         cp->updated = 0;
         cgroups_check = 1;
@@ -1134,7 +1140,7 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
         return;
     }
 
-    ff = procfile_reopen(ff, cp->filename, NULL, PROCFILE_FLAG_DEFAULT);
+    ff = procfile_reopen(ff, cp->filename, NULL, CGROUP_PROCFILE_FLAG);
     if (unlikely(!ff)) {
         cp->updated = 0;
         cgroups_check = 1;
@@ -1217,7 +1223,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
     static procfile *ff = NULL;
 
     if(likely(ca->filename)) {
-        ff = procfile_reopen(ff, ca->filename, NULL, PROCFILE_FLAG_DEFAULT);
+        ff = procfile_reopen(ff, ca->filename, NULL, CGROUP_PROCFILE_FLAG);
         if(unlikely(!ff)) {
             ca->updated = 0;
             cgroups_check = 1;
@@ -1280,7 +1286,7 @@ static inline void cgroup_read_blkio(struct blkio *io) {
     if(likely(io->filename)) {
         static procfile *ff = NULL;
 
-        ff = procfile_reopen(ff, io->filename, NULL, PROCFILE_FLAG_DEFAULT);
+        ff = procfile_reopen(ff, io->filename, NULL, CGROUP_PROCFILE_FLAG);
         if(unlikely(!ff)) {
             io->updated = 0;
             cgroups_check = 1;
@@ -1352,7 +1358,7 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
         if(likely(io->filename)) {
             static procfile *ff = NULL;
 
-            ff = procfile_reopen(ff, io->filename, NULL, PROCFILE_FLAG_DEFAULT);
+            ff = procfile_reopen(ff, io->filename, NULL, CGROUP_PROCFILE_FLAG);
             if(unlikely(!ff)) {
                 io->updated = 0;
                 cgroups_check = 1;
@@ -1397,7 +1403,7 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
     static procfile *ff = NULL;
 
     if (likely(res->filename)) {
-        ff = procfile_reopen(ff, res->filename, " =", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_reopen(ff, res->filename, " =", CGROUP_PROCFILE_FLAG);
         if (unlikely(!ff)) {
             res->updated = 0;
             cgroups_check = 1;
@@ -1454,7 +1460,7 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
             goto memory_next;
         }
 
-        ff = procfile_reopen(ff, mem->filename_detailed, NULL, PROCFILE_FLAG_DEFAULT);
+        ff = procfile_reopen(ff, mem->filename_detailed, NULL, CGROUP_PROCFILE_FLAG);
         if(unlikely(!ff)) {
             mem->updated_detailed = 0;
             cgroups_check = 1;
@@ -3630,7 +3636,7 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
     if(cg->filename_cpu_cfs_quota){
         static procfile *ff = NULL;
 
-        ff = procfile_reopen(ff, cg->filename_cpu_cfs_quota, NULL, PROCFILE_FLAG_DEFAULT);
+        ff = procfile_reopen(ff, cg->filename_cpu_cfs_quota, NULL, CGROUP_PROCFILE_FLAG);
         if(unlikely(!ff)) {
             goto cpu_limits2_err;
         }

@@ -465,7 +465,8 @@ static void ebpf_disk_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
 }
 

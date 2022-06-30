@@ -57,7 +57,6 @@ to work on these platforms with minimal user effort.
 | Docker | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker |
 | Debian | 11.x | x86\_64, i386, ARMv7, AArch64 | |
 | Debian | 10.x | x86\_64, i386, ARMv7, AArch64 | |
-| Debian | 9.x | x86\_64, i386, ARMv7, AArch64 | |
 | Fedora | 36 | x86\_64, ARMv7, AArch64 | |
 | Fedora | 35 | x86\_64, ARMv7, AArch64 | |
 | openSUSE | Leap 15.3 | x86\_64, AArch64 | |
@@ -146,7 +145,8 @@ This is a list of platforms that we have supported in the recent past but no lon
 | -------- | ------- | ----- |
 | Alpine Linux | 3.12 | EOL as of 2022-05-01 |
 | Alpine Linux | 3.11 | EOL as of 2021-11-01 |
-| Fedora 34 | EOL as of 2022-06-07 |
+| Fedora | 34 | EOL as of 2022-06-07 |
+| Debian | 9.x | EOL as of 2022-06-30 |
 | Fedora | 33 | EOL as of 2021-11-30 |
 | Fedora | 32 | EOL as of 2021-05-25 |
 | FreeBSD | 11-STABLE | EOL as of 2021-10-30 |

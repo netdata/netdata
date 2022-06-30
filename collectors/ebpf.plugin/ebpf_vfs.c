@@ -50,20 +50,6 @@ static int read_thread_closed = 1;
  *****************************************************************/
 
 /**
- * Clean PID structures
- *
- * Clean the allocated structures.
- */
-void clean_vfs_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(vfs_pid[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
-/**
 * Clean up the main thread.
 *
 * @param ptr thread data.
@@ -92,7 +78,8 @@ static void ebpf_vfs_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
 }
 
