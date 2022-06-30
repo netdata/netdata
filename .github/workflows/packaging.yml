@@ -46,7 +46,7 @@ jobs:
           import json
           import re
           FULL_CI_REGEX = '/actions run full ci'
-          ALWAYS_RUN_ARCHES = ["amd64"]
+          ALWAYS_RUN_ARCHES = ["amd64", "x86_64"]
           PR_BODY = """${{ github.event.pull_request.body }}"""
           yaml = YAML(typ='safe')
           entries = list()
