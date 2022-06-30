@@ -24,6 +24,8 @@ include:
       apk add -U bash
     jsonc_removal: |
       apk del json-c-dev
+    test:
+      ebpf-core: true
   - <<: *alpine
     version: "3.16"
   - <<: *alpine
@@ -37,6 +39,8 @@ include:
     version: latest
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
+    test:
+      ebpf-core: true
 
   - &alma
     distro: almalinux
@@ -50,6 +54,8 @@ include:
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
   - <<: *alma
     version: "8"
     packages:
@@ -63,6 +69,8 @@ include:
       repo_distro: el/7
       arches:
         - x86_64
+    test:
+      ebpf-core: false
 
   - &debian
     distro: debian
@@ -79,16 +87,22 @@ include:
         - amd64
         - armhf
         - arm64
+    test:
+      ebpf-core: true
   - <<: *debian
     version: "10"
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
+    test:
+      ebpf-core: false
   - <<: *debian
     version: "9"
     packages:
       <<: *debian_packages
       repo_distro: debian/stretch
+    test:
+      ebpf-core: false
 
   - &fedora
     distro: fedora
@@ -102,11 +116,15 @@ include:
         - x86_64
         - armhfp
         - aarch64
+    test:
+      ebpf-core: true
   - <<: *fedora
     version: "35"
     packages:
       <<: *fedora_packages
       repo_distro: fedora/35
+    test:
+      ebpf-core: true
 
   - &opensuse
     distro: opensuse
@@ -120,11 +138,15 @@ include:
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
   - <<: *opensuse
     version: "15.3"
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.3
+    test:
+      ebpf-core: false
 
   - distro: oraclelinux
     version: "8"
@@ -136,6 +158,8 @@ include:
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
 
   - &ubuntu
     distro: ubuntu
@@ -151,6 +175,8 @@ include:
         - amd64
         - armhf
         - arm64
+    test:
+      ebpf-core: true
   - <<: *ubuntu
     version: "21.10"
     packages:
@@ -171,3 +197,5 @@ include:
         - amd64
         - armhf
         - arm64
+    test:
+      ebpf-core: false
