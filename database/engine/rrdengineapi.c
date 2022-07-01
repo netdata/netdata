@@ -378,7 +378,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrd
     // TODO we should store the dt of each page in each page
     // this will produce wrong values for dt in case the user changes
     // the update every of the charts or the tier grouping iterations
-    handle->dt_sec = storage_tiers_grouping_iterations[ctx->tier] * rd->update_every;
+    handle->dt_sec = (time_t)storage_tiers_grouping_iterations[ctx->tier] * (time_t)rd->update_every;
     handle->dt = handle->dt_sec * USEC_PER_SEC;
     handle->position = 0;
     handle->ctx = ctx;
