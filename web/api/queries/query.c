@@ -428,19 +428,26 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 
 static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, time_t before_wanted, long points_wanted) {
     if(after_wanted == before_wanted || !points_wanted || !rd || !rd->rrdset) {
-        if(!rd) internal_error(true, "QUERY: NULL dimension - invalid params to tier calculation");
-        else internal_error(true, "QUERY: chart '%s' dimension '%s' invalid params to tier calculation", (rd->rrdset)?rd->rrdset->name:"unknown", rd->name);
+
+        if(!rd)
+            internal_error(true, "QUERY: NULL dimension - invalid params to tier calculation");
+        else
+            internal_error(true, "QUERY: chart '%s' dimension '%s' invalid params to tier calculation",
+                           (rd->rrdset)?rd->rrdset->name:"unknown", rd->name);
+
         return 0;
     }
 
     BUFFER *wb = buffer_create(1000);
-    buffer_sprintf(wb, "Best tier for chart '%s', dim '%s', from %ld to %ld (dur %ld, every %d), points %ld", rd->rrdset->name, rd->name, after_wanted, before_wanted, before_wanted - after_wanted, rd->update_every, points_wanted);
+    buffer_sprintf(wb, "Best tier for chart '%s', dim '%s', from %ld to %ld (dur %ld, every %d), points %ld",
+                   rd->rrdset->name, rd->name, after_wanted, before_wanted, before_wanted - after_wanted, rd->update_every, points_wanted);
 
     long weight[storage_tiers];
 
     for(int tier = 0; tier < storage_tiers ; tier++) {
         if(!rd->tiers[tier]) {
-            internal_error(true, "QUERY: tier %d of chart '%s' dimension '%s' not initialized", tier, rd->rrdset->name, rd->name);
+            internal_error(true, "QUERY: tier %d of chart '%s' dimension '%s' not initialized",
+                           tier, rd->rrdset->name, rd->name);
             buffer_free(wb);
             return 0;
         }
@@ -451,33 +458,39 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
         time_t common_after = MAX(first_t, after_wanted);
         time_t common_before = MIN(last_t, before_wanted);
 
-        long time_coverage = (common_before - common_after) * 100 / (before_wanted - after_wanted);
+        long time_coverage = (common_before - common_after) * 1000 / (before_wanted - after_wanted);
         if(time_coverage < 0) time_coverage = 0;
 
         int update_every = rd->tiers[tier]->tier_grouping * rd->update_every;
         if(update_every == 0) {
-            internal_error(true, "QUERY: update_every of tier %d for chart '%s' dimension '%s' is zero. tg = %d, ue = %d", tier, rd->rrdset->name, rd->name, rd->tiers[tier]->tier_grouping, rd->update_every);
+            internal_error(true, "QUERY: update_every of tier %d for chart '%s' dimension '%s' is zero. tg = %d, ue = %d",
+                           tier, rd->rrdset->name, rd->name, rd->tiers[tier]->tier_grouping, rd->update_every);
             buffer_free(wb);
             return 0;
         }
 
-        long points = (before_wanted - after_wanted) / update_every;
-        long points_delta = points - points_wanted;
-        long points_coverage = -ABS(points_delta) * 100 / points_wanted;
+        long points_available = (before_wanted - after_wanted) / update_every;
+        long points_delta = points_available - points_wanted;
+        long points_coverage = (points_delta < 0) ? points_available * 1000 / points_wanted: 1000;
 
-        if(time_coverage <= 0 || points <= 0)
+        if(time_coverage <= 0 || points_available <= 0)
             weight[tier] = -LONG_MAX;
         else
             weight[tier] = points_coverage * time_coverage;
 
-        buffer_sprintf(wb, ": tier %d, first %ld, last %ld (dur %ld, tg %d, every %d), points %ld, tcoverage %ld, pcoverage %ld, weight %ld", tier, first_t, last_t, last_t - first_t, rd->tiers[tier]->tier_grouping, update_every, points, time_coverage, points_coverage, weight[tier]);
+        buffer_sprintf(wb, ": tier %d, first %ld, last %ld (dur %ld, tg %d, every %d), points %ld, tcoverage %ld, pcoverage %ld, weight %ld",
+                       tier, first_t, last_t, last_t - first_t, rd->tiers[tier]->tier_grouping, update_every,
+                       points_available, time_coverage, points_coverage, weight[tier]);
     }
 
     int best_tier = 0;
     for(int tier = 1; tier < storage_tiers ; tier++) {
-        if(weight[tier] > weight[best_tier])
+        if(weight[tier] >= weight[best_tier])
             best_tier = tier;
     }
+
+    if(weight[best_tier] == -LONG_MAX)
+        best_tier = 0;
 
     buffer_sprintf(wb, ": final best tier %d", best_tier);
     internal_error(true, "%s", buffer_tostring(wb));
