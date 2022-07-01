@@ -121,7 +121,7 @@ extern RRDR *rrd2rrdr(
     RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
     struct context_param *context_param_list, const char *group_options, int timeout);
 
-extern int rrdr_relative_window_to_absolute(long long *after, long long *before, int update_every, long points);
+extern int rrdr_relative_window_to_absolute(long long *after, long long *before);
 
 #include "query.h"
 

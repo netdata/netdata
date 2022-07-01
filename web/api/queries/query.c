@@ -426,6 +426,48 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 // ----------------------------------------------------------------------------
 // fill RRDR for a single dimension
 
+static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, time_t before_wanted, long points_wanted) {
+    if(after_wanted == before_wanted || !points_wanted || !rd) return 0;
+
+    BUFFER *wb = buffer_create(1000);
+    buffer_sprintf(wb, "Best tier for chart '%s', dim '%s', from %ld to %ld (dur %ld, every %d), points %ld", rd->rrdset->name, rd->name, after_wanted, before_wanted, before_wanted - after_wanted, rd->update_every, points_wanted);
+
+    long weight[storage_tiers];
+
+    for(int tier = 0; tier < storage_tiers ; tier++) {
+        time_t first_t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
+        time_t last_t  = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
+
+        time_t common_after = MAX(first_t, after_wanted);
+        time_t common_before = MIN(last_t, before_wanted);
+
+        long time_coverage = (common_before - common_after) * 1000 / (before_wanted - after_wanted);
+        if(time_coverage < 0) time_coverage = -1000;
+
+        int update_every = rd->tiers[tier]->tier_grouping * rd->update_every;
+
+        long points = (common_before - common_after) / update_every;
+        long points_delta = points - points_wanted;
+        long points_coverage = -ABS(points_delta) * 1000 / points_wanted;
+
+        weight[tier] = points_coverage * time_coverage;
+
+        buffer_sprintf(wb, ": tier %d, first %ld, last %ld (dur %ld, tg %d, every %d), points %ld, tcoverage %ld, pcoverage %ld, weight %ld", tier, first_t, last_t, last_t - first_t, rd->tiers[tier]->tier_grouping, update_every, points, time_coverage, points_coverage, weight[tier]);
+    }
+
+    int best_tier = 0;
+    for(int tier = 1; tier < storage_tiers ; tier++) {
+        if(weight[tier] >= weight[best_tier])
+            best_tier = tier;
+    }
+
+    buffer_sprintf(wb, ": final best tier %d", best_tier);
+    internal_error(true, "%s", buffer_tostring(wb));
+    buffer_free(wb);
+
+    return best_tier;
+}
+
 static inline NETDATA_DOUBLE interpolate_value(NETDATA_DOUBLE this_value, NETDATA_DOUBLE last_value, time_t last_value_end_t, time_t this_value_start_t, time_t now, time_t this_value_end_t) {
     if(unlikely(
             this_value_start_t + 1 == this_value_end_t ||
@@ -467,9 +509,7 @@ static inline void rrd2rrdr_do_dimension(
     NETDATA_DOUBLE min = r->min, max = r->max;
     size_t db_points_read = 0;
 
-    struct rrddim_tier *tier = ((options & RRDR_OPTION_TIER1) && rd->tiers[1]) ? rd->tiers[1] : rd->tiers[0];
-    if (options & RRDR_OPTION_TIER1)
-        query_granularity = tier->tier_grouping / r->group;
+    struct rrddim_tier *tier = rd->tiers[rrddim_find_best_tier_for_timeframe(rd, after_wanted, before_wanted, points_wanted)];
 
     // cache the function pointers we need in the loop
     NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) = tier->query_ops.next_metric;
@@ -788,7 +828,7 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 #endif // NETDATA_INTERNAL_CHECKS
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-int rrdr_relative_window_to_absolute(long long *after, long long *before, int update_every, long points) {
+int rrdr_relative_window_to_absolute(long long *after, long long *before) {
     time_t now = now_realtime_sec() - 1;
 
     int absolute_period_requested = -1;
@@ -816,7 +856,7 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before, int up
         // if the user didn't give an after, use the number of points
         // to give a sane default
         if(after_requested == 0)
-            after_requested = -(points * update_every);
+            after_requested = -600;
 
         // since the query engine now returns inclusive timestamps
         // it is awkward to return 6 points when after=-5 is given
@@ -866,6 +906,22 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before, int up
 #define query_debug_log(args...) debug_dummy()
 #define query_debug_log_fin() debug_dummy()
 #endif
+
+static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t after_wanted, time_t before_wanted, long points_wanted) {
+    rrdset_rdlock(st);
+    int tier = rrddim_find_best_tier_for_timeframe(st->dimensions, after_wanted, before_wanted, points_wanted);
+    if(!st->dimensions || !st->dimensions->tiers[tier]) return st->update_every;
+    int ret = st->dimensions->tiers[tier]->tier_grouping * st->update_every;
+    if(!ret) {
+        internal_error(
+            true,
+            "QUERY: update_every calculated to be zero on chart '%s', tier_grouping %d, update_every %d",
+            st->name, st->dimensions->tiers[tier]->tier_grouping, st->update_every);
+        ret = 1;
+    }
+    rrdset_unlock(st);
+    return ret;
+}
 
 RRDR *rrd2rrdr(
           ONEWAYALLOC *owa
@@ -920,11 +976,6 @@ RRDR *rrd2rrdr(
         query_debug_log(":relative+natural");
     }
 
-    // this is the update_every of the query
-    // it may be different to the update_every of the database
-    time_t query_granularity = (natural_points)?update_every:1;
-    query_debug_log(":query_granularity %ld", query_granularity);
-
     if(after_wanted == 0 || before_wanted == 0) {
         // for non-context queries we have to find the duration of the database
         // for context queries we will assume 600 seconds duration
@@ -970,8 +1021,20 @@ RRDR *rrd2rrdr(
     }
 
     // convert our before_wanted and after_wanted to absolute
-    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted, (int)query_granularity, points_wanted);
+    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
     query_debug_log(":relative2absolute after %lld, before %lld", after_wanted, before_wanted);
+
+    if(natural_points && storage_tiers > 1) {
+        update_every = rrdset_find_natural_update_every_for_timeframe(st, after_wanted, before_wanted, points_wanted);
+        if(update_every <= 0) update_every = 1;
+        query_debug_log(":natural update every %d", update_every);
+    }
+
+    // this is the update_every of the query
+    // it may be different to the update_every of the database
+    time_t query_granularity = (natural_points)?update_every:1;
+    if(query_granularity <= 0) query_granularity = 1;
+    query_debug_log(":query_granularity %ld", query_granularity);
 
     // align before_wanted and after_wanted to query_granularity
     if (before_wanted % query_granularity) {

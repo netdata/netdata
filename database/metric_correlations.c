@@ -733,12 +733,12 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
 
     if(!points) points = 500;
 
-    rrdr_relative_window_to_absolute(&after, &before, default_rrd_update_every, points);
+    rrdr_relative_window_to_absolute(&after, &before);
 
     if(baseline_before <= API_RELATIVE_TIME_MAX)
         baseline_before += after;
 
-    rrdr_relative_window_to_absolute(&baseline_after, &baseline_before, default_rrd_update_every, points * 4);
+    rrdr_relative_window_to_absolute(&baseline_after, &baseline_before);
 
     if (before <= after || baseline_before <= baseline_after) {
         buffer_strcat(wb, "{\"error\": \"Invalid baseline or highlight ranges.\" }");
