@@ -50,8 +50,7 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
         i=0;
         e = m;
         while (*e) {
-            if (*e == ' ' || *e == '\0' || i == MAX_RRDCALC_VARIABLE - 1) {
-                var[i]='\0';
+            if (*e == ' ' || i == MAX_RRDCALC_VARIABLE - 1) {
                 break;
             }
             else
@@ -59,6 +58,7 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
             e++;
             i++;
         }
+        var[i]='\0';
         pos = e - temp;
         if (!strcmp(var, "$family")) {
             char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rc->rrdset->family : "", m);
