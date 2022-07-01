@@ -441,14 +441,14 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
         time_t common_after = MAX(first_t, after_wanted);
         time_t common_before = MIN(last_t, before_wanted);
 
-        long time_coverage = (common_before - common_after) * 1000 / (before_wanted - after_wanted);
-        if(time_coverage < 0) time_coverage = -1000;
+        long time_coverage = (common_before - common_after) * 100000 / (before_wanted - after_wanted);
+        if(time_coverage < 0) time_coverage = -100000;
 
         int update_every = rd->tiers[tier]->tier_grouping * rd->update_every;
 
-        long points = (common_before - common_after) / update_every;
+        long points = (before_wanted - after_wanted) / update_every;
         long points_delta = points - points_wanted;
-        long points_coverage = -ABS(points_delta) * 1000 / points_wanted;
+        long points_coverage = -ABS(points_delta) * 100000 / points_wanted;
 
         weight[tier] = points_coverage * time_coverage;
 

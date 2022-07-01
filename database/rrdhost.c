@@ -831,6 +831,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         }
 
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
+        internal_error(true, "DBENGINE tier %d grouping iterations is set to %d", tier, storage_tiers_grouping_iterations[tier]);
         ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
             error("DBENGINE on '%s': Failed to initialize multi-host database tier %d on path '%s'",
