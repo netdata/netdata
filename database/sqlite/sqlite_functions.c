@@ -1537,6 +1537,7 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
 {
     RRDDIM *rd = onewayalloc_callocz(owa, 1, sizeof(*rd));
     rd->rrdset = st;
+    rd->update_every = st->update_every;
     rd->last_stored_value = NAN;
     rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
     STORAGE_ENGINE *eng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
@@ -1546,8 +1547,10 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
     rd->name = onewayalloc_strdupz(owa, name);
 
     for(int tier = 0; tier < storage_tiers ;tier++) {
-        rd->tiers[tier] = onewayalloc_mallocz(owa, sizeof(*rd->tiers[tier]));
+        rd->tiers[tier] = onewayalloc_callocz(owa, 1, sizeof(*rd->tiers[tier]));
         rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        rd->tiers[tier]->tier_grouping = storage_tiers_grouping_iterations[tier];
+        rd->tiers[tier]->mode = RRD_MEMORY_MODE_DBENGINE;
         rd->tiers[tier]->query_ops.init = rrdeng_load_metric_init;
         rd->tiers[tier]->query_ops.next_metric = rrdeng_load_metric_next;
         rd->tiers[tier]->query_ops.is_finished = rrdeng_load_metric_is_finished;

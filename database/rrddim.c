@@ -267,7 +267,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
             if(!eng) continue;
 
-            rd->tiers[tier] = callocz(1, sizeof(*rd->tiers[tier]));
+            rd->tiers[tier] = callocz(1, sizeof(struct rrddim_tier));
             rd->tiers[tier]->tier_grouping = storage_tiers_grouping_iterations[tier];
             rd->tiers[tier]->mode = eng->id;
             rd->tiers[tier]->collect_ops = eng->api.collect_ops;

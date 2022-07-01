@@ -427,7 +427,11 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 // fill RRDR for a single dimension
 
 static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, time_t before_wanted, long points_wanted) {
-    if(after_wanted == before_wanted || !points_wanted || !rd) return 0;
+    if(after_wanted == before_wanted || !points_wanted || !rd || !rd->rrdset) {
+        if(!rd) internal_error(true, "QUERY: NULL dimension - invalid params to tier calculation");
+        else internal_error(true, "QUERY: chart '%s' dimension '%s' invalid params to tier calculation", (rd->rrdset)?rd->rrdset->name:"unknown", rd->name);
+        return 0;
+    }
 
     BUFFER *wb = buffer_create(1000);
     buffer_sprintf(wb, "Best tier for chart '%s', dim '%s', from %ld to %ld (dur %ld, every %d), points %ld", rd->rrdset->name, rd->name, after_wanted, before_wanted, before_wanted - after_wanted, rd->update_every, points_wanted);
@@ -435,29 +439,43 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
     long weight[storage_tiers];
 
     for(int tier = 0; tier < storage_tiers ; tier++) {
+        if(!rd->tiers[tier]) {
+            internal_error(true, "QUERY: tier %d of chart '%s' dimension '%s' not initialized", tier, rd->rrdset->name, rd->name);
+            buffer_free(wb);
+            return 0;
+        }
+
         time_t first_t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
         time_t last_t  = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
 
         time_t common_after = MAX(first_t, after_wanted);
         time_t common_before = MIN(last_t, before_wanted);
 
-        long time_coverage = (common_before - common_after) * 100000 / (before_wanted - after_wanted);
-        if(time_coverage < 0) time_coverage = -100000;
+        long time_coverage = (common_before - common_after) * 100 / (before_wanted - after_wanted);
+        if(time_coverage < 0) time_coverage = 0;
 
         int update_every = rd->tiers[tier]->tier_grouping * rd->update_every;
+        if(update_every == 0) {
+            internal_error(true, "QUERY: update_every of tier %d for chart '%s' dimension '%s' is zero. tg = %d, ue = %d", tier, rd->rrdset->name, rd->name, rd->tiers[tier]->tier_grouping, rd->update_every);
+            buffer_free(wb);
+            return 0;
+        }
 
         long points = (before_wanted - after_wanted) / update_every;
         long points_delta = points - points_wanted;
-        long points_coverage = -ABS(points_delta) * 100000 / points_wanted;
+        long points_coverage = -ABS(points_delta) * 100 / points_wanted;
 
-        weight[tier] = points_coverage * time_coverage;
+        if(time_coverage <= 0 || points <= 0)
+            weight[tier] = -LONG_MAX;
+        else
+            weight[tier] = points_coverage * time_coverage;
 
         buffer_sprintf(wb, ": tier %d, first %ld, last %ld (dur %ld, tg %d, every %d), points %ld, tcoverage %ld, pcoverage %ld, weight %ld", tier, first_t, last_t, last_t - first_t, rd->tiers[tier]->tier_grouping, update_every, points, time_coverage, points_coverage, weight[tier]);
     }
 
     int best_tier = 0;
     for(int tier = 1; tier < storage_tiers ; tier++) {
-        if(weight[tier] >= weight[best_tier])
+        if(weight[tier] > weight[best_tier])
             best_tier = tier;
     }
 
@@ -901,10 +919,12 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before) {
         buffer_free(debug_log); \
         debug_log = NULL; \
     }
+#define query_debug_log_free() do { buffer_free(debug_log); } while(0)
 #else
 #define query_debug_log_init() debug_dummy()
 #define query_debug_log(args...) debug_dummy()
 #define query_debug_log_fin() debug_dummy()
+#define query_debug_log_free() debug_dummy()
 #endif
 
 static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t after_wanted, time_t before_wanted, long points_wanted) {
@@ -987,6 +1007,12 @@ RRDR *rrd2rrdr(
             time_t first_entry_t = rrdset_first_entry_t_nolock(st);
             time_t last_entry_t = rrdset_last_entry_t_nolock(st);
             rrdset_unlock(st);
+
+            if(first_entry_t == 0 || last_entry_t == 0) {
+                internal_error(true, "QUERY: chart without data detected on '%s'", st->name);
+                query_debug_log_free();
+                return NULL;
+            }
 
             query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_t, last_entry_t);
 

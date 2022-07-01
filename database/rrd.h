@@ -1113,11 +1113,11 @@ static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
 }
 
 static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
-    time_t oldest = rd->tiers[0]->query_ops.oldest_time(rd->tiers[0]->db_metric_handle);
+    time_t oldest = 0;
 
-    for(int tier = 1; tier < storage_tiers ;tier++) {
+    for(int tier = 0; tier < storage_tiers ;tier++) {
         time_t t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
-        if(t < oldest)
+        if(t != 0 && (oldest == 0 || t < oldest))
             oldest = t;
     }
 
