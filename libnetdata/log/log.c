@@ -570,7 +570,7 @@ void reopen_all_log_files() {
         open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, &access_log_syslog, 0, &aclklog_fd);
+    aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
 #endif
 
     if(stdaccess_filename)
@@ -585,7 +585,7 @@ void open_all_log_files() {
     open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, &access_log_syslog, 0, &aclklog_fd);
+    aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
 #endif
 
     stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
