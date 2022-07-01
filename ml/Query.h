@@ -30,7 +30,8 @@ public:
     std::pair<time_t, CalculatedNumber> nextMetric() {
         time_t CurrT, EndT;
         SN_FLAGS Flags;
-        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags, NULL, NULL);
+        uint16_t QueryCount, QueryAnomalyCount;
+        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags, &QueryCount, &QueryAnomalyCount);
         return { CurrT, Value };
     }
 

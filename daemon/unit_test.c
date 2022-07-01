@@ -1774,7 +1774,8 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                     expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
                     time_t end_time;
-                    value = rd[i][j]->tiers[0]->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, NULL, TIER_QUERY_FETCH_SUM);
+                    uint16_t query_count, query_anomaly_count;
+                    value = rd[i][j]->tiers[0]->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, &query_count, &query_anomaly_count);
 
                     same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
@@ -2229,7 +2230,8 @@ static void query_dbengine_chart(void *arg)
                 break;
             }
             time_t end_time;
-            value = rd->tiers[0]->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, NULL, TIER_QUERY_FETCH_SUM);
+            uint16_t query_count, query_anomaly_count;
+            value = rd->tiers[0]->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, &query_count, &query_anomaly_count);
             if (!netdata_double_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT

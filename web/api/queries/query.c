@@ -450,7 +450,9 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 // fill RRDR for a single dimension
 
 static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, time_t before_wanted, long points_wanted) {
-    if(after_wanted == before_wanted || !points_wanted || !rd || !rd->rrdset) {
+    if(storage_tiers < 2) return 0;
+
+    if(unlikely(after_wanted == before_wanted || !points_wanted || !rd || !rd->rrdset)) {
 
         if(!rd)
             internal_error(true, "QUERY: NULL dimension - invalid params to tier calculation");
@@ -499,7 +501,7 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
         if(time_coverage <= 0 || points_available <= 0)
             weight[tier] = -LONG_MAX;
         else
-            weight[tier] = points_coverage * time_coverage;
+            weight[tier] = points_coverage + time_coverage;
 
         buffer_sprintf(wb, ": tier %d, first %ld, last %ld (dur %ld, tg %d, every %d), points %ld, tcoverage %ld, pcoverage %ld, weight %ld",
                        tier, first_t, last_t, last_t - first_t, rd->tiers[tier]->tier_grouping, update_every,
@@ -524,9 +526,9 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
 
 static inline NETDATA_DOUBLE interpolate_value(NETDATA_DOUBLE this_value, NETDATA_DOUBLE last_value, time_t last_value_end_t, time_t this_value_start_t, time_t now, time_t this_value_end_t) {
     if(unlikely(
-            this_value_start_t + 1 == this_value_end_t ||
             !netdata_double_isnumber(this_value) ||
             !netdata_double_isnumber(last_value) ||
+            this_value_start_t + 1 == this_value_end_t ||
             last_value_end_t != this_value_start_t))
         return this_value;
 

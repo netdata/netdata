@@ -496,40 +496,46 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         now = (time_t)((descr->start_time + position * handle->dt) / USEC_PER_SEC);
     }
 
-    storage_number n;
     *start_time = now - handle->dt_sec;
     *end_time = now;
 
     handle->position = position;
     handle->now = now;
 
-    if (handle->ctx->tier) {
+    // the value to return
+    NETDATA_DOUBLE value;
+
+    if(likely(!handle->ctx->tier)) {
+        storage_number n = handle->page[position];
+        *flags = n & SN_ALL_FLAGS;
+        *count = 1;
+        *anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
+        value = unpack_storage_number(n);
+    }
+    else {
         tier1_value = ((storage_number_tier1_t *)handle->page)[position];
         *flags = 0;
-        if (likely(count))
-            *count = tier1_value.count;
-        if (likely(anomaly_count))
-                *anomaly_count = tier1_value.anomaly_count;
+        *count = tier1_value.count;
+        *anomaly_count = tier1_value.anomaly_count;
 
         switch (handle->tier_query_fetch_type) {
             case TIER_QUERY_FETCH_SUM:
-                return tier1_value.sum_value;
+                value = (NETDATA_DOUBLE)tier1_value.sum_value;
+                break;
+
             case TIER_QUERY_FETCH_MIN:
-                return tier1_value.min_value;
+                value = (NETDATA_DOUBLE)tier1_value.min_value;
+                break;
+
             case TIER_QUERY_FETCH_MAX:
-                return tier1_value.max_value;
-            case TIER_QUERY_FETCH_AVERAGE:
-                return (double ) (tier1_value.sum_value / tier1_value.count);
+                value = (NETDATA_DOUBLE)tier1_value.max_value;
+                break;
+
             default:
-                return tier1_value.sum_value;
+            case TIER_QUERY_FETCH_AVERAGE:
+                value = (NETDATA_DOUBLE)tier1_value.sum_value / (NETDATA_DOUBLE)tier1_value.count;
+                break;
         }
-    }
-    else {
-        n = handle->page[position];
-        if (likely(count))
-            *count = 1;
-        if (likely(anomaly_count))
-            *anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
     }
 
     if (unlikely(now >= rrdimm_handle->end_time)) {
@@ -537,8 +543,7 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         handle->next_page_time = INVALID_TIME;
     }
 
-    *flags = n & SN_ALL_FLAGS;
-    return unpack_storage_number(n);
+    return value;
 }
 
 int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)

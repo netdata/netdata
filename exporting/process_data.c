@@ -129,7 +129,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     for (rd->tiers[0]->query_ops.init(rd->tiers[0]->db_metric_handle, &handle, after, before, TIER_QUERY_FETCH_SUM); !rd->tiers[0]->query_ops.is_finished(&handle);) {
         time_t curr_t, end_t;
         SN_FLAGS flags;
-        value = rd->tiers[0]->query_ops.next_metric(&handle, &curr_t, &end_t, &flags, NULL, TIER_QUERY_FETCH_SUM);
+        uint16_t query_count, query_anomaly_count;
+        value = rd->tiers[0]->query_ops.next_metric(&handle, &curr_t, &end_t, &flags, &query_count, &query_anomaly_count);
 
         if (unlikely(!netdata_double_isnumber(value))) {
             // not collected
