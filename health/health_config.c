@@ -942,6 +942,8 @@ static int health_readfile(const char *filename, void *data) {
                 }
                 rc->info = strdupz(value);
                 strip_quotes(rc->info);
+                rc->original_info = strdupz(value);
+                strip_quotes(rc->original_info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
                 alert_cfg->delay = strdupz(value);

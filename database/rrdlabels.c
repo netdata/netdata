@@ -620,7 +620,7 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
 }
 
 // ----------------------------------------------------------------------------
-// rrdlabels_get_to_buffer_or_null()
+// rrdlabels_get_value_to_buffer_or_null()
 
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
     DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
@@ -634,6 +634,20 @@ void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const
     dictionary_acquired_item_release(labels, acquired_item);
 }
 
+// ----------------------------------------------------------------------------
+// rrdlabels_get_value_to_char_or_null()
+
+void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key) {
+    void *acquired_item = dictionary_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(labels, acquired_item);
+
+    if(lb && lb->value)
+        *value = strdupz(lb->value);
+    else
+        value = NULL;
+
+    dictionary_acquired_item_release(labels, acquired_item);
+}
 
 // ----------------------------------------------------------------------------
 // rrdlabels_unmark_all()
