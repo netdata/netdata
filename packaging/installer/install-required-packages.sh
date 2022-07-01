@@ -1341,9 +1341,9 @@ packages() {
   require_cmd git || suitable_package git
   require_cmd find || suitable_package find
 
-  require_cmd gcc ||
+  require_cmd gcc || require_cmd clang ||
     require_cmd gcc-multilib || suitable_package gcc
-  require_cmd g++ || suitable_package gxx
+  require_cmd g++ || require_cmd clang++ || suitable_package gxx
 
   require_cmd make || suitable_package make
   require_cmd autoconf || suitable_package autoconf

@@ -9,7 +9,6 @@ DONT_WAIT=0
 
 package_tree="
   git
-  gcc
   autoconf
   autoconf-archive
   autogen
