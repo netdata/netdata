@@ -402,6 +402,7 @@ struct rrddim_tier {
     time_t next_point_time;
     size_t anomaly_count;
     uint8_t tier_grouping;
+    usec_t last_collected_ut;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
 };

@@ -964,15 +964,15 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     return last_updated_ut;
 }
 
-static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
-    rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, next_store_ut, n, 0, 0, 1, 0, flags);
+static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+    rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 
     for(int tier = 1; tier < storage_tiers ;tier++) {
         if (!rd->tiers[tier])
             continue;
         struct rrddim_tier *t = rd->tiers[tier];
 
-        time_t now = (time_t)(next_store_ut / USEC_PER_SEC);
+        time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
         if (!t->next_point_time) {
             time_t loop = rd->update_every * t->tier_grouping;
@@ -996,16 +996,17 @@ static void store_metric(RRDDIM *rd, usec_t next_store_ut, NETDATA_DOUBLE n, SN_
                 t->count++;
             }
 
+            t->last_collected_ut = point_end_time_ut;
             t->iterations++;
 
             if (now >= t->next_point_time) {
                 if (!t->count)
                     t->collect_ops.store_metric(
-                        t->db_collection_handle, next_store_ut, NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT);
+                        t->db_collection_handle, point_end_time_ut, NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT);
                 else {
                     t->collect_ops.store_metric(
                         t->db_collection_handle,
-                        next_store_ut,
+                        point_end_time_ut,
                         t->sum_value,
                         t->min_value,
                         t->max_value,

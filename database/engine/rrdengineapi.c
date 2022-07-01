@@ -375,15 +375,11 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrd
     handle->next_page_time = start_time;
     handle->now = start_time;
     handle->tier_query_fetch_type = tier_query_fetch_type;
-//    if(ctx->tier) {
-//        handle->dt = TIER1_GROUPING * rd->update_every * USEC_PER_SEC;
-//        handle->dt_sec = TIER1_GROUPING * rd->update_every;
-//    }
-//    else
-    {
-        handle->dt = rd->update_every * USEC_PER_SEC;
-        handle->dt_sec = rd->update_every;
-    }
+    // TODO we should store the dt of each page in each page
+    // this will produce wrong values for dt in case the user changes
+    // the update every of the charts or the tier grouping iterations
+    handle->dt_sec = storage_tiers_grouping_iterations[ctx->tier] * rd->update_every;
+    handle->dt = handle->dt_sec * USEC_PER_SEC;
     handle->position = 0;
     handle->ctx = ctx;
     handle->metric_handle = metric_handle;
@@ -450,6 +446,11 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     usec_t entries = handle->entries = page_length / ctx->storage_size;
     if (likely(entries > 1))
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
+    else {
+        // TODO we should store the dt of each page in each page
+        // now we keep the dt of whatever was before
+        ;
+    }
 
     handle->dt_sec = (time_t)(handle->dt / USEC_PER_SEC);
     handle->position = position;
