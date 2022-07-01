@@ -400,7 +400,7 @@ static void log_init(void) {
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    healthlog_filename = config_get(CONFIG_SECTION_GLOBAL, "health log", filename);
+    healthlog_filename = config_get(CONFIG_SECTION_LOGS, "health", filename);
 
     char deffacility[8];
     snprintfz(deffacility,7,"%s","daemon");
