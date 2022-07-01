@@ -44,6 +44,7 @@ struct pg_cache_page_index;
 
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
+#include "web/api/queries/rrdr.h"
 #include "rrdvar.h"
 #include "rrdsetvar.h"
 #include "rrddimvar.h"

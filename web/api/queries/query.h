@@ -3,12 +3,9 @@
 #ifndef NETDATA_API_DATA_QUERY_H
 #define NETDATA_API_DATA_QUERY_H
 
-typedef enum tier_query_fetch {
-    TIER_QUERY_FETCH_SUM,
-    TIER_QUERY_FETCH_MIN,
-    TIER_QUERY_FETCH_MAX,
-    TIER_QUERY_FETCH_AVERAGE
-} TIER_QUERY_FETCH;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef enum rrdr_grouping {
     RRDR_GROUPING_UNDEFINED = 0,
@@ -29,5 +26,9 @@ extern const char *group_method2string(RRDR_GROUPING group);
 extern void web_client_api_v1_init_grouping(void);
 extern RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def);
 extern const char *web_client_api_request_v1_data_group_to_string(RRDR_GROUPING group);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //NETDATA_API_DATA_QUERY_H

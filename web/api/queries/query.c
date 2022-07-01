@@ -50,6 +50,8 @@ static struct {
     // continue after a flush as if nothing changed, for others a
     // cleanup of the internal structures may be required).
     NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+
+    TIER_QUERY_FETCH tier_query_fetch;
 } api_v1_data_groups[] = {
         {.name = "average",
                 .hash  = 0,
@@ -59,7 +61,8 @@ static struct {
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
-                .flush = grouping_flush_average
+                .flush = grouping_flush_average,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "mean",                           // alias on 'average'
                 .hash  = 0,
@@ -69,7 +72,8 @@ static struct {
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
-                .flush = grouping_flush_average
+                .flush = grouping_flush_average,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name  = "incremental_sum",
                 .hash  = 0,
@@ -79,7 +83,8 @@ static struct {
                 .reset = grouping_reset_incremental_sum,
                 .free  = grouping_free_incremental_sum,
                 .add   = grouping_add_incremental_sum,
-                .flush = grouping_flush_incremental_sum
+                .flush = grouping_flush_incremental_sum,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "incremental-sum",
                 .hash  = 0,
@@ -89,7 +94,8 @@ static struct {
                 .reset = grouping_reset_incremental_sum,
                 .free  = grouping_free_incremental_sum,
                 .add   = grouping_add_incremental_sum,
-                .flush = grouping_flush_incremental_sum
+                .flush = grouping_flush_incremental_sum,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "median",
                 .hash  = 0,
@@ -99,7 +105,8 @@ static struct {
                 .reset = grouping_reset_median,
                 .free  = grouping_free_median,
                 .add   = grouping_add_median,
-                .flush = grouping_flush_median
+                .flush = grouping_flush_median,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "min",
                 .hash  = 0,
@@ -109,7 +116,8 @@ static struct {
                 .reset = grouping_reset_min,
                 .free  = grouping_free_min,
                 .add   = grouping_add_min,
-                .flush = grouping_flush_min
+                .flush = grouping_flush_min,
+                .tier_query_fetch = TIER_QUERY_FETCH_MIN
         },
         {.name = "max",
                 .hash  = 0,
@@ -119,7 +127,8 @@ static struct {
                 .reset = grouping_reset_max,
                 .free  = grouping_free_max,
                 .add   = grouping_add_max,
-                .flush = grouping_flush_max
+                .flush = grouping_flush_max,
+                .tier_query_fetch = TIER_QUERY_FETCH_MAX
         },
         {.name = "sum",
                 .hash  = 0,
@@ -129,7 +138,8 @@ static struct {
                 .reset = grouping_reset_sum,
                 .free  = grouping_free_sum,
                 .add   = grouping_add_sum,
-                .flush = grouping_flush_sum
+                .flush = grouping_flush_sum,
+                .tier_query_fetch = TIER_QUERY_FETCH_SUM
         },
 
         // standard deviation
@@ -141,7 +151,8 @@ static struct {
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
-                .flush = grouping_flush_stddev
+                .flush = grouping_flush_stddev,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "cv",                           // coefficient variation is calculated by stddev
                 .hash  = 0,
@@ -151,7 +162,8 @@ static struct {
                 .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
                 .free  = grouping_free_stddev,   // not an error, stddev calculates this too
                 .add   = grouping_add_stddev,    // not an error, stddev calculates this too
-                .flush = grouping_flush_coefficient_of_variation
+                .flush = grouping_flush_coefficient_of_variation,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "rsd",                          // alias of 'cv'
                 .hash  = 0,
@@ -161,7 +173,8 @@ static struct {
                 .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
                 .free  = grouping_free_stddev,   // not an error, stddev calculates this too
                 .add   = grouping_add_stddev,    // not an error, stddev calculates this too
-                .flush = grouping_flush_coefficient_of_variation
+                .flush = grouping_flush_coefficient_of_variation,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
 
         /*
@@ -173,7 +186,8 @@ static struct {
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
-                .flush = grouping_flush_mean
+                .flush = grouping_flush_mean,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         */
 
@@ -186,7 +200,8 @@ static struct {
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
-                .flush = grouping_flush_variance
+                .flush = grouping_flush_variance,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         */
 
@@ -199,7 +214,8 @@ static struct {
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
-                .flush = grouping_flush_ses
+                .flush = grouping_flush_ses,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "ema",                         // alias for 'ses'
                 .hash  = 0,
@@ -209,7 +225,8 @@ static struct {
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
-                .flush = grouping_flush_ses
+                .flush = grouping_flush_ses,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "ewma",                        // alias for ses
                 .hash  = 0,
@@ -219,7 +236,8 @@ static struct {
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
-                .flush = grouping_flush_ses
+                .flush = grouping_flush_ses,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
 
         // double exponential smoothing
@@ -231,7 +249,8 @@ static struct {
                 .reset = grouping_reset_des,
                 .free  = grouping_free_des,
                 .add   = grouping_add_des,
-                .flush = grouping_flush_des
+                .flush = grouping_flush_des,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
 
         {.name = "countif",
@@ -242,7 +261,8 @@ static struct {
                 .reset = grouping_reset_countif,
                 .free  = grouping_free_countif,
                 .add   = grouping_add_countif,
-                .flush = grouping_flush_countif
+                .flush = grouping_flush_countif,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
 
         // terminator
@@ -254,7 +274,8 @@ static struct {
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
-                .flush = grouping_flush_average
+                .flush = grouping_flush_average,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         }
 };
 
@@ -306,22 +327,24 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_GROUPING group_method) {
     int i, found = 0;
     for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
         if(api_v1_data_groups[i].value == group_method) {
-            r->internal.grouping_create= api_v1_data_groups[i].create;
-            r->internal.grouping_reset = api_v1_data_groups[i].reset;
-            r->internal.grouping_free  = api_v1_data_groups[i].free;
-            r->internal.grouping_add   = api_v1_data_groups[i].add;
-            r->internal.grouping_flush = api_v1_data_groups[i].flush;
+            r->internal.grouping_create  = api_v1_data_groups[i].create;
+            r->internal.grouping_reset   = api_v1_data_groups[i].reset;
+            r->internal.grouping_free    = api_v1_data_groups[i].free;
+            r->internal.grouping_add     = api_v1_data_groups[i].add;
+            r->internal.grouping_flush   = api_v1_data_groups[i].flush;
+            r->internal.tier_query_fetch = api_v1_data_groups[i].tier_query_fetch;
             found = 1;
         }
     }
     if(!found) {
         errno = 0;
         internal_error(true, "QUERY: grouping method %u not found. Using 'average'", (unsigned int)group_method);
-        r->internal.grouping_create = grouping_create_average;
-        r->internal.grouping_reset  = grouping_reset_average;
-        r->internal.grouping_free   = grouping_free_average;
-        r->internal.grouping_add    = grouping_add_average;
-        r->internal.grouping_flush  = grouping_flush_average;
+        r->internal.grouping_create  = grouping_create_average;
+        r->internal.grouping_reset   = grouping_reset_average;
+        r->internal.grouping_free    = grouping_free_average;
+        r->internal.grouping_add     = grouping_add_average;
+        r->internal.grouping_flush   = grouping_flush_average;
+        r->internal.tier_query_fetch = TIER_QUERY_FETCH_AVERAGE;
     }
 }
 
@@ -511,14 +534,13 @@ static inline NETDATA_DOUBLE interpolate_value(NETDATA_DOUBLE this_value, NETDAT
 }
 
 static inline void rrd2rrdr_do_dimension(
-        RRDR *r
-        , long points_wanted
-        , RRDDIM *rd
-        , long dim_id_in_rrdr
-        , time_t after_wanted
-        , time_t before_wanted
-        , RRDR_OPTIONS options
-        , TIER_QUERY_FETCH tier_query_fetch_type
+    RRDR *r
+    , long points_wanted
+    , RRDDIM *rd
+    , long dim_id_in_rrdr
+    , time_t after_wanted
+    , time_t before_wanted
+    , RRDR_OPTIONS options
 ){
     time_t now = after_wanted,
            query_granularity = r->update_every / r->group,
@@ -528,8 +550,10 @@ static inline void rrd2rrdr_do_dimension(
     bool interpolate = query_granularity < rd->update_every;
 
     long group_points_wanted = r->group,
-            points_added = 0, group_points_added = 0, group_points_non_zero = 0,
-            rrdr_line = -1;
+         points_added = 0,
+         group_points_added = 0,
+         group_points_non_zero = 0,
+         rrdr_line = -1;
 
     size_t group_anomaly_rate = 0;
 
@@ -560,7 +584,6 @@ static inline void rrd2rrdr_do_dimension(
     time_t last1_point_end_time = 0;
 
     NETDATA_DOUBLE new_point_value = NAN;
-//    storage_number_tier1_t tier_new_point_value;
     uint16_t anomaly_count;
     uint16_t count;
     SN_FLAGS new_point_flags = SN_EMPTY_SLOT;
@@ -568,8 +591,11 @@ static inline void rrd2rrdr_do_dimension(
     time_t new_point_start_time = 0;
     time_t new_point_end_time = 0;
 
-    // select the right tier to query
-    for(tier->query_ops.init(tier->db_metric_handle, &handle, now, before_wanted, tier_query_fetch_type) ; points_added < points_wanted ; now += query_granularity) {
+    // initialize the time aggregation function
+    tier->query_ops.init(tier->db_metric_handle, &handle, now, before_wanted, r->internal.tier_query_fetch);
+
+    // The main loop, based on the query granularity we need
+    for( ; points_added < points_wanted ; now += query_granularity) {
         if(unlikely(now > before_wanted))
             break;
 
@@ -596,14 +622,14 @@ static inline void rrd2rrdr_do_dimension(
             // So, here we fetch the next one.
             if(unlikely(new_point_end_time < now)) {
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld to %ld, before now (now = %ld, after_wanted = %ld, before_wanted = %ld, dt = %ld). Fetching the next one.",
-                               rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time, now, after_wanted, before_wanted, query_granularity);
+                               rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time,
+                               now, after_wanted, before_wanted, query_granularity);
 
                 new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &count, &anomaly_count);
                 db_points_read++;
             }
 
             if(likely(netdata_double_isnumber(new_point_value))) {
-
                 new_point_anomaly = count ? anomaly_count * 100 / count : 0;
 
                 if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
@@ -636,8 +662,7 @@ static inline void rrd2rrdr_do_dimension(
 
             if(unlikely(new_point_end_time < last1_point_end_time)) {
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu end time %ld, before the last point end time %ld",
-                               rd->rrdset->name, rd->name, db_points_read, new_point_end_time,
-                    last1_point_end_time);
+                               rd->rrdset->name, rd->name, db_points_read, new_point_end_time, last1_point_end_time);
 
                 new_point_value      = last1_point_value;
                 new_point_flags      = last1_point_flags;
@@ -661,7 +686,7 @@ static inline void rrd2rrdr_do_dimension(
         }
 
         // the inner loop
-        // we have 3 points in memory: last, new, next
+        // we have 3 points in memory: last2, last1, new
         // we select the one to use based on their timestamps
 
         size_t iterations = 0;
@@ -1279,7 +1304,6 @@ RRDR *rrd2rrdr(
     struct timeval query_current_time;
     if (timeout) now_realtime_timeval(&query_start_time);
 
-    TIER_QUERY_FETCH tier_query_fetch_type = TIER_QUERY_FETCH_AVERAGE;
     for(rd = first_rd, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
 
         // if we need a percentage, we need to calculate all dimensions
@@ -1292,7 +1316,7 @@ RRDR *rrd2rrdr(
         // reset the grouping for the new dimension
         r->internal.grouping_reset(r);
 
-        rrd2rrdr_do_dimension(r, points_wanted, rd, c, after_wanted, before_wanted, options, tier_query_fetch_type);
+        rrd2rrdr_do_dimension(r, points_wanted, rd, c, after_wanted, before_wanted, options);
         if (timeout)
             now_realtime_timeval(&query_current_time);
 

@@ -4,6 +4,18 @@
 #define NETDATA_QUERIES_RRDR_H
 
 #include "libnetdata/libnetdata.h"
+#include "web/api/queries/query.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef enum tier_query_fetch {
+    TIER_QUERY_FETCH_SUM,
+    TIER_QUERY_FETCH_MIN,
+    TIER_QUERY_FETCH_MAX,
+    TIER_QUERY_FETCH_AVERAGE
+} TIER_QUERY_FETCH;
 
 typedef enum rrdr_options {
     RRDR_OPTION_NONZERO        = 0x00000001, // don't output dimensions with just zero values
@@ -97,6 +109,7 @@ typedef struct rrdresult {
         NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
         void *grouping_data;
 
+        TIER_QUERY_FETCH tier_query_fetch;
         #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
         #endif
@@ -123,6 +136,8 @@ extern RRDR *rrd2rrdr(
 
 extern int rrdr_relative_window_to_absolute(long long *after, long long *before);
 
-#include "query.h"
+#ifdef __cplusplus
+}
+#endif
 
 #endif //NETDATA_QUERIES_RRDR_H
