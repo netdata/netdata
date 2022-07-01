@@ -358,7 +358,7 @@ int security_test_certificate(SSL *ssl) {
 int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
     struct stat statbuf;
     if (stat(file, &statbuf)) {
-        info("Netdata does not have the parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");
+        info("Netdata does not have the parent's SSL certificate, so it will use internal default configuration to validate certificates!");
         return 0;
     }
 
