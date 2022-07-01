@@ -586,8 +586,6 @@ static inline void rrd2rrdr_do_dimension(
     time_t last1_point_end_time = 0;
 
     NETDATA_DOUBLE new_point_value = NAN;
-    uint16_t anomaly_count;
-    uint16_t count;
     SN_FLAGS new_point_flags = SN_EMPTY_SLOT;
     size_t new_point_anomaly = 0;
     time_t new_point_start_time = 0;
@@ -614,8 +612,11 @@ static inline void rrd2rrdr_do_dimension(
         last1_point_end_time   = new_point_end_time;
 
         if(likely(!tier->query_ops.is_finished(&handle))) {
+            uint16_t query_point_anomaly_count;
+            uint16_t query_point_count;
+
             // fetch the new point
-            new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &count, &anomaly_count);
+            new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &query_point_count, &query_point_anomaly_count);
             db_points_read++;
 
             // dbengine does not take into account the starting time of points
@@ -627,12 +628,12 @@ static inline void rrd2rrdr_do_dimension(
                                rd->rrdset->name, rd->name, db_points_read, new_point_start_time, new_point_end_time,
                                now, after_wanted, before_wanted, query_granularity);
 
-                new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &count, &anomaly_count);
+                new_point_value = next_metric(&handle, &new_point_start_time, &new_point_end_time, &new_point_flags, &query_point_count, &query_point_anomaly_count);
                 db_points_read++;
             }
 
             if(likely(netdata_double_isnumber(new_point_value))) {
-                new_point_anomaly = count ? anomaly_count * 100 / count : 0;
+                new_point_anomaly = query_point_count ? query_point_anomaly_count * 100 / query_point_count : 0;
 
                 if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
                     new_point_value = (NETDATA_DOUBLE)new_point_anomaly;
