@@ -4,6 +4,11 @@
 #include "rrd.h"
 
 int storage_tiers = RRD_STORAGE_TIERS;
+int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60*60 };
+
+#if RRD_STORAGE_TIERS != 3
+#error RRD_STORAGE_TIERS is not 3 - you need to update the grouping iterations per tier
+#endif
 
 RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
@@ -807,6 +812,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
         int page_cache_mb = default_rrdeng_page_cache_mb;
         int disk_space_mb = default_multidb_disk_quota_mb;
+        int grouping_iterations = storage_tiers_grouping_iterations[tier];
 
         if(tier > 0) {
             snprintfz(dbengineconfig, 200, "dbengine tier %d page cache size MB", tier);
@@ -814,8 +820,17 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
             snprintfz(dbengineconfig, 200, "dbengine tier %d multihost disk space MB", tier);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
+
+            snprintfz(dbengineconfig, 200, "dbengine tier %d update every iterations", tier);
+            grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+            if(grouping_iterations < 2) {
+                grouping_iterations = 2;
+                config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+                error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be less than 2. Assuming 2.", localhost->hostname, tier);
+            }
         }
 
+        storage_tiers_grouping_iterations[tier] = grouping_iterations;
         ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
             error("DBENGINE on '%s': Failed to initialize multi-host database tier %d on path '%s'",

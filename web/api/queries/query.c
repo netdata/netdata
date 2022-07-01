@@ -715,7 +715,7 @@ static inline void rrd2rrdr_do_dimension(
 
 #ifdef NETDATA_INTERNAL_CHECKS
 static void rrd2rrdr_log_request_response_metadata(RRDR *r
-        , RRDR_OPTIONS options
+        , RRDR_OPTIONS options __maybe_unused
         , RRDR_GROUPING group_method
         , bool aligned
         , long group

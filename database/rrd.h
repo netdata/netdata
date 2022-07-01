@@ -32,16 +32,15 @@ struct rrddim_tier;
 struct rrdset_volatile;
 struct context_param;
 
-#define RRD_STORAGE_TIERS 2
+#define RRD_STORAGE_TIERS 3
 extern int storage_tiers;
+extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
 struct pg_cache_page_index;
 #endif
-
-#define TIER1_GROUPING (5)
 
 #include "daemon/common.h"
 #include "web/api/queries/query.h"

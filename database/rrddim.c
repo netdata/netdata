@@ -268,7 +268,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             if(!eng) continue;
 
             rd->tiers[tier] = callocz(1, sizeof(*rd->tiers[tier]));
-            rd->tiers[tier]->tier_grouping = tier ? TIER1_GROUPING : 1;  // Todo: gneric lookup based on tier
+            rd->tiers[tier]->tier_grouping = storage_tiers_grouping_iterations[tier];
             rd->tiers[tier]->mode = eng->id;
             rd->tiers[tier]->collect_ops = eng->api.collect_ops;
             rd->tiers[tier]->query_ops = eng->api.query_ops;

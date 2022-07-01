@@ -3,19 +3,17 @@
 
 /* Default global database instance */
 struct rrdengine_instance multidb_ctx_storage_tier0;
-#if RRD_STORAGE_TIERS > 1
 struct rrdengine_instance multidb_ctx_storage_tier1;
-#endif
-#if RRD_STORAGE_TIERS > 2
-#error RRD_STORAGE_TIERS is above 2 - you need to add allocations here
+struct rrdengine_instance multidb_ctx_storage_tier2;
+#if RRD_STORAGE_TIERS != 3
+#error RRD_STORAGE_TIERS is not 3 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
-#if RRD_STORAGE_TIERS > 1
     multidb_ctx[1] = &multidb_ctx_storage_tier1;
-#endif
+    multidb_ctx[2] = &multidb_ctx_storage_tier2;
 }
 
 int db_engine_use_malloc = 0;
