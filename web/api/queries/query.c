@@ -3,7 +3,6 @@
 #include "query.h"
 #include "web/api/formatters/rrd2json.h"
 #include "rrdr.h"
-#include "database/ram/rrddim_mem.h"
 
 #include "average/average.h"
 #include "countif/countif.h"
@@ -403,7 +402,7 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
 
     // check if all dimensions are hidden
     if(unlikely(!dims_not_hidden_not_zero && dims_selected)) {
-        // there are a few selected dimensions
+        // there are a few selected dimensions,
         // but they are all zero
         // enable the selected ones
         // to avoid returning an empty chart
@@ -450,7 +449,8 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 // tier management
 
 static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, time_t before_wanted, long points_wanted) {
-    if(unlikely(storage_tiers < 2)) return 0;
+    if(unlikely(storage_tiers < 2))
+        return 0;
 
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0 || !rd || !rd->rrdset)) {
 
@@ -463,17 +463,17 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
         return 0;
     }
 
-    BUFFER *wb = buffer_create(1000);
-    buffer_sprintf(wb, "Best tier for chart '%s', dim '%s', from %ld to %ld (dur %ld, every %d), points %ld",
-                   rd->rrdset->name, rd->name, after_wanted, before_wanted, before_wanted - after_wanted, rd->update_every, points_wanted);
+    //BUFFER *wb = buffer_create(1000);
+    //buffer_sprintf(wb, "Best tier for chart '%s', dim '%s', from %ld to %ld (dur %ld, every %d), points %ld",
+    //               rd->rrdset->name, rd->name, after_wanted, before_wanted, before_wanted - after_wanted, rd->update_every, points_wanted);
 
     long weight[storage_tiers];
 
     for(int tier = 0; tier < storage_tiers ; tier++) {
-        if(!rd->tiers[tier]) {
+        if(unlikely(!rd->tiers[tier])) {
             internal_error(true, "QUERY: tier %d of chart '%s' dimension '%s' not initialized",
                            tier, rd->rrdset->name, rd->name);
-            buffer_free(wb);
+            //buffer_free(wb);
             return 0;
         }
 
@@ -486,11 +486,11 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
         long time_coverage = (common_before - common_after) * 1000 / (before_wanted - after_wanted);
         if(time_coverage < 0) time_coverage = 0;
 
-        int update_every = rd->tiers[tier]->tier_grouping * rd->update_every;
-        if(update_every == 0) {
+        int update_every = (int)rd->tiers[tier]->tier_grouping * (int)rd->update_every;
+        if(unlikely(update_every == 0)) {
             internal_error(true, "QUERY: update_every of tier %d for chart '%s' dimension '%s' is zero. tg = %d, ue = %d",
                            tier, rd->rrdset->name, rd->name, rd->tiers[tier]->tier_grouping, rd->update_every);
-            buffer_free(wb);
+            //buffer_free(wb);
             return 0;
         }
 
@@ -503,9 +503,9 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
         else
             weight[tier] = points_coverage + time_coverage;
 
-        buffer_sprintf(wb, ": tier %d, first %ld, last %ld (dur %ld, tg %d, every %d), points %ld, tcoverage %ld, pcoverage %ld, weight %ld",
-                       tier, first_t, last_t, last_t - first_t, rd->tiers[tier]->tier_grouping, update_every,
-                       points_available, time_coverage, points_coverage, weight[tier]);
+        //buffer_sprintf(wb, ": tier %d, first %ld, last %ld (dur %ld, tg %d, every %d), points %ld, tcoverage %ld, pcoverage %ld, weight %ld",
+        //               tier, first_t, last_t, last_t - first_t, rd->tiers[tier]->tier_grouping, update_every,
+        //               points_available, time_coverage, points_coverage, weight[tier]);
     }
 
     int best_tier = 0;
@@ -517,11 +517,45 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
     if(weight[best_tier] == -LONG_MAX)
         best_tier = 0;
 
-    buffer_sprintf(wb, ": final best tier %d", best_tier);
+    //buffer_sprintf(wb, ": final best tier %d", best_tier);
     //internal_error(true, "%s", buffer_tostring(wb));
-    buffer_free(wb);
+    //buffer_free(wb);
 
     return best_tier;
+}
+
+static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t after_wanted, time_t before_wanted, long points_wanted) {
+    int ret = st->update_every;
+
+    if(unlikely(!st->dimensions))
+        return ret;
+
+    rrdset_rdlock(st);
+    int tier = rrddim_find_best_tier_for_timeframe(st->dimensions, after_wanted, before_wanted, points_wanted);
+
+    if(!st->dimensions->tiers[tier]) {
+        internal_error(
+            true,
+            "QUERY: tier %d on chart '%s', is not initialized",
+            tier, st->name);
+    }
+    else {
+        ret = (int)st->dimensions->tiers[tier]->tier_grouping * (int)st->update_every;
+        if(unlikely(!ret)) {
+            internal_error(
+                true,
+                "QUERY: update_every calculated to be zero on chart '%s', tier_grouping %d, update_every %d",
+                st->name, st->dimensions->tiers[tier]->tier_grouping, st->update_every);
+
+            ret = st->update_every;
+        }
+    }
+    rrdset_unlock(st);
+
+    if(unlikely(!ret))
+        ret = default_rrd_update_every;
+
+    return ret;
 }
 
 // ----------------------------------------------------------------------------
@@ -546,7 +580,8 @@ QUERY_POINT QUERY_POINT_EMPTY = {
 typedef struct query_engine_ops {
     RRDR *r;
     RRDDIM *rd;
-    struct rrddim_tier *tier;
+    size_t tier;
+    struct rrddim_tier *tier_ptr;
     NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count);
     int (*is_finished)(struct rrddim_query_handle *handle);
     void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value);
@@ -612,19 +647,19 @@ static inline void rrd2rrdr_do_dimension(
     QUERY_ENGINE_OPS ops = {
         .r = r,
         .rd = rd,
-        .tier = rd->tiers[rrddim_find_best_tier_for_timeframe(rd, after_wanted, before_wanted, points_wanted)],
+        .tier = rrddim_find_best_tier_for_timeframe(rd, after_wanted, before_wanted, points_wanted),
         .grouping_add = r->internal.grouping_add,
         .grouping_flush = r->internal.grouping_flush,
         .db_points_read = 0,
         .group_points_added = 0,
         .group_points_non_zero = 0,
         .group_anomaly_rate = 0,
-        .handle = { 0 },
         .options = options,
         .group_value_flags = RRDR_VALUE_NOTHING
     };
-    ops.next_metric = ops.tier->query_ops.next_metric;
-    ops.is_finished = ops.tier->query_ops.is_finished;
+    ops.tier_ptr = rd->tiers[ops.tier];
+    ops.next_metric = ops.tier_ptr->query_ops.next_metric;
+    ops.is_finished = ops.tier_ptr->query_ops.is_finished;
 
     long rrdr_line = -1;
 
@@ -635,7 +670,7 @@ static inline void rrd2rrdr_do_dimension(
     QUERY_POINT new_point   = QUERY_POINT_EMPTY;
 
     // initialize storage engine query
-    ops.tier->query_ops.init(ops.tier->db_metric_handle, &ops.handle, after_wanted, before_wanted, r->internal.tier_query_fetch);
+    ops.tier_ptr->query_ops.init(ops.tier_ptr->db_metric_handle, &ops.handle, after_wanted, before_wanted, r->internal.tier_query_fetch);
 
     // The main loop, based on the query granularity we need
     for(time_t now = after_wanted + view_update_every - query_granularity; (long)points_added < points_wanted ; now += view_update_every) {
@@ -680,7 +715,7 @@ static inline void rrd2rrdr_do_dimension(
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu start time %ld, end time %ld, that are both equal",
                                rd->rrdset->name, rd->name, ops.db_points_read, new_point.start_time, new_point.end_time);
 
-                new_point.start_time = new_point.end_time - ((time_t)ops.tier->tier_grouping * (time_t)ops.rd->update_every);
+                new_point.start_time = new_point.end_time - ((time_t)ops.tier_ptr->tier_grouping * (time_t)ops.rd->update_every);
             }
 
             if(unlikely(new_point.end_time <= last1_point.end_time)) {
@@ -783,8 +818,9 @@ static inline void rrd2rrdr_do_dimension(
         if(iterations)
             now -= view_update_every;
     }
-    ops.tier->query_ops.finalize(&ops.handle);
+    ops.tier_ptr->query_ops.finalize(&ops.handle);
 
+    r->internal.tier_points_read[ops.tier] = ops.db_points_read;
     r->internal.db_points_read += ops.db_points_read;
     r->internal.result_points_generated += points_added;
 
@@ -958,22 +994,6 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before) {
 #define query_debug_log_free() debug_dummy()
 #endif
 
-static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t after_wanted, time_t before_wanted, long points_wanted) {
-    rrdset_rdlock(st);
-    int tier = rrddim_find_best_tier_for_timeframe(st->dimensions, after_wanted, before_wanted, points_wanted);
-    if(!st->dimensions || !st->dimensions->tiers[tier]) return st->update_every;
-    int ret = (int)st->dimensions->tiers[tier]->tier_grouping * (int)st->update_every;
-    if(!ret) {
-        internal_error(
-            true,
-            "QUERY: update_every calculated to be zero on chart '%s', tier_grouping %d, update_every %d",
-            st->name, st->dimensions->tiers[tier]->tier_grouping, st->update_every);
-        ret = 1;
-    }
-    rrdset_unlock(st);
-    return ret;
-}
-
 RRDR *rrd2rrdr(
           ONEWAYALLOC *owa
         , RRDSET *st
@@ -1107,6 +1127,7 @@ RRDR *rrd2rrdr(
     // automatic_natural_points is set when the user wants all the points available in the database
     if(automatic_natural_points) {
         points_wanted = (before_wanted - after_wanted + 1) / query_granularity;
+        options |= RRDR_OPTION_NATURAL_POINTS;
         query_debug_log(":auto natural points_wanted %ld", points_wanted);
     }
 
@@ -1346,9 +1367,9 @@ RRDR *rrd2rrdr(
         }
 
         dimensions_used++;
-        if (timeout && (dt_usec(&query_start_time, &query_current_time) / 1000.0) > timeout) {
+        if (timeout && ((NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0) > timeout) {
             log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %d ms)",
-                       dt_usec(&query_start_time, &query_current_time) / 1000.0, timeout);
+                       (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, timeout);
             r->result_options |= RRDR_RESULT_OPTION_CANCEL;
             break;
         }

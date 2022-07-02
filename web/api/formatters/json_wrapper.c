@@ -343,12 +343,21 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     rrdr_buffer_print_format(wb, format);
 
+    buffer_sprintf(wb, "%s,\n"
+                       "   %sdb_points_per_tier%s: [ "
+                   , sq
+                   , kq, kq
+                   );
+
+    for(int tier = 0; tier < storage_tiers ; tier++)
+        buffer_sprintf(wb, "%s%zu", tier>0?", ":"", r->internal.tier_points_read[tier]);
+
+    buffer_strcat(wb, " ]");
+
     if((options & RRDR_OPTION_CUSTOM_VARS) && (options & RRDR_OPTION_JSON_WRAP)) {
-        buffer_sprintf(wb, "%s,\n   %schart_variables%s: ", sq, kq, kq);
+        buffer_sprintf(wb, ",\n   %schart_variables%s: ", kq, kq);
         health_api_v1_chart_custom_variables2json(r->st, wb);
     }
-    else
-        buffer_sprintf(wb, "%s", sq);
 
     buffer_sprintf(wb, ",\n   %sresult%s: ", kq, kq);
 
