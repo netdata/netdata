@@ -15,7 +15,7 @@ struct grouping_stddev {
 };
 
 void grouping_create_stddev(RRDR *r, const char *options __maybe_unused) {
-    r->internal.grouping_data = callocz(1, sizeof(struct grouping_stddev));
+    r->internal.grouping_data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_stddev));
 }
 
 // resets when switches dimensions
@@ -26,7 +26,7 @@ void grouping_reset_stddev(RRDR *r) {
 }
 
 void grouping_free_stddev(RRDR *r) {
-    freez(r->internal.grouping_data);
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 
@@ -55,7 +55,7 @@ static inline NETDATA_DOUBLE mean(struct grouping_stddev *g) {
 }
 
 static inline NETDATA_DOUBLE variance(struct grouping_stddev *g) {
-    return ( (g->count > 1) ? g->m_newS/(g->count - 1) : 0.0 );
+    return ( (g->count > 1) ? g->m_newS/(NETDATA_DOUBLE)(g->count - 1) : 0.0 );
 }
 static inline NETDATA_DOUBLE stddev(struct grouping_stddev *g) {
     return sqrtndd(variance(g));

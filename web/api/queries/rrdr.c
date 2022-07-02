@@ -104,6 +104,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_pa
 
     RRDR *r = onewayalloc_callocz(owa, 1, sizeof(RRDR));
     r->st = st;
+    r->internal.owa = owa;
 
     if (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
         rrdr_lock_rrdset(r);

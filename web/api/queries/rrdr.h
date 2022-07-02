@@ -116,6 +116,8 @@ typedef struct rrdresult {
 
         size_t db_points_read;
         size_t result_points_generated;
+        size_t tier_points_read[RRD_STORAGE_TIERS];
+        ONEWAYALLOC *owa;
     } internal;
 } RRDR;
 

@@ -351,6 +351,8 @@ extern char *netdata_configured_host_prefix;
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
 
+#define RRD_STORAGE_TIERS 3
+
 # ifdef __cplusplus
 }
 # endif

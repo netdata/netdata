@@ -11,7 +11,7 @@ struct grouping_min {
 };
 
 void grouping_create_min(RRDR *r, const char *options __maybe_unused) {
-    r->internal.grouping_data = callocz(1, sizeof(struct grouping_min));
+    r->internal.grouping_data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_min));
 }
 
 // resets when switches dimensions
@@ -23,7 +23,7 @@ void grouping_reset_min(RRDR *r) {
 }
 
 void grouping_free_min(RRDR *r) {
-    freez(r->internal.grouping_data);
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 

@@ -32,10 +32,6 @@ struct rrddim_tier;
 struct rrdset_volatile;
 struct context_param;
 
-#define RRD_STORAGE_TIERS 3
-extern int storage_tiers;
-extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -53,6 +49,9 @@ struct pg_cache_page_index;
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
+
+extern int storage_tiers;
+extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
 enum {
     CONTEXT_FLAGS_ARCHIVE = 0x01,
