@@ -1660,10 +1660,10 @@ after_first_database_work:
     // it is now time to interpolate values on a second boundary
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(now_collect_ut < next_store_ut)) {
+    if(unlikely(now_collect_ut < next_store_ut && st->counter_done > 1)) {
         // this is collected in the same interpolation point
         rrdset_debug(st, "THIS IS IN THE SAME INTERPOLATION POINT");
-        info("INTERNAL CHECK: host '%s', chart '%s' is collected in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, next_store_ut - now_collect_ut);
+        info("INTERNAL CHECK: host '%s', chart '%s' collection %zu is in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, st->counter_done, next_store_ut - now_collect_ut);
     }
 #endif
 
