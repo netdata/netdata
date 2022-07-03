@@ -1258,6 +1258,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
         descr = unlikely(NULL == PValue) ? NULL : *PValue;
 
         size_t metric_update_every = 0;
+        size_t metric_single_point_pages = 0;
 
         while (descr != NULL) {
             /* Iterate all page descriptors of this metric */
@@ -1293,7 +1294,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
                 points_in_db += descr->page_length / ctx->storage_size;
             }
             else
-                single_point_pages++;
+                metric_single_point_pages++;
 
             freez(descr);
             pages_bytes += sizeof(*descr);
@@ -1302,6 +1303,13 @@ void free_page_cache(struct rrdengine_instance *ctx)
             PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0);
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
         }
+
+        if(metric_single_point_pages && metric_update_every) {
+            points_in_db += metric_single_point_pages;
+            seconds_in_db += metric_update_every * metric_single_point_pages;
+        }
+        else
+            single_point_pages += metric_single_point_pages;
 
         /* Free page index */
         pages_index_bytes += JudyLFreeArray(&page_index->JudyL_array, PJE0);
