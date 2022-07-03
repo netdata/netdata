@@ -1234,7 +1234,8 @@ void free_page_cache(struct rrdengine_instance *ctx)
            cache_pages_data_bytes  = 0;
 
     size_t points_in_db        = 0,
-           uncompressed_points_size = 0;
+           uncompressed_points_size = 0,
+           seconds_in_db       = 0;
 
     Word_t pages_dirty_index_bytes = 0;
 
@@ -1271,8 +1272,14 @@ void free_page_cache(struct rrdengine_instance *ctx)
                 cache_pages_bytes += sizeof(*pg_cache_descr);
             }
 
+            size_t points_in_page = (descr->page_length / ctx->storage_size);
+            size_t page_duration  = ((descr->end_time - descr->start_time) / USEC_PER_SEC);
+            size_t update_every = (page_duration == 0) ? 1 : page_duration / (points_in_page - 1);
+
             points_in_db += descr->page_length / ctx->storage_size;
             uncompressed_points_size += descr->page_length;
+            seconds_in_db += update_every * points_in_page;
+
             freez(descr);
             pages_bytes += sizeof(*descr);
             pages_number++;
@@ -1307,7 +1314,8 @@ void free_page_cache(struct rrdengine_instance *ctx)
          " Per metric %f bytes for structures, %f bytes for index."
          " Per page descriptor %f bytes for structures, %f bytes for index."
          " Per page cache descriptor %f bytes."
-         " Points in db %zu, uncompressed size %zu."
+         " Points in db %zu, uncompressed size %zu, duration of all points %zu seconds."
+         " Average point duration %f seconds."
          , metrics_number, structures_freed + indexes_freed
          , structures_freed, indexes_freed
          , cache_pages_number, cache_pages_bytes, cache_pages_data_bytes
@@ -1316,6 +1324,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
          , (double)metrics_bytes/metrics_number, (double)metrics_index_bytes/metrics_number
          , (double)pages_bytes/pages_number, (double)pages_index_bytes/pages_number
          , (double)cache_pages_bytes/cache_pages_number
-         , points_in_db, uncompressed_points_size
+         , points_in_db, uncompressed_points_size, seconds_in_db
+         , (double)seconds_in_db/points_in_db
          );
 }
