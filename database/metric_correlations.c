@@ -401,7 +401,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     high_rrdr = rrd2rrdr(owa, st, points,
                          after, before, group,
                          group_time, options, NULL, context_param_list, group_options,
-                         timeout);
+                         timeout, 0);
     if(!high_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
         goto cleanup;
@@ -427,7 +427,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
                     baseline_after, baseline_before, group,
                     group_time, options, NULL, context_param_list, group_options,
-                    (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)));
+                    (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)), 0);
     if(!base_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
         goto cleanup;
@@ -549,7 +549,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, &base_anomaly_rate, 0);
+                                  &value_is_null, &base_anomaly_rate, 0, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(baseline_average)) {
             // this means no data for the baseline window, but we may have data for the highlighted one - assume zero
@@ -565,7 +565,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, &high_anomaly_rate, 0);
+                                  &value_is_null, &high_anomaly_rate, 0, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(highlight_average)) {
             // this means no data for the highlighted duration - so skip it
@@ -590,7 +590,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                   group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, NULL, 0);
+                                  &value_is_null, NULL, 0, 0);
 
         if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(highlight_countif)) {
             info("MC: highlighted countif query failed, but highlighted average worked - strange...");

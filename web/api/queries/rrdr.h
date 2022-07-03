@@ -36,13 +36,14 @@ typedef enum rrdr_options {
     RRDR_OPTION_MATCH_NAMES    = 0x00008000, // when filtering dimensions, match only names
     RRDR_OPTION_CUSTOM_VARS    = 0x00010000, // when wrapping response in a JSON, return custom variables in response
     RRDR_OPTION_NATURAL_POINTS = 0x00020000, // return the natural points of the database
-    RRDR_OPTION_ANOMALY_BIT    = 0x00040000, // Return the anomaly bit stored in each collected_number
-    RRDR_OPTION_RETURN_RAW     = 0x00080000, // Return raw data for aggregating across multiple nodes
-    RRDR_OPTION_RETURN_JWAR    = 0x00100000, // Return anomaly rates in jsonwrap
-    RRDR_OPTION_TIER1          = 0x00200000, // Return TIER1 data
+    RRDR_OPTION_VIRTUAL_POINTS = 0x00040000, // return virtual points
+    RRDR_OPTION_ANOMALY_BIT    = 0x00080000, // Return the anomaly bit stored in each collected_number
+    RRDR_OPTION_RETURN_RAW     = 0x00100000, // Return raw data for aggregating across multiple nodes
+    RRDR_OPTION_RETURN_JWAR    = 0x00200000, // Return anomaly rates in jsonwrap
+    RRDR_OPTION_SELECTED_TIER  = 0x00400000, // Use the selected tier for the query
 
     // internal ones - not to be exposed to the API
-    RRDR_OPTION_INTERNAL_AR  = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate
+    RRDR_OPTION_INTERNAL_AR    = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate
 } RRDR_OPTIONS;
 
 typedef enum rrdr_value_flag {
@@ -98,6 +99,9 @@ typedef struct rrdresult {
 
     // internal rrd2rrdr() members below this point
     struct {
+        int query_tier;                         // the selected tier
+        RRDR_OPTIONS query_options;       // RRDR_OPTION_* (as run by the query)
+
         long points_wanted;
         long resampling_group;
         NETDATA_DOUBLE resampling_divisor;
@@ -134,7 +138,7 @@ extern RRDR *rrd2rrdr(
     ONEWAYALLOC *owa,
     RRDSET *st, long points_wanted, long long after_wanted, long long before_wanted,
     RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
-    struct context_param *context_param_list, const char *group_options, int timeout);
+    struct context_param *context_param_list, const char *group_options, int timeout, int tier);
 
 extern int rrdr_relative_window_to_absolute(long long *after, long long *before);
 

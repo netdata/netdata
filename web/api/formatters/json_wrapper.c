@@ -90,7 +90,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq
                    , kq, kq, sq);
 
-    web_client_api_request_v1_data_options_to_string(wb, options);
+    web_client_api_request_v1_data_options_to_string(wb, r->internal.query_options);
 
     buffer_sprintf(wb, "%s,\n   %sdimension_names%s: [", sq, kq, kq);
 

@@ -859,7 +859,7 @@ void *health_main(void *ptr) {
                                                   0, rc->options,
                                                   &rc->db_after,&rc->db_before,
                                                   NULL, NULL,
-                                                  &value_is_null, NULL, 0);
+                                                  &value_is_null, NULL, 0, 0);
 
                     if (unlikely(ret != 200)) {
                         // database lookup failed

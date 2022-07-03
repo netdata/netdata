@@ -524,36 +524,38 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
     return best_tier;
 }
 
-static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t after_wanted, time_t before_wanted, long points_wanted) {
+static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, int tier) {
     int ret = st->update_every;
 
     if(unlikely(!st->dimensions))
         return ret;
 
     rrdset_rdlock(st);
-    int tier = rrddim_find_best_tier_for_timeframe(st->dimensions, after_wanted, before_wanted, points_wanted);
+    int best_tier;
 
-    if(!st->dimensions->tiers[tier]) {
+    if(options & RRDR_OPTION_SELECTED_TIER && tier >= 0 && tier < storage_tiers)
+        best_tier = tier;
+    else
+        best_tier = rrddim_find_best_tier_for_timeframe(st->dimensions, after_wanted, before_wanted, points_wanted);
+
+    if(!st->dimensions->tiers[best_tier]) {
         internal_error(
             true,
-            "QUERY: tier %d on chart '%s', is not initialized",
-            tier, st->name);
+            "QUERY: tier %d on chart '%s', is not initialized", best_tier, st->name);
     }
     else {
-        ret = (int)st->dimensions->tiers[tier]->tier_grouping * (int)st->update_every;
+        ret = (int)st->dimensions->tiers[best_tier]->tier_grouping * (int)st->update_every;
         if(unlikely(!ret)) {
             internal_error(
                 true,
                 "QUERY: update_every calculated to be zero on chart '%s', tier_grouping %d, update_every %d",
-                st->name, st->dimensions->tiers[tier]->tier_grouping, st->update_every);
+                st->name, st->dimensions->tiers[best_tier]->tier_grouping, st->update_every);
 
             ret = st->update_every;
         }
     }
-    rrdset_unlock(st);
 
-    if(unlikely(!ret))
-        ret = default_rrd_update_every;
+    rrdset_unlock(st);
 
     return ret;
 }
@@ -594,7 +596,6 @@ typedef struct query_engine_ops {
     RRDDIM *rd;
     time_t view_update_every;
     time_t query_granularity;
-    RRDR_OPTIONS options;
 
     // query planer
     QUERY_PLAN plan;
@@ -687,76 +688,82 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     //buffer_sprintf(wb, "QUERY PLAN for chart '%s' dimension '%s', from %ld to %ld:", rd->rrdset->name, rd->name, after_wanted, before_wanted);
 
     // put our selected tier as the first plan
-    size_t selected_tier = rrddim_find_best_tier_for_timeframe(rd, after_wanted, before_wanted, points_wanted);
+    size_t selected_tier;
+
+    if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER && ops->r->internal.query_tier >= 0 && ops->r->internal.query_tier < storage_tiers) {
+        selected_tier = ops->r->internal.query_tier;
+    }
+    else {
+
+        selected_tier = rrddim_find_best_tier_for_timeframe(rd, after_wanted, before_wanted, points_wanted);
+
+        if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)
+            ops->r->internal.query_options &= ~RRDR_OPTION_SELECTED_TIER;
+    }
+
     ops->plan.entries = 1;
     ops->plan.data[0].tier = selected_tier;
     ops->plan.data[0].after = rd->tiers[selected_tier]->query_ops.oldest_time(rd->tiers[selected_tier]->db_metric_handle);
     ops->plan.data[0].before = rd->tiers[selected_tier]->query_ops.latest_time(rd->tiers[selected_tier]->db_metric_handle);
 
-    // the selected tier
-    time_t selected_tier_first_time_t = ops->plan.data[0].after;
-    time_t selected_tier_last_time_t  = ops->plan.data[0].before;
+    if(!(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)) {
+        // the selected tier
+        time_t selected_tier_first_time_t = ops->plan.data[0].after;
+        time_t selected_tier_last_time_t = ops->plan.data[0].before;
 
-    //buffer_sprintf(wb, ": SELECTED tier %zu, from %ld to %ld", selected_tier, ops->plan.data[0].after, ops->plan.data[0].before);
+        //buffer_sprintf(wb, ": SELECTED tier %zu, from %ld to %ld", selected_tier, ops->plan.data[0].after, ops->plan.data[0].before);
 
-    // check if our selected tier can start the query
-    if(selected_tier_first_time_t > after_wanted) {
+        // check if our selected tier can start the query
+        if (selected_tier_first_time_t > after_wanted) {
+            // we need some help from other tiers
+            for (int tr = (int)selected_tier + 1; tr < storage_tiers; tr++) {
+                // find the first time of this tier
+                time_t first_time_t = rd->tiers[tr]->query_ops.oldest_time(rd->tiers[tr]->db_metric_handle);
 
-        // we need some help from other tiers
-        for (int tier = (int)selected_tier + 1; tier < storage_tiers; tier++) {
+                //buffer_sprintf(wb, ": EVAL AFTER tier %d, %ld", tier, first_time_t);
 
-            // find the first time of this tier
-            time_t first_time_t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
+                // can it help?
+                if (first_time_t < selected_tier_first_time_t) {
+                    // it can help us add detail at the beginning of the query
+                    QUERY_PLAN_ENTRY t = {
+                        .tier = tr,
+                        .after = (first_time_t < after_wanted) ? after_wanted : first_time_t,
+                        .before = selected_tier_first_time_t};
+                    ops->plan.data[ops->plan.entries++] = t;
 
-            //buffer_sprintf(wb, ": EVAL AFTER tier %d, %ld", tier, first_time_t);
+                    // prepare for the tier
+                    selected_tier_first_time_t = t.after;
 
-            // can it help?
-            if(first_time_t < selected_tier_first_time_t) {
-
-                // it can help us add detail at the beginning of the query
-                QUERY_PLAN_ENTRY t = {
-                    .tier = tier,
-                    .after = (first_time_t < after_wanted) ? after_wanted : first_time_t,
-                    .before = selected_tier_first_time_t
-                };
-                ops->plan.data[ops->plan.entries++] = t;
-
-                // prepare for the tier
-                selected_tier_first_time_t = t.after;
-
-                if(t.after <= after_wanted)
-                    break;
+                    if (t.after <= after_wanted)
+                        break;
+                }
             }
         }
-    }
 
-    // check if our selected tier can finish the query
-    if(selected_tier_last_time_t < before_wanted) {
+        // check if our selected tier can finish the query
+        if (selected_tier_last_time_t < before_wanted) {
+            // we need some help from other tiers
+            for (int tr = (int)selected_tier - 1; tr >= 0; tr--) {
+                // find the last time of this tier
+                time_t last_time_t = rd->tiers[tr]->query_ops.latest_time(rd->tiers[tr]->db_metric_handle);
 
-        // we need some help from other tiers
-        for (int tier = (int)selected_tier - 1; tier >= 0 ; tier--) {
+                //buffer_sprintf(wb, ": EVAL BEFORE tier %d, %ld", tier, last_time_t);
 
-            // find the last time of this tier
-            time_t last_time_t = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
+                // can it help?
+                if (last_time_t > selected_tier_last_time_t) {
+                    // it can help us add detail at the end of the query
+                    QUERY_PLAN_ENTRY t = {
+                        .tier = tr,
+                        .after = selected_tier_last_time_t,
+                        .before = (last_time_t > before_wanted) ? before_wanted : last_time_t};
+                    ops->plan.data[ops->plan.entries++] = t;
 
-            //buffer_sprintf(wb, ": EVAL BEFORE tier %d, %ld", tier, last_time_t);
+                    // prepare for the tier
+                    selected_tier_last_time_t = t.before;
 
-            // can it help?
-            if(last_time_t > selected_tier_last_time_t) {
-
-                // it can help us add detail at the end of the query
-                QUERY_PLAN_ENTRY t = {
-                    .tier = tier,
-                    .after = selected_tier_last_time_t,
-                    .before = (last_time_t > before_wanted) ? before_wanted : last_time_t
-                };
-                ops->plan.data[ops->plan.entries++] = t;
-
-                // prepare for the tier
-                selected_tier_last_time_t = t.before;
-
-                if(t.before >= before_wanted)
-                    break;
+                    if (t.before >= before_wanted)
+                        break;
+                }
             }
         }
     }
@@ -823,7 +830,6 @@ static inline void rrd2rrdr_do_dimension(
     , long dim_id_in_rrdr
     , time_t after_wanted
     , time_t before_wanted
-    , RRDR_OPTIONS options
 ){
     time_t max_date = 0,
            min_date = 0;
@@ -837,11 +843,11 @@ static inline void rrd2rrdr_do_dimension(
         .grouping_flush = r->internal.grouping_flush,
         .view_update_every = r->update_every,
         .query_granularity = r->update_every / r->group,
-        .options = options,
         .group_value_flags = RRDR_VALUE_NOTHING
     };
 
     long rrdr_line = -1;
+    bool use_anomaly_bit_as_value = (r->internal.query_options & RRDR_OPTION_ANOMALY_BIT) ? true : false;
 
     query_plan(&ops, after_wanted, before_wanted, points_wanted);
 
@@ -886,7 +892,7 @@ static inline void rrd2rrdr_do_dimension(
             if(likely(netdata_double_isnumber(new_point.value))) {
                 new_point.anomaly = query_point_count ? query_point_anomaly_count * 100 / query_point_count : 0;
 
-                if(unlikely(options & RRDR_OPTION_ANOMALY_BIT))
+                if(unlikely(use_anomaly_bit_as_value))
                     new_point.value = (NETDATA_DOUBLE)new_point.anomaly;
             }
             else {
@@ -1006,8 +1012,8 @@ static inline void rrd2rrdr_do_dimension(
 
     r->internal.result_points_generated += points_added;
     r->internal.db_points_read += ops.db_total_points_read;
-    for(int tier = 0; tier < storage_tiers ;tier++)
-        r->internal.tier_points_read[tier] += ops.db_points_read_per_tier[tier];
+    for(int tr = 0; tr < storage_tiers ; tr++)
+        r->internal.tier_points_read[tr] += ops.db_points_read_per_tier[tr];
 
     r->min = min;
     r->max = max;
@@ -1192,6 +1198,7 @@ RRDR *rrd2rrdr(
         , struct context_param *context_param_list
         , const char *group_options
         , int timeout
+        , int tier
 ) {
     // RULES
     // points_requested = 0
@@ -1230,6 +1237,24 @@ RRDR *rrd2rrdr(
         natural_points = true;
         options |= RRDR_OPTION_NATURAL_POINTS;
         query_debug_log(":relative+natural");
+    }
+
+    // if the user wants virtual points, make sure we do it
+    if(options & RRDR_OPTION_VIRTUAL_POINTS)
+        natural_points = false;
+
+    // set the right flag about natural and virtual points
+    if(natural_points) {
+        options |= RRDR_OPTION_NATURAL_POINTS;
+
+        if(options & RRDR_OPTION_VIRTUAL_POINTS)
+            options &= ~RRDR_OPTION_VIRTUAL_POINTS;
+    }
+    else {
+        options |= RRDR_OPTION_VIRTUAL_POINTS;
+
+        if(options & RRDR_OPTION_NATURAL_POINTS)
+            options &= ~RRDR_OPTION_NATURAL_POINTS;
     }
 
     if(after_wanted == 0 || before_wanted == 0) {
@@ -1287,7 +1312,7 @@ RRDR *rrd2rrdr(
     query_debug_log(":relative2absolute after %lld, before %lld", after_wanted, before_wanted);
 
     if(natural_points && storage_tiers > 1) {
-        update_every = rrdset_find_natural_update_every_for_timeframe(st, after_wanted, before_wanted, points_wanted);
+        update_every = rrdset_find_natural_update_every_for_timeframe(st, after_wanted, before_wanted, points_wanted, options, tier);
         if(update_every <= 0) update_every = 1;
         query_debug_log(":natural update every %d", update_every);
     }
@@ -1312,7 +1337,6 @@ RRDR *rrd2rrdr(
     // automatic_natural_points is set when the user wants all the points available in the database
     if(automatic_natural_points) {
         points_wanted = (before_wanted - after_wanted + 1) / query_granularity;
-        options |= RRDR_OPTION_NATURAL_POINTS;
         query_debug_log(":auto natural points_wanted %ld", points_wanted);
     }
 
@@ -1468,7 +1492,8 @@ RRDR *rrd2rrdr(
     r->internal.points_wanted = points_wanted;
     r->internal.resampling_group = resampling_group;
     r->internal.resampling_divisor = resampling_divisor;
-
+    r->internal.query_options = options;
+    r->internal.query_tier = tier;
 
     // -------------------------------------------------------------------------
     // assign the processor functions
@@ -1515,7 +1540,7 @@ RRDR *rrd2rrdr(
         // reset the grouping for the new dimension
         r->internal.grouping_reset(r);
 
-        rrd2rrdr_do_dimension(r, points_wanted, rd, c, after_wanted, before_wanted, options);
+        rrd2rrdr_do_dimension(r, points_wanted, rd, c, after_wanted, before_wanted);
         if (timeout)
             now_realtime_timeval(&query_current_time);
 

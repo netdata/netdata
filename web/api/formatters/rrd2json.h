@@ -78,6 +78,7 @@ extern int rrdset2anything_api_v1(
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
+        , int tier
 );
 
 extern int rrdset2value_api_v1(
@@ -99,6 +100,7 @@ extern int rrdset2value_api_v1(
         , int *value_is_null
         , uint8_t *anomaly_rate
         , int timeout
+        , int tier
 );
 
 extern void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list, RRDSET *st);

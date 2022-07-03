@@ -175,6 +175,7 @@ int rrdset2value_api_v1(
         , int *value_is_null
         , uint8_t *anomaly_rate
         , int timeout
+        , int tier
 ) {
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -182,7 +183,7 @@ int rrdset2value_api_v1(
 
     RRDR *r = rrd2rrdr(owa, st, points, after, before,
                        group_method, group_time, options, dimensions, NULL,
-                       group_options, timeout);
+                       group_options, timeout, tier);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -239,6 +240,7 @@ int rrdset2anything_api_v1(
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
+        , int tier
 )
 {
     BUFFER *wb = query_params->wb;
@@ -257,7 +259,7 @@ int rrdset2anything_api_v1(
         dimensions ? buffer_tostring(dimensions) : NULL,
         query_params->context_param_list,
         group_options,
-        query_params->timeout);
+        query_params->timeout, tier);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
