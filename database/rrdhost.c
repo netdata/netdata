@@ -15,7 +15,8 @@ int get_tier_grouping(int tier) {
     if(unlikely(tier < 0)) tier = 0;
 
     int grouping = 1;
-    for(int i = 0; i <= tier ;i++)
+    // first tier is always 1 iteration of whatever update every the chart has
+    for(int i = 1; i <= tier ;i++)
         grouping *= storage_tiers_grouping_iterations[i];
 
     return grouping;
