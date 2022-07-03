@@ -505,7 +505,7 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
     // the value to return
     NETDATA_DOUBLE value;
 
-    if(likely(!handle->ctx->tier)) {
+    if(likely(descr->type == PAGE_METRICS)) {
         storage_number n = handle->page[position];
         *flags = n & SN_ALL_FLAGS;
         *count = 1;
@@ -626,6 +626,7 @@ void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrde
 
     descr = pg_cache_create_descr();
     descr->id = id; /* TODO: add page type: metric, log, something? */
+    descr->type = ctx->page_type;
     page = dbengine_page_alloc(); /*TODO: add page size */
     rrdeng_page_descr_mutex_lock(ctx, descr);
     pg_cache_descr = descr->pg_cache_descr;
@@ -814,6 +815,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
         memset(ctx, 0, sizeof(*ctx));
         ctx->storage_size = (tier == 0) ? sizeof(storage_number) : sizeof(storage_number_tier1_t);
         ctx->tier = tier;
+        ctx->page_type = !tier ? PAGE_METRICS : PAGE_TIER;  // TODO: In the future it can be different page type per tier
     }
     else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));

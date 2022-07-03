@@ -250,6 +250,7 @@ struct rrdengine_instance {
     unsigned long metric_API_max_producers;
 
     uint8_t quiesce; /* set to SET_QUIESCE before shutdown of the engine */
+    uint8_t page_type; /* set to SET_QUIESCE before shutdown of the engine */
 
     struct rrdengine_statistics stats;
 };

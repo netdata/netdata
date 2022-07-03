@@ -331,6 +331,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->end_time = jf_metric_data->descr[i].end_time;
         descr->id = &page_index->id;
         descr->extent = extent;
+        descr->type = jf_metric_data->descr[i].type;
         extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
     }
