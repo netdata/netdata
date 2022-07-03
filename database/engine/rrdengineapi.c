@@ -505,37 +505,56 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
     // the value to return
     NETDATA_DOUBLE value;
 
-    if(likely(descr->type == PAGE_METRICS)) {
-        storage_number n = handle->page[position];
-        *flags = n & SN_ALL_FLAGS;
-        *count = 1;
-        *anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
-        value = unpack_storage_number(n);
-    }
-    else {
-        tier1_value = ((storage_number_tier1_t *)handle->page)[position];
-        *flags = 0;
-        *count = tier1_value.count;
-        *anomaly_count = tier1_value.anomaly_count;
-
-        switch (handle->tier_query_fetch_type) {
-            case TIER_QUERY_FETCH_SUM:
-                value = (NETDATA_DOUBLE)tier1_value.sum_value;
-                break;
-
-            case TIER_QUERY_FETCH_MIN:
-                value = (NETDATA_DOUBLE)tier1_value.min_value;
-                break;
-
-            case TIER_QUERY_FETCH_MAX:
-                value = (NETDATA_DOUBLE)tier1_value.max_value;
-                break;
-
-            default:
-            case TIER_QUERY_FETCH_AVERAGE:
-                value = (NETDATA_DOUBLE)tier1_value.sum_value / (NETDATA_DOUBLE)tier1_value.count;
-                break;
+    switch(descr->type) {
+        case PAGE_METRICS: {
+            storage_number n = handle->page[position];
+            *flags = n & SN_ALL_FLAGS;
+            *count = 1;
+            *anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
+            value = unpack_storage_number(n);
         }
+        break;
+
+        case PAGE_TIER: {
+            tier1_value = ((storage_number_tier1_t *)handle->page)[position];
+            *flags = 0;
+            *count = tier1_value.count;
+            *anomaly_count = tier1_value.anomaly_count;
+
+            switch (handle->tier_query_fetch_type) {
+                case TIER_QUERY_FETCH_SUM:
+                    value = (NETDATA_DOUBLE)tier1_value.sum_value;
+                    break;
+
+                case TIER_QUERY_FETCH_MIN:
+                    value = (NETDATA_DOUBLE)tier1_value.min_value;
+                    break;
+
+                case TIER_QUERY_FETCH_MAX:
+                    value = (NETDATA_DOUBLE)tier1_value.max_value;
+                    break;
+
+                default:
+                case TIER_QUERY_FETCH_AVERAGE:
+                    value = (NETDATA_DOUBLE)tier1_value.sum_value / (NETDATA_DOUBLE)tier1_value.count;
+                    break;
+            }
+        }
+        break;
+
+        // we don't know this page type
+        default: {
+            static bool logged = false;
+            if(!logged) {
+                error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", descr->type);
+                logged = true;
+            }
+            value = NAN;
+            *flags = SN_EMPTY_SLOT;
+            *count = 1;
+            *anomaly_count = 0;
+        }
+        break;
     }
 
     if (unlikely(now >= rrdimm_handle->end_time)) {

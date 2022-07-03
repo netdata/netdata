@@ -477,9 +477,9 @@ void finalize_data_files(struct rrdengine_instance *ctx)
     if(!extents_number) extents_number = 1;
 
     info("DBENGINE STATISTICS ON DATAFILES:"
-         " Files %zu, structures %zu bytes, %f bytes per file."
-         " Extents %zu, structures %zu bytes, %f bytes per extent."
-         " Compressed size of all pages: %zu"
+         " Files %zu, structures %zu bytes, %0.2f bytes per file."
+         " Extents %zu, structures %zu bytes, %0.2f bytes per extent."
+         " Compressed size of all pages: %zu bytes."
          , files_number, files_bytes, (double)files_bytes/files_number
          , extents_number, extents_bytes, (double)extents_bytes/extents_number
          , page_compressed_sizes

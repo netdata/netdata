@@ -1321,9 +1321,6 @@ void free_page_cache(struct rrdengine_instance *ctx)
     metrics_index_bytes = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
     fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
 
-    Word_t structures_freed = metrics_bytes + metrics_index_bytes + pages_bytes + pages_index_bytes + cache_pages_bytes + cache_pages_data_bytes;
-    Word_t indexes_freed    = metrics_index_bytes + pages_index_bytes + pages_dirty_index_bytes;
-
     if(!metrics_number) metrics_number = 1;
     if(!pages_number) pages_number = 1;
     if(!cache_pages_number) cache_pages_number = 1;
@@ -1336,25 +1333,15 @@ void free_page_cache(struct rrdengine_instance *ctx)
     }
 
     info("DBENGINE STATISTICS ON METRICS:"
-         " Freed %lu metrics, total %lu bytes."
-         " Structures %lu bytes. Indexes %lu bytes."
-         " Page cache of %lu pages, structures %lu bytes, data %lu bytes."
-         " Page descriptors %lu, structures %lu, index (L) %lu, dirty index %lu."
-         " Metrics %lu, structures %lu bytes, index (HS) %lu bytes."
-         " Per metric %f bytes for structures, %f bytes for index."
-         " Per page descriptor %f bytes for structures, %f bytes for index."
-         " Per page cache descriptor %f bytes."
-         " Points in db %zu, uncompressed size %zu, duration of all points %zu seconds."
-         " Average point duration %f seconds."
-         , metrics_number, structures_freed + indexes_freed
-         , structures_freed, indexes_freed
-         , cache_pages_number, cache_pages_bytes, cache_pages_data_bytes
-         , pages_number, pages_bytes, pages_index_bytes, pages_dirty_index_bytes
-         , metrics_number, metrics_bytes, metrics_index_bytes
-         , (double)metrics_bytes/metrics_number, (double)metrics_index_bytes/metrics_number
-         , (double)pages_bytes/pages_number, (double)pages_index_bytes/pages_number
-         , (double)cache_pages_bytes/cache_pages_number
-         , points_in_db, uncompressed_points_size, seconds_in_db
-         , (double)seconds_in_db/points_in_db
+         " Metrics: %lu (structures %lu bytes - per metric %0.2f, index (HS) %lu bytes - per metric %0.2f) |"
+         " Page descriptors: %lu (structures %lu bytes - per page %0.2f bytes, index (L) %lu bytes - per page %0.2f, dirty index %lu bytes). |"
+         " Page cache: %lu pages (structures %lu bytes - per page %0.2f bytes, data %lu bytes). |"
+         " Points in db %zu, uncompressed size of points database %zu bytes. |"
+         " Duration of all points %zu seconds, average point duration %0.2f seconds."
+         , metrics_number, metrics_bytes, (double)metrics_bytes/metrics_number, metrics_index_bytes, (double)metrics_index_bytes/metrics_number
+         , pages_number, pages_bytes, (double)pages_bytes/pages_number, pages_index_bytes, (double)pages_index_bytes/pages_number, pages_dirty_index_bytes
+         , cache_pages_number, cache_pages_bytes, (double)cache_pages_bytes/cache_pages_number, cache_pages_data_bytes
+         , points_in_db, uncompressed_points_size
+         , seconds_in_db, (double)seconds_in_db/points_in_db
          );
 }
