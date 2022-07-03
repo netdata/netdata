@@ -1,55 +1,151 @@
 <!--
-title: "Change how long Netdata stores metrics"
-description: "With a single configuration change, the Netdata Agent can store days, weeks, or months of metrics at its famous per-second granularity."
+title: "Netdata Longer Metrics Retention"
+description: ""
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/longer-metrics-storage.md
 -->
 
-# Change how long Netdata stores metrics
+# Netdata Longer Metrics Retention
 
-Netdata helps you collect thousands of system and application metrics every second, but what about storing them for the
-long term?
+Metrics retention affects 3 parameters on the operation of a Netdata Agent:
 
-Many people think Netdata can only store about an hour's worth of real-time metrics, but that's simply not true any
-more. With the right settings, Netdata is quite capable of efficiently storing hours or days worth of historical,
-per-second metrics without having to rely on an [exporting engine](/docs/export/external-databases.md).
+1. The disk space required to store the metrics.
+2. The memory the Netdata Agent will require to have that retention available for queries.
+3. The CPU resources that will be required to query longer time-frames.
 
-This guide gives two options for configuring Netdata to store more metrics. **We recommend the default [database
-engine](#using-the-database-engine)**, but you can stick with or switch to the round-robin database if you prefer.
+As retention increases, the resources required to support that retention increase too.
 
-Let's get started.
+Since Netdata Agents usually run at the edge, inside production systems, Netdata Agent **parents** should be considered. When having a **parent - child** setup, the child (the Netdata Agent running on a production system) delegates all its functions, including longer metrics retention and querying, to the parent node that can dedicate more resources to this task. A single Netdata Agent parent can centralize multiple children Netdata Agents (dozens, hundreds, or even thousands depending on its available resources). 
 
-## Using the database engine
+## Which database mode to use
 
-The database engine uses RAM to store recent metrics while also using a "spill to disk" feature that takes advantage of
-available disk space for long-term metrics storage. This feature of the database engine allows you to store a much
-larger dataset than your system's available RAM.
+Netdata Agents support multiple database modes.
 
-The database engine is currently the default method of storing metrics, but if you're not sure which database you're
-using, check out your `netdata.conf` file and look for the `[db].mode` setting:
+The default mode `[db].mode = dbengine` has been designed to scale for longer retentions.
 
-```conf
+The other available database modes are designed to minimize resource utilization and should usually be considered on **parent - child** setups at the children side.
+
+So,
+
+* On a single node setup, use `[db].mode = dbengine` to increase retention.
+* On a **parent - child** setup, use `[db].mode = dbengine` on the parent to increase retention and a more resource efficient mode (like `save`, `ram` or `none`) for the child to minimize resources utilization.
+
+To use `dbengine`, set this in `netdata.conf` (it is the default):
+
+```
 [db]
     mode = dbengine
 ```
 
-If `[db].mode` is set to anything but `dbengine`, change it and restart Netdata using the standard command for
-restarting services on your system. You're now using the database engine!
+## Tiering
 
-What makes the database engine efficient? While it's structured like a traditional database, the database engine splits
-data between RAM and disk. The database engine caches and indexes data on RAM to keep memory usage low, and then
-compresses older metrics onto disk for long-term storage.
+`dbengine` supports tiering. Tiering allows having up to 3 versions of the data:
 
-When the Netdata dashboard queries for historical metrics, the database engine will use its cache, stored in RAM, to
-return relevant metrics for visualization in charts.
+1. Tier 0 is the high resolution data.
+2. Tier 1 is the first tier that samples data every 60 data collections of Tier 0.
+3. Tier 2 is the second tier that samples data every 3600 data collections of Tier 0 (60 of Tier 1).
 
-Now, given that the database engine uses _both_ RAM and disk, there are two other settings to consider: `page cache
-size MB` and `dbengine multihost disk space MB`.
+To enable tiering set `[db].storage tiers` in `netdata.conf` (the default is 1, to enable only Tier 0):
 
-```conf
-[db]
-    dbengine page cache size MB = 32
-    dbengine multihost disk space MB = 256
 ```
+[db]
+    mode = dbengine
+    storage tiers = 3
+```
+
+## Disk space requirements
+
+Netdata Agents require about 0.34 bytes on disk per database point on Tier 0 and 4 times more on higher tiers (Tier 1 and 2).
+
+### Tier 0 - per second for a week
+
+For 2000 metrics, collected every second and retained for a week, Tier 0 needs: 0.34 bytes x 2000 metrics x 3600 secs per hour x 24 hours per day x 7 days per week = 392 MB.
+
+The setting to control this is in `netdata.conf`:
+
+```
+[db]
+    mode = dbengine
+    
+    # per second data collection
+    update every = 1
+    
+    # enable only Tier 0
+    storage tiers = 1
+    
+    # Tier 0, per second data for a week
+    dbengine multihost disk space MB = 392
+```
+
+By setting it to `392` and restarting the Netdata Agent, this node will start maintaining about a week of data. But pay attention to the number of metrics. If you have more than 2000 metrics on a node, or you need more that an week of high resolution metrics, you may need to adjust this setting accordingly.
+
+### Tier 1 - per minute for a month
+
+Tier 1 is by default sampling the data every 60 points of Tier 0. If Tier 0 is per second, then Tier 1 is per minute.
+
+Tier 1 needs 4 times more storage per point compared to Tier 0, because for every point it stores `min`, `max`, `sum`, `count` and `anomaly rate` (the values are 5, but they require 4 times the storage because `count` and `anomaly rate` are 16-bit integers). The `average` is calculated on the fly at query time using `sum / count`.
+
+For 2000 metrics, with per minute resolution, retained for a month, Tier 1 needs: 0.34 bytes x 4 x 2000 metrics x 60 minutes per hour x 24 hours per day x 30 days per month = 112MB.
+
+Do this in `netdata.conf`:
+
+```
+[db]
+    mode = dbengine
+    
+    # per second data collection
+    update every = 1
+    
+    # enable only Tier 0 and Tier 1
+    storage tiers = 2
+    
+    # Tier 0, per second data for a week
+    dbengine multihost disk space MB = 392
+    
+    # Tier 1, per minute data for a month
+    dbengine tier 1 multihost disk space MB = 112
+```
+
+Once `netdata.conf` is edited, the Netdata Agent needs to be restarted for the changes to take effect.
+
+### Tier 2 - per hour for a year
+
+Tier 2 is by default sampling data every 3600 points of Tier 0 (60 of Tier 1). If Tier 0 is per second, then Tier 2 is per hour.
+
+The storage requirements are the same to Tier 1.
+
+For 2000 metrics, with per hour resolution, retained for a year, Tier 2 needs: 0.34 bytes x 4 x 2000 metrics x 24 hours per day x 365 days per year = 23MB.
+
+
+Do this in `netdata.conf`:
+
+```
+[db]
+    mode = dbengine
+    
+    # per second data collection
+    update every = 1
+    
+    # enable only Tier 0 and Tier 1
+    storage tiers = 3
+    
+    # Tier 0, per second data for a week
+    dbengine multihost disk space MB = 392
+    
+    # Tier 1, per minute data for a month
+    dbengine tier 1 multihost disk space MB = 112
+
+    # Tier 2, per hour data for a year
+    dbengine tier 2 multihost disk space MB = 23
+```
+
+Once `netdata.conf` is edited, the Netdata Agent needs to be restarted for the changes to take effect.
+
+## Memory requirement
+
+TBD
+
+## TODO
+
 
 `[db].dbengine page cache size MB` sets the maximum amount of RAM the database engine will use for caching and indexing.
 `[db].dbengine multihost disk space MB` sets the maximum disk space the database engine will use for storing

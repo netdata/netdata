@@ -1194,24 +1194,60 @@ void init_page_cache(struct rrdengine_instance *ctx)
     init_committed_page_index(ctx);
 }
 
+
+
+/*
+ * METRIC                                            # number
+ * 1. INDEX: JudyHS                                  # bytes
+ * 2. DATA: page_index                               # bytes
+ *
+ * PAGE (1 page of 1 metric)                         # number
+ * 1. INDEX AT METRIC: page_index->JudyL_array       # bytes
+ * 2. DATA: descr                                    # bytes
+ *
+ * PAGE CACHE (1 page of 1 metric at the cache)      # number
+ * 1. pg_cache_descr (if PG_CACHE_DESCR_ALLOCATED)   # bytes
+ * 2. data (if RRD_PAGE_POPULATED)                   # bytes
+ *
+ */
+
+
 void free_page_cache(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    Word_t ret_Judy, bytes_freed = 0;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index, *prev_page_index;
     Word_t Index;
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
 
+    Word_t metrics_number      = 0,
+           metrics_bytes       = 0,
+           metrics_index_bytes = 0;
+
+    Word_t pages_number        = 0,
+           pages_bytes         = 0,
+           pages_index_bytes   = 0;
+
+    Word_t cache_pages_number  = 0,
+           cache_pages_bytes   = 0,
+           cache_pages_data_bytes  = 0;
+
+    size_t points_in_db        = 0,
+           uncompressed_points_size = 0;
+
+    Word_t pages_dirty_index_bytes = 0;
+
     /* Free committed page index */
-    ret_Judy = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
+    pages_dirty_index_bytes = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
     fatal_assert(NULL == pg_cache->committed_page_index.JudyL_array);
-    bytes_freed += ret_Judy;
 
     for (page_index = pg_cache->metrics_index.last_page_index ;
          page_index != NULL ;
          page_index = prev_page_index) {
+
+        metrics_number++;
+
         prev_page_index = page_index->prev;
 
         /* Find first page in range */
@@ -1223,33 +1259,63 @@ void free_page_cache(struct rrdengine_instance *ctx)
             /* Iterate all page descriptors of this metric */
 
             if (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED) {
+                cache_pages_number++;
+
                 /* Check rrdenglocking.c */
                 pg_cache_descr = descr->pg_cache_descr;
                 if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
                     dbengine_page_free(pg_cache_descr->page);
-                    bytes_freed += RRDENG_BLOCK_SIZE;
+                    cache_pages_data_bytes += RRDENG_BLOCK_SIZE;
                 }
                 rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
-                bytes_freed += sizeof(*pg_cache_descr);
+                cache_pages_bytes += sizeof(*pg_cache_descr);
             }
+
+            points_in_db += descr->page_length / ctx->storage_size;
+            uncompressed_points_size += descr->page_length;
             freez(descr);
-            bytes_freed += sizeof(*descr);
+            pages_bytes += sizeof(*descr);
+            pages_number++;
 
             PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0);
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
         }
 
         /* Free page index */
-        ret_Judy = JudyLFreeArray(&page_index->JudyL_array, PJE0);
+        pages_index_bytes += JudyLFreeArray(&page_index->JudyL_array, PJE0);
         fatal_assert(NULL == page_index->JudyL_array);
-        bytes_freed += ret_Judy;
         freez(page_index);
-        bytes_freed += sizeof(*page_index);
+        metrics_bytes += sizeof(*page_index);
     }
     /* Free metrics index */
-    ret_Judy = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
+    metrics_index_bytes = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
     fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
-    bytes_freed += ret_Judy;
 
-    info("Freed %lu bytes of memory from page cache.", bytes_freed);
+    Word_t structures_freed = metrics_bytes + metrics_index_bytes + pages_bytes + pages_index_bytes + cache_pages_bytes + cache_pages_data_bytes;
+    Word_t indexes_freed    = metrics_index_bytes + pages_index_bytes + pages_dirty_index_bytes;
+
+    if(!metrics_number) metrics_number = 1;
+    if(!pages_number) pages_number = 1;
+    if(!cache_pages_number) cache_pages_number = 1;
+
+    info("DBENGINE STATISTICS ON METRICS:"
+         " Freed %lu metrics, total %lu bytes."
+         " Structures %lu bytes. Indexes %lu bytes."
+         " Page cache of %lu pages, structures %lu bytes, data %lu bytes."
+         " Page descriptors %lu, structures %lu, index (L) %lu, dirty index %lu."
+         " Metrics %lu, structures %lu bytes, index (HS) %lu bytes."
+         " Per metric %f bytes for structures, %f bytes for index."
+         " Per page descriptor %f bytes for structures, %f bytes for index."
+         " Per page cache descriptor %f bytes."
+         " Points in db %zu, uncompressed size %zu."
+         , metrics_number, structures_freed + indexes_freed
+         , structures_freed, indexes_freed
+         , cache_pages_number, cache_pages_bytes, cache_pages_data_bytes
+         , pages_number, pages_bytes, pages_index_bytes, pages_dirty_index_bytes
+         , metrics_number, metrics_bytes, metrics_index_bytes
+         , (double)metrics_bytes/metrics_number, (double)metrics_index_bytes/metrics_number
+         , (double)pages_bytes/pages_number, (double)pages_index_bytes/pages_number
+         , (double)cache_pages_bytes/cache_pages_number
+         , points_in_db, uncompressed_points_size
+         );
 }
