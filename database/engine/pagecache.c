@@ -1235,7 +1235,8 @@ void free_page_cache(struct rrdengine_instance *ctx)
 
     size_t points_in_db        = 0,
            uncompressed_points_size = 0,
-           seconds_in_db       = 0;
+           seconds_in_db       = 0,
+           single_point_pages  = 0;
 
     Word_t pages_dirty_index_bytes = 0;
 
@@ -1255,6 +1256,8 @@ void free_page_cache(struct rrdengine_instance *ctx)
         Index = (Word_t) 0;
         PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
         descr = unlikely(NULL == PValue) ? NULL : *PValue;
+
+        size_t metric_update_every = 0;
 
         while (descr != NULL) {
             /* Iterate all page descriptors of this metric */
@@ -1276,9 +1279,21 @@ void free_page_cache(struct rrdengine_instance *ctx)
             size_t page_duration  = ((descr->end_time - descr->start_time) / USEC_PER_SEC);
             size_t update_every = (page_duration == 0) ? 1 : page_duration / (points_in_page - 1);
 
-            points_in_db += descr->page_length / ctx->storage_size;
+            if (!page_duration && metric_update_every) {
+                page_duration = metric_update_every;
+                update_every = metric_update_every;
+            }
+            else if(page_duration)
+                metric_update_every = update_every;
+
             uncompressed_points_size += descr->page_length;
-            seconds_in_db += update_every * points_in_page;
+
+            if(page_duration > 0) {
+                seconds_in_db += update_every * points_in_page;
+                points_in_db += descr->page_length / ctx->storage_size;
+            }
+            else
+                single_point_pages++;
 
             freez(descr);
             pages_bytes += sizeof(*descr);
@@ -1304,6 +1319,13 @@ void free_page_cache(struct rrdengine_instance *ctx)
     if(!metrics_number) metrics_number = 1;
     if(!pages_number) pages_number = 1;
     if(!cache_pages_number) cache_pages_number = 1;
+    if(!points_in_db) points_in_db = 1;
+
+    if(single_point_pages) {
+        long double avg_duration = (long double)seconds_in_db / points_in_db;
+        points_in_db += single_point_pages;
+        seconds_in_db += (size_t)(avg_duration * single_point_pages);
+    }
 
     info("DBENGINE STATISTICS ON METRICS:"
          " Freed %lu metrics, total %lu bytes."
