@@ -1348,6 +1348,8 @@ extern void set_host_properties(
     const char *guid, const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *program_name, const char *program_version);
 
+extern int get_tier_grouping(int tier);
+
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations
 

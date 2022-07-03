@@ -1549,7 +1549,7 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
     for(int tier = 0; tier < storage_tiers ;tier++) {
         rd->tiers[tier] = onewayalloc_callocz(owa, 1, sizeof(*rd->tiers[tier]));
         rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        rd->tiers[tier]->tier_grouping = storage_tiers_grouping_iterations[tier];
+        rd->tiers[tier]->tier_grouping = get_tier_grouping(tier);
         rd->tiers[tier]->mode = RRD_MEMORY_MODE_DBENGINE;
         rd->tiers[tier]->query_ops.init = rrdeng_load_metric_init;
         rd->tiers[tier]->query_ops.next_metric = rrdeng_load_metric_next;

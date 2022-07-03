@@ -4,11 +4,22 @@
 #include "rrd.h"
 
 int storage_tiers = RRD_STORAGE_TIERS;
-int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60*60 };
+int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60 };
 
 #if RRD_STORAGE_TIERS != 3
 #error RRD_STORAGE_TIERS is not 3 - you need to update the grouping iterations per tier
 #endif
+
+int get_tier_grouping(int tier) {
+    if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
+    if(unlikely(tier < 0)) tier = 0;
+
+    int grouping = 1;
+    for(int i = 0; i <= tier ;i++)
+        grouping *= storage_tiers_grouping_iterations[i];
+
+    return grouping;
+}
 
 RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
@@ -827,6 +838,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
                 grouping_iterations = 2;
                 config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
                 error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be less than 2. Assuming 2.", localhost->hostname, tier);
+            }
+            if(grouping_iterations > 255) {
+                grouping_iterations = 255;
+                config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+                error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be more than the previous tier. Assuming 255.", localhost->hostname, tier);
             }
         }
 

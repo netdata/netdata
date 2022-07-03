@@ -968,8 +968,8 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 
     for(int tier = 1; tier < storage_tiers ;tier++) {
-        if (!rd->tiers[tier])
-            continue;
+        if(unlikely(!rd->tiers[tier])) continue;
+
         struct rrddim_tier *t = rd->tiers[tier];
 
         time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
