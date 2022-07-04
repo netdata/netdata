@@ -793,7 +793,7 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 #define query_interpolate_point(this_point, last_point, now)      do {  \
     if(likely(                                                          \
             /* the point to interpolate is more than 1s wide */         \
-            (this_point).start_time - (this_point).end_time > 1         \
+            (this_point).end_time - (this_point).start_time > 1         \
                                                                         \
             /* the two points are exactly next to each other */         \
          && (last_point).end_time == (this_point).start_time            \
