@@ -1036,7 +1036,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
     if(unlikely(!t)) return;
 
     time_t latest_time_t = t->query_ops.latest_time(t->db_metric_handle);
-    time_t granularity = t->tier_grouping * rd->update_every;
+    time_t granularity = (time_t)t->tier_grouping * (time_t)rd->update_every;
     time_t time_diff   = now - latest_time_t;
 
     // there is really nothing we can do
