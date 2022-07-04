@@ -1086,7 +1086,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
 
         time_t timestamp = r->t[i];
         NETDATA_DOUBLE value = r->v[i];
-        SN_FLAGS flags = r->ar[i] ? SN_ANOMALY_BIT : 0;
+        SN_FLAGS flags = r->ar[i] ? 0 : SN_ANOMALY_BIT;
         store_metric_at_tier(rd, t, timestamp, timestamp * USEC_PER_SEC, value, flags);
     }
 

@@ -978,7 +978,8 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, time_t now, usec_t 
             t->sum_value = n;
             t->min_value = n;
             t->max_value = n;
-            if(flags & SN_ANOMALY_BIT)
+            // the anomaly bit is reversed
+            if(!(flags & SN_ANOMALY_BIT))
                 t->anomaly_count = 1;
             t->count = 1;
         }
@@ -986,7 +987,8 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, time_t now, usec_t 
             t->sum_value += n;
             t->min_value = MIN(t->min_value, n);
             t->max_value = MAX(t->max_value, n);
-            if(flags & SN_ANOMALY_BIT)
+            // the anomaly bit is reversed
+            if(!(flags & SN_ANOMALY_BIT))
                 t->anomaly_count++;
             t->count++;
         }
