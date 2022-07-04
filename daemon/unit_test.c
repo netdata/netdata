@@ -1751,11 +1751,10 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     uint8_t same;
-    time_t time_now, time_retrieved;
+    time_t time_now, time_retrieved, end_time;
     int i, j, k, c, errors, update_every;
     collected_number last;
     NETDATA_DOUBLE value, expected;
-    SN_FLAGS nflags;
     struct rrddim_query_handle handle;
     size_t value_errors = 0, time_errors = 0;
 
@@ -1773,9 +1772,10 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                            j * REGION_POINTS[current_region] + c + k;
                     expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    time_t end_time;
-                    uint16_t query_count, query_anomaly_count;
-                    value = rd[i][j]->tiers[0]->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, &query_count, &query_anomaly_count);
+                    STORAGE_POINT sp = rd[i][j]->tiers[0]->query_ops.next_metric(&handle);
+                    value = sp.sum;
+                    time_retrieved = sp.start_time;
+                    end_time = sp.end_time;
 
                     same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
@@ -2183,10 +2183,9 @@ static void query_dbengine_chart(void *arg)
     RRDSET *st;
     RRDDIM *rd;
     uint8_t same;
-    time_t time_now, time_retrieved;
+    time_t time_now, time_retrieved, end_time;
     collected_number generatedv;
     NETDATA_DOUBLE value, expected;
-    SN_FLAGS nflags;
     struct rrddim_query_handle handle;
     size_t value_errors = 0, time_errors = 0;
 
@@ -2229,9 +2228,12 @@ static void query_dbengine_chart(void *arg)
                 }
                 break;
             }
-            time_t end_time;
-            uint16_t query_count, query_anomaly_count;
-            value = rd->tiers[0]->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags, &query_count, &query_anomaly_count);
+
+            STORAGE_POINT sp = rd->tiers[0]->query_ops.next_metric(&handle);
+            value = sp.sum;
+            time_retrieved = sp.start_time;
+            end_time = sp.end_time;
+
             if (!netdata_double_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT

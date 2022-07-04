@@ -348,6 +348,32 @@ struct rrddim_query_handle {
     STORAGE_QUERY_HANDLE* handle;
 };
 
+typedef struct storage_point {
+    NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
+    NETDATA_DOUBLE max;     // when count > 1, this is the maximum among them
+    NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
+
+    // end_time - start_time = point duration
+    time_t start_time;      // the time the point starts
+    time_t end_time;        // the time the point ends
+
+    unsigned count;         // the number of original points aggregated
+    unsigned anomaly_count; // the number of original points found anomalous
+
+    SN_FLAGS flags;         // flags stored with the point
+} STORAGE_POINT;
+
+#define storage_point_empty(x, start_t, end_t)     do { \
+    (x).min = (x).max = (x).sum = NAN;                  \
+    (x).count = 1;                                      \
+    (x).anomaly_count = 0;                              \
+    (x).flags = SN_EMPTY_SLOT;                          \
+    (x).start_time = start_t;                           \
+    (x).end_time = end_t;                               \
+    } while(0)
+
+#define storage_point_is_empty(x) (!netdata_double_isnumber((x).sum) || !(x).count)
+
 // ------------------------------------------------------------------------
 // function pointers that handle data collection
 struct rrddim_collect_ops {
@@ -372,7 +398,7 @@ struct rrddim_query_ops {
     void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
 
     // run this to load each metric number from the database
-    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count);
+    STORAGE_POINT (*next_metric)(struct rrddim_query_handle *handle);
 
     // run this to test if the series of next_metric() database queries is finished
     int (*is_finished)(struct rrddim_query_handle *handle);
@@ -395,13 +421,9 @@ struct rrddim_tier {
     RRD_MEMORY_MODE mode;                           // the memory mode of this tier
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
-    NETDATA_DOUBLE sum_value;
-    NETDATA_DOUBLE min_value;
-    NETDATA_DOUBLE max_value;
-    size_t count;
+    STORAGE_POINT virtual_point;
     size_t iterations;
     time_t next_point_time;
-    size_t anomaly_count;
     int tier_grouping;
     usec_t last_collected_ut;
     struct rrddim_collect_ops collect_ops;

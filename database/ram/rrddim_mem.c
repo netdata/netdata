@@ -78,30 +78,30 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_qu
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-NETDATA_DOUBLE rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) {
+STORAGE_POINT rrddim_query_next_metric(struct rrddim_query_handle *handle) {
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     size_t entries = rd->rrdset->entries;
     size_t slot = h->slot;
-    *count = 1;
+
+    STORAGE_POINT sp;
+    sp.count = 1;
 
     time_t this_timestamp = h->next_timestamp;
     h->next_timestamp += h->dt;
 
     // set this timestamp for our caller
-    *start_time = this_timestamp - h->dt;
-    *end_time = this_timestamp;
+    sp.start_time = this_timestamp - h->dt;
+    sp.end_time = this_timestamp;
 
     if(unlikely(this_timestamp < h->slot_timestamp)) {
-        *flags = SN_EMPTY_SLOT;
-        *anomaly_count = 0;
-        return NAN;
+        storage_point_empty(sp, sp.start_time, sp.end_time);
+        return sp;
     }
 
     if(unlikely(this_timestamp > h->last_timestamp)) {
-        *flags = SN_EMPTY_SLOT;
-        *anomaly_count = 0;
-        return NAN;
+        storage_point_empty(sp, sp.start_time, sp.end_time);
+        return sp;
     }
 
     storage_number n = rd->db[slot++];
@@ -110,9 +110,11 @@ NETDATA_DOUBLE rrddim_query_next_metric(struct rrddim_query_handle *handle, time
     h->slot = slot;
     h->slot_timestamp += h->dt;
 
-    *anomaly_count = (!(n & SN_ANOMALY_BIT));
-    *flags = (n & SN_ALL_FLAGS);
-    return unpack_storage_number(n);
+    sp.anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
+    sp.flags = (n & SN_ALL_FLAGS);
+    sp.min = sp.max = sp.sum = unpack_storage_number(n);
+
+    return sp;
 }
 
 int rrddim_query_is_finished(struct rrddim_query_handle *handle) {

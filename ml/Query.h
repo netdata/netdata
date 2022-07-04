@@ -28,11 +28,8 @@ public:
     }
 
     std::pair<time_t, CalculatedNumber> nextMetric() {
-        time_t CurrT, EndT;
-        SN_FLAGS Flags;
-        uint16_t QueryCount, QueryAnomalyCount;
-        auto Value = (CalculatedNumber)Ops->next_metric(&Handle, &CurrT, &EndT, &Flags, &QueryCount, &QueryAnomalyCount);
-        return { CurrT, Value };
+        STORAGE_POINT sp = Ops->next_metric(&Handle);
+        return { sp.start_time, sp.sum / sp.count };
     }
 
     ~Query() {

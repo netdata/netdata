@@ -465,10 +465,11 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count) {
+STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
     // struct rrdeng_metric_handle *metric_handle = handle->metric_handle;
 
+    STORAGE_POINT sp;
     struct rrdeng_page_descr *descr = handle->descr;
     unsigned position = handle->position + 1;
     time_t now = handle->now + handle->dt_sec;
@@ -477,10 +478,8 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
     if (unlikely(INVALID_TIME == handle->next_page_time)) {
         handle->next_page_time = INVALID_TIME;
         handle->now = now;
-        *start_time = now - handle->dt_sec;
-        *end_time = now;
-        *flags = SN_EMPTY_SLOT;
-        return NAN;
+        storage_point_empty(sp, now - handle->dt_sec, now);
+        return sp;
     }
 
     if (unlikely(!descr || position >= handle->entries)) {
@@ -489,10 +488,8 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
             // next calls will not load any more metrics
             handle->next_page_time = INVALID_TIME;
             handle->now = now;
-            *start_time = now - handle->dt_sec;
-            *end_time = now;
-            *flags = SN_EMPTY_SLOT;
-            return NAN;
+            storage_point_empty(sp, now - handle->dt_sec, now);
+            return sp;
         }
 
         descr = handle->descr;
@@ -500,49 +497,30 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         now = (time_t)((descr->start_time + position * handle->dt) / USEC_PER_SEC);
     }
 
-    *start_time = now - handle->dt_sec;
-    *end_time = now;
+    sp.start_time = now - handle->dt_sec;
+    sp.end_time = now;
 
     handle->position = position;
     handle->now = now;
 
-    // the value to return
-    NETDATA_DOUBLE value;
-
     switch(descr->type) {
         case PAGE_METRICS: {
             storage_number n = handle->page[position];
-            *flags = n & SN_ALL_FLAGS;
-            *count = 1;
-            *anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
-            value = unpack_storage_number(n);
+            sp.min = sp.max = sp.sum = unpack_storage_number(n);
+            sp.flags = n & SN_ALL_FLAGS;
+            sp.count = 1;
+            sp.anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
         }
         break;
 
         case PAGE_TIER: {
             tier1_value = ((storage_number_tier1_t *)handle->page)[position];
-            *flags = 0;
-            *count = tier1_value.count;
-            *anomaly_count = tier1_value.anomaly_count;
-
-            switch (handle->tier_query_fetch_type) {
-                case TIER_QUERY_FETCH_SUM:
-                    value = (NETDATA_DOUBLE)tier1_value.sum_value;
-                    break;
-
-                case TIER_QUERY_FETCH_MIN:
-                    value = (NETDATA_DOUBLE)tier1_value.min_value;
-                    break;
-
-                case TIER_QUERY_FETCH_MAX:
-                    value = (NETDATA_DOUBLE)tier1_value.max_value;
-                    break;
-
-                default:
-                case TIER_QUERY_FETCH_AVERAGE:
-                    value = (NETDATA_DOUBLE)tier1_value.sum_value / (NETDATA_DOUBLE)tier1_value.count;
-                    break;
-            }
+            sp.flags = tier1_value.anomaly_count ? 0 : SN_ANOMALY_BIT;
+            sp.count = tier1_value.count;
+            sp.anomaly_count = tier1_value.anomaly_count;
+            sp.min = tier1_value.min_value;
+            sp.max = tier1_value.max_value;
+            sp.sum = tier1_value.sum_value;
         }
         break;
 
@@ -553,10 +531,7 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
                 error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", descr->type);
                 logged = true;
             }
-            value = NAN;
-            *flags = SN_EMPTY_SLOT;
-            *count = 1;
-            *anomaly_count = 0;
+            storage_point_empty(sp, sp.start_time, sp.end_time);
         }
         break;
     }
@@ -566,7 +541,7 @@ NETDATA_DOUBLE rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         handle->next_page_time = INVALID_TIME;
     }
 
-    return value;
+    return sp;
 }
 
 int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)

@@ -969,38 +969,31 @@ static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, tim
     return now + loop - ((now + loop) % loop);
 }
 
-void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, time_t now, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut) {
     if (unlikely(!t->next_point_time))
-        t->next_point_time = tier_next_point_time(rd, t, now);
+        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
 
-    if (likely(netdata_double_isnumber(n))) {
-        if (!t->count) {
-            t->sum_value = n;
-            t->min_value = n;
-            t->max_value = n;
-            // the anomaly bit is reversed
-            if(!(flags & SN_ANOMALY_BIT))
-                t->anomaly_count = 1;
-            t->count = 1;
+    if (likely(!storage_point_is_empty(sp))) {
+        if (!t->virtual_point.count) {
+            t->virtual_point = sp;
         }
         else {
-            t->sum_value += n;
-            t->min_value = MIN(t->min_value, n);
-            t->max_value = MAX(t->max_value, n);
-            // the anomaly bit is reversed
-            if(!(flags & SN_ANOMALY_BIT))
-                t->anomaly_count++;
-            t->count++;
+            t->virtual_point.sum += sp.sum;
+            t->virtual_point.min = MIN(t->virtual_point.min, sp.min);
+            t->virtual_point.max = MAX(t->virtual_point.max, sp.max);
+            t->virtual_point.count += sp.count;
+            t->virtual_point.anomaly_count += sp.anomaly_count;
+            t->virtual_point.flags |= sp.flags;
         }
 
-        t->last_collected_ut = point_end_time_ut;
+        t->last_collected_ut = now_ut;
         t->iterations++;
 
-        if (now >= t->next_point_time) {
-            if (!t->count)
+        if (sp.end_time >= t->next_point_time) {
+            if (!t->virtual_point.count)
                 t->collect_ops.store_metric(
                     t->db_collection_handle,
-                    point_end_time_ut,
+                    now_ut,
                     NAN,
                     NAN,
                     NAN,
@@ -1010,18 +1003,19 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, time_t now, usec_t 
             else {
                 t->collect_ops.store_metric(
                     t->db_collection_handle,
-                    point_end_time_ut,
-                    t->sum_value,
-                    t->min_value,
-                    t->max_value,
-                    t->count,
-                    t->anomaly_count,
-                    flags);
+                    now_ut,
+                    t->virtual_point.sum,
+                    t->virtual_point.min,
+                    t->virtual_point.max,
+                    t->virtual_point.count,
+                    t->virtual_point.anomaly_count,
+                    t->virtual_point.flags);
             }
-            t->iterations = 0;
-            t->count = 0;
 
-            t->next_point_time = tier_next_point_time(rd, t, now);
+            t->iterations = 0;
+            t->virtual_point.count = 0;
+
+            t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
         }
     }
 }
@@ -1041,13 +1035,19 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         if(!t->last_collected_ut) {
             // we have not collected this tier before
             // let's fill any gap that may exist
-
-            // disabled temporarily to merge
-            // rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
-            ;
+            rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
         }
 
-        store_metric_at_tier(rd, t, now, point_end_time_ut, n, flags);
+        STORAGE_POINT sp = {
+            .min = n,
+            .max = n,
+            .sum = n,
+            .count = 1,
+            .anomaly_count = (flags & SN_ANOMALY_BIT) ? 0 : 1,
+            .flags = flags
+        };
+
+        store_metric_at_tier(rd, t, sp, point_end_time_ut);
     }
 }
 

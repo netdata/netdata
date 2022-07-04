@@ -596,6 +596,7 @@ typedef struct query_engine_ops {
     RRDDIM *rd;
     time_t view_update_every;
     time_t query_granularity;
+    TIER_QUERY_FETCH tier_query_fetch;
 
     // query planer
     QUERY_PLAN plan;
@@ -606,7 +607,7 @@ typedef struct query_engine_ops {
     size_t tier;
     struct rrddim_tier *tier_ptr;
     struct rrddim_query_handle handle;
-    NETDATA_DOUBLE (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count);
+    STORAGE_POINT (*next_metric)(struct rrddim_query_handle *handle);
     int (*is_finished)(struct rrddim_query_handle *handle);
     void (*finalize)(struct rrddim_query_handle *handle);
 
@@ -841,6 +842,7 @@ static inline void rrd2rrdr_do_dimension(
         .rd = rd,
         .grouping_add = r->internal.grouping_add,
         .grouping_flush = r->internal.grouping_flush,
+        .tier_query_fetch = r->internal.tier_query_fetch,
         .view_update_every = r->update_every,
         .query_granularity = r->update_every / r->group,
         .group_value_flags = RRDR_VALUE_NOTHING
@@ -883,22 +885,46 @@ static inline void rrd2rrdr_do_dimension(
             }
 
             // fetch the new point
-            uint16_t query_point_anomaly_count, query_point_count;
-            new_point.value = ops.next_metric(&ops.handle, &new_point.start_time, &new_point.end_time, &new_point.flags, &query_point_count, &query_point_anomaly_count);
-            ops.db_points_read_per_tier[ops.tier]++;
-            ops.db_total_points_read++;
+            {
+                STORAGE_POINT sp = ops.next_metric(&ops.handle);
 
-            // calculate the right value for the fetched point
-            if(likely(netdata_double_isnumber(new_point.value))) {
-                new_point.anomaly = query_point_count ? query_point_anomaly_count * 100 / query_point_count : 0;
+                ops.db_points_read_per_tier[ops.tier]++;
+                ops.db_total_points_read++;
 
-                if(unlikely(use_anomaly_bit_as_value))
-                    new_point.value = (NETDATA_DOUBLE)new_point.anomaly;
-            }
-            else {
-                new_point.value   = NAN;
-                new_point.anomaly = 0;
-                new_point.flags   = SN_EMPTY_SLOT;
+                new_point.start_time = sp.start_time;
+                new_point.end_time   = sp.end_time;
+                new_point.anomaly    = sp.count ? sp.anomaly_count * 100 / sp.count : 0;
+
+                if(likely(!storage_point_is_empty(sp))) {
+
+                    if(unlikely(use_anomaly_bit_as_value))
+                        new_point.value = (NETDATA_DOUBLE)new_point.anomaly;
+
+                    else {
+                        switch (ops.tier_query_fetch) {
+                            default:
+                            case TIER_QUERY_FETCH_AVERAGE:
+                                new_point.value = sp.sum / sp.count;
+                                break;
+
+                            case TIER_QUERY_FETCH_MIN:
+                                new_point.value = sp.min;
+                                break;
+
+                            case TIER_QUERY_FETCH_MAX:
+                                new_point.value = sp.max;
+                                break;
+
+                            case TIER_QUERY_FETCH_SUM:
+                                new_point.value = sp.sum;
+                                break;
+                        };
+                    }
+                }
+                else {
+                    new_point.value      = NAN;
+                    new_point.flags      = SN_EMPTY_SLOT;
+                }
             }
 
             if(unlikely(new_point.start_time == new_point.end_time)) {
@@ -1029,7 +1055,7 @@ static inline void rrd2rrdr_do_dimension(
 // ----------------------------------------------------------------------------
 // fill the gap of a tier
 
-extern void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, time_t now, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags);
+extern void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
     struct rrddim_tier *t = rd->tiers[tier];
@@ -1042,56 +1068,41 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
     // there is really nothing we can do
     if(now <= latest_time_t || latest_time_t <= 0 || time_diff < granularity) return;
 
-    time_t tier0_last_time = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
-    if(tier0_last_time <= latest_time_t) return;  // it is as bad as we are
+    struct rrddim_query_handle handle;
 
-    long after_wanted = latest_time_t;
-    long before_wanted = tier0_last_time;
-    long points_wanted = (before_wanted - after_wanted) / rd->update_every;
+    size_t all_points_read = 0;
 
-    if(points_wanted > 20000) {
-        // too many points
-        after_wanted = before_wanted - (20000 * rd->update_every);
-        points_wanted = (before_wanted - after_wanted) / rd->update_every;
+    // for each lower tier
+    for(int tr = tier - 1; tr >= 0 ;tr--){
+        time_t smaller_tier_last_time = rd->tiers[tr]->query_ops.latest_time(rd->tiers[tr]->db_metric_handle);
+        if(smaller_tier_last_time <= latest_time_t) continue;  // it is as bad as we are
+
+        long after_wanted = latest_time_t;
+        long before_wanted = smaller_tier_last_time;
+
+        rd->tiers[tr]->query_ops.init(rd->tiers[tr]->db_metric_handle, &handle, after_wanted, before_wanted, TIER_QUERY_FETCH_AVERAGE);
+
+        size_t points = 0;
+
+        while(!rd->tiers[tr]->query_ops.is_finished(&handle)) {
+
+            STORAGE_POINT sp = rd->tiers[tr]->query_ops.next_metric(&handle);
+
+            if(sp.end_time > latest_time_t) {
+                latest_time_t = sp.end_time;
+                store_metric_at_tier(rd, t, sp, sp.end_time * USEC_PER_SEC);
+                points++;
+            }
+        }
+
+        all_points_read += points;
+        rd->tiers[tr]->query_ops.finalize(&handle);
+
+        internal_error(true, "DBENGINE: backfilled chart '%s', dimension '%s', tier %d, from %ld to %ld, with %zu points from tier %d",
+                       rd->rrdset->name, rd->name, tier, after_wanted, before_wanted, points, tr);
     }
 
-    ONEWAYALLOC *owa = onewayalloc_create(0);
-    RRDR *r = rrdr_create_for_x_dimensions(owa, 1, points_wanted);
-    r->st = rd->rrdset;
-
-    r->group = 1;
-    r->update_every = rd->update_every;
-    r->after = after_wanted;
-    r->before = before_wanted;
-    r->internal.points_wanted = points_wanted;
-    r->internal.resampling_group = 1;
-    r->internal.resampling_divisor = 1.0;
-    r->internal.query_options = RRDR_OPTION_SELECTED_TIER;
-    r->internal.query_tier = 0;
-
-    rrdr_set_grouping_function(r, RRDR_GROUPING_AVERAGE);
-    r->internal.grouping_create(r, NULL);
-
-    // do the query
-    rrd2rrdr_do_dimension(r, points_wanted, rd, 0, after_wanted, before_wanted);
-
-    r->internal.grouping_free(r);
-    rrdr_query_completed(r->internal.db_points_read, r->internal.result_points_generated);
-
-    internal_error(true, "DBENGINE: backfilling chart '%s', dimension '%s' with update every %d, tier %d (tier grouping %d, granularity %ld, latest time %ld), from %ld to %ld, with %ld points from tier 0",
-                   rd->rrdset->name, rd->name, rd->update_every, tier, t->tier_grouping, granularity, latest_time_t, after_wanted, before_wanted, rrdr_rows(r));
-
-    for(long i = 0; i < rrdr_rows(r) ;i++) {
-        if(r->o[i] & RRDR_VALUE_EMPTY) continue;
-
-        time_t timestamp = r->t[i];
-        NETDATA_DOUBLE value = r->v[i];
-        SN_FLAGS flags = r->ar[i] ? 0 : SN_ANOMALY_BIT;
-        store_metric_at_tier(rd, t, timestamp, timestamp * USEC_PER_SEC, value, flags);
-    }
-
-    rrdr_free(owa, r);
-    onewayalloc_destroy(owa);
+    rrdr_query_completed(all_points_read, all_points_read);
 }
 
 // ----------------------------------------------------------------------------
