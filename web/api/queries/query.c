@@ -948,7 +948,7 @@ static inline void rrd2rrdr_do_dimension(
             else if(likely(now <= last1_point.end_time)) {
                 // our LAST point is still valid
                 current_point = last1_point;
-                query_interpolate_point(last1_point, last2_point, now);
+                query_interpolate_point(current_point, last2_point, now);
             }
             else {
                 // a GAP, we don't have a value this time
