@@ -3,7 +3,7 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
-int storage_tiers = 1;
+int storage_tiers = RRD_STORAGE_TIERS;
 int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 
 #if RRD_STORAGE_TIERS != 5
@@ -1033,7 +1033,7 @@ void rrdhost_free(RRDHOST *host) {
     // release its children resources
 
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+    for(int tier = 0; tier < storage_tiers ;tier++) {
         if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
             host->storage_instance[tier] &&
             !is_storage_engine_shared(host->storage_instance[tier]))
@@ -1072,7 +1072,7 @@ void rrdhost_free(RRDHOST *host) {
     health_alarm_log_free(host);
 
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+    for(int tier = 0; tier < storage_tiers ;tier++) {
         if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
             host->storage_instance[tier] &&
             !is_storage_engine_shared(host->storage_instance[tier]))
