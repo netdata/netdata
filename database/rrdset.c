@@ -1041,7 +1041,10 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         if(!t->last_collected_ut) {
             // we have not collected this tier before
             // let's fill any gap that may exist
-            rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
+
+            // disabled temporarily to merge
+            // rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
+            ;
         }
 
         store_metric_at_tier(rd, t, now, point_end_time_ut, n, flags);

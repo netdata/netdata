@@ -3,11 +3,11 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
-int storage_tiers = RRD_STORAGE_TIERS;
-int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60 };
+int storage_tiers = 1;
+int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 
-#if RRD_STORAGE_TIERS != 3
-#error RRD_STORAGE_TIERS is not 3 - you need to update the grouping iterations per tier
+#if RRD_STORAGE_TIERS != 5
+#error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
 
 int get_tier_grouping(int tier) {

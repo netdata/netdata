@@ -5,8 +5,10 @@
 struct rrdengine_instance multidb_ctx_storage_tier0;
 struct rrdengine_instance multidb_ctx_storage_tier1;
 struct rrdengine_instance multidb_ctx_storage_tier2;
-#if RRD_STORAGE_TIERS != 3
-#error RRD_STORAGE_TIERS is not 3 - you need to add allocations here
+struct rrdengine_instance multidb_ctx_storage_tier3;
+struct rrdengine_instance multidb_ctx_storage_tier4;
+#if RRD_STORAGE_TIERS != 5
+#error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 
@@ -14,6 +16,8 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
     multidb_ctx[1] = &multidb_ctx_storage_tier1;
     multidb_ctx[2] = &multidb_ctx_storage_tier2;
+    multidb_ctx[3] = &multidb_ctx_storage_tier3;
+    multidb_ctx[4] = &multidb_ctx_storage_tier4;
 }
 
 int db_engine_use_malloc = 0;
