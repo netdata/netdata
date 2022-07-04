@@ -1379,9 +1379,9 @@ RRDR *rrd2rrdr(
     rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
     query_debug_log(":relative2absolute after %lld, before %lld", after_wanted, before_wanted);
 
-    if(natural_points && storage_tiers > 1) {
+    if(natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
         update_every = rrdset_find_natural_update_every_for_timeframe(st, after_wanted, before_wanted, points_wanted, options, tier);
-        if(update_every <= 0) update_every = 1;
+        if(update_every <= 0) update_every = st->update_every;
         query_debug_log(":natural update every %d", update_every);
     }
 
