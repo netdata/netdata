@@ -339,7 +339,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-        int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+        int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags,
+                                host->system_info ? host->system_info->hops : 0);
         if (unlikely(rc))
             error_report("Failed to store machine GUID to the database");
         sql_load_node_id(host);
@@ -755,7 +756,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
     }
 
-    if (unlikely(sql_init_database(DB_CHECK_NONE, 0))) {
+    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             fatal("Failed to initialize SQLite");
         info("Skipping SQLITE metadata initialization since memory mode is not db engine");
@@ -887,7 +888,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 #endif
-
+    if (likely(system_info))
+       migrate_localhost(&localhost->host_uuid);
     sql_aclk_sync_init();
     rrd_unlock();
 

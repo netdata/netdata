@@ -3,11 +3,11 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 1
+#define DB_METADATA_VERSION 2
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
-    "registry_hostname text, update_every int, os text, timezone text, tags text);",
+    "registry_hostname text, update_every int, os text, timezone text, tags text, hops INT);",
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
     "chart_type int, memory_mode int, history_entries);",
@@ -345,7 +345,7 @@ static int attempt_database_fix()
     return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
 }
 
-static int init_database_batch(int rebuild, int init_type, const char *batch[])
+int init_database_batch(int rebuild, int init_type, const char *batch[])
 {
     int rc;
     char *err_msg = NULL;
@@ -437,7 +437,10 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
 
-    int target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
+    int target_version = DB_METADATA_VERSION;
+
+    if (likely(!memory))
+        target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
@@ -731,11 +734,53 @@ uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
     return uuid;
 }
 
-// Functions to create host, chart, dimension in the database
+static int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
+{
+    int rc, result = 1;
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement %s, rc = %d", sql, rc);
+        return 1;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to %s, rc = %d", sql, rc);
+        goto failed;
+    }
+
+    rc = execute_insert(res);
+    if (likely(rc == SQLITE_DONE))
+        result = 0;
+    else
+        error_report("Failed to execute %s, rc = %d", sql, rc);
+
+failed:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement %s, rc = %d", sql, rc);
+    return result;
+}
+
+
+// Migrate all hosts with hops zero to this host_uuid
+void migrate_localhost(uuid_t *host_uuid)
+{
+    int rc;
+
+    rc = exec_statement_with_uuid("UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0); ", host_uuid);
+    if (!rc)
+        rc = exec_statement_with_uuid("DELETE FROM host WHERE hops = 0 AND host_id <> @host_id; ", host_uuid);
+    if (!rc)
+        db_execute("DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);");
+
+}
 
 int sql_store_host(
     uuid_t *host_uuid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
-    const char *tzone, const char *tags)
+    const char *tzone, const char *tags, int hops)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc;
@@ -780,6 +825,10 @@ int sql_store_host(
         goto bind_fail;
 
     rc = sqlite3_bind_text(res, 7, tags, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 8, hops);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
