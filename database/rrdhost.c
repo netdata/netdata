@@ -3,7 +3,7 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
-int storage_tiers = RRD_STORAGE_TIERS;
+int storage_tiers = 1;
 int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 
 #if RRD_STORAGE_TIERS != 5
