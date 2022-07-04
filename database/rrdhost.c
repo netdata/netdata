@@ -740,6 +740,35 @@ restart_after_removal:
 // RRDHOST global / startup initialization
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
+
+#ifdef ENABLE_DBENGINE
+    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
+    if(storage_tiers < 1) {
+        error("At least 1 storage tier is required. Assuming 1.");
+        storage_tiers = 1;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
+    }
+    if(storage_tiers > RRD_STORAGE_TIERS) {
+        error("Up to %d storage tier are supported. Assuming %d.", RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
+        storage_tiers = RRD_STORAGE_TIERS;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
+    }
+
+    default_rrdeng_page_fetch_timeout = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page fetch timeout secs", PAGE_CACHE_FETCH_WAIT_TIMEOUT);
+    if (default_rrdeng_page_fetch_timeout < 1) {
+        info("'dbengine page fetch timeout secs' cannot be %d, using 1", default_rrdeng_page_fetch_timeout);
+        default_rrdeng_page_fetch_timeout = 1;
+        config_set_number(CONFIG_SECTION_DB, "dbengine page fetch timeout secs", default_rrdeng_page_fetch_timeout);
+    }
+
+    default_rrdeng_page_fetch_retries = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page fetch retries", MAX_PAGE_CACHE_FETCH_RETRIES);
+    if (default_rrdeng_page_fetch_retries < 1) {
+        info("\"dbengine page fetch retries\" found in netdata.conf cannot be %d, using 1", default_rrdeng_page_fetch_retries);
+        default_rrdeng_page_fetch_retries = 1;
+        config_set_number(CONFIG_SECTION_DB, "dbengine page fetch retries", default_rrdeng_page_fetch_retries);
+    }
+#endif
+
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
@@ -763,7 +792,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     }
 
     health_init();
-
     rrdpush_init();
 
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
@@ -796,18 +824,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     }
 
 #ifdef ENABLE_DBENGINE
-    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    if(storage_tiers < 1) {
-        error("At least 1 storage tier is required. Assuming 1.");
-        storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    }
-    if(storage_tiers > RRD_STORAGE_TIERS) {
-        error("Up to %d storage tier are supported. Assuming %d.", RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
-        storage_tiers = RRD_STORAGE_TIERS;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    }
-
     int created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
@@ -888,6 +904,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 #endif
+
     if (likely(system_info))
        migrate_localhost(&localhost->host_uuid);
     sql_aclk_sync_init();

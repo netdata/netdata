@@ -1080,13 +1080,14 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
         long after_wanted = latest_time_t;
         long before_wanted = smaller_tier_last_time;
 
-        rd->tiers[tr]->query_ops.init(rd->tiers[tr]->db_metric_handle, &handle, after_wanted, before_wanted, TIER_QUERY_FETCH_AVERAGE);
+        struct rrddim_tier *tmp = rd->tiers[tr];
+        tmp->query_ops.init(tmp->db_metric_handle, &handle, after_wanted, before_wanted, TIER_QUERY_FETCH_AVERAGE);
 
         size_t points = 0;
 
-        while(!rd->tiers[tr]->query_ops.is_finished(&handle)) {
+        while(!tmp->query_ops.is_finished(&handle)) {
 
-            STORAGE_POINT sp = rd->tiers[tr]->query_ops.next_metric(&handle);
+            STORAGE_POINT sp = tmp->query_ops.next_metric(&handle);
 
             if(sp.end_time > latest_time_t) {
                 latest_time_t = sp.end_time;
@@ -1096,7 +1097,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
         }
 
         all_points_read += points;
-        rd->tiers[tr]->query_ops.finalize(&handle);
+        tmp->query_ops.finalize(&handle);
 
         internal_error(true, "DBENGINE: backfilled chart '%s', dimension '%s', tier %d, from %ld to %ld, with %zu points from tier %d",
                        rd->rrdset->name, rd->name, tier, after_wanted, before_wanted, points, tr);
