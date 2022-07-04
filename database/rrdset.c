@@ -964,7 +964,69 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     return last_updated_ut;
 }
 
+static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, time_t now) {
+    time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
+    return now + loop - ((now + loop) % loop);
+}
+
+void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, time_t now, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+    if (unlikely(!t->next_point_time))
+        t->next_point_time = tier_next_point_time(rd, t, now);
+
+    if (likely(netdata_double_isnumber(n))) {
+        if (!t->count) {
+            t->sum_value = n;
+            t->min_value = n;
+            t->max_value = n;
+            if(flags & SN_ANOMALY_BIT)
+                t->anomaly_count = 1;
+            t->count = 1;
+        }
+        else {
+            t->sum_value += n;
+            t->min_value = MIN(t->min_value, n);
+            t->max_value = MAX(t->max_value, n);
+            if(flags & SN_ANOMALY_BIT)
+                t->anomaly_count++;
+            t->count++;
+        }
+
+        t->last_collected_ut = point_end_time_ut;
+        t->iterations++;
+
+        if (now >= t->next_point_time) {
+            if (!t->count)
+                t->collect_ops.store_metric(
+                    t->db_collection_handle,
+                    point_end_time_ut,
+                    NAN,
+                    NAN,
+                    NAN,
+                    0,
+                    0,
+                    SN_EMPTY_SLOT);
+            else {
+                t->collect_ops.store_metric(
+                    t->db_collection_handle,
+                    point_end_time_ut,
+                    t->sum_value,
+                    t->min_value,
+                    t->max_value,
+                    t->count,
+                    t->anomaly_count,
+                    flags);
+            }
+            t->iterations = 0;
+            t->count = 0;
+
+            t->next_point_time = tier_next_point_time(rd, t, now);
+        }
+    }
+}
+
 static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+
+    // store the metric on tier 0
     rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 
     for(int tier = 1; tier < storage_tiers ;tier++) {
@@ -974,53 +1036,13 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 
         time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
-        if (!t->next_point_time) {
-            time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
-            t->next_point_time = now + loop - ((now + loop) % loop);
+        if(!t->last_collected_ut) {
+            // we have not collected this tier before
+            // let's fill any gap that may exist
+            rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
         }
 
-        if (likely(netdata_double_isnumber(n))) {
-            if (!t->count) {
-                t->sum_value = n;
-                t->min_value = n;
-                t->max_value = n;
-                if (!(flags & SN_ANOMALY_BIT))
-                    t->anomaly_count = 1;
-                t->count = 1;
-            } else {
-                t->sum_value += n;
-                t->min_value = MIN(t->min_value, n);
-                t->max_value = MAX(t->max_value, n);
-                if (!(flags & SN_ANOMALY_BIT))
-                    t->anomaly_count++;
-                t->count++;
-            }
-
-            t->last_collected_ut = point_end_time_ut;
-            t->iterations++;
-
-            if (now >= t->next_point_time) {
-                if (!t->count)
-                    t->collect_ops.store_metric(
-                        t->db_collection_handle, point_end_time_ut, NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT);
-                else {
-                    t->collect_ops.store_metric(
-                        t->db_collection_handle,
-                        point_end_time_ut,
-                        t->sum_value,
-                        t->min_value,
-                        t->max_value,
-                        t->count,
-                        t->anomaly_count,
-                        flags);
-                }
-                t->iterations = 0;
-                t->count = 0;
-
-                time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
-                t->next_point_time = now + loop - ((now + loop) % loop);
-            }
-        }
+        store_metric_at_tier(rd, t, now, point_end_time_ut, n, flags);
     }
 }
 

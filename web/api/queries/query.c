@@ -1027,6 +1027,74 @@ static inline void rrd2rrdr_do_dimension(
 }
 
 // ----------------------------------------------------------------------------
+// fill the gap of a tier
+
+extern void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, time_t now, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags);
+
+void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
+    struct rrddim_tier *t = rd->tiers[tier];
+    if(unlikely(!t)) return;
+
+    time_t latest_time_t = t->query_ops.latest_time(t->db_metric_handle);
+    time_t granularity = t->tier_grouping * rd->update_every;
+    time_t time_diff   = now - latest_time_t;
+
+    // there is really nothing we can do
+    if(now <= latest_time_t || latest_time_t <= 0 || time_diff < granularity) return;
+
+    time_t tier0_last_time = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
+    if(tier0_last_time <= latest_time_t) return;  // it is as bad as we are
+
+    long after_wanted = latest_time_t;
+    long before_wanted = tier0_last_time;
+    long points_wanted = (before_wanted - after_wanted) / rd->update_every;
+
+    if(points_wanted > 20000) {
+        // too many points
+        after_wanted = before_wanted - (20000 * rd->update_every);
+        points_wanted = (before_wanted - after_wanted) / rd->update_every;
+    }
+
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+    RRDR *r = rrdr_create_for_x_dimensions(owa, 1, points_wanted);
+    r->st = rd->rrdset;
+
+    r->group = 1;
+    r->update_every = rd->update_every;
+    r->after = after_wanted;
+    r->before = before_wanted;
+    r->internal.points_wanted = points_wanted;
+    r->internal.resampling_group = 1;
+    r->internal.resampling_divisor = 1.0;
+    r->internal.query_options = RRDR_OPTION_SELECTED_TIER;
+    r->internal.query_tier = 0;
+
+    rrdr_set_grouping_function(r, RRDR_GROUPING_AVERAGE);
+    r->internal.grouping_create(r, NULL);
+
+    // do the query
+    rrd2rrdr_do_dimension(r, points_wanted, rd, 0, after_wanted, before_wanted);
+
+    r->internal.grouping_free(r);
+    rrdr_query_completed(r->internal.db_points_read, r->internal.result_points_generated);
+
+    internal_error(true, "DBENGINE: backfilling chart '%s', dimension '%s' with update every %d, tier %d (tier grouping %d, granularity %ld, latest time %ld), from %ld to %ld, with %ld points from tier 0",
+                   rd->rrdset->name, rd->name, rd->update_every, tier, t->tier_grouping, granularity, latest_time_t, after_wanted, before_wanted, rrdr_rows(r));
+
+    for(long i = 0; i < rrdr_rows(r) ;i++) {
+        if(r->o[i] & RRDR_VALUE_EMPTY) continue;
+
+        time_t timestamp = r->t[i];
+        NETDATA_DOUBLE value = r->v[i];
+        SN_FLAGS flags = r->ar[i] ? SN_ANOMALY_BIT : 0;
+        store_metric_at_tier(rd, t, timestamp, timestamp * USEC_PER_SEC, value, flags);
+    }
+
+    rrdr_free(owa, r);
+    onewayalloc_destroy(owa);
+}
+
+// ----------------------------------------------------------------------------
 // fill RRDR for the whole chart
 
 #ifdef NETDATA_INTERNAL_CHECKS

@@ -389,7 +389,8 @@ struct rrddim_query_ops {
 
 
 // ----------------------------------------------------------------------------
-// volatile state per RRD dimension
+// Storage tier data for every dimension
+
 struct rrddim_tier {
     RRD_MEMORY_MODE mode;                           // the memory mode of this tier
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
@@ -406,6 +407,8 @@ struct rrddim_tier {
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
 };
+
+extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
 
 // ----------------------------------------------------------------------------
 // volatile state per chart

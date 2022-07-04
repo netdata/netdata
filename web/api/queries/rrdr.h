@@ -81,7 +81,7 @@ typedef struct rrdresult {
     RRDR_DIMENSION_FLAGS *od; // the options for the dimensions
 
     time_t *t;                // array of n timestamps
-    NETDATA_DOUBLE *v;     // array n x d values
+    NETDATA_DOUBLE *v;        // array n x d values
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
     uint8_t *ar;              // array n x d of anomaly rates (0 - 200)
 
@@ -94,8 +94,7 @@ typedef struct rrdresult {
     time_t before;
     time_t after;
 
-    int has_st_lock;        // if st is read locked by us
-    uint8_t st_needs_lock;  // if ST should be locked
+    bool st_locked_by_rrdr_create;        // if st is read locked by us
 
     // internal rrd2rrdr() members below this point
     struct {
@@ -130,6 +129,7 @@ typedef struct rrdresult {
 #include "database/rrd.h"
 extern void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
 extern RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_param *context_param_list);
+extern RRDR *rrdr_create_for_x_dimensions(ONEWAYALLOC *owa, int dimensions, long points);
 
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"
