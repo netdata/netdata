@@ -848,6 +848,13 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         }
 
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
+
+        if(tier > 0 && get_tier_grouping(tier) > 65535) {
+            storage_tiers_grouping_iterations[tier] = 1;
+            error("DBENGINE on '%s': dbengine tier %d gives aggregation of more than 65535 points of tier 0. Disabling tiers above %d", localhost->hostname, tier, tier);
+            break;
+        }
+        
         internal_error(true, "DBENGINE tier %d grouping iterations is set to %d", tier, storage_tiers_grouping_iterations[tier]);
         ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
