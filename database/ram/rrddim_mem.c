@@ -51,6 +51,87 @@ int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
 }
 
 // ----------------------------------------------------------------------------
+
+// get the total duration in seconds of the round robin database
+#define rrddim_duration(st) (( (time_t)(rd)->rrdset->counter >= (time_t)(rd)->rrdset->entries ? (time_t)(rd)->rrdset->entries : (time_t)(rd)->rrdset->counter ) * (time_t)(rd)->rrdset->update_every)
+
+// get the last slot updated in the round robin database
+#define rrddim_last_slot(rd) ((size_t)(((rd)->rrdset->current_entry == 0) ? (rd)->rrdset->entries - 1 : (rd)->rrdset->current_entry - 1))
+
+// return the slot that has the oldest value
+#define rrddim_first_slot(rd) ((size_t)((rd)->rrdset->counter >= (size_t)(rd)->rrdset->entries ? (rd)->rrdset->current_entry : 0))
+
+// get the slot of the round robin database, for the given timestamp (t)
+// it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
+// only valid when not using dbengine
+static inline size_t rrddim_time2slot(RRDDIM *rd, time_t t) {
+    size_t ret = 0;
+    time_t last_entry_t  = rrddim_query_latest_time((STORAGE_METRIC_HANDLE *)rd);
+    time_t first_entry_t = rrddim_query_oldest_time((STORAGE_METRIC_HANDLE *)rd);
+    size_t entries       = rd->rrdset->entries;
+    size_t first_slot    = rrddim_first_slot(rd);
+    size_t last_slot     = rrddim_last_slot(rd);
+    size_t update_every  = rd->rrdset->update_every;
+
+    if(t >= last_entry_t) {
+        // the requested time is after the last entry we have
+        ret = last_slot;
+    }
+    else {
+        if(t <= first_entry_t) {
+            // the requested time is before the first entry we have
+            ret = first_slot;
+        }
+        else {
+            if(last_slot >= (size_t)((last_entry_t - t) / update_every))
+                ret = last_slot - ((last_entry_t - t) / update_every);
+            else
+                ret = last_slot - ((last_entry_t - t) / update_every) + entries;
+        }
+    }
+
+    if(unlikely(ret >= entries)) {
+        error("INTERNAL ERROR: rrddim_time2slot() on %s returns values outside entries", rd->name);
+        ret = entries - 1;
+    }
+
+    return ret;
+}
+
+// get the timestamp of a specific slot in the round robin database
+// only valid when not using dbengine
+static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
+    time_t ret;
+    time_t last_entry_t  = rrddim_query_latest_time((STORAGE_METRIC_HANDLE *)rd);
+    time_t first_entry_t = rrddim_query_oldest_time((STORAGE_METRIC_HANDLE *)rd);
+    size_t entries       = rd->rrdset->entries;
+    size_t last_slot     = rrddim_last_slot(rd);
+    size_t update_every  = rd->rrdset->update_every;
+
+    if(slot >= entries) {
+        error("INTERNAL ERROR: caller of rrddim_slot2time() gives invalid slot %zu", slot);
+        slot = entries - 1;
+    }
+
+    if(slot > last_slot)
+        ret = last_entry_t - (time_t)(update_every * (last_slot - slot + entries));
+    else
+        ret = last_entry_t - (time_t)(update_every * (last_slot - slot));
+
+    if(unlikely(ret < first_entry_t)) {
+        error("INTERNAL ERROR: rrddim_slot2time() on %s returns time too far in the past", rd->name);
+        ret = first_entry_t;
+    }
+
+    if(unlikely(ret > last_entry_t)) {
+        error("INTERNAL ERROR: rrddim_slot2time() on %s returns time into the future", rd->name);
+        ret = last_entry_t;
+    }
+
+    return ret;
+}
+
+// ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
 void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type) {
@@ -62,13 +143,13 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_qu
     handle->start_time = start_time;
     handle->end_time = end_time;
     struct mem_query_handle* h = calloc(1, sizeof(struct mem_query_handle));
-    h->slot = rrdset_time2slot(rd->rrdset, start_time);
-    h->last_slot = rrdset_time2slot(rd->rrdset, end_time);
-    h->dt = rd->update_every;
+    h->slot           = rrddim_time2slot(rd, start_time);
+    h->last_slot      = rrddim_time2slot(rd, end_time);
+    h->dt = rd->rrdset->update_every;
 
     h->next_timestamp = start_time;
-    h->slot_timestamp = rrdset_slot2time(rd->rrdset, h->slot);
-    h->last_timestamp = rrdset_slot2time(rd->rrdset, h->last_slot);
+    h->slot_timestamp = rrddim_slot2time(rd, h->slot);
+    h->last_timestamp = rrddim_slot2time(rd, h->last_slot);
 
     // info("RRDDIM QUERY INIT: start %ld, end %ld, next %ld, first %ld, last %ld, dt %ld", start_time, end_time, h->next_timestamp, h->slot_timestamp, h->last_timestamp, h->dt);
 
@@ -137,5 +218,5 @@ time_t rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
 
 time_t rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
-    return (time_t)(rd->rrdset->last_updated.tv_sec - rrdset_duration(rd->rrdset));
+    return (time_t)(rd->rrdset->last_updated.tv_sec - rrddim_duration(rd));
 }
