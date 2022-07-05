@@ -80,6 +80,7 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   build-static: # Build the static binary archives, and store them as artifacts.
@@ -151,6 +152,7 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   matrix: # Generate the shared build matrix for our build tests.
@@ -220,6 +222,7 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
@@ -319,6 +322,7 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   source-build: # Test various source build arrangements.
@@ -391,6 +395,7 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   updater-check: # Test the generated dist archive using the updater code.
@@ -468,6 +473,7 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   prepare-upload: # Consolidate the artifacts for uploading or releasing.
@@ -534,6 +540,7 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
@@ -582,6 +589,7 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   artifact-verification-static: # Verify the static installer works with the consolidated artifacts.
@@ -630,12 +638,13 @@ jobs:
             failure()
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
           }}
 
   upload-nightly: # Upload the nightly build artifacts to GCS.
     name: Upload Nightly Artifacts
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
     needs:
       - updater-check
       - source-build
@@ -703,7 +712,7 @@ jobs:
   upload-release: # Create the draft release and upload the build artifacts.
     name: Create Release Draft
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release' && github.repository == 'netdata/netdata'
     needs:
       - updater-check
       - source-build
