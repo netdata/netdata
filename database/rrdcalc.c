@@ -666,10 +666,16 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
                  host->hostname,
                  rc->host_labels);
 
+            RRDCALC *rc_old = rc->next;
+
             if(host->alarms == alarms)
                 rrdcalc_unlink_and_free(host, rc);
             else
                 rrdcalc_foreach_unlink_and_free(host, rc);
+
+            if (!rc_old)
+                break;
+            rc = rc_old;
         }
     }
 }
