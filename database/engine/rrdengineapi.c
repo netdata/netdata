@@ -238,8 +238,6 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
     storage_number number;
     storage_number_tier1_t number_tier1;
 
-    number = pack_storage_number(n, flags);
-
     if (!tier) {
         number = pack_storage_number(n, flags);
     }
