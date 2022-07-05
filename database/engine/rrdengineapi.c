@@ -223,31 +223,13 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
                               uint16_t anomaly_count,
                               SN_FLAGS flags)
 {
-    UNUSED(min_value);
-    UNUSED(max_value);
-    UNUSED(count);
-
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
     struct rrdengine_instance *ctx = handle->ctx;
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = handle->descr;
     RRDDIM *rd = metric_handle->rd;
-    int tier = ctx->tier;
-
-    storage_number number;
     storage_number_tier1_t number_tier1;
-
-    if (!tier) {
-        number = pack_storage_number(n, flags);
-    }
-    else {
-        number_tier1.sum_value = n; //pack_storage_number(n, flags);
-        number_tier1.min_value = min_value; //pack_storage_number(n, flags);
-        number_tier1.max_value = max_value; //pack_storage_number(n, flags);
-        number_tier1.anomaly_count = anomaly_count;
-        number_tier1.count = count;
-    }
 
     void *page;
     uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
@@ -293,10 +275,21 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
         }
     }
     page = descr->pg_cache_descr->page;
-    if (!tier)
-        ((storage_number *) page)[descr->page_length / storage_size] = number;
-    else
-        ((storage_number_tier1_t *) page)[descr->page_length / storage_size] = number_tier1;
+
+    switch (descr->type) {
+        default:
+        case PAGE_METRICS:
+            ((storage_number *) page)[descr->page_length / storage_size] =  pack_storage_number(n, flags);
+            break;
+        case PAGE_TIER:
+            number_tier1.sum_value = n;
+            number_tier1.min_value = min_value;
+            number_tier1.max_value = max_value;
+            number_tier1.anomaly_count = anomaly_count;
+            number_tier1.count = count;
+            ((storage_number_tier1_t *) page)[descr->page_length / storage_size] = number_tier1;
+    }
+
     pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + storage_size);
 
     if (perfect_page_alignment)
