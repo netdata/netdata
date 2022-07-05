@@ -35,7 +35,7 @@ void grouping_free_median(RRDR *r) {
     struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
     if(g) onewayalloc_freez(r->internal.owa, g->series);
 
-    freez(r->internal.grouping_data);
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 
