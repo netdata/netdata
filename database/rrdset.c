@@ -973,11 +973,19 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
     if (unlikely(!t->next_point_time))
         t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
 
+    // merge the dates into our virtual point
+    if (unlikely(sp.start_time < t->virtual_point.start_time))
+        t->virtual_point.start_time = sp.start_time;
+
+    if (likely(sp.end_time > t->virtual_point.end_time))
+        t->virtual_point.end_time = sp.end_time;
+
+    // merge the values into our virtual point
     if (likely(!storage_point_is_empty(sp))) {
-        if (!t->virtual_point.count) {
-            t->virtual_point = sp;
-        }
-        else {
+        // we aggregate only non NULLs into higher tiers
+
+        if (likely(!storage_point_is_unset(t->virtual_point))) {
+            // merge the collected point to our virtual one
             t->virtual_point.sum += sp.sum;
             t->virtual_point.min = MIN(t->virtual_point.min, sp.min);
             t->virtual_point.max = MAX(t->virtual_point.max, sp.max);
@@ -985,38 +993,39 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
             t->virtual_point.anomaly_count += sp.anomaly_count;
             t->virtual_point.flags |= sp.flags;
         }
-
-        t->last_collected_ut = now_ut;
-        t->iterations++;
-
-        if (sp.end_time >= t->next_point_time) {
-            if (!t->virtual_point.count)
-                t->collect_ops.store_metric(
-                    t->db_collection_handle,
-                    now_ut,
-                    NAN,
-                    NAN,
-                    NAN,
-                    0,
-                    0,
-                    SN_EMPTY_SLOT);
-            else {
-                t->collect_ops.store_metric(
-                    t->db_collection_handle,
-                    now_ut,
-                    t->virtual_point.sum,
-                    t->virtual_point.min,
-                    t->virtual_point.max,
-                    t->virtual_point.count,
-                    t->virtual_point.anomaly_count,
-                    t->virtual_point.flags);
-            }
-
-            t->iterations = 0;
-            t->virtual_point.count = 0;
-
-            t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+        else {
+            // reset our virtual point to this one
+            t->virtual_point = sp;
         }
+    }
+
+    if(unlikely(sp.end_time >= t->next_point_time)) {
+        if (likely(!storage_point_is_unset(t->virtual_point))) {
+
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                now_ut,
+                t->virtual_point.sum,
+                t->virtual_point.min,
+                t->virtual_point.max,
+                t->virtual_point.count,
+                t->virtual_point.anomaly_count,
+                t->virtual_point.flags);
+        }
+        else {
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                now_ut,
+                NAN,
+                NAN,
+                NAN,
+                0,
+                0,
+                SN_EMPTY_SLOT);
+        }
+
+        t->virtual_point.count = 0;
+        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
     }
 }
 
@@ -1039,6 +1048,8 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         }
 
         STORAGE_POINT sp = {
+            .start_time = now - rd->update_every,
+            .end_time = now,
             .min = n,
             .max = n,
             .sum = n,
@@ -1047,6 +1058,7 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
             .flags = flags
         };
 
+        t->last_collected_ut = point_end_time_ut;
         store_metric_at_tier(rd, t, sp, point_end_time_ut);
     }
 }

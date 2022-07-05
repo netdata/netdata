@@ -5,6 +5,7 @@
 
 int storage_tiers = 1;
 int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
+RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
@@ -842,6 +843,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         int page_cache_mb = default_rrdeng_page_cache_mb;
         int disk_space_mb = default_multidb_disk_quota_mb;
         int grouping_iterations = storage_tiers_grouping_iterations[tier];
+        RRD_BACKFILL backfill = storage_tiers_backfill[tier];
 
         if(tier > 0) {
             snprintfz(dbengineconfig, 200, "dbengine tier %d page cache size MB", tier);
@@ -862,9 +864,21 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
                 config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
                 error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be more than the previous tier. Assuming 255.", localhost->hostname, tier);
             }
+
+            snprintfz(dbengineconfig, 200, "dbengine tier %d backfill", tier);
+            const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
+            if(strcmp(bf, "new") == 0) backfill = RRD_BACKFILL_NEW;
+            else if(strcmp(bf, "full") == 0) backfill = RRD_BACKFILL_FULL;
+            else if(strcmp(bf, "none") == 0) backfill = RRD_BACKFILL_NONE;
+            else {
+                error("DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
+                config_set(CONFIG_SECTION_DB, dbengineconfig, "new");
+                backfill = RRD_BACKFILL_NEW;
+            }
         }
 
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
+        storage_tiers_backfill[tier] = backfill;
 
         if(tier > 0 && get_tier_grouping(tier) > 65535) {
             storage_tiers_grouping_iterations[tier] = 1;

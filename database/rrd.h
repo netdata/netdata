@@ -53,6 +53,13 @@ struct pg_cache_page_index;
 extern int storage_tiers;
 extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
+typedef enum { RRD_BACKFILL_NONE,
+    RRD_BACKFILL_FULL,
+    RRD_BACKFILL_NEW
+} RRD_BACKFILL;
+
+extern RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
+
 enum {
     CONTEXT_FLAGS_ARCHIVE = 0x01,
     CONTEXT_FLAGS_CHART   = 0x02,
@@ -363,6 +370,15 @@ typedef struct storage_point {
     SN_FLAGS flags;         // flags stored with the point
 } STORAGE_POINT;
 
+#define storage_point_unset(x)                     do { \
+    (x).min = (x).max = (x).sum = NAN;                  \
+    (x).count = 0;                                      \
+    (x).anomaly_count = 0;                              \
+    (x).flags = SN_EMPTY_SLOT;                          \
+    (x).start_time = 0;                                 \
+    (x).end_time = 0;                                   \
+    } while(0)
+
 #define storage_point_empty(x, start_t, end_t)     do { \
     (x).min = (x).max = (x).sum = NAN;                  \
     (x).count = 1;                                      \
@@ -372,7 +388,8 @@ typedef struct storage_point {
     (x).end_time = end_t;                               \
     } while(0)
 
-#define storage_point_is_empty(x) (!netdata_double_isnumber((x).sum) || !(x).count)
+#define storage_point_is_unset(x) (!(x).count)
+#define storage_point_is_empty(x) (!netdata_double_isnumber((x).sum))
 
 // ------------------------------------------------------------------------
 // function pointers that handle data collection
@@ -418,13 +435,13 @@ struct rrddim_query_ops {
 // Storage tier data for every dimension
 
 struct rrddim_tier {
+    int tier_grouping;
     RRD_MEMORY_MODE mode;                           // the memory mode of this tier
+    RRD_BACKFILL backfill;                          // backfilling configuration
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     STORAGE_POINT virtual_point;
-    size_t iterations;
     time_t next_point_time;
-    int tier_grouping;
     usec_t last_collected_ut;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;

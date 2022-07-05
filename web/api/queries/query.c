@@ -895,7 +895,7 @@ static inline void rrd2rrdr_do_dimension(
                 new_point.end_time   = sp.end_time;
                 new_point.anomaly    = sp.count ? sp.anomaly_count * 100 / sp.count : 0;
 
-                if(likely(!storage_point_is_empty(sp))) {
+                if(likely(!storage_point_is_unset(sp) && !storage_point_is_empty(sp))) {
 
                     if(unlikely(use_anomaly_bit_as_value))
                         new_point.value = (NETDATA_DOUBLE)new_point.anomaly;
@@ -1058,6 +1058,9 @@ static inline void rrd2rrdr_do_dimension(
 extern void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
+    if(unlikely(tier < 0 || tier >= storage_tiers)) return;
+    if(storage_tiers_backfill[tier] == RRD_BACKFILL_NONE) return;
+
     struct rrddim_tier *t = rd->tiers[tier];
     if(unlikely(!t)) return;
 
@@ -1065,8 +1068,11 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
     time_t granularity = (time_t)t->tier_grouping * (time_t)rd->update_every;
     time_t time_diff   = now - latest_time_t;
 
+    // if the user wants only NEW backfilling, and we don't have any data
+    if(storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_t <= 0) return;
+
     // there is really nothing we can do
-    if(now <= latest_time_t || latest_time_t <= 0 || time_diff < granularity) return;
+    if(now <= latest_time_t || time_diff < granularity) return;
 
     struct rrddim_query_handle handle;
 
@@ -1074,10 +1080,11 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
 
     // for each lower tier
     for(int tr = tier - 1; tr >= 0 ;tr--){
+        time_t smaller_tier_first_time = rd->tiers[tr]->query_ops.oldest_time(rd->tiers[tr]->db_metric_handle);
         time_t smaller_tier_last_time = rd->tiers[tr]->query_ops.latest_time(rd->tiers[tr]->db_metric_handle);
         if(smaller_tier_last_time <= latest_time_t) continue;  // it is as bad as we are
 
-        long after_wanted = latest_time_t;
+        long after_wanted = (latest_time_t < smaller_tier_first_time) ? smaller_tier_first_time : latest_time_t;
         long before_wanted = smaller_tier_last_time;
 
         struct rrddim_tier *tmp = rd->tiers[tr];
