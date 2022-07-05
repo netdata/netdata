@@ -231,18 +231,14 @@ int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle)
     return mock_type(int);
 }
 
-NETDATA_DOUBLE __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags, uint16_t *count, uint16_t *anomaly_count)
+STORAGE_POINT __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle)
 {
     (void)handle;
-    (void)current_time;
-    (void)end_time;
-    (void)flags;
-    (void)count;
-    (void)anomaly_count;
-
 
     function_called();
-    return mock_type(NETDATA_DOUBLE);
+
+    STORAGE_POINT sp = {};
+    return sp;    
 }
 
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
