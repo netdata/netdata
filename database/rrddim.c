@@ -410,12 +410,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         STORAGE_ENGINE* eng = storage_engine_get(rd->tiers[tier]->mode);
         if(eng && eng->api.free)
             eng->api.free(rd->tiers[tier]->db_metric_handle);
-    }
 
-    freez((void *)rd->id);
-    freez((void *)rd->name);
-
-    for(int tier = 0; tier < storage_tiers ;tier++) {
         freez(rd->tiers[tier]);
         rd->tiers[tier] = NULL;
     }
@@ -427,6 +422,8 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
             freez(rd->db);
     }
 
+    freez((void *)rd->id);
+    freez((void *)rd->name);
     freez(rd);
 }
 

@@ -53,7 +53,8 @@ struct pg_cache_page_index;
 extern int storage_tiers;
 extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
-typedef enum { RRD_BACKFILL_NONE,
+typedef enum {
+    RRD_BACKFILL_NONE,
     RRD_BACKFILL_FULL,
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;

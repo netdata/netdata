@@ -859,11 +859,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
                 config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
                 error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be less than 2. Assuming 2.", localhost->hostname, tier);
             }
-            if(grouping_iterations > 255) {
-                grouping_iterations = 255;
-                config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be more than the previous tier. Assuming 255.", localhost->hostname, tier);
-            }
 
             snprintfz(dbengineconfig, 200, "dbengine tier %d backfill", tier);
             const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
