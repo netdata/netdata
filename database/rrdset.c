@@ -1912,6 +1912,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
 
     time_t now = now_realtime_sec();
 
+    st_on_file->magic[sizeof(RRDSET_MAGIC_V019)] = '\0';
     if(strcmp(st_on_file->magic, RRDSET_MAGIC_V019) != 0) {
         info("Initializing file '%s'.", fullfilename);
         memset(st_on_file, 0, size);
