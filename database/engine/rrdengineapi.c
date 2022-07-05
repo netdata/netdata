@@ -229,7 +229,6 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = handle->descr;
     RRDDIM *rd = metric_handle->rd;
-    storage_number_tier1_t number_tier1;
 
     void *page;
     uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
@@ -274,20 +273,34 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
             perfect_page_alignment = 1;
         }
     }
+
     page = descr->pg_cache_descr->page;
 
     switch (descr->type) {
-        default:
-        case PAGE_METRICS:
-            ((storage_number *) page)[descr->page_length / storage_size] =  pack_storage_number(n, flags);
-            break;
-        case PAGE_TIER:
-            number_tier1.sum_value = n;
-            number_tier1.min_value = min_value;
-            number_tier1.max_value = max_value;
+        case PAGE_METRICS: {
+            ((storage_number *)page)[descr->page_length / storage_size] = pack_storage_number(n, flags);
+        }
+        break;
+
+        case PAGE_TIER: {
+            storage_number_tier1_t number_tier1;
+            number_tier1.sum_value = (float)n;
+            number_tier1.min_value = (float)min_value;
+            number_tier1.max_value = (float)max_value;
             number_tier1.anomaly_count = anomaly_count;
             number_tier1.count = count;
-            ((storage_number_tier1_t *) page)[descr->page_length / storage_size] = number_tier1;
+            ((storage_number_tier1_t *)page)[descr->page_length / storage_size] = number_tier1;
+        }
+        break;
+
+        default: {
+            static bool logged = false;
+            if(!logged) {
+                error("DBENGINE: cannot store metric on unknown page type id %d", descr->type);
+                logged = true;
+            }
+        }
+        break;
     }
 
     pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + storage_size);
