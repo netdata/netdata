@@ -2656,7 +2656,6 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
 
     if (strlen(cg->chart_id) >= RRD_ID_LENGTH_MAX) {
         info("cgroup '%s' (chart id '%s') disabled because chart_id exceeds the limit (RRD_ID_LENGTH_MAX)", cg->id, cg->chart_id);
-        cg->processed = 1;
         return;
     }
 
