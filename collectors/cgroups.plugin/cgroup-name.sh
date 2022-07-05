@@ -185,6 +185,13 @@ function k8s_get_kubepod_name() {
   # |   |   |-- kubepods-besteffort-pod10fb5647_c724_400c_b9cc_0e6eae3110e7.slice
   # |   |   |   |-- docker-36e5eb5056dfdf6dbb75c0c44a1ecf23217fe2c50d606209d8130fcbb19fb5a7.scope
   #
+  # kind v0.14.0
+  # |-- kubelet.slice
+  # |   |-- kubelet-kubepods.slice
+  # |   |   |-- kubelet-kubepods-besteffort.slice
+  # |   |   |   |-- kubelet-kubepods-besteffort-pod7881ed9e_c63e_4425_b5e0_ac55a08ae939.slice
+  # |   |   |   |   |-- cri-containerd-00c7939458bffc416bb03451526e9fde13301d6654cfeadf5b4964a7fb5be1a9.scope
+  #
   # NOTE: cgroups plugin
   # - uses '_' to join dir names (so it is <parent>_<child>_<child>_...)
   # - replaces '.' with '-'
@@ -193,7 +200,7 @@ function k8s_get_kubepod_name() {
   local cgroup_path="${1}"
   local id="${2}"
 
-  if [[ ! $id =~ ^kubepods ]]; then
+  if [[ ! $id =~ ^.*kubepods.* ]]; then
     warning "${fn}: '${id}' is not kubepod cgroup."
     return 1
   fi

@@ -567,6 +567,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     now_realtime_timeval(&now);
 
     int reset = 0;
+    rd_on_file->magic[sizeof(RRDDIMENSION_MAGIC_V019)] = '\0';
     if(strcmp(rd_on_file->magic, RRDDIMENSION_MAGIC_V019) != 0) {
         info("Initializing file %s.", fullfilename);
         memset(rd_on_file, 0, size);

@@ -657,8 +657,13 @@ void rrdcalc_foreach_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
 }
 
 static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
-    for(RRDCALC *rc = alarms ; rc ; rc = rc->next ) {
-        if (!rc->host_labels) continue;
+    for(RRDCALC *rc = alarms ; rc ; ) {
+        RRDCALC *rc_next = rc->next;
+
+        if (!rc->host_labels) {
+            rc = rc_next;
+            continue;
+        }
 
         if(!rrdlabels_match_simple_pattern_parsed(host->host_labels, rc->host_labels_pattern, '=')) {
             info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
@@ -671,6 +676,7 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
             else
                 rrdcalc_foreach_unlink_and_free(host, rc);
         }
+        rc = rc_next;
     }
 }
 

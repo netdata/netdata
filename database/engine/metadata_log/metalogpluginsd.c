@@ -30,7 +30,7 @@ PARSER_RC metalog_pluginsd_host_action(
     }
 
     if (likely(!uuid_parse(machine_guid, state->host_uuid))) {
-        int rc = sql_store_host(&state->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+        int rc = sql_store_host(&state->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags, 1);
         if (unlikely(rc)) {
             errno = 0;
             error("Failed to store host %s with UUID %s in the database", hostname, machine_guid);
