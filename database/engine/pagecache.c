@@ -1371,6 +1371,6 @@ void free_page_cache(struct rrdengine_instance *ctx)
 
     for(int i = 0; i < 256 ;i++) {
         if(pages_count_per_type[i])
-            info("DBENGINE page type %d total pages %lu, average page size %0.2f bytes", i, pages_count_per_type[i], (double)pages_size_per_type[i]/pages_count_per_type[i]);
+            info("DBENGINE STATISTICS ON PAGE TYPES: page type %d total pages %lu, average page size %0.2f bytes", i, pages_count_per_type[i], (double)pages_size_per_type[i]/pages_count_per_type[i]);
     }
 }
