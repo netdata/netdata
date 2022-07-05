@@ -408,7 +408,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         if(!rd->tiers[tier]) continue;
 
         STORAGE_ENGINE* eng = storage_engine_get(rd->tiers[tier]->mode);
-        if(eng && eng->api.free)
+        if(eng)
             eng->api.free(rd->tiers[tier]->db_metric_handle);
 
         freez(rd->tiers[tier]);

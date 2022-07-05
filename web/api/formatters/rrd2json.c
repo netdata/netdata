@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web/api/web_api_v1.h"
+#include "database/storage_engine.h"
 
 static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int archive_mode)
 {
@@ -18,8 +19,15 @@ static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int arc
         }
     }
 
-    for(int tier = 0; tier < storage_tiers ;tier++)
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        if(!temp_rd->tiers[tier]) continue;
+
+        STORAGE_ENGINE* eng = storage_engine_get(temp_rd->tiers[tier]->mode);
+        if(eng)
+            eng->api.free(temp_rd->tiers[tier]->db_metric_handle);
+
         onewayalloc_freez(owa, temp_rd->tiers[tier]);
+    }
 
     onewayalloc_freez(owa, temp_rd);
 }
