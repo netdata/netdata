@@ -1387,11 +1387,11 @@ RRDR *rrd2rrdr(
             after_wanted = -600;
             query_debug_log(":zero600 after_wanted %lld", after_wanted);
         }
+    }
 
-        if(points_wanted == 0) {
-            points_wanted = 600;
-            query_debug_log(":zero600 points_wanted %ld", points_wanted);
-        }
+    if(points_wanted == 0) {
+        points_wanted = 600;
+        query_debug_log(":zero600 points_wanted %ld", points_wanted);
     }
 
     // convert our before_wanted and after_wanted to absolute
@@ -1424,6 +1424,7 @@ RRDR *rrd2rrdr(
     // automatic_natural_points is set when the user wants all the points available in the database
     if(automatic_natural_points) {
         points_wanted = (before_wanted - after_wanted + 1) / query_granularity;
+        if(unlikely(points_wanted <= 0)) points_wanted = 1;
         query_debug_log(":auto natural points_wanted %ld", points_wanted);
     }
 
@@ -1450,6 +1451,7 @@ RRDR *rrd2rrdr(
 
     // the available points of the query
     long points_available = (duration + 1) / query_granularity;
+    if(unlikely(points_available <= 0)) points_available = 1;
     query_debug_log(":points_available %ld", points_available);
 
     if(points_wanted > points_available) {
@@ -1478,6 +1480,9 @@ RRDR *rrd2rrdr(
 
         if(points_wanted * group < points_available)
             points_wanted++;
+
+        if(unlikely(points_wanted <= 0))
+            points_wanted = 1;
 
         query_debug_log(":optimal points %ld", points_wanted);
     }
