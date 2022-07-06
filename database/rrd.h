@@ -831,7 +831,7 @@ struct rrdhost {
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     void *dbsync_worker;
 
-    volatile unsigned int rrdpush_sender_connected; // 1 when the sender is ready to push metrics
+    bool rrdpush_sender_connected;                  // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
 
     volatile unsigned int rrdpush_sender_error_shown; // 1 when we have logged a communication error
