@@ -275,6 +275,7 @@ static int check_journal_file_superblock(uv_file file)
 static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                                     void *buf, unsigned max_size)
 {
+    static uint64_t page_error_map[4] = {0,0,0,0};
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned i, count, payload_length, descr_size, valid_pages;
     struct rrdeng_page_descr *descr;
@@ -301,11 +302,31 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         uuid_t *temp_id;
         Pvoid_t *PValue;
         struct pg_cache_page_index *page_index = NULL;
+        uint8_t page_type = jf_metric_data->descr[i].type;
 
-        if (jf_metric_data->descr[i].type > PAGE_TYPE_MAX) {
-            error("Unknown page type %d encountered.", jf_metric_data->descr[i].type );
+        if (page_type > PAGE_TYPE_MAX) {
+            if (!(page_error_map[page_type / 64] & (1 << (page_type % 64)))) {
+                error("Unknown page type %d encountered.", page_type);
+                page_error_map[page_type / 64] |= (1 << (page_type % 64));
+            }
             continue;
         }
+        uint64_t start_time = jf_metric_data->descr[i].start_time;
+        uint64_t end_time = jf_metric_data->descr[i].end_time;
+
+        if (unlikely(start_time > end_time)) {
+            error("Invalid page encountered, start time %lu > end time %lu", start_time , end_time );
+            continue;
+        }
+
+        if (unlikely(start_time == end_time)) {
+            size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
+            if (unlikely(entries > 1)) {
+                error("Invalid page encountered, start time %lu = end time but %zu entries were found", start_time, entries);
+                continue;
+            }
+        }
+
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -327,11 +348,11 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
         descr = pg_cache_create_descr();
         descr->page_length = jf_metric_data->descr[i].page_length;
-        descr->start_time = jf_metric_data->descr[i].start_time;
-        descr->end_time = jf_metric_data->descr[i].end_time;
+        descr->start_time = start_time;
+        descr->end_time = end_time;
         descr->id = &page_index->id;
         descr->extent = extent;
-        descr->type = jf_metric_data->descr[i].type;
+        descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
     }
