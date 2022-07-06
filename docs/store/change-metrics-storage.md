@@ -51,7 +51,7 @@ accuracy of the values you enter below, changes in the compression ratio, and th
 
 :::
 
-<Calculator />
+https://docs.google.com/spreadsheets/d/e/2PACX-1vS4qfEZbhc2Ku_tYwyu4yQQsFU975pxWrCJD1fbDG-l9bWq0xTe2xROV7uRbVzdfIpZUwH0Z0s5tACd/pubhtml?gid=2017045638&single=true
 
 ## Edit `netdata.conf` with recommended database engine settings
 
