@@ -19,6 +19,8 @@ typedef struct arrayalloc_page {
     size_t size;                  // the total size of the page
     size_t used_elements;         // the total number of used elements on this page
     uint8_t *data;
+    ARAL_FREE *free_list;
+    struct arrayalloc_page *prev; // the prev page on the list
     struct arrayalloc_page *next; // the next page on the list
 } ARAL_PAGE;
 
@@ -62,17 +64,15 @@ static void arrayalloc_init(ARAL *ar) {
             ar->elements = 1000;
 
         ar->internal.mmap = (ar->use_mmap && ar->cache_dir && *ar->cache_dir) ? true : false;
-        ar->internal.max_alloc_size = (ar->internal.mmap) ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC;
+        ar->internal.max_alloc_size = natural_alignment(ar->internal.mmap ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC);
 
         if(ar->internal.max_alloc_size % ar->internal.element_size)
             ar->internal.max_alloc_size -= ar->internal.max_alloc_size % ar->internal.element_size;
 
-        ar->internal.pages = NULL;
-        ar->internal.free_list = NULL;
+        ar->internal.first_page = NULL;
+        ar->internal.last_page = NULL;
         ar->internal.allocation_multiplier = 1;
         ar->internal.file_number = 0;
-        ar->internal.total_allocated = 0;
-        ar->internal.initialized = true;
 
         if(ar->internal.mmap) {
             char filename[FILENAME_MAX + 1];
@@ -81,15 +81,75 @@ static void arrayalloc_init(ARAL *ar) {
             if (r != 0 && errno != EEXIST)
                 fatal("Cannot create directory '%s'", filename);
         }
+
+        ar->internal.initialized = true;
     }
 
     netdata_mutex_unlock(&mutex);
 }
 
 static void arrayalloc_free_checks(ARAL *ar, ARAL_FREE *fr) {
-    internal_error(fr->size < ar->internal.element_size, "ARRAYALLOC: free item of size %zu, less than the expected element size %zu", fr->size, ar->internal.element_size);
-    internal_error(fr->size % ar->internal.element_size, "ARRAYALLOC: free item of size %zu is not multiple to element size %zu", fr->size, ar->internal.element_size);
-    ;
+    if(fr->size < ar->internal.element_size)
+        fatal("ARRAYALLOC: free item of size %zu, less than the expected element size %zu", fr->size, ar->internal.element_size);
+
+    if(fr->size % ar->internal.element_size)
+        fatal("ARRAYALLOC: free item of size %zu is not multiple to element size %zu", fr->size, ar->internal.element_size);
+}
+
+void unlink_page(ARAL *ar, ARAL_PAGE *page) {
+    if(unlikely(!page)) return;
+
+    if(page->next)
+        page->next->prev = page->prev;
+
+    if(page->prev)
+        page->prev->next = page->next;
+
+    if(page == ar->internal.first_page)
+        ar->internal.first_page = page->next;
+
+    if(page == ar->internal.last_page)
+        ar->internal.last_page = page->prev;
+}
+
+ARAL_PAGE *unlink_first_page(ARAL *ar) {
+    ARAL_PAGE *page = ar->internal.first_page;
+    unlink_page(ar, page);
+    return page;
+}
+
+void link_page_first(ARAL *ar, ARAL_PAGE *page) {
+    page->prev = NULL;
+    page->next = ar->internal.first_page;
+    if(page->next) page->next->prev = page;
+
+    ar->internal.first_page = page;
+
+    if(!ar->internal.last_page)
+        ar->internal.last_page = page;
+}
+
+void link_page_last(ARAL *ar, ARAL_PAGE *page) {
+    page->next = NULL;
+    page->prev = ar->internal.last_page;
+    if(page->prev) page->prev->next = page;
+
+    ar->internal.last_page = page;
+
+    if(!ar->internal.first_page)
+        ar->internal.first_page = page;
+}
+
+ARAL_PAGE *find_page_with_allocation(ARAL *ar, void *ptr) {
+    size_t seeking = (size_t)ptr;
+    ARAL_PAGE *page;
+
+    for(page = ar->internal.first_page; page ; page = page->next) {
+        if(unlikely(seeking >= (size_t)page->data && seeking < (size_t)page->data + page->size))
+            break;
+    }
+
+    return page;
 }
 
 static void arrayalloc_increase(ARAL *ar) {
@@ -112,19 +172,18 @@ static void arrayalloc_increase(ARAL *ar) {
         if (unlikely(!page->data))
             fatal("Cannot allocate arrayalloc buffer of size %zu on filename '%s'", page->size, page->filename);
     }
-    else {
+    else
         page->data = mallocz(page->size);
-    }
 
+    // link the free space to its page
     ARAL_FREE *fr = (ARAL_FREE *)page->data;
     fr->size = page->size;
     fr->page = page;
-    fr->next = ar->internal.free_list;
-    ar->internal.free_list = fr;
+    fr->next = NULL;
+    page->free_list = fr;
 
-    // link the new page
-    page->next = ar->internal.pages;
-    ar->internal.pages = page;
+    // link the new page at the front of the list of pages
+    link_page_first(ar, page);
 
     arrayalloc_free_checks(ar, fr);
 }
@@ -143,16 +202,26 @@ static void arrayalloc_unlock(ARAL *ar) {
 void *arrayalloc_mallocz(ARAL *ar) {
     arrayalloc_lock(ar);
 
-    if(unlikely(!ar->internal.free_list))
+    if(unlikely(!ar->internal.first_page || !ar->internal.first_page->free_list))
         arrayalloc_increase(ar);
 
-    ARAL_FREE *fr = ar->internal.free_list;
+    ARAL_PAGE *page = ar->internal.first_page;
+    ARAL_FREE *fr = page->free_list;
 
-    internal_error(fr->size < ar->internal.element_size, "ARRAYALLOC: free item size is too small %zu", fr->size);
+    if(unlikely(!fr))
+        fatal("ARRAYALLOC: free item cannot be NULL.");
+
+    if(unlikely(fr->size < ar->internal.element_size))
+        fatal("ARRAYALLOC: free item size %zu is smaller than %zu", fr->size, ar->internal.element_size);
 
     if(fr->size - ar->internal.element_size <= ar->internal.element_size) {
-        // we are done with this space
-        ar->internal.free_list = fr->next;
+        // we are done with this page
+        page->free_list = NULL;
+
+        if(page != ar->internal.last_page) {
+            unlink_page(ar, page);
+            link_page_last(ar, page);
+        }
     }
     else {
         uint8_t *data = (uint8_t *)fr;
@@ -160,8 +229,8 @@ void *arrayalloc_mallocz(ARAL *ar) {
         fr2->page = fr->page;
         fr2->size = fr->size - ar->internal.element_size;
         fr2->next = fr->next;
+        page->free_list = fr2;
 
-        ar->internal.free_list = fr2;
         arrayalloc_free_checks(ar, fr2);
     }
 
@@ -176,19 +245,12 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
     arrayalloc_lock(ar);
 
     // find the page ptr belongs
-    size_t seeking = (size_t)ptr;
-    ARAL_PAGE *page, *last_page = NULL;
-    for(page = ar->internal.pages; page ; page = page->next) {
-        if(seeking >= (size_t)page->data && seeking < (size_t)page->data + page->size)
-            break;
+    ARAL_PAGE *page = find_page_with_allocation(ar, ptr);
 
-        last_page = page;
-    }
-
-    if(!page)
+    if(unlikely(!page))
         fatal("ARRAYALLOC: free of pointer %p is not in arrayalloc address space.", ptr);
 
-    if(!page->used_elements)
+    if(unlikely(!page->used_elements))
         fatal("ARRAYALLOC: free of pointer %p is inside an already free page.", ptr);
 
     page->used_elements--;
@@ -197,29 +259,12 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
     ARAL_FREE *fr = (ARAL_FREE *)ptr;
     fr->page = page;
     fr->size = ar->internal.element_size;
-    fr->next = ar->internal.free_list;
-    ar->internal.free_list = fr;
+    fr->next = page->free_list;
+    page->free_list = fr;
 
     // if the page is empty, release it
     if(!page->used_elements) {
-        // remove all the free elements from the list
-        ARAL_FREE *last_fr = NULL;
-        for(fr = ar->internal.free_list; fr ;fr = fr->next) {
-            if(fr->page == page) {
-                if(fr == ar->internal.free_list)
-                    ar->internal.free_list = fr->next;
-                else
-                    last_fr->next = fr->next;
-            }
-            else
-                last_fr = fr;
-        }
-
-        // unlink it
-        if(page == ar->internal.pages)
-            ar->internal.pages = page->next;
-        else
-            last_page->next = page->next;
+        unlink_page(ar, page);
 
         // free it
         if(ar->internal.mmap) {
@@ -231,6 +276,10 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
             freez(page->data);
 
         freez(page);
+    }
+    else if(page != ar->internal.first_page) {
+        unlink_page(ar, page);
+        link_page_first(ar, page);
     }
 
     arrayalloc_unlock(ar);
