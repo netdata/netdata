@@ -37,14 +37,16 @@ whether you are streaming metrics to a parent node, and more.
 You do not need to edit the `dbengine page cache size` setting to store more metrics using the database engine. However,
 if you want to store more metrics _specifically in memory_, you can increase the cache size.
 
-:::info If you want to also store long term metrics you can always utilize
+:::info 
+
+If you want to also store long term metrics you can always utilize
 the [tiering mechanism](/database/engine/README.md#tiering) of the Agent.
 
 :::
 
 :::caution
 
-This calculator provides an estimate of disk and RAM usage for **metrics storage** Real-life usage may vary based on the
+This calculator provides an estimate of disk and RAM usage for **metrics usage**. Real-life usage may vary based on the
 accuracy of the values you enter below, changes in the compression ratio, and the types of metrics stored.
 
 :::
