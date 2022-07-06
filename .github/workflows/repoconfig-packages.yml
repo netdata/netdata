@@ -75,6 +75,7 @@ jobs:
             failure()
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
           }}
 
   build:
@@ -161,7 +162,7 @@ jobs:
             .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" "${pkgfile}"
           done
       - name: Failure Notification
-        if: ${{ failure() }}
+        if: ${{ failure() && github.repository == 'netdata/netdata' }}
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
