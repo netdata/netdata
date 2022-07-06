@@ -58,35 +58,12 @@ static void rrdr_dump(RRDR *r)
 }
 */
 
-
-
-
-inline static void rrdr_lock_rrdset(RRDR *r) {
-    if(unlikely(!r)) {
-        error("NULL value given!");
-        return;
-    }
-
-    rrdset_rdlock(r->st);
-    r->has_st_lock = 1;
-}
-
-inline static void rrdr_unlock_rrdset(RRDR *r) {
-    if(unlikely(!r)) {
-        error("NULL value given!");
-        return;
-    }
-
-    if(likely(r->has_st_lock)) {
-        r->has_st_lock = 0;
-        rrdset_unlock(r->st);
-    }
-}
-
 inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     if(unlikely(!r)) return;
 
-    rrdr_unlock_rrdset(r);
+    if(likely(r->st_locked_by_rrdr_create))
+        rrdset_unlock(r->st);
+
     onewayalloc_freez(owa, r->t);
     onewayalloc_freez(owa, r->v);
     onewayalloc_freez(owa, r->o);
@@ -95,39 +72,51 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r);
 }
 
-RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_param *context_param_list)
-{
-    if (unlikely(!st)) {
-        error("NULL value given!");
-        return NULL;
-    }
-
+RRDR *rrdr_create_for_x_dimensions(ONEWAYALLOC *owa, int dimensions, long points) {
     RRDR *r = onewayalloc_callocz(owa, 1, sizeof(RRDR));
-    r->st = st;
+    r->internal.owa = owa;
 
+    r->d = dimensions;
+    r->n = points;
+
+    r->t = onewayalloc_callocz(owa, points, sizeof(time_t));
+    r->v = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
+    r->o = onewayalloc_mallocz(owa, points * dimensions * sizeof(RRDR_VALUE_FLAGS));
+    r->ar = onewayalloc_mallocz(owa, points * dimensions * sizeof(uint8_t));
+    r->od = onewayalloc_mallocz(owa, dimensions * sizeof(RRDR_DIMENSION_FLAGS));
+
+    r->group = 1;
+    r->update_every = 1;
+
+    return r;
+}
+
+RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_param *context_param_list) {
+    if (unlikely(!st)) return NULL;
+
+    bool st_locked_by_rrdr_create = false;
     if (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
-        rrdr_lock_rrdset(r);
-        r->st_needs_lock = 1;
+        rrdset_rdlock(st);
+        st_locked_by_rrdr_create = true;
     }
 
+    // count the number of dimensions
+    int dimensions = 0;
     RRDDIM *temp_rd =  context_param_list ? context_param_list->rd : NULL;
     RRDDIM *rd;
     if (temp_rd) {
         RRDDIM *t = temp_rd;
         while (t) {
-            r->d++;
+            dimensions++;
             t = t->next;
         }
     } else
-        rrddim_foreach_read(rd, st) r->d++;
+        rrddim_foreach_read(rd, st) dimensions++;
 
-    r->n = n;
-
-    r->t = onewayalloc_callocz(owa, (size_t)n, sizeof(time_t));
-    r->v = onewayalloc_mallocz(owa, n * r->d * sizeof(NETDATA_DOUBLE));
-    r->o = onewayalloc_mallocz(owa, n * r->d * sizeof(RRDR_VALUE_FLAGS));
-    r->ar = onewayalloc_mallocz(owa, n * r->d * sizeof(uint8_t));
-    r->od = onewayalloc_mallocz(owa, r->d * sizeof(RRDR_DIMENSION_FLAGS));
+    // create the rrdr
+    RRDR *r = rrdr_create_for_x_dimensions(owa, dimensions, n);
+    r->st = st;
+    r->st_locked_by_rrdr_create = st_locked_by_rrdr_create;
 
     // set the hidden flag on hidden dimensions
     int c;
@@ -137,9 +126,6 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_pa
         else
             r->od[c] = RRDR_DIMENSION_DEFAULT;
     }
-
-    r->group = 1;
-    r->update_every = 1;
 
     return r;
 }

@@ -35,6 +35,7 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
 struct rrdeng_collect_handle {
+    struct rrdeng_metric_handle *metric_handle;
     struct rrdeng_page_descr *descr;
     unsigned long page_correlation_id;
     struct rrdengine_instance *ctx;
@@ -43,6 +44,7 @@ struct rrdeng_collect_handle {
 };
 
 struct rrdeng_query_handle {
+    struct rrdeng_metric_handle *metric_handle;
     struct rrdeng_page_descr *descr;
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
@@ -50,6 +52,7 @@ struct rrdeng_query_handle {
     time_t now;
     unsigned position;
     unsigned entries;
+    TIER_QUERY_FETCH tier_query_fetch_type;
     storage_number *page;
     usec_t page_end_time;
     uint32_t page_length;
@@ -239,12 +242,15 @@ struct rrdengine_instance {
     char machine_guid[GUID_LEN + 1]; /* the unique ID of the corresponding host, or localhost for multihost DB */
     uint64_t disk_space;
     uint64_t max_disk_space;
+    int tier;
+    size_t storage_size;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;
     unsigned long metric_API_max_producers;
 
     uint8_t quiesce; /* set to SET_QUIESCE before shutdown of the engine */
+    uint8_t page_type; /* set to SET_QUIESCE before shutdown of the engine */
 
     struct rrdengine_statistics stats;
 };

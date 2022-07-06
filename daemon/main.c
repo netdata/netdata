@@ -55,11 +55,13 @@ void netdata_cleanup_and_exit(int ret) {
         // free the database
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
-        rrdeng_prepare_exit(&multidb_ctx);
+        for(int tier = 0; tier < storage_tiers ; tier++)
+            rrdeng_prepare_exit(multidb_ctx[tier]);
 #endif
         rrdhost_free_all();
 #ifdef ENABLE_DBENGINE
-        rrdeng_exit(&multidb_ctx);
+        for(int tier = 0; tier < storage_tiers ; tier++)
+            rrdeng_exit(multidb_ctx[tier]);
 #endif
     }
     sql_close_database();
@@ -533,10 +535,16 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_DB,      "update every");
 
     config_move(CONFIG_SECTION_GLOBAL,  "page cache size",
-                CONFIG_SECTION_DB,      "page cache size MB");
+                CONFIG_SECTION_DB,      "dbengine page cache size MB");
+
+    config_move(CONFIG_SECTION_DB,      "page cache size",
+                CONFIG_SECTION_DB,      "dbengine page cache size MB");
 
     config_move(CONFIG_SECTION_GLOBAL,  "page cache uses malloc",
-                CONFIG_SECTION_DB,      "page cache with malloc");
+                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
+
+    config_move(CONFIG_SECTION_DB,      "page cache with malloc",
+                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
 
     config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
                 CONFIG_SECTION_DB,      "dbengine disk space MB");
@@ -650,12 +658,12 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "page cache with malloc", CONFIG_BOOLEAN_NO);
-    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "page cache size MB", default_rrdeng_page_cache_mb);
+    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "dbengine page cache with malloc", CONFIG_BOOLEAN_NO);
+    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_number(CONFIG_SECTION_DB, "page cache size MB", default_rrdeng_page_cache_mb);
+        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     }
 
     // ------------------------------------------------------------------------
@@ -946,6 +954,7 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
+                            storage_tiers = 1;
                             registry_init();
                             if(rrd_init("unittest", NULL)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
@@ -1302,22 +1311,6 @@ int main(int argc, char **argv) {
 
         // initialize the log files
         open_all_log_files();
-
-#ifdef ENABLE_DBENGINE
-        default_rrdeng_page_fetch_timeout = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page fetch timeout secs", PAGE_CACHE_FETCH_WAIT_TIMEOUT);
-        if (default_rrdeng_page_fetch_timeout < 1) {
-            info("'dbengine page fetch timeout secs' cannot be %d, using 1", default_rrdeng_page_fetch_timeout);
-            default_rrdeng_page_fetch_timeout = 1;
-            config_set_number(CONFIG_SECTION_DB, "dbengine page fetch timeout secs", default_rrdeng_page_fetch_timeout);
-        }
-
-        default_rrdeng_page_fetch_retries = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page fetch retries", MAX_PAGE_CACHE_FETCH_RETRIES);
-        if (default_rrdeng_page_fetch_retries < 1) {
-            info("\"dbengine page fetch retries\" found in netdata.conf cannot be %d, using 1", default_rrdeng_page_fetch_retries);
-            default_rrdeng_page_fetch_retries = 1;
-            config_set_number(CONFIG_SECTION_DB, "dbengine page fetch retries", default_rrdeng_page_fetch_retries);
-        }
-#endif
 
         get_system_timezone();
 

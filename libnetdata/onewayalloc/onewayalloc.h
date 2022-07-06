@@ -14,4 +14,6 @@ extern char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s);
 extern void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size);
 extern void onewayalloc_freez(ONEWAYALLOC *owa, const void *ptr);
 
+extern void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize);
+
 #endif // ONEWAYALLOC_H

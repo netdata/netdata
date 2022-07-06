@@ -87,7 +87,7 @@ static int aclk_add_chart_payload(
         char sql[ACLK_SYNC_QUERY_SIZE];
         snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,
                   "INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
-                  "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s','now'), @type, @payload);", wc->uuid_str);
+                  "VALUES (@unique_id, @uuid, @claim_id, unixepoch(), @type, @payload);", wc->uuid_str);
         rc = prepare_statement(db_meta, sql, &res_chart);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to store chart payload data");
@@ -398,7 +398,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         if (likely(first_sequence)) {
 
             db_lock();
-            snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "UPDATE aclk_chart_%s SET status = NULL, date_submitted=strftime('%%s','now') "
+            snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "UPDATE aclk_chart_%s SET status = NULL, date_submitted=unixepoch() "
                                 "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                                 wc->uuid_str, first_sequence, last_sequence);
             db_execute(sql);
@@ -540,7 +540,7 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
 
     char sql[ACLK_SYNC_QUERY_SIZE];
 
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"UPDATE aclk_chart_%s SET date_updated=strftime('%%s','now') WHERE sequence_id <= @sequence_id "
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1,"UPDATE aclk_chart_%s SET date_updated=unixepoch() WHERE sequence_id <= @sequence_id "
             "AND date_submitted IS NOT NULL AND date_updated IS NULL;", wc->uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
@@ -611,7 +611,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
                 rrddim_foreach_read(rd, st)
                 {
                     rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
-                    rd->state->aclk_live_status = (rd->state->aclk_live_status == 0);
+                    rd->aclk_live_status = (rd->aclk_live_status == 0);
                 }
                 rrdset_unlock(st);
             }
@@ -927,7 +927,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
 #ifdef ENABLE_DBENGINE
         if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
             rc =
-                rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &first_entry_t, &last_entry_t);
+                rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &first_entry_t, &last_entry_t, 0);
         else
 #endif
         {
@@ -1088,15 +1088,15 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
 {
     int live = !last_updated;
 
-    if (likely(rd->state->aclk_live_status == live))
+    if (likely(rd->aclk_live_status == live))
         return;
 
-    time_t created_at = rd->state->query_ops.oldest_time(rd);
+    time_t created_at = rd->tiers[0]->query_ops.oldest_time(rd->tiers[0]->db_metric_handle);
 
     if (unlikely(!created_at && rd->updated))
        created_at = rd->last_collected_time.tv_sec;
 
-    rd->state->aclk_live_status = live;
+    rd->aclk_live_status = live;
 
     struct aclk_database_worker_config *wc = rd->rrdset->rrdhost->dbsync_worker;
     if (unlikely(!wc))
@@ -1124,7 +1124,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
         return;
 
     struct aclk_chart_dimension_data *aclk_cd_data = mallocz(sizeof(*aclk_cd_data));
-    uuid_copy(aclk_cd_data->uuid, rd->state->metric_uuid);
+    uuid_copy(aclk_cd_data->uuid, rd->metric_uuid);
     aclk_cd_data->payload = payload;
     aclk_cd_data->payload_size = size;
     aclk_cd_data->check_payload = 1;
@@ -1139,7 +1139,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     if (unlikely(rc)) {
         freez(aclk_cd_data->payload);
         freez(aclk_cd_data);
-        rd->state->aclk_live_status = !live;
+        rd->aclk_live_status = !live;
     }
     return;
 }
@@ -1156,11 +1156,11 @@ void aclk_send_dimension_update(RRDDIM *rd)
     time_t now = now_realtime_sec();
     int live = ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every));
 
-    if (!live || rd->state->aclk_live_status != live || !first_entry_t) {
+    if (!live || rd->aclk_live_status != live || !first_entry_t) {
         (void)aclk_upd_dimension_event(
             rd->rrdset->rrdhost->dbsync_worker,
             claim_id,
-            &rd->state->metric_uuid,
+            &rd->metric_uuid,
             rd->id,
             rd->name,
             rd->rrdset->id,
@@ -1189,7 +1189,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
                 first_entry_t,
                 last_entry_t,
                 now - last_entry_t);
-        rd->state->aclk_live_status = live;
+        rd->aclk_live_status = live;
     }
 
     freez(claim_id);

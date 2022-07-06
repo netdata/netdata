@@ -37,16 +37,16 @@ static inline NETDATA_DOUBLE window(RRDR *r, struct grouping_des *g) {
     NETDATA_DOUBLE points;
     if(r->group == 1) {
         // provide a running DES
-        points = r->internal.points_wanted;
+        points = (NETDATA_DOUBLE)r->internal.points_wanted;
     }
     else {
         // provide a SES with flush points
-        points = r->group;
+        points = (NETDATA_DOUBLE)r->group;
     }
 
     // https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
     // A commonly used value for alpha is 2 / (N + 1)
-    return (points > max_window_size) ? max_window_size : points;
+    return (points > (NETDATA_DOUBLE)max_window_size) ? (NETDATA_DOUBLE)max_window_size : points;
 }
 
 static inline void set_alpha(RRDR *r, struct grouping_des *g) {
@@ -70,7 +70,7 @@ static inline void set_beta(RRDR *r, struct grouping_des *g) {
 }
 
 void grouping_create_des(RRDR *r, const char *options __maybe_unused) {
-    struct grouping_des *g = (struct grouping_des *)mallocz(sizeof(struct grouping_des));
+    struct grouping_des *g = (struct grouping_des *)onewayalloc_mallocz(r->internal.owa, sizeof(struct grouping_des));
     set_alpha(r, g);
     set_beta(r, g);
     g->level = 0.0;
@@ -92,7 +92,7 @@ void grouping_reset_des(RRDR *r) {
 }
 
 void grouping_free_des(RRDR *r) {
-    freez(r->internal.grouping_data);
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 

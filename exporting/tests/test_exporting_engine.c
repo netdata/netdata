@@ -307,12 +307,10 @@ static void test_exporting_calculate_value_from_stored_data(void **state)
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 0);
     expect_function_call(__mock_rrddim_query_next_metric);
-    will_return(__mock_rrddim_query_next_metric, 27);
 
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 0);
     expect_function_call(__mock_rrddim_query_next_metric);
-    will_return(__mock_rrddim_query_next_metric, 45);
 
     expect_function_call(__mock_rrddim_query_is_finished);
     will_return(__mock_rrddim_query_is_finished, 1);

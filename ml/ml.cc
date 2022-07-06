@@ -80,12 +80,12 @@ void ml_new_dimension(RRDDIM *RD) {
         return;
 
     Dimension *D = new Dimension(RD);
-    RD->state->ml_dimension = static_cast<ml_dimension_t>(D);
+    RD->ml_dimension = static_cast<ml_dimension_t>(D);
     H->addDimension(D);
 }
 
 void ml_delete_dimension(RRDDIM *RD) {
-    Dimension *D = static_cast<Dimension *>(RD->state->ml_dimension);
+    Dimension *D = static_cast<Dimension *>(RD->ml_dimension);
     if (!D)
         return;
 
@@ -95,7 +95,7 @@ void ml_delete_dimension(RRDDIM *RD) {
     else
         H->removeDimension(D);
 
-    RD->state->ml_dimension = nullptr;
+    RD->ml_dimension = nullptr;
 }
 
 char *ml_get_host_info(RRDHOST *RH) {
@@ -125,7 +125,7 @@ char *ml_get_host_runtime_info(RRDHOST *RH) {
 }
 
 bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
-    Dimension *D = static_cast<Dimension *>(RD->state->ml_dimension);
+    Dimension *D = static_cast<Dimension *>(RD->ml_dimension);
     if (!D)
         return false;
 
@@ -210,7 +210,7 @@ void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {
 void ml_dimension_update_name(RRDSET *RS, RRDDIM *RD, const char *Name) {
     (void) RS;
 
-    Dimension *D = static_cast<Dimension *>(RD->state->ml_dimension);
+    Dimension *D = static_cast<Dimension *>(RD->ml_dimension);
     if (!D)
         return;
 

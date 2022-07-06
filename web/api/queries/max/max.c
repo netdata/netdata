@@ -11,7 +11,7 @@ struct grouping_max {
 };
 
 void grouping_create_max(RRDR *r, const char *options __maybe_unused) {
-    r->internal.grouping_data = callocz(1, sizeof(struct grouping_max));
+    r->internal.grouping_data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_max));
 }
 
 // resets when switches dimensions
@@ -23,7 +23,7 @@ void grouping_reset_max(RRDR *r) {
 }
 
 void grouping_free_max(RRDR *r) {
-    freez(r->internal.grouping_data);
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 

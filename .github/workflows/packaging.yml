@@ -94,6 +94,7 @@ jobs:
             failure()
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
           }}
 
   version-check:
@@ -149,6 +150,7 @@ jobs:
             failure()
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
           }}
 
   build:
@@ -216,7 +218,7 @@ jobs:
                      /netdata/.github/scripts/pkg-test.sh
       - name: SSH setup
         id: ssh-setup
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
         continue-on-error: true
         uses: shimataro/ssh-key-action@v2
         with:
@@ -226,7 +228,7 @@ jobs:
       - name: Upload to packages.netdata.cloud
         id: package-upload
         continue-on-error: true
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
         run: |
           .github/scripts/package-upload.sh \
           ${{ matrix.repo_distro }} \
@@ -235,7 +237,7 @@ jobs:
           ${{ needs.version-check.outputs.repo }}
       - name: Upload to PackageCloud
         id: upload
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
         shell: bash
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
@@ -270,4 +272,5 @@ jobs:
             failure()
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
           }}
