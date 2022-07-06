@@ -19,54 +19,32 @@ In addition, the `dbengine` is the only mode that supports changing the data col
 
 ## Tiering
 
-For Netdata Agent with version `netdata-1.35.1.138.nightly` plus, `dbengine` supports tiering. Tiering is a mechanism of
-providing multiple tiers of data with
+For Netdata Agent with version `netdata-1.35.1.138.nightly` and greater, `dbengine` supports tiering. Tiering is a
+mechanism of providing multiple tiers of data with
 different [granularity on metrics](/docs/store/distributed-data-architecture.md#granularity-of-metrics). Every Tier down
 samples the exact lower tier (lower tiers have greater resolution). You can have up to 5 Tiers **[0. . 4]** of data (
 including the Tier 0, which has the highest resolution) which means years of data.
 
-Tiering allows having up to 3 versions of the data:
+### Metric size
 
-1. Tier 0 is the high resolution data.
-2. Tier 1 is the first tier that samples data every 60 data collections of Tier 0.
-3. Tier 2 is the second tier that samples data every 3600 data collections of Tier 0 (60 of Tier 1).
+Tier 0 is the default that was always available in `dbengine` mode. Tier 1 is the first level of aggregation, Tier 2 is
+the second so on so forth.
 
-To enable tiering set `[db].storage tiers` in `netdata.conf` (the default is 1, to enable only Tier 0):
+Metrics on all tiers > 1 store 5 values for every point for accurate representation:
 
-### Tier 0 - per second for a week
+1. The `sum` of the points aggregated
+2. The `min` of the points aggregated
+3. The `max` of the points aggregated
+4. The `count` of the points aggregated (could be constant, but it may not be due to gaps in data collection)
+5. The `anomaly_count` of the points aggregated (how many of the aggregated points found anomalous)
 
-For 2000 metrics, collected every second and retained for a week, Tier 0 needs: 1 byte x 2000 metrics x 3600 secs per
-hour x 24 hours per day x 7 days per week = 1100MB.
+Among `min`, `max` and `sum`, the right value is chosen based on the user query. `average` is calculated on the fly at
+query time.
 
-The setting to control this is in `netdata.conf`:
+### Tiering in a nutshell
 
-```
-[db]
-    mode = dbengine
-    
-    # per second data collection
-    update every = 1
-    
-    # enable only Tier 0
-    storage tiers = 1
-    
-    # Tier 0, per second data for a week
-    dbengine multihost disk space MB = 1100
-```
-
-By setting it to `1100` and restarting the Netdata Agent, this node will start maintaining about a week of data. But pay
-attention to the number of metrics. If you have more than 2000 metrics on a node, or you need more that a week of high
-resolution metrics, you may need to adjust this setting accordingly.
-
-### Tier 1 - per minute for a month
-
-Tier 1 is by default sampling the data every 60 points of Tier 0. If Tier 0 is per second, then Tier 1 is per minute.
-
-Tier 1 needs 4 times more storage per point compared to Tier 0. So, for 2000 metrics, with per minute resolution,
-retained for a month, Tier 1 needs: 4 bytes x 2000 metrics x 60 minutes per hour x 24 hours per day x 30 days per month
-= 330MB.
-
-Do this in `netdata.conf`:
+The `dbengine` is capable of retaining metrics for years. To further understand the `dbengine` tiering mechanism let's
+explore the following configuration.
 
 ```
 [db]
@@ -75,38 +53,7 @@ Do this in `netdata.conf`:
     # per second data collection
     update every = 1
     
-    # enable only Tier 0 and Tier 1
-    storage tiers = 2
-    
-    # Tier 0, per second data for a week
-    dbengine multihost disk space MB = 1100
-    
-    # Tier 1, per minute data for a month
-    dbengine tier 1 multihost disk space MB = 330
-```
-
-Once `netdata.conf` is edited, the Netdata Agent needs to be restarted for the changes to take effect.
-
-### Tier 2 - per hour for a year
-
-Tier 2 is by default sampling data every 3600 points of Tier 0 (60 of Tier 1). If Tier 0 is per second, then Tier 2 is
-per hour.
-
-The storage requirements are the same to Tier 1.
-
-For 2000 metrics, with per hour resolution, retained for a year, Tier 2 needs: 4 bytes x 2000 metrics x 24 hours per day
-x 365 days per year = 67MB.
-
-Do this in `netdata.conf`:
-
-```
-[db]
-    mode = dbengine
-    
-    # per second data collection
-    update every = 1
-    
-    # enable only Tier 0 and Tier 1
+    # enables Tier 1 and Tier 2, Tier 0 is always enabled in dbengine mode
     storage tiers = 3
     
     # Tier 0, per second data for a week
@@ -119,7 +66,27 @@ Do this in `netdata.conf`:
     dbengine tier 2 multihost disk space MB = 67
 ```
 
-Once `netdata.conf` is edited, the Netdata Agent needs to be restarted for the changes to take effect.
+For 2000 metrics, collected every second and retained for a week, Tier 0 needs: 1 byte x 2000 metrics x 3600 secs per
+hour x 24 hours per day x 7 days per week = 1100MB.
+
+By setting it to `1100`, this node will start maintaining about a week of data. But pay attention to the number of
+metrics. If you have more than 2000 metrics on a node, or you need more that a week of high resolution metrics, you may
+need to adjust this setting accordingly.
+
+Tier 1 is by default sampling the data every **60 points of Tier 0**. In our case Tier 0 is per second, if we want to
+transform this information in terms of time then the Tier 1 "resolution" is per minute.
+
+Tier 1 needs 4 times more storage per point compared to Tier 0. So, for 2000 metrics, with per minute resolution,
+retained for a month, Tier 1 needs: 4 bytes x 2000 metrics x 60 minutes per hour x 24 hours per day x 30 days per month
+= 330MB.
+
+Tier 2 is by default sampling data every 3600 points of Tier 0 (60 of Tier 1, which is the previous exact Tier). Again
+in term of "time" (Tier 0 is per second), then Tier 2 is per hour.
+
+The storage requirements are the same to Tier 1.
+
+For 2000 metrics, with per hour resolution, retained for a year, Tier 2 needs: 4 bytes x 2000 metrics x 24 hours per day
+x 365 days per year = 67MB.
 
 ## Configuration
 
@@ -130,11 +97,8 @@ To use the database engine, open `netdata.conf` and set `[db].mode` to `dbengine
     mode = dbengine
 ```
 
-
 To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in
-the
-
-`[db]` section of your `netdata.conf`. The Agent ignores the `[db].retention` setting when using the dbengine.
+the `[db]` section of your `netdata.conf`. The Agent ignores the `[db].retention` setting when using the dbengine.
 
 ```conf
 [db]
@@ -142,50 +106,18 @@ the
     dbengine multihost disk space MB = 256
 ```
 
-The above values are the default values for Page Cache size and DB engine disk space quota.
+:::note
 
-The `dbengine page cache size MB` option determines the amount of RAM dedicated to caching Netdata metric values. The actual page
-cache size will be slightly larger than this figure—see the [memory requirements](#memory-requirements)
+In this configuration section we don't use any storage Tier
 
-section for details.
+:::
 
-The `dbengine multihost disk space MB` option determines the amount of disk space that is dedicated to storing Netdata
-metric values and all related metadata describing them. You can use the [**database engine
-calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-to correctly set `dbengine multihost disk space MB` based on your metrics retention policy. The calculator gives an
-accurate estimate based on how many child nodes you have, how many metrics your Agent collects, and more.
+:::info
 
+You can consult the [dbengine's reference](/daemon/config/README.md#[db]-section-options) section for all the option you
+can change
 
-## Configuration
-
-To use the database engine, open `netdata.conf` and set `[db].mode` to `dbengine`.
-
-```conf
-[db]
-    mode = dbengine
-```
-
-To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in
-the
-`[db]` section of your `netdata.conf`. The Agent ignores the `[db].retention` setting when using the dbengine.
-
-```conf
-[db]
-    page cache size MB = 32
-    dbengine multihost disk space MB = 256
-```
-
-The above values are the default values for Page Cache size and DB engine disk space quota.
-
-The `page cache size MB` option determines the amount of RAM dedicated to caching Netdata metric values. The actual page
-cache size will be slightly larger than this figure—see the [memory requirements](#memory-requirements)
-section for details.
-
-The `dbengine multihost disk space MB` option determines the amount of disk space that is dedicated to storing Netdata
-metric values and all related metadata describing them. You can use the [**database engine
-calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-to correctly set `dbengine multihost disk space MB` based on your metrics retention policy. The calculator gives an
-accurate estimate based on how many child nodes you have, how many metrics your Agent collects, and more.
+:::
 
 ### Legacy configuration
 
@@ -199,19 +131,11 @@ metric values per legacy database engine instance (see [details on the legacy mo
 
 ### Streaming metrics to the database engine
 
-<<<<<<< HEAD
-When using the multihost database engine, all parent and child nodes share the same `dbengine page cache size MB` and `dbengine
-multihost disk space MB` in a single dbengine instance. The [**database engine
-calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-helps you properly set `dbengine page cache size MB` and `dbengine multihost disk space MB` on your parent node to allocate enough
-resources based on your metrics retention policy and how many child nodes you have.
-=======
-When using the multihost database engine, all parent and child nodes share the same `page cache size MB`
+the multihost database engine, all parent and child nodes share the same `page cache size MB`
 and `dbengine multihost disk space MB` in a single dbengine instance. The [**database engine
 calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 helps you properly set `page cache size MB` and `dbengine multihost disk space MB` on your parent node to allocate
 enough resources based on your metrics retention policy and how many child nodes you have.
->>>>>>> b89840d34 (minor draft)
 
 #### Legacy mode (prior v1.23.2)
 
