@@ -63,7 +63,7 @@ The Netdata config directory also contains one symlink:
 
 ## Configure a Netdata docker container
 
-See [configure agent containers](https://learn.netdata.cloud/docs/agent/packaging/docker#configure-agent-containers).
+See [configure agent containers](packaging/docker/README.md#configure-agent-containers).
 
 ## Use `edit-config` to edit configuration files
 
