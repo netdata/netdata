@@ -1,9 +1,10 @@
----
+<!---
 title: "Troubleshooting Agent with Cloud connection issues"
 description: "A simple guide to troubleshoot occurances where the Agent is showing as offline after claiming"
-# image: /img/seo/guides/troubleshoot/monitor-debug-applications-ebpf.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/troubleshoot/troubleshooting-agent-not-connecting-to-cloud.md
----
+--->
+
+# Troubleshooting Agent with Cloud connection issues
 
 Sometimes, when claiming a node, it might not show up as online in Netdata Cloud.  
 The occurances triggering this behavior might be:
