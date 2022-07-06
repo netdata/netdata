@@ -12,7 +12,7 @@ struct grouping_incremental_sum {
 };
 
 void grouping_create_incremental_sum(RRDR *r, const char *options __maybe_unused) {
-    r->internal.grouping_data = callocz(1, sizeof(struct grouping_incremental_sum));
+    r->internal.grouping_data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_incremental_sum));
 }
 
 // resets when switches dimensions
@@ -25,7 +25,7 @@ void grouping_reset_incremental_sum(RRDR *r) {
 }
 
 void grouping_free_incremental_sum(RRDR *r) {
-    freez(r->internal.grouping_data);
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 

@@ -271,9 +271,7 @@ static struct statsd {
     size_t tcp_idle_timeout;
     collected_number decimal_detail;
     size_t private_charts;
-    size_t max_private_charts;
     size_t max_private_charts_hard;
-    RRD_MEMORY_MODE private_charts_memory_mode;
     long private_charts_rrd_history_entries;
     unsigned int private_charts_hidden:1;
 
@@ -290,7 +288,6 @@ static struct statsd {
     LISTEN_SOCKETS sockets;
 } statsd = {
         .enabled = 1,
-        .max_private_charts = 200,
         .max_private_charts_hard = 1000,
         .private_charts_hidden = 0,
         .recvmmsg_size = 10,
@@ -1591,7 +1588,7 @@ static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, c
 }
 
 static inline RRDSET *statsd_private_rrdset_create(
-        STATSD_METRIC *m
+        STATSD_METRIC *m __maybe_unused
         , const char *type
         , const char *id
         , const char *name
@@ -1603,16 +1600,6 @@ static inline RRDSET *statsd_private_rrdset_create(
         , int update_every
         , RRDSET_TYPE chart_type
 ) {
-    RRD_MEMORY_MODE memory_mode = statsd.private_charts_memory_mode;
-    long history = statsd.private_charts_rrd_history_entries;
-
-    if(unlikely(statsd.private_charts >= statsd.max_private_charts)) {
-        debug(D_STATSD, "STATSD: metric '%s' will be charted with memory mode = none, because the maximum number of charts has been reached.", m->name);
-        info("STATSD: metric '%s' will be charted with memory mode = none, because the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts);
-        memory_mode = RRD_MEMORY_MODE_NONE;
-        history = 5;
-    }
-
     statsd.private_charts++;
     RRDSET *st = rrdset_create_custom(
             localhost         // host
@@ -1628,8 +1615,8 @@ static inline RRDSET *statsd_private_rrdset_create(
             , priority        // priority
             , update_every    // update every
             , chart_type      // chart type
-            , memory_mode     // memory mode
-            , history         // history
+            , default_rrd_memory_mode     // memory mode
+            , default_rrd_history_entries // history
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
 
@@ -2300,7 +2287,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED))) {
             if(unlikely(statsd.private_charts >= statsd.max_private_charts_hard)) {
                 debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts has been reached.", m->name);
-                info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts);
+                info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts_hard);
                 m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
             }
             else {
@@ -2446,9 +2433,7 @@ void *statsd_main(void *ptr) {
 #endif
 
     statsd.charts_for = simple_pattern_create(config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    statsd.max_private_charts = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts allowed", (long long)statsd.max_private_charts);
-    statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts * 5);
-    statsd.private_charts_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_STATSD, "private charts memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
+    statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts_hard);
     statsd.private_charts_rrd_history_entries = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
     statsd.decimal_detail = (collected_number)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
     statsd.tcp_idle_timeout = (size_t) config_get_number(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds", (long long int)statsd.tcp_idle_timeout);

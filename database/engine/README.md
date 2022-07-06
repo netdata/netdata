@@ -26,18 +26,18 @@ To use the database engine, open `netdata.conf` and set `[db].mode` to `dbengine
     mode = dbengine
 ```
 
-To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in the
+To configure the database engine, look for the `dbengine page cache size MB` and `dbengine multihost disk space MB` settings in the
 `[db]` section of your `netdata.conf`. The Agent ignores the `[db].retention` setting when using the dbengine.
 
 ```conf
 [db]
-    page cache size MB = 32
+    dbengine page cache size MB = 32
     dbengine multihost disk space MB = 256
 ```
 
 The above values are the default values for Page Cache size and DB engine disk space quota.
 
-The `page cache size MB` option determines the amount of RAM dedicated to caching Netdata metric values. The
+The `dbengine page cache size MB` option determines the amount of RAM dedicated to caching Netdata metric values. The
 actual page cache size will be slightly larger than this figure—see the [memory requirements](#memory-requirements)
 section for details.
 
@@ -59,10 +59,10 @@ Netdata metric values per legacy database engine instance (see [details on the l
 
 ### Streaming metrics to the database engine
 
-When using the multihost database engine, all parent and child nodes share the same `page cache size MB` and `dbengine
+When using the multihost database engine, all parent and child nodes share the same `dbengine page cache size MB` and `dbengine
 multihost disk space MB` in a single dbengine instance. The [**database engine
 calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-helps you properly set `page cache size MB` and `dbengine multihost disk space MB` on your parent node to allocate enough
+helps you properly set `dbengine page cache size MB` and `dbengine multihost disk space MB` on your parent node to allocate enough
 resources based on your metrics retention policy and how many child nodes you have.
 
 #### Legacy mode
@@ -98,7 +98,7 @@ available memory.
 There are explicit memory requirements **per** DB engine **instance**:
 
 -   The total page cache memory footprint will be an additional `#dimensions-being-collected x 4096 x 2` bytes over what
-    the user configured with `page cache size MB`.
+    the user configured with `dbengine page cache size MB`.
 
 -   an additional `#pages-on-disk x 4096 x 0.03` bytes of RAM are allocated for metadata.
 

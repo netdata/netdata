@@ -63,6 +63,7 @@ struct rrdeng_page_descr {
     usec_t start_time;
     usec_t end_time;
     uint32_t page_length;
+    uint8_t type;
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)

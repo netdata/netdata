@@ -37,7 +37,7 @@ static size_t countif_greaterequal(NETDATA_DOUBLE v, NETDATA_DOUBLE target) {
 }
 
 void grouping_create_countif(RRDR *r, const char *options __maybe_unused) {
-    struct grouping_countif *g = callocz(1, sizeof(struct grouping_countif));
+    struct grouping_countif *g = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_countif));
     r->internal.grouping_data = g;
 
     if(options && *options) {
@@ -106,7 +106,7 @@ void grouping_reset_countif(RRDR *r) {
 }
 
 void grouping_free_countif(RRDR *r) {
-    freez(r->internal.grouping_data);
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 

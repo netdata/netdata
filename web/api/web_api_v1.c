@@ -36,9 +36,11 @@ static struct {
         , {"match-names"       , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"    , 0    , RRDR_OPTION_CUSTOM_VARS}
         , {"anomaly-bit"       , 0    , RRDR_OPTION_ANOMALY_BIT}
+        , {"selected-tier"     , 0    , RRDR_OPTION_SELECTED_TIER}
         , {"raw"               , 0    , RRDR_OPTION_RETURN_RAW}
         , {"jw-anomaly-rates"  , 0    , RRDR_OPTION_RETURN_JWAR}
         , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
+        , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {NULL                , 0    , 0}
 };
 
@@ -436,7 +438,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
     char *group_options = NULL;
-
+    int tier = 0;
     int group = RRDR_GROUPING_AVERAGE;
     int show_dimensions = 0;
     uint32_t format = DATASOURCE_JSON;
@@ -519,6 +521,11 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         }
         else if(!strcmp(name, "max_anomaly_rates")) {
             max_anomaly_rates_str = value;
+        }
+        else if(!strcmp(name, "tier")) {
+            tier = str2i(value);
+            if(tier >= 0 && tier < storage_tiers)
+                options |= RRDR_OPTION_SELECTED_TIER;
         }
     }
 
@@ -678,7 +685,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         .wb = w->response.data};
 
     ret = rrdset2anything_api_v1(owa, st, &query_params, dimensions, format,
-            points, after, before, group, group_options, group_time, options, &last_timestamp_in_data);
+            points, after, before, group, group_options, group_time, options, &last_timestamp_in_data, tier);
 
     free_context_param_list(owa, &context_param_list);
 

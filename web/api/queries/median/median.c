@@ -10,14 +10,15 @@ struct grouping_median {
     size_t series_size;
     size_t next_pos;
 
-    NETDATA_DOUBLE series[];
+    NETDATA_DOUBLE *series;
 };
 
 void grouping_create_median(RRDR *r, const char *options __maybe_unused) {
     long entries = r->group;
     if(entries < 0) entries = 0;
 
-    struct grouping_median *g = (struct grouping_median *)callocz(1, sizeof(struct grouping_median) + entries * sizeof(NETDATA_DOUBLE));
+    struct grouping_median *g = (struct grouping_median *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_median));
+    g->series = onewayalloc_mallocz(r->internal.owa, entries * sizeof(NETDATA_DOUBLE));
     g->series_size = (size_t)entries;
 
     r->internal.grouping_data = g;
@@ -31,7 +32,10 @@ void grouping_reset_median(RRDR *r) {
 }
 
 void grouping_free_median(RRDR *r) {
-    freez(r->internal.grouping_data);
+    struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
+    if(g) onewayalloc_freez(r->internal.owa, g->series);
+
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 
@@ -39,7 +43,8 @@ void grouping_add_median(RRDR *r, NETDATA_DOUBLE value) {
     struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
-        error("INTERNAL ERROR: median buffer overflow on chart '%s' - next_pos = %zu, series_size = %zu, r->group = %ld.", r->st->name, g->next_pos, g->series_size, r->group);
+        g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
+        g->series_size *= 2;
     }
     else
         g->series[g->next_pos++] = (NETDATA_DOUBLE)value;

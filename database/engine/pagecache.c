@@ -1194,24 +1194,66 @@ void init_page_cache(struct rrdengine_instance *ctx)
     init_committed_page_index(ctx);
 }
 
+
+
+/*
+ * METRIC                                            # number
+ * 1. INDEX: JudyHS                                  # bytes
+ * 2. DATA: page_index                               # bytes
+ *
+ * PAGE (1 page of 1 metric)                         # number
+ * 1. INDEX AT METRIC: page_index->JudyL_array       # bytes
+ * 2. DATA: descr                                    # bytes
+ *
+ * PAGE CACHE (1 page of 1 metric at the cache)      # number
+ * 1. pg_cache_descr (if PG_CACHE_DESCR_ALLOCATED)   # bytes
+ * 2. data (if RRD_PAGE_POPULATED)                   # bytes
+ *
+ */
+
+
 void free_page_cache(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    Word_t ret_Judy, bytes_freed = 0;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index, *prev_page_index;
     Word_t Index;
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
 
+    Word_t metrics_number      = 0,
+           metrics_bytes       = 0,
+           metrics_index_bytes = 0,
+           metrics_duration    = 0;
+
+    Word_t pages_number        = 0,
+           pages_bytes         = 0,
+           pages_index_bytes   = 0;
+
+    Word_t pages_size_per_type[256]  = { 0 },
+           pages_count_per_type[256] = { 0 };
+
+    Word_t cache_pages_number  = 0,
+           cache_pages_bytes   = 0,
+           cache_pages_data_bytes  = 0;
+
+    size_t points_in_db        = 0,
+           uncompressed_points_size = 0,
+           seconds_in_db       = 0,
+           single_point_pages  = 0;
+
+    Word_t pages_dirty_index_bytes = 0;
+
+    usec_t oldest_time_ut = LONG_MAX, latest_time_ut = 0;
+
     /* Free committed page index */
-    ret_Judy = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
+    pages_dirty_index_bytes = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
     fatal_assert(NULL == pg_cache->committed_page_index.JudyL_array);
-    bytes_freed += ret_Judy;
 
     for (page_index = pg_cache->metrics_index.last_page_index ;
          page_index != NULL ;
          page_index = prev_page_index) {
+
         prev_page_index = page_index->prev;
 
         /* Find first page in range */
@@ -1219,37 +1261,116 @@ void free_page_cache(struct rrdengine_instance *ctx)
         PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
         descr = unlikely(NULL == PValue) ? NULL : *PValue;
 
+        size_t metric_duration = 0;
+        size_t metric_update_every = 0;
+        size_t metric_single_point_pages = 0;
+
         while (descr != NULL) {
             /* Iterate all page descriptors of this metric */
 
             if (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED) {
+                cache_pages_number++;
+
                 /* Check rrdenglocking.c */
                 pg_cache_descr = descr->pg_cache_descr;
                 if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
                     dbengine_page_free(pg_cache_descr->page);
-                    bytes_freed += RRDENG_BLOCK_SIZE;
+                    cache_pages_data_bytes += RRDENG_BLOCK_SIZE;
                 }
                 rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
-                bytes_freed += sizeof(*pg_cache_descr);
+                cache_pages_bytes += sizeof(*pg_cache_descr);
             }
+
+            if(descr->start_time < oldest_time_ut)
+                oldest_time_ut = descr->start_time;
+
+            if(descr->end_time > latest_time_ut)
+                latest_time_ut = descr->end_time;
+
+            pages_size_per_type[descr->type] += descr->page_length;
+            pages_count_per_type[descr->type]++;
+
+            size_t points_in_page = (descr->page_length / ctx->storage_size);
+            size_t page_duration  = ((descr->end_time - descr->start_time) / USEC_PER_SEC);
+            size_t update_every = (page_duration == 0) ? 1 : page_duration / (points_in_page - 1);
+
+            if (!page_duration && metric_update_every) {
+                page_duration = metric_update_every;
+                update_every = metric_update_every;
+            }
+            else if(page_duration)
+                metric_update_every = update_every;
+
+            uncompressed_points_size += descr->page_length;
+
+            if(page_duration > 0) {
+                page_duration = update_every * points_in_page;
+                metric_duration += page_duration;
+                seconds_in_db += page_duration;
+                points_in_db += descr->page_length / ctx->storage_size;
+            }
+            else
+                metric_single_point_pages++;
+
             freez(descr);
-            bytes_freed += sizeof(*descr);
+            pages_bytes += sizeof(*descr);
+            pages_number++;
 
             PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0);
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
         }
 
+        if(metric_single_point_pages && metric_update_every) {
+            points_in_db += metric_single_point_pages;
+            seconds_in_db += metric_update_every * metric_single_point_pages;
+            metric_duration += metric_update_every * metric_single_point_pages;
+        }
+        else
+            single_point_pages += metric_single_point_pages;
+
         /* Free page index */
-        ret_Judy = JudyLFreeArray(&page_index->JudyL_array, PJE0);
+        pages_index_bytes += JudyLFreeArray(&page_index->JudyL_array, PJE0);
         fatal_assert(NULL == page_index->JudyL_array);
-        bytes_freed += ret_Judy;
         freez(page_index);
-        bytes_freed += sizeof(*page_index);
+
+        metrics_number++;
+        metrics_bytes += sizeof(*page_index);
+        metrics_duration += metric_duration;
     }
     /* Free metrics index */
-    ret_Judy = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
+    metrics_index_bytes = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
     fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
-    bytes_freed += ret_Judy;
 
-    info("Freed %lu bytes of memory from page cache.", bytes_freed);
+    if(!metrics_number) metrics_number = 1;
+    if(!pages_number) pages_number = 1;
+    if(!cache_pages_number) cache_pages_number = 1;
+    if(!points_in_db) points_in_db = 1;
+    if(latest_time_ut == oldest_time_ut) oldest_time_ut -= USEC_PER_SEC;
+
+    if(single_point_pages) {
+        long double avg_duration = (long double)seconds_in_db / points_in_db;
+        points_in_db += single_point_pages;
+        seconds_in_db += (size_t)(avg_duration * single_point_pages);
+    }
+
+    info("DBENGINE STATISTICS ON METRICS:"
+         " Metrics: %lu (structures %lu bytes - per metric %0.2f, index (HS) %lu bytes - per metric %0.2f bytes - duration %zu secs) |"
+         " Page descriptors: %lu (structures %lu bytes - per page %0.2f bytes, index (L) %lu bytes - per page %0.2f, dirty index %lu bytes). |"
+         " Page cache: %lu pages (structures %lu bytes - per page %0.2f bytes, data %lu bytes). |"
+         " Points in db %zu, uncompressed size of points database %zu bytes. |"
+         " Duration of all points %zu seconds, average point duration %0.2f seconds."
+         " Duration of the database %llu seconds, average metric duration %0.2f seconds, average metric lifetime %0.2f%%."
+         , metrics_number, metrics_bytes, (double)metrics_bytes/metrics_number, metrics_index_bytes, (double)metrics_index_bytes/metrics_number, metrics_duration
+         , pages_number, pages_bytes, (double)pages_bytes/pages_number, pages_index_bytes, (double)pages_index_bytes/pages_number, pages_dirty_index_bytes
+         , cache_pages_number, cache_pages_bytes, (double)cache_pages_bytes/cache_pages_number, cache_pages_data_bytes
+         , points_in_db, uncompressed_points_size
+         , seconds_in_db, (double)seconds_in_db/points_in_db
+         , (latest_time_ut - oldest_time_ut) / USEC_PER_SEC, (double)metrics_duration/metrics_number
+         , (double)metrics_duration/metrics_number * 100.0 / ((latest_time_ut - oldest_time_ut) / USEC_PER_SEC)
+         );
+
+    for(int i = 0; i < 256 ;i++) {
+        if(pages_count_per_type[i])
+            info("DBENGINE STATISTICS ON PAGE TYPES: page type %d total pages %lu, average page size %0.2f bytes", i, pages_count_per_type[i], (double)pages_size_per_type[i]/pages_count_per_type[i]);
+    }
 }

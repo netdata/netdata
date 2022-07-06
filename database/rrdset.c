@@ -273,12 +273,13 @@ void rrdset_reset(RRDSET *st) {
         rd->last_collected_time.tv_sec = 0;
         rd->last_collected_time.tv_usec = 0;
         rd->collections_counter = 0;
-        // memset(rd->values, 0, rd->entries * sizeof(storage_number));
-#ifdef ENABLE_DBENGINE
-        if (RRD_MEMORY_MODE_DBENGINE == st->rrd_memory_mode && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            rrdeng_store_metric_flush_current_page(rd);
+
+        if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+            for(int tier = 0; tier < storage_tiers ;tier++) {
+                if(rd->tiers[tier])
+                    rd->tiers[tier]->collect_ops.flush(rd->tiers[tier]->db_collection_handle);
+            }
         }
-#endif
     }
 }
 
@@ -963,6 +964,105 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     return last_updated_ut;
 }
 
+static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, time_t now) {
+    time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
+    return now + loop - ((now + loop) % loop);
+}
+
+void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut) {
+    if (unlikely(!t->next_point_time))
+        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+
+    // merge the dates into our virtual point
+    if (unlikely(sp.start_time < t->virtual_point.start_time))
+        t->virtual_point.start_time = sp.start_time;
+
+    if (likely(sp.end_time > t->virtual_point.end_time))
+        t->virtual_point.end_time = sp.end_time;
+
+    // merge the values into our virtual point
+    if (likely(!storage_point_is_empty(sp))) {
+        // we aggregate only non NULLs into higher tiers
+
+        if (likely(!storage_point_is_unset(t->virtual_point))) {
+            // merge the collected point to our virtual one
+            t->virtual_point.sum += sp.sum;
+            t->virtual_point.min = MIN(t->virtual_point.min, sp.min);
+            t->virtual_point.max = MAX(t->virtual_point.max, sp.max);
+            t->virtual_point.count += sp.count;
+            t->virtual_point.anomaly_count += sp.anomaly_count;
+            t->virtual_point.flags |= sp.flags;
+        }
+        else {
+            // reset our virtual point to this one
+            t->virtual_point = sp;
+        }
+    }
+
+    if(unlikely(sp.end_time >= t->next_point_time)) {
+        if (likely(!storage_point_is_unset(t->virtual_point))) {
+
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                now_ut,
+                t->virtual_point.sum,
+                t->virtual_point.min,
+                t->virtual_point.max,
+                t->virtual_point.count,
+                t->virtual_point.anomaly_count,
+                t->virtual_point.flags);
+        }
+        else {
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                now_ut,
+                NAN,
+                NAN,
+                NAN,
+                0,
+                0,
+                SN_EMPTY_SLOT);
+        }
+
+        t->virtual_point.count = 0;
+        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+    }
+}
+
+static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+
+    // store the metric on tier 0
+    rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+
+    for(int tier = 1; tier < storage_tiers ;tier++) {
+        if(unlikely(!rd->tiers[tier])) continue;
+
+        struct rrddim_tier *t = rd->tiers[tier];
+
+        time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
+
+        if(!t->last_collected_ut) {
+            // we have not collected this tier before
+            // let's fill any gap that may exist
+            rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
+        }
+
+        STORAGE_POINT sp = {
+            .start_time = now - rd->update_every,
+            .end_time = now,
+            .min = n,
+            .max = n,
+            .sum = n,
+            .count = 1,
+            .anomaly_count = (flags & SN_ANOMALY_BIT) ? 0 : 1,
+            .flags = flags
+        };
+
+        t->last_collected_ut = point_end_time_ut;
+        store_metric_at_tier(rd, t, sp, point_end_time_ut);
+    }
+}
+
 static inline size_t rrdset_done_interpolate(
         RRDSET *st
         , usec_t update_every_ut
@@ -1086,8 +1186,8 @@ static inline size_t rrdset_done_interpolate(
 
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
-
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
+                store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 continue;
             }
 
@@ -1099,7 +1199,8 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
                 }
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, dim_storage_flags);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, 0, 0, 1, dim_storage_flags, 0);
+                store_metric(rd, next_store_ut, new_value, dim_storage_flags);
                 rd->last_stored_value = new_value;
             }
             else {
@@ -1112,7 +1213,8 @@ static inline size_t rrdset_done_interpolate(
                 );
                 #endif
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
+                store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 rd->last_stored_value = NAN;
             }
 
@@ -1597,10 +1699,10 @@ after_first_database_work:
     // it is now time to interpolate values on a second boundary
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(now_collect_ut < next_store_ut)) {
+    if(unlikely(now_collect_ut < next_store_ut && st->counter_done > 1)) {
         // this is collected in the same interpolation point
         rrdset_debug(st, "THIS IS IN THE SAME INTERPOLATION POINT");
-        info("INTERNAL CHECK: host '%s', chart '%s' is collected in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, next_store_ut - now_collect_ut);
+        info("INTERNAL CHECK: host '%s', chart '%s' collection %zu is in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, st->counter_done, next_store_ut - now_collect_ut);
     }
 #endif
 
@@ -1734,10 +1836,22 @@ after_second_database_work:
 
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
-                        if (can_delete_metric) {
+
+                        size_t tiers_available = 0, tiers_said_yes = 0;
+                        for(int tier = 0; tier < storage_tiers ;tier++) {
+                            if(rd->tiers[tier]) {
+                                tiers_available++;
+
+                                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
+                                    tiers_said_yes++;
+
+                                rd->tiers[tier]->db_collection_handle = NULL;
+                            }
+                        }
+
+                        if (tiers_available == tiers_said_yes && tiers_said_yes) {
                             /* This metric has no data and no references */
-                            delete_dimension_uuid(&rd->state->metric_uuid);
+                            delete_dimension_uuid(&rd->metric_uuid);
                         } else {
                             /* Do not delete this dimension */
 #ifdef ENABLE_ACLK

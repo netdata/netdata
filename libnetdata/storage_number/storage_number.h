@@ -63,6 +63,15 @@ typedef long long collected_number;
 #endif
 
 typedef uint32_t storage_number;
+
+typedef struct storage_number_tier1 {
+    float sum_value;
+    float min_value;
+    float max_value;
+    uint16_t count;
+    uint16_t anomaly_count;
+} storage_number_tier1_t;
+
 #define STORAGE_NUMBER_FORMAT "%u"
 
 typedef enum {

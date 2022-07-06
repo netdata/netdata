@@ -31,14 +31,14 @@ static inline NETDATA_DOUBLE window(RRDR *r, struct grouping_ses *g) {
     NETDATA_DOUBLE points;
     if(r->group == 1) {
         // provide a running DES
-        points = r->internal.points_wanted;
+        points = (NETDATA_DOUBLE)r->internal.points_wanted;
     }
     else {
         // provide a SES with flush points
-        points = r->group;
+        points = (NETDATA_DOUBLE)r->group;
     }
 
-    return (points > max_window_size) ? max_window_size : points;
+    return (points > (NETDATA_DOUBLE)max_window_size) ? (NETDATA_DOUBLE)max_window_size : points;
 }
 
 static inline void set_alpha(RRDR *r, struct grouping_ses *g) {
@@ -49,7 +49,7 @@ static inline void set_alpha(RRDR *r, struct grouping_ses *g) {
 }
 
 void grouping_create_ses(RRDR *r, const char *options __maybe_unused) {
-    struct grouping_ses *g = (struct grouping_ses *)callocz(1, sizeof(struct grouping_ses));
+    struct grouping_ses *g = (struct grouping_ses *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_ses));
     set_alpha(r, g);
     g->level = 0.0;
     r->internal.grouping_data = g;
@@ -64,7 +64,7 @@ void grouping_reset_ses(RRDR *r) {
 }
 
 void grouping_free_ses(RRDR *r) {
-    freez(r->internal.grouping_data);
+    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 

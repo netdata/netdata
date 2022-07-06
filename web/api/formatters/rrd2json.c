@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web/api/web_api_v1.h"
+#include "database/storage_engine.h"
 
 static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int archive_mode)
 {
@@ -18,7 +19,18 @@ static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int arc
         }
     }
 
-    onewayalloc_freez(owa, temp_rd->state);
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        if(!temp_rd->tiers[tier]) continue;
+
+        if(archive_mode) {
+            STORAGE_ENGINE *eng = storage_engine_get(temp_rd->tiers[tier]->mode);
+            if (eng)
+                eng->api.free(temp_rd->tiers[tier]->db_metric_handle);
+        }
+
+        onewayalloc_freez(owa, temp_rd->tiers[tier]);
+    }
+
     onewayalloc_freez(owa, temp_rd);
 }
 
@@ -89,7 +101,12 @@ void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_lis
         RRDDIM *rd = onewayalloc_memdupz(owa, rd1, sizeof(RRDDIM));
         rd->id = onewayalloc_strdupz(owa, rd1->id);
         rd->name = onewayalloc_strdupz(owa, rd1->name);
-        rd->state = onewayalloc_memdupz(owa, rd1->state, sizeof(*rd->state));
+        for(int tier = 0; tier < storage_tiers ;tier++) {
+            if(rd1->tiers[tier])
+                rd->tiers[tier] = onewayalloc_memdupz(owa, rd1->tiers[tier], sizeof(*rd->tiers[tier]));
+            else
+                rd->tiers[tier] = NULL;
+        }
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }
@@ -168,6 +185,7 @@ int rrdset2value_api_v1(
         , int *value_is_null
         , uint8_t *anomaly_rate
         , int timeout
+        , int tier
 ) {
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -175,7 +193,7 @@ int rrdset2value_api_v1(
 
     RRDR *r = rrd2rrdr(owa, st, points, after, before,
                        group_method, group_time, options, dimensions, NULL,
-                       group_options, timeout);
+                       group_options, timeout, tier);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -232,6 +250,7 @@ int rrdset2anything_api_v1(
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
+        , int tier
 )
 {
     BUFFER *wb = query_params->wb;
@@ -250,7 +269,7 @@ int rrdset2anything_api_v1(
         dimensions ? buffer_tostring(dimensions) : NULL,
         query_params->context_param_list,
         group_options,
-        query_params->timeout);
+        query_params->timeout, tier);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;

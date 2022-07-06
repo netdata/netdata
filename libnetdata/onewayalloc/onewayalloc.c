@@ -166,6 +166,14 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
     return;
 }
 
+void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize) {
+    size_t newsize = oldsize * 2;
+    void *dst = onewayalloc_mallocz(owa, newsize);
+    memcpy(dst, src, oldsize);
+    onewayalloc_freez(owa, src);
+    return dst;
+}
+
 void onewayalloc_destroy(ONEWAYALLOC *owa) {
     if(!owa) return;
 

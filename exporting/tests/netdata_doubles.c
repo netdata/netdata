@@ -196,26 +196,27 @@ void rrdset_update_heterogeneous_flag(RRDSET *st)
     (void)st;
 }
 
-time_t __mock_rrddim_query_oldest_time(RRDDIM *rd)
+time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
 {
-    (void)rd;
+    (void)db_metric_handle;
 
     function_called();
     return mock_type(time_t);
 }
 
-time_t __mock_rrddim_query_latest_time(RRDDIM *rd)
+time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
 {
-    (void)rd;
+    (void)db_metric_handle;
 
     function_called();
     return mock_type(time_t);
 }
 
-void __mock_rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time)
+void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type)
 {
-    (void)rd;
+    (void)db_metric_handle;
     (void)handle;
+    (void)tier_query_fetch_type;
 
     function_called();
     check_expected(start_time);
@@ -230,16 +231,14 @@ int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle)
     return mock_type(int);
 }
 
-NETDATA_DOUBLE __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *start_time, time_t *end_time, SN_FLAGS *flags)
+STORAGE_POINT __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle)
 {
     (void)handle;
-    (void)start_time;
-    (void)end_time;
-    (void) flags;
-
 
     function_called();
-    return mock_type(NETDATA_DOUBLE);
+
+    STORAGE_POINT sp = {};
+    return sp;    
 }
 
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)

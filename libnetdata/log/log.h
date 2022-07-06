@@ -82,7 +82,7 @@ static inline void debug_dummy(void) {}
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
-#define internal_error(condition, args...) do { if(unlikely(condition)) error_int("INTERNAL ERROR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define internal_error(condition, args...) do { if(unlikely(condition)) error_int("IERR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
 #define debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()

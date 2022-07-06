@@ -444,18 +444,44 @@ void finalize_data_files(struct rrdengine_instance *ctx)
     struct rrdengine_journalfile *journalfile;
     struct extent_info *extent, *next_extent;
 
+    size_t extents_number = 0;
+    size_t extents_bytes = 0;
+    size_t page_compressed_sizes = 0;
+
+    size_t files_number = 0;
+    size_t files_bytes = 0;
+
     for (datafile = ctx->datafiles.first ; datafile != NULL ; datafile = next_datafile) {
         journalfile = datafile->journalfile;
         next_datafile = datafile->next;
 
         for (extent = datafile->extents.first ; extent != NULL ; extent = next_extent) {
+            extents_number++;
+            extents_bytes += sizeof(*extent) + sizeof(struct rrdeng_page_descr *) * extent->number_of_pages;
+            page_compressed_sizes += extent->size;
+
             next_extent = extent->next;
             freez(extent);
         }
         close_journal_file(journalfile, datafile);
         close_data_file(datafile);
+
+        files_number++;
+        files_bytes += sizeof(*journalfile) + sizeof(*datafile);
+
         freez(journalfile);
         freez(datafile);
-
     }
+
+    if(!files_number) files_number = 1;
+    if(!extents_number) extents_number = 1;
+
+    info("DBENGINE STATISTICS ON DATAFILES:"
+         " Files %zu, structures %zu bytes, %0.2f bytes per file."
+         " Extents %zu, structures %zu bytes, %0.2f bytes per extent."
+         " Compressed size of all pages: %zu bytes."
+         , files_number, files_bytes, (double)files_bytes/files_number
+         , extents_number, extents_bytes, (double)extents_bytes/extents_number
+         , page_compressed_sizes
+         );
 }

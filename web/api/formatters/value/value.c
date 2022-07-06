@@ -3,11 +3,7 @@
 #include "value.h"
 
 
-inline NETDATA_DOUBLE
-rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, uint8_t *anomaly_rate, RRDDIM *temp_rd) {
-    if (r->st_needs_lock)
-        rrdset_check_rdlock(r->st);
-
+inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, uint8_t *anomaly_rate, RRDDIM *temp_rd) {
     long c;
     RRDDIM *d;
 
