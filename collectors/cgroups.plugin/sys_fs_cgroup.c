@@ -449,15 +449,17 @@ void read_cgroup_plugin_configuration() {
                     " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
                     " *.scope "                            // we need all other *.scope for sure
 
+            // ----------------------------------------------------------------
+
+                    " /machine.slice/*.service "           // #3367 systemd-nspawn
+
+            // ----------------------------------------------------------------
+
                     " */kubepods/pod*/* "                   // k8s containers
                     " */kubepods/*/pod*/* "                 // k8s containers
                     " */*-kubepods-pod*/* "                 // k8s containers
                     " */*-kubepods-*-pod*/* "               // k8s containers
                     " !*kubepods* !*kubelet*"               // all other k8s cgroups
-
-            // ----------------------------------------------------------------
-
-                    " /machine.slice/*.service "           // #3367 systemd-nspawn
 
             // ----------------------------------------------------------------
 
