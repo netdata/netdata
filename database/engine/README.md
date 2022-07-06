@@ -19,7 +19,7 @@ In addition, the `dbengine` is the only mode that supports changing the data col
 
 ## Tiering
 
-For Netdata Agent with version `netdata-1.35.1.138.nightly` and greater, `dbengine` supports tiering. Tiering is a
+For Netdata Agent with version `netdata-1.35.0.138.nightly` and greater, `dbengine` supports tiering. Tiering is a
 mechanism of providing multiple tiers of data with
 different [granularity on metrics](/docs/store/distributed-data-architecture.md#granularity-of-metrics). Every Tier down
 samples the exact lower tier (lower tiers have greater resolution). You can have up to 5 Tiers **[0. . 4]** of data (
