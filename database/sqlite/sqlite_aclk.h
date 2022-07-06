@@ -98,7 +98,7 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 #define TRIGGER_ACLK_CHART_PAYLOAD "CREATE TRIGGER IF NOT EXISTS aclk_tr_chart_payload_%s " \
         "after insert on aclk_chart_payload_%s " \
         "begin insert into aclk_chart_%s (uuid, unique_id, type, status, date_created) values " \
-        " (new.uuid, new.unique_id, new.type, 'pending', strftime('%%s')) on conflict(uuid, status) " \
+        " (new.uuid, new.unique_id, new.type, 'pending', unixepoch()) on conflict(uuid, status) " \
         " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
         "end;"
 

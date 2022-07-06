@@ -42,14 +42,14 @@ const char *database_config[] = {
     "WHERE ch.hash_id = chm.hash_id;",
 
     "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
-      " SELECT new.host_id, strftime(\"%s\") WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
+      " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
 
     "CREATE TRIGGER IF NOT EXISTS tr_v_chart_hash INSTEAD OF INSERT on v_chart_hash BEGIN "
     "INSERT INTO chart_hash (hash_id, type, id, name, family, context, title, unit, plugin, "
     "module, priority, chart_type, last_used) "
     "values (new.hash_id, new.type, new.id, new.name, new.family, new.context, new.title, new.unit, new.plugin, "
-    "new.module, new.priority, new.chart_type, strftime('%s')) "
-    "ON CONFLICT (hash_id) DO UPDATE SET last_used = strftime('%s'); "
+    "new.module, new.priority, new.chart_type, unixepoch()) "
+    "ON CONFLICT (hash_id) DO UPDATE SET last_used = unixepoch(); "
     "INSERT INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id) "
     "on conflict (chart_id, hash_id) do nothing; END; ",
 
@@ -1444,7 +1444,7 @@ int file_is_migrated(char *path)
 }
 
 #define STORE_MIGRATED_FILE    "insert or replace into metadata_migration (filename, file_size, date_created) " \
-                                "values (@file, @size, strftime('%s'));"
+                                "values (@file, @size, unixepoch());"
 
 void add_migrated_file(char *path, uint64_t file_size)
 {
@@ -1481,7 +1481,7 @@ void add_migrated_file(char *path, uint64_t file_size)
 
 #define SQL_INS_CHART_LABEL "insert or replace into chart_label " \
     "(chart_id, source_type, label_key, label_value, date_created) " \
-    "values (@chart, @source, @label, @value, strftime('%s'));"
+    "values (@chart, @source, @label, @value, unixepoch());"
 
 void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
 {
@@ -1740,7 +1740,7 @@ failed:
 
 #define SQL_STORE_CHART_HASH "insert into v_chart_hash (hash_id, type, id, " \
     "name, family, context, title, unit, plugin, module, priority, chart_type, last_used, chart_id) " \
-    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, ?12, strftime('%s'), ?13);"
+    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, ?12, unixepoch(), ?13);"
 
 int sql_store_chart_hash(
     uuid_t *hash_id, uuid_t *chart_id, const char *type, const char *id, const char *name, const char *family,
@@ -1911,7 +1911,7 @@ void compute_chart_hash(RRDSET *st)
 }
 
 #define SQL_STORE_CLAIM_ID  "insert into node_instance " \
-    "(host_id, claim_id, date_created) values (@host_id, @claim_id, strftime('%s')) " \
+    "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
     "on conflict(host_id) do update set claim_id = excluded.claim_id;"
 
 void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
