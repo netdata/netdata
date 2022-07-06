@@ -264,8 +264,8 @@ struct rrddim {
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // configuration flags for the dimension
 
-    unsigned int updated:1;                         // 1 when the dimension has been updated since the last processing
-    unsigned int exposed:1;                         // 1 when set what have sent this dimension to the central netdata
+    bool updated;                                   // 1 when the dimension has been updated since the last processing
+    bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
 
     collected_number multiplier;                    // the multiplier of the collected values
     collected_number divisor;                       // the divider of the collected values
