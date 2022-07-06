@@ -9,11 +9,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/troublesh
 Sometimes, when claiming a node, it might not show up as online in Netdata Cloud.  
 The occurances triggering this behavior might be:
 
-- Agent requiring a restart
-
-- Claiming was executed on an agent with an old version, that was deprecated with the new architecture.
-
-- Network or other temporary issue connecting to the Cloud.
+- [Agent requiring a restart](#agent-requiring-a-restart)
+- [Claiming was executed on an agent with an old version, that was deprecated with the new architecture.](#claiming-on-an-older-deprecated-version-of-the-agent)
+- [Network or other temporary issue connecting to the Cloud.](#network-or-other-temporary-issue-connecting-to-the-cloud)
 
 ## Agent requiring a restart
 
