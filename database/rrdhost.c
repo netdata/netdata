@@ -740,9 +740,6 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
-extern void rrdeng_page_descr_aral_go_singlethreaded(void);
-extern void rrdeng_page_descr_aral_go_multithreaded(void);
-
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
 #ifdef ENABLE_DBENGINE
@@ -771,6 +768,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         default_rrdeng_page_fetch_retries = 1;
         config_set_number(CONFIG_SECTION_DB, "dbengine page fetch retries", default_rrdeng_page_fetch_retries);
     }
+
+    if(config_get_boolean(CONFIG_SECTION_DB, "dbengine page descriptors in file mapped memory", rrdeng_page_descr_is_mmap()) == CONFIG_BOOLEAN_YES)
+        rrdeng_page_descr_use_mmap();
+    else
+        rrdeng_page_descr_use_malloc();
 #endif
 
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);

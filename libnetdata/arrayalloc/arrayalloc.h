@@ -9,12 +9,18 @@ typedef struct arrayalloc {
     size_t elements;
     const char *filename;
     char **cache_dir;
+    bool use_mmap;
+
+    // private members - do not touch
     struct {
+        bool mmap;
         bool lockless;
         bool initialized;
+        size_t element_size;
         size_t file_number;
         size_t natural_page_size;
         size_t allocation_multiplier;
+        size_t max_alloc_size;
         size_t total_allocated;
         netdata_mutex_t mutex;
         struct arrayalloc_page *pages;

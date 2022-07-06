@@ -3,50 +3,49 @@
 
 #include "rrdengine.h"
 
-// #define PAGE_DESCR_WITH_ARAL 1
-
-#ifdef PAGE_DESCR_WITH_ARAL
 ARAL page_descr_aral = {
     .element_size = sizeof(struct rrdeng_page_descr),
-    .elements = 100000,
+    .elements = 512*1024,
     .filename = "page_descriptors",
-    .cache_dir = &netdata_configured_cache_dir
+    .cache_dir = &netdata_configured_cache_dir,
+    .use_mmap = false,
+    .internal.initialized = false
 };
-#endif
 
 void rrdeng_page_descr_aral_go_singlethreaded(void) {
-#ifdef PAGE_DESCR_WITH_ARAL
     page_descr_aral.internal.lockless = true;
-#endif
-    ;
 }
 void rrdeng_page_descr_aral_go_multithreaded(void) {
-#ifdef PAGE_DESCR_WITH_ARAL
     page_descr_aral.internal.lockless = false;
-#endif
-    ;
 }
 
 struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void) {
     struct rrdeng_page_descr *descr;
-
-#ifdef PAGE_DESCR_WITH_ARAL
     descr = arrayalloc_mallocz(&page_descr_aral);
-#else
-    descr = mallocz(sizeof(*descr));
-#endif
-
     return descr;
 }
 
 void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr) {
-#ifdef PAGE_DESCR_WITH_ARAL
     arrayalloc_freez(&page_descr_aral, descr);
-#else
-    freez(descr);
-#endif
 }
 
+void rrdeng_page_descr_use_malloc(void) {
+    if(page_descr_aral.internal.initialized)
+        error("DBENGINE: cannot change ARAL allocation policy after it has been initialized.");
+    else
+        page_descr_aral.use_mmap = false;
+}
+
+void rrdeng_page_descr_use_mmap(void) {
+    if(page_descr_aral.internal.initialized)
+        error("DBENGINE: cannot change ARAL allocation policy after it has been initialized.");
+    else
+        page_descr_aral.use_mmap = true;
+}
+
+bool rrdeng_page_descr_is_mmap(void) {
+    return page_descr_aral.use_mmap;
+}
 
 /* Forward declarations */
 static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
