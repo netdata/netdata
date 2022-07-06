@@ -459,7 +459,7 @@ void read_cgroup_plugin_configuration() {
                     " */kubepods/*/pod*/* "                 // k8s containers
                     " */*-kubepods-pod*/* "                 // k8s containers
                     " */*-kubepods-*-pod*/* "               // k8s containers
-                    " !*kubepods* !*kubelet*"               // all other k8s cgroups
+                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
 
             // ----------------------------------------------------------------
 
@@ -538,7 +538,7 @@ void read_cgroup_plugin_configuration() {
                     " */kubepods/*/pod*/* "                 // k8s containers
                     " */*-kubepods-pod*/* "                 // k8s containers
                     " */*-kubepods-*-pod*/* "               // k8s containers
-                    " !*kubepods* !*kubelet*"               // all other k8s cgroups
+                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
                     " *.libvirt-qemu "                    // #3010
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
