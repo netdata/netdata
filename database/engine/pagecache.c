@@ -3,6 +3,51 @@
 
 #include "rrdengine.h"
 
+// #define PAGE_DESCR_WITH_ARAL 1
+
+#ifdef PAGE_DESCR_WITH_ARAL
+ARAL page_descr_aral = {
+    .element_size = sizeof(struct rrdeng_page_descr),
+    .elements = 100000,
+    .filename = "page_descriptors",
+    .cache_dir = &netdata_configured_cache_dir
+};
+#endif
+
+void rrdeng_page_descr_aral_go_singlethreaded(void) {
+#ifdef PAGE_DESCR_WITH_ARAL
+    page_descr_aral.internal.lockless = true;
+#endif
+    ;
+}
+void rrdeng_page_descr_aral_go_multithreaded(void) {
+#ifdef PAGE_DESCR_WITH_ARAL
+    page_descr_aral.internal.lockless = false;
+#endif
+    ;
+}
+
+struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void) {
+    struct rrdeng_page_descr *descr;
+
+#ifdef PAGE_DESCR_WITH_ARAL
+    descr = arrayalloc_mallocz(&page_descr_aral);
+#else
+    descr = mallocz(sizeof(*descr));
+#endif
+
+    return descr;
+}
+
+void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr) {
+#ifdef PAGE_DESCR_WITH_ARAL
+    arrayalloc_freez(&page_descr_aral, descr);
+#else
+    freez(descr);
+#endif
+}
+
+
 /* Forward declarations */
 static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
 
@@ -81,7 +126,7 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
 {
     struct rrdeng_page_descr *descr;
 
-    descr = mallocz(sizeof(*descr));
+    descr = rrdeng_page_descr_mallocz();
     descr->page_length = 0;
     descr->start_time = INVALID_TIME;
     descr->end_time = INVALID_TIME;
@@ -494,7 +539,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
         (void)sleep_usec(1000); /* 1 msec */
     }
 destroy:
-    freez(descr);
+    rrdeng_page_descr_freez(descr);
     pg_cache_update_metric_times(page_index);
 
     return can_delete_metric;
@@ -1312,7 +1357,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
             else
                 metric_single_point_pages++;
 
-            freez(descr);
+            rrdeng_page_descr_freez(descr);
             pages_bytes += sizeof(*descr);
             pages_number++;
 

@@ -740,6 +740,9 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
+extern void rrdeng_page_descr_aral_go_singlethreaded(void);
+extern void rrdeng_page_descr_aral_go_multithreaded(void);
+
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
 #ifdef ENABLE_DBENGINE
@@ -825,6 +828,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     }
 
 #ifdef ENABLE_DBENGINE
+    rrdeng_page_descr_aral_go_singlethreaded();
+
     int created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
@@ -905,6 +910,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         rrd_unlock();
         fatal("DBENGINE: Failed to be initialized.");
     }
+
+    rrdeng_page_descr_aral_go_multithreaded();
 #else
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
     if(storage_tiers != 1) {

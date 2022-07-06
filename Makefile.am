@@ -136,6 +136,8 @@ LIBNETDATA_FILES = \
     libnetdata/adaptive_resortable_list/adaptive_resortable_list.h \
     libnetdata/config/appconfig.c \
     libnetdata/config/appconfig.h \
+    libnetdata/arrayalloc/arrayalloc.c \
+    libnetdata/arrayalloc/arrayalloc.h \
     libnetdata/avl/avl.c \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \

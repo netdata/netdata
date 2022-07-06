@@ -1724,6 +1724,7 @@ AC_CONFIG_FILES([
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
+    libnetdata/arrayalloc/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
     libnetdata/clocks/Makefile
