@@ -168,6 +168,7 @@ struct aclk_database_worker_config {
     char uuid_str[GUID_LEN + 1];
     char node_id[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
+    char *hostname;                 // hostname to avoid constant lookups
     uint64_t chart_sequence_id;     // last chart_sequence_id
     time_t chart_timestamp;         // last chart timestamp
     time_t cleanup_after;           // Start a cleanup after this timestamp
