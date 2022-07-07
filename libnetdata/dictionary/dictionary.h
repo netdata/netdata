@@ -35,9 +35,8 @@
  *
  */
 
-#ifndef DICTIONARY_INTERNALS
-typedef void DICTIONARY;
-#endif
+typedef struct dictionary DICTIONARY;
+typedef struct dictionary_item DICTIONARY_ITEM;
 
 typedef enum dictionary_flags {
     DICTIONARY_FLAG_NONE                   = 0,        // the default is the opposite of all below
@@ -99,11 +98,12 @@ extern void *dictionary_get(DICTIONARY *dict, const char *name);
 // returns -1 if the item was not found in the index
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
-extern void *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name);
-extern void *dictionary_acquire_item(DICTIONARY *dict, const char *name);
-extern void *dictionary_acquired_item_value(DICTIONARY *dict, void *item);
-extern void dictionary_acquired_item_release(DICTIONARY *dict, void *item);
-extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, void *item);
+extern DICTIONARY_ITEM *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name);
+extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item);
+
+extern DICTIONARY_ITEM *dictionary_acquire_item(DICTIONARY *dict, const char *name);
+extern void *dictionary_acquired_item_value(DICTIONARY *dict, DICTIONARY_ITEM *item);
+extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
 
 // UNSAFE functions, without locks
 // to be used when the user is traversing with the right lock type
