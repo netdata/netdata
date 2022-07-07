@@ -7,6 +7,7 @@
 #include "../../aclk/aclk_charts_api.h"
 #endif
 
+#ifdef ENABLE_ACLK
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     RRDSET *st;
     char name[500];
@@ -26,9 +27,11 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 
     return dict;
 }
+#endif
 
 void sql_build_node_collectors(struct aclk_database_worker_config *wc)
 {
+#ifdef ENABLE_ACLK
     struct update_node_collectors upd_node_collectors;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
 
@@ -42,7 +45,9 @@ void sql_build_node_collectors(struct aclk_database_worker_config *wc)
     freez(upd_node_collectors.claim_id);
 
     log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, wc->host->hostname);
-
+#else
+    UNUSED(wc);
+#endif
     return;
 }
 
