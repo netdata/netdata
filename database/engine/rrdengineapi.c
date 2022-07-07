@@ -877,7 +877,8 @@ error_after_init_rrd_files:
     free_page_cache(ctx);
     if (!is_storage_engine_shared((STORAGE_INSTANCE *)ctx)) {
         freez(ctx);
-        *ctxp = NULL;
+        if (ctxp)
+            *ctxp = NULL;
     }
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return UV_EIO;

@@ -1584,12 +1584,16 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
 #ifdef ENABLE_DBENGINE
 static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *name, uuid_t *metric_uuid)
 {
+    STORAGE_ENGINE *eng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
+
+    if (unlikely(!eng))
+        return NULL;
+
     RRDDIM *rd = onewayalloc_callocz(owa, 1, sizeof(*rd));
     rd->rrdset = st;
     rd->update_every = st->update_every;
     rd->last_stored_value = NAN;
     rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
-    STORAGE_ENGINE *eng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
 
     uuid_copy(rd->metric_uuid, *metric_uuid);
     rd->id = onewayalloc_strdupz(owa, id);
@@ -1714,6 +1718,8 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
         st->last_entry_t = MAX(st->last_entry_t, (*param_list)->last_entry_t);
 
         RRDDIM *rd = create_rrdim_entry(owa, st, (char *)sqlite3_column_text(res, 1), (char *)sqlite3_column_text(res, 2), &rrdeng_uuid);
+        if (unlikely(!rd))
+            continue;
         if (sqlite3_column_int(res, 9) == 1)
             rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
         rd->next = (*param_list)->rd;
