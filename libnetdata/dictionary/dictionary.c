@@ -26,7 +26,8 @@ typedef struct dictionary DICTIONARY;
 
 typedef enum name_value_flags {
     NAME_VALUE_FLAG_NONE                   = 0,
-    NAME_VALUE_FLAG_DELETED                = (1 << 0), // this item is deleted
+    NAME_VALUE_FLAG_NAME_IS_ALLOCATED = (1 << 0),
+    NAME_VALUE_FLAG_DELETED                = (1 << 1), // this item is deleted
 } NAME_VALUE_FLAGS;
 
 /*
@@ -45,7 +46,10 @@ typedef struct name_value {
     size_t value_len;           // the size of the value (assumed binary)
 
     void *value;                // the value of the dictionary item
-    char *name;                 // the name of the dictionary item
+    union {
+        STRING *string_name;    // the name of the dictionary item
+        char *caller_name;      // the user supplied string pointer
+    };
 
     int refcount;               // the reference counter
     NAME_VALUE_FLAGS flags;     // the flags for this item
@@ -66,7 +70,7 @@ struct dictionary {
     Pvoid_t JudyHSArray;                // the hash table
 #endif
 
-    netdata_rwlock_t *rwlock;           // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
+    netdata_rwlock_t rwlock;            // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
 
     void (*ins_callback)(const char *name, void *value, void *data);
     void *ins_callback_data;
@@ -252,26 +256,23 @@ static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
 
 static inline size_t dictionary_lock_init(DICTIONARY *dict) {
     if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
-            dict->rwlock = mallocz(sizeof(netdata_rwlock_t));
-            netdata_rwlock_init(dict->rwlock);
+        netdata_rwlock_init(&dict->rwlock);
 
-            if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)
-                dict->flags &= ~DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
+        if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)
+            dict->flags &= ~DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
 
-            return sizeof(netdata_rwlock_t);
+        return 0;
     }
 
     // we are single threaded
     dict->flags |= DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
-    dict->rwlock = NULL;
     return 0;
 }
 
 static inline size_t dictionary_lock_free(DICTIONARY *dict) {
     if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
-        netdata_rwlock_destroy(dict->rwlock);
-        freez(dict->rwlock);
-        return sizeof(netdata_rwlock_t);
+        netdata_rwlock_destroy(&dict->rwlock);
+        return 0;
     }
     return 0;
 }
@@ -291,7 +292,7 @@ static void dictionary_lock(DICTIONARY *dict, char rw) {
 
     if(rw == 'r' || rw == 'R') {
         // read lock
-        netdata_rwlock_rdlock(dict->rwlock);
+        netdata_rwlock_rdlock(&dict->rwlock);
 
         if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
             internal_error(true, "DICTIONARY: left-over exclusive access to dictionary found");
@@ -300,7 +301,7 @@ static void dictionary_lock(DICTIONARY *dict, char rw) {
     }
     else {
         // write lock
-        netdata_rwlock_wrlock(dict->rwlock);
+        netdata_rwlock_wrlock(&dict->rwlock);
 
         dict->flags |= DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
     }
@@ -323,7 +324,7 @@ static void dictionary_unlock(DICTIONARY *dict, char rw) {
     if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)
         dict->flags &= ~DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
 
-    netdata_rwlock_unlock(dict->rwlock);
+    netdata_rwlock_unlock(&dict->rwlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -440,7 +441,7 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
     return 0;
 }
 
-static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *nv) {
     (void)name;
     (void)name_len;
 
@@ -469,12 +470,9 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char 
     return &dict->hash_base;
 }
 
-static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, void *nv) {
     // we have our new NAME_VALUE object.
     // Let's index it.
-
-    (void)name;
-    (void)name_len;
 
     if(unlikely(avl_insert(&((dict)->values_index), (avl_t *)(nv)) != (avl_t *)nv))
         error("dictionary: INTERNAL ERROR: duplicate insertion to dictionary.");
@@ -522,7 +520,7 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char 
     return (NAME_VALUE **)Rc;
 }
 
-static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *nv) {
     internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: deleting from the index without exclusive access to the dictionary.");
 
     (void)nv;
@@ -566,10 +564,8 @@ static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *nam
     }
 }
 
-static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, const char *name, size_t name_len, NAME_VALUE *nv) {
+static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, void *nv) {
     (void)dict;
-    (void)name;
-    (void)name_len;
     (void)nv;
     ;
 }
@@ -620,6 +616,31 @@ static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VAL
 // ----------------------------------------------------------------------------
 // NAME_VALUE methods
 
+static inline size_t namevalue_set_name(DICTIONARY *dict, NAME_VALUE *nv, const char *name, size_t name_len) {
+    if(likely(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE)) {
+        nv->caller_name = (char *)name;
+        return 0;
+    }
+
+    nv->string_name = string_dupz(name);
+    nv->flags |= NAME_VALUE_FLAG_NAME_IS_ALLOCATED;
+    return name_len;
+}
+
+static inline size_t namevalue_free_name(DICTIONARY *dict, NAME_VALUE *nv) {
+    if(unlikely(!(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE)))
+        string_freez(nv->string_name);
+
+    return 0;
+}
+
+static inline const char *namevalue_get_name(NAME_VALUE *nv) {
+    if(nv->flags & NAME_VALUE_FLAG_NAME_IS_ALLOCATED)
+        return string_tostring(nv->string_name);
+    else
+        return nv->caller_name;
+}
+
 static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len) {
     debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
@@ -632,13 +653,7 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
     nv->name_len = name_len;
     nv->value_len = value_len;
 
-    if(likely(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE))
-        nv->name = (char *)name;
-    else {
-        nv->name = mallocz(name_len);
-        memcpy(nv->name, name, name_len);
-        allocated += name_len;
-    }
+    allocated += namevalue_set_name(dict, nv, name, name_len);
 
     if(likely(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE))
         nv->value = value;
@@ -667,26 +682,26 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
     DICTIONARY_STATS_ENTRIES_PLUS1(dict, allocated);
 
     if(dict->ins_callback)
-        dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
+        dict->ins_callback(namevalue_get_name(nv), nv->value, dict->ins_callback_data);
 
     return nv;
 }
 
 static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value, size_t value_len) {
-    debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", nv->name);
+    debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", namevalue_get_name(nv));
 
     DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
 
     if(dict->del_callback)
-        dict->del_callback(nv->name, nv->value, dict->del_callback_data);
+        dict->del_callback(namevalue_get_name(nv), nv->value, dict->del_callback_data);
 
     if(likely(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE)) {
-        debug(D_DICTIONARY, "Dictionary: linking value to '%s'", nv->name);
+        debug(D_DICTIONARY, "Dictionary: linking value to '%s'", namevalue_get_name(nv));
         nv->value = value;
         nv->value_len = value_len;
     }
     else {
-        debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", nv->name);
+        debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", namevalue_get_name(nv));
 
         void *oldvalue = nv->value;
         void *newvalue = NULL;
@@ -698,32 +713,31 @@ static void namevalue_reset_unsafe(DICTIONARY *dict, NAME_VALUE *nv, void *value
         nv->value = newvalue;
         nv->value_len = value_len;
 
-        debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", nv->name);
+        debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", namevalue_get_name(nv));
         freez(oldvalue);
     }
 
     if(dict->ins_callback)
-        dict->ins_callback(nv->name, nv->value, dict->ins_callback_data);
+        dict->ins_callback(namevalue_get_name(nv), nv->value, dict->ins_callback_data);
 }
 
 static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
-    debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
+    debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", namevalue_get_name(nv));
 
     if(dict->del_callback)
-        dict->del_callback(nv->name, nv->value, dict->del_callback_data);
+        dict->del_callback(namevalue_get_name(nv), nv->value, dict->del_callback_data);
 
     size_t freed = 0;
 
     if(unlikely(!(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE))) {
-        debug(D_DICTIONARY, "Dictionary freeing value of '%s'", nv->name);
+        debug(D_DICTIONARY, "Dictionary freeing value of '%s'", namevalue_get_name(nv));
         freez(nv->value);
         freed += nv->value_len;
     }
 
     if(unlikely(!(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE))) {
-        debug(D_DICTIONARY, "Dictionary freeing name '%s'", nv->name);
-        freez(nv->name);
-        freed += nv->name_len;
+        debug(D_DICTIONARY, "Dictionary freeing name '%s'", namevalue_get_name(nv));
+        freed += namevalue_free_name(dict, nv);
     }
 
     freez(nv);
@@ -843,7 +857,7 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
     if(likely(*pnv == 0)) {
         // a new item added to the index
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
-        hashtable_inserted_name_value_unsafe(dict, name, name_len, nv);
+        hashtable_inserted_name_value_unsafe(dict, nv);
         linkedlist_namevalue_link_unsafe(dict, nv);
     }
     else {
@@ -856,7 +870,7 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
             namevalue_reset_unsafe(dict, nv, value, value_len);
 
         else if(dict->conflict_callback)
-            dict->conflict_callback(nv->name, nv->value, value, dict->conflict_callback_data);
+            dict->conflict_callback(namevalue_get_name(nv), nv->value, value, dict->conflict_callback_data);
     }
 
     return nv->value;
@@ -1036,7 +1050,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
 
     if(likely(nv)) {
         dfe->last_item = nv;
-        dfe->name = nv->name;
+        dfe->name = (char *)namevalue_get_name(nv);
         dfe->value = nv->value;
         reference_counter_acquire(dict, nv);
     }
@@ -1076,7 +1090,7 @@ void *dictionary_foreach_next(DICTFE *dfe) {
 
     if(likely(nv = nv_next)) {
         dfe->last_item = nv;
-        dfe->name = nv->name;
+        dfe->name = (char *)namevalue_get_name(nv);
         dfe->value = nv->value;
         reference_counter_acquire(dfe->dict, nv);
     }
@@ -1149,7 +1163,7 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
         // while we are using it
         reference_counter_acquire(dict, nv);
 
-        int r = callback(nv->name, nv->value, data);
+        int r = callback(namevalue_get_name(nv), nv->value, data);
 
         // since we have a reference counter, this item cannot be deleted
         // until we release the reference counter, so the pointers are there
@@ -1175,7 +1189,7 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
 // sorted walkthrough
 
 static int dictionary_sort_compar(const void *nv1, const void *nv2) {
-    return strcmp((*(NAME_VALUE **)nv1)->name, (*(NAME_VALUE **)nv2)->name);
+    return strcmp(namevalue_get_name((*(NAME_VALUE **)nv1)), namevalue_get_name((*(NAME_VALUE **)nv2)));
 }
 
 int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
@@ -1215,7 +1229,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
         nv = array[i];
         if(likely(!(nv->flags & NAME_VALUE_FLAG_DELETED))) {
             reference_counter_acquire(dict, nv);
-            int r = callback(nv->name, nv->value, data);
+            int r = callback(namevalue_get_name(nv), nv->value, data);
             reference_counter_release(dict, nv, false);
             if (r < 0) {
                 ret = r;
@@ -1230,6 +1244,72 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
     freez(array);
 
     return ret;
+}
+
+// ----------------------------------------------------------------------------
+// STRING implementation - dedup all STRINGs
+
+static DICTIONARY string_dictionary = {
+    .flags = DICTIONARY_FLAG_EXCLUSIVE_ACCESS,
+    .rwlock = NETDATA_RWLOCK_INITIALIZER
+};
+
+static netdata_mutex_t string_mutex = NETDATA_MUTEX_INITIALIZER;
+
+typedef struct string_entry {
+#ifdef DICTIONARY_WITH_AVL
+    avl_t avl_node;
+#endif
+    const char *str;
+    volatile size_t references;
+} STRING_ENTRY;
+
+STRING *string_dupz(const char *str) {
+    if(unlikely(!str || !*str)) return NULL;
+    netdata_mutex_lock(&string_mutex);
+
+    size_t str_len = strlen(str) + 1;
+    STRING_ENTRY *se;
+    STRING_ENTRY **ptr = (STRING_ENTRY **)hashtable_insert_unsafe(&string_dictionary, str, str_len);
+    if(unlikely(*ptr == 0)) {
+        // a new item added to the index
+        se = mallocz(sizeof(STRING_ENTRY));
+        se->str = strdupz(str);
+        se->references = 1;
+        *ptr = se;
+        hashtable_inserted_name_value_unsafe(&string_dictionary, se);
+    }
+    else {
+        // the item is already in the index
+        se = *ptr;
+        se->references++;
+    }
+
+    netdata_mutex_unlock(&string_mutex);
+    return (STRING *)se;
+}
+
+void string_freez(STRING *item) {
+    if(unlikely(!item)) return;
+    netdata_mutex_lock(&string_mutex);
+
+    STRING_ENTRY *se = (STRING_ENTRY *)item;
+    se->references--;
+    if(unlikely(se->references == 0)) {
+        size_t str_len = strlen(se->str) + 1;
+        if(hashtable_delete_unsafe(&string_dictionary, se->str, str_len, se) == 0)
+            error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index", se->str);
+
+        freez((void *)se->str);
+        freez(se);
+    }
+
+    netdata_mutex_unlock(&string_mutex);
+}
+
+const char *string_tostring(STRING *item) {
+    if(unlikely(!item)) return "";
+    return ((STRING_ENTRY *)item)->str;
 }
 
 // ----------------------------------------------------------------------------
@@ -1652,8 +1732,8 @@ static int check_name_value_callback(const char *name, void *value, void *data) 
 static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *name, const char *value, int refcount, NAME_VALUE_FLAGS flags, bool searchable, bool browsable, bool linked) {
     size_t errors = 0;
 
-    fprintf(stderr, "NAME_VALUE name is '%s', expected '%s'...\t\t\t\t", nv->name, name);
-    if(strcmp(nv->name, name) != 0) {
+    fprintf(stderr, "NAME_VALUE name is '%s', expected '%s'...\t\t\t\t", namevalue_get_name(nv), name);
+    if(strcmp(namevalue_get_name(nv), name) != 0) {
         fprintf(stderr, "FAILED\n");
         errors++;
     }
@@ -1810,7 +1890,7 @@ int dictionary_unittest(size_t entries) {
     // check reference counters
     {
         fprintf(stderr, "\nTesting reference counters:\n");
-        dict = dictionary_create(DICTIONARY_FLAG_NONE);
+        dict = dictionary_create(DICTIONARY_FLAG_NONE|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE);
         errors += check_dictionary(dict, 0, 0);
 
         fprintf(stderr, "\nAdding test item to dictionary and acquiring it\n");
