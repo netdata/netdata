@@ -402,8 +402,11 @@ static void log_init(void) {
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
-    aclklog_filename = config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename);
+    aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
+    if (aclklog_enabled) {
+        snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
+        aclklog_filename = config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename);
+    }
 #endif
 
     char deffacility[8];

@@ -65,6 +65,7 @@ extern const char *facility_log;
 extern const char *aclklog_filename;
 extern int aclklog_fd;
 extern FILE *aclklog;
+extern int aclklog_enabled;
 #endif
 
 extern int access_log_syslog;
