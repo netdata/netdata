@@ -1,61 +1,55 @@
 <!--
-title: "Troubleshooting Agent with Cloud connection"
+title: "Troubleshoot Agent-Cloud connectivity issues"
 description: "A simple guide to troubleshoot occurrences where the Agent is showing as offline after claiming."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
 -->
 
-# Troubleshooting Agent with Cloud connection
+# Troubleshoot Agent-Cloud connectivity issues
 
-Sometimes, when claiming a node, it might not show up as online in Netdata Cloud.  
-The occurrences triggering this behavior might be:
+When you are claiming a node, you might not be able to see it online in Netdata Cloud immediately.  
+This could be due to an error in the claiming process or a temporary outage of some services:
 
-- [The claiming script was unsuccessful](#the-claiming-script-was-unsuccessful)
+We identified some scenarios and possible actions you could take to overcome this situation.
+
+- [The claiming process of the kickstart script was unsuccessful](#the-claiming-process-of-the-kickstart-script-was-unsuccessful)
 - [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
 - [Network issues while connecting to the Cloud](#network-issues-while-connecting-to-the-cloud)
 
-## The claiming script was unsuccessful
+## The claiming process of the kickstart script was unsuccessful
 
-### Make sure the Agent is running
+Here we will try to find some corner cases you might bump into.
 
-Check if the Agent is running:
+### The kickstart script auto-claimed the Agent but there was no error message displayed
 
-```bash
-systemctl status netdata
-```
+The kickstart script will install/update your Agent and then try to claim the node to the Cloud (if tokens are provided). To
+complete the second part the Agent must be running. In some platforms the Netdata service cannot be enabled by default
+and you must do it manually.
 
-The expected output should contain info like this:
+1. Check if the Agent is running:
 
-```bash
-Active: active (running) since Wed 2022-07-06 12:25:02 EEST; 1h 40min ago
-```
+    ```bash
+    systemctl status netdata
+    ```
 
-:::tip
+    The expected output should contain info like this:
 
-The Agent must be running for the claiming to work.
+    ```bash
+    Active: active (running) since Wed 2022-07-06 12:25:02 EEST; 1h 40min ago
+    ```
 
-If the Agent is already running, the solution might be as simple as restarting the Agent, you can do so by running:
+2. Enable and start the Netdata Service.
 
-```bash
-systemctl restart netdata
-```
+    ```bash
+    systemctl enable netdata
+    systemctl start netdata
+    ```
 
-:::
+3. Retry the kickstart claiming process.
 
-If the Agent is not running, enable the service:
+:::note
 
-```bash
-sudo systemctl enable netdata 
-```
-
-and then start the Agent:
-
-```bash
-sudo systemctl start netdata 
-```
-
-:::info
-
-Read more about [Starting, Stopping and Restarting the Agent](https://learn.netdata.cloud/docs/configure/start-stop-restart).
+In some cases a simple restart of the Agent can fix the issue.  
+Read more about [Starting, Stopping and Restarting the Agent](/docs/configure/start-stop-restart).
 
 :::
 
@@ -67,68 +61,55 @@ With the introduction of our new architecture, Agents running versions lower tha
 
 ## Network issues while connecting to the Cloud
 
-### Check your IP
+### Verify that your IP is whitelisted from Netdata Cloud
 
-It is possible that your IP might be banned from `app.netdata.cloud`, for security reasons.
+Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `app.netdata.cloud` due to security concerns.
 
-To check this, run:
+To verify this:
 
-```bash
-sudo netdatacli aclk-state 
-```
+1. Check the Agent's `aclk-state`.
 
-The output will contain a line indicating if the IP is banned from `app.netdata.cloud`:
+    ```bash
+    sudo netdatacli aclk-state | grep "Banned By Cloud"
+    ```
 
-```bash
-Banned By Cloud: No
-```
+    The output will contain a line indicating if the IP is banned from `app.netdata.cloud`:
 
-If your node's IP is banned, you can:
+    ```bash
+    Banned By Cloud: yes
+    ```
 
-- Contact our team to whitelist your IP by submitting a ticket at [Netdata Community](https://community.netdata.cloud/)
-- Change your node's IP
+2. If your node's IP is banned, you can:
 
-### Make sure that you have an internet connection
+    - Contact our team to whitelist your IP by submitting a ticket in the [Netdata forum](https://community.netdata.cloud/)
+    - Change your node's IP
 
-Firstly, check that you have internet connection by pinging well known hosts:
+### Make sure that your node has internet connectivity and can resolve network domains
 
-```bash
-ping 8.8.8.8
-```
+1. Try to reach a well known host:
 
-or
+    ```bash
+    ping 8.8.8.8
+    ```
+  
+2. If you can reach external IPs, then check your domain resolution.
 
-```bash
-ping 1.1.1.1
-```
+    ```bash
+    host app.netdata.cloud
+    ```
 
-:::tip
+    The expected output should be something like this:
 
-Exit the `ping` command by pressing `Ctrl+C`
+    ```bash
+    app.netdata.cloud is an alias for main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com.
+    main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 54.198.178.11
+    main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.207.131.212
+    main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.196.50.41
+    ```
 
-:::
+    :::info
 
-### Check DNS resolution
+    There will be cases in which the firewall restricts network access. In those cases you need to whitelist the `app.netdata.cloud` domain to be able to see your nodes in Netdata Cloud.  
+    If you can't whitelist domains in your firewall, you can whitelist the IPs that the above command will produce, but keep in mind that they can change without any notice.
 
-You can check your DNS resolution by running:
-
-```bash
-host app.netdata.cloud
-```
-
-The expected output should be something like this:
-
-```bash
-app.netdata.cloud is an alias for main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com.
-main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 54.198.178.11
-main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.207.131.212
-main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.196.50.41
-```
-
-If the command fails, you can whitelist the `app.netdata.cloud` domain from the node's firewall restrictions.
-
-:::tip
-
-If you can't whitelist domains from your firewall, you can whitelist the IPs that the above mentioned command will produce, but keep in mind that they can change at anytime without notice.
-
-:::
+    :::
