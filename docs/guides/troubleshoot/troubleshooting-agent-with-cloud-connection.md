@@ -1,13 +1,13 @@
 <!--
 title: "Troubleshooting Agent with Cloud connection"
-description: "A simple guide to troubleshoot occurances where the Agent is showing as offline after claiming."
+description: "A simple guide to troubleshoot occurrences where the Agent is showing as offline after claiming."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
 -->
 
 # Troubleshooting Agent with Cloud connection
 
 Sometimes, when claiming a node, it might not show up as online in Netdata Cloud.  
-The occurances triggering this behavior might be:
+The occurrences triggering this behavior might be:
 
 - [The claiming script failed](#the-claiming-script-failed)
 - [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
