@@ -211,7 +211,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     } else {
         dbengine_page_free(descr->pg_cache_descr->page);
         rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
-        freez(descr);
+        rrdeng_page_descr_freez(descr);
     }
     handle->descr = NULL;
 }

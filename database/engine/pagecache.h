@@ -195,6 +195,14 @@ extern unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx);
 extern unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx);
 extern unsigned long pg_cache_committed_hard_limit(struct rrdengine_instance *ctx);
 
+extern void rrdeng_page_descr_aral_go_singlethreaded(void);
+extern void rrdeng_page_descr_aral_go_multithreaded(void);
+extern void rrdeng_page_descr_use_malloc(void);
+extern void rrdeng_page_descr_use_mmap(void);
+extern bool rrdeng_page_descr_is_mmap(void);
+extern struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void);
+extern void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr);
+
 static inline void
     pg_cache_atomic_get_pg_info(struct rrdeng_page_descr *descr, usec_t *end_timep, uint32_t *page_lengthp)
 {

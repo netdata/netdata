@@ -3,6 +3,50 @@
 
 #include "rrdengine.h"
 
+ARAL page_descr_aral = {
+    .element_size = sizeof(struct rrdeng_page_descr),
+    .elements = 20000,
+    .filename = "page_descriptors",
+    .cache_dir = &netdata_configured_cache_dir,
+    .use_mmap = false,
+    .internal.initialized = false
+};
+
+void rrdeng_page_descr_aral_go_singlethreaded(void) {
+    page_descr_aral.internal.lockless = true;
+}
+void rrdeng_page_descr_aral_go_multithreaded(void) {
+    page_descr_aral.internal.lockless = false;
+}
+
+struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void) {
+    struct rrdeng_page_descr *descr;
+    descr = arrayalloc_mallocz(&page_descr_aral);
+    return descr;
+}
+
+void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr) {
+    arrayalloc_freez(&page_descr_aral, descr);
+}
+
+void rrdeng_page_descr_use_malloc(void) {
+    if(page_descr_aral.internal.initialized)
+        error("DBENGINE: cannot change ARAL allocation policy after it has been initialized.");
+    else
+        page_descr_aral.use_mmap = false;
+}
+
+void rrdeng_page_descr_use_mmap(void) {
+    if(page_descr_aral.internal.initialized)
+        error("DBENGINE: cannot change ARAL allocation policy after it has been initialized.");
+    else
+        page_descr_aral.use_mmap = true;
+}
+
+bool rrdeng_page_descr_is_mmap(void) {
+    return page_descr_aral.use_mmap;
+}
+
 /* Forward declarations */
 static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
 
@@ -81,7 +125,7 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
 {
     struct rrdeng_page_descr *descr;
 
-    descr = mallocz(sizeof(*descr));
+    descr = rrdeng_page_descr_mallocz();
     descr->page_length = 0;
     descr->start_time = INVALID_TIME;
     descr->end_time = INVALID_TIME;
@@ -494,7 +538,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
         (void)sleep_usec(1000); /* 1 msec */
     }
 destroy:
-    freez(descr);
+    rrdeng_page_descr_freez(descr);
     pg_cache_update_metric_times(page_index);
 
     return can_delete_metric;
@@ -1312,7 +1356,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
             else
                 metric_single_point_pages++;
 
-            freez(descr);
+            rrdeng_page_descr_freez(descr);
             pages_bytes += sizeof(*descr);
             pages_number++;
 

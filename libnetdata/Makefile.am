@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
     adaptive_resortable_list \
+    arrayalloc \
     avl \
     buffer \
     clocks \

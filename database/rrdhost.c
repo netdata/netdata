@@ -768,6 +768,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         default_rrdeng_page_fetch_retries = 1;
         config_set_number(CONFIG_SECTION_DB, "dbengine page fetch retries", default_rrdeng_page_fetch_retries);
     }
+
+    if(config_get_boolean(CONFIG_SECTION_DB, "dbengine page descriptors in file mapped memory", rrdeng_page_descr_is_mmap()) == CONFIG_BOOLEAN_YES)
+        rrdeng_page_descr_use_mmap();
+    else
+        rrdeng_page_descr_use_malloc();
 #endif
 
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
@@ -825,6 +830,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     }
 
 #ifdef ENABLE_DBENGINE
+    rrdeng_page_descr_aral_go_singlethreaded();
+
     int created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
@@ -905,6 +912,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         rrd_unlock();
         fatal("DBENGINE: Failed to be initialized.");
     }
+
+    rrdeng_page_descr_aral_go_multithreaded();
 #else
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
     if(storage_tiers != 1) {
