@@ -260,7 +260,7 @@ ML_FILES += \
     $(NULL)
 
 # Disable warnings from dlib library
-ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations
+ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow
 
 endif
 
@@ -474,6 +474,9 @@ RRD_PLUGIN_FILES = \
     database/metric_correlations.h \
     $(NULL)
 
+database/sqlite/sqlite3.$(OBJEXT) : CFLAGS += -Wno-cast-function-type
+database/KolmogorovSmirnovDist.$(OBJEXT) : CFLAGS += -Wno-maybe-uninitialized
+
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
         database/engine/rrdengine.c \
@@ -668,6 +671,8 @@ ACLK_FILES = \
     aclk/schema-wrappers/schema_wrapper_utils.cc \
     aclk/schema-wrappers/schema_wrapper_utils.h \
     $(NULL)
+
+mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
 
 ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/aclk/v1/lib.proto \
