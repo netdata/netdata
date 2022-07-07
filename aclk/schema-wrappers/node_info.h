@@ -50,9 +50,6 @@ struct aclk_node_info {
 
     char *custom_info;
 
-    char **services;
-    size_t service_count;
-
     char *machine_guid;
 
     DICTIONARY *host_labels_ptr;
