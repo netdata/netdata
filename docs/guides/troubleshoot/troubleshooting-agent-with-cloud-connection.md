@@ -57,7 +57,7 @@ Read more about [Starting, Stopping and Restarting the Agent](https://learn.netd
 
 Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://learn.netdata.cloud/docs/agent/claim#claiming-script).
 
-With the introduction of our new architecture, Agents running versions lower than v1.32.0 can face claiming problems, so we reccomend to [update the Netdata Agent](https://learn.netdata.cloud/docs/agent/packaging/installer/update).
+With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we reccomend to [update the Netdata Agent](https://learn.netdata.cloud/docs/agent/packaging/installer/update).
 
 ## Network issues while connecting to the Cloud
 
@@ -77,7 +77,7 @@ The output will contain a line indicating if the IP is banned from `app.netdata.
 Banned By Cloud: No
 ```
 
-If your node's ip is banned, you can:
+If your node's IP is banned, you can:
 
 - Contact our team to whitelist your IP by sumbiting a ticket at [Netdata Community](https://community.netdata.cloud/)
 - Change your node's IP
