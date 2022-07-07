@@ -39,17 +39,17 @@ typedef struct dictionary DICTIONARY;
 typedef struct dictionary_item DICTIONARY_ITEM;
 
 typedef enum dictionary_flags {
-    DICTIONARY_FLAG_NONE                   = 0,        // the default is the opposite of all below
-    DICTIONARY_FLAG_SINGLE_THREADED        = (1 << 0), // don't use any locks (default: use locks)
-    DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE  = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
-    DICTIONARY_FLAG_NAME_LINK_DONT_CLONE   = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
-    DICTIONARY_FLAG_DONT_OVERWRITE_VALUE   = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
-    DICTIONARY_FLAG_ADD_IN_FRONT           = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
+    DICTIONARY_FLAG_NONE                    = 0,        // the default is the opposite of all below
+    DICTIONARY_FLAG_SINGLE_THREADED         = (1 << 0), // don't use any locks (default: use locks)
+    DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
+    DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
+    DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
+    DICTIONARY_FLAG_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
 
     // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
-    DICTIONARY_FLAG_RESERVED1              = (1 << 29), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
-    DICTIONARY_FLAG_RESERVED2              = (1 << 30), // reserved for DICTIONARY_FLAG_DESTROYED
-    DICTIONARY_FLAG_RESERVED3              = (1 << 31), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
+    DICTIONARY_FLAG_RESERVED1               = (1 << 29), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
+    DICTIONARY_FLAG_RESERVED2               = (1 << 30), // reserved for DICTIONARY_FLAG_DESTROYED
+    DICTIONARY_FLAG_RESERVED3               = (1 << 31), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
@@ -201,5 +201,13 @@ extern size_t dictionary_stats_resets(DICTIONARY *dict);
 extern size_t dictionary_stats_walkthroughs(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
+
+// ----------------------------------------------------------------------------
+// STRING implementation
+
+typedef struct string STRING;
+extern STRING *string_dupz(const char *str);
+extern void string_freez(STRING *item);
+extern const char *string_tostring(STRING *item);
 
 #endif /* NETDATA_DICTIONARY_H */
