@@ -9,11 +9,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/troublesh
 Sometimes, when claiming a node, it might not show up as online in Netdata Cloud.  
 The occurrences triggering this behavior might be:
 
-- [The claiming script failed](#the-claiming-script-failed)
+- [The claiming script was unsuccessful](#the-claiming-script-was-unsuccessful)
 - [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
 - [Network issues while connecting to the Cloud](#network-issues-while-connecting-to-the-cloud)
 
-## The claiming script failed
+## The claiming script was unsuccessful
 
 ### Make sure the Agent is running
 
@@ -29,9 +29,15 @@ The expected output should contain info like this:
 Active: active (running) since Wed 2022-07-06 12:25:02 EEST; 1h 40min ago
 ```
 
-:::note
+:::tip
 
 The Agent must be running for the claiming to work.
+
+If the Agent is already running, the solution might be as simple as restarting the Agent, you can do so by running:
+
+```bash
+systemctl restart netdata
+```
 
 :::
 
@@ -57,7 +63,7 @@ Read more about [Starting, Stopping and Restarting the Agent](https://learn.netd
 
 Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://learn.netdata.cloud/docs/agent/claim#claiming-script).
 
-With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we reccomend to [update the Netdata Agent](https://learn.netdata.cloud/docs/agent/packaging/installer/update).
+With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend to [update the Netdata Agent](https://learn.netdata.cloud/docs/agent/packaging/installer/update) to the latest stable version.
 
 ## Network issues while connecting to the Cloud
 
@@ -79,7 +85,7 @@ Banned By Cloud: No
 
 If your node's IP is banned, you can:
 
-- Contact our team to whitelist your IP by sumbiting a ticket at [Netdata Community](https://community.netdata.cloud/)
+- Contact our team to whitelist your IP by submitting a ticket at [Netdata Community](https://community.netdata.cloud/)
 - Change your node's IP
 
 ### Make sure that you have an internet connection
