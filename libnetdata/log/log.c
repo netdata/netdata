@@ -681,6 +681,26 @@ int error_log_limit(int reset) {
     return 0;
 }
 
+void error_log_limit_reset(void) {
+    log_lock();
+
+    error_log_errors_per_period = error_log_errors_per_period_backup;
+    error_log_limit(1);
+
+    log_unlock();
+}
+
+void error_log_limit_unlimited(void) {
+    log_lock();
+
+    error_log_errors_per_period = error_log_errors_per_period_backup;
+    error_log_limit(1);
+
+    error_log_errors_per_period = ((error_log_errors_per_period_backup * 10) < 10000) ? 10000 : (error_log_errors_per_period_backup * 10);
+
+    log_unlock();
+}
+
 // ----------------------------------------------------------------------------
 // debug log
 
@@ -712,8 +732,13 @@ void info_int( const char *file, const char *function, const unsigned long line,
 {
     va_list args;
 
+    log_lock();
+
     // prevent logging too much
-    if(error_log_limit(0)) return;
+    if (error_log_limit(0)) {
+        log_unlock();
+        return;
+    }
 
     if(error_log_syslog) {
         va_start( args, fmt );
@@ -723,8 +748,6 @@ void info_int( const char *file, const char *function, const unsigned long line,
 
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH);
-
-    log_lock();
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -771,8 +794,13 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 
     va_list args;
 
+    log_lock();
+
     // prevent logging too much
-    if(error_log_limit(0)) return;
+    if (error_log_limit(0)) {
+        log_unlock();
+        return;
+    }
 
     if(error_log_syslog) {
         va_start( args, fmt );
@@ -782,8 +810,6 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH);
-
-    log_lock();
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
