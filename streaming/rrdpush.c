@@ -334,7 +334,7 @@ void rrdset_done_push(RRDSET *st) {
         rrdpush_sender_thread_spawn(host);
 
     // Handle non-connected case
-    if(unlikely(!host->rrdpush_sender_connected)) {
+    if(unlikely(!__atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
         if(unlikely(!host->rrdpush_sender_error_shown))
             error("STREAM %s [send]: not ready - discarding collected metrics.", host->hostname);
         host->rrdpush_sender_error_shown = 1;
@@ -383,7 +383,7 @@ void rrdpush_send_labels(RRDHOST *host) {
 
 void rrdpush_claimed_id(RRDHOST *host)
 {
-    if(unlikely(!host->rrdpush_send_enabled || !host->rrdpush_sender_connected))
+    if(unlikely(!host->rrdpush_send_enabled || !__atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)))
         return;
     
     if(host->sender->version < STREAM_VERSION_CLAIM)

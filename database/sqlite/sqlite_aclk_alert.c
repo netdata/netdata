@@ -416,33 +416,28 @@ void aclk_send_alarm_health_log(char *node_id)
     if (unlikely(!node_id))
         return;
 
-    char *hostname= NULL;
+    struct aclk_database_worker_config *wc = find_inactive_wc_by_node_id(node_id);
 
-    struct aclk_database_worker_config *wc  = NULL;
+    if (likely(!wc)) {
+        rrd_rdlock();
+        RRDHOST *host = find_host_by_node_id(node_id);
+        rrd_unlock();
+        if (likely(host))
+            wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+    }
+
+    if (!wc) {
+        log_access("ACLK REQ [%s (N/A)]: HEALTH LOG REQUEST RECEIVED FOR INVALID NODE", node_id);
+        return;
+    }
+
+    log_access("ACLK REQ [%s (%s)]: HEALTH LOG REQUEST RECEIVED", node_id, wc->hostname ? wc->hostname : "N/A");
+
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_ALARM_HEALTH_LOG;
 
-    rrd_rdlock();
-    RRDHOST *host = find_host_by_node_id(node_id);
-    if (likely(host)) {
-        wc = (struct aclk_database_worker_config *)host->dbsync_worker;
-        hostname = host->hostname;
-    }
-    else
-        hostname = get_hostname_by_node_id(node_id);
-    rrd_unlock();
-
-    log_access("ACLK REQ [%s (%s)]: HEALTH LOG request received", node_id, hostname ? hostname : "N/A");
-    if (unlikely(!host))
-        freez(hostname);
-
-    if (wc)
-        aclk_database_enq_cmd(wc, &cmd);
-    else {
-        if (aclk_worker_enq_cmd(node_id, &cmd))
-            log_access("ACLK STA [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
-    }
+    aclk_database_enq_cmd(wc, &cmd);
     return;
 }
 
@@ -528,7 +523,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     wc->alert_sequence_id = last_sequence;
 
     aclk_send_alarm_log_health(&alarm_log);
-    log_access("ACLK RES [%s (%s)]: HEALTH LOG SENT from %"PRIu64" to %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", first_sequence, last_sequence);
+    log_access("ACLK RES [%s (%s)]: HEALTH LOG SENT from %"PRIu64" to %"PRIu64, wc->node_id, wc->hostname ? wc->hostname : "N/A", first_sequence, last_sequence);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))

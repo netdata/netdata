@@ -2052,12 +2052,6 @@ char *get_hostname_by_node_id(char *node)
     char  *hostname = NULL;
     int rc;
 
-    rrd_rdlock();
-    RRDHOST *host = find_host_by_node_id(node);
-    rrd_unlock();
-    if (host)
-        return strdupz(host->hostname);
-
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");

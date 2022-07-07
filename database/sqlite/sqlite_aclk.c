@@ -622,6 +622,8 @@ void aclk_database_worker(void *arg)
                                 snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", wc->host->hostname);
                                 uv_thread_set_name_np(wc->thread, threadname);
                                 wc->host->dbsync_worker = wc;
+                                if (unlikely(!wc->hostname))
+                                    wc->hostname = strdupz(wc->host->hostname);
                                 aclk_del_worker_thread(wc);
                                 wc->node_info_send = 1;
                             }
@@ -674,6 +676,7 @@ void aclk_database_worker(void *arg)
     rrd_rdlock();
     if (likely(wc->host))
         wc->host->dbsync_worker = NULL;
+    freez(wc->hostname);
     freez(wc);
     rrd_unlock();
 
@@ -743,13 +746,17 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
         return;
 
     struct aclk_database_worker_config *wc = callocz(1, sizeof(struct aclk_database_worker_config));
-    if (likely(host))
-        host->dbsync_worker = (void *) wc;
+    if (node_id && !uuid_is_null(*node_id))
+        uuid_unparse_lower(*node_id, wc->node_id);
+    if (likely(host)) {
+        host->dbsync_worker = (void *)wc;
+        wc->hostname = strdupz(host->hostname);
+    }
+    else
+        wc->hostname = get_hostname_by_node_id(wc->node_id);
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
     strcpy(wc->host_guid, host_guid);
-    if (node_id && !uuid_is_null(*node_id))
-        uuid_unparse_lower(*node_id, wc->node_id);
     wc->chart_updates = 0;
     wc->alert_updates = 0;
     wc->retry_count = 0;
