@@ -264,8 +264,8 @@ struct rrddim {
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // configuration flags for the dimension
 
-    unsigned int updated:1;                         // 1 when the dimension has been updated since the last processing
-    unsigned int exposed:1;                         // 1 when set what have sent this dimension to the central netdata
+    bool updated;                                   // 1 when the dimension has been updated since the last processing
+    bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
 
     collected_number multiplier;                    // the multiplier of the collected values
     collected_number divisor;                       // the divider of the collected values
@@ -831,7 +831,7 @@ struct rrdhost {
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     void *dbsync_worker;
 
-    volatile unsigned int rrdpush_sender_connected; // 1 when the sender is ready to push metrics
+    bool rrdpush_sender_connected;                  // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
 
     volatile unsigned int rrdpush_sender_error_shown; // 1 when we have logged a communication error
