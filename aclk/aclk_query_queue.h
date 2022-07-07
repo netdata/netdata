@@ -22,6 +22,7 @@ typedef enum {
     ALARM_LOG_HEALTH,
     ALARM_PROVIDE_CFG,
     ALARM_SNAPSHOT,
+    UPDATE_NODE_COLLECTORS,
     ACLK_QUERY_TYPE_COUNT // always keep this as last
 } aclk_query_type_t;
 

@@ -7,6 +7,45 @@
 #include "../../aclk/aclk_charts_api.h"
 #endif
 
+DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
+    RRDSET *st;
+    char name[500];
+
+    rrdhost_rdlock(host);
+    rrdset_foreach_read(st, host) {
+        if (rrdset_is_available_for_viewers(st)) {
+            struct collector_info col = {
+                    .plugin = st->plugin_name ? st->plugin_name : "",
+                    .module = st->module_name ? st->module_name : ""
+            };
+            snprintfz(name, 499, "%s:%s", col.plugin, col.module);
+            dictionary_set(dict, name, &col, sizeof(struct collector_info));
+        }
+    }
+    rrdhost_unlock(host);
+
+    return dict;
+}
+
+void sql_build_node_collectors(struct aclk_database_worker_config *wc)
+{
+    struct update_node_collectors upd_node_collectors;
+    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+
+    upd_node_collectors.node_id = wc->node_id;
+    upd_node_collectors.claim_id = is_agent_claimed();
+
+    upd_node_collectors.node_collectors = collectors_from_charts(wc->host, dict);
+    aclk_update_node_collectors(&upd_node_collectors);
+
+    dictionary_destroy(dict);
+    freez(upd_node_collectors.claim_id);
+
+    log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, wc->host->hostname);
+
+    return;
+}
+
 void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(cmd);
@@ -81,6 +120,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     rrd_unlock();
     freez(node_info.claim_id);
     freez(host_version);
+
+    wc->node_collectors_send = now_realtime_sec();
 #else
     UNUSED(wc);
 #endif
