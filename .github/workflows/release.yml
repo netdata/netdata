@@ -41,7 +41,8 @@ jobs:
               ${{ github.repository }} \
               ${{ github.event_name }} \
               ${{ github.event.inputs.type }} \
-              ${{ github.event.inputs.version }}
+              ${{ github.event.inputs.version }} \
+              ${{ secrets.NETDATA_RELEASE_TEST }}
       - name: Generate Nightly Changleog
         id: nightly-changelog
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly'
