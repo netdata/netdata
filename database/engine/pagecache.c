@@ -5,7 +5,7 @@
 
 ARAL page_descr_aral = {
     .element_size = sizeof(struct rrdeng_page_descr),
-    .elements = 512*1024,
+    .elements = 20000,
     .filename = "page_descriptors",
     .cache_dir = &netdata_configured_cache_dir,
     .use_mmap = false,

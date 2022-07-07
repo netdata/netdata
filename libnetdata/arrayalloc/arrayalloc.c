@@ -2,11 +2,11 @@
 #include "arrayalloc.h"
 #include "daemon/common.h"
 
-// 1GB max file size
+// max file size
 #define ARAL_MAX_PAGE_SIZE_MMAP (1*1024*1024*1024)
 
-// 5MB max malloc size
-#define ARAL_MAX_PAGE_SIZE_MALLOC (5*1024*1024)
+// max malloc size
+#define ARAL_MAX_PAGE_SIZE_MALLOC (10*1024*1024)
 
 typedef struct arrayalloc_free {
     size_t size;
@@ -34,9 +34,9 @@ ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filena
 }
 
 #define ARAL_NATURAL_ALIGNMENT  (sizeof(uintptr_t) * 2)
-static inline size_t natural_alignment(size_t size) {
-    if(unlikely(size % ARAL_NATURAL_ALIGNMENT))
-        size = size + ARAL_NATURAL_ALIGNMENT - (size % ARAL_NATURAL_ALIGNMENT);
+static inline size_t natural_alignment(size_t size, size_t alignment) {
+    if(unlikely(size % alignment))
+        size = size + alignment - (size % alignment);
 
     return size;
 }
@@ -54,17 +54,35 @@ static void arrayalloc_init(ARAL *ar) {
         else
             ar->internal.natural_page_size = page_size;
 
-        ar->internal.element_size = ar->element_size;
+        // we need to add a page pointer after the element
+        // so, first align the element size to the pointer size
+        ar->internal.element_size = natural_alignment(ar->element_size, sizeof(uintptr_t));
+
+        // then add the size of a pointer to it
+        ar->internal.element_size = ar->internal.element_size + sizeof(uintptr_t);
+
+        // make sure it is at least what we need for an ARAL_FREE slot
         if (ar->internal.element_size < sizeof(ARAL_FREE))
             ar->internal.element_size = sizeof(ARAL_FREE);
 
-        ar->internal.element_size = natural_alignment(ar->element_size);
+        // and finally align it to the natural alignment
+        ar->internal.element_size = natural_alignment(ar->element_size, ARAL_NATURAL_ALIGNMENT);
+
+        // this is where we should write the pointer
+        ar->internal.page_ptr_offset = ar->internal.element_size - sizeof(uintptr_t);
+
+        if(ar->element_size + sizeof(uintptr_t) > ar->internal.element_size)
+            fatal("ARRAYALLOC: failed to calculate properly page_ptr_offset: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
+                  ar->element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT, ar->internal.element_size, ar->internal.page_ptr_offset);
+
+        //info("ARRAYALLOC: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
+        //      ar->element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT, ar->internal.element_size, ar->internal.page_ptr_offset);
 
         if (ar->elements < 1000)
             ar->elements = 1000;
 
         ar->internal.mmap = (ar->use_mmap && ar->cache_dir && *ar->cache_dir) ? true : false;
-        ar->internal.max_alloc_size = natural_alignment(ar->internal.mmap ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC);
+        ar->internal.max_alloc_size = natural_alignment(ar->internal.mmap ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC, ARAL_NATURAL_ALIGNMENT);
 
         if(ar->internal.max_alloc_size % ar->internal.element_size)
             ar->internal.max_alloc_size -= ar->internal.max_alloc_size % ar->internal.element_size;
@@ -110,12 +128,6 @@ void unlink_page(ARAL *ar, ARAL_PAGE *page) {
 
     if(page == ar->internal.last_page)
         ar->internal.last_page = page->prev;
-}
-
-ARAL_PAGE *unlink_first_page(ARAL *ar) {
-    ARAL_PAGE *page = ar->internal.first_page;
-    unlink_page(ar, page);
-    return page;
 }
 
 void link_page_first(ARAL *ar, ARAL_PAGE *page) {
@@ -236,6 +248,11 @@ void *arrayalloc_mallocz(ARAL *ar) {
 
     fr->page->used_elements++;
 
+    // put the page pointer after the element
+    uint8_t *data = (uint8_t *)fr;
+    ARAL_PAGE **page_ptr = (ARAL_PAGE **)&data[ar->internal.page_ptr_offset];
+    *page_ptr = page;
+
     arrayalloc_unlock(ar);
     return (void *)fr;
 }
@@ -244,14 +261,39 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
     if(!ptr) return;
     arrayalloc_lock(ar);
 
-    // find the page ptr belongs
-    ARAL_PAGE *page = find_page_with_allocation(ar, ptr);
+    // get the page pointer
+    ARAL_PAGE *page;
+    {
+        uint8_t *data = (uint8_t *)ptr;
+        ARAL_PAGE **page_ptr = (ARAL_PAGE **)&data[ar->internal.page_ptr_offset];
+        page = *page_ptr;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        // make it NULL so that we will fail on double free
+        // do not enable this on production, because the MMAP file
+        // will need to be saved again!
+        *page_ptr = NULL;
+#endif
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    {
+        // find the page ptr belongs
+        ARAL_PAGE *page2 = find_page_with_allocation(ar, ptr);
+
+        if(unlikely(page != page2))
+            fatal("ARRAYALLOC: page pointers do not match!");
+
+        if (unlikely(!page2))
+            fatal("ARRAYALLOC: free of pointer %p is not in arrayalloc address space.", ptr);
+    }
+#endif
 
     if(unlikely(!page))
-        fatal("ARRAYALLOC: free of pointer %p is not in arrayalloc address space.", ptr);
+        fatal("ARRAYALLOC: possible corruption or double free of pointer %p", ptr);
 
-    if(unlikely(!page->used_elements))
-        fatal("ARRAYALLOC: free of pointer %p is inside an already free page.", ptr);
+    if (unlikely(!page->used_elements))
+        fatal("ARRAYALLOC: free of pointer %p is inside a page without any active allocations.", ptr);
 
     page->used_elements--;
 

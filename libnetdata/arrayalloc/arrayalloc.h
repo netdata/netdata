@@ -17,6 +17,7 @@ typedef struct arrayalloc {
         bool lockless;
         bool initialized;
         size_t element_size;
+        size_t page_ptr_offset;
         size_t file_number;
         size_t natural_page_size;
         size_t allocation_multiplier;
