@@ -20,7 +20,7 @@ const char *stderr_filename = NULL;
 const char *stdout_filename = NULL;
 const char *facility_log = NULL;
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef ENABLE_ACLK
 const char *aclklog_filename = NULL;
 int aclklog_fd = -1;
 FILE *aclklog = NULL;
@@ -570,7 +570,7 @@ void reopen_all_log_files() {
     if(stderr_filename)
         open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef ENABLE_ACLK
     if (aclklog_enabled)
         aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
 #endif
@@ -586,7 +586,7 @@ void open_all_log_files() {
     open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
     open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef ENABLE_ACLK
     if(aclklog_enabled)
         aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
 #endif
@@ -932,7 +932,7 @@ void log_access( const char *fmt, ... ) {
     }
 }
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef ENABLE_ACLK
 void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name) {
     if (aclklog) {
         static netdata_mutex_t aclklog_mutex = NETDATA_MUTEX_INITIALIZER;

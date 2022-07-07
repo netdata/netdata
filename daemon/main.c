@@ -401,7 +401,7 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);

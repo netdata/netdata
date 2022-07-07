@@ -61,7 +61,7 @@ extern const char *stderr_filename;
 extern const char *stdout_filename;
 extern const char *facility_log;
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef ENABLE_ACLK
 extern const char *aclklog_filename;
 extern int aclklog_fd;
 extern FILE *aclklog;
