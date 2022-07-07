@@ -1317,6 +1317,7 @@ extern int get_tier_grouping(int tier);
 #include "database/engine/rrdengineapi.h"
 #endif
 #include "sqlite/sqlite_functions.h"
+#include "sqlite/sqlite_context.h"
 #include "sqlite/sqlite_aclk.h"
 #include "sqlite/sqlite_aclk_chart.h"
 #include "sqlite/sqlite_aclk_alert.h"

@@ -1010,6 +1010,9 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "mctest") == 0) {
                             return mc_unittest();
                         }
+                        else if(strcmp(optarg, "ctxtest") == 0) {
+                            return ctx_unittest();
+                        }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             return dictionary_unittest(10000);
                         }
