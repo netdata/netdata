@@ -910,34 +910,34 @@ void *dictionary_get(DICTIONARY *dict, const char *name) {
     return ret;
 }
 
-void *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name) {
+DICTIONARY_ITEM *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name) {
     NAME_VALUE *nv = dictionary_get_name_value_unsafe(dict, name);
 
     if(unlikely(!nv))
         return NULL;
 
     reference_counter_acquire(dict, nv);
-    return nv;
+    return (DICTIONARY_ITEM *)nv;
 }
 
-void *dictionary_acquire_item(DICTIONARY *dict, const char *name) {
+DICTIONARY_ITEM *dictionary_acquire_item(DICTIONARY *dict, const char *name) {
     dictionary_lock(dict, 'r');
     void *ret = dictionary_acquire_item_unsafe(dict, name);
     dictionary_unlock(dict, 'r');
     return ret;
 }
 
-void *dictionary_acquired_item_value(DICTIONARY *dict __maybe_unused, void *item) {
+void *dictionary_acquired_item_value(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
     return ((NAME_VALUE *)item)->value;
 }
 
-void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, void *item) {
+void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return;
     reference_counter_release(dict, (NAME_VALUE *)item, false);
 }
 
-void dictionary_acquired_item_release(DICTIONARY *dict, void *item) {
+void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return;
 
     // no need to get a lock here
@@ -1815,7 +1815,7 @@ int dictionary_unittest(size_t entries) {
 
         fprintf(stderr, "\nAdding test item to dictionary and acquiring it\n");
         dictionary_set(dict, "test", "ITEM1", 6);
-        NAME_VALUE *nv = dictionary_acquire_item(dict, "test");
+        NAME_VALUE *nv = (NAME_VALUE *)dictionary_acquire_item(dict, "test");
 
         errors += check_dictionary(dict, 1, 1);
         errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
@@ -1843,12 +1843,12 @@ int dictionary_unittest(size_t entries) {
         errors += check_dictionary(dict, 1, 2);
 
         fprintf(stderr, "\nAcquiring the second item:\n");
-        NAME_VALUE *nv2 = dictionary_acquire_item(dict, "test");
+        NAME_VALUE *nv2 = (NAME_VALUE *)dictionary_acquire_item(dict, "test");
         errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
         errors += check_name_value(dict, nv2, "test", "ITEM2", 1, NAME_VALUE_FLAG_NONE,    true,  true,  true);
 
         fprintf(stderr, "\nReleasing the second item (the first is still acquired):\n");
-        dictionary_acquired_item_release(dict, nv2);
+        dictionary_acquired_item_release(dict, (DICTIONARY_ITEM *)nv2);
         errors += check_dictionary(dict, 1, 2);
         errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
         errors += check_name_value(dict, nv2, "test", "ITEM2", 0, NAME_VALUE_FLAG_NONE,    true,  true,  true);
@@ -1859,12 +1859,12 @@ int dictionary_unittest(size_t entries) {
         errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
 
         fprintf(stderr, "\nReleasing the first item (which we have already deleted):\n");
-        dictionary_acquired_item_release(dict, nv);
+        dictionary_acquired_item_release(dict, (DICTIONARY_ITEM *)nv);
         errors += check_dictionary(dict, 0, 0);
 
         fprintf(stderr, "\nAdding again the test item to dictionary and acquiring it\n");
         dictionary_set(dict, "test", "ITEM1", 6);
-        nv = dictionary_acquire_item(dict, "test");
+        nv = (NAME_VALUE *)dictionary_acquire_item(dict, "test");
 
         errors += check_dictionary(dict, 1, 1);
         errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
@@ -1873,7 +1873,7 @@ int dictionary_unittest(size_t entries) {
         dictionary_destroy(dict);
 
         fprintf(stderr, "Releasing the item (on a destroyed dictionary)\n");
-        dictionary_acquired_item_release(dict, nv);
+        dictionary_acquired_item_release(dict, (DICTIONARY_ITEM *)nv);
         nv = NULL;
         dict = NULL;
     }
