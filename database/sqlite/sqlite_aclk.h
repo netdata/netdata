@@ -132,6 +132,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
     ACLK_DATABASE_QUEUE_REMOVED_ALERTS,
+    ACLK_DATABASE_NODE_COLLECTORS,
     ACLK_DATABASE_TIMER,
 
     // leave this last
@@ -195,6 +196,7 @@ struct aclk_database_worker_config {
     int alert_updates;
     time_t batch_created;
     int node_info_send;
+    time_t node_collectors_send;
     int chart_pending;
     int chart_reset_count;
     int retention_running;
