@@ -6,12 +6,16 @@
 
 **Merged pull requests:**
 
+- Add link to docker config section [\#13323](https://github.com/netdata/netdata/pull/13323) ([cakrit](https://github.com/cakrit))
+- fix\(apps.plugin\): adjust `zmstat*` pattern to exclude zoneminder scripts [\#13314](https://github.com/netdata/netdata/pull/13314) ([ilyam8](https://github.com/ilyam8))
 - fix\(health\): disable go.d last collected alarm for prometheus module [\#13309](https://github.com/netdata/netdata/pull/13309) ([ilyam8](https://github.com/ilyam8))
+- Explicitly skip uploads and notifications in third-party repositories. [\#13308](https://github.com/netdata/netdata/pull/13308) ([Ferroin](https://github.com/Ferroin))
 - Keep rc before freeing it during labels unlink alarms [\#13305](https://github.com/netdata/netdata/pull/13305) ([MrZammler](https://github.com/MrZammler))
 - fix\(cgroups.plugin\): adjust kubepods regex to fix name resolution in a kind cluster [\#13302](https://github.com/netdata/netdata/pull/13302) ([ilyam8](https://github.com/ilyam8))
 - Null terminate string if file read was not successful [\#13299](https://github.com/netdata/netdata/pull/13299) ([stelfrag](https://github.com/stelfrag))
 - fix\(health\): fix incorrect Redis dimension names [\#13296](https://github.com/netdata/netdata/pull/13296) ([ilyam8](https://github.com/ilyam8))
 - chore: remove python-mysql from install-required-packages.sh [\#13288](https://github.com/netdata/netdata/pull/13288) ([ilyam8](https://github.com/ilyam8))
+- Use new MQTT as default \(revert \#13258\)" [\#13287](https://github.com/netdata/netdata/pull/13287) ([underhood](https://github.com/underhood))
 - query engine fixes for alarms and dashboards [\#13282](https://github.com/netdata/netdata/pull/13282) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin version to v0.33.0 [\#13280](https://github.com/netdata/netdata/pull/13280) ([ilyam8](https://github.com/ilyam8))
 - Fixes vbi parser in mqtt5 implementation [\#13277](https://github.com/netdata/netdata/pull/13277) ([underhood](https://github.com/underhood))
@@ -23,12 +27,14 @@
 - Update documentation about our REST API documentation. [\#13269](https://github.com/netdata/netdata/pull/13269) ([Ferroin](https://github.com/Ferroin))
 - Fix package build filtering on PRs. [\#13267](https://github.com/netdata/netdata/pull/13267) ([Ferroin](https://github.com/Ferroin))
 - chore\(python.d\): remove deprecated modules from python.d.conf [\#13264](https://github.com/netdata/netdata/pull/13264) ([ilyam8](https://github.com/ilyam8))
+- Multi-Tier database backend for long term metrics storage [\#13263](https://github.com/netdata/netdata/pull/13263) ([stelfrag](https://github.com/stelfrag))
 - Get rid of extra semicolon in Graphite exporting [\#13261](https://github.com/netdata/netdata/pull/13261) ([vlvkobal](https://github.com/vlvkobal))
 - fix RAM calculation on macOS in system-info [\#13260](https://github.com/netdata/netdata/pull/13260) ([ilyam8](https://github.com/ilyam8))
 - Ebpf issues [\#13259](https://github.com/netdata/netdata/pull/13259) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use old mqtt implementation as default [\#13258](https://github.com/netdata/netdata/pull/13258) ([MrZammler](https://github.com/MrZammler))
 - Remove warnings while compiling ML on FreeBSD [\#13255](https://github.com/netdata/netdata/pull/13255) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix issues with DEB postinstall script. [\#13252](https://github.com/netdata/netdata/pull/13252) ([Ferroin](https://github.com/Ferroin))
+- Remove strftime from statements and use unixepoch instead [\#13250](https://github.com/netdata/netdata/pull/13250) ([stelfrag](https://github.com/stelfrag))
 - Query engine with natural and virtual points [\#13248](https://github.com/netdata/netdata/pull/13248) ([ktsaou](https://github.com/ktsaou))
 - Add fstype labels to disk charts [\#13245](https://github.com/netdata/netdata/pull/13245) ([vlvkobal](https://github.com/vlvkobal))
 - Don’t pull in GCC for build if Clang is already present. [\#13244](https://github.com/netdata/netdata/pull/13244) ([Ferroin](https://github.com/Ferroin))
@@ -50,6 +56,7 @@
 - Ensure tmpdir is set for every function that uses it. [\#13206](https://github.com/netdata/netdata/pull/13206) ([Ferroin](https://github.com/Ferroin))
 - Add user plugin dirs to environment [\#13203](https://github.com/netdata/netdata/pull/13203) ([vlvkobal](https://github.com/vlvkobal))
 - Fix cgroups netdev chart labels [\#13200](https://github.com/netdata/netdata/pull/13200) ([vlvkobal](https://github.com/vlvkobal))
+- Add hostname in the worker structure to avoid constant lookups [\#13199](https://github.com/netdata/netdata/pull/13199) ([stelfrag](https://github.com/stelfrag))
 - Rpm group creation [\#13197](https://github.com/netdata/netdata/pull/13197) ([iigorkarpov](https://github.com/iigorkarpov))
 - Allow for an easy way to do metadata migrations [\#13196](https://github.com/netdata/netdata/pull/13196) ([stelfrag](https://github.com/stelfrag))
 - Dictionaries with reference counters and full deletion support during traversal [\#13195](https://github.com/netdata/netdata/pull/13195) ([ktsaou](https://github.com/ktsaou))
@@ -327,9 +334,6 @@
 - \[Uninstall Netdata\] - Add description in the docs to use uninstaller script with force arg [\#12687](https://github.com/netdata/netdata/pull/12687) ([odynik](https://github.com/odynik))
 - Correctly propagate errors and warnings up to the kickstart script from scripts it calls. [\#12686](https://github.com/netdata/netdata/pull/12686) ([Ferroin](https://github.com/Ferroin))
 - Memory CO-RE [\#12684](https://github.com/netdata/netdata/pull/12684) ([thiagoftsm](https://github.com/thiagoftsm))
-- Docs: fix GitHub format [\#12682](https://github.com/netdata/netdata/pull/12682) ([eltociear](https://github.com/eltociear))
-- feat\(apps.plugin\): add caddy to apps\_groups.conf [\#12678](https://github.com/netdata/netdata/pull/12678) ([simon300000](https://github.com/simon300000))
-- fix: use NETDATA\_LISTENER\_PORT in docker healtcheck [\#12676](https://github.com/netdata/netdata/pull/12676) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
@@ -342,11 +346,6 @@
 ## [v1.34.0](https://github.com/netdata/netdata/tree/v1.34.0) (2022-04-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.33.1...v1.34.0)
-
-**Merged pull requests:**
-
-- Cancel anomaly detection threads before joining. [\#12681](https://github.com/netdata/netdata/pull/12681) ([vkalintiris](https://github.com/vkalintiris))
-- Update dashboard to version v2.25.0. [\#12680](https://github.com/netdata/netdata/pull/12680) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 
