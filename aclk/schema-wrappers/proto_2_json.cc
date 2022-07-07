@@ -81,7 +81,6 @@ char *protomsg_to_json(const void *protobin, size_t len, const char *msgname)
         return strdupz("Can't parse this message. Malformed or wrong parser used.");
 
     JsonPrintOptions options;
-    options.add_whitespace = true;
 
     std::string output;
     google::protobuf::util::MessageToJsonString(*msg, &output, options);
