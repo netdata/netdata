@@ -672,6 +672,8 @@ ACLK_FILES = \
     aclk/schema-wrappers/schema_wrapper_utils.h \
     $(NULL)
 
+mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
+
 ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/aclk/v1/lib.proto \
     aclk/aclk-schemas/proto/agent/v1/disconnect.proto \
