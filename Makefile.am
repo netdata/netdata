@@ -456,6 +456,8 @@ RRD_PLUGIN_FILES = \
     database/ram/rrddim_mem.h \
     database/sqlite/sqlite_functions.c \
     database/sqlite/sqlite_functions.h \
+    database/sqlite/sqlite_context.c \
+    database/sqlite/sqlite_context.h \
     database/sqlite/sqlite_db_migration.c \
     database/sqlite/sqlite_db_migration.h \
     database/sqlite/sqlite_aclk.c \
