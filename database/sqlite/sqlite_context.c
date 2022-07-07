@@ -138,16 +138,30 @@ void sql_close_context_database(void)
 //
 // Fetching data
 //
-#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.context, c.update_every FROM meta.chart c;"
-void ctx_get_chart_list(void (*dict_cb)(void *))
+#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.context, c.update_every FROM meta.chart c WHERE c.host_id = @host_id;"
+
+#define CTX_GET_CHART_LIST_NO_HOST  "SELECT c.chart_id, c.type||'.'||c.id, c.context, c.update_every FROM meta.chart c;"
+
+void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *))
 {
     int rc;
     sqlite3_stmt *res = NULL;
 
-    rc = sqlite3_prepare_v2(db_context_meta, CTX_GET_CHART_LIST, -1, &res, 0);
+    if (likely(host_id))
+        rc = sqlite3_prepare_v2(db_context_meta, CTX_GET_CHART_LIST, -1, &res, 0);
+    else
+        rc = sqlite3_prepare_v2(db_context_meta, CTX_GET_CHART_LIST_NO_HOST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch chart lanbels");
         return;
+    }
+
+    if (likely(host_id)) {
+        rc = sqlite3_bind_blob(res, 1, *host_id, sizeof(*host_id), SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to bind host_id to fetch the chart list");
+            goto failed;
+        }
     }
 
     ctx_chart_t chart_data;
@@ -161,6 +175,7 @@ void ctx_get_chart_list(void (*dict_cb)(void *))
         dict_cb(&chart_data);
     }
 
+failed:
     rc = sqlite3_finalize(res);
     if (rc != SQLITE_OK)
         error_report("Failed to finalize statement that fetches chart label data, rc = %d", rc);
@@ -403,7 +418,7 @@ static void dict_ctx_get_context_list_cb(void *data)
 int ctx_unittest(void)
 {
     sql_init_context_database(0,1);
-    ctx_get_chart_list(dict_ctx_get_chart_list_cb);
+    ctx_get_chart_list(NULL, dict_ctx_get_chart_list_cb);
 
     // Store a context
     ctx_context_t context_data;
