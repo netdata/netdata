@@ -260,7 +260,7 @@ ML_FILES += \
     $(NULL)
 
 # Disable warnings from dlib library
-ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations
+ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow
 
 endif
 
@@ -473,6 +473,9 @@ RRD_PLUGIN_FILES = \
     database/metric_correlations.c \
     database/metric_correlations.h \
     $(NULL)
+
+database/sqlite/sqlite3.$(OBJEXT) : CFLAGS += -Wno-cast-function-type
+database/KolmogorovSmirnovDist.$(OBJEXT) : CFLAGS += -Wno-maybe-uninitialized
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
