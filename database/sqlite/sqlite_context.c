@@ -138,30 +138,29 @@ void sql_close_context_database(void)
 //
 // Fetching data
 //
-#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.context, c.update_every FROM meta.chart c WHERE c.host_id = @host_id;"
-
-#define CTX_GET_CHART_LIST_NO_HOST  "SELECT c.chart_id, c.type||'.'||c.id, c.context, c.update_every FROM meta.chart c;"
+#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.context, c.update_every FROM meta.chart c " \
+        "WHERE c.host_id IN (SELECT h.host_id FROM meta.host h " \
+        "WHERE UNLIKELY((h.hops = 0 AND @host_id IS NULL)) OR LIKELY((h.host_id = @host_id)));"
 
 void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *))
 {
     int rc;
     sqlite3_stmt *res = NULL;
 
-    if (likely(host_id))
-        rc = sqlite3_prepare_v2(db_context_meta, CTX_GET_CHART_LIST, -1, &res, 0);
-    else
-        rc = sqlite3_prepare_v2(db_context_meta, CTX_GET_CHART_LIST_NO_HOST, -1, &res, 0);
+
+    rc = sqlite3_prepare_v2(db_context_meta, CTX_GET_CHART_LIST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch chart lanbels");
         return;
     }
 
-    if (likely(host_id)) {
+    if (likely(host_id))
         rc = sqlite3_bind_blob(res, 1, *host_id, sizeof(*host_id), SQLITE_STATIC);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to bind host_id to fetch the chart list");
-            goto failed;
-        }
+    else
+        rc = sqlite3_bind_null(res, 1);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id to fetch the chart list");
+        goto failed;
     }
 
     ctx_chart_t chart_data;
