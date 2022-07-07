@@ -64,6 +64,7 @@ struct dictionary {
 #ifdef DICTIONARY_WITH_AVL
     avl_tree_type values_index;
     NAME_VALUE *hash_base;
+    void *(*get_thread_static_name_value)(const char *name);
 #endif
 
 #ifdef DICTIONARY_WITH_JUDYHS
@@ -428,12 +429,22 @@ static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_
 // hash table
 
 #ifdef DICTIONARY_WITH_AVL
+static inline const char *namevalue_get_name(NAME_VALUE *nv);
+
 static int name_value_compare(void* a, void* b) {
-    return strcmp(((NAME_VALUE *)a)->name, ((NAME_VALUE *)b)->name);
+    return strcmp(namevalue_get_name((NAME_VALUE *)a), namevalue_get_name((NAME_VALUE *)b));
+}
+
+static void *get_thread_static_name_value(const char *name) {
+    static __thread NAME_VALUE tmp = { 0 };
+    memset(&tmp, 0, sizeof(NAME_VALUE));
+    tmp.caller_name = (char *)name;
+    return &tmp;
 }
 
 static void hashtable_init_unsafe(DICTIONARY *dict) {
     avl_init(&dict->values_index, name_value_compare);
+    dict->get_thread_static_name_value = get_thread_static_name_value;
 }
 
 static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
@@ -454,9 +465,8 @@ static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, si
 static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
     (void)name_len;
 
-    NAME_VALUE tmp;
-    tmp.name = (char *)name;
-    return (NAME_VALUE *)avl_search(&(dict->values_index), (avl_t *) &tmp);
+    void *tmp = dict->get_thread_static_name_value(name);
+    return (NAME_VALUE *)avl_search(&(dict->values_index), (avl_t *)tmp);
 }
 
 static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
@@ -1249,13 +1259,6 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 // ----------------------------------------------------------------------------
 // STRING implementation - dedup all STRINGs
 
-static DICTIONARY string_dictionary = {
-    .flags = DICTIONARY_FLAG_EXCLUSIVE_ACCESS,
-    .rwlock = NETDATA_RWLOCK_INITIALIZER
-};
-
-static netdata_mutex_t string_mutex = NETDATA_MUTEX_INITIALIZER;
-
 typedef struct string_entry {
 #ifdef DICTIONARY_WITH_AVL
     avl_t avl_node;
@@ -1263,6 +1266,34 @@ typedef struct string_entry {
     const char *str;
     volatile size_t references;
 } STRING_ENTRY;
+
+#ifdef DICTIONARY_WITH_AVL
+static int string_entry_compare(void* a, void* b) {
+    return strcmp(((STRING_ENTRY *)a)->str, ((STRING_ENTRY *)b)->str);
+}
+
+static void *get_thread_static_string_entry(const char *name) {
+    static __thread STRING_ENTRY tmp = { 0 };
+    memset(&tmp, 0, sizeof(STRING_ENTRY));
+    tmp.str = (char *)name;
+    return &tmp;
+}
+#endif
+
+static DICTIONARY string_dictionary = {
+#ifdef DICTIONARY_WITH_AVL
+    .values_index = {
+        .root = NULL,
+        .compar = string_entry_compare
+    },
+    .get_thread_static_name_value = get_thread_static_string_entry,
+#endif
+
+    .flags = DICTIONARY_FLAG_EXCLUSIVE_ACCESS,
+    .rwlock = NETDATA_RWLOCK_INITIALIZER
+};
+
+static netdata_mutex_t string_mutex = NETDATA_MUTEX_INITIALIZER;
 
 STRING *string_dupz(const char *str) {
     if(unlikely(!str || !*str)) return NULL;
