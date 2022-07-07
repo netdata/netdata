@@ -32,8 +32,8 @@ typedef struct ctx_context {
 } ctx_context_t;
 
 extern void ctx_get_context_list(void (*dict_cb)(void *));
-extern void ctx_get_chart_list( void (*dict_cb)(void *));
 
+extern void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *));
 extern void ctx_get_label_list(uuid_t *chart_id, void (*dict_cb)(void *));
 extern void ctx_get_dimension_list(uuid_t *chart_id, void (*dict_cb)(void *));
 
