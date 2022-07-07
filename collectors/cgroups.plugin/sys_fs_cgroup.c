@@ -452,12 +452,17 @@ void read_cgroup_plugin_configuration() {
             // ----------------------------------------------------------------
 
                     " /machine.slice/*.service "           // #3367 systemd-nspawn
-                    " /kubepods/pod*/* "                   // k8s containers
-                    " /kubepods/*/pod*/* "                 // k8s containers
 
             // ----------------------------------------------------------------
 
-                    " !/kubepods* "                        // all other k8s cgroups
+                    " */kubepods/pod*/* "                   // k8s containers
+                    " */kubepods/*/pod*/* "                 // k8s containers
+                    " */*-kubepods-pod*/* "                 // k8s containers
+                    " */*-kubepods-*-pod*/* "               // k8s containers
+                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
+
+            // ----------------------------------------------------------------
+
                     " !*/vcpu* "                           // libvirtd adds these sub-cgroups
                     " !*/emulator "                        // libvirtd adds these sub-cgroups
                     " !*.mount "
@@ -529,9 +534,11 @@ void read_cgroup_plugin_configuration() {
                     " *docker* "
                     " *lxc* "
                     " *qemu* "
-                    " /kubepods/pod*/* "                   // k8s containers
-                    " /kubepods/*/pod*/* "                 // k8s containers
-                    " !/kubepods* "                        // all other k8s cgroups
+                    " */kubepods/pod*/* "                   // k8s containers
+                    " */kubepods/*/pod*/* "                 // k8s containers
+                    " */*-kubepods-pod*/* "                 // k8s containers
+                    " */*-kubepods-*-pod*/* "               // k8s containers
+                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
                     " *.libvirt-qemu "                    // #3010
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
