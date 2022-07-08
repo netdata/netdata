@@ -32,6 +32,9 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 void sql_build_node_collectors(struct aclk_database_worker_config *wc)
 {
 #ifdef ENABLE_ACLK
+    if (!wc->host)
+        return;
+
     struct update_node_collectors upd_node_collectors;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
 
