@@ -495,7 +495,7 @@ static void rrdlabel_conflict_callback(const char *name, void *oldvalue, void *n
     RRDLABEL *lbold = (RRDLABEL *)oldvalue;
     RRDLABEL *lbnew = (RRDLABEL *)newvalue;
 
-    if(lbold->label_value == lbnew->label_value || strcmp(string_tostring(lbold->label_value), string_tostring(lbnew->label_value)) == 0) {
+    if(lbold->label_value == lbnew->label_value || strcmp(string2str(lbold->label_value), string2str(lbnew->label_value)) == 0) {
         // they are the same
         lbold->label_source |= lbnew->label_source;
         lbold->label_source |= RRDLABEL_FLAG_OLD;
@@ -617,7 +617,7 @@ void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const
     RRDLABEL *lb = dictionary_acquired_item_value(labels, acquired_item);
 
     if(lb && lb->label_value)
-        buffer_sprintf(wb, "%s%s%s", quote, string_tostring(lb->label_value), quote);
+        buffer_sprintf(wb, "%s%s%s", quote, string2str(lb->label_value), quote);
     else
         buffer_strcat(wb, null);
 
@@ -683,7 +683,7 @@ static int labels_walkthrough_callback(const char *name, void *value, void *data
     if(ls & RRDLABEL_FLAG_NEW) ls &= ~RRDLABEL_FLAG_NEW;
     if(ls & RRDLABEL_FLAG_OLD) ls &= ~RRDLABEL_FLAG_OLD;
 
-    return d->callback(name, string_tostring(lb->label_value), ls, d->data);
+    return d->callback(name, string2str(lb->label_value), ls, d->data);
 }
 
 int rrdlabels_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data) {
@@ -710,7 +710,7 @@ int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)(const 
 static int copy_label_to_dictionary_callback(const char *name, void *value, void *data) {
     DICTIONARY *dst = (DICTIONARY *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
-    labels_add_already_sanitized(dst, name, string_tostring(lb->label_value), lb->label_source);
+    labels_add_already_sanitized(dst, name, string2str(lb->label_value), lb->label_source);
     return 1;
 }
 
@@ -763,7 +763,7 @@ static int simple_pattern_match_name_and_value_callback(const char *name, void *
 
     size_t len = RRDLABELS_MAX_NAME_LENGTH + RRDLABELS_MAX_VALUE_LENGTH + 2; // +1 for =, +1 for \0
     char tmp[len], *dst = &tmp[0];
-    const char *v = string_tostring(lb->label_value);
+    const char *v = string2str(lb->label_value);
 
     // copy the name
     while(*name) *dst++ = *name++;
@@ -824,7 +824,7 @@ static int rrdlabels_log_label_to_buffer_callback(const char *name, void *value,
     BUFFER *wb = (BUFFER *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
 
-    buffer_sprintf(wb, "Label: %s: \"%s\" (", name, string_tostring(lb->label_value));
+    buffer_sprintf(wb, "Label: %s: \"%s\" (", name, string2str(lb->label_value));
 
     size_t sources = 0;
     if(lb->label_source & RRDLABEL_SRC_AUTO) {
@@ -880,7 +880,7 @@ static int label_to_buffer_callback(const char *name, void *value, void *data) {
     char n[n_size];
     char v[v_size];
 
-    const char *nn = name, *vv = string_tostring(lb->label_value);
+    const char *nn = name, *vv = string2str(lb->label_value);
 
     if(t->name_sanitizer) {
         t->name_sanitizer(n, name, n_size);
@@ -888,11 +888,11 @@ static int label_to_buffer_callback(const char *name, void *value, void *data) {
     }
 
     if(t->value_sanitizer) {
-        t->value_sanitizer(v, string_tostring(lb->label_value), v_size);
+        t->value_sanitizer(v, string2str(lb->label_value), v_size);
         vv = v;
     }
 
-    if(!t->filter_callback || (t->filter_callback && t->filter_callback(name, string_tostring(lb->label_value), lb->label_source, t->filter_data))) {
+    if(!t->filter_callback || (t->filter_callback && t->filter_callback(name, string2str(lb->label_value), lb->label_source, t->filter_data))) {
         buffer_sprintf(t->wb, "%s%s%s%s%s%s%s%s%s", t->count++?t->between_them:"", t->before_each, t->quote, nn, t->quote, t->equal, t->quote, vv, t->quote);
         return 1;
     }
