@@ -145,11 +145,11 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
 
     OWA_PAGE *head = (OWA_PAGE *)owa;
     OWA_PAGE *page;
-    size_t seeking = (size_t)ptr;
+    uintptr_t seeking = (uintptr_t)ptr;
 
     for(page = head; page ;page = page->next) {
-        size_t start = (size_t)page;
-        size_t end = start + page->size;
+        uintptr_t start = (uintptr_t)page;
+        uintptr_t end = start + page->size;
 
         if(seeking >= start && seeking <= end) {
             // found it - it is ours
