@@ -6,10 +6,17 @@
 
 **Merged pull requests:**
 
+- Silence compile warnings on external source [\#13332](https://github.com/netdata/netdata/pull/13332) ([MrZammler](https://github.com/MrZammler))
+- UpdateNodeCollectors message [\#13330](https://github.com/netdata/netdata/pull/13330) ([MrZammler](https://github.com/MrZammler))
+- Cid 379238 379238 [\#13328](https://github.com/netdata/netdata/pull/13328) ([stelfrag](https://github.com/stelfrag))
+- Fix two helgrind reports [\#13325](https://github.com/netdata/netdata/pull/13325) ([vkalintiris](https://github.com/vkalintiris))
+- fix\(cgroups.plugin\): adjust kubepods patterns to filter pods when using Kind cluster [\#13324](https://github.com/netdata/netdata/pull/13324) ([ilyam8](https://github.com/ilyam8))
 - Add link to docker config section [\#13323](https://github.com/netdata/netdata/pull/13323) ([cakrit](https://github.com/cakrit))
 - fix\(apps.plugin\): adjust `zmstat*` pattern to exclude zoneminder scripts [\#13314](https://github.com/netdata/netdata/pull/13314) ([ilyam8](https://github.com/ilyam8))
+- array allocator for dbengine page descriptors [\#13312](https://github.com/netdata/netdata/pull/13312) ([ktsaou](https://github.com/ktsaou))
 - fix\(health\): disable go.d last collected alarm for prometheus module [\#13309](https://github.com/netdata/netdata/pull/13309) ([ilyam8](https://github.com/ilyam8))
 - Explicitly skip uploads and notifications in third-party repositories. [\#13308](https://github.com/netdata/netdata/pull/13308) ([Ferroin](https://github.com/Ferroin))
+- Protect shared variables with log lock. [\#13306](https://github.com/netdata/netdata/pull/13306) ([vkalintiris](https://github.com/vkalintiris))
 - Keep rc before freeing it during labels unlink alarms [\#13305](https://github.com/netdata/netdata/pull/13305) ([MrZammler](https://github.com/MrZammler))
 - fix\(cgroups.plugin\): adjust kubepods regex to fix name resolution in a kind cluster [\#13302](https://github.com/netdata/netdata/pull/13302) ([ilyam8](https://github.com/ilyam8))
 - Null terminate string if file read was not successful [\#13299](https://github.com/netdata/netdata/pull/13299) ([stelfrag](https://github.com/stelfrag))
@@ -330,10 +337,6 @@
 - chore\(ebpf.plugin\): re-enable socket module by default [\#12702](https://github.com/netdata/netdata/pull/12702) ([ilyam8](https://github.com/ilyam8))
 - Disable automake dependency tracking in our various one-time builds. [\#12701](https://github.com/netdata/netdata/pull/12701) ([Ferroin](https://github.com/Ferroin))
 - Add missing values to algorithm vector \(eBPF\) [\#12698](https://github.com/netdata/netdata/pull/12698) ([thiagoftsm](https://github.com/thiagoftsm))
-- Allocate buffer memory for uv\_write and release in the callback function [\#12688](https://github.com/netdata/netdata/pull/12688) ([stelfrag](https://github.com/stelfrag))
-- \[Uninstall Netdata\] - Add description in the docs to use uninstaller script with force arg [\#12687](https://github.com/netdata/netdata/pull/12687) ([odynik](https://github.com/odynik))
-- Correctly propagate errors and warnings up to the kickstart script from scripts it calls. [\#12686](https://github.com/netdata/netdata/pull/12686) ([Ferroin](https://github.com/Ferroin))
-- Memory CO-RE [\#12684](https://github.com/netdata/netdata/pull/12684) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
