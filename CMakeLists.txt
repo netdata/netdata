@@ -641,6 +641,8 @@ set(RRD_PLUGIN_FILES
         database/rrdcalc.h
         database/rrdcalctemplate.c
         database/rrdcalctemplate.h
+        database/rrdcontext.c
+        database/rrdcontext.h
         database/rrddim.c
         database/rrddimvar.c
         database/rrddimvar.h
