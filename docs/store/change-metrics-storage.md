@@ -40,7 +40,7 @@ if you want to store more metrics _specifically in memory_, you can increase the
 :::tip
 
 We advise you to revisit the [tiering mechanism](/database/engine/README.md#tiering) reference. This will you help
-you to configure the Agent retain metrics for longer periods.
+you configure the Agent to retain metrics for longer periods.
 
 :::
 
