@@ -487,6 +487,7 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->health_default_exec
          , host->health_default_recipient
     );
+    sql_store_host_system_info(&host->host_uuid, system_info);
 
     rrd_hosts_available++;
 
@@ -526,6 +527,7 @@ void rrdhost_update(RRDHOST *host
 
     rrdhost_system_info_free(host->system_info);
     host->system_info = system_info;
+    sql_store_host_system_info(&host->host_uuid, system_info);
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
@@ -687,6 +689,7 @@ RRDHOST *rrdhost_find_or_create(
            , rrdpush_api_key
            , rrdpush_send_charts_matching
            , system_info);
+        sql_store_host_system_info(&host->host_uuid, system_info);
     }
     if (host) {
         rrdhost_wrlock(host);

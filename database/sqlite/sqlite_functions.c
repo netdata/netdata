@@ -32,8 +32,8 @@ const char *database_config[] = {
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int);",
 
-    "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text, system_value text, "
-    "date_created int, PRIMARY KEY(host_id, system_key));"
+    "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
+    "date_created INT, PRIMARY KEY(host_id, system_key));"
 
     "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob , hash_id blob, UNIQUE (chart_id, hash_id));",
 
@@ -2317,7 +2317,7 @@ failed:
     return;
 };
 
-#define SELECT_HOST_INFO "select system_key, system_value from host_info where host_id = @host_id;"
+#define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id;"
 
 void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info)
 {
@@ -2348,9 +2348,9 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
 }
 
 
-#define SQL_INS_HOST_SYSTEM_INFO "insert or replace into host_info " \
+#define SQL_INS_HOST_SYSTEM_INFO "INSERT OR REPLACE INTO host_info " \
     "(host_id, system_key, system_value, date_created) " \
-    "values (@host, @key, @value, strftime('%s'));"
+    "VALUES (@host, @key, @value, unixepoch());"
 
 void sql_store_host_system_info_key_value(uuid_t *host_id, char *name, char *value)
 {
@@ -2372,26 +2372,26 @@ void sql_store_host_system_info_key_value(uuid_t *host_id, char *name, char *val
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to store system information");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_text(res, 2, name, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind label parameter to store name information");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_text(res, 3, value, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind value parameter to store value information");
-        goto failed;
+        goto skip_store;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store host system info, rc = %d", rc);
 
-failed:
+skip_store:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when storing  host system information");
 
