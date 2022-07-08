@@ -39,15 +39,15 @@ if you want to store more metrics _specifically in memory_, you can increase the
 
 :::tip
 
-We advise you to revisit the [tiering mechanism](/database/engine/README.md#tiering) reference. This will you help
-you configure the Agent to retain metrics for longer periods.
+We advise you to revisit the [tiering mechanism](/database/engine/README.md#tiering) reference. This will help you
+configure the Agent to retain metrics for longer periods.
 
 :::
 
 :::caution
 
-This calculator provides an estimation of disk and RAM usage for **metrics usage**. Real-life usage may vary based on the
-accuracy of the values you enter below, changes in the compression ratio, and the types of metrics stored.
+This calculator provides an estimation of disk and RAM usage for **metrics usage**. Real-life usage may vary based on
+the accuracy of the values you enter below, changes in the compression ratio, and the types of metrics stored.
 
 :::
 
