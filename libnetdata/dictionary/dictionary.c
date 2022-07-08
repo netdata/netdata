@@ -26,7 +26,7 @@ typedef struct dictionary DICTIONARY;
 
 typedef enum name_value_flags {
     NAME_VALUE_FLAG_NONE                   = 0,
-    NAME_VALUE_FLAG_NAME_IS_ALLOCATED = (1 << 0),
+    NAME_VALUE_FLAG_NAME_IS_ALLOCATED      = (1 << 0),
     NAME_VALUE_FLAG_DELETED                = (1 << 1), // this item is deleted
 } NAME_VALUE_FLAGS;
 
@@ -1264,7 +1264,7 @@ typedef struct string_entry {
     avl_t avl_node;
 #endif
     const char *str;
-    volatile size_t references;
+    volatile int references;
 } STRING_ENTRY;
 
 #ifdef DICTIONARY_WITH_AVL
@@ -1297,11 +1297,11 @@ static netdata_mutex_t string_mutex = NETDATA_MUTEX_INITIALIZER;
 
 STRING *string_dupz(const char *str) {
     if(unlikely(!str || !*str)) return NULL;
+
     netdata_mutex_lock(&string_mutex);
 
-    size_t str_len = strlen(str) + 1;
     STRING_ENTRY *se;
-    STRING_ENTRY **ptr = (STRING_ENTRY **)hashtable_insert_unsafe(&string_dictionary, str, str_len);
+    STRING_ENTRY **ptr = (STRING_ENTRY **)hashtable_insert_unsafe(&string_dictionary, str, strlen(str) + 1);
     if(unlikely(*ptr == 0)) {
         // a new item added to the index
         se = mallocz(sizeof(STRING_ENTRY));
