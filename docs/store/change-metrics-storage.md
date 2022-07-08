@@ -31,27 +31,29 @@ removes the oldest metrics on a rolling basis.
 ## Calculate the system resources (RAM, disk space) needed to store metrics
 
 You can store more or less metrics using the database engine by changing the allocated disk space. Use the calculator
-below to find an appropriate value for `dbengine multihost disk space` based on how many metrics your node(s) collect,
-whether you are streaming metrics to a parent node, and more.
+below to find the appropriate value for the `dbengine` based on how many metrics your node(s) collect, whether you are
+streaming metrics to a parent node, and more.
 
 You do not need to edit the `dbengine page cache size` setting to store more metrics using the database engine. However,
 if you want to store more metrics _specifically in memory_, you can increase the cache size.
 
-:::info 
+:::tip
 
-If you want to also store long term metrics you can always utilize
-the [tiering mechanism](/database/engine/README.md#tiering) of the Agent.
+We advise you to revisit the [tiering mechanism](/database/engine/README.md#tiering) reference. This will you help
+you to configure the Agent retain metrics for longer periods.
 
 :::
 
 :::caution
 
-This calculator provides an estimate of disk and RAM usage for **metrics usage**. Real-life usage may vary based on the
+This calculator provides an estimation of disk and RAM usage for **metrics usage**. Real-life usage may vary based on the
 accuracy of the values you enter below, changes in the compression ratio, and the types of metrics stored.
 
 :::
 
-https://docs.google.com/spreadsheets/d/e/2PACX-1vS4qfEZbhc2Ku_tYwyu4yQQsFU975pxWrCJD1fbDG-l9bWq0xTe2xROV7uRbVzdfIpZUwH0Z0s5tACd/pubhtml?gid=2017045638&single=true
+Download
+the [calculator](https://docs.google.com/spreadsheets/d/e/2PACX-1vTYMhUU90aOnIQ7qF6iIk6tXps57wmY9lxS6qDXznNJrzCKMDzxU3zkgh8Uv0xj_XqwFl3U6aHDZ6ag/pub?output=xlsx)
+to optimize the data retention to your preferences. Utilize the "Front" spreadsheet.
 
 ## Edit `netdata.conf` with recommended database engine settings
 
@@ -61,7 +63,17 @@ the `dbengine multihost disk space` setting. Change it to the value recommended 
 
 ```conf
 [db]
-    dbengine multihost disk space = 1024
+   mode = dbengine
+   storage tiers = 3
+   update every = 1
+   dbengine multihost disk space MB = 1024
+   dbengine page cache size MB = 32
+   dbengine tier 1 update every iterations = 60
+   dbengine tier 1 multihost disk space MB = 384
+   dbengine tier 1 page cache size MB = 32
+   dbengine tier 2 update every iterations = 60
+   dbengine tier 2 multihost disk space MB = 16
+   dbengine tier 2 page cache size MB = 32
 ```
 
 Save the file and restart the Agent with `sudo systemctl restart netdata`, or
