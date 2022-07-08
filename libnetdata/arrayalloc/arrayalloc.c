@@ -50,14 +50,14 @@ static void arrayalloc_init(ARAL *ar) {
         ar->internal.element_size = natural_alignment(ar->element_size, sizeof(uintptr_t));
 
         // then add the size of a pointer to it
-        ar->internal.element_size = ar->internal.element_size + sizeof(uintptr_t);
+        ar->internal.element_size += sizeof(uintptr_t);
 
         // make sure it is at least what we need for an ARAL_FREE slot
         if (ar->internal.element_size < sizeof(ARAL_FREE))
             ar->internal.element_size = sizeof(ARAL_FREE);
 
         // and finally align it to the natural alignment
-        ar->internal.element_size = natural_alignment(ar->element_size, ARAL_NATURAL_ALIGNMENT);
+        ar->internal.element_size = natural_alignment(ar->internal.element_size, ARAL_NATURAL_ALIGNMENT);
 
         // this is where we should write the pointer
         ar->internal.page_ptr_offset = ar->internal.element_size - sizeof(uintptr_t);
@@ -151,11 +151,11 @@ static inline void link_page_last(ARAL *ar, ARAL_PAGE *page) {
 }
 
 static inline ARAL_PAGE *find_page_with_allocation(ARAL *ar, void *ptr) {
-    size_t seeking = (size_t)ptr;
+    uintptr_t seeking = (uintptr_t)ptr;
     ARAL_PAGE *page;
 
     for(page = ar->internal.first_page; page ; page = page->next) {
-        if(unlikely(seeking >= (size_t)page->data && seeking < (size_t)page->data + page->size))
+        if(unlikely(seeking >= (uintptr_t)page->data && seeking < (uintptr_t)page->data + page->size))
             break;
     }
 
