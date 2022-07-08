@@ -1534,3 +1534,19 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 
     return value;
 }
+
+
+bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx) {
+    if (unlikely(!ptr))
+        return false;
+    return (ptr->data[idx / 64] & (1 << (idx % 64)));
+}
+
+void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
+    if (unlikely(!ptr))
+        return;
+    if (likely(value))
+        ptr->data[idx / 64] |= (1U << (idx % 64));
+    else
+        ptr->data[idx / 64] &= ~(1U << (idx % 64));
+}

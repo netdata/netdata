@@ -1606,6 +1606,107 @@ error:
     return 1;
 }
 
+int unit_test_bitmap256(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
+
+    BITMAP256 test_bitmap = {0};
+
+    bitmap256_set_bit(&test_bitmap, 0, 1);
+    bitmap256_set_bit(&test_bitmap, 64, 1);
+    bitmap256_set_bit(&test_bitmap, 128, 1);
+    bitmap256_set_bit(&test_bitmap, 192, 1);
+    if (test_bitmap.data[0] == 1)
+        fprintf(stderr, "%s() INDEX 1 is OK\n", __FUNCTION__ );
+    if (test_bitmap.data[1] == 1)
+        fprintf(stderr, "%s() INDEX 65 is OK\n", __FUNCTION__ );
+    if (test_bitmap.data[2] == 1)
+        fprintf(stderr, "%s() INDEX 129 is OK\n", __FUNCTION__ );
+    if (test_bitmap.data[3] == 1)
+        fprintf(stderr, "%s() INDEX 192 is OK\n", __FUNCTION__ );
+
+    uint8_t i=0;
+    do {
+        bitmap256_set_bit(&test_bitmap, i++, 1);
+    } while (i);
+
+    if (test_bitmap.data[0] == 0xffffffff)
+        fprintf(stderr, "%s() INDEX 0 is fully set OK\n", __FUNCTION__);
+    if (test_bitmap.data[1] == 0xffffffff)
+        fprintf(stderr, "%s() INDEX 1 is fully set OK\n", __FUNCTION__);
+    if (test_bitmap.data[2] == 0xffffffff)
+        fprintf(stderr, "%s() INDEX 2 is fully set OK\n", __FUNCTION__);
+    if (test_bitmap.data[3] == 0xffffffff)
+        fprintf(stderr, "%s() INDEX 3 is fully set OK\n", __FUNCTION__);
+
+    i = 0;
+    do {
+        bitmap256_set_bit(&test_bitmap, i++, 0);
+    } while (i);
+
+    if (test_bitmap.data[0] == 0)
+        fprintf(stderr, "%s() INDEX 0 is reset OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 0 is not reset FAILED\n", __FUNCTION__);
+        return 1;
+    }
+    if (test_bitmap.data[1] == 0)
+        fprintf(stderr, "%s() INDEX 1 is reset OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 1 is not reset FAILED\n", __FUNCTION__);
+        return 1;
+    }
+
+    if (test_bitmap.data[2] == 0)
+        fprintf(stderr, "%s() INDEX 2 is reset OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 2 is not reset FAILED\n", __FUNCTION__);
+        return 1;
+    }
+
+    if (test_bitmap.data[3] == 0)
+        fprintf(stderr, "%s() INDEX 3 is reset OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 3 is not reset FAILED\n", __FUNCTION__);
+        return 1;
+    }
+
+    i=0;
+    do {
+        bitmap256_set_bit(&test_bitmap, i, 1);
+        i += 4;
+    } while (i);
+
+    if (test_bitmap.data[0] == 0x11111111)
+        fprintf(stderr, "%s() INDEX 0 is 0x11111111 set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 0 is %lx expected 0x11111111\n", __FUNCTION__, test_bitmap.data[0]);
+        return 1;
+    }
+
+    if (test_bitmap.data[1] == 0x11111111)
+        fprintf(stderr, "%s() INDEX 1 is 0x11111111 set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 1 is %lx expected 0x11111111\n", __FUNCTION__, test_bitmap.data[1]);
+        return 1;
+    }
+
+    if (test_bitmap.data[2] == 0x11111111)
+        fprintf(stderr, "%s() INDEX 2 is 0x11111111 set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 2 is %lx expected 0x11111111\n", __FUNCTION__, test_bitmap.data[2]);
+        return 1;
+    }
+
+    if (test_bitmap.data[3] == 0x11111111)
+        fprintf(stderr, "%s() INDEX 3 is 0x11111111 set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 3 is %lx expected 0x11111111\n", __FUNCTION__, test_bitmap.data[3]);
+        return 1;
+    }
+
+    fprintf(stderr, "%s() tests passed\n", __FUNCTION__);
+    return 1;
+}
 
 #ifdef ENABLE_DBENGINE
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now)

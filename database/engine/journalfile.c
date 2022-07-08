@@ -275,7 +275,7 @@ static int check_journal_file_superblock(uv_file file)
 static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                                     void *buf, unsigned max_size)
 {
-    static uint64_t page_error_map[4] = {0,0,0,0};
+    static BITMAP256 page_error_map;
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned i, count, payload_length, descr_size, valid_pages;
     struct rrdeng_page_descr *descr;
@@ -305,9 +305,9 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         uint8_t page_type = jf_metric_data->descr[i].type;
 
         if (page_type > PAGE_TYPE_MAX) {
-            if (!(page_error_map[page_type / 64] & (1 << (page_type % 64)))) {
+            if (!bitmap256_get_bit(&page_error_map, page_type)) {
                 error("Unknown page type %d encountered.", page_type);
-                page_error_map[page_type / 64] |= (1 << (page_type % 64));
+                bitmap256_set_bit(&page_error_map, page_type, 1);
             }
             continue;
         }
