@@ -6,8 +6,21 @@
 
 using namespace ml;
 
-std::pair<CalculatedNumber *, size_t>
-TrainableDimension::getCalculatedNumbers() {
+std::string Dimension::getID() const {
+    RRDSET *RS = RD->rrdset;
+
+    std::stringstream SS;
+    SS << RS->context << "|" << RS->id << "|" << RD->name;
+    return SS.str();
+}
+
+bool Dimension::isActive() const {
+    bool SetObsolete = rrdset_flag_check(RD->rrdset, RRDSET_FLAG_OBSOLETE);
+    bool DimObsolete = rrddim_flag_check(RD, RRDDIM_FLAG_OBSOLETE);
+    return !SetObsolete && !DimObsolete;
+}
+
+std::pair<CalculatedNumber *, size_t> Dimension::getCalculatedNumbers() {
     size_t MinN = Cfg.MinTrainSamples;
     size_t MaxN = Cfg.MaxTrainSamples;
 
@@ -68,7 +81,7 @@ TrainableDimension::getCalculatedNumbers() {
     return { CNs, TotalValues };
 }
 
-MLResult TrainableDimension::trainModel() {
+MLResult Dimension::trainModel() {
     auto P = getCalculatedNumbers();
     CalculatedNumber *CNs = P.first;
     unsigned N = P.second;
@@ -90,7 +103,14 @@ MLResult TrainableDimension::trainModel() {
     return MLResult::Success;
 }
 
-void PredictableDimension::addValue(CalculatedNumber Value, bool Exists) {
+bool Dimension::shouldTrain(const TimePoint &TP) const {
+    if (ConstantModel)
+        return false;
+
+    return (LastTrainedAt + trainEvery()) < TP;
+}
+
+void Dimension::addValue(CalculatedNumber Value, bool Exists) {
     if (!Exists) {
         CNs.clear();
         return;
@@ -110,7 +130,7 @@ void PredictableDimension::addValue(CalculatedNumber Value, bool Exists) {
     CNs[N - 1] = Value;
 }
 
-std::pair<MLResult, bool> PredictableDimension::predict() {
+std::pair<MLResult, bool> Dimension::predict() {
     unsigned N = Cfg.DiffN + Cfg.SmoothN + Cfg.LagN;
     if (CNs.size() != N) {
         AnomalyBit = false;
@@ -132,4 +152,27 @@ std::pair<MLResult, bool> PredictableDimension::predict() {
 
     AnomalyBit = AnomalyScore >= (100 * Cfg.DimensionAnomalyScoreThreshold);
     return { MLResult::Success, AnomalyBit };
+}
+
+void Dimension::updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous) {
+    AnomalyBitCounter += IsAnomalous;
+
+    if (Elapsed == Cfg.DBEngineAnomalyRateEvery) {
+        double AR = static_cast<double>(AnomalyBitCounter) / Cfg.DBEngineAnomalyRateEvery;
+        rrddim_set_by_pointer(RS, getAnomalyRateRD(), AR * 1000);
+        AnomalyBitCounter = 0;
+    }
+}
+
+std::pair<bool, double> Dimension::detect(size_t WindowLength, bool Reset) {
+    bool AnomalyBit = isAnomalous();
+
+    if (Reset)
+        NumSetBits = BBC.numSetBits();
+
+    NumSetBits += AnomalyBit;
+    BBC.insert(AnomalyBit);
+
+    double AnomalyRate = static_cast<double>(NumSetBits) / WindowLength;
+    return { AnomalyBit, AnomalyRate };
 }

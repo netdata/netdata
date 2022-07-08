@@ -24,16 +24,16 @@ public:
     }
 
     bool isFinished() {
-        return Ops->is_finished(&Handle);
+        if (!Ops->is_finished(&Handle))
+            return false;
+
+        Ops->finalize(&Handle);
+        return true;
     }
 
     std::pair<time_t, CalculatedNumber> nextMetric() {
         STORAGE_POINT sp = Ops->next_metric(&Handle);
         return { sp.start_time, sp.sum / sp.count };
-    }
-
-    ~Query() {
-        Ops->finalize(&Handle);
     }
 
 private:
