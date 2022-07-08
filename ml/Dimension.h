@@ -76,8 +76,6 @@ public:
         return isTrained() ? KM.anomalyScore(SB) : 0.0;
     }
 
-    bool isAnomalous() { return AnomalyBit; }
-
     bool shouldTrain(const TimePoint &TP) const;
 
     std::string getID() const;
