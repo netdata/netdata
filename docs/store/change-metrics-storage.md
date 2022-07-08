@@ -13,18 +13,21 @@ The default settings retain approximately two day's worth of metrics on a system
 but the Netdata Agent is highly configurable if you want your nodes to store days, weeks, or months worth of per-second
 data.
 
-The Netdata Agent uses two settings in `netdata.conf` to change the behavior of the database engine:
+The Netdata Agent uses 3 fundamental settings in `netdata.conf` to change the behavior of the database engine:
 
 ```conf
 [global]
     dbengine page cache size = 32
     dbengine multihost disk space = 256
+    storage tiers = 1
 ```
 
-`page cache size` sets the maximum amount of RAM (in MiB) the database engine uses to cache and index recent metrics.
+`dbengine page cache size` sets the maximum amount of RAM (in MiB) the database engine uses to cache and index recent
+metrics.
 `dbengine multihost disk space` sets the maximum disk space (again, in MiB) the database engine uses to store
-historical, compressed metrics. When the size of stored metrics exceeds the allocated disk space, the database engine
-removes the oldest metrics on a rolling basis.
+historical, compressed metrics and `storage tiers` specifies the number of storage tiers you want to have in
+your `dbengine` . When the size of stored metrics exceeds the allocated disk space, the database engine removes the
+oldest metrics on a rolling basis.
 
 ## Calculate the system resources (RAM, disk space) needed to store metrics
 
@@ -55,9 +58,9 @@ to optimize the data retention to your preferences. Utilize the "Front" spreadsh
 
 ## Edit `netdata.conf` with recommended database engine settings
 
-Now that you have a recommended setting for `dbengine multihost disk space`, open `netdata.conf` with
-[`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) and look for
-the `dbengine multihost disk space` setting. Change it to the value recommended above. For example:
+Now that you have a recommended setting for your Agent's `dbengine`, open `netdata.conf` with
+[`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) and look for the `[db]`
+subsection. Change it to the recommended values you calculated from the calculator. For example:
 
 ```conf
 [db]

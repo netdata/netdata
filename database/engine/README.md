@@ -13,7 +13,7 @@ ratio, not a fixed number of metrics collected.
 
 ## Tiering
 
-For Netdata Agent with version `netdata-1.35.0.138.nightly` and greater, `dbengine` supports Tiering which can offer
+For Netdata Agents with version `netdata-1.35.0.138.nightly` and greater, `dbengine` supports Tiering which can offer
 almost unlimited retention of data. Tiering is a mechanism of providing multiple tiers of data with
 different [granularity on metrics](/docs/store/distributed-data-architecture.md#granularity-of-metrics). Every Tier down
 samples the exact lower tier (lower tiers have greater resolution). You can have up to 5 Tiers **[0. . 4]** of data (
@@ -84,15 +84,23 @@ x 365 days per year = 67MB.
 
 ## Legacy configuration
 
-The deprecated `dbengine disk space MB` option determines the amount of disk space that is dedicated to storing Netdata
-metric values per legacy database engine instance (see [details on the legacy mode](#legacy-mode) below).
+
+### v1.35.1 and prior
+
+These versions of the Agent do not support [Tiering](#Tiering). You could change the metric retention for the parent
+and all of its children only with the `dbengine multihost disk space MB` setting. This setting accounts the space
+allocation for the parent node and all of its children.
+
+To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in
+the `[db]` section of your `netdata.conf`.
 
 ```conf
 [db]
-    dbengine disk space MB = 256
+    dbengine page cache size MB = 32
+    dbengine multihost disk space MB = 256
 ```
 
-#### Legacy mode (prior v1.23.2)
+### prior v1.23.2
 
 _For Netdata Agents earlier than v1.23.2_, the Agent on the parent node uses one dbengine instance for itself, and
 another instance for every child node it receives metrics from. If you had four streaming nodes, you would have five
