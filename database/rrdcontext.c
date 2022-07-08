@@ -173,9 +173,10 @@ void rrdinstance_set_label(RRDHOST *host, const char *id, const char *key, const
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
 
-typedeff enum {
-    RRDCONTEXT_FLAG_NONE    = 0,
-    RRDCONTEXT_FLAG_DELETED = (1 << 0),
+typedef enum {
+    RRDCONTEXT_FLAG_NONE      = 0,
+    RRDCONTEXT_FLAG_DELETED   = (1 << 0),
+    RRDCONTEXT_FLAG_COLLECTED = (1 << 1),
 } RRDCONTEXT_FLAGS;
 
 struct rrdcontext {
@@ -186,9 +187,9 @@ struct rrdcontext {
     STRING *units;
 
     size_t priority;
+
     time_t first_time_t;
     time_t last_time_t;
-
     RRDCONTEXT_FLAGS flags;
 
     VERSIONED_CONTEXT_DATA hub;
@@ -227,6 +228,8 @@ void rrdcontext_insert_callback(const char *id, void *value, void *data) {
     else {
         // we are adding this context now
         rc->current.version = now_realtime_sec();
+
+        // TODO save to SQL
     }
 
     rc->hub.id        = string2str(rc->id);
