@@ -44,8 +44,8 @@ So,
 
 - On a single node setup, use `[db].mode = dbengine`.
 - On a [parent - child](/docs/metrics-storage-management/how-streaming-works) setup, use `[db].mode = dbengine` on the
-  parent to increase retention and a more resource efficient mode (like `save`, `ram` or `none`) for the child to
-  minimize resource utilization.
+  parent to increase retention and a more resource efficient modes like, `dbengine` with light retention settings or
+  `save`, `ram` and `none` modes for the children to minimize resource utilization.
 
 ## Choose your database mode
 
