@@ -846,6 +846,8 @@ set(ACLK_FILES
         aclk/schema-wrappers/node_info.h
         aclk/schema-wrappers/capability.cc
         aclk/schema-wrappers/capability.h
+        aclk/schema-wrappers/proto_2_json.cc
+        aclk/schema-wrappers/proto_2_json.h
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h

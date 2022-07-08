@@ -6,6 +6,8 @@
 #include "aclk_stats.h"
 #include "aclk.h"
 
+#include "schema-wrappers/proto_2_json.h"
+
 #ifndef __GNUC__
 #pragma region aclk_tx_msgs helper functions
 #endif
@@ -33,16 +35,9 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
-#endif
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 1024
-    char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx-%s.bin", ACLK_GET_CONV_LOG_NEXT(), msgname);
-    FILE *fptr;
-    if (fptr = fopen(filename,"w")) {
-        fwrite(msg, msg_len, 1, fptr);
-        fclose(fptr);
-    }
+    char *json = protomsg_to_json(msg, msg_len, msgname);
+    log_aclk_message_bin(json, strlen(json), 1, topic, msgname);
+    freez(json);
 #endif
 
     return packet_id;

@@ -61,6 +61,13 @@ extern const char *stderr_filename;
 extern const char *stdout_filename;
 extern const char *facility_log;
 
+#ifdef ENABLE_ACLK
+extern const char *aclklog_filename;
+extern int aclklog_fd;
+extern FILE *aclklog;
+extern int aclklog_enabled;
+#endif
+
 extern int access_log_syslog;
 extern int error_log_syslog;
 extern int output_log_syslog;
@@ -97,6 +104,10 @@ extern void info_int( const char *file, const char *function, const unsigned lon
 extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
 extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 extern void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
+
+#ifdef ENABLE_ACLK
+extern void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);
+#endif
 
 # ifdef __cplusplus
 }

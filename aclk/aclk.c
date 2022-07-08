@@ -254,7 +254,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
     close(logfd);
 #endif
 
-    aclk_handle_new_cloud_msg(msgtype, msg, msglen);
+    aclk_handle_new_cloud_msg(msgtype, msg, msglen, topic);
 }
 
 static void puback_callback(uint16_t packet_id)
