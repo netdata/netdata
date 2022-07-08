@@ -236,14 +236,8 @@ ML_FILES = \
 if ENABLE_ML
 
 ML_FILES += \
-    ml/BitBufferCounter.h \
-    ml/BitBufferCounter.cc \
-    ml/BitRateWindow.h \
-    ml/BitRateWindow.cc \
     ml/Config.h \
     ml/Config.cc \
-    ml/Database.h \
-    ml/Database.cc \
     ml/Dimension.cc \
     ml/Dimension.h \
     ml/Host.h \
@@ -267,7 +261,6 @@ endif
 
 if ENABLE_ML_TESTS
 ML_TESTS_FILES = \
-    ml/BitRateWindowTests.cc \
     ml/SamplesBufferTests.cc \
     $(NULL)
 endif

@@ -1025,14 +1025,8 @@ set(ML_FILES
 
 IF(ENABLE_ML)
     list(APPEND ML_FILES
-            ml/BitBufferCounter.h
-            ml/BitBufferCounter.cc
-            ml/BitRateWindow.h
-            ml/BitRateWindow.cc
             ml/Config.h
             ml/Config.cc
-            ml/Database.h
-            ml/Database.cc
             ml/Dimension.cc
             ml/Dimension.h
             ml/Host.h

@@ -4,7 +4,6 @@
 #define ML_DIMENSION_H
 
 #include "Query.h"
-#include "BitBufferCounter.h"
 #include "Config.h"
 
 #include "ml-private.h"
@@ -35,9 +34,7 @@ public:
         ConstantModel(false),
         AnomalyScore(0.0),
         AnomalyBit(0),
-        AnomalyBitCounter(0),
-        BBC(static_cast<size_t>(Cfg.ADMinWindowSize)),
-        NumSetBits(0)
+        AnomalyBitCounter(0)
     { }
 
     RRDDIM *getRD() const {
@@ -66,6 +63,10 @@ public:
 
     bool isTrained() const {
         return Trained;
+    }
+
+    bool isAnomalous() const {
+        return AnomalyBit;
     }
 
     CalculatedNumber computeAnomalyScore(SamplesBuffer &SB) {
@@ -102,9 +103,6 @@ public:
     CalculatedNumber AnomalyScore;
     std::atomic<bool> AnomalyBit;
     unsigned AnomalyBitCounter;
-
-    BitBufferCounter BBC;
-    size_t NumSetBits;
 
     std::vector<CalculatedNumber> CNs;
     KMeans KM;

@@ -98,93 +98,6 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
     rrdset_done(RS);
 }
 
-static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *WindowLengthRD = nullptr;
-
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "detector_window_on_" << localhost->machine_guid;
-        NameSS << "detector_window_on_" << rrdhost_hostname(localhost);
-
-        RS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "detector_window", // family
-            "anomaly_detection.detector_window", // ctx
-            "Anomaly detector window length", // title
-            "seconds", // units
-            "netdata", // plugin
-            "ml", // module
-            39185, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
-
-        WindowLengthRD = rrddim_add(RS, "duration", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(RS);
-
-    rrddim_set_by_pointer(RS, WindowLengthRD, WindowLength * RH->rrd_update_every);
-    rrdset_done(RS);
-}
-
-static void updateEventsChart(RRDHOST *RH,
-                              std::pair<BitRateWindow::Edge, size_t> P,
-                              bool ResetBitCounter,
-                              bool NewAnomalyEvent) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *AboveThresholdRD = nullptr;
-    static thread_local RRDDIM *ResetBitCounterRD = nullptr;
-    static thread_local RRDDIM *NewAnomalyEventRD = nullptr;
-
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "detector_events_on_" << localhost->machine_guid;
-        NameSS << "detector_events_on_" << rrdhost_hostname(localhost);
-
-        RS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "detector_events", // family
-            "anomaly_detection.detector_events", // ctx
-            "Anomaly events triggered", // title
-            "boolean", // units
-            "netdata", // plugin
-            "ml", // module
-            39186, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
-
-        AboveThresholdRD = rrddim_add(RS, "above_threshold", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        ResetBitCounterRD = rrddim_add(RS, "reset_bit_counter", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NewAnomalyEventRD = rrddim_add(RS, "new_anomaly_event", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(RS);
-
-    BitRateWindow::Edge E = P.first;
-    bool AboveThreshold = E.second == BitRateWindow::State::AboveThreshold;
-
-    rrddim_set_by_pointer(RS, AboveThresholdRD, AboveThreshold);
-    rrddim_set_by_pointer(RS, ResetBitCounterRD, ResetBitCounter);
-    rrddim_set_by_pointer(RS, NewAnomalyEventRD, NewAnomalyEvent);
-
-    rrdset_done(RS);
-}
-
 static void updateDetectionChart(RRDHOST *RH) {
     static thread_local RRDSET *RS = nullptr;
     static thread_local RRDDIM *UserRD, *SystemRD = nullptr;
@@ -387,23 +300,12 @@ void TrainableHost::train() {
 #define WORKER_JOB_UPDATE_DETECTION_CHART 1
 #define WORKER_JOB_UPDATE_ANOMALY_RATES   2
 #define WORKER_JOB_UPDATE_CHARTS          3
-#define WORKER_JOB_SAVE_ANOMALY_EVENT     4
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 5
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
 #endif
 
 void DetectableHost::detectOnce() {
-    auto P = BRW.insert(WindowAnomalyRate >= Cfg.HostAnomalyRateThreshold);
-    BitRateWindow::Edge Edge = P.first;
-    size_t WindowLength = P.second;
-
-    bool ResetBitCounter = (Edge.first != BitRateWindow::State::AboveThreshold);
-    bool NewAnomalyEvent = (Edge.first == BitRateWindow::State::AboveThreshold) &&
-                           (Edge.second == BitRateWindow::State::Idle);
-
-    std::vector<std::pair<double, std::string>> DimsOverThreshold;
-
     size_t NumAnomalousDimensions = 0;
     size_t NumNormalDimensions = 0;
     size_t NumTrainedDimensions = 0;
@@ -416,8 +318,6 @@ void DetectableHost::detectOnce() {
     {
         std::lock_guard<std::mutex> Lock(Mutex);
 
-        DimsOverThreshold.reserve(DimensionsMap.size());
-
         for (auto &DP : DimensionsMap) {
             worker_is_busy(WORKER_JOB_DETECT_DIMENSION);
 
@@ -429,26 +329,18 @@ void DetectableHost::detectOnce() {
             }
 
             NumActiveDimensions++;
-
-            auto P = D->detect(WindowLength, ResetBitCounter);
-            bool IsAnomalous = P.first;
-            double AnomalyScore = P.second;
-
             NumTrainedDimensions += D->isTrained();
 
+            bool IsAnomalous = D->isAnomalous();
             if (IsAnomalous)
                 NumAnomalousDimensions += 1;
-
-            if (NewAnomalyEvent && (AnomalyScore >= Cfg.ADDimensionRateThreshold))
-                DimsOverThreshold.push_back({ AnomalyScore, D->getID() });
-
             D->updateAnomalyBitCounter(AnomalyRateRS, AnomalyRateTimer, IsAnomalous);
         }
 
         if (NumAnomalousDimensions)
-            WindowAnomalyRate = static_cast<double>(NumAnomalousDimensions) / NumActiveDimensions;
+            HostAnomalyRate = static_cast<double>(NumAnomalousDimensions) / NumActiveDimensions;
         else
-            WindowAnomalyRate = 0.0;
+            HostAnomalyRate = 0.0;
 
         NumNormalDimensions = NumActiveDimensions - NumAnomalousDimensions;
     }
@@ -466,38 +358,11 @@ void DetectableHost::detectOnce() {
 
     worker_is_busy(WORKER_JOB_UPDATE_CHARTS);
     updateDimensionsChart(getRH(), NumTrainedDimensions, NumNormalDimensions, NumAnomalousDimensions);
-    updateRateChart(getRH(), WindowAnomalyRate * 10000.0);
-    updateWindowLengthChart(getRH(), WindowLength);
-    updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
+    updateRateChart(getRH(), HostAnomalyRate * 10000.0);
 
     struct rusage TRU;
     getResourceUsage(&TRU);
     updateTrainingChart(getRH(), &TRU);
-
-    if (!NewAnomalyEvent || (DimsOverThreshold.size() == 0))
-        return;
-
-    worker_is_busy(WORKER_JOB_SAVE_ANOMALY_EVENT);
-
-    std::sort(DimsOverThreshold.begin(), DimsOverThreshold.end());
-    std::reverse(DimsOverThreshold.begin(), DimsOverThreshold.end());
-
-    // Make sure the JSON response won't grow beyond a specific number
-    // of dimensions. Log an error message if this happens, because it
-    // most likely means that the user specified a very-low anomaly rate
-    // threshold.
-    size_t NumMaxDimsOverThreshold = 2000;
-    if (DimsOverThreshold.size() > NumMaxDimsOverThreshold) {
-        error("Found %zu dimensions over threshold. Reducing JSON result to %zu dimensions.",
-              DimsOverThreshold.size(), NumMaxDimsOverThreshold);
-        DimsOverThreshold.resize(NumMaxDimsOverThreshold);
-    }
-
-    nlohmann::json JsonResult = DimsOverThreshold;
-
-    time_t Before = now_realtime_sec();
-    time_t After = Before - (WindowLength * updateEvery());
-    DB.insertAnomaly("AD1", 1, getUUID(), After, Before, JsonResult.dump(4));
 }
 
 void DetectableHost::detect() {
@@ -506,7 +371,6 @@ void DetectableHost::detect() {
     worker_register_job_name(WORKER_JOB_UPDATE_DETECTION_CHART, "detection chart");
     worker_register_job_name(WORKER_JOB_UPDATE_ANOMALY_RATES,   "anomaly rates");
     worker_register_job_name(WORKER_JOB_UPDATE_CHARTS,          "charts");
-    worker_register_job_name(WORKER_JOB_SAVE_ANOMALY_EVENT,     "anomaly event");
 
     std::this_thread::sleep_for(Seconds{10});
 

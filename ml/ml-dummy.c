@@ -33,20 +33,6 @@ bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
     return false;
 }
 
-char *ml_get_anomaly_events(RRDHOST *RH, const char *AnomalyDetectorName,
-                            int AnomalyDetectorVersion, time_t After, time_t Before) {
-    (void) RH; (void) AnomalyDetectorName;
-    (void) AnomalyDetectorVersion; (void) After; (void) Before;
-    return NULL;
-}
-
-char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
-                                int AnomalyDetectorVersion, time_t After, time_t Before) {
-    (void) RH; (void) AnomalyDetectorName;
-    (void) AnomalyDetectorVersion; (void) After; (void) Before;
-    return NULL;
-}
-
 void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {
     (void) R;
     (void) MaxAnomalyRates;
