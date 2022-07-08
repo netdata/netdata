@@ -43,5 +43,6 @@ extern int ctx_store_context(ctx_context_t *context_data);
 
 extern int ctx_delete_context(ctx_context_t *context_data);
 
+extern int sql_init_context_database(int memory);
 extern int ctx_unittest(void);
 #endif //NETDATA_SQLITE_CONTEXT_H

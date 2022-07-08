@@ -17,18 +17,15 @@ const char *database_context_cleanup[] = {
 
 sqlite3 *db_context_meta = NULL;
 
-
-int init_context_database_batch(int rebuild, int init_type, const char *batch[])
+int init_context_database_batch(const char *batch[])
 {
-    UNUSED(rebuild);
-
     int rc;
     char *err_msg = NULL;
     for (int i = 0; batch[i]; i++) {
         debug(D_METADATALOG, "Executing %s", batch[i]);
         rc = sqlite3_exec(db_context_meta, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
-            error_report("SQLite error during database %s, rc = %d (%s)", init_type ? "cleanup" : "setup", rc, err_msg);
+            error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
             sqlite3_free(err_msg);
             if (SQLITE_CORRUPT == rc)
@@ -43,7 +40,7 @@ int init_context_database_batch(int rebuild, int init_type, const char *batch[])
  * Initialize the SQLite database
  * Return 0 on success
  */
-int sql_init_context_database(int rebuild, int memory)
+int sql_init_context_database(int memory)
 {
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
@@ -74,44 +71,44 @@ int sql_init_context_database(int rebuild, int memory)
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
     snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
-    if(init_context_database_batch(rebuild, 0, list)) return 1;
+    if(init_context_database_batch(list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_synchronous
     // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
     snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
-    if(init_context_database_batch(rebuild, 0, list)) return 1;
+    if(init_context_database_batch(list))  return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_mode
     // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
     snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
-    if(init_context_database_batch(rebuild, 0, list)) return 1;
+    if(init_context_database_batch(list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_temp_store
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
     snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
-    if(init_context_database_batch(rebuild, 0, list)) return 1;
+    if(init_context_database_batch(list)) return 1;
     
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
     snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
-    if(init_context_database_batch(rebuild, 0, list)) return 1;
+    if(init_context_database_batch(list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_cache_size
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
     snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
-    if(init_context_database_batch(rebuild, 0, list)) return 1;
+    if(init_context_database_batch(list)) return 1;
 
     snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
-    if(init_context_database_batch(rebuild, 0, list)) return 1;
+    if(init_context_database_batch(list)) return 1;
 
     snprintfz(buf, 1024, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta;", netdata_configured_cache_dir);
-    if(init_context_database_batch(rebuild, 0, list)) return 1;
+    if(init_context_database_batch(list)) return 1;
 
-    if (init_context_database_batch(rebuild, 0, &database_context_config[0]))
+    if (init_context_database_batch(&database_context_config[0]))
         return 1;
 
-    if (init_context_database_batch(rebuild, 0, &database_context_cleanup[0]))
+    if (init_context_database_batch(&database_context_cleanup[0]))
         return 1;
 
     return 0;
@@ -168,8 +165,8 @@ void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *))
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid_copy(chart_data.chart_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
-        chart_data.id = strdupz((const char *) sqlite3_column_text(res, 1));
-        chart_data.context = strdupz((const char *) sqlite3_column_text(res, 2));
+        chart_data.id = (char *) sqlite3_column_text(res, 1);
+        chart_data.context = (char *) sqlite3_column_text(res, 2);
         chart_data.update_every = sqlite3_column_int(res, 3);
         dict_cb(&chart_data);
     }
@@ -205,7 +202,7 @@ void ctx_get_dimension_list(uuid_t *chart_id, void (*dict_cb)(void *))
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
-        dimension_data.id = strdupz((const char *) sqlite3_column_text(res, 1));
+        dimension_data.id = (char *) sqlite3_column_text(res, 1);
         dict_cb(&dimension_data);
     }
 
@@ -239,8 +236,8 @@ void ctx_get_label_list(uuid_t *chart_id, void (*dict_cb)(void *))
     ctx_label_t label_data;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        label_data.label_key = strdupz((const char *) sqlite3_column_text(res, 0));
-        label_data.label_value = strdupz((const char *) sqlite3_column_text(res, 1));
+        label_data.label_key = (char *) sqlite3_column_text(res, 0);
+        label_data.label_value = (char *) sqlite3_column_text(res, 1);
         label_data.label_source = sqlite3_column_int(res, 2);
         dict_cb(&label_data);
     }
@@ -269,7 +266,7 @@ void ctx_get_context_list(void (*dict_cb)(void *))
     ctx_context_t context_data;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        context_data.context = strdupz((const char *) sqlite3_column_text(res, 0));
+        context_data.context = (char *) sqlite3_column_text(res, 0);
         context_data.first_time_t = (time_t) sqlite3_column_int64(res, 1);
         context_data.last_time_t = (time_t) sqlite3_column_int64(res, 2);
         dict_cb(&context_data);
@@ -376,8 +373,6 @@ static void dict_ctx_get_label_list_cb(void *data)
     ctx_label_t *label_data = data;
 
     info(" LABEL %d %s = %s", label_data->label_source, label_data->label_key, label_data->label_value);
-    freez(label_data->label_key);
-    freez(label_data->label_value);
 }
 
 static void dict_ctx_get_dimension_list_cb(void *data)
@@ -388,7 +383,6 @@ static void dict_ctx_get_dimension_list_cb(void *data)
     uuid_unparse_lower(dimension_data->dim_id, uuid_str);
 
     info(" Dimension %s = %s", uuid_str, dimension_data->id);
-    freez(dimension_data->id);
 }
 
 
@@ -401,8 +395,6 @@ static void dict_ctx_get_chart_list_cb(void *data)
     info("OK GOT %s ID = %s, context = %s", uuid_str, chart_data->id, chart_data->context);
     ctx_get_label_list(&chart_data->chart_id, dict_ctx_get_label_list_cb);
     ctx_get_dimension_list(&chart_data->chart_id, dict_ctx_get_dimension_list_cb);
-    freez(chart_data->context);
-    freez(chart_data->id);
 }
 
 static void dict_ctx_get_context_list_cb(void *data)
@@ -410,13 +402,12 @@ static void dict_ctx_get_context_list_cb(void *data)
     ctx_context_t *context_data = data;
 
     info("   Context %s from %ld to %ld", context_data->context, context_data->first_time_t, context_data->last_time_t);
-    freez(context_data->context);
 }
 
 
 int ctx_unittest(void)
 {
-    sql_init_context_database(0,1);
+    sql_init_context_database(1);
     ctx_get_chart_list(NULL, dict_ctx_get_chart_list_cb);
 
     // Store a context
