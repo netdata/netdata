@@ -261,18 +261,12 @@ static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
 }
 
 void RrdHost::addDimension(Dimension *D) {
-	RRDDIM *AnomalyRateRD = rrddim_add(AnomalyRateRS, D->getID().c_str(), NULL,
-                                       1, 1000, RRD_ALGORITHM_ABSOLUTE);
-    D->setAnomalyRateRD(AnomalyRateRD);
+    std::lock_guard<std::mutex> Lock(Mutex);
 
-	{
-		std::lock_guard<std::mutex> Lock(Mutex);
+    DimensionsMap[D->getRD()] = D;
 
-		DimensionsMap[D->getRD()] = D;
-
-		// Default construct mutex for dimension
-	    LocksMap[D];
-	}
+    // Default construct mutex for dimension
+    LocksMap[D];
 }
 
 void RrdHost::removeDimension(Dimension *D) {

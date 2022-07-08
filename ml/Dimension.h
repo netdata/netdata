@@ -17,11 +17,19 @@ enum class MLResult {
     NaN,
 };
 
+static inline std::string getMLDimensionID(RRDDIM *RD) {
+    RRDSET *RS = RD->rrdset;
+
+    std::stringstream SS;
+    SS << RS->context << "|" << RS->id << "|" << RD->name;
+    return SS.str();
+}
+
 class Dimension {
 public:
-    Dimension(RRDDIM *RD) :
+    Dimension(RRDDIM *RD, RRDSET *AnomalyRateRS) :
         RD(RD),
-        AnomalyRateRD(nullptr),
+        AnomalyRateRD(rrddim_add(AnomalyRateRS, ml::getMLDimensionID(RD).c_str(), NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE)),
         LastTrainedAt(Seconds(0)),
         Trained(false),
         ConstantModel(false),
@@ -30,7 +38,7 @@ public:
         AnomalyBitCounter(0),
         BBC(static_cast<size_t>(Cfg.ADMinWindowSize)),
         NumSetBits(0)
-    {}
+    { }
 
     RRDDIM *getRD() const {
         return RD;
@@ -46,10 +54,6 @@ public:
 
     time_t oldestTime() const {
         return Query(RD).oldestTime();
-    }
-
-    void setAnomalyRateRD(RRDDIM *ARRD) {
-        AnomalyRateRD = ARRD;
     }
 
     void setAnomalyRateRDName(const char *Name) const {

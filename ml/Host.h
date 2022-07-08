@@ -44,6 +44,10 @@ public:
         return S;
     }
 
+    RRDSET *getAnomalyRateRS() const {
+        return AnomalyRateRS;
+    }
+
     void addDimension(Dimension *D);
     void removeDimension(Dimension *D);
 
