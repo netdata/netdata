@@ -107,7 +107,7 @@ bool Dimension::shouldTrain(const TimePoint &TP) const {
     if (ConstantModel)
         return false;
 
-    return (LastTrainedAt + trainEvery()) < TP;
+    return (LastTrainedAt + Seconds(Cfg.TrainEvery * updateEvery())) < TP;
 }
 
 void Dimension::addValue(CalculatedNumber Value, bool Exists) {

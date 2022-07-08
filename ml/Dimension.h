@@ -64,10 +64,6 @@ public:
         return AnomalyRateRD;
     }
 
-    Seconds trainEvery() const {
-        return Seconds{Cfg.TrainEvery * updateEvery()};
-    }
-
     bool isTrained() const {
         return Trained;
     }
