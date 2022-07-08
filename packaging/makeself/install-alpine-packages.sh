@@ -24,6 +24,7 @@ apk add --no-cache -U \
   git \
   gnutls-dev \
   gzip \
+  jq \
   libelf-static \
   libmnl-dev \
   libnetfilter_acct-dev \
