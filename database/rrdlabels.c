@@ -641,10 +641,7 @@ void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const
     void *acquired_item = dictionary_acquire_item(labels, key);
     RRDLABEL *lb = dictionary_acquired_item_value(labels, acquired_item);
 
-    if(lb && lb->value)
-        *value = strdupz(lb->value);
-    else
-        value = NULL;
+    *value = (lb && lb->value) ? strdupz(lb->value) : NULL;
 
     dictionary_acquired_item_release(labels, acquired_item);
 }
