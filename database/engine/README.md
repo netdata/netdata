@@ -11,16 +11,10 @@ indexing, while the rest of the data resides compressed on disk. Unlike other [d
 amount of historical metrics stored is based on the amount of disk space you allocate and the effective compression
 ratio, not a fixed number of metrics collected.
 
-By using both RAM and disk space, the database engine allows for long-term storage of per-second metrics inside of the
-Agent itself.
-
-In addition, the `dbengine` is the only mode that supports changing the data collection update frequency
-(`update every`) without losing the metrics your Agent already gathered and stored.
-
 ## Tiering
 
-For Netdata Agent with version `netdata-1.35.0.138.nightly` and greater, `dbengine` supports tiering. Tiering is a
-mechanism of providing multiple tiers of data with
+For Netdata Agent with version `netdata-1.35.0.138.nightly` and greater, `dbengine` supports Tiering which can offer
+almost unlimited retention of data. Tiering is a mechanism of providing multiple tiers of data with
 different [granularity on metrics](/docs/store/distributed-data-architecture.md#granularity-of-metrics). Every Tier down
 samples the exact lower tier (lower tiers have greater resolution). You can have up to 5 Tiers **[0. . 4]** of data (
 including the Tier 0, which has the highest resolution) which means years of data.
@@ -30,7 +24,7 @@ including the Tier 0, which has the highest resolution) which means years of dat
 Tier 0 is the default that was always available in `dbengine` mode. Tier 1 is the first level of aggregation, Tier 2 is
 the second so on so forth.
 
-Metrics on all tiers > 1 store 5 values for every point for accurate representation:
+Metrics on all tiers except of the _Tier 0_, store 5 more values for every point for accurate representation:
 
 1. The `sum` of the points aggregated
 2. The `min` of the points aggregated
@@ -88,38 +82,7 @@ The storage requirements are the same to Tier 1.
 For 2000 metrics, with per hour resolution, retained for a year, Tier 2 needs: 4 bytes x 2000 metrics x 24 hours per day
 x 365 days per year = 67MB.
 
-## Configuration
-
-To use the database engine, open `netdata.conf` and set `[db].mode` to `dbengine`.
-
-```conf
-[db]
-    mode = dbengine
-```
-
-To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in
-the `[db]` section of your `netdata.conf`. The Agent ignores the `[db].retention` setting when using the dbengine.
-
-```conf
-[db]
-    dbengine page cache size MB = 32
-    dbengine multihost disk space MB = 256
-```
-
-:::note
-
-In this configuration section we don't use any storage Tier
-
-:::
-
-:::info
-
-You can consult the [dbengine's reference](/daemon/config/README.md#[db]-section-options) section for all the option you
-can change
-
-:::
-
-### Legacy configuration
+## Legacy configuration
 
 The deprecated `dbengine disk space MB` option determines the amount of disk space that is dedicated to storing Netdata
 metric values per legacy database engine instance (see [details on the legacy mode](#legacy-mode) below).
@@ -128,14 +91,6 @@ metric values per legacy database engine instance (see [details on the legacy mo
 [db]
     dbengine disk space MB = 256
 ```
-
-### Streaming metrics to the database engine
-
-the multihost database engine, all parent and child nodes share the same `page cache size MB`
-and `dbengine multihost disk space MB` in a single dbengine instance. The [**database engine
-calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-helps you properly set `page cache size MB` and `dbengine multihost disk space MB` on your parent node to allocate
-enough resources based on your metrics retention policy and how many child nodes you have.
 
 #### Legacy mode (prior v1.23.2)
 

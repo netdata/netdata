@@ -34,19 +34,18 @@ Netdata is fully capable of long-term metrics storage, at per-second granularity
 
 ## Which database mode to use
 
-Netdata Agents support multiple database modes.
+The default mode `[db].mode = dbengine` has been designed to scale for longer retentions and is the only mode suitable
+for parent Agents in the _Parent - Child_ setups
 
-The default mode `[db].mode = dbengine` has been designed to scale for longer retentions.
-
-The other available database modes are designed to minimize resource utilization and should usually be considered on **
-parent - child** setups at the children side.
+The other available database modes are designed to minimize resource utilization and should only be considered on
+_Parent - Child_ setups at the children side and only when the resource constraints are very strict.
 
 So,
 
-- On a single node setup, use `[db].mode = dbengine` to increase retention.
+- On a single node setup, use `[db].mode = dbengine`.
 - On a [parent - child](/docs/metrics-storage-management/how-streaming-works) setup, use `[db].mode = dbengine` on the
   parent to increase retention and a more resource efficient mode (like `save`, `ram` or `none`) for the child to
-  minimize resources utilization.
+  minimize resource utilization.
 
 ## Choose your database mode
 
@@ -60,21 +59,16 @@ You can select the database mode by editing `netdata.conf` and setting:
 
 ## Netdata Longer Metrics Retention
 
-Metrics retention affects 3 parameters on the operation of a Netdata Agent:
+Metrics retention is controlled only by the disk space allocated to storing metrics. But it also affects the memory and
+CPU required by the agent to query longer timeframes.
 
-1. The disk space required to store the metrics.
-2. The memory the Netdata Agent will require to have that retention available for queries.
-3. The CPU resources that will be required to query longer time-frames.
+Since Netdata Agents usually run on the edge, on production systems, Netdata Agent **parents** should be considered.
+When having a [**parent - child**](/docs/metrics-storage-management/how-streaming-works.md) setup, the child (the
+Netdata Agent running on a production system) delegates all its functions, including longer metrics retention and
+querying, to the parent node that can dedicate more resources to this task. A single Netdata Agent parent can centralize
+multiple children Netdata Agents (dozens, hundreds, or even thousands depending on its available resources).
 
-As retention increases, the resources required to support that retention increase too.
-
-Since Netdata Agents usually run on the edge, inside production systems, Netdata Agent **parents** should be considered.
-When having a **parent - child** setup, the child (the Netdata Agent running on a production system) delegates all its
-functions, including longer metrics retention and querying, to the parent node that can dedicate more resources to this
-task. A single Netdata Agent parent can centralize multiple children Netdata Agents (dozens, hundreds, or even thousands
-depending on its available resources).
-
-## Running Netdata in embedded devices
+## Running Netdata on embedded devices
 
 Embedded devices usually have very limited RAM resources available.
 
@@ -93,22 +87,19 @@ On very weak devices you might have to use `[db].update every = 5` and `[db].ret
 You can also disable [data collection plugins](/collectors/README.md) you don't need. Disabling such plugins will also
 free both CPU and RAM resources.
 
-## Running a dedicated parent Netdata server
+## Memory optimizations
 
-Netdata allows streaming data between Netdata nodes in real-time. This allows you having one or more parent Netdata
-servers that will maintain the entire database for all the nodes that connect to them (their children), and will also
-run health checks/alarms for all these nodes. Explore this feature following the following
-section: [enable streaming between nodes](/docs/metrics-storage-management/enable-streaming.md)
+### KSM
 
-## KSM
+KSM performs memory deduplication by scanning through main memory for physical pages that have identical content, and
+identifies the virtual pages that are mapped to those physical pages. It leaves one page unchanged, and re-maps each
+duplicate page to point to the same physical page. Netdata offers all its in-memory database to kernel for
+deduplication.
 
-Netdata offers all its in-memory database to kernel for deduplication.
-
-In the past KSM has been criticized for consuming a lot of CPU resources. Although this is true when KSM is used for
-deduplicating certain applications, it is not true with netdata, since the Netdata memory is written very infrequently
-(if you have 24 hours of metrics in netdata, each byte at the in-memory database will be updated just once per day).
-
-KSM is a solution that will provide 60+% memory savings to Netdata.
+In the past KSM has been criticized for consuming a lot of CPU resources. This is true when KSM is used for
+deduplicating certain applications, but it is not true for Netdata. Agent's memory is written very infrequently
+(if you have 24 hours of metrics in Netdata, each byte at the in-memory database will be updated just once per day). KSM
+is a solution that will provide 60+% memory savings to Netdata.
 
 ### Enable KSM in kernel
 

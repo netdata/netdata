@@ -6,8 +6,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/store/chang
 
 # Change how long Netdata stores metrics
 
-import { Calculator } from '../../src/components/agent/dbCalc/'
-
 The Netdata Agent uses a custom made time-series database (TSDB), named the [database engine
 (`dbengine`)](/database/engine/README.md), to store metrics.
 
