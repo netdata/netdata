@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdcontext.h"
+#include "sqlite/sqlite_context.h"
 
 typedef enum {
     RRDMETRIC_FLAG_NONE     = 0,
     RRDMETRIC_FLAG_ARCHIVED = (1 << 0),
 } RRDMETRIC_FLAGS;
+
+typedef struct rrdcontext RRDCONTEXT;
+
 
 typedef struct rrdmetric {
     uuid_t uuid;
@@ -27,20 +31,10 @@ typedef struct rrdinstance {
 
     RRDSET *st;
 
+    RRDCONTEXT *context;
     DICTIONARY *rrdlabels;
     DICTIONARY *rrdmetrics;
 } RRDINSTANCE;
-
-typedef struct rrdcontext {
-    STRING *context;
-
-    usec_t version;
-
-    time_t oldest_t;
-    time_t latest_t;
-
-    DICTIONARY *rrdinstances;
-} RRDCONTEXT;
 
 
 // ----------------------------------------------------------------------------
@@ -179,12 +173,69 @@ void rrdinstance_set_label(RRDHOST *host, const char *id, const char *key, const
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
 
+typedeff enum {
+    RRDCONTEXT_FLAG_NONE    = 0,
+    RRDCONTEXT_FLAG_DELETED = (1 << 0),
+} RRDCONTEXT_FLAGS;
+
+struct rrdcontext {
+    uint64_t version;
+
+    STRING *id;
+    STRING *title;
+    STRING *units;
+
+    size_t priority;
+    time_t first_time_t;
+    time_t last_time_t;
+
+    RRDCONTEXT_FLAGS flags;
+
+    VERSIONED_CONTEXT_DATA hub;
+    VERSIONED_CONTEXT_DATA current;
+
+    RRDHOST *host;
+    DICTIONARY *rrdinstances;
+};
+
 void rrdcontext_insert_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data;
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
     (void)host;
-    (void)rc;
+
+    if(rc->hub.version) {
+        // we are loading data from the SQL database
+
+        if(rc->version)
+            error("RRDCONTEXT: context '%s' is already initialized with version %lu, but it is loaded again from SQL with version %lu", string2str(rc->id), rc->version, rc->hub.version);
+
+        string_freez(rc->id);
+        rc->id = string_dupz(rc->hub.id);
+
+        string_freez(rc->title);
+        rc->title = string_dupz(rc->hub.title);
+
+        string_freez(rc->units);
+        rc->units = string_dupz(rc->hub.units);
+
+        rc->priority     = rc->hub.priority;
+        rc->version      = rc->hub.version;
+        rc->first_time_t = rc->hub.first_time_t;
+        rc->last_time_t  = rc->hub.last_time_t;
+    }
+    else {
+        // we are adding this context now
+        rc->current.version = now_realtime_sec();
+    }
+
+    rc->hub.id        = string2str(rc->id);
+    rc->hub.title     = string2str(rc->title);
+    rc->hub.units     = string2str(rc->units);
+
+    rc->current.id    = string2str(rc->id);
+    rc->current.title = string2str(rc->title);
+    rc->current.units = string2str(rc->units);
 
     // TODO what other initializations needed?
 }
@@ -196,7 +247,7 @@ void rrdcontext_delete_callback(const char *id, void *value, void *data) {
 
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
     dictionary_destroy(rc->rrdinstances);
-    string_freez(rc->context);
+    string_freez(rc->id);
 }
 
 void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
@@ -209,7 +260,7 @@ void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *
 
     // TODO what other needs to be done here?
 
-    string_freez(rc_new->context);
+    string_freez(rc_new->id);
 
     (void)rc_old;
 }
@@ -226,7 +277,7 @@ void rrdcontext_add(RRDHOST *host, const char *id, const char *name) {
     (void)name;
 
     RRDCONTEXT tmp = {
-        .context = string_dupz(id),
+        .id = string_dupz(id),
         .rrdinstances = NULL,
     };
 

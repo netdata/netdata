@@ -263,10 +263,10 @@ void ctx_get_context_list(void (*dict_cb)(void *))
         return;
     }
 
-    ctx_context_t context_data;
+    VERSIONED_CONTEXT_DATA context_data;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        context_data.context = (char *) sqlite3_column_text(res, 0);
+        context_data.id = (char *) sqlite3_column_text(res, 0);
         context_data.first_time_t = (time_t) sqlite3_column_int64(res, 1);
         context_data.last_time_t = (time_t) sqlite3_column_int64(res, 2);
         dict_cb(&context_data);
@@ -284,12 +284,12 @@ void ctx_get_context_list(void (*dict_cb)(void *))
 // Storing Data
 //
 #define CTX_STORE_CONTEXT "INSERT OR REPLACE INTO context (context_name, first_time_t, last_time_t) VALUES (@context, @first_time_t, @last_time_t);"
-int ctx_store_context(ctx_context_t *context_data)
+int ctx_store_context(VERSIONED_CONTEXT_DATA *context_data)
 {
     int rc, rc_stored = 1;
     sqlite3_stmt *res = NULL;
 
-    if (unlikely(!context_data || !context_data->context))
+    if (unlikely(!context_data || !context_data->id))
         return 0;
 
     rc = sqlite3_prepare_v2(db_context_meta, CTX_STORE_CONTEXT, -1, &res, 0);
@@ -298,7 +298,7 @@ int ctx_store_context(ctx_context_t *context_data)
         return 1;
     }
 
-    rc = sqlite3_bind_text(res, 1, context_data->context, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, 1, context_data->id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
         goto failed;
@@ -319,7 +319,7 @@ int ctx_store_context(ctx_context_t *context_data)
     rc_stored = execute_insert(res);
 
     if (rc_stored != SQLITE_DONE)
-        error_report("Failed store context details for context %s, rc = %d", context_data->context, rc_stored);
+        error_report("Failed store context details for context %s, rc = %d", context_data->id, rc_stored);
 
 failed:
     rc = sqlite3_finalize(res);
@@ -332,12 +332,12 @@ failed:
 // Delete a context
 
 #define CTX_DELETE_CONTEXT "DELETE FROM context WHERE context_name = @context;"
-int ctx_delete_context(ctx_context_t *context_data)
+int ctx_delete_context(VERSIONED_CONTEXT_DATA *context_data)
 {
     int rc, rc_stored = 1;
     sqlite3_stmt *res = NULL;
 
-    if (unlikely(!context_data || !context_data->context))
+    if (unlikely(!context_data || !context_data->id))
         return 0;
 
     rc = sqlite3_prepare_v2(db_context_meta, CTX_DELETE_CONTEXT, -1, &res, 0);
@@ -346,7 +346,7 @@ int ctx_delete_context(ctx_context_t *context_data)
         return 1;
     }
 
-    rc = sqlite3_bind_text(res, 1, context_data->context, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, 1, context_data->id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context for data deletion");
         goto failed;
@@ -355,7 +355,7 @@ int ctx_delete_context(ctx_context_t *context_data)
     rc_stored = execute_insert(res);
 
     if (rc_stored != SQLITE_DONE)
-        error_report("Failed to delete context %s, rc = %d", context_data->context, rc_stored);
+        error_report("Failed to delete context %s, rc = %d", context_data->id, rc_stored);
 
 failed:
     rc = sqlite3_finalize(res);
@@ -399,9 +399,9 @@ static void dict_ctx_get_chart_list_cb(void *data)
 
 static void dict_ctx_get_context_list_cb(void *data)
 {
-    ctx_context_t *context_data = data;
+    VERSIONED_CONTEXT_DATA *context_data = data;
 
-    info("   Context %s from %ld to %ld", context_data->context, context_data->first_time_t, context_data->last_time_t);
+    info("   Context %s from %ld to %ld", context_data->id, context_data->first_time_t, context_data->last_time_t);
 }
 
 
@@ -411,31 +411,31 @@ int ctx_unittest(void)
     ctx_get_chart_list(NULL, dict_ctx_get_chart_list_cb);
 
     // Store a context
-    ctx_context_t context_data;
+    VERSIONED_CONTEXT_DATA context_data;
 
-    context_data.context = strdupz("TestContext1");
+    context_data.id = strdupz("TestContext1");
     context_data.first_time_t = 1000;
     context_data.last_time_t  = 1001;
     if (likely(!ctx_store_context(&context_data)))
-        info("Entry %s inserted", context_data.context);
+        info("Entry %s inserted", context_data.id);
     else
-        info("Entry %s not inserted", context_data.context);
+        info("Entry %s not inserted", context_data.id);
 
     // This will change end time
     context_data.first_time_t = 1000;
     context_data.last_time_t  = 2001;
     if (likely(!ctx_update_context(&context_data)))
-        info("Entry %s updated", context_data.context);
+        info("Entry %s updated", context_data.id);
     else
-        info("Entry %s not updated", context_data.context);
+        info("Entry %s not updated", context_data.id);
 
     // This will change start time
     context_data.first_time_t = 2000;
     context_data.last_time_t  = 2001;
     if (likely(!ctx_update_context(&context_data)))
-        info("Entry %s updated", context_data.context);
+        info("Entry %s updated", context_data.id);
     else
-        info("Entry %s not updated", context_data.context);
+        info("Entry %s not updated", context_data.id);
 
     // This will list one entry
     info("List context start after insert");
@@ -444,11 +444,11 @@ int ctx_unittest(void)
 
     // This will delete the entry
     if (likely(!ctx_delete_context(&context_data)))
-        info("Entry %s deleted", context_data.context);
+        info("Entry %s deleted", context_data.id);
     else
-        info("Entry %s not deleted", context_data.context);
+        info("Entry %s not deleted", context_data.id);
 
-    freez(context_data.context);
+    freez(context_data.id);
 
     // The list should be empty
     info("List context start after delete");

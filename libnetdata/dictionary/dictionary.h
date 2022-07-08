@@ -208,6 +208,6 @@ extern int dictionary_unittest(size_t entries);
 typedef struct string STRING;
 extern STRING *string_dupz(const char *str);
 extern void string_freez(STRING *item);
-extern const char *string_tostring(STRING *item);
+extern const char *string2str(STRING *item) NEVERNULL;
 
 #endif /* NETDATA_DICTIONARY_H */

@@ -646,7 +646,7 @@ static inline size_t namevalue_free_name(DICTIONARY *dict, NAME_VALUE *nv) {
 
 static inline const char *namevalue_get_name(NAME_VALUE *nv) {
     if(nv->flags & NAME_VALUE_FLAG_NAME_IS_ALLOCATED)
-        return string_tostring(nv->string_name);
+        return string2str(nv->string_name);
     else
         return nv->caller_name;
 }
@@ -1338,7 +1338,7 @@ void string_freez(STRING *item) {
     netdata_mutex_unlock(&string_mutex);
 }
 
-const char *string_tostring(STRING *item) {
+const char *string2str(STRING *item) {
     if(unlikely(!item)) return "";
     return ((STRING_ENTRY *)item)->str;
 }
