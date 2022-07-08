@@ -100,7 +100,7 @@ the `[db]` section of your `netdata.conf`.
     dbengine multihost disk space MB = 256
 ```
 
-### prior v1.23.2
+### v1.23.2 and prior
 
 _For Netdata Agents earlier than v1.23.2_, the Agent on the parent node uses one dbengine instance for itself, and
 another instance for every child node it receives metrics from. If you had four streaming nodes, you would have five
