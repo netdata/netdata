@@ -46,7 +46,7 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
     int i=0;
     char *m, *e, *lbl_value = NULL;
 
-    while ((m = strstr(temp + pos, "$"))) {
+    while ((m = strchr(temp + pos, '$'))) {
         i=0;
         e = m;
         while (*e) {
