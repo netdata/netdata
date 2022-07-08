@@ -38,14 +38,15 @@ The default mode `[db].mode = dbengine` has been designed to scale for longer re
 for parent Agents in the _Parent - Child_ setups
 
 The other available database modes are designed to minimize resource utilization and should only be considered on
-_Parent - Child_ setups at the children side and only when the resource constraints are very strict.
+[Parent - Child](/docs/metrics-storage-management/how-streaming-works) setups at the children side and only when the
+resource constraints are very strict.
 
 So,
 
 - On a single node setup, use `[db].mode = dbengine`.
-- On a [parent - child](/docs/metrics-storage-management/how-streaming-works) setup, use `[db].mode = dbengine` on the
-  parent to increase retention and a more resource efficient modes like, `dbengine` with light retention settings or
-  `save`, `ram` and `none` modes for the children to minimize resource utilization.
+- On a [Parent - Child](/docs/metrics-storage-management/how-streaming-works) setup, use `[db].mode = dbengine` on the
+  parent to increase retention and a more resource efficient modes like, `dbengine` with light retention settings,
+  `save`, `ram` or `none` modes for the children to minimize resource utilization.
 
 ## Choose your database mode
 

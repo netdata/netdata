@@ -6,8 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/store/chang
 
 # Change how long Netdata stores metrics
 
-The Netdata Agent uses a custom made time-series database (TSDB), named the [database engine
-(`dbengine`)](/database/engine/README.md), to store metrics.
+The Netdata Agent uses a custom made time-series database (TSDB), named the [`dbengine`](/database/engine/README.md), to store metrics.
 
 The default settings retain approximately two day's worth of metrics on a system collecting 2,000 metrics every second,
 but the Netdata Agent is highly configurable if you want your nodes to store days, weeks, or months worth of per-second
@@ -26,7 +25,7 @@ The Netdata Agent uses 3 fundamental settings in `netdata.conf` to change the be
 metrics.
 `dbengine multihost disk space` sets the maximum disk space (again, in MiB) the database engine uses to store
 historical, compressed metrics and `storage tiers` specifies the number of storage tiers you want to have in
-your `dbengine` . When the size of stored metrics exceeds the allocated disk space, the database engine removes the
+your `dbengine`. When the size of stored metrics exceeds the allocated disk space, the database engine removes the
 oldest metrics on a rolling basis.
 
 ## Calculate the system resources (RAM, disk space) needed to store metrics
@@ -40,7 +39,7 @@ if you want to store more metrics _specifically in memory_, you can increase the
 
 :::tip
 
-We advise you to revisit the [tiering mechanism](/database/engine/README.md#tiering) reference. This will help you
+We advise you to visit the [tiering mechanism](/database/engine/README.md#tiering) reference. This will help you
 configure the Agent to retain metrics for longer periods.
 
 :::
