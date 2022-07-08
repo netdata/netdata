@@ -179,7 +179,7 @@ static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
     storage_number *page;
 
     page = descr->pg_cache_descr->page;
-    for (i = 0 ; i < descr->page_length / PAGE_SIZE(descr); ++i) {
+    for (i = 0 ; i < descr->page_length / PAGE_POINT_SIZE_BYTES(descr); ++i) {
         if (SN_EMPTY_SLOT != page[i]) {
             has_only_empty_metrics = 0;
             break;
@@ -244,7 +244,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
             perfect_page_alignment = 1;
         }
         /* is the metric far enough out of alignment with the others? */
-        if (unlikely(descr->page_length + PAGE_SIZE(descr) < rd->rrdset->rrddim_page_alignment)) {
+        if (unlikely(descr->page_length + PAGE_POINT_SIZE_BYTES(descr) < rd->rrdset->rrddim_page_alignment)) {
             handle->unaligned_page = 1;
             debug(D_RRDENGINE, "Metric page is not aligned with chart:");
             if (unlikely(debug_flags & D_RRDENGINE))
@@ -252,14 +252,14 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
         }
         if (unlikely(handle->unaligned_page &&
                      /* did the other metrics change page? */
-                     rd->rrdset->rrddim_page_alignment <= PAGE_SIZE(descr))) {
+                     rd->rrdset->rrddim_page_alignment <= PAGE_POINT_SIZE_BYTES(descr))) {
             debug(D_RRDENGINE, "Flushing unaligned metric page.");
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
         }
     }
     if (unlikely(NULL == descr ||
-                 descr->page_length + PAGE_SIZE(descr) > RRDENG_BLOCK_SIZE ||
+                 descr->page_length + PAGE_POINT_SIZE_BYTES(descr) > RRDENG_BLOCK_SIZE ||
                  must_flush_unaligned_page)) {
         rrdeng_store_metric_flush_current_page(collection_handle);
 
@@ -280,7 +280,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
 
     switch (descr->type) {
         case PAGE_METRICS: {
-            ((storage_number *)page)[descr->page_length / PAGE_SIZE(descr)] = pack_storage_number(n, flags);
+            ((storage_number *)page)[descr->page_length / PAGE_POINT_SIZE_BYTES(descr)] = pack_storage_number(n, flags);
         }
         break;
 
@@ -291,7 +291,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
             number_tier1.max_value = (float)max_value;
             number_tier1.anomaly_count = anomaly_count;
             number_tier1.count = count;
-            ((storage_number_tier1_t *)page)[descr->page_length / PAGE_SIZE(descr)] = number_tier1;
+            ((storage_number_tier1_t *)page)[descr->page_length / PAGE_POINT_SIZE_BYTES(descr)] = number_tier1;
         }
         break;
 
@@ -305,7 +305,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
         break;
     }
 
-    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + PAGE_SIZE(descr));
+    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + PAGE_POINT_SIZE_BYTES(descr));
 
     if (perfect_page_alignment)
         rd->rrdset->rrddim_page_alignment = descr->page_length;
@@ -443,7 +443,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 
     if (unlikely(descr->start_time != page_end_time && next_page_time > descr->start_time)) {
         // we're in the middle of the page somewhere
-        unsigned entries = page_length / PAGE_SIZE(descr);
+        unsigned entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
         position = ((uint64_t)(next_page_time - descr->start_time)) * (entries - 1) /
                    (page_end_time - descr->start_time);
     }
@@ -453,7 +453,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     handle->page_end_time = page_end_time;
     handle->page_length = page_length;
     handle->page = descr->pg_cache_descr->page;
-    usec_t entries = handle->entries = page_length / PAGE_SIZE(descr);
+    usec_t entries = handle->entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
     if (likely(entries > 1))
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
     else {
