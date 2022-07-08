@@ -715,6 +715,24 @@ static void get_netdata_configured_variables() {
     default_metric_correlations_method = mc_string_to_method(config_get(CONFIG_SECTION_GLOBAL, "metric correlations method", mc_method_to_string(default_metric_correlations_method)));
 
     // --------------------------------------------------------------------
+
+    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
+    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
+    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
+    if (rrdset_free_obsolete_time < 10) {
+        rrdset_free_obsolete_time = 10;
+        info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
+        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+    }
+
+    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    if (gap_when_lost_iterations_above < 1) {
+        gap_when_lost_iterations_above = 1;
+        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    }
+
+    // --------------------------------------------------------------------
     // get various system parameters
 
     get_system_HZ();

@@ -742,6 +742,12 @@ restart_after_removal:
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
+    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            fatal("Failed to initialize SQLite");
+        info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
+    }
+
 #ifdef ENABLE_DBENGINE
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     if(storage_tiers < 1) {
@@ -773,63 +779,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         rrdeng_page_descr_use_mmap();
     else
         rrdeng_page_descr_use_malloc();
-#endif
 
-    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
-    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
-    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
-    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
-    if (rrdset_free_obsolete_time < 10) {
-        rrdset_free_obsolete_time = 10;
-        info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
-        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
-    }
-
-    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
-    if (gap_when_lost_iterations_above < 1) {
-        gap_when_lost_iterations_above = 1;
-        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
-    }
-
-    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            fatal("Failed to initialize SQLite");
-        info("Skipping SQLITE metadata initialization since memory mode is not db engine");
-    }
-
-    health_init();
-    rrdpush_init();
-
-    debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
-    rrd_wrlock();
-    localhost = rrdhost_create(
-            hostname
-            , registry_get_this_machine_hostname()
-            , registry_get_this_machine_guid()
-            , os_type
-            , netdata_configured_timezone
-            , netdata_configured_abbrev_timezone
-            , netdata_configured_utc_offset
-            , ""
-            , program_name
-            , program_version
-            , default_rrd_update_every
-            , default_rrd_history_entries
-            , default_rrd_memory_mode
-            , default_health_enabled
-            , default_rrdpush_enabled
-            , default_rrdpush_destination
-            , default_rrdpush_api_key
-            , default_rrdpush_send_charts_matching
-            , system_info
-            , 1
-    );
-    if (unlikely(!localhost)) {
-        rrd_unlock();
-        return 1;
-    }
-
-#ifdef ENABLE_DBENGINE
     rrdeng_page_descr_aral_go_singlethreaded();
 
     int created_tiers = 0;
@@ -837,13 +787,13 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     char dbengineconfig[200 + 1];
     for(int tier = 0; tier < storage_tiers ;tier++) {
         if(tier == 0)
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
         else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%d", localhost->cache_dir, tier);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%d", netdata_configured_cache_dir, tier);
 
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
-            error("DBENGINE on '%s': cannot create directory '%s'", localhost->hostname, dbenginepath);
+            error("DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
             break;
         }
 
@@ -864,7 +814,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             if(grouping_iterations < 2) {
                 grouping_iterations = 2;
                 config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be less than 2. Assuming 2.", localhost->hostname, tier);
+                error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be less than 2. Assuming 2.", hostname, tier);
             }
 
             snprintfz(dbengineconfig, 200, "dbengine tier %d backfill", tier);
@@ -884,7 +834,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
         if(tier > 0 && get_tier_grouping(tier) > 65535) {
             storage_tiers_grouping_iterations[tier] = 1;
-            error("DBENGINE on '%s': dbengine tier %d gives aggregation of more than 65535 points of tier 0. Disabling tiers above %d", localhost->hostname, tier, tier);
+            error("DBENGINE on '%s': dbengine tier %d gives aggregation of more than 65535 points of tier 0. Disabling tiers above %d", hostname, tier, tier);
             break;
         }
         
@@ -892,7 +842,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
             error("DBENGINE on '%s': Failed to initialize multi-host database tier %d on path '%s'",
-                  localhost->hostname, tier, dbenginepath);
+                  hostname, tier, dbenginepath);
             break;
         }
         else
@@ -901,27 +851,53 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
     if(created_tiers && created_tiers < storage_tiers) {
         error("DBENGINE on '%s': Managed to create %d tiers instead of %d. Continuing with %d available.",
-              localhost->hostname, created_tiers, storage_tiers, created_tiers);
+              hostname, created_tiers, storage_tiers, created_tiers);
         storage_tiers = created_tiers;
     }
-    else if(!created_tiers) {
-        error("DBENGINE on '%s', with machine guid '%s', failed to initialize databases at '%s'.",
-              localhost->hostname, localhost->machine_guid, localhost->cache_dir);
-        rrdhost_free(localhost);
-        localhost = NULL;
-        rrd_unlock();
-        fatal("DBENGINE: Failed to be initialized.");
-    }
+    else if(!created_tiers)
+        fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
     rrdeng_page_descr_aral_go_multithreaded();
 #else
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
     if(storage_tiers != 1) {
-        error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", localhost->hostname);
+        error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", hostname);
         storage_tiers = 1;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 #endif
+
+    health_init();
+    rrdpush_init();
+
+    debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
+    rrd_wrlock();
+    localhost = rrdhost_create(
+        hostname
+        , registry_get_this_machine_hostname()
+            , registry_get_this_machine_guid()
+            , os_type
+        , netdata_configured_timezone
+        , netdata_configured_abbrev_timezone
+        , netdata_configured_utc_offset
+        , ""
+        , program_name
+        , program_version
+        , default_rrd_update_every
+        , default_rrd_history_entries
+        , default_rrd_memory_mode
+        , default_health_enabled
+        , default_rrdpush_enabled
+        , default_rrdpush_destination
+        , default_rrdpush_api_key
+        , default_rrdpush_send_charts_matching
+        , system_info
+        , 1
+    );
+    if (unlikely(!localhost)) {
+        rrd_unlock();
+        return 1;
+    }
 
     if (likely(system_info))
        migrate_localhost(&localhost->host_uuid);
