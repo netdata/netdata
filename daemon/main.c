@@ -973,7 +973,8 @@ int main(int argc, char **argv) {
                                 return 1;
                             if (unit_test_str2ld())
                                 return 1;
-
+                            if (unit_test_bitmap256())
+                                return 1;
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
                             get_netdata_configured_variables();

@@ -11,9 +11,12 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
+uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
 
-uint8_t tier_page_type[] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
-size_t page_type_size[] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
+#if PAGE_TYPE_MAX != 1
+#error PAGE_TYPE_MAX is not 1 - you need to add allocations here
+#endif
+size_t page_type_size[256] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;

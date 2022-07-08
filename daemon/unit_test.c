@@ -1705,7 +1705,7 @@ int unit_test_bitmap256(void) {
     }
 
     fprintf(stderr, "%s() tests passed\n", __FUNCTION__);
-    return 1;
+    return 0;
 }
 
 #ifdef ENABLE_DBENGINE
