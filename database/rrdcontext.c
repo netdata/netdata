@@ -187,6 +187,7 @@ typedef enum {
     RRDCONTEXT_FLAG_NONE      = 0,
     RRDCONTEXT_FLAG_DELETED   = (1 << 0),
     RRDCONTEXT_FLAG_COLLECTED = (1 << 1),
+    RRDCONTEXT_FLAG_UPDATED   = (1 << 2),
 } RRDCONTEXT_FLAGS;
 
 struct rrdcontext {
@@ -208,6 +209,13 @@ struct rrdcontext {
     RRDHOST *host;
     DICTIONARY *rrdinstances;
 };
+
+static void rrdcontext_freez(RRDCONTEXT *rc) {
+    string_freez(rc->id);
+    string_freez(rc->title);
+    string_freez(rc->units);
+    dictionary_destroy(rc->rrdinstances);
+}
 
 static void check_if_we_need_to_update_cloud(RRDCONTEXT *rc) {
     VERSIONED_CONTEXT_DATA tmp = {
@@ -231,8 +239,8 @@ static void check_if_we_need_to_update_cloud(RRDCONTEXT *rc) {
 void rrdcontext_insert_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data;
-    RRDCONTEXT *rc = (RRDCONTEXT *)value;
     (void)host;
+    RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
     if(rc->hub.version) {
         // we are loading data from the SQL database
@@ -269,6 +277,10 @@ void rrdcontext_insert_callback(const char *id, void *value, void *data) {
         rc->version = now_realtime_sec();
     }
 
+    internal_error(true, "RRDCONTEXT: added context '%s' on host '%s', version %lu, title '%s', units '%s', chart type '%s' priority %zu",
+                   string2str(rc->id), host->hostname, rc->version, string2str(rc->title), string2str(rc->units),
+                   rrdset_type_name(rc->chart_type), rc->priority);
+
     check_if_we_need_to_update_cloud(rc);
 }
 
@@ -278,8 +290,7 @@ void rrdcontext_delete_callback(const char *id, void *value, void *data) {
     (void)host;
 
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
-    dictionary_destroy(rc->rrdinstances);
-    string_freez(rc->id);
+    rrdcontext_freez(rc);
 }
 
 void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
@@ -287,14 +298,41 @@ void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *
     RRDHOST *host = (RRDHOST *)data;
     (void)host;
 
-    RRDCONTEXT *rc_old = (RRDCONTEXT *)oldv;
+    RRDCONTEXT *rc = (RRDCONTEXT *)oldv;
     RRDCONTEXT *rc_new = (RRDCONTEXT *)newv;
 
-    // TODO what other needs to be done here?
+    bool changed = false;
 
-    string_freez(rc_new->id);
+    if(rc->title != rc_new->title) {
+        STRING *old_title = rc->title;
+        rc->title = string_dupz(string2str(rc_new->title));
+        string_freez(old_title);
+        changed = true;
+    }
 
-    (void)rc_old;
+    if(rc->units != rc_new->units) {
+        STRING *old_units = rc->units;
+        rc->units = string_dupz(string2str(rc_new->units));
+        string_freez(old_units);
+        changed = true;
+    }
+
+    if(rc->chart_type != rc_new->chart_type) {
+        rc->chart_type = rc_new->chart_type;
+        changed = true;
+    }
+
+    if(rc->priority != rc_new->priority) {
+        rc->priority = rc_new->priority;
+        changed = true;
+    }
+
+    // free the resources of the new one
+    rrdcontext_freez(rc_new);
+
+    // update the cloud if necessary
+    if(changed)
+        check_if_we_need_to_update_cloud(rc);
 }
 
 void rrdcontexts_create(RRDHOST *host) {
