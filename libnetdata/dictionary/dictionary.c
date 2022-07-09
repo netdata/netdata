@@ -929,6 +929,10 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 
 DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
     NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+
+    if(unlikely(!nv))
+        return NULL;
+
     reference_counter_acquire(dict, nv);
     return (DICTIONARY_ITEM *)nv;
 }
@@ -971,6 +975,11 @@ DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *n
     void *ret = dictionary_get_and_acquire_item_unsafe(dict, name);
     dictionary_unlock(dict, 'r');
     return ret;
+}
+
+const char *dictionary_acquired_item_name(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+    if(unlikely(!item)) return NULL;
+    return namevalue_get_name((NAME_VALUE *)item);
 }
 
 void *dictionary_acquired_item_value(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {

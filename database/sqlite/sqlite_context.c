@@ -139,7 +139,7 @@ void sql_close_context_database(void)
         "WHERE c.host_id IN (SELECT h.host_id FROM meta.host h " \
         "WHERE UNLIKELY((h.hops = 0 AND @host_id IS NULL)) OR LIKELY((h.host_id = @host_id)));"
 
-void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *, void *), void *data)
+void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -151,8 +151,8 @@ void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *, void *), void *
         return;
     }
 
-    if (likely(host_id))
-        rc = sqlite3_bind_blob(res, 1, *host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (likely(host_uuid))
+        rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     else
         rc = sqlite3_bind_null(res, 1);
     if (unlikely(rc != SQLITE_OK)) {
@@ -160,9 +160,7 @@ void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *, void *), void *
         goto failed;
     }
 
-    ctx_chart_t chart_data;
-    memset(&chart_data, 0, sizeof(chart_data));
-
+    SQL_CHART_DATA chart_data = { 0 };
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid_copy(chart_data.chart_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         chart_data.id = (char *) sqlite3_column_text(res, 1);
@@ -179,7 +177,7 @@ failed:
 
 // Dimension list
 #define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id FROM meta.dimension d where d.chart_id = @id;"
-void ctx_get_dimension_list(uuid_t *chart_id, void (*dict_cb)(void *, void *), void *data)
+void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -190,7 +188,7 @@ void ctx_get_dimension_list(uuid_t *chart_id, void (*dict_cb)(void *, void *), v
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, *chart_id, sizeof(*chart_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, *chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_id to fetch dimension list");
         goto failed;
@@ -212,7 +210,7 @@ failed:
 
 // LABEL LIST
 #define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l where l.chart_id = @id;"
-void ctx_get_label_list(uuid_t *chart_id, void (*dict_cb)(void *, void *), void *data)
+void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -223,7 +221,7 @@ void ctx_get_label_list(uuid_t *chart_id, void (*dict_cb)(void *, void *), void 
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, *chart_id, sizeof(*chart_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, *chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_id to fetch chart labels");
         goto failed;
@@ -248,8 +246,13 @@ failed:
 
 // CONTEXT LIST
 #define CTX_GET_CONTEXT_LIST  "SELECT context_name, first_time_t, last_time_t FROM context;"
-void ctx_get_context_list(void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
+void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
+    (void)host_uuid;
+
+    // TODO load contexts only for host uuid
+    // TODO support all VERSIONED_CONTEXT_DATA fields
+
     int rc;
     sqlite3_stmt *res = NULL;
 
@@ -263,8 +266,8 @@ void ctx_get_context_list(void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), voi
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         context_data.id = (char *) sqlite3_column_text(res, 0);
-        context_data.first_time_t = (time_t) sqlite3_column_int64(res, 1);
-        context_data.last_time_t = (time_t) sqlite3_column_int64(res, 2);
+        context_data.first_time_t = sqlite3_column_int64(res, 1);
+        context_data.last_time_t = sqlite3_column_int64(res, 2);
         dict_cb(&context_data, data);
     }
 
@@ -383,10 +386,9 @@ static void dict_ctx_get_dimension_list_cb(void *dimension_data_ptr, void *data)
 }
 
 
-static void dict_ctx_get_chart_list_cb(void *chart_data_ptr, void *data)
+static void dict_ctx_get_chart_list_cb(SQL_CHART_DATA *chart_data, void *data)
 {
     (void)data;
-    ctx_chart_t *chart_data = chart_data_ptr;
 
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(chart_data->chart_id, uuid_str);
@@ -436,7 +438,7 @@ int ctx_unittest(void)
 
     // This will list one entry
     info("List context start after insert");
-    ctx_get_context_list(dict_ctx_get_context_list_cb, NULL);
+    ctx_get_context_list(NULL, dict_ctx_get_context_list_cb, NULL);
     info("List context end after insert");
 
     // This will delete the entry
@@ -449,7 +451,7 @@ int ctx_unittest(void)
 
     // The list should be empty
     info("List context start after delete");
-    ctx_get_context_list(dict_ctx_get_context_list_cb, NULL);
+    ctx_get_context_list(NULL, dict_ctx_get_context_list_cb, NULL);
     info("List context end after delete");
 
     sql_close_context_database();
