@@ -141,6 +141,8 @@ void sql_close_context_database(void)
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
+    // TODO support all fields required
+
     int rc;
     sqlite3_stmt *res = NULL;
 
