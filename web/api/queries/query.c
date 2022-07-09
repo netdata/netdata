@@ -564,20 +564,32 @@ static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t aft
 // query ops
 
 typedef struct query_point {
-    NETDATA_DOUBLE value;
-    SN_FLAGS flags;
-    size_t anomaly;
-    time_t start_time;
     time_t end_time;
+    time_t start_time;
+    NETDATA_DOUBLE value;
+    size_t anomaly;
+    SN_FLAGS flags;
+#ifdef NETDATA_INTERNAL_CHECKS
+    size_t id;
+#endif
 } QUERY_POINT;
 
 QUERY_POINT QUERY_POINT_EMPTY = {
-    .value = NAN,
-    .flags = SN_EMPTY_SLOT,
-    .anomaly = 0,
+    .end_time = 0,
     .start_time = 0,
-    .end_time = 0
+    .value = NAN,
+    .anomaly = 0,
+    .flags = SN_EMPTY_SLOT,
+#ifdef NETDATA_INTERNAL_CHECKS
+    .id = 0,
+#endif
 };
+
+#ifdef NETDATA_INTERNAL_CHECKS
+#define query_point_set_id(point, point_id) (point).id = point_id
+#else
+#define query_point_set_id(point, point_id) debug_dummy()
+#endif
 
 typedef struct query_plan_entry {
     size_t tier;
@@ -859,13 +871,18 @@ static inline void rrd2rrdr_do_dimension(
     QUERY_POINT last1_point = QUERY_POINT_EMPTY;
     QUERY_POINT new_point   = QUERY_POINT_EMPTY;
 
+    time_t now_start_time = after_wanted - ops.query_granularity;
+    time_t now_end_time   = after_wanted + ops.view_update_every - ops.query_granularity;
+
     // The main loop, based on the query granularity we need
-    for(time_t now = after_wanted + ops.view_update_every - ops.query_granularity; (long)points_added < points_wanted ; now += ops.view_update_every) {
+    for( ; (long)points_added < points_wanted ; now_start_time = now_end_time, now_end_time += ops.view_update_every) {
 
-        if(query_plan_should_switch_plan(ops, now))
-            query_planer_next_plan(&ops, now, new_point.end_time);
+        if(query_plan_should_switch_plan(ops, now_end_time))
+            query_planer_next_plan(&ops, now_end_time, new_point.end_time);
 
-        // real all the points of the db, prior to the time we need (now)
+        // read all the points of the db, prior to the time we need (now_end_time)
+
+
         size_t count_same_end_time = 0;
         while(count_same_end_time < 100) {
             if(likely(count_same_end_time == 0)) {
@@ -880,7 +897,7 @@ static inline void rrd2rrdr_do_dimension(
                 }
                 new_point = QUERY_POINT_EMPTY;
                 new_point.start_time = last1_point.end_time;
-                new_point.end_time   = now;
+                new_point.end_time   = now_end_time;
                 break;
             }
 
@@ -894,7 +911,9 @@ static inline void rrd2rrdr_do_dimension(
                 new_point.start_time = sp.start_time;
                 new_point.end_time   = sp.end_time;
                 new_point.anomaly    = sp.count ? sp.anomaly_count * 100 / sp.count : 0;
+                query_point_set_id(new_point, ops.db_total_points_read);
 
+                // set the right value to the point we got
                 if(likely(!storage_point_is_unset(sp) && !storage_point_is_empty(sp))) {
 
                     if(unlikely(use_anomaly_bit_as_value))
@@ -927,35 +946,66 @@ static inline void rrd2rrdr_do_dimension(
                 }
             }
 
+            // check if the db is giving us zero duration points
             if(unlikely(new_point.start_time == new_point.end_time)) {
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu start time %ld, end time %ld, that are both equal",
-                               rd->rrdset->name, rd->name, ops.db_total_points_read, new_point.start_time, new_point.end_time);
+                               rd->rrdset->name, rd->name, new_point.id, new_point.start_time, new_point.end_time);
 
                 new_point.start_time = new_point.end_time - ((time_t)ops.tier_ptr->tier_grouping * (time_t)ops.rd->update_every);
             }
 
+            // check if the db is advancing the query
             if(unlikely(new_point.end_time <= last1_point.end_time)) {
-                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld time %ld, before the last point end time %ld, now is %ld",
-                               rd->rrdset->name, rd->name, ops.db_total_points_read, new_point.start_time, new_point.end_time, last1_point.end_time, now);
+                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld time %ld, before the last point %zu end time %ld, now is %ld to %ld",
+                               rd->rrdset->name, rd->name, new_point.id, new_point.start_time, new_point.end_time,
+                               last1_point.id, last1_point.end_time, now_start_time, now_end_time);
 
                 count_same_end_time++;
                 continue;
             }
-
             count_same_end_time = 0;
 
-            if(new_point.end_time < now)
-                query_add_point_to_group(r, new_point, ops);
-            else
+            // decide how to use this point
+            if(likely(new_point.end_time < now_end_time)) { // likely to favor tier0
+                // this db point ends before our now_end_time
+
+                if(likely(new_point.end_time >= now_start_time)) { // likely to favor tier0
+                    // this db point ends after our now_start time
+
+                    query_add_point_to_group(r, new_point, ops);
+                }
+                else {
+                    // we don't need this db point
+                    // it is totally outside our current time-frame
+
+                    // this is desirable for the first point of the query
+                    // because it allows us to interpolate the next point
+                    // at exactly the time we will want
+
+                    // we only log if this is not point 1
+                    internal_error(new_point.end_time < after_wanted && new_point.id > 1,
+                                   "QUERY: next_metric(%s, %s) returned point %zu from %ld time %ld, which is entirely before our current timeframe %ld to %ld (and before the entire query, after %ld, before %ld)",
+                                   rd->rrdset->name, rd->name,
+                                   new_point.id, new_point.start_time, new_point.end_time,
+                                   now_start_time, now_end_time,
+                                   after_wanted, before_wanted);
+                }
+
+            }
+            else {
+                // the point ends in the future
+                // so, we will interpolate it below, at the inner loop
                 break;
+            }
         }
 
-        if(count_same_end_time) {
+        if(unlikely(count_same_end_time)) {
             internal_error(true,
-                           "QUERY: the database does not advance the query, it returned an end time less or equal to %ld, %zu times",
+                           "QUERY: the database does not advance the query, it returned an end time less or equal to the end time of the last point we got %ld, %zu times",
                            last1_point.end_time, count_same_end_time);
 
-            new_point.end_time = now;
+            if(unlikely(new_point.end_time <= last1_point.end_time))
+                new_point.end_time = now_end_time;
         }
 
         // the inner loop
@@ -963,18 +1013,35 @@ static inline void rrd2rrdr_do_dimension(
         // we select the one to use based on their timestamps
 
         size_t iterations = 0;
-        for ( ; now <= new_point.end_time && (long)points_added < points_wanted; now += ops.view_update_every, iterations++) {
+        for ( ; now_end_time <= new_point.end_time && (long)points_added < points_wanted ;
+                now_end_time += ops.view_update_every, iterations++) {
+
+            // now_start_time is wrong in this loop
+            // but, we don't need it
+
             QUERY_POINT current_point;
 
-            if(likely(now > new_point.start_time)) {
+            if(likely(now_end_time > new_point.start_time)) {
                 // it is time for our NEW point to be used
                 current_point = new_point;
-                query_interpolate_point(current_point, last1_point, now);
+                query_interpolate_point(current_point, last1_point, now_end_time);
+
+                internal_error(current_point.id > 0 && last1_point.id == 0 && current_point.end_time > after_wanted && current_point.end_time < now_end_time,
+                               "QUERY: on '%s', dim '%s', after %ld, before %ld, view update every %ld, query granularity %ld,"
+                               " interpolating point %zu (from %ld to %ld) at %ld, but we could really favor by having last_point1 in this query.",
+                               rd->rrdset->name, rd->name, after_wanted, before_wanted, ops.view_update_every, ops.query_granularity,
+                               current_point.id, current_point.start_time, current_point.end_time, now_end_time);
             }
-            else if(likely(now <= last1_point.end_time)) {
+            else if(likely(now_end_time <= last1_point.end_time)) {
                 // our LAST point is still valid
                 current_point = last1_point;
-                query_interpolate_point(current_point, last2_point, now);
+                query_interpolate_point(current_point, last2_point, now_end_time);
+
+                internal_error(current_point.id > 0 && last2_point.id == 0 && current_point.end_time > after_wanted && current_point.end_time < now_end_time,
+                               "QUERY: on '%s', dim '%s', after %ld, before %ld, view update every %ld, query granularity %ld,"
+                               " interpolating point %zu (from %ld to %ld) at %ld, but we could really favor by having last_point2 in this query.",
+                               rd->rrdset->name, rd->name, after_wanted, before_wanted, ops.view_update_every, ops.query_granularity,
+                               current_point.id, current_point.start_time, current_point.end_time, now_end_time);
             }
             else {
                 // a GAP, we don't have a value this time
@@ -983,11 +1050,11 @@ static inline void rrd2rrdr_do_dimension(
 
             query_add_point_to_group(r, current_point, ops);
 
-            rrdr_line = rrdr_line_init(r, now, rrdr_line);
+            rrdr_line = rrdr_line_init(r, now_end_time, rrdr_line);
             size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
 
-            if(unlikely(!min_date)) min_date = now;
-            max_date = now;
+            if(unlikely(!min_date)) min_date = now_end_time;
+            max_date = now_end_time;
 
             // find the place to store our values
             RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_o_v_index];
@@ -1032,7 +1099,7 @@ static inline void rrd2rrdr_do_dimension(
         // but the main loop will increase it too,
         // so, let's undo the last iteration of this loop
         if(iterations)
-            now -= ops.view_update_every;
+            now_end_time   -= ops.view_update_every;
     }
     ops.finalize(&ops.handle);
 
