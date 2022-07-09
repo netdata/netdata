@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- fix 32bit calculation on array allocator [\#13343](https://github.com/netdata/netdata/pull/13343) ([ktsaou](https://github.com/ktsaou))
+- fix crash on start on slow disks because ml is initialized before dbengine starts [\#13342](https://github.com/netdata/netdata/pull/13342) ([ktsaou](https://github.com/ktsaou))
+- add github stars badge to readme [\#13338](https://github.com/netdata/netdata/pull/13338) ([andrewm4894](https://github.com/andrewm4894))
+- Fix coverity 379241 [\#13336](https://github.com/netdata/netdata/pull/13336) ([MrZammler](https://github.com/MrZammler))
 - Silence compile warnings on external source [\#13332](https://github.com/netdata/netdata/pull/13332) ([MrZammler](https://github.com/MrZammler))
 - UpdateNodeCollectors message [\#13330](https://github.com/netdata/netdata/pull/13330) ([MrZammler](https://github.com/MrZammler))
 - Cid 379238 379238 [\#13328](https://github.com/netdata/netdata/pull/13328) ([stelfrag](https://github.com/stelfrag))
@@ -24,6 +28,7 @@
 - chore: remove python-mysql from install-required-packages.sh [\#13288](https://github.com/netdata/netdata/pull/13288) ([ilyam8](https://github.com/ilyam8))
 - Use new MQTT as default \(revert \#13258\)" [\#13287](https://github.com/netdata/netdata/pull/13287) ([underhood](https://github.com/underhood))
 - query engine fixes for alarms and dashboards [\#13282](https://github.com/netdata/netdata/pull/13282) ([ktsaou](https://github.com/ktsaou))
+- Better ACLK debug communication log [\#13281](https://github.com/netdata/netdata/pull/13281) ([underhood](https://github.com/underhood))
 - bump go.d.plugin version to v0.33.0 [\#13280](https://github.com/netdata/netdata/pull/13280) ([ilyam8](https://github.com/ilyam8))
 - Fixes vbi parser in mqtt5 implementation [\#13277](https://github.com/netdata/netdata/pull/13277) ([underhood](https://github.com/underhood))
 - Fix alignment in charts endpoint [\#13275](https://github.com/netdata/netdata/pull/13275) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -335,8 +340,6 @@
 - Check for chart obsoletion on children re-connections [\#12707](https://github.com/netdata/netdata/pull/12707) ([MrZammler](https://github.com/MrZammler))
 - feat\(apps.plugin\): add proxmox-ve processes to apps\_groups.conf [\#12704](https://github.com/netdata/netdata/pull/12704) ([ilyam8](https://github.com/ilyam8))
 - chore\(ebpf.plugin\): re-enable socket module by default [\#12702](https://github.com/netdata/netdata/pull/12702) ([ilyam8](https://github.com/ilyam8))
-- Disable automake dependency tracking in our various one-time builds. [\#12701](https://github.com/netdata/netdata/pull/12701) ([Ferroin](https://github.com/Ferroin))
-- Add missing values to algorithm vector \(eBPF\) [\#12698](https://github.com/netdata/netdata/pull/12698) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
