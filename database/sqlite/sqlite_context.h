@@ -42,7 +42,7 @@ typedef struct versioned_context_data {
 
 } VERSIONED_CONTEXT_DATA;
 
-extern void ctx_get_context_list(void (*dict_cb)(void *, void *), void *data);
+extern void ctx_get_context_list(void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data);
 
 extern void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *, void *), void *data);
 extern void ctx_get_label_list(uuid_t *chart_id, void (*dict_cb)(void *, void *), void *data);

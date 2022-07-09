@@ -155,7 +155,7 @@ void rrdinstance_add(RRDHOST *host, const char *id, const char *name) {
 }
 
 void rrdinstance_set_label(RRDHOST *host, const char *id, const char *key, const char *value, RRDLABEL_SRC src) {
-    DICTIONARY_ITEM *item = dictionary_acquire_item(host->rrdinstances, id);
+    DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdinstances, id);
     if(!item) {
         error("RRDINSTANCE: cannot find instance '%s' on host '%s' to set label key '%s' to value '%s'", id, host->hostname, key, value);
         return;
@@ -268,7 +268,7 @@ void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *
     (void)rc_old;
 }
 
-DICTIONARY *rrdcontext_create_dictionary(RRDHOST *host) {
+DICTIONARY *rrdcontext_create(RRDHOST *host) {
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     dictionary_register_insert_callback(dict, rrdcontext_insert_callback, (void *)host);
     dictionary_register_delete_callback(dict, rrdcontext_delete_callback, (void *)host);
@@ -286,6 +286,30 @@ void rrdcontext_add(RRDHOST *host, const char *id, const char *name) {
 
     dictionary_set(host->rrdcontexts, id, &tmp, sizeof(RRDINSTANCE));
 }
+
+static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, void *data) {
+    RRDHOST *host = data;
+    if(!host->rrdcontexts) rrdcontext_create(host);
+
+    RRDCONTEXT tmp = {
+        .id = string_dupz(ctx_data->id),
+    };
+    memcpy(&tmp.hub, ctx_data, sizeof(VERSIONED_CONTEXT_DATA));
+
+    DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->rrdcontexts, ctx_data->id, &tmp, sizeof(RRDCONTEXT));
+    RRDCONTEXT *rc = dictionary_acquired_item_value(host->rrdcontexts, item);
+
+
+
+    dictionary_acquired_item_release(host->rrdcontexts, item);
+}
+
+void rrdcontext_load_all(RRDHOST *host) {
+    ctx_get_context_list(rrdcontext_load_context_callback, host);
+}
+
+
+
 
 // ----------------------------------------------------------------------------
 // Load from SQL
