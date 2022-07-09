@@ -139,7 +139,7 @@ void sql_close_context_database(void)
         "WHERE c.host_id IN (SELECT h.host_id FROM meta.host h " \
         "WHERE UNLIKELY((h.hops = 0 AND @host_id IS NULL)) OR LIKELY((h.host_id = @host_id)));"
 
-void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *))
+void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -168,20 +168,18 @@ void ctx_get_chart_list(uuid_t *host_id, void (*dict_cb)(void *))
         chart_data.id = (char *) sqlite3_column_text(res, 1);
         chart_data.context = (char *) sqlite3_column_text(res, 2);
         chart_data.update_every = sqlite3_column_int(res, 3);
-        dict_cb(&chart_data);
+        dict_cb(&chart_data, data);
     }
 
 failed:
     rc = sqlite3_finalize(res);
     if (rc != SQLITE_OK)
         error_report("Failed to finalize statement that fetches chart label data, rc = %d", rc);
-
-    return;
 }
 
 // Dimension list
 #define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id FROM meta.dimension d where d.chart_id = @id;"
-void ctx_get_dimension_list(uuid_t *chart_id, void (*dict_cb)(void *))
+void ctx_get_dimension_list(uuid_t *chart_id, void (*dict_cb)(void *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -203,20 +201,18 @@ void ctx_get_dimension_list(uuid_t *chart_id, void (*dict_cb)(void *))
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
-        dict_cb(&dimension_data);
+        dict_cb(&dimension_data, data);
     }
 
 failed:
     rc = sqlite3_finalize(res);
     if (rc != SQLITE_OK)
         error_report("Failed to finalize statement that fetches the chart dimension list, rc = %d", rc);
-
-    return;
 }
 
 // LABEL LIST
 #define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l where l.chart_id = @id;"
-void ctx_get_label_list(uuid_t *chart_id, void (*dict_cb)(void *))
+void ctx_get_label_list(uuid_t *chart_id, void (*dict_cb)(void *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -239,7 +235,7 @@ void ctx_get_label_list(uuid_t *chart_id, void (*dict_cb)(void *))
         label_data.label_key = (char *) sqlite3_column_text(res, 0);
         label_data.label_value = (char *) sqlite3_column_text(res, 1);
         label_data.label_source = sqlite3_column_int(res, 2);
-        dict_cb(&label_data);
+        dict_cb(&label_data, data);
     }
 
 failed:
@@ -252,7 +248,7 @@ failed:
 
 // CONTEXT LIST
 #define CTX_GET_CONTEXT_LIST  "SELECT context_name, first_time_t, last_time_t FROM context;"
-void ctx_get_context_list(void (*dict_cb)(void *))
+void ctx_get_context_list(void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -269,14 +265,12 @@ void ctx_get_context_list(void (*dict_cb)(void *))
         context_data.id = (char *) sqlite3_column_text(res, 0);
         context_data.first_time_t = (time_t) sqlite3_column_int64(res, 1);
         context_data.last_time_t = (time_t) sqlite3_column_int64(res, 2);
-        dict_cb(&context_data);
+        dict_cb(&context_data, data);
     }
 
     rc = sqlite3_finalize(res);
     if (rc != SQLITE_OK)
         error_report("Failed to finalize statement that fetches stored context list, rc = %d", rc);
-
-    return;
 }
 
 
@@ -368,16 +362,19 @@ failed:
 //
 // TESTING FUNCTIONS
 //
-static void dict_ctx_get_label_list_cb(void *data)
+static void dict_ctx_get_label_list_cb(void *label_data_ptr, void *data)
 {
-    ctx_label_t *label_data = data;
+    (void)data;
+    ctx_label_t *label_data = label_data_ptr;
 
     info(" LABEL %d %s = %s", label_data->label_source, label_data->label_key, label_data->label_value);
 }
 
-static void dict_ctx_get_dimension_list_cb(void *data)
+static void dict_ctx_get_dimension_list_cb(void *dimension_data_ptr, void *data)
 {
-    ctx_dimension_t *dimension_data = data;
+    (void)data;
+
+    ctx_dimension_t *dimension_data = dimension_data_ptr;
 
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(dimension_data->dim_id, uuid_str);
@@ -386,29 +383,29 @@ static void dict_ctx_get_dimension_list_cb(void *data)
 }
 
 
-static void dict_ctx_get_chart_list_cb(void *data)
+static void dict_ctx_get_chart_list_cb(void *chart_data_ptr, void *data)
 {
-    ctx_chart_t *chart_data = data;
+    (void)data;
+    ctx_chart_t *chart_data = chart_data_ptr;
 
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(chart_data->chart_id, uuid_str);
     info("OK GOT %s ID = %s, context = %s", uuid_str, chart_data->id, chart_data->context);
-    ctx_get_label_list(&chart_data->chart_id, dict_ctx_get_label_list_cb);
-    ctx_get_dimension_list(&chart_data->chart_id, dict_ctx_get_dimension_list_cb);
+    ctx_get_label_list(&chart_data->chart_id, dict_ctx_get_label_list_cb, NULL);
+    ctx_get_dimension_list(&chart_data->chart_id, dict_ctx_get_dimension_list_cb, NULL);
 }
 
-static void dict_ctx_get_context_list_cb(void *data)
+static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, void *data)
 {
-    VERSIONED_CONTEXT_DATA *context_data = data;
-
-    info("   Context %s from %ld to %ld", context_data->id, context_data->first_time_t, context_data->last_time_t);
+    (void)data;
+    info("   Context %s from %lu to %lu", context_data->id, context_data->first_time_t, context_data->last_time_t);
 }
 
 
 int ctx_unittest(void)
 {
     sql_init_context_database(1);
-    ctx_get_chart_list(NULL, dict_ctx_get_chart_list_cb);
+    ctx_get_chart_list(NULL, dict_ctx_get_chart_list_cb, NULL);
 
     // Store a context
     VERSIONED_CONTEXT_DATA context_data;
@@ -439,7 +436,7 @@ int ctx_unittest(void)
 
     // This will list one entry
     info("List context start after insert");
-    ctx_get_context_list(dict_ctx_get_context_list_cb);
+    ctx_get_context_list(dict_ctx_get_context_list_cb, NULL);
     info("List context end after insert");
 
     // This will delete the entry
@@ -448,11 +445,11 @@ int ctx_unittest(void)
     else
         info("Entry %s not deleted", context_data.id);
 
-    freez(context_data.id);
+    freez((void *)context_data.id);
 
     // The list should be empty
     info("List context start after delete");
-    ctx_get_context_list(dict_ctx_get_context_list_cb);
+    ctx_get_context_list(dict_ctx_get_context_list_cb, NULL);
     info("List context end after delete");
 
     sql_close_context_database();
