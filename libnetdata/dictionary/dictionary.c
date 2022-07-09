@@ -833,9 +833,9 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 }
 
 // ----------------------------------------------------------------------------
-// API - items management
+// helpers
 
-void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
     if(unlikely(!name || !*name)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_set() a dictionary item without a name");
         return NULL;
@@ -883,14 +883,7 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
             dict->conflict_callback(namevalue_get_name(nv), nv->value, value, dict->conflict_callback_data);
     }
 
-    return nv->value;
-}
-
-void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
-    dictionary_lock(dict, 'w');
-    void *ret = dictionary_set_unsafe(dict, name, value, value_len);
-    dictionary_unlock(dict, 'w');
-    return ret;
+    return nv;
 }
 
 static NAME_VALUE *dictionary_get_name_value_unsafe(DICTIONARY *dict, const char *name) {
@@ -918,6 +911,35 @@ static NAME_VALUE *dictionary_get_name_value_unsafe(DICTIONARY *dict, const char
     return nv;
 }
 
+
+// ----------------------------------------------------------------------------
+// API - items management
+
+void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+    return nv->value;
+}
+
+void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+    dictionary_lock(dict, 'w');
+    void *ret = dictionary_set_unsafe(dict, name, value, value_len);
+    dictionary_unlock(dict, 'w');
+    return ret;
+}
+
+DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+    reference_counter_acquire(dict, nv);
+    return (DICTIONARY_ITEM *)nv;
+}
+
+DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+    dictionary_lock(dict, 'w');
+    DICTIONARY_ITEM *item = dictionary_set_and_acquire_item_unsafe(dict, name, value, value_len);
+    dictionary_unlock(dict, 'w');
+    return item;
+}
+
 void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
     NAME_VALUE *nv = dictionary_get_name_value_unsafe(dict, name);
 
@@ -934,7 +956,7 @@ void *dictionary_get(DICTIONARY *dict, const char *name) {
     return ret;
 }
 
-DICTIONARY_ITEM *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name) {
+DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name) {
     NAME_VALUE *nv = dictionary_get_name_value_unsafe(dict, name);
 
     if(unlikely(!nv))
@@ -944,9 +966,9 @@ DICTIONARY_ITEM *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *na
     return (DICTIONARY_ITEM *)nv;
 }
 
-DICTIONARY_ITEM *dictionary_acquire_item(DICTIONARY *dict, const char *name) {
+DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name) {
     dictionary_lock(dict, 'r');
-    void *ret = dictionary_acquire_item_unsafe(dict, name);
+    void *ret = dictionary_get_and_acquire_item_unsafe(dict, name);
     dictionary_unlock(dict, 'r');
     return ret;
 }
@@ -1926,7 +1948,7 @@ int dictionary_unittest(size_t entries) {
 
         fprintf(stderr, "\nAdding test item to dictionary and acquiring it\n");
         dictionary_set(dict, "test", "ITEM1", 6);
-        NAME_VALUE *nv = (NAME_VALUE *)dictionary_acquire_item(dict, "test");
+        NAME_VALUE *nv = (NAME_VALUE *)dictionary_get_and_acquire_item(dict, "test");
 
         errors += check_dictionary(dict, 1, 1);
         errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
@@ -1954,7 +1976,7 @@ int dictionary_unittest(size_t entries) {
         errors += check_dictionary(dict, 1, 2);
 
         fprintf(stderr, "\nAcquiring the second item:\n");
-        NAME_VALUE *nv2 = (NAME_VALUE *)dictionary_acquire_item(dict, "test");
+        NAME_VALUE *nv2 = (NAME_VALUE *)dictionary_get_and_acquire_item(dict, "test");
         errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
         errors += check_name_value(dict, nv2, "test", "ITEM2", 1, NAME_VALUE_FLAG_NONE,    true,  true,  true);
 
@@ -1975,7 +1997,7 @@ int dictionary_unittest(size_t entries) {
 
         fprintf(stderr, "\nAdding again the test item to dictionary and acquiring it\n");
         dictionary_set(dict, "test", "ITEM1", 6);
-        nv = (NAME_VALUE *)dictionary_acquire_item(dict, "test");
+        nv = (NAME_VALUE *)dictionary_get_and_acquire_item(dict, "test");
 
         errors += check_dictionary(dict, 1, 1);
         errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);

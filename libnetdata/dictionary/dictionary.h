@@ -98,12 +98,16 @@ extern void *dictionary_get(DICTIONARY *dict, const char *name);
 // returns -1 if the item was not found in the index
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
-extern DICTIONARY_ITEM *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name);
-extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item);
+extern DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name);
+extern DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name);
 
-extern DICTIONARY_ITEM *dictionary_acquire_item(DICTIONARY *dict, const char *name);
-extern void *dictionary_acquired_item_value(DICTIONARY *dict, DICTIONARY_ITEM *item);
+extern DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len);
+extern DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const char *name, void *value, size_t value_len);
+
+extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item);
 extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
+
+extern void *dictionary_acquired_item_value(DICTIONARY *dict, DICTIONARY_ITEM *item);
 
 // UNSAFE functions, without locks
 // to be used when the user is traversing with the right lock type
