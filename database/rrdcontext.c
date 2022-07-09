@@ -3,15 +3,16 @@
 #include "rrdcontext.h"
 #include "sqlite/sqlite_context.h"
 
+
+// ----------------------------------------------------------------------------
+// RRDMETRIC
+
 typedef enum {
     RRDMETRIC_FLAG_NONE     = 0,
     RRDMETRIC_FLAG_ARCHIVED = (1 << 0),
 } RRDMETRIC_FLAGS;
 
-typedef struct rrdcontext RRDCONTEXT;
-typedef struct rrdcontext_acquired_item RRDCONTEXT_ACQUIRED_ITEM;
-
-typedef struct rrdmetric {
+struct rrdmetric {
     uuid_t uuid;
 
     STRING *id;
@@ -23,9 +24,11 @@ typedef struct rrdmetric {
     struct rrddim_tier *tiers[RRD_STORAGE_TIERS];
 
     RRDMETRIC_FLAGS flags;
-} RRDMETRIC;
 
-typedef struct rrdinstance {
+    RRDINSTANCE_ACQUIRED *rrdinstance;
+};
+
+struct rrdinstance {
     uuid_t uuid;
 
     STRING *id;
@@ -37,15 +40,12 @@ typedef struct rrdinstance {
     int update_every;                   // data collection frequency
     RRDSET *st;                         // pointer to RRDSET when collected, or NULL
 
-    RRDCONTEXT_ACQUIRED_ITEM *context;  // acquired dictionary item, or NULL
+    RRDCONTEXT_ACQUIRED *context;       // acquired dictionary item, or NULL
 
     DICTIONARY *rrdlabels;
     DICTIONARY *rrdmetrics;
-} RRDINSTANCE;
+};
 
-
-// ----------------------------------------------------------------------------
-// RRDMETRIC
 
 void rrdmetric_insert_callback(const char *id, void *value, void *data) {
     (void)id;
@@ -83,7 +83,7 @@ void rrdmetric_conflict_callback(const char *id, void *oldv, void *newv, void *d
     (void)rm_old;
 }
 
-DICTIONARY *rrdmetric_create_dictionary(RRDINSTANCE *ri) {
+DICTIONARY *rrdmetrics_create(RRDINSTANCE *ri) {
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     dictionary_register_insert_callback(dict, rrdmetric_insert_callback, (void *)ri);
     dictionary_register_delete_callback(dict, rrdmetric_delete_callback, (void *)ri);
@@ -112,6 +112,9 @@ void rrdinstance_insert_callback(const char *id, void *value, void *data) {
     (void)ri;
 
     // TODO what other initializations needed?
+
+    ri->rrdlabels = rrdlabels_create();
+    ri->rrdmetrics = rrdmetrics_create(ri);
 }
 
 void rrdinstance_delete_callback(const char *id, void *value, void *data) {
@@ -142,12 +145,12 @@ void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void 
     (void)ri_old;
 }
 
-DICTIONARY *rrdinstances_create(RRDHOST *host) {
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(dict, rrdinstance_insert_callback, (void *)host);
-    dictionary_register_delete_callback(dict, rrdinstance_delete_callback, (void *)host);
-    dictionary_register_conflict_callback(dict, rrdinstance_conflict_callback, (void *)host);
-    return dict;
+void rrdinstances_create(RRDHOST *host) {
+    if(host->rrdinstances) return;
+    host->rrdinstances = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback(host->rrdinstances, rrdinstance_insert_callback, (void *)host);
+    dictionary_register_delete_callback(host->rrdinstances, rrdinstance_delete_callback, (void *)host);
+    dictionary_register_conflict_callback(host->rrdinstances, rrdinstance_conflict_callback, (void *)host);
 }
 
 void rrdinstance_add(RRDHOST *host, const char *id, const char *name) {
@@ -192,6 +195,7 @@ struct rrdcontext {
     STRING *id;
     STRING *title;
     STRING *units;
+    RRDSET_TYPE chart_type;
 
     size_t priority;
 
@@ -200,11 +204,29 @@ struct rrdcontext {
     RRDCONTEXT_FLAGS flags;
 
     VERSIONED_CONTEXT_DATA hub;
-    VERSIONED_CONTEXT_DATA current;
 
     RRDHOST *host;
     DICTIONARY *rrdinstances;
 };
+
+static void check_if_we_need_to_update_cloud(RRDCONTEXT *rc) {
+    VERSIONED_CONTEXT_DATA tmp = {
+        .version = rc->version,
+        .id = string2str(rc->id),
+        .title = string2str(rc->title),
+        .units = string2str(rc->units),
+        .chart_type = rrdset_type_name(rc->chart_type),
+        .priority = rc->priority,
+        .last_time_t = rc->last_time_t,
+        .first_time_t = rc->first_time_t,
+    };
+
+    if(memcmp(&tmp, &rc->hub, sizeof(tmp)) != 0) {
+        rc->version = tmp.version = (rc->version > rc->hub.version ? rc->version : rc->hub.version) + 1;
+        memcpy(&rc->hub, &tmp, sizeof(tmp));
+        // TODO save to SQL and send to cloud
+    }
+}
 
 void rrdcontext_insert_callback(const char *id, void *value, void *data) {
     (void)id;
@@ -218,36 +240,36 @@ void rrdcontext_insert_callback(const char *id, void *value, void *data) {
         if(rc->version)
             error("RRDCONTEXT: context '%s' is already initialized with version %lu, but it is loaded again from SQL with version %lu", string2str(rc->id), rc->version, rc->hub.version);
 
+        // IMPORTANT
+        // replace all string pointers in rc->hub with our own versions
+        // the originals are coming from a tmp allocation of sqlite
+
         string_freez(rc->id);
         rc->id = string_dupz(rc->hub.id);
+        rc->hub.id = string2str(rc->id);
 
         string_freez(rc->title);
         rc->title = string_dupz(rc->hub.title);
+        rc->hub.title = string2str(rc->title);
 
         string_freez(rc->units);
         rc->units = string_dupz(rc->hub.units);
+        rc->hub.units = string2str(rc->units);
 
-        rc->priority     = rc->hub.priority;
+        rc->chart_type = rrdset_type_id(rc->hub.chart_type);
+        rc->hub.chart_type = rrdset_type_name(rc->chart_type);
+
         rc->version      = rc->hub.version;
+        rc->priority     = rc->hub.priority;
         rc->first_time_t = rc->hub.first_time_t;
         rc->last_time_t  = rc->hub.last_time_t;
     }
     else {
         // we are adding this context now for the first time
-        rc->current.version = now_realtime_sec();
-
-        // TODO save to SQL
+        rc->version = now_realtime_sec();
     }
 
-    rc->hub.id        = string2str(rc->id);
-    rc->hub.title     = string2str(rc->title);
-    rc->hub.units     = string2str(rc->units);
-
-    rc->current.id    = string2str(rc->id);
-    rc->current.title = string2str(rc->title);
-    rc->current.units = string2str(rc->units);
-
-    // TODO what other initializations needed?
+    check_if_we_need_to_update_cloud(rc);
 }
 
 void rrdcontext_delete_callback(const char *id, void *value, void *data) {
@@ -275,20 +297,12 @@ void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *
     (void)rc_old;
 }
 
-DICTIONARY *rrdcontext_create(RRDHOST *host) {
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(dict, rrdcontext_insert_callback, (void *)host);
-    dictionary_register_delete_callback(dict, rrdcontext_delete_callback, (void *)host);
-    dictionary_register_conflict_callback(dict, rrdcontext_conflict_callback, (void *)host);
-    return dict;
-}
-
-RRDCONTEXT_ACQUIRED_ITEM *rrdcontext_acquire(RRDHOST *host, const char *name) {
-    return (RRDCONTEXT_ACQUIRED_ITEM *)dictionary_get_and_acquire_item(host->rrdcontexts, name);
-}
-
-RRDCONTEXT *rrdcontext_acquired_value(RRDHOST *host, RRDCONTEXT_ACQUIRED_ITEM *item) {
-    return dictionary_acquired_item_value(host->rrdcontexts, (DICTIONARY_ITEM *)item);
+void rrdcontexts_create(RRDHOST *host) {
+    if(host->rrdcontexts) return;
+    host->rrdcontexts = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback(host->rrdcontexts, rrdcontext_insert_callback, (void *)host);
+    dictionary_register_delete_callback(host->rrdcontexts, rrdcontext_delete_callback, (void *)host);
+    dictionary_register_conflict_callback(host->rrdcontexts, rrdcontext_conflict_callback, (void *)host);
 }
 
 void rrdcontext_add(RRDHOST *host, const char *id, const char *name) {
@@ -302,16 +316,8 @@ void rrdcontext_add(RRDHOST *host, const char *id, const char *name) {
     dictionary_set(host->rrdcontexts, id, &tmp, sizeof(RRDCONTEXT));
 }
 
-static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, void *data) {
-    RRDHOST *host = data;
-    (void)host;
-
-    RRDCONTEXT tmp = {
-        .id = string_dupz(ctx_data->id),
-    };
-    memcpy(&tmp.hub, ctx_data, sizeof(VERSIONED_CONTEXT_DATA));
-    dictionary_set(host->rrdcontexts, ctx_data->id, &tmp, sizeof(tmp));
-}
+// ----------------------------------------------------------------------------
+// load from SQL
 
 static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
     RRDHOST *host = data;
@@ -325,47 +331,28 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .context = rrdcontext_acquire(host, sc->context),
     };
     uuid_copy(tmp.uuid, sc->chart_id);
-    dictionary_set(host->rrdinstances, sc->id, &tmp, sizeof(tmp));
+    DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->rrdinstances, sc->id, &tmp, sizeof(tmp));
+    RRDINSTANCE *ri = dictionary_acquired_item_value(host->rrdinstances, item);
+
+    //ctx_get_label_list(ri->uuid, dict_ctx_get_label_list_cb, NULL);
+    //ctx_get_dimension_list(ri->uuid, dict_ctx_get_dimension_list_cb, NULL);
+}
+
+static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, void *data) {
+    RRDHOST *host = data;
+    (void)host;
+
+    RRDCONTEXT tmp = {
+        .id = string_dupz(ctx_data->id),
+    };
+    memcpy(&tmp.hub, ctx_data, sizeof(VERSIONED_CONTEXT_DATA));
+    dictionary_set(host->rrdcontexts, ctx_data->id, &tmp, sizeof(tmp));
 }
 
 void rrdcontext_load_all(RRDHOST *host) {
-    if(!host->rrdcontexts) rrdcontext_create(host);
-    if(!host->rrdinstances) rrdinstances_create(host);
+    rrdinstances_create(host);
+    rrdcontexts_create(host);
 
     ctx_get_context_list(&host->host_uuid, rrdcontext_load_context_callback, host);
     ctx_get_chart_list(&host->host_uuid, rrdinstance_load_chart_callback, host);
 }
-
-
-
-
-// ----------------------------------------------------------------------------
-// Load from SQL
-
-/*
-struct chart_load {
-    uuid_t uuid;
-    const char *id;
-    const char *name;
-    const char *context;
-};
-
-
-void load_chart_callback(RRDHOST *host, struct chart_load *cl) {
-
-}
-
-void load_everything_from_sql(void) {
-    for(RRDHOST *host = localhost; host ;host = host->next) {
-        sqlite_load_host_charts(host, load_chart_callback);
-
-        RRDINSTANCE *ri;
-        dfe_start_read(host->rrdinstances, ri) {
-            sqlite_load_chart_labels(ri->uuid, load_chart_labels_callback, ri);
-            sqlite_load_chart_dimensions(ri->uuid, load_chart_dimensions_callback, ri);
-        }
-        dfe_done(ri);
-    }
-
-}
-*/
