@@ -338,7 +338,7 @@ int format_variable_prometheus_remote_write_callback(RRDVAR *rv, void *data) {
         prometheus_name_copy(context, rv->name, PROMETHEUS_ELEMENT_MAX);
         snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
-        calculated_number value = rrdvar2number(rv);
+        NETDATA_DOUBLE value = rrdvar2number(rv);
         add_variable(connector_specific_data->write_request, name,
             (host == localhost) ? instance->config.hostname : host->hostname, value, opts->now / USEC_PER_MS);
     }
