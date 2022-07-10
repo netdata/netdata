@@ -1294,8 +1294,9 @@ typedef struct string_entry {
 #ifdef DICTIONARY_WITH_AVL
     avl_t avl_node;
 #endif
-    const char *str;
     volatile int references;
+    size_t length;
+    const char str[];
 } STRING_ENTRY;
 
 #ifdef DICTIONARY_WITH_AVL
@@ -1331,12 +1332,14 @@ STRING *string_dupz(const char *str) {
 
     netdata_mutex_lock(&string_mutex);
 
+    size_t length = strlen(str) + 1;
     STRING_ENTRY *se;
-    STRING_ENTRY **ptr = (STRING_ENTRY **)hashtable_insert_unsafe(&string_dictionary, str, strlen(str) + 1);
+    STRING_ENTRY **ptr = (STRING_ENTRY **)hashtable_insert_unsafe(&string_dictionary, str, length);
     if(unlikely(*ptr == 0)) {
         // a new item added to the index
-        se = mallocz(sizeof(STRING_ENTRY));
-        se->str = strdupz(str);
+        se = mallocz(sizeof(STRING_ENTRY)) + length;
+        strcpy((char *)se->str, str);
+        se->length = length;
         se->references = 1;
         *ptr = se;
         hashtable_inserted_name_value_unsafe(&string_dictionary, se);
@@ -1358,15 +1361,18 @@ void string_freez(STRING *item) {
     STRING_ENTRY *se = (STRING_ENTRY *)item;
     se->references--;
     if(unlikely(se->references == 0)) {
-        size_t str_len = strlen(se->str) + 1;
-        if(hashtable_delete_unsafe(&string_dictionary, se->str, str_len, se) == 0)
+        if(hashtable_delete_unsafe(&string_dictionary, se->str, se->length, se) == 0)
             error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index", se->str);
 
-        freez((void *)se->str);
         freez(se);
     }
 
     netdata_mutex_unlock(&string_mutex);
+}
+
+size_t string_length(STRING *item) {
+    if(unlikely(!item)) return 0;
+    return ((STRING_ENTRY *)item)->length - 1;
 }
 
 const char *string2str(STRING *item) {

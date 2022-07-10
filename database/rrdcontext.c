@@ -293,6 +293,38 @@ void rrdcontext_delete_callback(const char *id, void *value, void *data) {
     rrdcontext_freez(rc);
 }
 
+static STRING *merge_titles(STRING *a, STRING *b) {
+    size_t alen = string_length(a);
+    size_t blen = string_length(b);
+    size_t length = MAX(a, b);
+    char buf1[length + 1], buf2[length + 1], *dst1, *dst2;
+    const char *s1, *s2;
+
+    s1 = string2str(a);
+    s2 = string2str(b);
+    dst1 = buf1;
+    for( ; *s1 && *s2 && *s1 == *s2 ;s1++, s2++)
+        *dst1++ = *s1;
+
+    *dst1 = '\0';
+
+    if(*s1 != '\0' || *s2 != '\0') {
+        *dst1++ = 'X';
+
+        s1 = &(string2str(a))[alen - 1];
+        s2 = &(string2str(b))[blen - 1];
+        dst2 = &buf2[length];
+        *dst2 = '\0';
+        for (; *s1 && *s2 && *s1 == *s2; s1--, s2--)
+            *(--dst2) = *s1;
+
+        strcpy(dst1, dst2);
+    }
+
+    internal_error(true, "RRDCONTEXT: merged title '%s' and title '%s' as '%s'", string2str(a), string2str(b), buf1);
+    return string_dupz(buf1);
+}
+
 void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data;
@@ -305,7 +337,7 @@ void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *
 
     if(rc->title != rc_new->title) {
         STRING *old_title = rc->title;
-        rc->title = string_dupz(string2str(rc_new->title));
+        rc->title = merge_titles(rc->title, rc_new->title);
         string_freez(old_title);
         changed = true;
     }
