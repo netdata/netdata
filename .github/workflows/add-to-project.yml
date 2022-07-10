@@ -17,7 +17,7 @@ jobs:
           github-token: ${{ secrets.NETDATABOT_ORG_GITHUB_TOKEN }}
 
   add-bugs-to-project:
-    name: Add issue to project
+    name: Add bugs to project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/add-to-project@v0.1.0
