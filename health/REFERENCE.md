@@ -542,6 +542,39 @@ The info field can contain a small piece of text describing the alarm or templat
 info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
 ```
 
+info fields can contain special variables in their text that will be replaced during run-time to provide more specific alert information. Current variables supported are:
+
+| variable | description |
+| ---------| ----------- |
+| $family  | Will be replaced by the family instance for the alert (e.g. eth0) |
+| $label:  | Followed by a chart label name, this will replace the variable with the chart label's value |
+
+For example, an info field like the following:
+
+```yaml
+info: average inbound utilization for the network interface $family over the last minute
+```
+
+Will be rendered on the alert acting on interface `eth0` as:
+
+```yaml
+info: average inbound utilization for the network interface eth0 over the last minute
+```
+
+An alert acting on a chart that has a chart label named e.g. `target`, with a value of `https://netdata.cloud/`, can be enriched as follows:
+
+```yaml
+info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site $label:target
+```
+
+Will become:
+
+```yaml
+info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site https://netdata.cloud/
+```
+
+Note: variables are case-sensitive.
+
 ## Expressions
 
 Netdata has an internal [infix expression parser](/libnetdata/eval). This parses expressions and creates an internal

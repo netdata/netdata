@@ -42,7 +42,7 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
 
     size_t pos = 0;
     char *temp = strdupz(line);
-    char var[MAX_RRDCALC_VARIABLE];
+    char var[RRDCALC_VAR_MAX];
     int i=0;
     char *m, *e, *lbl_value = NULL;
 
@@ -50,7 +50,7 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
         i=0;
         e = m;
         while (*e) {
-            if (*e == ' ' || i == MAX_RRDCALC_VARIABLE - 1) {
+            if (*e == ' ' || i == RRDCALC_VAR_MAX - 1) {
                 break;
             }
             else
@@ -60,14 +60,14 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
         }
         var[i]='\0';
         pos = e - temp;
-        if (!strcmp(var, "$family")) {
+        if (!strcmp(var, RRDCALC_VAR_FAMILY)) {
             char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rc->rrdset->family : "", m);
             freez(temp);
             temp = strdupz(buf);
             freez(buf);
-        } else if (!strncmp(var, "$lbl_", 5)) {
+        } else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
             if(likely(rc->rrdset->state && rc->rrdset->state->chart_labels)) {
-                rrdlabels_get_value_to_char_or_null(rc->rrdset->state->chart_labels, &lbl_value, var+5);
+                rrdlabels_get_value_to_char_or_null(rc->rrdset->state->chart_labels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
                     freez(temp);

@@ -223,6 +223,9 @@ static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     return 0;
 }
 
-#define MAX_RRDCALC_VARIABLE 100
+#define RRDCALC_VAR_MAX 100
+#define RRDCALC_VAR_FAMILY "$family"
+#define RRDCALC_VAR_LABEL "$label:"
+#define RRDCALC_VAR_LABEL_LEN 7
 
 #endif //NETDATA_RRDCALC_H
