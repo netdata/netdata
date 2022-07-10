@@ -56,6 +56,8 @@ mv community/netdata-agent-deployment/ansible-quickstart .
 rm -rf community
 ```
 
+Or if you don't want to clone entire repository, use gitzip browser extention to get netdata-agent-deployment directory as a zip file
+
 Next, `cd` into the Ansible directory.
 
 ```bash
