@@ -215,9 +215,10 @@ extern int dictionary_unittest(size_t entries);
 // STRING implementation
 
 typedef struct string STRING;
-extern STRING *string_dupz(const char *str);
-extern void string_freez(STRING *item);
-extern size_t string_length(STRING *item);
-extern const char *string2str(STRING *item) NEVERNULL;
+extern STRING *string_strdupz(const char *str);
+extern STRING *string_clone(STRING *string);
+extern void string_freez(STRING *string);
+extern size_t string_length(STRING *string);
+extern const char *string2str(STRING *string) NEVERNULL;
 
 #endif /* NETDATA_DICTIONARY_H */

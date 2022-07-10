@@ -100,9 +100,9 @@ typedef long long total_number;
 // chart types
 
 typedef enum rrdset_type {
-    RRDSET_TYPE_LINE    = 0,
-    RRDSET_TYPE_AREA    = 1,
-    RRDSET_TYPE_STACKED = 2
+    RRDSET_TYPE_LINE    = 1,
+    RRDSET_TYPE_AREA    = 2,
+    RRDSET_TYPE_STACKED = 3
 } RRDSET_TYPE;
 
 #define RRDSET_TYPE_LINE_NAME "line"

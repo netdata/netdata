@@ -28,8 +28,8 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 // ----------------------------------------------------------------------------
 // public API for rrdhost
 
-extern void rrdinstances_create(RRDHOST *host);
-extern void rrdinstances_destroy(RRDHOST *host);
+extern void rrdhost_create_rrdinstances(RRDHOST *host);
+extern void rrdhost_destroy_rrdinstances(RRDHOST *host);
 
 extern void rrdcontexts_create(RRDHOST *host);
 extern void rrdcontexts_destroy(RRDHOST *host);

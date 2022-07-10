@@ -645,7 +645,7 @@ static inline size_t namevalue_set_name(DICTIONARY *dict, NAME_VALUE *nv, const 
         return 0;
     }
 
-    nv->string_name = string_dupz(name);
+    nv->string_name = string_strdupz(name);
     nv->flags |= NAME_VALUE_FLAG_NAME_IS_ALLOCATED;
     return name_len;
 }
@@ -1345,7 +1345,17 @@ static DICTIONARY string_dictionary = {
 
 static netdata_mutex_t string_mutex = NETDATA_MUTEX_INITIALIZER;
 
-STRING *string_dupz(const char *str) {
+STRING *string_clone(STRING *string) {
+    if(unlikely(!string)) return NULL;
+
+    STRING_ENTRY *se = (STRING_ENTRY *)string;
+    netdata_mutex_lock(&string_mutex);
+    se->refcount++;
+    netdata_mutex_unlock(&string_mutex);
+    return string;
+}
+
+STRING *string_strdupz(const char *str) {
     if(unlikely(!str || !*str)) return NULL;
 
     netdata_mutex_lock(&string_mutex);
@@ -1378,11 +1388,11 @@ STRING *string_dupz(const char *str) {
     return (STRING *)se;
 }
 
-void string_freez(STRING *item) {
-    if(unlikely(!item)) return;
+void string_freez(STRING *string) {
+    if(unlikely(!string)) return;
     netdata_mutex_lock(&string_mutex);
 
-    STRING_ENTRY *se = (STRING_ENTRY *)item;
+    STRING_ENTRY *se = (STRING_ENTRY *)string;
     se->refcount--;
     if(unlikely(se->refcount == 0)) {
         if(hashtable_delete_unsafe(&string_dictionary, se->str, se->length, se) == 0)
@@ -1399,14 +1409,14 @@ void string_freez(STRING *item) {
     netdata_mutex_unlock(&string_mutex);
 }
 
-size_t string_length(STRING *item) {
-    if(unlikely(!item)) return 0;
-    return ((STRING_ENTRY *)item)->length - 1;
+size_t string_length(STRING *string) {
+    if(unlikely(!string)) return 0;
+    return ((STRING_ENTRY *)string)->length - 1;
 }
 
-const char *string2str(STRING *item) {
-    if(unlikely(!item)) return "";
-    return ((STRING_ENTRY *)item)->str;
+const char *string2str(STRING *string) {
+    if(unlikely(!string)) return "";
+    return ((STRING_ENTRY *)string)->str;
 }
 
 // ----------------------------------------------------------------------------

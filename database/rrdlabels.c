@@ -538,7 +538,7 @@ static void labels_add_already_sanitized(DICTIONARY *dict, const char *key, cons
 
     RRDLABEL tmp = {
         .label_source = ls,
-        .label_value = string_dupz(value)
+        .label_value = string_strdupz(value)
     };
     dictionary_set(dict, key, &tmp, sizeof(RRDLABEL));
 }
