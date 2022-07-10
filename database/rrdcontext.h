@@ -31,8 +31,8 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 extern void rrdhost_create_rrdinstances(RRDHOST *host);
 extern void rrdhost_destroy_rrdinstances(RRDHOST *host);
 
-extern void rrdcontexts_create(RRDHOST *host);
-extern void rrdcontexts_destroy(RRDHOST *host);
+extern void rrdhost_create_rrdcontexts(RRDHOST *host);
+extern void rrdhost_destroy_rrdcontexts(RRDHOST *host);
 
 
 // ----------------------------------------------------------------------------

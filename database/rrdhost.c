@@ -692,7 +692,7 @@ RRDHOST *rrdhost_find_or_create(
         rrdhost_wrlock(host);
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
         host->senders_disconnected_time = 0;
-        rrdcontexts_create(host);
+        rrdhost_create_rrdcontexts(host);
         rrdhost_create_rrdinstances(host);
         rrdhost_unlock(host);
     }
@@ -1128,7 +1128,7 @@ void rrdhost_free(RRDHOST *host) {
     // free it
 
     rrdhost_destroy_rrdinstances(host);
-    rrdcontexts_destroy(host);
+    rrdhost_destroy_rrdcontexts(host);
 
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);

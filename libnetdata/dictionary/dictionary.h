@@ -53,8 +53,14 @@ typedef enum dictionary_flags {
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
+#ifdef NETDATA_INTERNAL_CHECKS
+#define dictionary_create(flags) dictionary_create_advanced_with_trace(flags, 0, __FUNCTION__, __LINE__, __FILE__);
+#define dictionary_create_advanced(flags) dictionary_create_advanced_with_trace(flags, 0, __FUNCTION__, __LINE__, __FILE__);
+extern DICTIONARY *dictionary_create_advanced_with_trace(DICTIONARY_FLAGS flags, size_t scratchpad_size, const char *function, size_t line, const char *file);
+#else
 #define dictionary_create(flags) dictionary_create_advanced(flags, 0);
 extern DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad_size);
+#endif
 
 extern void *dictionary_scratchpad(DICTIONARY *dict);
 

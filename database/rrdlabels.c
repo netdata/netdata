@@ -900,7 +900,7 @@ static int label_to_buffer_callback(const char *name, void *value, void *data) {
     return 0;
 }
 
-void rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size)) {
+int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size)) {
     struct labels_to_buffer tmp = {
         .wb = wb,
         .filter_callback = filter_callback,
@@ -913,7 +913,7 @@ void rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each
         .between_them = between_them,
         .count = 0
     };
-    dictionary_sorted_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
+    return dictionary_sorted_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
 }
 
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
