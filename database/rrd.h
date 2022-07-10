@@ -223,7 +223,7 @@ extern int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)
 extern void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
 extern bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
 extern bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
-extern void rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
+extern int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
 
 extern void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
 extern void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
