@@ -39,6 +39,10 @@ typedef struct name_value {
     avl_t avl_node;
 #endif
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    DICTIONARY *dict;
+#endif
+
     struct name_value *next;    // a double linked list to allow fast insertions and deletions
     struct name_value *prev;
 
@@ -56,6 +60,12 @@ typedef struct name_value {
 } NAME_VALUE;
 
 struct dictionary {
+#ifdef NETDATA_INTERNAL_CHECKS
+    const char *creation_function;
+    const char *creation_file;
+    size_t creation_line;
+#endif
+
     DICTIONARY_FLAGS flags;             // the flags of the dictionary
 
     NAME_VALUE *first_item;             // the double linked list base pointers
@@ -671,6 +681,10 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
     NAME_VALUE *nv = mallocz(size);
     size_t allocated = size;
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    nv->dict = dict;
+#endif
+
     nv->refcount = 0;
     nv->flags = NAME_VALUE_FLAG_NONE;
     nv->name_len = name_len;
@@ -784,8 +798,11 @@ static bool name_value_can_be_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
 
 // ----------------------------------------------------------------------------
 // API - dictionary management
-
+#ifdef NETDATA_INTERNAL_CHECKS
+DICTIONARY *dictionary_create_advanced_with_trace(DICTIONARY_FLAGS flags, size_t scratchpad_size, const char *function, size_t line, const char *file) {
+#else
 DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad_size) {
+#endif
     debug(D_DICTIONARY, "Creating dictionary.");
 
     if(unlikely(flags & DICTIONARY_FLAGS_RESERVED))
@@ -803,6 +820,13 @@ DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad
     dict->memory = (long)allocated;
 
     hashtable_init_unsafe(dict);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    dict->creation_function = function;
+    dict->creation_file = file;
+    dict->creation_line = line;
+#endif
+
     return (DICTIONARY *)dict;
 }
 
@@ -814,6 +838,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     if(!dict) return 0;
 
     if(dict->referenced_items) {
+        internal_error(true, "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).", dict->creation_function, dict->creation_line, dict->creation_file, dict->referenced_items, dict->entries);
         dict->flags |= DICTIONARY_FLAG_DESTROYED;
         return 0;
     }
@@ -997,21 +1022,44 @@ DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *n
 
 const char *dictionary_acquired_item_name(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(((NAME_VALUE *)item)->dict != dict)
+        fatal("DICTIONARY: %s(): name_value item with name '%s' does not belong to this dictionary", __FUNCTION__, namevalue_get_name((NAME_VALUE *)item));
+#endif
+
     return namevalue_get_name((NAME_VALUE *)item);
 }
 
 void *dictionary_acquired_item_value(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(((NAME_VALUE *)item)->dict != dict)
+        fatal("DICTIONARY: %s(): name_value item with name '%s' does not belong to this dictionary", __FUNCTION__, namevalue_get_name((NAME_VALUE *)item));
+#endif
+
     return ((NAME_VALUE *)item)->value;
 }
 
 void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(((NAME_VALUE *)item)->dict != dict)
+        fatal("DICTIONARY: %s(): name_value item with name '%s' does not belong to this dictionary", __FUNCTION__, namevalue_get_name((NAME_VALUE *)item));
+#endif
+
     reference_counter_release(dict, (NAME_VALUE *)item, false);
 }
 
 void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(((NAME_VALUE *)item)->dict != dict)
+        fatal("DICTIONARY: %s(): name_value item with name '%s' does not belong to this dictionary", __FUNCTION__, namevalue_get_name((NAME_VALUE *)item));
+#endif
 
     // no need to get a lock here
     // we pass the last parameter to reference_counter_release() as true
