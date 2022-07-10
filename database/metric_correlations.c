@@ -9,7 +9,7 @@ int metric_correlations_version = 1;
 METRIC_CORRELATIONS_METHOD default_metric_correlations_method = METRIC_CORRELATIONS_KS2;
 
 typedef struct mc_stats {
-    calculated_number max_base_high_ratio;
+    NETDATA_DOUBLE max_base_high_ratio;
     size_t db_points;
     size_t result_points;
     size_t db_queries;
@@ -58,7 +58,7 @@ struct register_result {
     const char *chart_id;
     const char *context;
     const char *dim_name;
-    calculated_number value;
+    NETDATA_DOUBLE value;
 };
 
 static void register_result_insert_callback(const char *name, void *value, void *data) {
@@ -93,11 +93,11 @@ static void register_result_destroy(DICTIONARY *results) {
     dictionary_destroy(results);
 }
 
-static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, calculated_number value, RESULT_FLAGS flags, MC_STATS *stats) {
-    if(!calculated_number_isnumber(value)) return;
+static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, NETDATA_DOUBLE value, RESULT_FLAGS flags, MC_STATS *stats) {
+    if(!netdata_double_isnumber(value)) return;
 
     // make it positive
-    calculated_number v = calculated_number_fabs(value);
+    NETDATA_DOUBLE v = fabsndd(value);
 
     // no need to store zero scored values
     if(v == 0.0) return;
@@ -186,7 +186,7 @@ static size_t registered_results_to_json(DICTIONARY *results, BUFFER *wb,
             chart_dims = 0;
         }
         if (chart_dims) buffer_sprintf(wb, ",\n");
-        buffer_sprintf(wb, "\t\t\t\t\"%s\": " CALCULATED_NUMBER_FORMAT, t->dim_name, t->value);
+        buffer_sprintf(wb, "\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, t->dim_name, t->value);
         chart_dims++;
         total_dimensions++;
     }
@@ -240,14 +240,14 @@ int compare_diffs(const void *left, const void *right) {
     return (lt > rt) - (lt < rt);
 }
 
-static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, calculated_number *arr, size_t size) {
-    calculated_number *last = &arr[size - 1];
+static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, NETDATA_DOUBLE *arr, size_t size) {
+    NETDATA_DOUBLE *last = &arr[size - 1];
     size_t added = 0;
 
     while(last > arr) {
-        calculated_number second = *last--;
-        calculated_number first  = *last;
-        *diffs++ = (DIFFS_NUMBERS)((first - second) * (calculated_number)DOUBLE_TO_INT_MULTIPLIER);
+        NETDATA_DOUBLE second = *last--;
+        NETDATA_DOUBLE first  = *last;
+        *diffs++ = (DIFFS_NUMBERS)((first - second) * (NETDATA_DOUBLE)DOUBLE_TO_INT_MULTIPLIER);
         added++;
     }
 
@@ -356,7 +356,9 @@ static double ks_2samp(DIFFS_NUMBERS baseline_diffs[], int base_size, DIFFS_NUMB
     return KSfbar((int)en, d);
 }
 
-static double kstwo(calculated_number baseline[], int baseline_points, calculated_number highlight[], int highlight_points, uint32_t base_shifts) {
+static double kstwo(
+    NETDATA_DOUBLE baseline[], int baseline_points,
+    NETDATA_DOUBLE highlight[], int highlight_points, uint32_t base_shifts) {
     // -1 in size, since the calculate_pairs_diffs() returns one less point
     DIFFS_NUMBERS baseline_diffs[baseline_points - 1];
     DIFFS_NUMBERS highlight_diffs[highlight_points - 1];
@@ -382,6 +384,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                           long long points, RRDR_OPTIONS options,
                                           RRDR_GROUPING group, const char *group_options,
                                           uint32_t shifts, int timeout, MC_STATS *stats) {
+    options |= RRDR_OPTION_NATURAL_POINTS;
+
     long group_time = 0;
     struct context_param  *context_param_list = NULL;
 
@@ -397,7 +401,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     high_rrdr = rrd2rrdr(owa, st, points,
                          after, before, group,
                          group_time, options, NULL, context_param_list, group_options,
-                         timeout);
+                         timeout, 0);
     if(!high_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
         goto cleanup;
@@ -423,7 +427,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
                     baseline_after, baseline_before, group,
                     group_time, options, NULL, context_param_list, group_options,
-                    (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)));
+                    (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)), 0);
     if(!base_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
         goto cleanup;
@@ -469,14 +473,14 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
 
         // copy the baseline points of the dimension to a contiguous array
         // there is no need to check for empty values, since empty are already zero
-        calculated_number baseline[base_points];
+        NETDATA_DOUBLE baseline[base_points];
         for(int c = 0; c < base_points; c++)
             baseline[c] = base_rrdr->v[ c * base_rrdr->d + i ];
 
         // copy the highlight points of the dimension to a contiguous array
         // there is no need to check for empty values, since empty values are already zero
         // https://github.com/netdata/netdata/blob/6e3144683a73a2024d51425b20ecfd569034c858/web/api/queries/average/average.c#L41-L43
-        calculated_number highlight[high_points];
+        NETDATA_DOUBLE highlight[high_points];
         for(int c = 0; c < high_points; c++)
             highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
 
@@ -516,7 +520,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              long long after, long long before,
                                              RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
                                              int timeout, MC_STATS *stats) {
-    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE;
+    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
     long group_time = 0;
 
     int correlated_dimensions = 0;
@@ -537,7 +541,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         // dimensions, and we query a single dimension at a time.
 
         stats->db_queries++;
-        calculated_number baseline_average = NAN;
+        NETDATA_DOUBLE baseline_average = NAN;
         uint8_t base_anomaly_rate = 0;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
@@ -545,15 +549,15 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, &base_anomaly_rate, 0);
+                                  &value_is_null, &base_anomaly_rate, 0, 0);
 
-        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(baseline_average)) {
+        if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(baseline_average)) {
             // this means no data for the baseline window, but we may have data for the highlighted one - assume zero
             baseline_average = 0.0;
         }
 
         stats->db_queries++;
-        calculated_number highlight_average = NAN;
+        NETDATA_DOUBLE highlight_average = NAN;
         uint8_t high_anomaly_rate = 0;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
@@ -561,9 +565,9 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, &high_anomaly_rate, 0);
+                                  &value_is_null, &high_anomaly_rate, 0, 0);
 
-        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_average)) {
+        if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(highlight_average)) {
             // this means no data for the highlighted duration - so skip it
             continue;
         }
@@ -574,11 +578,11 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         }
 
         stats->db_queries++;
-        calculated_number highlight_countif = NAN;
+        NETDATA_DOUBLE highlight_countif = NAN;
         value_is_null = 1;
 
         char highlighted_countif_options[50 + 1];
-        snprintfz(highlighted_countif_options, 50, "%s" CALCULATED_NUMBER_FORMAT, highlight_average < baseline_average ? "<":">", baseline_average);
+        snprintfz(highlighted_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average < baseline_average ? "<":">", baseline_average);
 
         ret = rrdset2value_api_v1(st, NULL, &highlight_countif, d->id, 1,
                                   after, before,
@@ -586,9 +590,9 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                   group_time, options,
                                   NULL, NULL,
                                   &stats->db_points, &stats->result_points,
-                                  &value_is_null, NULL, 0);
+                                  &value_is_null, NULL, 0, 0);
 
-        if(ret != HTTP_RESP_OK || value_is_null || !calculated_number_isnumber(highlight_countif)) {
+        if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(highlight_countif)) {
             info("MC: highlighted countif query failed, but highlighted average worked - strange...");
             continue;
         }
@@ -599,7 +603,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         highlight_countif = highlight_countif / 100.0; // countif returns 0 - 100.0
 
         RESULT_FLAGS flags;
-        calculated_number pcent = NAN;
+        NETDATA_DOUBLE pcent = NAN;
         if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0)) {
             flags = RESULT_IS_BASE_HIGH_RATIO;
             pcent = (highlight_average - baseline_average) / baseline_average * highlight_countif;
@@ -615,15 +619,15 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
     return correlated_dimensions;
 }
 
-int compare_calculated_numbers(const void *left, const void *right) {
-    calculated_number lt = *(calculated_number *)left;
-    calculated_number rt = *(calculated_number *)right;
+int compare_netdata_doubles(const void *left, const void *right) {
+    NETDATA_DOUBLE lt = *(NETDATA_DOUBLE *)left;
+    NETDATA_DOUBLE rt = *(NETDATA_DOUBLE *)right;
 
     // https://stackoverflow.com/a/3886497/1114110
     return (lt > rt) - (lt < rt);
 }
 
-static inline int binary_search_bigger_than_calculated_number(const calculated_number arr[], int left, int size, calculated_number K) {
+static inline int binary_search_bigger_than_netdata_double(const NETDATA_DOUBLE arr[], int left, int size, NETDATA_DOUBLE K) {
     // binary search to find the index the smallest index
     // of the first value in the array that is greater than K
 
@@ -655,7 +659,7 @@ static size_t spread_results_evenly(DICTIONARY *results, MC_STATS *stats) {
         stats->max_base_high_ratio = 1.0;
 
     // create an array of the right size and copy all the values in it
-    calculated_number slots[dimensions];
+    NETDATA_DOUBLE slots[dimensions];
     dimensions = 0;
     dfe_start_read(results, t) {
         if(t->flags & (RESULT_IS_PERCENTAGE_OF_TIME))
@@ -666,10 +670,10 @@ static size_t spread_results_evenly(DICTIONARY *results, MC_STATS *stats) {
     dfe_done(t);
 
     // sort the array with the values of all dimensions
-    qsort(slots, dimensions, sizeof(calculated_number), compare_calculated_numbers);
+    qsort(slots, dimensions, sizeof(NETDATA_DOUBLE), compare_netdata_doubles);
 
     // skip the duplicates in the sorted array
-    calculated_number last_value = NAN;
+    NETDATA_DOUBLE last_value = NAN;
     size_t unique_values = 0;
     for(size_t i = 0; i < dimensions ;i++) {
         if(likely(slots[i] != last_value))
@@ -681,11 +685,11 @@ static size_t spread_results_evenly(DICTIONARY *results, MC_STATS *stats) {
         unique_values = dimensions;
 
     // calculate the weight of each slot, using the number of unique values
-    calculated_number slot_weight = 1.0 / (calculated_number)unique_values;
+    NETDATA_DOUBLE slot_weight = 1.0 / (NETDATA_DOUBLE)unique_values;
 
     dfe_start_read(results, t) {
-        int slot = binary_search_bigger_than_calculated_number(slots, 0, (int)unique_values, t->value);
-        calculated_number v = slot * slot_weight;
+        int slot = binary_search_bigger_than_netdata_double(slots, 0, (int)unique_values, t->value);
+        NETDATA_DOUBLE v = slot * slot_weight;
         if(unlikely(v > 1.0)) v = 1.0;
         v = 1.0 - v;
         t->value = v;
@@ -729,12 +733,12 @@ int metric_correlations(RRDHOST *host, BUFFER *wb, METRIC_CORRELATIONS_METHOD me
 
     if(!points) points = 500;
 
-    rrdr_relative_window_to_absolute(&after, &before, default_rrd_update_every, points);
+    rrdr_relative_window_to_absolute(&after, &before);
 
     if(baseline_before <= API_RELATIVE_TIME_MAX)
         baseline_before += after;
 
-    rrdr_relative_window_to_absolute(&baseline_after, &baseline_before, default_rrd_update_every, points * 4);
+    rrdr_relative_window_to_absolute(&baseline_after, &baseline_before);
 
     if (before <= after || baseline_before <= baseline_after) {
         buffer_strcat(wb, "{\"error\": \"Invalid baseline or highlight ranges.\" }");

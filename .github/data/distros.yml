@@ -1,10 +1,21 @@
 # This defines the full set of distros we run CI on.
 ---
 platform_map: # map packaging architectures to docker platforms
-  i386: linux/i386
+  aarch64: linux/arm64/v8
   amd64: linux/amd64
-  armhf: linux/arm/v7
   arm64: linux/arm64/v8
+  armhf: linux/arm/v7
+  armhfp: linux/arm/v7
+  i386: linux/i386
+  x86_64: linux/amd64
+arch_order: # sort order for per-architecture jobs in CI
+  - amd64
+  - x86_64
+  - i386
+  - armhf
+  - armhfp
+  - arm64
+  - aarch64
 include:
   - &alpine
     distro: alpine
@@ -13,6 +24,8 @@ include:
       apk add -U bash
     jsonc_removal: |
       apk del json-c-dev
+    test:
+      ebpf-core: true
   - <<: *alpine
     version: "3.16"
   - <<: *alpine
@@ -26,6 +39,8 @@ include:
     version: latest
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
+    test:
+      ebpf-core: true
 
   - &alma
     distro: almalinux
@@ -37,8 +52,10 @@ include:
       type: rpm
       repo_distro: el/9
       arches:
-        - amd64
-        - arm64
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
   - <<: *alma
     version: "8"
     packages:
@@ -51,7 +68,9 @@ include:
       type: rpm
       repo_distro: el/7
       arches:
-        - amd64
+        - x86_64
+    test:
+      ebpf-core: false
 
   - &debian
     distro: debian
@@ -68,16 +87,15 @@ include:
         - amd64
         - armhf
         - arm64
+    test:
+      ebpf-core: true
   - <<: *debian
     version: "10"
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
-  - <<: *debian
-    version: "9"
-    packages:
-      <<: *debian_packages
-      repo_distro: debian/stretch
+    test:
+      ebpf-core: false
 
   - &fedora
     distro: fedora
@@ -88,14 +106,18 @@ include:
       type: rpm
       repo_distro: fedora/36
       arches:
-        - amd64
-        - armhf
-        - arm64
+        - x86_64
+        - armhfp
+        - aarch64
+    test:
+      ebpf-core: true
   - <<: *fedora
     version: "35"
     packages:
       <<: *fedora_packages
       repo_distro: fedora/35
+    test:
+      ebpf-core: true
 
   - &opensuse
     distro: opensuse
@@ -107,13 +129,17 @@ include:
       type: rpm
       repo_distro: opensuse/15.4
       arches:
-        - amd64
-        - arm64
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
   - <<: *opensuse
     version: "15.3"
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.3
+    test:
+      ebpf-core: false
 
   - distro: oraclelinux
     version: "8"
@@ -123,8 +149,10 @@ include:
       type: rpm
       repo_distro: ol/8
       arches:
-        - amd64
-        - arm64
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
 
   - &ubuntu
     distro: ubuntu
@@ -140,6 +168,8 @@ include:
         - amd64
         - armhf
         - arm64
+    test:
+      ebpf-core: true
   - <<: *ubuntu
     version: "21.10"
     packages:
@@ -160,3 +190,5 @@ include:
         - amd64
         - armhf
         - arm64
+    test:
+      ebpf-core: false

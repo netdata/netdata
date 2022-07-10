@@ -158,9 +158,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
                       );
 
     // for each line in the array
-    calculated_number total = 1;
+    NETDATA_DOUBLE total = 1;
     for(i = start; i != end ;i += step) {
-        calculated_number *cn = &r->v[ i * r->d ];
+        NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
         uint8_t *ar = &r->ar[ i * r->d ];
 
@@ -210,7 +210,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_fast_strcat(wb, object_rows_time, object_rows_time_len);
 
-            buffer_rrd_value(wb, (calculated_number)r->t[i]);
+            buffer_rrd_value(wb, (NETDATA_DOUBLE)r->t[i]);
 
             // in ms
             if(unlikely(options & RRDR_OPTION_MILLISECONDS))
@@ -223,9 +223,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-                calculated_number n;
+                NETDATA_DOUBLE n;
                 if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
-                    n = (calculated_number)ar[c] / 2.0; // rrdr stores anomaly rates 0 - 200
+                    n = (NETDATA_DOUBLE)ar[c] / 2.0; // rrdr stores anomaly rates 0 - 200
                 else
                     n = cn[c];
 
@@ -244,9 +244,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
-            calculated_number n;
+            NETDATA_DOUBLE n;
             if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
-                n = (calculated_number)ar[c] / 2.0; // rrdr stores anomaly rates 0 - 200
+                n = (NETDATA_DOUBLE)ar[c] / 2.0; // rrdr stores anomaly rates 0 - 200
             else
                 n = cn[c];
 

@@ -116,15 +116,17 @@ For example, if your plugin wants to monitor `squid`, you can search for it on p
 
 Any program that can print a few values to its standard output can become a Netdata external plugin.
 
-Netdata parses 7 lines starting with:
+Netdata parses 9 lines starting with:
 
--   `CHART` - create or update a chart
--   `DIMENSION` - add or update a dimension to the chart just created
--   `BEGIN` - initialize data collection for a chart
--   `SET` - set the value of a dimension for the initialized chart
--   `END` - complete data collection for the initialized chart
--   `FLUSH` - ignore the last collected values
--   `DISABLE` - disable this plugin
+-    `CHART` - create or update a chart
+-    `DIMENSION` - add or update a dimension to the chart just created
+-    `BEGIN` - initialize data collection for a chart
+-    `SET` - set the value of a dimension for the initialized chart
+-    `END` - complete data collection for the initialized chart
+-    `FLUSH` - ignore the last collected values
+-    `DISABLE` - disable this plugin
+-    `CLABEL` - add a label to a chart
+-    `CLABEL_COMMIT` - commit added labels to the chart.
 
 a single program can produce any number of charts with any number of dimensions each.
 
@@ -319,6 +321,46 @@ Variable names should use alphanumeric characters, the `.` and the `_`.
 The `value` is floating point (Netdata used `long double`).
 
 Variables are transferred to upstream Netdata servers (streaming and database replication).
+
+#### CLABEL
+
+> CLABEL name value source
+
+`CLABEL` defines a label used to organize and identify a chart.
+
+Name and value accept characters according to the following table:
+
+| Character           | Symbol | Label Name | Label Value |
+|---------------------|:------:|:----------:|:-----------:|
+| UTF-8 character     | UTF-8  |     _      |    keep     |
+| Lower case letter   | [a-z]  |    keep    |    keep     |
+| Upper case letter   | [A-Z]  |    keep    |    [a-z]    |
+| Digit               | [0-9]  |    keep    |    keep     |
+| Underscore          |   _    |    keep    |    keep     |
+| Minus               |   -    |    keep    |    keep     |
+| Plus                |   +    |     _      |    keep     |
+| Colon               |   :    |     _      |    keep     |
+| Semicolon           |   ;    |     _      |      :      |
+| Equal               |   =    |     _      |      :      |
+| Period              |   .    |    keep    |    keep     |
+| Comma               |   ,    |     .      |      .      |
+| Slash               |   /    |    keep    |    keep     |
+| Backslash           |   \    |     /      |      /      |
+| At                  |   @    |     _      |    keep     |
+| Space               |  ' '   |     _      |    keep     |
+| Opening parenthesis |   (    |     _      |    keep     |
+| Closing parenthesis |   )    |     _      |    keep     |
+| Anything else       |        |     _      |      _      |
+
+The `source` is an integer field that can have the following values:
+- `1`: The value was set automatically.
+- `2`: The value was set manually.
+- `4`: This is a K8 label.
+- `8`: This is a label defined using `netdata` agent cloud link.
+
+#### CLABEL_COMMIT
+
+`CLABEL_COMMIT` indicates that all labels were defined and the chart can be updated.
 
 ## Data collection
 

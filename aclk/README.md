@@ -50,12 +50,12 @@ You can configure following keys in the `netdata.conf` section `[cloud]`:
 [cloud]
   statistics = yes
   query thread count = 2
-  mqtt5 = no
+  mqtt5 = yes
 ```
 
 - `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the database and slightly reduce memory usage of Netdata Agent.
 - `query thread count` specifies the number of threads to process cloud queries. Increasing this setting is useful for nodes with many children (streaming), which can expect to handle more queries (and/or more complicated queries).
-- `mqtt5` enables the new MQTT5 protocol implementation in the Agent. Currently a technical preview.
+- `mqtt5` allows disabling the new MQTT5 implementation which is used now by default in case of issues. This option will be removed in future stable release.
 
 ## Disable the ACLK
 

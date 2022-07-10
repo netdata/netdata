@@ -6,7 +6,7 @@
 #include "sqlite_aclk_chart.h"
 #include "sqlite_aclk_node.h"
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
 #include "../../aclk/aclk.h"
 #endif
 
@@ -23,11 +23,11 @@ const char *aclk_sync_config[] = {
 
     "CREATE TRIGGER IF NOT EXISTS tr_dim_del AFTER DELETE ON dimension BEGIN INSERT INTO dimension_delete "
     "(dimension_id, dimension_name, chart_type_id, dim_id, chart_id, host_id, date_created)"
-    " select old.id, old.name, c.type||\".\"||c.id, old.dim_id, old.chart_id, c.host_id, strftime('%s') FROM"
+    " select old.id, old.name, c.type||\".\"||c.id, old.dim_id, old.chart_id, c.host_id, unixepoch() FROM"
     " chart c WHERE c.chart_id = old.chart_id; END;",
 
     "DELETE FROM dimension_delete WHERE host_id NOT IN"
-    " (SELECT host_id FROM host) OR strftime('%s') - date_created > 604800;",
+    " (SELECT host_id FROM host) OR unixepoch() - date_created > 604800;",
 
     NULL,
 };
@@ -36,7 +36,7 @@ uv_mutex_t aclk_async_lock;
 struct aclk_database_worker_config  *aclk_thread_head = NULL;
 int retention_running = 0;
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
 static void stop_retention_run()
 {
     uv_mutex_lock(&aclk_async_lock);
@@ -276,7 +276,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
 void sql_aclk_sync_init(void)
 {
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
     char *err_msg = NULL;
     int rc;
 
@@ -323,7 +323,7 @@ static void timer_cb(uv_timer_t* handle)
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
     struct aclk_database_worker_config *wc = handle->data;
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -338,7 +338,7 @@ static void timer_cb(uv_timer_t* handle)
             wc->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
     }
 
-    if (aclk_use_new_cloud_arch && aclk_connected) {
+    if (aclk_connected) {
         if (wc->rotation_after && wc->rotation_after < now) {
             cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
             if (!aclk_database_enq_cmd_noblock(wc, &cmd))
@@ -373,7 +373,7 @@ static void timer_cb(uv_timer_t* handle)
 }
 
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
 void after_send_retention(uv_work_t *req, int status)
 {
     struct aclk_database_worker_config *wc = req->data;
@@ -410,7 +410,6 @@ void aclk_database_worker(void *arg)
 {
     worker_register("ACLKSYNC");
     worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     worker_register_job_name(ACLK_DATABASE_ADD_CHART,            "chart add");
     worker_register_job_name(ACLK_DATABASE_ADD_DIMENSION,        "dimension add");
     worker_register_job_name(ACLK_DATABASE_PUSH_CHART,           "chart push");
@@ -420,11 +419,11 @@ void aclk_database_worker(void *arg)
     worker_register_job_name(ACLK_DATABASE_UPD_RETENTION,        "retention check");
     worker_register_job_name(ACLK_DATABASE_DIM_DELETION,         "dimension delete");
     worker_register_job_name(ACLK_DATABASE_ORPHAN_HOST,          "node orphan");
-#endif
     worker_register_job_name(ACLK_DATABASE_ALARM_HEALTH_LOG,     "alert log");
     worker_register_job_name(ACLK_DATABASE_CLEANUP,              "cleanup");
     worker_register_job_name(ACLK_DATABASE_DELETE_HOST,          "node delete");
     worker_register_job_name(ACLK_DATABASE_NODE_INFO,            "node info");
+    worker_register_job_name(ACLK_DATABASE_NODE_COLLECTORS,      "node collectors");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,  "alert snapshot");
@@ -479,7 +478,7 @@ void aclk_database_worker(void *arg)
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
 
     memset(&cmd, 0, sizeof(cmd));
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
     uv_work_t retention_work;
     sql_get_last_chart_sequence(wc);
     wc->chart_payload_count = sql_get_pending_count(wc);
@@ -532,7 +531,7 @@ void aclk_database_worker(void *arg)
                     break;
 
 // CHART / DIMENSION OPERATIONS
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
                 case ACLK_DATABASE_ADD_CHART:
                     debug(D_ACLK_SYNC, "Adding chart event for %s", wc->host_guid);
                     aclk_add_chart_event(wc, cmd);
@@ -585,7 +584,11 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
                     sql_build_node_info(wc, cmd);
                     break;
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+                case ACLK_DATABASE_NODE_COLLECTORS:
+                    debug(D_ACLK_SYNC,"Sending node collectors info for %s", wc->uuid_str);
+                    sql_build_node_collectors(wc);
+                    break;
+#ifdef ENABLE_ACLK
                 case ACLK_DATABASE_DIM_DELETION:
                     debug(D_ACLK_SYNC,"Sending dimension deletion information %s", wc->uuid_str);
                     aclk_process_dimension_deletion(wc, cmd);
@@ -624,6 +627,8 @@ void aclk_database_worker(void *arg)
                                 snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", wc->host->hostname);
                                 uv_thread_set_name_np(wc->thread, threadname);
                                 wc->host->dbsync_worker = wc;
+                                if (unlikely(!wc->hostname))
+                                    wc->hostname = strdupz(wc->host->hostname);
                                 aclk_del_worker_thread(wc);
                                 wc->node_info_send = 1;
                             }
@@ -633,6 +638,11 @@ void aclk_database_worker(void *arg)
                         cmd.opcode = ACLK_DATABASE_NODE_INFO;
                         cmd.completion = NULL;
                         wc->node_info_send = aclk_database_enq_cmd_noblock(wc, &cmd);
+                    }
+                    if (wc->node_collectors_send && wc->node_collectors_send + 30 < now_realtime_sec()) {
+                        cmd.opcode = ACLK_DATABASE_NODE_COLLECTORS;
+                        cmd.completion = NULL;
+                        wc->node_collectors_send = aclk_database_enq_cmd_noblock(wc, &cmd);
                     }
                     if (localhost == wc->host)
                         (void) sqlite3_wal_checkpoint(db_meta, NULL);
@@ -676,6 +686,7 @@ void aclk_database_worker(void *arg)
     rrd_rdlock();
     if (likely(wc->host))
         wc->host->dbsync_worker = NULL;
+    freez(wc->hostname);
     freez(wc);
     rrd_unlock();
 
@@ -745,13 +756,17 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
         return;
 
     struct aclk_database_worker_config *wc = callocz(1, sizeof(struct aclk_database_worker_config));
-    if (likely(host))
-        host->dbsync_worker = (void *) wc;
+    if (node_id && !uuid_is_null(*node_id))
+        uuid_unparse_lower(*node_id, wc->node_id);
+    if (likely(host)) {
+        host->dbsync_worker = (void *)wc;
+        wc->hostname = strdupz(host->hostname);
+    }
+    else
+        wc->hostname = get_hostname_by_node_id(wc->node_id);
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
     strcpy(wc->host_guid, host_guid);
-    if (node_id && !uuid_is_null(*node_id))
-        uuid_unparse_lower(*node_id, wc->node_id);
     wc->chart_updates = 0;
     wc->alert_updates = 0;
     wc->retry_count = 0;
@@ -775,7 +790,7 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
 
     buffer_sprintf(sql,"DELETE FROM aclk_chart_%s WHERE date_submitted IS NOT NULL AND "
-        "date_updated < strftime('%%s','now','-%d seconds');", wc->uuid_str, ACLK_DELETE_ACK_INTERNAL);
+        "date_updated < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_INTERNAL);
     db_execute(buffer_tostring(sql));
     buffer_flush(sql);
 
@@ -786,7 +801,7 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
     buffer_flush(sql);
 
     buffer_sprintf(sql,"DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
-        "date_cloud_ack < strftime('%%s','now','-%d seconds');", wc->uuid_str, ACLK_DELETE_ACK_ALERTS_INTERNAL);
+        "date_cloud_ack < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_ALERTS_INTERNAL);
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
@@ -912,15 +927,15 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
         sqlite3_free(err_msg);
     }
     db_execute("DELETE FROM dimension_delete WHERE host_id NOT IN (SELECT host_id FROM host) "
-               " OR strftime('%s') - date_created > 604800;");
+               " OR unixepoch() - date_created > 604800;");
     return;
 }
 
 void aclk_data_rotated(void)
 {
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
 
-    if (!aclk_use_new_cloud_arch || !aclk_connected)
+    if (!aclk_connected)
         return;
 
     time_t next_rotation_time = now_realtime_sec()+ACLK_DATABASE_ROTATION_DELAY;

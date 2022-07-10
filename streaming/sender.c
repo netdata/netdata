@@ -80,7 +80,7 @@ void sender_commit(struct sender_state *s) {
 
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
-    host->rrdpush_sender_connected = 0;
+    __atomic_clear(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
 
     if(host->rrdpush_sender_socket != -1) {
         close(host->rrdpush_sender_socket);
@@ -89,20 +89,20 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 }
 
 static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
-    calculated_number *value = (calculated_number *)rv->value;
+    NETDATA_DOUBLE *value = (NETDATA_DOUBLE *)rv->value;
 
     buffer_sprintf(
             host->sender->build
-            , "VARIABLE HOST %s = " CALCULATED_NUMBER_FORMAT "\n"
+            , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
             , rv->name
             , *value
     );
 
-    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
+    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rv->name, *value);
 }
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {
-    if(host->rrdpush_send_enabled && host->rrdpush_sender_spawn && host->rrdpush_sender_connected) {
+    if(host->rrdpush_send_enabled && host->rrdpush_sender_spawn && __atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)) {
         sender_start(host->sender);
         rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
         sender_commit(host->sender);
@@ -563,7 +563,7 @@ static void attempt_to_connect(struct sender_state *state)
         state->sent_bytes_on_this_connection = 0;
 
         // let the data collection threads know we are ready
-        state->host->rrdpush_sender_connected = 1;
+        __atomic_test_and_set(&state->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
     }
     else {
         // increase the failed connections counter
@@ -770,7 +770,7 @@ void *rrdpush_sender_thread(void *ptr) {
         remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
 
     // initialize rrdpush globals
-    s->host->rrdpush_sender_connected = 0;
+    __atomic_clear(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
     if(pipe(s->host->rrdpush_sender_pipe) == -1) {
         error("STREAM %s [send]: cannot create required pipe. DISABLING STREAMING THREAD", s->host->hostname);
         return NULL;

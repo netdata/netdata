@@ -294,20 +294,6 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *****************************************************************/
 
 /**
- * Clean PID structures
- *
- * Clean the allocated structures.
- */
-void clean_cachestat_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(cachestat_pid[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
-/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -338,7 +324,8 @@ static void ebpf_cachestat_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else if (bpf_obj)
@@ -367,23 +354,23 @@ void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, ui
                               uint64_t apcl, uint64_t apd)
 {
     // Adapted algorithm from https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138
-    calculated_number total = (calculated_number) (((long long)mpa) - ((long long)mbd));
+    NETDATA_DOUBLE total = (NETDATA_DOUBLE) (((long long)mpa) - ((long long)mbd));
     if (total < 0)
         total = 0;
 
-    calculated_number misses = (calculated_number) ( ((long long) apcl) - ((long long) apd) );
+    NETDATA_DOUBLE misses = (NETDATA_DOUBLE) ( ((long long) apcl) - ((long long) apd) );
     if (misses < 0)
         misses = 0;
 
     // If hits are < 0, then its possible misses are overestimate due to possibly page cache read ahead adding
     // more pages than needed. In this case just assume misses as total and reset hits.
-    calculated_number hits = total - misses;
+    NETDATA_DOUBLE hits = total - misses;
     if (hits < 0 ) {
         misses = total;
         hits = 0;
     }
 
-    calculated_number ratio = (total > 0) ? hits/total : 1;
+    NETDATA_DOUBLE ratio = (total > 0) ? hits/total : 1;
 
     out->ratio = (long long )(ratio*100);
     out->hit = (long long)hits;

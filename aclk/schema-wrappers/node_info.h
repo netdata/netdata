@@ -50,9 +50,6 @@ struct aclk_node_info {
 
     char *custom_info;
 
-    char **services;
-    size_t service_count;
-
     char *machine_guid;
 
     DICTIONARY *host_labels_ptr;
@@ -74,7 +71,20 @@ struct update_node_info {
     struct capability *node_instance_capabilities;
 };
 
+struct collector_info {
+    char *module;
+    char *plugin;
+};
+
+struct update_node_collectors {
+    char *claim_id;
+    char *node_id;
+    DICTIONARY *node_collectors;
+};
+
 char *generate_update_node_info_message(size_t *len, struct update_node_info *info);
+
+char *generate_update_node_collectors_message(size_t *len, struct update_node_collectors *collectors);
 
 #ifdef __cplusplus
 }

@@ -16,42 +16,39 @@ dpkg-maintscript-helper dir_to_symlink \
   /var/lib/netdata/www/static /usr/share/netdata/www/static 1.18.1~ netdata -- "$@"
 
 case "$1" in
-  configure)
-    if [ -z "$2" ]; then
-      if ! getent group netdata > /dev/null; then
-        addgroup --quiet --system netdata
+  configure|recnfigure)
+    if ! getent group netdata > /dev/null; then
+      addgroup --quiet --system netdata
+    fi
+
+    if ! getent passwd netdata > /dev/null; then
+      adduser --quiet --system --ingroup netdata --home /var/lib/netdata --no-create-home netdata
+    fi
+
+    for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
+      if getent group $item > /dev/null 2>&1; then
+        usermod -a -G $item netdata
       fi
+    done
 
-      if ! getent passwd netdata > /dev/null; then
-        adduser --quiet --system --ingroup netdata --home /var/lib/netdata --no-create-home netdata
-      fi
+    if ! dpkg-statoverride --list /var/lib/netdata > /dev/null 2>&1; then
+      dpkg-statoverride --update --add netdata netdata 0755 /var/lib/netdata
+    fi
 
-      for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
-        if getent group $item > /dev/null 2>&1; then
-          usermod -a -G $item netdata
-        fi
-      done
+    if ! dpkg-statoverride --list /var/lib/netdata/www > /dev/null 2>&1; then
+      dpkg-statoverride --update --add root netdata 0755 /var/lib/netdata/www
+    fi
 
-      if ! dpkg-statoverride --list /var/lib/netdata > /dev/null 2>&1; then
-        dpkg-statoverride --update --add netdata netdata 0755 /var/lib/netdata
-      fi
+    if ! dpkg-statoverride --list /var/cache/netdata > /dev/null 2>&1; then
+      dpkg-statoverride --update --add netdata netdata 0755 /var/cache/netdata
+    fi
 
-      if ! dpkg-statoverride --list /var/lib/netdata/www > /dev/null 2>&1; then
-        dpkg-statoverride --update --add root netdata 0755 /var/lib/netdata/www
-      fi
+    if ! dpkg-statoverride --list /var/run/netdata > /dev/null 2>&1; then
+      dpkg-statoverride --update --add netdata netdata 0755 /var/run/netdata
+    fi
 
-      if ! dpkg-statoverride --list /var/cache/netdata > /dev/null 2>&1; then
-        dpkg-statoverride --update --add netdata netdata 0755 /var/cache/netdata
-      fi
-
-      if ! dpkg-statoverride --list /var/run/netdata > /dev/null 2>&1; then
-        dpkg-statoverride --update --add netdata netdata 0755 /var/run/netdata
-      fi
-
-      if ! dpkg-statoverride --list /var/log/netdata > /dev/null 2>&1; then
-        dpkg-statoverride --update --add netdata adm 02750 /var/log/netdata
-      fi
-
+    if ! dpkg-statoverride --list /var/log/netdata > /dev/null 2>&1; then
+      dpkg-statoverride --update --add netdata adm 02750 /var/log/netdata
     fi
 
     dpkg-statoverride --force --update --add root netdata 0775 /var/lib/netdata/registry > /dev/null 2>&1
@@ -59,7 +56,12 @@ case "$1" in
     chown -R root:netdata /usr/libexec/netdata/plugins.d
     setcap cap_dac_read_search,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin
     setcap cap_dac_read_search+ep /usr/libexec/netdata/plugins.d/slabinfo.plugin
-    capsh --supports=cap_perfmon 2>/dev/null && setcap cap_perfmon+ep /usr/libexec/netdata/plugins.d/perf.plugin || setcap cap_sys_admin+ep /usr/libexec/netdata/plugins.d/perf.plugin
+
+    if capsh --supports=cap_perfmon 2>/dev/null; then
+        setcap cap_perfmon+ep /usr/libexec/netdata/plugins.d/perf.plugin
+    else
+        setcap cap_sys_admin+ep /usr/libexec/netdata/plugins.d/perf.plugin
+    fi
 
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network
     chmod 4750 /usr/libexec/netdata/plugins.d/nfacct.plugin

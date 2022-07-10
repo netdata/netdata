@@ -201,7 +201,7 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
         static int unknown_units_error = 10;
 
         char *end = NULL;
-        long double value = str2ld(buffer, &end);
+        NETDATA_DOUBLE value = str2ndd(buffer, &end);
         if(end && *end) {
             if(*end == 'k')
                 return (unsigned long long int)(value * 1024.0);

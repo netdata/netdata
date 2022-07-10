@@ -219,51 +219,8 @@ static void ebpf_exit(int sig)
         return;
     }
 
-    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
-        clean_socket_apps_structures();
-        freez(socket_bandwidth_curr);
-    }
-
-    if (ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled = 0;
-        clean_cachestat_pid_structures();
-        freez(cachestat_pid);
-    }
-
-    if (ebpf_modules[EBPF_MODULE_DCSTAT_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_DCSTAT_IDX].enabled = 0;
-        clean_dcstat_pid_structures();
-        freez(dcstat_pid);
-    }
-
-    if (ebpf_modules[EBPF_MODULE_SWAP_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_SWAP_IDX].enabled = 0;
-        clean_swap_pid_structures();
-        freez(swap_pid);
-    }
-
-    if (ebpf_modules[EBPF_MODULE_VFS_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_VFS_IDX].enabled = 0;
-        clean_vfs_pid_structures();
-        freez(vfs_pid);
-    }
-
-    if (ebpf_modules[EBPF_MODULE_FD_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_FD_IDX].enabled = 0;
-        clean_fd_pid_structures();
-        freez(fd_pid);
-    }
-
-    if (ebpf_modules[EBPF_MODULE_SHM_IDX].enabled) {
-        ebpf_modules[EBPF_MODULE_SHM_IDX].enabled = 0;
-        clean_shm_pid_structures();
-        freez(shm_pid);
-    }
-
     ebpf_close_cgroup_shm();
 
-    ebpf_clean_cgroup_pids();
     /*
     int ret = fork();
     if (ret < 0) // error

@@ -227,14 +227,14 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
         RRD_ID_LENGTH_MAX);
 
     time_t last_t;
-    calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+    NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     if(isnan(value))
         return 0;
 
     buffer_sprintf(
         instance->buffer,
-        "put %s.%s.%s %llu " CALCULATED_NUMBER_FORMAT " host=%s%s%s%s\n",
+        "put %s.%s.%s %llu " NETDATA_DOUBLE_FORMAT " host=%s%s%s%s\n",
         instance->config.prefix,
         chart_name,
         dimension_name,
@@ -370,7 +370,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         RRD_ID_LENGTH_MAX);
 
     time_t last_t;
-    calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+    NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     if(isnan(value))
         return 0;
@@ -383,7 +383,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         "{"
         "\"metric\":\"%s.%s.%s\","
         "\"timestamp\":%llu,"
-        "\"value\":"CALCULATED_NUMBER_FORMAT","
+        "\"value\":" NETDATA_DOUBLE_FORMAT ","
         "\"tags\":{"
         "\"host\":\"%s%s%s\"%s"
         "}"

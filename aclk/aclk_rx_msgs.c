@@ -6,6 +6,8 @@
 #include "aclk_query_queue.h"
 #include "aclk.h"
 
+#include "schema-wrappers/proto_2_json.h"
+
 #define ACLK_V2_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
 #define ACLK_CLOUD_REQ_V2_PREFIX "GET /"
 
@@ -55,19 +57,19 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
             break;
         case JSON_NUMBER:
             if (!strcmp(e->name, "version")) {
-                data->version = e->data.number;
+                data->version = (int)e->data.number;
                 break;
             }
             if (!strcmp(e->name, "timeout")) {
-                data->timeout = e->data.number;
+                data->timeout = (int)e->data.number;
                 break;
             }
             if (!strcmp(e->name, "min-version")) {
-                data->min_version = e->data.number;
+                data->min_version = (int)e->data.number;
                 break;
             }
             if (!strcmp(e->name, "max-version")) {
-                data->max_version = e->data.number;
+                data->max_version = (int)e->data.number;
                 break;
             }
 
@@ -116,20 +118,8 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     return 0;
 }
 
-#define HTTP_CHECK_AGENT_INITIALIZED() ACLK_SHARED_STATE_LOCK;\
-    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {\
-        debug(D_ACLK, "Ignoring \"http\" cloud request; agent not in stable state");\
-        ACLK_SHARED_STATE_UNLOCK;\
-        return 1;\
-    }\
-    ACLK_SHARED_STATE_UNLOCK;
-
 static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent, char *raw_payload)
 {
-    if (!aclk_use_new_cloud_arch) {
-        HTTP_CHECK_AGENT_INITIALIZED();
-    }
-
     aclk_query_t query;
 
     errno = 0;
@@ -229,7 +219,6 @@ err_cleanup:
     return 1;
 }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 typedef uint32_t simple_hash_t;
 typedef int(*rx_msg_handler)(const char *msg, size_t msg_len);
 
@@ -491,7 +480,7 @@ unsigned int aclk_init_rx_msg_handlers(void)
     return i;
 }
 
-void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len)
+void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic)
 {
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
@@ -509,6 +498,17 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         }
         return;
     }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if (!strncmp(message_type, "cmd", strlen("cmd"))) {
+        log_aclk_message_bin(msg, msg_len, 0, topic, msg_descriptor->name);
+    } else {
+        char *json = protomsg_to_json(msg, msg_len, msg_descriptor->name);
+        log_aclk_message_bin(json, strlen(json), 0, topic, msg_descriptor->name);
+        freez(json);
+    }
+#endif
+
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
         aclk_proto_rx_msgs_sample[msg_descriptor-rx_msgs]++;
@@ -524,4 +524,3 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         return;
     }
 }
-#endif

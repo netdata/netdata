@@ -35,7 +35,7 @@
 // data specific to each metric type
 
 typedef struct statsd_metric_gauge {
-    LONG_DOUBLE value;
+    NETDATA_DOUBLE value;
 } STATSD_METRIC_GAUGE;
 
 typedef struct statsd_metric_counter { // counter and meter
@@ -64,7 +64,7 @@ typedef struct statsd_histogram_extensions {
 
     size_t size;
     size_t used;
-    LONG_DOUBLE *values;   // dynamic array of values collected
+    NETDATA_DOUBLE *values;   // dynamic array of values collected
 } STATSD_METRIC_HISTOGRAM_EXTENSIONS;
 
 typedef struct statsd_metric_histogram { // histogram and timer
@@ -271,9 +271,7 @@ static struct statsd {
     size_t tcp_idle_timeout;
     collected_number decimal_detail;
     size_t private_charts;
-    size_t max_private_charts;
     size_t max_private_charts_hard;
-    RRD_MEMORY_MODE private_charts_memory_mode;
     long private_charts_rrd_history_entries;
     unsigned int private_charts_hidden:1;
 
@@ -290,7 +288,6 @@ static struct statsd {
     LISTEN_SOCKETS sockets;
 } statsd = {
         .enabled = 1,
-        .max_private_charts = 200,
         .max_private_charts_hard = 1000,
         .private_charts_hidden = 0,
         .recvmmsg_size = 10,
@@ -390,7 +387,7 @@ static void dictionary_metric_insert_callback(const char *name, void *value, voi
         netdata_mutex_init(&m->histogram.ext->mutex);
     }
 
-    __atomic_fetch_add(&index->metrics, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&index->metrics, 1, __ATOMIC_RELAXED);
 }
 
 static void dictionary_metric_delete_callback(const char *name, void *value, void *data) {
@@ -431,12 +428,12 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing numbers
 
-static inline LONG_DOUBLE statsd_parse_float(const char *v, LONG_DOUBLE def) {
-    LONG_DOUBLE value;
+static inline NETDATA_DOUBLE statsd_parse_float(const char *v, NETDATA_DOUBLE def) {
+    NETDATA_DOUBLE value;
 
     if(likely(v && *v)) {
         char *e = NULL;
-        value = str2ld(v, &e);
+        value = str2ndd(v, &e);
         if(unlikely(e && *e))
             error("STATSD: excess data '%s' after value '%s'", e, v);
     }
@@ -446,8 +443,8 @@ static inline LONG_DOUBLE statsd_parse_float(const char *v, LONG_DOUBLE def) {
     return value;
 }
 
-static inline LONG_DOUBLE statsd_parse_sampling_rate(const char *v) {
-    LONG_DOUBLE sampling_rate = statsd_parse_float(v, 1.0);
+static inline NETDATA_DOUBLE statsd_parse_sampling_rate(const char *v) {
+    NETDATA_DOUBLE sampling_rate = statsd_parse_float(v, 1.0);
     if(unlikely(isless(sampling_rate, 0.001))) sampling_rate = 0.001;
     if(unlikely(isgreater(sampling_rate, 1.0))) sampling_rate = 1.0;
     return sampling_rate;
@@ -522,7 +519,7 @@ static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char 
         // magic loading of metric, without affecting anything
     }
     else {
-        m->counter.value += llrintl((LONG_DOUBLE) statsd_parse_int(value, 1) / statsd_parse_sampling_rate(sampling));
+        m->counter.value += llrintndd((NETDATA_DOUBLE) statsd_parse_int(value, 1) / statsd_parse_sampling_rate(sampling));
 
         m->events++;
         m->count++;
@@ -549,18 +546,18 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
         // magic loading of metric, without affecting anything
     }
     else {
-        LONG_DOUBLE v = statsd_parse_float(value, 1.0);
-        LONG_DOUBLE sampling_rate = statsd_parse_sampling_rate(sampling);
+        NETDATA_DOUBLE v = statsd_parse_float(value, 1.0);
+        NETDATA_DOUBLE sampling_rate = statsd_parse_sampling_rate(sampling);
         if(unlikely(isless(sampling_rate, 0.01))) sampling_rate = 0.01;
         if(unlikely(isgreater(sampling_rate, 1.0))) sampling_rate = 1.0;
 
-        long long samples = llrintl(1.0 / sampling_rate);
+        long long samples = llrintndd(1.0 / sampling_rate);
         while(samples-- > 0) {
 
             if(unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
                 netdata_mutex_lock(&m->histogram.ext->mutex);
                 m->histogram.ext->size += statsd.histogram_increase_step;
-                m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(LONG_DOUBLE) * m->histogram.ext->size);
+                m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(NETDATA_DOUBLE) * m->histogram.ext->size);
                 netdata_mutex_unlock(&m->histogram.ext->mutex);
             }
 
@@ -1591,7 +1588,7 @@ static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, c
 }
 
 static inline RRDSET *statsd_private_rrdset_create(
-        STATSD_METRIC *m
+        STATSD_METRIC *m __maybe_unused
         , const char *type
         , const char *id
         , const char *name
@@ -1603,16 +1600,6 @@ static inline RRDSET *statsd_private_rrdset_create(
         , int update_every
         , RRDSET_TYPE chart_type
 ) {
-    RRD_MEMORY_MODE memory_mode = statsd.private_charts_memory_mode;
-    long history = statsd.private_charts_rrd_history_entries;
-
-    if(unlikely(statsd.private_charts >= statsd.max_private_charts)) {
-        debug(D_STATSD, "STATSD: metric '%s' will be charted with memory mode = none, because the maximum number of charts has been reached.", m->name);
-        info("STATSD: metric '%s' will be charted with memory mode = none, because the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts);
-        memory_mode = RRD_MEMORY_MODE_NONE;
-        history = 5;
-    }
-
     statsd.private_charts++;
     RRDSET *st = rrdset_create_custom(
             localhost         // host
@@ -1628,8 +1615,8 @@ static inline RRDSET *statsd_private_rrdset_create(
             , priority        // priority
             , update_every    // update every
             , chart_type      // chart type
-            , memory_mode     // memory mode
-            , history         // history
+            , default_rrd_memory_mode     // memory mode
+            , default_rrd_history_entries // history
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
 
@@ -1945,21 +1932,21 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         netdata_mutex_lock(&m->histogram.ext->mutex);
 
         size_t len = m->histogram.ext->used;
-        LONG_DOUBLE *series = m->histogram.ext->values;
+        NETDATA_DOUBLE *series = m->histogram.ext->values;
         sort_series(series, len);
 
-        m->histogram.ext->last_min = (collected_number)roundl(series[0] * statsd.decimal_detail);
-        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * statsd.decimal_detail);
-        m->last = (collected_number)roundl(average(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_min = (collected_number)roundndd(series[0] * statsd.decimal_detail);
+        m->histogram.ext->last_max = (collected_number)roundndd(series[len - 1] * statsd.decimal_detail);
+        m->last = (collected_number)roundndd(average(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_median = (collected_number)roundndd(median_on_sorted_series(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_stddev = (collected_number)roundndd(standard_deviation(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_sum = (collected_number)roundndd(sum(series, len) * statsd.decimal_detail);
 
         size_t pct_len = (size_t)floor((double)len * statsd.histogram_percentile / 100.0);
         if(pct_len < 1)
             m->histogram.ext->last_percentile = (collected_number)(series[0] * statsd.decimal_detail);
         else
-            m->histogram.ext->last_percentile = (collected_number)roundl(series[pct_len - 1] * statsd.decimal_detail);
+            m->histogram.ext->last_percentile = (collected_number)roundndd(series[pct_len - 1] * statsd.decimal_detail);
 
         netdata_mutex_unlock(&m->histogram.ext->mutex);
 
@@ -2300,7 +2287,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED))) {
             if(unlikely(statsd.private_charts >= statsd.max_private_charts_hard)) {
                 debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts has been reached.", m->name);
-                info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts);
+                info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts_hard);
                 m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
             }
             else {
@@ -2446,9 +2433,7 @@ void *statsd_main(void *ptr) {
 #endif
 
     statsd.charts_for = simple_pattern_create(config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    statsd.max_private_charts = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts allowed", (long long)statsd.max_private_charts);
-    statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts * 5);
-    statsd.private_charts_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_STATSD, "private charts memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
+    statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts_hard);
     statsd.private_charts_rrd_history_entries = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
     statsd.decimal_detail = (collected_number)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
     statsd.tcp_idle_timeout = (size_t) config_get_number(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds", (long long int)statsd.tcp_idle_timeout);

@@ -196,18 +196,6 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  *****************************************************************/
 
 /**
- * Clean swap structure
- */
-void clean_swap_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(swap_pid[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
-/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -238,7 +226,8 @@ static void ebpf_swap_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else if (bpf_obj)

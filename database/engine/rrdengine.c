@@ -781,7 +781,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         xt_io_descr->descr_commit_idx_array[i] = descr_commit_idx_array[i];
 
         descr = xt_io_descr->descr_array[i];
-        header->descr[i].type = PAGE_METRICS;
+        header->descr[i].type = descr->type;
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time = descr->start_time;
@@ -1074,16 +1074,12 @@ struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc)
 
 static void load_configuration_dynamic(void)
 {
-    unsigned read_num;
-    static int printed_error = 0;
-
-    read_num = (unsigned) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine extent pages",
-                                                    MAX_PAGES_PER_EXTENT);
-    if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT) {
+    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
+    if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
         pages_per_extent = read_num;
-    } else if (!printed_error) {
-        printed_error = 1;
-        error("Invalid dbengine extent pages %u given. Defaulting to %u.", read_num, pages_per_extent);
+    else {
+        error("Invalid dbengine pages per extent %u given. Using %u.", read_num, pages_per_extent);
+        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", pages_per_extent);
     }
 }
 
@@ -1343,7 +1339,7 @@ void rrdengine_main(void)
     struct rrdengine_instance *ctx;
 
     sanity_check();
-    ret = rrdeng_init(NULL, &ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
+    ret = rrdeng_init(NULL, &ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB, 0);
     if (ret) {
         exit(ret);
     }

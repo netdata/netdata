@@ -96,7 +96,7 @@ PARSER_RC pluginsd_disable_action(void *user)
 }
 
 
-PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *name, int global, calculated_number value)
+PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value)
 {
     UNUSED(user);
 
@@ -146,13 +146,13 @@ PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name
     if (likely(unhide_dimension)) {
         rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-            (void)sql_set_dimension_option(&rd->state->metric_uuid, NULL);
+            (void)sql_set_dimension_option(&rd->metric_uuid, NULL);
             rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
         }
     } else {
         rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-           (void)sql_set_dimension_option(&rd->state->metric_uuid, "hidden");
+           (void)sql_set_dimension_option(&rd->metric_uuid, "hidden");
             rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
         }
     }
@@ -473,7 +473,7 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
 {
     char *name = words[1];
     char *value = words[2];
-    calculated_number v;
+    NETDATA_DOUBLE v;
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
@@ -513,7 +513,7 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
     }
 
     char *endptr = NULL;
-    v = (calculated_number)str2ld(value, &endptr);
+    v = (NETDATA_DOUBLE)str2ndd(value, &endptr);
     if (unlikely(endptr && *endptr)) {
         if (endptr == value)
             error(

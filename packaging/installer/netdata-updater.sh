@@ -28,7 +28,7 @@
 # Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 # Author: Austin S. Hemmelgarn <austin@netdata.cloud>
 
-# Next unused error code: U001A
+# Next unused error code: U001B
 
 set -e
 
@@ -420,7 +420,9 @@ self_update() {
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
-      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update --tmpdir-path "$(pwd)"
+      force_update=""
+      [ "$NETDATA_FORCE_UPDATE" = "1" ] && force_update="--force-update"
+      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update "$force_update" --tmpdir-path "$(pwd)"
     else
       error "Failed to download newest version of updater script, continuing with current version."
     fi
@@ -551,7 +553,11 @@ update_build() {
       NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
       tar -xf netdata-latest.tar.gz >&3 2>&3
       rm netdata-latest.tar.gz >&3 2>&3
-      cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
+      if [ -z "$path_version" ]; then
+        latest_tag="$(get_latest_version)"
+        path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
+      fi
+      cd "$(find . -maxdepth 1 -type d -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
       RUN_INSTALLER=1
     fi
   fi
@@ -844,27 +850,30 @@ if [ -r "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
 fi
 
 while [ -n "${1}" ]; do
-  if [ "${1}" = "--not-running-from-cron" ]; then
-    NETDATA_NOT_RUNNING_FROM_CRON=1
-    shift 1
-  elif [ "${1}" = "--no-updater-self-update" ]; then
-    NETDATA_NO_UPDATER_SELF_UPDATE=1
-    shift 1
-  elif [ "${1}" = "--force-update" ]; then
-    NETDATA_FORCE_UPDATE=1
-    shift 1
-  elif [ "${1}" = "--tmpdir-path" ]; then
-    NETDATA_TMPDIR_PATH="${2}"
-    shift 2
-  elif [ "${1}" = "--enable-auto-updates" ]; then
-    enable_netdata_updater "${2}"
-    exit $?
-  elif [ "${1}" = "--disable-auto-updates" ]; then
-    disable_netdata_updater
-    exit $?
-  else
-    break
-  fi
+  case "${1}" in
+    --not-running-from-cron) NETDATA_NOT_RUNNING_FROM_CRON=1 ;;
+    --no-updater-self-update) NETDATA_NO_UPDATER_SELF_UPDATE=1 ;;
+    --force-update) NETDATA_FORCE_UPDATE=1 ;;
+    --non-interactive) INTERACTIVE=0 ;;
+    --interactive) INTERACTIVE=1 ;;
+    --tmpdir-path)
+        NETDATA_TMPDIR_PATH="${2}"
+        shift 1
+        ;;
+    --enable-auto-updates)
+        enable_netdata_updater "${2}"
+        exit $?
+        ;;
+    --disable-auto-updates)
+        disable_netdata_updater
+        exit $?
+        ;;
+    *)
+        fatal "Unrecognized option ${1}" U001A
+        ;;
+  esac
+
+  shift 1
 done
 
 # Random sleep to alleviate stampede effect of Agents upgrading

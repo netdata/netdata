@@ -98,7 +98,7 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 #define TRIGGER_ACLK_CHART_PAYLOAD "CREATE TRIGGER IF NOT EXISTS aclk_tr_chart_payload_%s " \
         "after insert on aclk_chart_payload_%s " \
         "begin insert into aclk_chart_%s (uuid, unique_id, type, status, date_created) values " \
-        " (new.uuid, new.unique_id, new.type, 'pending', strftime('%%s')) on conflict(uuid, status) " \
+        " (new.uuid, new.unique_id, new.type, 'pending', unixepoch()) on conflict(uuid, status) " \
         " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
         "end;"
 
@@ -115,7 +115,6 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     ACLK_DATABASE_ADD_CHART,
     ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_PUSH_CHART,
@@ -125,7 +124,6 @@ enum aclk_database_opcode {
     ACLK_DATABASE_UPD_RETENTION,
     ACLK_DATABASE_DIM_DELETION,
     ACLK_DATABASE_ORPHAN_HOST,
-#endif
     ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_DELETE_HOST,
@@ -134,6 +132,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
     ACLK_DATABASE_QUEUE_REMOVED_ALERTS,
+    ACLK_DATABASE_NODE_COLLECTORS,
     ACLK_DATABASE_TIMER,
 
     // leave this last
@@ -170,6 +169,7 @@ struct aclk_database_worker_config {
     char uuid_str[GUID_LEN + 1];
     char node_id[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
+    char *hostname;                 // hostname to avoid constant lookups
     uint64_t chart_sequence_id;     // last chart_sequence_id
     time_t chart_timestamp;         // last chart timestamp
     time_t cleanup_after;           // Start a cleanup after this timestamp
@@ -196,6 +196,7 @@ struct aclk_database_worker_config {
     int alert_updates;
     time_t batch_created;
     int node_info_send;
+    time_t node_collectors_send;
     int chart_pending;
     int chart_reset_count;
     int retention_running;

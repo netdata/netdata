@@ -65,9 +65,9 @@ void buffer_char_replace(BUFFER *wb, char from, char to)
 }
 
 // This trick seems to give an 80% speed increase in 32bit systems
-// print_calculated_number_llu_r() will just print the digits up to the
+// print_number_llu_r() will just print the digits up to the
 // point the remaining value fits in 32 bits, and then calls
-// print_calculated_number_lu_r() to print the rest with 32 bit arithmetic.
+// print_number_lu_r() to print the rest with 32 bit arithmetic.
 
 inline char *print_number_lu_r(char *str, unsigned long uvalue) {
     char *wstr = str;
@@ -299,7 +299,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 }
 
 
-void buffer_rrd_value(BUFFER *wb, calculated_number value)
+void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value)
 {
     buffer_need_bytes(wb, 50);
 
@@ -308,7 +308,7 @@ void buffer_rrd_value(BUFFER *wb, calculated_number value)
         return;
     }
     else
-        wb->len += print_calculated_number(&wb->buffer[wb->len], value);
+        wb->len += print_netdata_double(&wb->buffer[wb->len], value);
 
     // terminate it
     buffer_need_bytes(wb, 1);

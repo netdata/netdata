@@ -28,7 +28,7 @@ typedef struct pluginsd_action {
 
     PARSER_RC (*flush_action)(void *user, RRDSET *st);
     PARSER_RC (*disable_action)(void *user);
-    PARSER_RC (*variable_action)(void *user, RRDHOST *host, RRDSET *st, char *name, int global, calculated_number value);
+    PARSER_RC (*variable_action)(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value);
     PARSER_RC (*label_action)(void *user, char *key, char *value, RRDLABEL_SRC source);
     PARSER_RC (*overwrite_action)(void *user, RRDHOST *host, DICTIONARY *new_labels);
     PARSER_RC (*clabel_action)(void *user, char *key, char *value, RRDLABEL_SRC source);

@@ -302,8 +302,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         Pvoid_t *PValue;
         struct pg_cache_page_index *page_index = NULL;
 
-        if (PAGE_METRICS != jf_metric_data->descr[i].type) {
-            error("Unknown page type encountered.");
+        if (jf_metric_data->descr[i].type > PAGE_TYPE_MAX) {
+            error("Unknown page type %d encountered.", jf_metric_data->descr[i].type );
             continue;
         }
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
@@ -331,6 +331,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->end_time = jf_metric_data->descr[i].end_time;
         descr->id = &page_index->id;
         descr->extent = extent;
+        descr->type = jf_metric_data->descr[i].type;
         extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
     }

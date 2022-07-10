@@ -31,8 +31,8 @@ import os
 import pprint
 import re
 import sys
-import time
 import threading
+import time
 import types
 
 try:
@@ -50,6 +50,7 @@ else:
 ENV_NETDATA_USER_CONFIG_DIR = 'NETDATA_USER_CONFIG_DIR'
 ENV_NETDATA_STOCK_CONFIG_DIR = 'NETDATA_STOCK_CONFIG_DIR'
 ENV_NETDATA_PLUGINS_DIR = 'NETDATA_PLUGINS_DIR'
+ENV_NETDATA_USER_PLUGINS_DIRS = 'NETDATA_USER_PLUGINS_DIRS'
 ENV_NETDATA_LIB_DIR = 'NETDATA_LIB_DIR'
 ENV_NETDATA_UPDATE_EVERY = 'NETDATA_UPDATE_EVERY'
 ENV_NETDATA_LOCK_DIR = 'NETDATA_LOCK_DIR'
@@ -99,6 +100,9 @@ def dirs():
     modules_user_config = os.path.join(plugin_user_config, 'python.d')
     modules_stock_config = os.path.join(plugin_stock_config, 'python.d')
     modules = os.path.abspath(pluginsd + '/../python.d')
+    user_modules = [os.path.join(p, 'python.d') for p in
+                    os.getenv(ENV_NETDATA_USER_PLUGINS_DIRS, "").split(" ") if
+                    p]
 
     Dirs = collections.namedtuple(
         'Dirs',
@@ -108,6 +112,7 @@ def dirs():
             'modules_user_config',
             'modules_stock_config',
             'modules',
+            'user_modules',
             'var_lib',
             'locks',
         ]
@@ -118,6 +123,7 @@ def dirs():
         modules_user_config,
         modules_stock_config,
         modules,
+        user_modules,
         var_lib,
         locks,
     )
@@ -128,6 +134,28 @@ DIRS = dirs()
 IS_ATTY = sys.stdout.isatty()
 
 MODULE_SUFFIX = '.chart.py'
+
+
+def find_available_modules(*directories):
+    AvailableModule = collections.namedtuple(
+        'AvailableModule',
+        [
+            'filepath',
+            'name',
+        ]
+    )
+    available = list()
+    for d in directories:
+        try:
+            if not os.path.isdir(d):
+                continue
+            files = sorted(os.listdir(d))
+        except OSError:
+            continue
+        modules = [m for m in files if m.endswith(MODULE_SUFFIX)]
+        available.extend([AvailableModule(os.path.join(d, m), m[:-len(MODULE_SUFFIX)]) for m in modules])
+
+    return available
 
 
 def available_modules():
@@ -143,10 +171,17 @@ def available_modules():
         'unbound',  # rewritten in Go
     )
 
-    files = sorted(os.listdir(DIRS.modules))
-    modules = [m[:-len(MODULE_SUFFIX)] for m in files if m.endswith(MODULE_SUFFIX)]
-    avail = [m for m in modules if m not in obsolete]
-    return tuple(avail)
+    stock = [m for m in find_available_modules(DIRS.modules) if m.name not in obsolete]
+    user = find_available_modules(*DIRS.user_modules)
+
+    available, seen = list(), set()
+    for m in user + stock:
+        if m.name in seen:
+            continue
+        seen.add(m.name)
+        available.append(m)
+
+    return available
 
 
 AVAILABLE_MODULES = available_modules()
@@ -176,9 +211,8 @@ def multi_path_find(name, *paths):
     return str()
 
 
-def load_module(name):
-    abs_path = os.path.join(DIRS.modules, '{0}{1}'.format(name, MODULE_SUFFIX))
-    module = SourceFileLoader('pythond_' + name, abs_path)
+def load_module(name, filepath):
+    module = SourceFileLoader('pythond_' + name, filepath)
     if isinstance(module, types.ModuleType):
         return module
     return module.load_module()
@@ -331,12 +365,13 @@ class Job(threading.Thread):
 
 
 class ModuleSrc:
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, m):
+        self.name = m.name
+        self.filepath = m.filepath
         self.src = None
 
     def load(self):
-        self.src = load_module(self.name)
+        self.src = load_module(self.name, self.filepath)
 
     def get(self, key):
         return getattr(self.src, key, None)
@@ -553,37 +588,38 @@ class Plugin:
         builder.min_update_every = self.min_update_every
 
         jobs = list()
-        for mod_name in self.modules_to_run:
-            if not self.config.is_module_enabled(mod_name):
-                self.log.info("[{0}] is disabled in the configuration file, skipping it".format(mod_name))
+        for m in self.modules_to_run:
+            if not self.config.is_module_enabled(m.name):
+                self.log.info("[{0}] is disabled in the configuration file, skipping it".format(m.name))
                 continue
 
-            src = ModuleSrc(mod_name)
+            src = ModuleSrc(m)
             try:
                 src.load()
             except Exception as error:
-                self.log.warning("[{0}] error on loading source : {1}, skipping it".format(mod_name, repr(error)))
+                self.log.warning("[{0}] error on loading source : {1}, skipping it".format(m.name, repr(error)))
                 continue
+            self.log.debug("[{0}] loaded module source : '{1}'".format(m.name, m.filepath))
 
             if not (src.service() and callable(src.service())):
-                self.log.warning("[{0}] has no callable Service object, skipping it".format(mod_name))
+                self.log.warning("[{0}] has no callable Service object, skipping it".format(m.name))
                 continue
 
-            if src.is_disabled_by_default() and not self.config.is_module_explicitly_enabled(mod_name):
-                self.log.info("[{0}] is disabled by default, skipping it".format(mod_name))
+            if src.is_disabled_by_default() and not self.config.is_module_explicitly_enabled(m.name):
+                self.log.info("[{0}] is disabled by default, skipping it".format(m.name))
                 continue
 
             builder.module_defaults = src.defaults()
-            configs = builder.build(mod_name)
+            configs = builder.build(m.name)
             if not configs:
-                self.log.info("[{0}] has no job configs, skipping it".format(mod_name))
+                self.log.info("[{0}] has no job configs, skipping it".format(m.name))
                 continue
 
             for config in configs:
                 config['job_name'] = re.sub(r'\s+', '_', config['job_name'])
                 config['override_name'] = re.sub(r'\s+', '_', config.pop('name'))
 
-                job = Job(src.service(), mod_name, config)
+                job = Job(src.service(), m.name, config)
 
                 was_previously_active = job_statuses and job_statuses.has(job.module_name, job.real_name)
                 if was_previously_active and job.autodetection_retry == 0:
@@ -811,6 +847,20 @@ def disable():
     exit(0)
 
 
+def get_modules_to_run(cmd):
+    if not cmd.modules_to_run:
+        return AVAILABLE_MODULES
+
+    modules_to_run, seen = list(), set()
+    for m in AVAILABLE_MODULES:
+        if m.name not in cmd.modules_to_run or m.name in seen:
+            continue
+        seen.add(m.name)
+        modules_to_run.append(m)
+
+    return modules_to_run
+
+
 def main():
     cmd = parse_command_line()
     log = PythonDLogger()
@@ -822,21 +872,22 @@ def main():
 
     log.info('using python v{0}'.format(PY_VERSION[0]))
 
-    unknown = set(cmd.modules_to_run) - set(AVAILABLE_MODULES)
-    if unknown:
-        log.error('unknown modules : {0}'.format(sorted(list(unknown))))
-        guessed = guess_module(AVAILABLE_MODULES, *cmd.modules_to_run)
-        if guessed:
-            log.info('probably you meant : \n{0}'.format(pprint.pformat(guessed, width=1)))
-        return
-
     if DIRS.locks and not cmd.nolock:
         registry = FileLockRegistry(DIRS.locks)
     else:
         registry = DummyRegistry()
 
+    unique_avail_module_names = set([m.name for m in AVAILABLE_MODULES])
+    unknown = set(cmd.modules_to_run) - unique_avail_module_names
+    if unknown:
+        log.error('unknown modules : {0}'.format(sorted(list(unknown))))
+        guessed = guess_module(unique_avail_module_names, *cmd.modules_to_run)
+        if guessed:
+            log.info('probably you meant : \n{0}'.format(pprint.pformat(guessed, width=1)))
+        return
+
     p = Plugin(
-        cmd.modules_to_run or AVAILABLE_MODULES,
+        get_modules_to_run(cmd),
         cmd.update_every,
         registry,
     )

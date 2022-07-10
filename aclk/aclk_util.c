@@ -4,7 +4,6 @@
 
 #include "daemon/common.h"
 
-int aclk_use_new_cloud_arch = 0;
 usec_t aclk_session_newarch = 0;
 
 aclk_env_t *aclk_env = NULL;
@@ -124,22 +123,15 @@ struct topic_name {
     { .id = ACLK_TOPICID_ALARM_HEALTH,          .name = "alarm-health"             },
     { .id = ACLK_TOPICID_ALARM_CONFIG,          .name = "alarm-config"             },
     { .id = ACLK_TOPICID_ALARM_SNAPSHOT,        .name = "alarm-snapshot"           },
+    { .id = ACLK_TOPICID_NODE_COLLECTORS,       .name = "node-instance-collectors" },
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
-enum aclk_topics compulsory_topics_legacy[] = {
-    ACLK_TOPICID_CHART,
-    ACLK_TOPICID_ALARMS,
-    ACLK_TOPICID_METADATA,
-    ACLK_TOPICID_COMMAND,
-    ACLK_TOPICID_UNKNOWN
-};
-
-enum aclk_topics compulsory_topics_new_cloud_arch[] = {
+enum aclk_topics compulsory_topics[] = {
 // TODO remove old topics once not needed anymore
-    ACLK_TOPICID_CHART,
-    ACLK_TOPICID_ALARMS,
-    ACLK_TOPICID_METADATA,
+    ACLK_TOPICID_CHART, //TODO from legacy
+    ACLK_TOPICID_ALARMS, //TODO from legacy
+    ACLK_TOPICID_METADATA, //TODO from legacy
     ACLK_TOPICID_COMMAND,
     ACLK_TOPICID_AGENT_CONN,
     ACLK_TOPICID_CMD_NG_V1,
@@ -154,6 +146,7 @@ enum aclk_topics compulsory_topics_new_cloud_arch[] = {
     ACLK_TOPICID_ALARM_HEALTH,
     ACLK_TOPICID_ALARM_CONFIG,
     ACLK_TOPICID_ALARM_SNAPSHOT,
+    ACLK_TOPICID_NODE_COLLECTORS,
     ACLK_TOPICID_UNKNOWN
 };
 
@@ -278,8 +271,6 @@ int aclk_generate_topic_cache(struct json_object *json)
             return 1;
         }
     }
-
-    enum aclk_topics *compulsory_topics = aclk_use_new_cloud_arch ? compulsory_topics_new_cloud_arch : compulsory_topics_legacy;
 
     for (int i = 0; compulsory_topics[i] != ACLK_TOPICID_UNKNOWN; i++) {
         if (!aclk_get_topic(compulsory_topics[i])) {

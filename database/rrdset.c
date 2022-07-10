@@ -80,17 +80,9 @@ static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, ui
     tmp.name = name;
     tmp.hash_name = (hash)?hash:simple_hash(tmp.name);
 
-    // fprintf(stderr, "SEARCHING: %s\n", name);
     result = avl_search_lock(&host->rrdset_root_index_name, (avl_t *) (&(tmp.avlname)));
-    if(result) {
-        RRDSET *st = rrdset_from_avlname(result);
-        if(strcmp(st->magic, RRDSET_MAGIC) != 0)
-            error("Search for RRDSET %s returned an invalid RRDSET %s (name %s)", name, st->id, st->name);
+    if(result) return rrdset_from_avlname(result);
 
-        // fprintf(stderr, "FOUND: %s\n", name);
-        return rrdset_from_avlname(result);
-    }
-    // fprintf(stderr, "NOT FOUND: %s\n", name);
     return NULL;
 }
 
@@ -281,12 +273,13 @@ void rrdset_reset(RRDSET *st) {
         rd->last_collected_time.tv_sec = 0;
         rd->last_collected_time.tv_usec = 0;
         rd->collections_counter = 0;
-        // memset(rd->values, 0, rd->entries * sizeof(storage_number));
-#ifdef ENABLE_DBENGINE
-        if (RRD_MEMORY_MODE_DBENGINE == st->rrd_memory_mode && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            rrdeng_store_metric_flush_current_page(rd);
+
+        if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+            for(int tier = 0; tier < storage_tiers ;tier++) {
+                if(rd->tiers[tier])
+                    rd->tiers[tier]->collect_ops.flush(rd->tiers[tier]->db_collection_handle);
+            }
         }
-#endif
     }
 }
 
@@ -294,20 +287,27 @@ void rrdset_reset(RRDSET *st) {
 // RRDSET - helpers for rrdset_create()
 
 inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
-    if(unlikely(entries < 5)) entries = 5;
-    if(unlikely(entries > RRD_HISTORY_ENTRIES_MAX)) entries = RRD_HISTORY_ENTRIES_MAX;
+    if(mode == RRD_MEMORY_MODE_DBENGINE) return 0;
+    if(mode == RRD_MEMORY_MODE_NONE) return 5;
 
-    if(unlikely(mode == RRD_MEMORY_MODE_NONE || mode == RRD_MEMORY_MODE_ALLOC))
-        return entries;
+    if(entries < 5) entries = 5;
+    if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
 
-    long page = (size_t)sysconf(_SC_PAGESIZE);
-    long size = sizeof(RRDDIM) + entries * sizeof(storage_number);
-    if(unlikely(size % page)) {
-        size -= (size % page);
-        size += page;
+    if(mode == RRD_MEMORY_MODE_MAP || mode == RRD_MEMORY_MODE_SAVE || mode == RRD_MEMORY_MODE_RAM) {
+        long header_size = 0;
 
-        long n = (size - sizeof(RRDDIM)) / sizeof(storage_number);
-        return n;
+        if(mode == RRD_MEMORY_MODE_MAP || mode == RRD_MEMORY_MODE_SAVE)
+            header_size = (long)rrddim_memory_file_header_size();
+
+        long page = (long)sysconf(_SC_PAGESIZE);
+        long size = (long)(header_size + entries * sizeof(storage_number));
+        if (unlikely(size % page)) {
+            size -= (size % page);
+            size += page;
+
+            long n = (long)((size - header_size) / sizeof(storage_number));
+            return n;
+        }
     }
 
     return entries;
@@ -405,73 +405,47 @@ void rrdset_free(RRDSET *st) {
     freez(st->state);
     freez(st->chart_uuid);
 
-    switch(st->rrd_memory_mode) {
-        case RRD_MEMORY_MODE_SAVE:
-        case RRD_MEMORY_MODE_MAP:
-        case RRD_MEMORY_MODE_RAM:
-            debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
-            munmap(st, st->memsize);
-            break;
-
-        case RRD_MEMORY_MODE_ALLOC:
-        case RRD_MEMORY_MODE_NONE:
-        case RRD_MEMORY_MODE_DBENGINE:
-            freez(st);
-            break;
-    }
-
+    rrdset_memory_file_free(st);
+    freez(st);
 }
 
 void rrdset_save(RRDSET *st) {
     rrdset_check_rdlock(st);
 
-    // info("Saving chart '%s' ('%s')", st->id, st->name);
-
-    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
-        debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
-        memory_file_save(st->cache_filename, st, st->memsize);
-    }
+    rrdset_memory_file_save(st);
 
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
-            debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-            memory_file_save(rd->cache_filename, rd, rd->memsize);
-        }
-    }
+    rrddim_foreach_read(rd, st)
+        rrddim_memory_file_save(rd);
 }
 
-void rrdset_delete_custom(RRDSET *st, int db_rotated) {
+void rrdset_delete(RRDSET *st) {
     RRDDIM *rd;
-#ifndef ENABLE_ACLK
-    UNUSED(db_rotated);
-#endif
     rrdset_check_rdlock(st);
 
     info("Deleting chart '%s' ('%s') from disk...", st->id, st->name);
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-        info("Deleting chart header file '%s'.", st->cache_filename);
-        if(unlikely(unlink(st->cache_filename) == -1))
-            error("Cannot delete chart header file '%s'", st->cache_filename);
+        const char *cache_filename = rrdset_cache_filename(st);
+        if(cache_filename) {
+            info("Deleting chart header file '%s'.", cache_filename);
+            if (unlikely(unlink(cache_filename) == -1))
+                error("Cannot delete chart header file '%s'", cache_filename);
+        }
+        else
+            error("Cannot find the cache filename of chart '%s'", st->id);
     }
 
     rrddim_foreach_read(rd, st) {
-        if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
-            info("Deleting dimension file '%s'.", rd->cache_filename);
-            if(unlikely(unlink(rd->cache_filename) == -1))
-                error("Cannot delete dimension file '%s'", rd->cache_filename);
-        }
+        const char *cache_filename = rrddim_cache_filename(rd);
+        if(!cache_filename) continue;
+
+        info("Deleting dimension file '%s'.", cache_filename);
+        if(unlikely(unlink(cache_filename) == -1))
+            error("Cannot delete dimension file '%s'", cache_filename);
     }
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
-#ifdef ENABLE_ACLK
-    if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)) {
-        aclk_del_collector(st->rrdhost, st->plugin_name, st->module_name);
-        st->rrdhost->deleted_charts_count++;
-    }
-#endif
-
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
@@ -483,11 +457,11 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
 
     rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
-            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
-                info("Deleting dimension file '%s'.", rd->cache_filename);
-                if(unlikely(unlink(rd->cache_filename) == -1))
-                    error("Cannot delete dimension file '%s'", rd->cache_filename);
-            }
+            const char *cache_filename = rrddim_cache_filename(rd);
+            if(!cache_filename) continue;
+            info("Deleting dimension file '%s'.", cache_filename);
+            if(unlikely(unlink(cache_filename) == -1))
+                error("Cannot delete dimension file '%s'", cache_filename);
         }
     }
 }
@@ -659,22 +633,7 @@ RRDSET *rrdset_create_custom(
         }
 
         if (mark_rebuild) {
-#ifdef ENABLE_ACLK
-            if (netdata_cloud_setting) {
-                if (mark_rebuild & META_CHART_ACTIVATED) {
-                    aclk_add_collector(host, st->plugin_name, st->module_name);
-                }
-                else {
-                    if (mark_rebuild & (META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
-                        aclk_del_collector(
-                            host, mark_rebuild & META_PLUGIN_UPDATED ? old_plugin : st->plugin_name,
-                            mark_rebuild & META_MODULE_UPDATED ? old_module : st->module_name);
-                        aclk_add_collector(host, st->plugin_name, st->module_name);
-                    }
-                }
-                rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-            }
-#endif
+            rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
             freez(old_plugin);
             freez(old_module);
             freez(old_title);
@@ -724,8 +683,6 @@ RRDSET *rrdset_create_custom(
         return st;
     }
 
-    char fullfilename[FILENAME_MAX + 1];
-
     // ------------------------------------------------------------------------
     // get the options from the config, we need to create it
 
@@ -733,126 +690,37 @@ RRDSET *rrdset_create_custom(
     if (memory_mode != RRD_MEMORY_MODE_DBENGINE)
         entries = align_entries_to_pagesize(memory_mode, history_entries);
 
-    unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid);
-
-    time_t now = now_realtime_sec();
 
     // ------------------------------------------------------------------------
     // load it or allocate it
 
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
-       memory_mode == RRD_MEMORY_MODE_RAM) {
-        st = (RRDSET *)netdata_mmap(
-            (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename,
-            size,
-            ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE),
-            0);
-
-        if(st) {
-            memset(&st->avl, 0, sizeof(avl_t));
-            memset(&st->avlname, 0, sizeof(avl_t));
-            memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
-            memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
-            memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
-
-            st->name = NULL;
-            st->type = NULL;
-            st->family = NULL;
-            st->title = NULL;
-            st->units = NULL;
-            st->context = NULL;
-            st->cache_dir = NULL;
-            st->plugin_name = NULL;
-            st->module_name = NULL;
-            st->dimensions = NULL;
-            st->rrdfamily = NULL;
-            st->rrdhost = NULL;
-            st->next = NULL;
-            st->variables = NULL;
-            st->alarms = NULL;
-            st->flags = 0x00000000;
-            st->exporting_flags = NULL;
-
-            if(memory_mode == RRD_MEMORY_MODE_RAM) {
-                memset(st, 0, size);
-            }
-            else {
-                if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
-                    info("Initializing file %s.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(strcmp(st->id, fullid) != 0) {
-                    error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
-                    // munmap(st, size);
-                    // st = NULL;
-                    memset(st, 0, size);
-                }
-                else if(st->memsize != size || st->entries != entries) {
-                    error("File %s does not have the desired size. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(st->update_every != update_every) {
-                    error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if((now - st->last_updated.tv_sec) > update_every * entries) {
-                    info("File %s is too old. Clearing it.", fullfilename);
-                    memset(st, 0, size);
-                }
-                else if(st->last_updated.tv_sec > now + update_every) {
-                    error("File %s refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st->last_updated.tv_sec - now));
-                    st->last_updated.tv_sec = now;
-                }
-
-                // make sure the database is aligned
-                if(st->last_updated.tv_sec) {
-                    st->update_every = update_every;
-                    last_updated_time_align(st);
-                }
-            }
-
-            // make sure we have the right memory mode
-            // even if we cleared the memory
-            st->rrd_memory_mode = memory_mode;
-        }
-    }
-
-    if(unlikely(!st)) {
-        st = callocz(1, size);
-        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            st->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        else
-            st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
-    }
-
-    st->plugin_name = plugin?strdupz(plugin):NULL;
-    st->module_name = module?strdupz(module):NULL;
-
-    st->rrdhost = host;
-    st->memsize = size;
-    st->entries = entries;
-    st->update_every = update_every;
-
-    if(st->current_entry >= st->entries) st->current_entry = 0;
-
-    strcpy(st->cache_filename, fullfilename);
-    strcpy(st->magic, RRDSET_MAGIC);
+    st = callocz(1, sizeof(RRDSET));
+    st->state = callocz(1, sizeof(*st->state));
 
     strcpy(st->id, fullid);
     st->hash = simple_hash(st->id);
 
+    st->rrdhost = host;
     st->cache_dir = cache_dir;
+    st->entries = entries;
+    st->update_every = update_every;
 
-    st->chart_type = chart_type;
-    st->type       = strdupz(type);
+    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP) {
+        if(!rrdset_memory_load_or_create_map_save(st, memory_mode)) {
+            info("Failed to use memory mode %s for chart '%s', falling back to ram", (memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", st->name);
+            memory_mode = RRD_MEMORY_MODE_RAM;
+        }
+    }
+    st->rrd_memory_mode = memory_mode;
 
-    st->state = callocz(1, sizeof(*st->state));
-
-    st->family = family ? strdupz(family) : strdupz(st->type);
+    st->plugin_name = plugin?strdupz(plugin):NULL;
+    st->module_name = module?strdupz(module):NULL;
+    st->chart_type  = chart_type;
+    st->type        = strdupz(type);
+    st->family      = family ? strdupz(family) : strdupz(st->type);
     json_fix_string(st->family);
 
     st->state->is_ar_chart = strcmp(st->id, ML_ANOMALY_RATES_CHART_ID) == 0;
@@ -873,15 +741,7 @@ RRDSET *rrdset_create_custom(
     st->green = NAN;
     st->red = NAN;
 
-    st->last_collected_time.tv_sec = 0;
-    st->last_collected_time.tv_usec = 0;
-    st->counter_done = 0;
-    st->rrddim_page_alignment = 0;
-
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
-
-    st->last_accessed_time = 0;
-    st->upstream_resync_time = 0;
 
     avl_init_lock(&st->dimensions_index, rrddim_compare);
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
@@ -929,11 +789,6 @@ RRDSET *rrdset_create_custom(
     compute_chart_hash(st);
 
     rrdhost_unlock(host);
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_setting)
-        aclk_add_collector(host, plugin, module);
-    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-#endif
     return(st);
 }
 
@@ -993,7 +848,8 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         if(unlikely(since_last_usec < 0)) {
             // oops! the database is in the future
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+            info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
+                " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (NETDATA_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
@@ -1012,7 +868,8 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
             // oops! the database is too far behind
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+            info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
+                " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
             microseconds = (usec_t)since_last_usec;
@@ -1069,7 +926,7 @@ static inline usec_t rrdset_init_last_collected_time(RRDSET *st) {
     usec_t last_collect_ut = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "initialized last collected time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_collect_ut / USEC_PER_SEC);
+    rrdset_debug(st, "initialized last collected time to %0.3" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)last_collect_ut / USEC_PER_SEC);
     #endif
 
     return last_collect_ut;
@@ -1082,7 +939,7 @@ static inline usec_t rrdset_update_last_collected_time(RRDSET *st) {
     st->last_collected_time.tv_usec = (suseconds_t) (ut % USEC_PER_SEC);
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "updated last collected time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_collect_ut / USEC_PER_SEC);
+    rrdset_debug(st, "updated last collected time to %0.3" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)last_collect_ut / USEC_PER_SEC);
     #endif
 
     return last_collect_ut;
@@ -1101,10 +958,109 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     usec_t last_updated_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "initialized last updated time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_updated_ut / USEC_PER_SEC);
+    rrdset_debug(st, "initialized last updated time to %0.3" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)last_updated_ut / USEC_PER_SEC);
     #endif
 
     return last_updated_ut;
+}
+
+static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, time_t now) {
+    time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
+    return now + loop - ((now + loop) % loop);
+}
+
+void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut) {
+    if (unlikely(!t->next_point_time))
+        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+
+    // merge the dates into our virtual point
+    if (unlikely(sp.start_time < t->virtual_point.start_time))
+        t->virtual_point.start_time = sp.start_time;
+
+    if (likely(sp.end_time > t->virtual_point.end_time))
+        t->virtual_point.end_time = sp.end_time;
+
+    // merge the values into our virtual point
+    if (likely(!storage_point_is_empty(sp))) {
+        // we aggregate only non NULLs into higher tiers
+
+        if (likely(!storage_point_is_unset(t->virtual_point))) {
+            // merge the collected point to our virtual one
+            t->virtual_point.sum += sp.sum;
+            t->virtual_point.min = MIN(t->virtual_point.min, sp.min);
+            t->virtual_point.max = MAX(t->virtual_point.max, sp.max);
+            t->virtual_point.count += sp.count;
+            t->virtual_point.anomaly_count += sp.anomaly_count;
+            t->virtual_point.flags |= sp.flags;
+        }
+        else {
+            // reset our virtual point to this one
+            t->virtual_point = sp;
+        }
+    }
+
+    if(unlikely(sp.end_time >= t->next_point_time)) {
+        if (likely(!storage_point_is_unset(t->virtual_point))) {
+
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                now_ut,
+                t->virtual_point.sum,
+                t->virtual_point.min,
+                t->virtual_point.max,
+                t->virtual_point.count,
+                t->virtual_point.anomaly_count,
+                t->virtual_point.flags);
+        }
+        else {
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                now_ut,
+                NAN,
+                NAN,
+                NAN,
+                0,
+                0,
+                SN_EMPTY_SLOT);
+        }
+
+        t->virtual_point.count = 0;
+        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+    }
+}
+
+static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+
+    // store the metric on tier 0
+    rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+
+    for(int tier = 1; tier < storage_tiers ;tier++) {
+        if(unlikely(!rd->tiers[tier])) continue;
+
+        struct rrddim_tier *t = rd->tiers[tier];
+
+        time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
+
+        if(!t->last_collected_ut) {
+            // we have not collected this tier before
+            // let's fill any gap that may exist
+            rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
+        }
+
+        STORAGE_POINT sp = {
+            .start_time = now - rd->update_every,
+            .end_time = now,
+            .min = n,
+            .max = n,
+            .sum = n,
+            .count = 1,
+            .anomaly_count = (flags & SN_ANOMALY_BIT) ? 0 : 1,
+            .flags = flags
+        };
+
+        t->last_collected_ut = point_end_time_ut;
+        store_metric_at_tier(rd, t, sp, point_end_time_ut);
+    }
 }
 
 static inline size_t rrdset_done_interpolate(
@@ -1139,8 +1095,8 @@ static inline size_t rrdset_done_interpolate(
 
         #ifdef NETDATA_INTERNAL_CHECKS
         if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
-        rrdset_debug(st, "last_stored_ut = %0.3" LONG_DOUBLE_MODIFIER " (last updated time)", (LONG_DOUBLE)last_stored_ut/USEC_PER_SEC);
-        rrdset_debug(st, "next_store_ut  = %0.3" LONG_DOUBLE_MODIFIER " (next interpolation point)", (LONG_DOUBLE)next_store_ut/USEC_PER_SEC);
+        rrdset_debug(st, "last_stored_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last updated time)", (NETDATA_DOUBLE)last_stored_ut/USEC_PER_SEC);
+        rrdset_debug(st, "next_store_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
         #endif
 
         last_ut = next_store_ut;
@@ -1149,20 +1105,19 @@ static inline size_t rrdset_done_interpolate(
             if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
                 continue;
 
-            calculated_number new_value;
+            NETDATA_DOUBLE new_value;
 
             switch(rd->algorithm) {
                 case RRD_ALGORITHM_INCREMENTAL:
-                    new_value = (calculated_number)
+                    new_value = (NETDATA_DOUBLE)
                             (      rd->calculated_value
-                                   * (calculated_number)(next_store_ut - last_collect_ut)
-                                   / (calculated_number)(now_collect_ut - last_collect_ut)
+                                   * (NETDATA_DOUBLE)(next_store_ut - last_collect_ut)
+                                   / (NETDATA_DOUBLE)(now_collect_ut - last_collect_ut)
                             );
 
                     #ifdef NETDATA_INTERNAL_CHECKS
-                    rrdset_debug(st, "%s: CALC2 INC "
-                                CALCULATED_NUMBER_FORMAT " = "
-                                CALCULATED_NUMBER_FORMAT
+                    rrdset_debug(st, "%s: CALC2 INC " NETDATA_DOUBLE_FORMAT " = "
+                                 NETDATA_DOUBLE_FORMAT
                                 " * (%llu - %llu)"
                                 " / (%llu - %llu)"
                               , rd->name
@@ -1176,18 +1131,18 @@ static inline size_t rrdset_done_interpolate(
                     rd->calculated_value -= new_value;
                     new_value += rd->last_calculated_value;
                     rd->last_calculated_value = 0;
-                    new_value /= (calculated_number)st->update_every;
+                    new_value /= (NETDATA_DOUBLE)st->update_every;
 
                     if(unlikely(next_store_ut - last_stored_ut < update_every_ut)) {
 
                         #ifdef NETDATA_INTERNAL_CHECKS
-                        rrdset_debug(st, "%s: COLLECTION POINT IS SHORT " CALCULATED_NUMBER_FORMAT " - EXTRAPOLATING",
+                        rrdset_debug(st, "%s: COLLECTION POINT IS SHORT " NETDATA_DOUBLE_FORMAT " - EXTRAPOLATING",
                                     rd->name
-                                  , (calculated_number)(next_store_ut - last_stored_ut)
+                                  , (NETDATA_DOUBLE)(next_store_ut - last_stored_ut)
                         );
                         #endif
 
-                        new_value = new_value * (calculated_number)(st->update_every * USEC_PER_SEC) / (calculated_number)(next_store_ut - last_stored_ut);
+                        new_value = new_value * (NETDATA_DOUBLE)(st->update_every * USEC_PER_SEC) / (NETDATA_DOUBLE)(next_store_ut - last_stored_ut);
                     }
                     break;
 
@@ -1206,21 +1161,19 @@ static inline size_t rrdset_done_interpolate(
                         // we have missed an update
                         // interpolate in the middle values
 
-                        new_value = (calculated_number)
+                        new_value = (NETDATA_DOUBLE)
                                 (   (     (rd->calculated_value - rd->last_calculated_value)
-                                          * (calculated_number)(next_store_ut - last_collect_ut)
-                                          / (calculated_number)(now_collect_ut - last_collect_ut)
+                                          * (NETDATA_DOUBLE)(next_store_ut - last_collect_ut)
+                                          / (NETDATA_DOUBLE)(now_collect_ut - last_collect_ut)
                                     )
                                     +  rd->last_calculated_value
                                 );
 
                         #ifdef NETDATA_INTERNAL_CHECKS
-                        rrdset_debug(st, "%s: CALC2 DEF "
-                                    CALCULATED_NUMBER_FORMAT " = ((("
-                                            "(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
+                        rrdset_debug(st, "%s: CALC2 DEF " NETDATA_DOUBLE_FORMAT " = ((("
+                                            "(" NETDATA_DOUBLE_FORMAT " - " NETDATA_DOUBLE_FORMAT ")"
                                             " * %llu"
-                                            " / %llu) + " CALCULATED_NUMBER_FORMAT
-                                  , rd->name
+                                            " / %llu) + " NETDATA_DOUBLE_FORMAT, rd->name
                                   , new_value
                                   , rd->calculated_value, rd->last_calculated_value
                                   , (next_store_ut - first_ut)
@@ -1233,8 +1186,8 @@ static inline size_t rrdset_done_interpolate(
 
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
-
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
+                store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 continue;
             }
 
@@ -1246,7 +1199,8 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
                 }
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, dim_storage_flags);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, 0, 0, 1, dim_storage_flags, 0);
+                store_metric(rd, next_store_ut, new_value, dim_storage_flags);
                 rd->last_stored_value = new_value;
             }
             else {
@@ -1259,7 +1213,8 @@ static inline size_t rrdset_done_interpolate(
                 );
                 #endif
 
-                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
+//                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
+                store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
                 rd->last_stored_value = NAN;
             }
 
@@ -1301,7 +1256,7 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
         long current_entry = st->current_entry;
 
         for(c = 0; c < entries && next_store_ut <= now_collect_ut ; next_store_ut += update_every_ut, c++) {
-            rd->values[current_entry] = SN_EMPTY_SLOT;
+            rd->db[current_entry] = SN_EMPTY_SLOT;
             current_entry = ((current_entry + 1) >= entries) ? 0 : current_entry + 1;
 
             #ifdef NETDATA_INTERNAL_CHECKS
@@ -1362,7 +1317,8 @@ void rrdset_done(RRDSET *st) {
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
                 st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && st->rrd_memory_mode != RRD_MEMORY_MODE_NONE)) {
-        info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" LONG_DOUBLE_MODIFIER " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (LONG_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
+        info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" NETDATA_DOUBLE_MODIFIER
+            " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
         store_this_entry = 0;
@@ -1489,6 +1445,7 @@ void rrdset_done(RRDSET *st) {
             #endif
         }
     }
+
 after_first_database_work:
     st->counter_done++;
 
@@ -1499,10 +1456,10 @@ after_first_database_work:
     }
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "last_collect_ut = %0.3" LONG_DOUBLE_MODIFIER " (last collection time)", (LONG_DOUBLE)last_collect_ut/USEC_PER_SEC);
-    rrdset_debug(st, "now_collect_ut  = %0.3" LONG_DOUBLE_MODIFIER " (current collection time)", (LONG_DOUBLE)now_collect_ut/USEC_PER_SEC);
-    rrdset_debug(st, "last_stored_ut  = %0.3" LONG_DOUBLE_MODIFIER " (last updated time)", (LONG_DOUBLE)last_stored_ut/USEC_PER_SEC);
-    rrdset_debug(st, "next_store_ut   = %0.3" LONG_DOUBLE_MODIFIER " (next interpolation point)", (LONG_DOUBLE)next_store_ut/USEC_PER_SEC);
+    rrdset_debug(st, "last_collect_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last collection time)", (NETDATA_DOUBLE)last_collect_ut/USEC_PER_SEC);
+    rrdset_debug(st, "now_collect_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (current collection time)", (NETDATA_DOUBLE)now_collect_ut/USEC_PER_SEC);
+    rrdset_debug(st, "last_stored_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (last updated time)", (NETDATA_DOUBLE)last_stored_ut/USEC_PER_SEC);
+    rrdset_debug(st, "next_store_ut   = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
     #endif
 
     // calculate totals and count the dimensions
@@ -1511,7 +1468,9 @@ after_first_database_work:
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
+
         dimensions++;
+
         if(likely(rd->updated))
             st->collected_total += rd->collected_value;
     }
@@ -1539,9 +1498,8 @@ after_first_database_work:
         rrdset_debug(st, "%s: START "
                 " last_collected_value = " COLLECTED_NUMBER_FORMAT
                 " collected_value = " COLLECTED_NUMBER_FORMAT
-                " last_calculated_value = " CALCULATED_NUMBER_FORMAT
-                " calculated_value = " CALCULATED_NUMBER_FORMAT
-                                      , rd->name
+                " last_calculated_value = " NETDATA_DOUBLE_FORMAT
+                " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
                                       , rd->last_collected_value
                                       , rd->collected_value
                                       , rd->last_calculated_value
@@ -1551,21 +1509,19 @@ after_first_database_work:
 
         switch(rd->algorithm) {
             case RRD_ALGORITHM_ABSOLUTE:
-                rd->calculated_value = (calculated_number)rd->collected_value
-                                       * (calculated_number)rd->multiplier
-                                       / (calculated_number)rd->divisor;
+                rd->calculated_value = (NETDATA_DOUBLE)rd->collected_value
+                                       * (NETDATA_DOUBLE)rd->multiplier
+                                       / (NETDATA_DOUBLE)rd->divisor;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC ABS/ABS-NO-IN "
-                            CALCULATED_NUMBER_FORMAT " = "
+                rrdset_debug(st, "%s: CALC ABS/ABS-NO-IN " NETDATA_DOUBLE_FORMAT " = "
                             COLLECTED_NUMBER_FORMAT
-                            " * " CALCULATED_NUMBER_FORMAT
-                            " / " CALCULATED_NUMBER_FORMAT
-                          , rd->name
+                            " * " NETDATA_DOUBLE_FORMAT
+                            " / " NETDATA_DOUBLE_FORMAT, rd->name
                           , rd->calculated_value
                           , rd->collected_value
-                          , (calculated_number)rd->multiplier
-                          , (calculated_number)rd->divisor
+                          , (NETDATA_DOUBLE)rd->multiplier
+                          , (NETDATA_DOUBLE)rd->divisor
                 );
                 #endif
 
@@ -1578,13 +1534,12 @@ after_first_database_work:
                     // the percentage of the current value
                     // over the total of all dimensions
                     rd->calculated_value =
-                            (calculated_number)100
-                            * (calculated_number)rd->collected_value
-                            / (calculated_number)st->collected_total;
+                            (NETDATA_DOUBLE)100
+                            * (NETDATA_DOUBLE)rd->collected_value
+                            / (NETDATA_DOUBLE)st->collected_total;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC PCENT-ROW "
-                            CALCULATED_NUMBER_FORMAT " = 100"
+                rrdset_debug(st, "%s: CALC PCENT-ROW " NETDATA_DOUBLE_FORMAT " = 100"
                             " * " COLLECTED_NUMBER_FORMAT
                             " / " COLLECTED_NUMBER_FORMAT
                           , rd->name
@@ -1635,34 +1590,32 @@ after_first_database_work:
                     // TODO: remember recent history of rates and compare with current rate to reduce this chance.
                     if (delta < max_acceptable_rate) {
                         rd->calculated_value +=
-                                (calculated_number) delta
-                                * (calculated_number) rd->multiplier
-                                / (calculated_number) rd->divisor;
+                                (NETDATA_DOUBLE) delta
+                                * (NETDATA_DOUBLE) rd->multiplier
+                                / (NETDATA_DOUBLE) rd->divisor;
                     } else {
                         // This is a reset. Any overflow with a rate greater than MAX_INCREMENTAL_PERCENT_RATE will also
                         // be detected as a reset instead.
-                        rd->calculated_value += (calculated_number)0;
+                        rd->calculated_value += (NETDATA_DOUBLE)0;
                     }
                 }
                 else {
                     rd->calculated_value +=
-                            (calculated_number) (rd->collected_value - rd->last_collected_value)
-                            * (calculated_number) rd->multiplier
-                            / (calculated_number) rd->divisor;
+                            (NETDATA_DOUBLE) (rd->collected_value - rd->last_collected_value)
+                            * (NETDATA_DOUBLE) rd->multiplier
+                            / (NETDATA_DOUBLE) rd->divisor;
                 }
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC INC PRE "
-                            CALCULATED_NUMBER_FORMAT " = ("
+                rrdset_debug(st, "%s: CALC INC PRE " NETDATA_DOUBLE_FORMAT " = ("
                             COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
                             ")"
-                                    " * " CALCULATED_NUMBER_FORMAT
-                            " / " CALCULATED_NUMBER_FORMAT
-                          , rd->name
+                                    " * " NETDATA_DOUBLE_FORMAT
+                            " / " NETDATA_DOUBLE_FORMAT, rd->name
                           , rd->calculated_value
                           , rd->collected_value, rd->last_collected_value
-                          , (calculated_number)rd->multiplier
-                          , (calculated_number)rd->divisor
+                          , (NETDATA_DOUBLE)rd->multiplier
+                          , (NETDATA_DOUBLE)rd->divisor
                 );
                 #endif
 
@@ -1695,13 +1648,12 @@ after_first_database_work:
                     rd->calculated_value = 0;
                 else
                     rd->calculated_value =
-                            (calculated_number)100
-                            * (calculated_number)(rd->collected_value - rd->last_collected_value)
-                            / (calculated_number)(st->collected_total - st->last_collected_total);
+                            (NETDATA_DOUBLE)100
+                            * (NETDATA_DOUBLE)(rd->collected_value - rd->last_collected_value)
+                            / (NETDATA_DOUBLE)(st->collected_total - st->last_collected_total);
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC PCENT-DIFF "
-                            CALCULATED_NUMBER_FORMAT " = 100"
+                rrdset_debug(st, "%s: CALC PCENT-DIFF " NETDATA_DOUBLE_FORMAT " = 100"
                             " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
                             " / (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
                           , rd->name
@@ -1719,8 +1671,7 @@ after_first_database_work:
                 rd->calculated_value = 0;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: CALC "
-                            CALCULATED_NUMBER_FORMAT " = 0"
+                rrdset_debug(st, "%s: CALC " NETDATA_DOUBLE_FORMAT " = 0"
                           , rd->name
                           , rd->calculated_value
                 );
@@ -1733,9 +1684,8 @@ after_first_database_work:
         rrdset_debug(st, "%s: PHASE2 "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
-                    " last_calculated_value = " CALCULATED_NUMBER_FORMAT
-                    " calculated_value = " CALCULATED_NUMBER_FORMAT
-                                      , rd->name
+                    " last_calculated_value = " NETDATA_DOUBLE_FORMAT
+                    " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
                                       , rd->last_collected_value
                                       , rd->collected_value
                                       , rd->last_calculated_value
@@ -1749,10 +1699,10 @@ after_first_database_work:
     // it is now time to interpolate values on a second boundary
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(now_collect_ut < next_store_ut)) {
+    if(unlikely(now_collect_ut < next_store_ut && st->counter_done > 1)) {
         // this is collected in the same interpolation point
         rrdset_debug(st, "THIS IS IN THE SAME INTERPOLATION POINT");
-        info("INTERNAL CHECK: host '%s', chart '%s' is collected in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, next_store_ut - now_collect_ut);
+        info("INTERNAL CHECK: host '%s', chart '%s' collection %zu is in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, st->counter_done, next_store_ut - now_collect_ut);
     }
 #endif
 
@@ -1769,14 +1719,14 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
     time_t mark = now_realtime_sec();
 #endif
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
         if (likely(!st->state->is_ar_chart)) {
             if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
                 queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
@@ -1795,7 +1745,8 @@ after_second_database_work:
             case RRD_ALGORITHM_INCREMENTAL:
                 if(unlikely(!first_entry)) {
                     #ifdef NETDATA_INTERNAL_CHECKS
-                    rrdset_debug(st, "%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", rd->name, rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
+                    rrdset_debug(st, "%s: setting last_calculated_value (old: " NETDATA_DOUBLE_FORMAT
+                        ") to last_calculated_value (new: " NETDATA_DOUBLE_FORMAT ")", rd->name, rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
                     #endif
 
                     rd->last_calculated_value += rd->calculated_value;
@@ -1811,7 +1762,8 @@ after_second_database_work:
             case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
             case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", rd->name, rd->last_calculated_value, rd->calculated_value);
+                rrdset_debug(st, "%s: setting last_calculated_value (old: " NETDATA_DOUBLE_FORMAT
+                    ") to last_calculated_value (new: " NETDATA_DOUBLE_FORMAT ")", rd->name, rd->last_calculated_value, rd->calculated_value);
                 #endif
 
                 rd->last_calculated_value = rd->calculated_value;
@@ -1826,9 +1778,8 @@ after_second_database_work:
         rrdset_debug(st, "%s: END "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
-                    " last_calculated_value = " CALCULATED_NUMBER_FORMAT
-                    " calculated_value = " CALCULATED_NUMBER_FORMAT
-                                      , rd->name
+                    " last_calculated_value = " NETDATA_DOUBLE_FORMAT
+                    " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
                                       , rd->last_collected_value
                                       , rd->collected_value
                                       , rd->last_calculated_value
@@ -1841,15 +1792,24 @@ after_second_database_work:
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
 
-    // find if there are any obsolete dimensions
-    time_t now = now_realtime_sec();
+    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+        // update the memory mapped files with the latest values
 
+        rrdset_memory_file_update(st);
+        rrddim_foreach_read(rd, st) {
+            rrddim_memory_file_update(rd);
+        }
+    }
+
+    // find if there are any obsolete dimensions
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
         rrddim_foreach_read(rd, st)
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
                 break;
 
         if(unlikely(rd)) {
+            time_t now = now_realtime_sec();
+
             RRDDIM *last;
             // there is a dimension to free
             // upgrade our read lock to a write lock
@@ -1861,10 +1821,11 @@ after_second_database_work:
                              && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
                     info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
-                    if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
-                        info("Deleting dimension file '%s'.", rd->cache_filename);
-                        if(unlikely(unlink(rd->cache_filename) == -1))
-                            error("Cannot delete dimension file '%s'", rd->cache_filename);
+                    const char *cache_filename = rrddim_cache_filename(rd);
+                    if(cache_filename) {
+                        info("Deleting dimension file '%s'.", cache_filename);
+                        if (unlikely(unlink(cache_filename) == -1))
+                            error("Cannot delete dimension file '%s'", cache_filename);
                     }
 
 #ifdef ENABLE_DBENGINE
@@ -1875,13 +1836,25 @@ after_second_database_work:
 
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
-                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
-                        if (can_delete_metric) {
+
+                        size_t tiers_available = 0, tiers_said_yes = 0;
+                        for(int tier = 0; tier < storage_tiers ;tier++) {
+                            if(rd->tiers[tier]) {
+                                tiers_available++;
+
+                                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
+                                    tiers_said_yes++;
+
+                                rd->tiers[tier]->db_collection_handle = NULL;
+                            }
+                        }
+
+                        if (tiers_available == tiers_said_yes && tiers_said_yes) {
                             /* This metric has no data and no references */
-                            delete_dimension_uuid(&rd->state->metric_uuid);
+                            delete_dimension_uuid(&rd->metric_uuid);
                         } else {
                             /* Do not delete this dimension */
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
                             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
 #endif
                             last = rd;
@@ -1914,4 +1887,210 @@ after_second_database_work:
     rrdset_unlock(st);
 
     netdata_thread_enable_cancelability();
+}
+
+
+// ----------------------------------------------------------------------------
+// compatibility layer for RRDSET files v019
+
+#define RRDSET_MAGIC_V019 "NETDATA RRD SET FILE V019"
+#define RRD_ID_LENGTH_MAX_V019 200
+
+struct avl_element_v019 {
+    void *avl_link[2];
+    signed char avl_balance;
+};
+struct avl_tree_type_v019 {
+    void *root;
+    int (*compar)(void *a, void *b);
+};
+struct avl_tree_lock_v019 {
+    struct avl_tree_type_v019 avl_tree;
+    pthread_rwlock_t rwlock;
+};
+struct rrdset_map_save_v019 {
+    struct avl_element_v019 avl;                    // ignored
+    struct avl_element_v019 avlname;                // ignored
+    char id[RRD_ID_LENGTH_MAX_V019 + 1];            // check to reset all - update on load
+    void *name;                                     // ignored
+    void *unused_ptr;                               // ignored
+    void *type;                                     // ignored
+    void *family;                                   // ignored
+    void *title;                                    // ignored
+    void *units;                                    // ignored
+    void *context;                                  // ignored
+    uint32_t hash_context;                          // ignored
+    uint32_t chart_type;                            // ignored
+    int update_every;                               // check to reset all - update on load
+    long entries;                                   // check to reset all - update on load
+    long current_entry;                             // NEEDS TO BE UPDATED - FIXED ON LOAD
+    uint32_t flags;                                 // ignored
+    void *exporting_flags;                          // ignored
+    int gap_when_lost_iterations_above;             // ignored
+    long priority;                                  // ignored
+    uint32_t rrd_memory_mode;                       // ignored
+    void *cache_dir;                                // ignored
+    char cache_filename[FILENAME_MAX+1];            // ignored - update on load
+    pthread_rwlock_t rrdset_rwlock;                 // ignored
+    size_t counter;                                 // NEEDS TO BE UPDATED - maintained on load
+    size_t counter_done;                            // ignored
+    union {                                         //
+        time_t last_accessed_time;                  // ignored
+        time_t last_entry_t;                        // ignored
+    };                                              //
+    time_t upstream_resync_time;                    // ignored
+    void *plugin_name;                              // ignored
+    void *module_name;                              // ignored
+    void *chart_uuid;                               // ignored
+    void *state;                                    // ignored
+    size_t unused[3];                               // ignored
+    size_t rrddim_page_alignment;                   // ignored
+    uint32_t hash;                                  // ignored
+    uint32_t hash_name;                             // ignored
+    usec_t usec_since_last_update;                  // NEEDS TO BE UPDATED - maintained on load
+    struct timeval last_updated;                    // NEEDS TO BE UPDATED - check to reset all - fixed on load
+    struct timeval last_collected_time;             // ignored
+    long long collected_total;                      // NEEDS TO BE UPDATED - maintained on load
+    long long last_collected_total;                 // NEEDS TO BE UPDATED - maintained on load
+    void *rrdfamily;                                // ignored
+    void *rrdhost;                                  // ignored
+    void *next;                                     // ignored
+    long double green;                              // ignored
+    long double red;                                // ignored
+    struct avl_tree_lock_v019 rrdvar_root_index;    // ignored
+    void *variables;                                // ignored
+    void *alarms;                                   // ignored
+    unsigned long memsize;                          // check to reset all - update on load
+    char magic[sizeof(RRDSET_MAGIC_V019) + 1];      // check to reset all - update on load
+    struct avl_tree_lock_v019 dimensions_index;     // ignored
+    void *dimensions;                               // ignored
+};
+
+void rrdset_memory_file_update(RRDSET *st) {
+    if(!st->st_on_file) return;
+    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+
+    st_on_file->current_entry = st->current_entry;
+    st_on_file->counter = st->counter;
+    st_on_file->usec_since_last_update = st->usec_since_last_update;
+    st_on_file->last_updated.tv_sec = st->last_updated.tv_sec;
+    st_on_file->last_updated.tv_usec = st->last_updated.tv_usec;
+    st_on_file->collected_total = st->collected_total;
+    st_on_file->last_collected_total = st->last_collected_total;
+}
+
+const char *rrdset_cache_filename(RRDSET *st) {
+    if(!st->st_on_file) return NULL;
+    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    return st_on_file->cache_filename;
+}
+
+void rrdset_memory_file_free(RRDSET *st) {
+    if(!st->st_on_file) return;
+
+    // needed for memory mode map, to save the latest state
+    rrdset_memory_file_update(st);
+
+    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    munmap(st_on_file, st_on_file->memsize);
+
+    // remove the pointers from the RRDDIM
+    st->st_on_file = NULL;
+}
+
+void rrdset_memory_file_save(RRDSET *st) {
+    if(!st->st_on_file) return;
+
+    rrdset_memory_file_update(st);
+
+    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    if(st_on_file->rrd_memory_mode != RRD_MEMORY_MODE_SAVE) return;
+
+    memory_file_save(st_on_file->cache_filename, st->st_on_file, st_on_file->memsize);
+}
+
+bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mode) {
+    if(memory_mode != RRD_MEMORY_MODE_SAVE && memory_mode != RRD_MEMORY_MODE_MAP)
+        return false;
+
+    char fullfilename[FILENAME_MAX + 1];
+    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", st->cache_dir);
+
+    unsigned long size = sizeof(struct rrdset_map_save_v019);
+    struct rrdset_map_save_v019 *st_on_file = (struct rrdset_map_save_v019 *)netdata_mmap(
+        fullfilename, size,
+        ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE),
+        0);
+
+    if(!st_on_file) return false;
+
+    time_t now = now_realtime_sec();
+
+    st_on_file->magic[sizeof(RRDSET_MAGIC_V019)] = '\0';
+    if(strcmp(st_on_file->magic, RRDSET_MAGIC_V019) != 0) {
+        info("Initializing file '%s'.", fullfilename);
+        memset(st_on_file, 0, size);
+    }
+    else if(strncmp(st_on_file->id, st->id, RRD_ID_LENGTH_MAX_V019) != 0) {
+        error("File '%s' contents are not for chart '%s'. Clearing it.", fullfilename, st->id);
+        memset(st_on_file, 0, size);
+    }
+    else if(st_on_file->memsize != size || st_on_file->entries != st->entries) {
+        error("File '%s' does not have the desired size. Clearing it.", fullfilename);
+        memset(st_on_file, 0, size);
+    }
+    else if(st_on_file->update_every != st->update_every) {
+        error("File '%s' does not have the desired granularity. Clearing it.", fullfilename);
+        memset(st_on_file, 0, size);
+    }
+    else if((now - st_on_file->last_updated.tv_sec) > st->update_every * st->entries) {
+        info("File '%s' is too old. Clearing it.", fullfilename);
+        memset(st_on_file, 0, size);
+    }
+    else if(st_on_file->last_updated.tv_sec > now + st->update_every) {
+        error("File '%s' refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st_on_file->last_updated.tv_sec - now));
+        st_on_file->last_updated.tv_sec = now;
+    }
+
+    if(st_on_file->current_entry >= st_on_file->entries)
+        st_on_file->current_entry = 0;
+
+    // make sure the database is aligned
+    bool align_last_updated = false;
+    if(st_on_file->last_updated.tv_sec) {
+        st_on_file->update_every = st->update_every;
+        align_last_updated = true;
+    }
+
+    // copy the useful values to st
+    st->current_entry = st_on_file->current_entry;
+    st->counter = st_on_file->counter;
+    st->usec_since_last_update = st_on_file->usec_since_last_update;
+    st->last_updated.tv_sec = st_on_file->last_updated.tv_sec;
+    st->last_updated.tv_usec = st_on_file->last_updated.tv_usec;
+    st->collected_total = st_on_file->collected_total;
+    st->last_collected_total = st_on_file->last_collected_total;
+
+    // link it to st
+    st->st_on_file = st_on_file;
+
+    // clear everything
+    memset(st_on_file, 0, size);
+
+    // set the values we need
+    strncpyz(st_on_file->id, st->id, RRD_ID_LENGTH_MAX_V019 + 1);
+    strcpy(st_on_file->cache_filename, fullfilename);
+    strcpy(st_on_file->magic, RRDSET_MAGIC_V019);
+    st_on_file->memsize = size;
+    st_on_file->entries = st->entries;
+    st_on_file->update_every = st->update_every;
+    st_on_file->rrd_memory_mode = memory_mode;
+
+    if(align_last_updated)
+        last_updated_time_align(st);
+
+    // copy the useful values back to st_on_file
+    rrdset_memory_file_update(st);
+
+    return true;
 }

@@ -46,9 +46,9 @@ static struct global_statistics {
 };
 
 void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_generated) {
-    __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&global_statistics.rrdr_db_points_read, db_points_read, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, result_points_generated, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.rrdr_db_points_read, db_points_read, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
 }
 
 void finished_web_request_statistics(uint64_t dt,
@@ -58,45 +58,44 @@ void finished_web_request_statistics(uint64_t dt,
                                      uint64_t compressed_content_size) {
     uint64_t old_web_usec_max = global_statistics.web_usec_max;
     while(dt > old_web_usec_max)
-        __atomic_compare_exchange(&global_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+        __atomic_compare_exchange(&global_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 
-    __atomic_fetch_add(&global_statistics.web_requests, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&global_statistics.web_usec, dt, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&global_statistics.bytes_received, bytes_received, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&global_statistics.bytes_sent, bytes_sent, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&global_statistics.content_size, content_size, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&global_statistics.compressed_content_size, compressed_content_size, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.web_requests, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.web_usec, dt, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.bytes_received, bytes_received, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.bytes_sent, bytes_sent, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.content_size, content_size, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.compressed_content_size, compressed_content_size, __ATOMIC_RELAXED);
 }
 
 uint64_t web_client_connected(void) {
-    __atomic_fetch_add(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
-    return __atomic_fetch_add(&global_statistics.web_client_count, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.connected_clients, 1, __ATOMIC_RELAXED);
+    return __atomic_fetch_add(&global_statistics.web_client_count, 1, __ATOMIC_RELAXED);
 }
 
 void web_client_disconnected(void) {
-    __atomic_fetch_sub(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_sub(&global_statistics.connected_clients, 1, __ATOMIC_RELAXED);
 }
 
 
 static inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
-    gs->connected_clients            = __atomic_fetch_add(&global_statistics.connected_clients, 0, __ATOMIC_SEQ_CST);
-    gs->web_requests                 = __atomic_fetch_add(&global_statistics.web_requests, 0, __ATOMIC_SEQ_CST);
-    gs->web_usec                     = __atomic_fetch_add(&global_statistics.web_usec, 0, __ATOMIC_SEQ_CST);
-    gs->web_usec_max                 = __atomic_fetch_add(&global_statistics.web_usec_max, 0, __ATOMIC_SEQ_CST);
-    gs->bytes_received               = __atomic_fetch_add(&global_statistics.bytes_received, 0, __ATOMIC_SEQ_CST);
-    gs->bytes_sent                   = __atomic_fetch_add(&global_statistics.bytes_sent, 0, __ATOMIC_SEQ_CST);
-    gs->content_size                 = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_SEQ_CST);
-    gs->compressed_content_size      = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_SEQ_CST);
-    gs->web_client_count             = __atomic_fetch_add(&global_statistics.web_client_count, 0, __ATOMIC_SEQ_CST);
+    gs->connected_clients            = __atomic_fetch_add(&global_statistics.connected_clients, 0, __ATOMIC_RELAXED);
+    gs->web_requests                 = __atomic_fetch_add(&global_statistics.web_requests, 0, __ATOMIC_RELAXED);
+    gs->web_usec                     = __atomic_fetch_add(&global_statistics.web_usec, 0, __ATOMIC_RELAXED);
+    gs->web_usec_max                 = __atomic_fetch_add(&global_statistics.web_usec_max, 0, __ATOMIC_RELAXED);
+    gs->bytes_received               = __atomic_fetch_add(&global_statistics.bytes_received, 0, __ATOMIC_RELAXED);
+    gs->bytes_sent                   = __atomic_fetch_add(&global_statistics.bytes_sent, 0, __ATOMIC_RELAXED);
+    gs->content_size                 = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_RELAXED);
+    gs->compressed_content_size      = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_RELAXED);
+    gs->web_client_count             = __atomic_fetch_add(&global_statistics.web_client_count, 0, __ATOMIC_RELAXED);
 
-    gs->rrdr_queries_made            = __atomic_fetch_add(&global_statistics.rrdr_queries_made, 0, __ATOMIC_SEQ_CST);
-    gs->rrdr_db_points_read          = __atomic_fetch_add(&global_statistics.rrdr_db_points_read, 0, __ATOMIC_SEQ_CST);
-    gs->rrdr_result_points_generated = __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, 0, __ATOMIC_SEQ_CST);
+    gs->rrdr_queries_made            = __atomic_fetch_add(&global_statistics.rrdr_queries_made, 0, __ATOMIC_RELAXED);
+    gs->rrdr_db_points_read          = __atomic_fetch_add(&global_statistics.rrdr_db_points_read, 0, __ATOMIC_RELAXED);
+    gs->rrdr_result_points_generated = __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, 0, __ATOMIC_RELAXED);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
-        __atomic_compare_exchange(&global_statistics.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_SEQ_CST,
-                                  __ATOMIC_SEQ_CST);
+        __atomic_compare_exchange(&global_statistics.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
     }
 }
 
@@ -452,21 +451,28 @@ static void dbengine_statistics_charts(void) {
         RRDHOST *host;
         unsigned long long stats_array[RRDENG_NR_STATS] = {0};
         unsigned long long local_stats_array[RRDENG_NR_STATS];
-        unsigned dbengine_contexts = 0, counted_multihost_db = 0, i;
+        unsigned dbengine_contexts = 0, counted_multihost_db[RRD_STORAGE_TIERS] = { 0 }, i;
 
         rrdhost_foreach_read(host) {
             if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-                if (&multidb_ctx == host->rrdeng_ctx) {
-                    if (counted_multihost_db)
-                        continue; /* Only count multi-host DB once */
-                    counted_multihost_db = 1;
-                }
-                ++dbengine_contexts;
-                /* get localhost's DB engine's statistics */
-                rrdeng_get_37_statistics(host->rrdeng_ctx, local_stats_array);
-                for (i = 0; i < RRDENG_NR_STATS; ++i) {
-                    /* aggregate statistics across hosts */
-                    stats_array[i] += local_stats_array[i];
+
+                /* get localhost's DB engine's statistics for each tier */
+                for(int tier = 0; tier < storage_tiers ;tier++) {
+                    if(!host->storage_instance[tier]) continue;
+
+                    if(is_storage_engine_shared(host->storage_instance[tier])) {
+                        if(counted_multihost_db[tier])
+                            continue;
+                        else
+                            counted_multihost_db[tier] = 1;
+                    }
+
+                    ++dbengine_contexts;
+                    rrdeng_get_37_statistics((struct rrdengine_instance *)host->storage_instance[tier], local_stats_array);
+                    for (i = 0; i < RRDENG_NR_STATS; ++i) {
+                        /* aggregate statistics across hosts */
+                        stats_array[i] += local_stats_array[i];
+                    }
                 }
             }
         }
@@ -1146,7 +1152,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         if(wu->workers_cpu_registered == 0)
             rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, 0);
         else
-            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( wu->workers_cpu_total * 10000ULL / (calculated_number)wu->workers_cpu_registered ));
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( wu->workers_cpu_total * 10000ULL / (NETDATA_DOUBLE)wu->workers_cpu_registered ));
 
         rrdset_done(wu->st_workers_cpu);
     }

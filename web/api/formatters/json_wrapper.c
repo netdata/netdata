@@ -90,7 +90,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq
                    , kq, kq, sq);
 
-    web_client_api_request_v1_data_options_to_string(wb, options);
+    web_client_api_request_v1_data_options_to_string(wb, r->internal.query_options);
 
     buffer_sprintf(wb, "%s,\n   %sdimension_names%s: [", sq, kq, kq);
 
@@ -257,7 +257,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         if(i) buffer_strcat(wb, ", ");
         i++;
 
-        calculated_number value = rd->last_stored_value;
+        NETDATA_DOUBLE value = rd->last_stored_value;
         if (NAN == value)
             buffer_strcat(wb, "null");
         else
@@ -282,13 +282,13 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     i = 0;
     if(rows) {
-        calculated_number total = 1;
+        NETDATA_DOUBLE total = 1;
 
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-                calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
-                calculated_number n = cn[c];
+                NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
+                NETDATA_DOUBLE n = cn[c];
 
                 if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                     n = -n;
@@ -306,9 +306,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             if(i) buffer_strcat(wb, ", ");
             i++;
 
-            calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
+            NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
             RRDR_VALUE_FLAGS *co = &r->o[ (rrdr_rows(r) - 1) * r->d ];
-            calculated_number n = cn[c];
+            NETDATA_DOUBLE n = cn[c];
 
             if(co[c] & RRDR_VALUE_EMPTY) {
                 if(options & RRDR_OPTION_NULL2ZERO)
@@ -343,12 +343,21 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     rrdr_buffer_print_format(wb, format);
 
+    buffer_sprintf(wb, "%s,\n"
+                       "   %sdb_points_per_tier%s: [ "
+                   , sq
+                   , kq, kq
+                   );
+
+    for(int tier = 0; tier < storage_tiers ; tier++)
+        buffer_sprintf(wb, "%s%zu", tier>0?", ":"", r->internal.tier_points_read[tier]);
+
+    buffer_strcat(wb, " ]");
+
     if((options & RRDR_OPTION_CUSTOM_VARS) && (options & RRDR_OPTION_JSON_WRAP)) {
-        buffer_sprintf(wb, "%s,\n   %schart_variables%s: ", sq, kq, kq);
+        buffer_sprintf(wb, ",\n   %schart_variables%s: ", kq, kq);
         health_api_v1_chart_custom_variables2json(r->st, wb);
     }
-    else
-        buffer_sprintf(wb, "%s", sq);
 
     buffer_sprintf(wb, ",\n   %sresult%s: ", kq, kq);
 

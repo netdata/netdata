@@ -249,7 +249,8 @@ cleanup:
     return len - i;
 }
 
-static inline char *format_value_with_precision_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
+static inline char *format_value_with_precision_and_unit(char *value_string, size_t value_string_len,
+    NETDATA_DOUBLE value, const char *units, int precision) {
     if(unlikely(isnan(value) || isinf(value)))
         value = 0.0;
 
@@ -260,23 +261,23 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
     if(precision < 0) {
         int len, lstop = 0, trim_zeros = 1;
 
-        calculated_number abs = value;
+        NETDATA_DOUBLE abs = value;
         if(isless(value, 0)) {
             lstop = 1;
-            abs = calculated_number_fabs(value);
+            abs = fabsndd(value);
         }
 
         if(isgreaterequal(abs, 1000)) {
-            len = snprintfz(value_string, value_string_len, "%0.0" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+            len = snprintfz(value_string, value_string_len, "%0.0" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
             trim_zeros = 0;
         }
-        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else                                 len = snprintfz(value_string, value_string_len, "%0.7" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else                                 len = snprintfz(value_string, value_string_len, "%0.7" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
 
         if(unlikely(trim_zeros)) {
             int l;
@@ -303,7 +304,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
     }
     else {
         if(precision > 50) precision = 50;
-        snprintfz(value_string, value_string_len, "%0.*" LONG_DOUBLE_MODIFIER "%s%s", precision, (LONG_DOUBLE) value, separator, units);
+        snprintfz(value_string, value_string_len, "%0.*" NETDATA_DOUBLE_MODIFIER "%s%s", precision, (NETDATA_DOUBLE) value, separator, units);
     }
 
     return value_string;
@@ -359,7 +360,8 @@ static struct units_formatter {
         { NULL,          0, UNITS_FORMAT_NONE }
 };
 
-inline char *format_value_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
+inline char *format_value_and_unit(char *value_string, size_t value_string_len,
+    NETDATA_DOUBLE value, const char *units, int precision) {
     static int max = -1;
     int i;
 
@@ -555,7 +557,7 @@ typedef enum color_comparison {
     COLOR_COMPARE_GREATEREQUAL,
 } BADGE_COLOR_COMPARISON;
 
-static inline void calc_colorz(const char *color, char *final, size_t len, calculated_number value) {
+static inline void calc_colorz(const char *color, char *final, size_t len, NETDATA_DOUBLE value) {
     if(isnan(value) || isinf(value))
         value = NAN;
 
@@ -642,7 +644,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
         *dc = '\0';
         if(dv) {
             *dv = '\0';
-            calculated_number v;
+            NETDATA_DOUBLE v;
 
             if(!*value_buffer || !strcmp(value_buffer, "null")) {
                 v = NAN;
@@ -732,7 +734,8 @@ static const char *parse_color_argument(const char *arg, const char *def)
     return color_map(arg, def);
 }
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options, int fixed_width_lbl, int fixed_width_val, const char* text_color_lbl, const char* text_color_val) {
+void buffer_svg(BUFFER *wb, const char *label,
+    NETDATA_DOUBLE value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options, int fixed_width_lbl, int fixed_width_val, const char* text_color_lbl, const char* text_color_val) {
     char    value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
             , label_escaped[LABEL_STRING_SIZE + 1]
@@ -750,7 +753,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         value_color = (isnan(value) || isinf(value))?"999":"4c1";
 
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
-    format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
+    format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)? fabsndd(value):value, units, precision);
 
     if(fixed_width_lbl <= 0 || fixed_width_val <= 0) {
         label_width = verdana11_width(label, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
@@ -1098,7 +1101,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     else {
         time_t latest_timestamp = 0;
         int value_is_null = 1;
-        calculated_number n = NAN;
+        NETDATA_DOUBLE n = NAN;
         ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
         // if the collected value is too old, don't calculate its value
@@ -1108,7 +1111,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                                       points, after, before, group, group_options, 0, options,
                                       NULL, &latest_timestamp,
                                       NULL, NULL,
-                                      &value_is_null, NULL, 0);
+                                      &value_is_null, NULL, 0, 0);
 
         // if the value cannot be calculated, show empty badge
         if (ret != HTTP_RESP_OK) {

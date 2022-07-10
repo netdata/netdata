@@ -20,7 +20,6 @@ fi
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
 PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-1}
-PACKAGES_NETDATA_PYTHON_MYSQL=${PACKAGES_NETDATA_PYTHON_MYSQL-0}
 PACKAGES_NETDATA_PYTHON_POSTGRES=${PACKAGES_NETDATA_PYTHON_POSTGRES-0}
 PACKAGES_NETDATA_PYTHON_MONGO=${PACKAGES_NETDATA_PYTHON_MONGO-0}
 PACKAGES_DEBUG=${PACKAGES_DEBUG-0}
@@ -98,19 +97,15 @@ Supported installers (IN):
 Supported packages (you can append many of them):
 
     - netdata-all    all packages required to install netdata
-                     including mysql client, postgres client,
+                     including postgres client,
                      node.js, python, sensors, etc
 
     - netdata        minimum packages required to install netdata
-                     (no mysql client, includes python)
+                     (includes python)
 
     - python         install python
 
     - python3        install python3
-
-    - python-mysql   install MySQLdb
-                     (for monitoring mysql, will install python3 version
-                     if python3 is enabled or detected)
 
     - python-postgres install psycopg2
                      (for monitoring postgres, will install python3 version
@@ -960,55 +955,6 @@ declare -A pkg_python=(
   ['centos-8']="python2"
 )
 
-declare -A pkg_python_mysqldb=(
-  ['alpine']="py-mysqldb"
-  ['arch']="mysql-python"
-  ['centos']="MySQL-python"
-  ['debian']="python-mysqldb"
-  ['gentoo']="dev-python/mysqlclient"
-  ['sabayon']="dev-python/mysqlclient"
-  ['rhel']="MySQL-python"
-  ['suse']="python-PyMySQL"
-  ['clearlinux']="WARNING|"
-  ['default']="python-mysql"
-
-  # exceptions
-  ['fedora-24']="python2-mysql"
-  ['ol-8']="WARNING|"
-)
-
-declare -A pkg_python3_mysqldb=(
-  ['alpine']="WARNING|"
-  ['arch']="WARNING|"
-  ['centos']="WARNING|"
-  ['debian']="python3-mysqldb"
-  ['gentoo']="dev-python/mysqlclient"
-  ['sabayon']="dev-python/mysqlclient"
-  ['rhel']="WARNING|"
-  ['ol']="WARNING|"
-  ['suse']="WARNING|"
-  ['clearlinux']="WARNING|"
-  ['macos']="WARNING|"
-  ['default']="WARNING|"
-
-  # exceptions
-  ['debian-6']="WARNING|"
-  ['debian-7']="WARNING|"
-  ['debian-8']="WARNING|"
-  ['ubuntu-12.04']="WARNING|"
-  ['ubuntu-12.10']="WARNING|"
-  ['ubuntu-13.04']="WARNING|"
-  ['ubuntu-13.10']="WARNING|"
-  ['ubuntu-14.04']="WARNING|"
-  ['ubuntu-14.10']="WARNING|"
-  ['ubuntu-15.04']="WARNING|"
-  ['ubuntu-15.10']="WARNING|"
-  ['centos-7']="python36-mysql"
-  ['centos-8']="python38-mysql"
-  ['rhel-7']="python36-mysql"
-  ['rhel-8']="python38-mysql"
-)
-
 declare -A pkg_python_psycopg2=(
   ['alpine']="py-psycopg2"
   ['arch']="python2-psycopg2"
@@ -1341,9 +1287,9 @@ packages() {
   require_cmd git || suitable_package git
   require_cmd find || suitable_package find
 
-  require_cmd gcc ||
+  require_cmd gcc || require_cmd clang ||
     require_cmd gcc-multilib || suitable_package gcc
-  require_cmd g++ || suitable_package gxx
+  require_cmd g++ || require_cmd clang++ || suitable_package gxx
 
   require_cmd make || suitable_package make
   require_cmd autoconf || suitable_package autoconf
@@ -1441,7 +1387,6 @@ packages() {
     # suitable_package python-requests
     # suitable_package python-pip
 
-    [ "${PACKAGES_NETDATA_PYTHON_MYSQL}" -ne 0 ] && suitable_package python-mysqldb
     [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python-psycopg2
   fi
 
@@ -1455,7 +1400,6 @@ packages() {
     # suitable_package python3-requests
     # suitable_package python3-pip
 
-    [ "${PACKAGES_NETDATA_PYTHON_MYSQL}" -ne 0 ] && suitable_package python3-mysqldb
     [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python3-psycopg2
   fi
 
@@ -1992,7 +1936,7 @@ EOF
 remote_log() {
   # log success or failure on our system
   # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
+  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
 }
 
 if [ -z "${1}" ]; then
@@ -2055,12 +1999,10 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MYSQL=1
         PACKAGES_NETDATA_PYTHON_POSTGRES=1
         PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MYSQL=1
         PACKAGES_NETDATA_PYTHON3_POSTGRES=1
         PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
@@ -2082,16 +2024,6 @@ while [ -n "${1}" ]; do
 
     python3 | netdata-python3)
       PACKAGES_NETDATA_PYTHON3=1
-      ;;
-
-    python-mysql | mysql-python | mysqldb | netdata-mysql)
-      if [ "${pv}" -eq 2 ]; then
-        PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MYSQL=1
-      else
-        PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MYSQL=1
-      fi
       ;;
 
     python-postgres | postgres-python | psycopg2 | netdata-postgres)
@@ -2133,12 +2065,10 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MYSQL=1
         PACKAGES_NETDATA_PYTHON_POSTGRES=1
         PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MYSQL=1
         PACKAGES_NETDATA_PYTHON3_POSTGRES=1
         PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi

@@ -98,7 +98,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%08x\t%08x\t%08x"
                         "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
                         "\t%d\t%d\t%d\t%d"
-                        "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
+                        "\t" NETDATA_DOUBLE_FORMAT_AUTO "\t" NETDATA_DOUBLE_FORMAT_AUTO
                         "\t%016"PRIx64""
                         "\t%s\t%s\t%s"
                         "\n"
@@ -457,8 +457,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         const char *exec,
         const char *recipient,
         time_t duration,
-        calculated_number old_value,
-        calculated_number new_value,
+    NETDATA_DOUBLE old_value,
+    NETDATA_DOUBLE new_value,
         RRDCALC_STATUS old_status,
         RRDCALC_STATUS new_status,
         const char *source,

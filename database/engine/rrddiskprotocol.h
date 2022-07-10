@@ -35,7 +35,8 @@ struct rrdeng_df_sb {
  * Page types
  */
 #define PAGE_METRICS    (0)
-#define PAGE_LOGS       (1) /* reserved */
+#define PAGE_TIER       (1)
+#define PAGE_TYPE_MAX   (1)
 
 /*
  * Data file page descriptor

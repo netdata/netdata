@@ -3,7 +3,6 @@
 #include "web_api_v1.h"
 
 char *api_secret;
-extern int aclk_use_new_cloud_arch;
 
 static struct {
     const char *name;
@@ -37,8 +36,11 @@ static struct {
         , {"match-names"       , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"    , 0    , RRDR_OPTION_CUSTOM_VARS}
         , {"anomaly-bit"       , 0    , RRDR_OPTION_ANOMALY_BIT}
+        , {"selected-tier"     , 0    , RRDR_OPTION_SELECTED_TIER}
         , {"raw"               , 0    , RRDR_OPTION_RETURN_RAW}
         , {"jw-anomaly-rates"  , 0    , RRDR_OPTION_RETURN_JWAR}
+        , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
+        , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {NULL                , 0    , 0}
 };
 
@@ -436,7 +438,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
     char *group_options = NULL;
-
+    int tier = 0;
     int group = RRDR_GROUPING_AVERAGE;
     int show_dimensions = 0;
     uint32_t format = DATASOURCE_JSON;
@@ -519,6 +521,11 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         }
         else if(!strcmp(name, "max_anomaly_rates")) {
             max_anomaly_rates_str = value;
+        }
+        else if(!strcmp(name, "tier")) {
+            tier = str2i(value);
+            if(tier >= 0 && tier < storage_tiers)
+                options |= RRDR_OPTION_SELECTED_TIER;
         }
     }
 
@@ -678,7 +685,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         .wb = w->response.data};
 
     ret = rrdset2anything_api_v1(owa, st, &query_params, dimensions, format,
-            points, after, before, group, group_options, group_time, options, &last_timestamp_in_data);
+            points, after, before, group, group_options, group_time, options, &last_timestamp_in_data, tier);
 
     free_context_param_list(owa, &context_param_list);
 
@@ -1062,11 +1069,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
     buffer_strcat(wb, "\t\"aclk-ng-available\": true,\n");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": true,\n");
-#else
-    buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": false,\n");
-#endif
     buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
     buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
 #else
@@ -1084,12 +1087,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef ENABLE_ACLK
     if (aclk_connected) {
         buffer_strcat(wb, "\t\"aclk-available\": true,\n");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        if (aclk_use_new_cloud_arch)
-            buffer_strcat(wb, "\t\"aclk-available-protocol\": \"New\",\n");
-        else
-#endif
-            buffer_strcat(wb, "\t\"aclk-available-protocol\": \"Legacy\",\n");
+        buffer_strcat(wb, "\t\"aclk-available-protocol\": \"New\",\n");
     }
     else
 #endif
@@ -1336,7 +1334,7 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO | RRDR_OPTION_ALLOW_PAST;
+    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
     METRIC_CORRELATIONS_METHOD method = default_metric_correlations_method;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;

@@ -3,11 +3,11 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 1
+#define DB_METADATA_VERSION 2
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
-    "registry_hostname text, update_every int, os text, timezone text, tags text);",
+    "registry_hostname text, update_every int, os text, timezone text, tags text, hops INT);",
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
     "chart_type int, memory_mode int, history_entries);",
@@ -42,14 +42,14 @@ const char *database_config[] = {
     "WHERE ch.hash_id = chm.hash_id;",
 
     "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
-      " SELECT new.host_id, strftime(\"%s\") WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
+      " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
 
     "CREATE TRIGGER IF NOT EXISTS tr_v_chart_hash INSTEAD OF INSERT on v_chart_hash BEGIN "
     "INSERT INTO chart_hash (hash_id, type, id, name, family, context, title, unit, plugin, "
     "module, priority, chart_type, last_used) "
     "values (new.hash_id, new.type, new.id, new.name, new.family, new.context, new.title, new.unit, new.plugin, "
-    "new.module, new.priority, new.chart_type, strftime('%s')) "
-    "ON CONFLICT (hash_id) DO UPDATE SET last_used = strftime('%s'); "
+    "new.module, new.priority, new.chart_type, unixepoch()) "
+    "ON CONFLICT (hash_id) DO UPDATE SET last_used = unixepoch(); "
     "INSERT INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id) "
     "on conflict (chart_id, hash_id) do nothing; END; ",
 
@@ -345,7 +345,7 @@ static int attempt_database_fix()
     return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
 }
 
-static int init_database_batch(int rebuild, int init_type, const char *batch[])
+int init_database_batch(int rebuild, int init_type, const char *batch[])
 {
     int rc;
     char *err_msg = NULL;
@@ -437,7 +437,10 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
 
-    int target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
+    int target_version = DB_METADATA_VERSION;
+
+    if (likely(!memory))
+        target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
@@ -731,11 +734,53 @@ uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
     return uuid;
 }
 
-// Functions to create host, chart, dimension in the database
+static int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
+{
+    int rc, result = 1;
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement %s, rc = %d", sql, rc);
+        return 1;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to %s, rc = %d", sql, rc);
+        goto failed;
+    }
+
+    rc = execute_insert(res);
+    if (likely(rc == SQLITE_DONE))
+        result = 0;
+    else
+        error_report("Failed to execute %s, rc = %d", sql, rc);
+
+failed:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement %s, rc = %d", sql, rc);
+    return result;
+}
+
+
+// Migrate all hosts with hops zero to this host_uuid
+void migrate_localhost(uuid_t *host_uuid)
+{
+    int rc;
+
+    rc = exec_statement_with_uuid("UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0); ", host_uuid);
+    if (!rc)
+        rc = exec_statement_with_uuid("DELETE FROM host WHERE hops = 0 AND host_id <> @host_id; ", host_uuid);
+    if (!rc)
+        db_execute("DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);");
+
+}
 
 int sql_store_host(
     uuid_t *host_uuid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
-    const char *tzone, const char *tags)
+    const char *tzone, const char *tags, int hops)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc;
@@ -780,6 +825,10 @@ int sql_store_host(
         goto bind_fail;
 
     rc = sqlite3_bind_text(res, 7, tags, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 8, hops);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1320,8 +1369,10 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
 
     host->system_info = callocz(1, sizeof(*host->system_info));;
     rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+
 #ifdef ENABLE_DBENGINE
-    host->rrdeng_ctx = &multidb_ctx;
+    for(int tier = 0; tier < storage_tiers ; tier++)
+        host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
 #endif
 
 failed:
@@ -1395,7 +1446,7 @@ int file_is_migrated(char *path)
 }
 
 #define STORE_MIGRATED_FILE    "insert or replace into metadata_migration (filename, file_size, date_created) " \
-                                "values (@file, @size, strftime('%s'));"
+                                "values (@file, @size, unixepoch());"
 
 void add_migrated_file(char *path, uint64_t file_size)
 {
@@ -1432,7 +1483,7 @@ void add_migrated_file(char *path, uint64_t file_size)
 
 #define SQL_INS_CHART_LABEL "insert or replace into chart_label " \
     "(chart_id, source_type, label_key, label_value, date_created) " \
-    "values (@chart, @source, @label, @value, strftime('%s'));"
+    "values (@chart, @source, @label, @value, unixepoch());"
 
 void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
 {
@@ -1489,7 +1540,7 @@ failed:
 }
 
 int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id,
-                                uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t, uuid_t *rrdeng_uuid)
+                                uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t, uuid_t *rrdeng_uuid, int tier)
 {
 #ifdef ENABLE_DBENGINE
     int rc;
@@ -1497,13 +1548,13 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
     uuid_t  multihost_legacy_uuid;
     time_t dim_first_entry_t, dim_last_entry_t;
 
-    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t);
+    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t, tier);
     if (unlikely(rc)) {
         rrdeng_generate_legacy_uuid(dim_id, chart_id, &legacy_uuid);
-        rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
+        rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t, tier);
         if (likely(rc)) {
             rrdeng_convert_legacy_uuid_to_multihost(machine_guid, &legacy_uuid, &multihost_legacy_uuid);
-            rc = rrdeng_metric_latest_time_by_uuid(&multihost_legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
+            rc = rrdeng_metric_latest_time_by_uuid(&multihost_legacy_uuid, &dim_first_entry_t, &dim_last_entry_t, tier);
             if (likely(!rc))
                 uuid_copy(*rrdeng_uuid, multihost_legacy_uuid);
         }
@@ -1529,27 +1580,39 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
     return 1;
 #endif
 }
-
+#include "../storage_engine.h"
 #ifdef ENABLE_DBENGINE
 static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *name, uuid_t *metric_uuid)
 {
+    STORAGE_ENGINE *eng = storage_engine_get(RRD_MEMORY_MODE_DBENGINE);
+
+    if (unlikely(!eng))
+        return NULL;
+
     RRDDIM *rd = onewayalloc_callocz(owa, 1, sizeof(*rd));
     rd->rrdset = st;
+    rd->update_every = st->update_every;
     rd->last_stored_value = NAN;
     rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
-    rd->state = onewayalloc_mallocz(owa, sizeof(*rd->state));
-    rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-    rd->state->query_ops.init = rrdeng_load_metric_init;
-    rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-    rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-    rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-    rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-    rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-    rd->state->rrdeng_uuid = onewayalloc_mallocz(owa, sizeof(uuid_t));
-    uuid_copy(*rd->state->rrdeng_uuid, *metric_uuid);
-    uuid_copy(rd->state->metric_uuid, *metric_uuid);
+
+    uuid_copy(rd->metric_uuid, *metric_uuid);
     rd->id = onewayalloc_strdupz(owa, id);
     rd->name = onewayalloc_strdupz(owa, name);
+
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        rd->tiers[tier] = onewayalloc_callocz(owa, 1, sizeof(*rd->tiers[tier]));
+        rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        rd->tiers[tier]->tier_grouping = get_tier_grouping(tier);
+        rd->tiers[tier]->mode = RRD_MEMORY_MODE_DBENGINE;
+        rd->tiers[tier]->query_ops.init = rrdeng_load_metric_init;
+        rd->tiers[tier]->query_ops.next_metric = rrdeng_load_metric_next;
+        rd->tiers[tier]->query_ops.is_finished = rrdeng_load_metric_is_finished;
+        rd->tiers[tier]->query_ops.finalize = rrdeng_load_metric_finalize;
+        rd->tiers[tier]->query_ops.latest_time = rrdeng_metric_latest_time;
+        rd->tiers[tier]->query_ops.oldest_time = rrdeng_metric_oldest_time;
+        rd->tiers[tier]->db_metric_handle = eng->api.init(rd, st->rrdhost->storage_instance[tier]);
+    }
+
     return rd;
 }
 #endif
@@ -1648,13 +1711,15 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
 
         if (unlikely(find_dimension_first_last_t(machine_guid, (char *)st->name, (char *)sqlite3_column_text(res, 1),
                 (uuid_t *)sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t,
-                &rrdeng_uuid)))
+                &rrdeng_uuid, 0)))
             continue;
 
         st->counter++;
         st->last_entry_t = MAX(st->last_entry_t, (*param_list)->last_entry_t);
 
         RRDDIM *rd = create_rrdim_entry(owa, st, (char *)sqlite3_column_text(res, 1), (char *)sqlite3_column_text(res, 2), &rrdeng_uuid);
+        if (unlikely(!rd))
+            continue;
         if (sqlite3_column_int(res, 9) == 1)
             rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
         rd->next = (*param_list)->rd;
@@ -1691,7 +1756,7 @@ failed:
 
 #define SQL_STORE_CHART_HASH "insert into v_chart_hash (hash_id, type, id, " \
     "name, family, context, title, unit, plugin, module, priority, chart_type, last_used, chart_id) " \
-    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, ?12, strftime('%s'), ?13);"
+    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, ?12, unixepoch(), ?13);"
 
 int sql_store_chart_hash(
     uuid_t *hash_id, uuid_t *chart_id, const char *type, const char *id, const char *name, const char *family,
@@ -1862,7 +1927,7 @@ void compute_chart_hash(RRDSET *st)
 }
 
 #define SQL_STORE_CLAIM_ID  "insert into node_instance " \
-    "(host_id, claim_id, date_created) values (@host_id, @claim_id, strftime('%s')) " \
+    "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
     "on conflict(host_id) do update set claim_id = excluded.claim_id;"
 
 void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
@@ -1992,12 +2057,6 @@ char *get_hostname_by_node_id(char *node)
     sqlite3_stmt *res = NULL;
     char  *hostname = NULL;
     int rc;
-
-    rrd_rdlock();
-    RRDHOST *host = find_host_by_node_id(node);
-    rrd_unlock();
-    if (host)
-        return strdupz(host->hostname);
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)

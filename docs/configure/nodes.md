@@ -61,6 +61,10 @@ The Netdata config directory also contains one symlink:
   versions are copied into the config directory when opened with `edit-config`. _Do not edit the files in
   `/usr/lib/netdata/conf.d`, as they are overwritten by updates to the Netdata Agent._
 
+## Configure a Netdata docker container
+
+See [configure agent containers](/packaging/docker/README.md#configure-agent-containers).
+
 ## Use `edit-config` to edit configuration files
 
 The **recommended way to easily and safely edit Netdata's configuration** is with the `edit-config` script. This script

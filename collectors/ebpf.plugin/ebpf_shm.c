@@ -243,18 +243,6 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
  *****************************************************************/
 
 /**
- * Clean shm structure
- */
-void clean_shm_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(shm_pid[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
-/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -286,7 +274,8 @@ static void ebpf_shm_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else if (bpf_obj)

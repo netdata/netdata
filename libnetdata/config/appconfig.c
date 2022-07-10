@@ -462,15 +462,15 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     return strtoll(s, NULL, 0);
 }
 
-LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
+NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value)
 {
     char buffer[100], *s;
-    sprintf(buffer, "%0.5" LONG_DOUBLE_MODIFIER, value);
+    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
     s = appconfig_get(root, section, name, buffer);
     if(!s) return value;
 
-    return str2ld(s, NULL);
+    return str2ndd(s, NULL);
 }
 
 static inline int appconfig_test_boolean_value(char *s) {
@@ -588,10 +588,10 @@ long long appconfig_set_number(struct config *root, const char *section, const c
     return value;
 }
 
-LONG_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
+NETDATA_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value)
 {
     char buffer[100];
-    sprintf(buffer, "%0.5" LONG_DOUBLE_MODIFIER, value);
+    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
     appconfig_set(root, section, name, buffer);
 
@@ -831,26 +831,27 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                   "#\n"
                   "\n# global netdata configuration\n");
 
-    for(i = 0; i <= 15 ;i++) {
+    for(i = 0; i <= 16 ;i++) {
         appconfig_wrlock(root);
         for(co = root->first_section; co ; co = co->next) {
             if(!strcmp(co->name, CONFIG_SECTION_GLOBAL))                 pri = 0;
-            else if(!strcmp(co->name, CONFIG_SECTION_DIRECTORIES))       pri = 1;
-            else if(!strcmp(co->name, CONFIG_SECTION_LOGS))              pri = 2;
-            else if(!strcmp(co->name, CONFIG_SECTION_ENV_VARS))          pri = 3;
-            else if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))        pri = 4;
-            else if(!strcmp(co->name, CONFIG_SECTION_SQLITE))            pri = 5;
-            else if(!strcmp(co->name, CONFIG_SECTION_CLOUD))             pri = 6;
-            else if(!strcmp(co->name, CONFIG_SECTION_ML))                pri = 7;
-            else if(!strcmp(co->name, CONFIG_SECTION_HEALTH))            pri = 8;
-            else if(!strcmp(co->name, CONFIG_SECTION_WEB))               pri = 9;
-            // by default, new sections will get pri = 10 (set at the end, below)
-            else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 11;
-            else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 12;
-            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 13;
-            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 14;
-            else if(!strncmp(co->name, "plugin:", 7))                    pri = 15; // << change the loop too if you change this
-            else pri = 10; // this is used for any new (currently unknown) sections
+            else if(!strcmp(co->name, CONFIG_SECTION_DB))                pri = 1;
+            else if(!strcmp(co->name, CONFIG_SECTION_DIRECTORIES))       pri = 2;
+            else if(!strcmp(co->name, CONFIG_SECTION_LOGS))              pri = 3;
+            else if(!strcmp(co->name, CONFIG_SECTION_ENV_VARS))          pri = 4;
+            else if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))        pri = 5;
+            else if(!strcmp(co->name, CONFIG_SECTION_SQLITE))            pri = 6;
+            else if(!strcmp(co->name, CONFIG_SECTION_CLOUD))             pri = 7;
+            else if(!strcmp(co->name, CONFIG_SECTION_ML))                pri = 8;
+            else if(!strcmp(co->name, CONFIG_SECTION_HEALTH))            pri = 9;
+            else if(!strcmp(co->name, CONFIG_SECTION_WEB))               pri = 10;
+            // by default, new sections will get pri = 11 (set at the end, below)
+            else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 12;
+            else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 13;
+            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 14;
+            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 15;
+            else if(!strncmp(co->name, "plugin:", 7))                    pri = 16; // << change the loop too if you change this
+            else pri = 11; // this is used for any new (currently unknown) sections
 
             if(i == pri) {
                 int loaded = 0;
@@ -916,7 +917,7 @@ int config_parse_duration(const char* string, int* result) {
     if(!(isdigit(*string) || *string == '+' || *string == '-')) goto fallback;
 
     char *e = NULL;
-    calculated_number n = str2ld(string, &e);
+    NETDATA_DOUBLE n = str2ndd(string, &e);
     if(e && *e) {
         switch (*e) {
             case 'Y':

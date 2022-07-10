@@ -47,10 +47,6 @@ extern "C" {
 #define D_ACLK_SYNC         0x0000000800000000
 #define D_SYSTEM            0x8000000000000000
 
-//#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
-//#define DEBUG 0xffffffff
-#define DEBUG (0)
-
 extern int web_server_is_multithreaded;
 
 extern uint64_t debug_flags;
@@ -65,6 +61,13 @@ extern const char *stderr_filename;
 extern const char *stdout_filename;
 extern const char *facility_log;
 
+#ifdef ENABLE_ACLK
+extern const char *aclklog_filename;
+extern int aclklog_fd;
+extern FILE *aclklog;
+extern int aclklog_enabled;
+#endif
+
 extern int access_log_syslog;
 extern int error_log_syslog;
 extern int output_log_syslog;
@@ -78,16 +81,15 @@ extern void reopen_all_log_files();
 
 static inline void debug_dummy(void) {}
 
-#define error_log_limit_reset() do { error_log_errors_per_period = error_log_errors_per_period_backup; error_log_limit(1); } while(0)
-#define error_log_limit_unlimited() do { \
-        error_log_limit_reset(); \
-        error_log_errors_per_period = ((error_log_errors_per_period_backup * 10) < 10000) ? 10000 : (error_log_errors_per_period_backup * 10); \
-    } while(0)
+void error_log_limit_reset(void);
+void error_log_limit_unlimited(void);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define internal_error(condition, args...) do { if(unlikely(condition)) error_int("IERR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
 #define debug(type, args...) debug_dummy()
+#define internal_error(args...) debug_dummy()
 #endif
 
 #define info(args...)    info_int(__FILE__, __FUNCTION__, __LINE__, ##args)
@@ -102,6 +104,10 @@ extern void info_int( const char *file, const char *function, const unsigned lon
 extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
 extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 extern void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
+
+#ifdef ENABLE_ACLK
+extern void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);
+#endif
 
 # ifdef __cplusplus
 }

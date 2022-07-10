@@ -47,7 +47,7 @@ void netdata_cleanup_and_exit(int ret) {
 
         // stop everything
         info("EXIT: stopping static threads...");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_ACLK
         aclk_sync_exit_all();
 #endif
         cancel_main_threads();
@@ -55,11 +55,13 @@ void netdata_cleanup_and_exit(int ret) {
         // free the database
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
-        rrdeng_prepare_exit(&multidb_ctx);
+        for(int tier = 0; tier < storage_tiers ; tier++)
+            rrdeng_prepare_exit(multidb_ctx[tier]);
 #endif
         rrdhost_free_all();
 #ifdef ENABLE_DBENGINE
-        rrdeng_exit(&multidb_ctx);
+        for(int tier = 0; tier < storage_tiers ; tier++)
+            rrdeng_exit(multidb_ctx[tier]);
 #endif
     }
     sql_close_database();
@@ -349,6 +351,12 @@ int help(int exitcode) {
 #endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
+            "  -W buildinfo             Print the version, the configure options,\n"
+            "                           a list of optional features, and whether they\n"
+            "                           are enabled or not.\n\n"
+            "  -W buildinfojson         Print the version, the configure options,\n"
+            "                           a list of optional features, and whether they\n"
+            "                           are enabled or not, in JSON format.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
             "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
@@ -392,6 +400,14 @@ static void log_init(void) {
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
+
+#ifdef ENABLE_ACLK
+    aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
+    if (aclklog_enabled) {
+        snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
+        aclklog_filename = config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename);
+    }
+#endif
 
     char deffacility[8];
     snprintfz(deffacility,7,"%s","daemon");
@@ -516,6 +532,64 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_STATSD,  "enabled",
                 CONFIG_SECTION_PLUGINS, "statsd");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "memory mode",
+                CONFIG_SECTION_DB,      "mode");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "history",
+                CONFIG_SECTION_DB,      "retention");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "update every",
+                CONFIG_SECTION_DB,      "update every");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "page cache size",
+                CONFIG_SECTION_DB,      "dbengine page cache size MB");
+
+    config_move(CONFIG_SECTION_DB,      "page cache size",
+                CONFIG_SECTION_DB,      "dbengine page cache size MB");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "page cache uses malloc",
+                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
+
+    config_move(CONFIG_SECTION_DB,      "page cache with malloc",
+                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
+                CONFIG_SECTION_DB,      "dbengine disk space MB");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
+                CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
+                CONFIG_SECTION_DB,      "memory deduplication (ksm)");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine page fetch timeout",
+                CONFIG_SECTION_DB,      "dbengine page fetch timeout secs");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine page fetch retries",
+                CONFIG_SECTION_DB,      "dbengine page fetch retries");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine extent pages",
+                CONFIG_SECTION_DB,      "dbengine pages per extent");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "cleanup obsolete charts after seconds",
+                CONFIG_SECTION_DB,      "cleanup obsolete charts after secs");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "gap when lost iterations above",
+                CONFIG_SECTION_DB,      "gap when lost iterations above");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "cleanup orphan hosts after seconds",
+                CONFIG_SECTION_DB,      "cleanup orphan hosts after secs");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "delete obsolete charts files",
+                CONFIG_SECTION_DB,      "delete obsolete charts files");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "delete orphan hosts files",
+                CONFIG_SECTION_DB,      "delete orphan hosts files");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
+                CONFIG_SECTION_DB,      "enable zero metrics");
+
 }
 
 static void get_netdata_configured_variables() {
@@ -533,28 +607,40 @@ static void get_netdata_configured_variables() {
     debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
 
     // ------------------------------------------------------------------------
-    // get default database size
+    // get default database update frequency
 
-    default_rrd_history_entries = (int) config_get_number(CONFIG_SECTION_GLOBAL, "history", align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
-
-    long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
-    if(h != default_rrd_history_entries) {
-        config_set_number(CONFIG_SECTION_GLOBAL, "history", h);
-        default_rrd_history_entries = (int)h;
-    }
-
-    if(default_rrd_history_entries < 5 || default_rrd_history_entries > RRD_HISTORY_ENTRIES_MAX) {
-        error("Invalid history entries %d given. Defaulting to %d.", default_rrd_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
-        default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
+    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
+    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
+        error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
+        default_rrd_update_every = UPDATE_EVERY;
+        config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
     }
 
     // ------------------------------------------------------------------------
-    // get default database update frequency
+    // get default memory mode for the database
 
-    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_GLOBAL, "update every", UPDATE_EVERY);
-    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
-        error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY_MAX);
-        default_rrd_update_every = UPDATE_EVERY;
+    {
+        const char *mode = config_get(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+        default_rrd_memory_mode = rrd_memory_mode_id(mode);
+        if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
+            error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
+            config_set(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // get default database size
+
+    if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) {
+        default_rrd_history_entries = (int)config_get_number(
+            CONFIG_SECTION_DB, "retention",
+            align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
+
+        long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
+        if (h != default_rrd_history_entries) {
+            config_set_number(CONFIG_SECTION_DB, "retention", h);
+            default_rrd_history_entries = (int)h;
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -576,39 +662,38 @@ static void get_netdata_configured_variables() {
         netdata_configured_primary_plugins_dir = plugin_directories[PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH];
     }
 
-    // ------------------------------------------------------------------------
-    // get default memory mode for the database
-
-    default_rrd_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_GLOBAL, "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
 #ifdef ENABLE_DBENGINE
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_GLOBAL, "page cache uses malloc", CONFIG_BOOLEAN_NO);
-    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
+    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "dbengine page cache with malloc", CONFIG_BOOLEAN_NO);
+    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     }
 
     // ------------------------------------------------------------------------
     // get default Database Engine disk space quota in MiB
 
-    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine disk space", default_rrdeng_disk_quota_mb);
+    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
         error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     }
 
-    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine multihost disk space", compute_multidb_diskspace());
+    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
     if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
         error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
         default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
+        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
     }
 #else
     if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-       error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use memory mode ram instead.");
-       default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+       error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
+       default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
     }
 #endif
     // ------------------------------------------------------------------------
@@ -620,13 +705,32 @@ static void get_netdata_configured_variables() {
     // get KSM settings
 
 #ifdef MADV_MERGEABLE
-    enable_ksm = config_get_boolean(CONFIG_SECTION_GLOBAL, "memory deduplication (ksm)", enable_ksm);
+    enable_ksm = config_get_boolean(CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
 #endif
 
     // --------------------------------------------------------------------
     // metric correlations
+
     enable_metric_correlations = config_get_boolean(CONFIG_SECTION_GLOBAL, "enable metric correlations", enable_metric_correlations);
     default_metric_correlations_method = mc_string_to_method(config_get(CONFIG_SECTION_GLOBAL, "metric correlations method", mc_method_to_string(default_metric_correlations_method)));
+
+    // --------------------------------------------------------------------
+
+    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
+    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
+    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
+    if (rrdset_free_obsolete_time < 10) {
+        rrdset_free_obsolete_time = 10;
+        info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
+        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+    }
+
+    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    if (gap_when_lost_iterations_above < 1) {
+        gap_when_lost_iterations_above = 1;
+        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    }
 
     // --------------------------------------------------------------------
     // get various system parameters
@@ -876,6 +980,7 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
+                            storage_tiers = 1;
                             registry_init();
                             if(rrd_init("unittest", NULL)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
@@ -1226,39 +1331,31 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
         // get log filenames and settings
+
         log_init();
         error_log_limit_unlimited();
+
         // initialize the log files
         open_all_log_files();
 
-#ifdef ENABLE_DBENGINE
-        default_rrdeng_page_fetch_timeout = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine page fetch timeout", PAGE_CACHE_FETCH_WAIT_TIMEOUT);
-        if (default_rrdeng_page_fetch_timeout < 1) {
-            info("\"dbengine page fetch timeout\" found in netdata.conf cannot be %d, using 1", default_rrdeng_page_fetch_timeout);
-            default_rrdeng_page_fetch_timeout = 1;
-        }
-
-        default_rrdeng_page_fetch_retries = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine page fetch retries", MAX_PAGE_CACHE_FETCH_RETRIES);
-        if (default_rrdeng_page_fetch_retries < 1) {
-            info("\"dbengine page fetch retries\" found in netdata.conf cannot be %d, using 1", default_rrdeng_page_fetch_retries);
-            default_rrdeng_page_fetch_retries = 1;
-        }
-#endif
-
         get_system_timezone();
+
         // --------------------------------------------------------------------
         // get the certificate and start security
+
 #ifdef ENABLE_HTTPS
         security_init();
 #endif
 
         // --------------------------------------------------------------------
         // This is the safest place to start the SILENCERS structure
+
         set_silencers_filename();
         health_initialize_global_silencers();
 
         // --------------------------------------------------------------------
         // Initialize ML configuration
+
         ml_init();
 
         // --------------------------------------------------------------------
@@ -1266,9 +1363,11 @@ int main(int argc, char **argv) {
 
         // block signals while initializing threads.
         // this causes the threads to block signals.
+
         signals_block();
 
         // setup the signals we want to use
+
         signals_init();
 
         // setup threads configs
@@ -1297,6 +1396,7 @@ int main(int argc, char **argv) {
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
+
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1380,7 +1480,7 @@ int main(int argc, char **argv) {
 
     web_server_config_options();
 
-    netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_GLOBAL, "enable zero metrics", CONFIG_BOOLEAN_NO);
+    netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_DB, "enable zero metrics", CONFIG_BOOLEAN_NO);
 
     set_late_global_environment();
 

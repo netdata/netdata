@@ -20,7 +20,6 @@
 
 // Helper stuff which should not have any further inside ACLK dependency
 // and are supposed not to be needed outside of ACLK
-extern int aclk_use_new_cloud_arch;
 extern usec_t aclk_session_newarch;
 
 extern int chart_batch_id;
@@ -88,7 +87,8 @@ enum aclk_topics {
     ACLK_TOPICID_ALARM_LOG             = 14,
     ACLK_TOPICID_ALARM_HEALTH          = 15,
     ACLK_TOPICID_ALARM_CONFIG          = 16,
-    ACLK_TOPICID_ALARM_SNAPSHOT        = 17
+    ACLK_TOPICID_ALARM_SNAPSHOT        = 17,
+    ACLK_TOPICID_NODE_COLLECTORS       = 18
 };
 
 const char *aclk_get_topic(enum aclk_topics topic);

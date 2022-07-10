@@ -136,6 +136,8 @@ LIBNETDATA_FILES = \
     libnetdata/adaptive_resortable_list/adaptive_resortable_list.h \
     libnetdata/config/appconfig.c \
     libnetdata/config/appconfig.h \
+    libnetdata/arrayalloc/arrayalloc.c \
+    libnetdata/arrayalloc/arrayalloc.h \
     libnetdata/avl/avl.c \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \
@@ -260,7 +262,7 @@ ML_FILES += \
     $(NULL)
 
 # Disable warnings from dlib library
-ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits
+ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow
 
 endif
 
@@ -474,6 +476,9 @@ RRD_PLUGIN_FILES = \
     database/metric_correlations.h \
     $(NULL)
 
+database/sqlite/sqlite3.$(OBJEXT) : CFLAGS += -Wno-cast-function-type
+database/KolmogorovSmirnovDist.$(OBJEXT) : CFLAGS += -Wno-maybe-uninitialized
+
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
         database/engine/rrdengine.c \
@@ -641,11 +646,7 @@ ACLK_FILES = \
     mqtt_websockets/c-rbuf/include/ringbuffer.h \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/MQTT-C/src/mqtt.c \
-    mqtt_websockets/MQTT-C/include/mqtt.h
-    $(NULL)
-
-if ENABLE_NEW_CLOUD_PROTOCOL
-ACLK_FILES += \
+    mqtt_websockets/MQTT-C/include/mqtt.h \
     aclk/aclk_charts_api.c \
     aclk/aclk_charts_api.h \
     aclk/aclk_alarm_api.c \
@@ -668,10 +669,14 @@ ACLK_FILES += \
     aclk/schema-wrappers/node_info.h \
     aclk/schema-wrappers/capability.cc \
     aclk/schema-wrappers/capability.h \
+    aclk/schema-wrappers/proto_2_json.cc \
+    aclk/schema-wrappers/proto_2_json.h \
     aclk/schema-wrappers/schema_wrappers.h \
     aclk/schema-wrappers/schema_wrapper_utils.cc \
     aclk/schema-wrappers/schema_wrapper_utils.h \
     $(NULL)
+
+mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
 
 ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/aclk/v1/lib.proto \
@@ -768,16 +773,7 @@ aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h: aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
-endif #ENABLE_NEW_CLOUD_PROTOCOL
-
 endif #ENABLE_ACLK
-
-if ENABLE_ACLK
-ACLK_COMMON_FILES = \
-    aclk/aclk_collector_list.c \
-    aclk/aclk_collector_list.h \
-    $(NULL)
-endif
 
 ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_rrdhost_state.h \
@@ -885,7 +881,6 @@ NETDATA_FILES = \
     $(CLAIM_FILES) \
     $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
-    $(ACLK_COMMON_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \

@@ -2827,15 +2827,6 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
     }
 }
 
-void clean_socket_apps_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(socket_bandwidth_curr[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
 /**
  * Cleanup publish syscall
  *
@@ -2939,7 +2930,8 @@ static void ebpf_socket_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
     finalized_threads = 1;
 }

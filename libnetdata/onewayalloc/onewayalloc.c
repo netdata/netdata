@@ -1,9 +1,7 @@
 #include "onewayalloc.h"
 
-static size_t OWA_NATURAL_PAGE_SIZE = 0;
-
 // https://www.gnu.org/software/libc/manual/html_node/Aligned-Memory-Blocks.html
-#define OWA_NATURAL_ALIGNMENT  (sizeof(void *) * 2)
+#define OWA_NATURAL_ALIGNMENT  (sizeof(uintptr_t) * 2)
 
 typedef struct owa_page {
     size_t stats_pages;
@@ -30,6 +28,8 @@ static inline size_t natural_alignment(size_t size) {
 // any number of times, for any amount of memory.
 
 static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
+    static size_t OWA_NATURAL_PAGE_SIZE = 0;
+
     if(unlikely(!OWA_NATURAL_PAGE_SIZE)) {
         long int page_size = sysconf(_SC_PAGE_SIZE);
         if (unlikely(page_size == -1))
@@ -82,11 +82,11 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     head->stats_pages++;
     head->stats_pages_size += size;
 
-    return (ONEWAYALLOC *)page;
+    return page;
 }
 
 ONEWAYALLOC *onewayalloc_create(size_t size_hint) {
-    return onewayalloc_create_internal(NULL, size_hint);
+    return (ONEWAYALLOC *)onewayalloc_create_internal(NULL, size_hint);
 }
 
 void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
@@ -145,11 +145,11 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
 
     OWA_PAGE *head = (OWA_PAGE *)owa;
     OWA_PAGE *page;
-    size_t seeking = (size_t)ptr;
+    uintptr_t seeking = (uintptr_t)ptr;
 
     for(page = head; page ;page = page->next) {
-        size_t start = (size_t)page;
-        size_t end = start + page->size;
+        uintptr_t start = (uintptr_t)page;
+        uintptr_t end = start + page->size;
 
         if(seeking >= start && seeking <= end) {
             // found it - it is ours
@@ -164,6 +164,14 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
 #endif
 
     return;
+}
+
+void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize) {
+    size_t newsize = oldsize * 2;
+    void *dst = onewayalloc_mallocz(owa, newsize);
+    memcpy(dst, src, oldsize);
+    onewayalloc_freez(owa, src);
+    return dst;
 }
 
 void onewayalloc_destroy(ONEWAYALLOC *owa) {

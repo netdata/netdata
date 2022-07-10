@@ -63,13 +63,13 @@ int setup_rrdhost()
     rd->collections_counter++;
     rd->next = NULL;
 
-    rd->state = calloc(1, sizeof(*rd->state));
-    rd->state->query_ops.oldest_time = __mock_rrddim_query_oldest_time;
-    rd->state->query_ops.latest_time = __mock_rrddim_query_latest_time;
-    rd->state->query_ops.init = __mock_rrddim_query_init;
-    rd->state->query_ops.is_finished = __mock_rrddim_query_is_finished;
-    rd->state->query_ops.next_metric = __mock_rrddim_query_next_metric;
-    rd->state->query_ops.finalize = __mock_rrddim_query_finalize;
+    rd->tiers[0] = calloc(1, sizeof(struct rrddim_tier));
+    rd->tiers[0]->query_ops.oldest_time = __mock_rrddim_query_oldest_time;
+    rd->tiers[0]->query_ops.latest_time = __mock_rrddim_query_latest_time;
+    rd->tiers[0]->query_ops.init = __mock_rrddim_query_init;
+    rd->tiers[0]->query_ops.is_finished = __mock_rrddim_query_is_finished;
+    rd->tiers[0]->query_ops.next_metric = __mock_rrddim_query_next_metric;
+    rd->tiers[0]->query_ops.finalize = __mock_rrddim_query_finalize;
 
     return 0;
 }
@@ -79,7 +79,7 @@ int teardown_rrdhost()
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     free((void *)rd->name);
     free((void *)rd->id);
-    free(rd->state);
+    free(rd->tiers[0]);
     free(rd);
 
     RRDSET *st = localhost->rrdset_root;

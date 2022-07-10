@@ -133,7 +133,7 @@ inline int rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)
 }
 
 static RRDVAR *rrdvar_custom_variable_create(const char *scope, avl_tree_lock *tree_lock, const char *name) {
-    calculated_number *v = callocz(1, sizeof(calculated_number));
+    NETDATA_DOUBLE *v = callocz(1, sizeof(NETDATA_DOUBLE));
     *v = NAN;
 
     RRDVAR *rv = rrdvar_create_and_index(scope, tree_lock, name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_ALLOCATED, v);
@@ -158,11 +158,11 @@ RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
     return rrdvar_custom_variable_create("host", &host->rrdvar_root_index, name);
 }
 
-void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value) {
+void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, NETDATA_DOUBLE value) {
     if(rv->type != RRDVAR_TYPE_CALCULATED || !(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR) || !(rv->options & RRDVAR_OPTION_ALLOCATED))
-        error("requested to set variable '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom one.", rv->name, value);
+        error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rv->name, value);
     else {
-        calculated_number *v = rv->value;
+        NETDATA_DOUBLE *v = rv->value;
         if(*v != value) {
             *v = value;
 
@@ -181,10 +181,10 @@ int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR * /*rv*
 // ----------------------------------------------------------------------------
 // RRDVAR lookup
 
-calculated_number rrdvar2number(RRDVAR *rv) {
+NETDATA_DOUBLE rrdvar2number(RRDVAR *rv) {
     switch(rv->type) {
         case RRDVAR_TYPE_CALCULATED: {
-            calculated_number *n = (calculated_number *)rv->value;
+            NETDATA_DOUBLE *n = (NETDATA_DOUBLE *)rv->value;
             return *n;
         }
 
@@ -209,12 +209,12 @@ calculated_number rrdvar2number(RRDVAR *rv) {
         }
 
         default:
-            error("I don't know how to convert RRDVAR type %u to calculated_number", rv->type);
+            error("I don't know how to convert RRDVAR type %u to NETDATA_DOUBLE", rv->type);
             return NAN;
     }
 }
 
-int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
+int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, NETDATA_DOUBLE *result) {
     RRDSET *st = rc->rrdset;
     if(!st) return 0;
 
@@ -254,13 +254,13 @@ struct variable2json_helper {
 static int single_variable2json(void *entry, void *data) {
     struct variable2json_helper *helper = (struct variable2json_helper *)data;
     RRDVAR *rv = (RRDVAR *)entry;
-    calculated_number value = rrdvar2number(rv);
+    NETDATA_DOUBLE value = rrdvar2number(rv);
 
     if (helper->options == RRDVAR_OPTION_DEFAULT || rv->options & helper->options) {
         if(unlikely(isnan(value) || isinf(value)))
             buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rv->name);
         else
-            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" LONG_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (LONG_DOUBLE)value);
+            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" NETDATA_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (NETDATA_DOUBLE)value);
 
         helper->counter++;
     }

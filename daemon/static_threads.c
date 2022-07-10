@@ -123,7 +123,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = socket_listen_main_static_threaded
     },
 
-#if defined(ENABLE_ACLK) || defined(ACLK_NG)
+#ifdef ENABLE_ACLK
     {
         .name = "ACLK_Main",
         .config_section = NULL,

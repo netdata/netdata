@@ -370,6 +370,8 @@ set(LIBNETDATA_FILES
         libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
         libnetdata/config/appconfig.c
         libnetdata/config/appconfig.h
+        libnetdata/arrayalloc/arrayalloc.c
+        libnetdata/arrayalloc/arrayalloc.h
         libnetdata/avl/avl.c
         libnetdata/avl/avl.h
         libnetdata/buffer/buffer.c
@@ -787,11 +789,6 @@ set(ACLK_ALWAYS_BUILD
         aclk/aclk_proxy.h
         )
 
-set(ACLK_COMMON_FILES
-        aclk/aclk_collector_list.c
-        aclk/aclk_collector_list.h
-        )
-
 set(ACLK_FILES
         aclk/aclk.c
         aclk/aclk.h
@@ -849,6 +846,8 @@ set(ACLK_FILES
         aclk/schema-wrappers/node_info.h
         aclk/schema-wrappers/capability.cc
         aclk/schema-wrappers/capability.h
+        aclk/schema-wrappers/proto_2_json.cc
+        aclk/schema-wrappers/proto_2_json.h
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
@@ -1172,7 +1171,6 @@ list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
 list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
 list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
-list(APPEND NETDATA_FILES ${ACLK_COMMON_FILES})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)

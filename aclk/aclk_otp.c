@@ -446,11 +446,37 @@ cleanup_buffers:
     return rc;
 }
 
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+static int private_decrypt(EVP_PKEY *p_key, unsigned char * enc_data, int data_len, unsigned char **decrypted)
+#else
 static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, unsigned char **decrypted)
+#endif
 {
+    int result;
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+    size_t outlen = EVP_PKEY_size(p_key);
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(p_key, NULL);
+    if (!ctx)
+        return 1;
+
+    if (EVP_PKEY_decrypt_init(ctx) <= 0)
+        return 1;
+
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
+        return 1;
+
+    *decrypted = mallocz(outlen);
+
+    if (EVP_PKEY_decrypt(ctx, *decrypted, &outlen, enc_data, data_len) == 1)
+        result = (int) outlen;
+    else
+        result = -1;
+#else
     *decrypted = mallocz(RSA_size(p_key));
-    int result = RSA_private_decrypt(data_len, enc_data, *decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
-    if (result == -1) {
+    result = RSA_private_decrypt(data_len, enc_data, *decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
+#endif
+    if (result == -1)
+    {
         char err[512];
         ERR_error_string_n(ERR_get_error(), err, sizeof(err));
         error("Decryption of the challenge failed: %s", err);
@@ -458,7 +484,11 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     return result;
 }
 
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+int aclk_get_mqtt_otp(EVP_PKEY *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
+#else
 int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
+#endif
 {
     unsigned char *challenge;
     int challenge_bytes;
@@ -814,11 +844,8 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
         return 1;
     }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=json,proto&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
-#else
-    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=json&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
-#endif
+    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=proto&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
+
     freez(agent_id);
 
     req.host = (char*)aclk_hostname;

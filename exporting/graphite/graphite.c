@@ -101,8 +101,7 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
-    buffer_strcat(instance->labels_buffer, ";");
-    rrdlabels_to_buffer(host->host_labels, instance->labels_buffer, "", "=", "", ";",
+    rrdlabels_to_buffer(host->host_labels, instance->labels_buffer, ";", "=", "", "",
                         exporting_labels_filter_callback, instance,
                         NULL, sanitize_graphite_label_value);
 
@@ -174,14 +173,14 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
         RRD_ID_LENGTH_MAX);
 
     time_t last_t;
-    calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+    NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     if(isnan(value))
         return 0;
 
     buffer_sprintf(
         instance->buffer,
-        "%s.%s.%s.%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
+        "%s.%s.%s.%s%s%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
         instance->config.prefix,
         (host == localhost) ? instance->config.hostname : host->hostname,
         chart_name,

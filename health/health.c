@@ -219,10 +219,6 @@ static void health_reload_host(RRDHOST *host) {
  * Reload the host configuration for all hosts.
  */
 void health_reload(void) {
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_setting)
-        aclk_single_update_disable();
-#endif
     sql_refresh_hashes();
 
     rrd_rdlock();
@@ -234,11 +230,7 @@ void health_reload(void) {
     rrd_unlock();
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting) {
-        aclk_single_update_enable();
-        aclk_alarm_reload();
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         aclk_alert_reloaded = 1;
-#endif
     }
 #endif
 }
@@ -246,7 +238,7 @@ void health_reload(void) {
 // ----------------------------------------------------------------------------
 // health main thread and friends
 
-static inline RRDCALC_STATUS rrdcalc_value2status(calculated_number n) {
+static inline RRDCALC_STATUS rrdcalc_value2status(NETDATA_DOUBLE n) {
     if(isnan(n) || isinf(n)) return RRDCALC_STATUS_UNDEFINED;
     if(n) return RRDCALC_STATUS_RAISED;
     return RRDCALC_STATUS_CLEAR;
@@ -354,7 +346,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" NETDATA_DOUBLE_FORMAT_ZERO
+        "' '" NETDATA_DOUBLE_FORMAT_ZERO
+        "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -419,7 +413,7 @@ static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
 }
 
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
-    debug(D_HEALTH, "Health alarm '%s.%s' = " CALCULATED_NUMBER_FORMAT_AUTO " - changed status from %s to %s",
+    debug(D_HEALTH, "Health alarm '%s.%s' = " NETDATA_DOUBLE_FORMAT_AUTO " - changed status from %s to %s",
          ae->chart?ae->chart:"NOCHART", ae->name,
          ae->new_value,
          rrdcalc_status2string(ae->old_status),
@@ -736,7 +730,7 @@ void *health_main(void *ptr) {
     rrdcalc_labels_unlink();
 
     unsigned int loop = 0;
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
     unsigned int marked_aclk_reload_loop = 0;
 #endif
     while(!netdata_exit) {
@@ -765,7 +759,7 @@ void *health_main(void *ptr) {
             }
         }
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
         if (aclk_alert_reloaded && !marked_aclk_reload_loop)
             marked_aclk_reload_loop = loop;
 #endif
@@ -794,6 +788,11 @@ void *health_main(void *ptr) {
                 info("Resuming health checks on host '%s'.", host->hostname);
                 host->health_delay_up_to = 0;
             }
+
+            // wait until cleanup of obsolete charts on children is complete
+            if (host != localhost)
+                if (unlikely(host->trigger_chart_obsoletion_check == 1))
+                    continue;
 
             if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
                 sql_health_alarm_log_cleanup(host);
@@ -828,7 +827,7 @@ void *health_main(void *ptr) {
                             rc->last_status_change = now;
                             rc->last_updated = now;
                             rc->value = NAN;
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
                             if (netdata_cloud_setting && likely(!aclk_alert_reloaded))
                                 sql_queue_alarm_to_aclk(host, ae, 1);
 #endif
@@ -860,7 +859,7 @@ void *health_main(void *ptr) {
                                                   0, rc->options,
                                                   &rc->db_after,&rc->db_before,
                                                   NULL, NULL,
-                                                  &value_is_null, NULL, 0);
+                                                  &value_is_null, NULL, 0, 0);
 
                     if (unlikely(ret != 200)) {
                         // database lookup failed
@@ -900,8 +899,7 @@ void *health_main(void *ptr) {
                     } else
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_NAN;
 
-                    debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value "
-                          CALCULATED_NUMBER_FORMAT, host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
+                    debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT, host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
                           rc->value
                     );
                 }
@@ -925,7 +923,7 @@ void *health_main(void *ptr) {
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
-                              CALCULATED_NUMBER_FORMAT
+                              NETDATA_DOUBLE_FORMAT
                               ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
                               rc->calculation->parsed_as, rc->calculation->result,
                               buffer_tostring(rc->calculation->error_msg), rc->source
@@ -974,7 +972,7 @@ void *health_main(void *ptr) {
                         } else {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value "
-                                  CALCULATED_NUMBER_FORMAT
+                                  NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART",
                                   rc->name, rc->warning->result, buffer_tostring(rc->warning->error_msg), rc->source
                             );
@@ -1000,7 +998,7 @@ void *health_main(void *ptr) {
                         } else {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression gave value "
-                                  CALCULATED_NUMBER_FORMAT
+                                  NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART",
                                   rc->name, rc->critical->result, buffer_tostring(rc->critical->error_msg),
                                   rc->source
@@ -1180,7 +1178,7 @@ void *health_main(void *ptr) {
             health_alarm_wait_for_execution(ae);
         }
 
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
         if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
                 rrdhost_foreach_read(host) {
                     if (unlikely(!host->health_enabled))

@@ -35,7 +35,7 @@ struct rrdsetvar {
 };
 
 extern RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name);
-extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, calculated_number value);
+extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, NETDATA_DOUBLE value);
 
 extern void rrdsetvar_rename_all(RRDSET *st);
 extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options);

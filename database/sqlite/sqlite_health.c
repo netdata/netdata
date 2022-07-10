@@ -435,8 +435,8 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 
 #define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
 "delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type) " \
-"select hostname, ?1, ?2, ?3, config_hash_id, 0, ?4, strftime('%%s'), 0, 0, flags, exec_run_timestamp, " \
-"strftime('%%s'), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type " \
+"select hostname, ?1, ?2, ?3, config_hash_id, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, " \
+"unixepoch(), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type " \
 "from health_log_%s where unique_id = ?5", guid, guid2
 #define SQL_INJECT_REMOVED_UPDATE(guid) "update health_log_%s set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3; ", guid
 void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id)
@@ -751,8 +751,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae->old_status  = (RRDCALC_STATUS)sqlite3_column_int(res, 23);
         ae->delay       = (int) sqlite3_column_int(res, 24);
 
-        ae->new_value   = (calculated_number) sqlite3_column_double(res, 25);
-        ae->old_value   = (calculated_number) sqlite3_column_double(res, 26);
+        ae->new_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 25);
+        ae->old_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 26);
 
         ae->last_repeat = last_repeat;
 
@@ -814,7 +814,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     "on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, " \
     "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
-    "p_db_lookup_before, p_update_every) values (?1,strftime('%s'),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
+    "p_db_lookup_before, p_update_every) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
     "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34);"
 
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)

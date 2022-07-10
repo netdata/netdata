@@ -9,7 +9,7 @@ typedef struct eval_value {
     int type;
 
     union {
-        calculated_number number;
+        NETDATA_DOUBLE number;
         EVAL_VARIABLE *variable;
         struct eval_node *expression;
     };
@@ -54,16 +54,16 @@ typedef struct eval_node {
 static inline void eval_node_free(EVAL_NODE *op);
 static inline EVAL_NODE *parse_full_expression(const char **string, int *error);
 static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error);
-static inline calculated_number eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
+static inline NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
 static inline void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error);
-static inline void print_parsed_as_constant(BUFFER *out, calculated_number n);
+static inline void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n);
 
 // ----------------------------------------------------------------------------
 // evaluation of expressions
 
-static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
+static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
     static uint32_t this_hash = 0, now_hash = 0, after_hash = 0, before_hash = 0, status_hash = 0, removed_hash = 0, uninitialized_hash = 0, undefined_hash = 0, clear_hash = 0, warning_hash = 0, critical_hash = 0;
-    calculated_number n;
+    NETDATA_DOUBLE n;
 
     if(unlikely(this_hash == 0)) {
         this_hash = simple_hash("this");
@@ -179,8 +179,8 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
     return NAN;
 }
 
-static inline calculated_number eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, int *error) {
-    calculated_number n;
+static inline NETDATA_DOUBLE eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, int *error) {
+    NETDATA_DOUBLE n;
 
     switch(v->type) {
         case EVAL_VALUE_EXPRESSION:
@@ -204,101 +204,101 @@ static inline calculated_number eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, 
     return n;
 }
 
-static inline int is_true(calculated_number n) {
+static inline int is_true(NETDATA_DOUBLE n) {
     if(isnan(n)) return 0;
     if(isinf(n)) return 1;
     if(n == 0) return 0;
     return 1;
 }
 
-calculated_number eval_and(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+NETDATA_DOUBLE eval_and(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return is_true(eval_value(exp, &op->ops[0], error)) && is_true(eval_value(exp, &op->ops[1], error));
 }
-calculated_number eval_or(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+NETDATA_DOUBLE eval_or(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return is_true(eval_value(exp, &op->ops[0], error)) || is_true(eval_value(exp, &op->ops[1], error));
 }
-calculated_number eval_greater_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_greater_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     return isgreaterequal(n1, n2);
 }
-calculated_number eval_less_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_less_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     return islessequal(n1, n2);
 }
-calculated_number eval_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(isnan(n1) && isnan(n2)) return 1;
     if(isinf(n1) && isinf(n2)) return 1;
     if(isnan(n1) || isnan(n2)) return 0;
     if(isinf(n1) || isinf(n2)) return 0;
-    return calculated_number_equal(n1, n2);
+    return considered_equal_ndd(n1, n2);
 }
-calculated_number eval_not_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+NETDATA_DOUBLE eval_not_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return !eval_equal(exp, op, error);
 }
-calculated_number eval_less(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_less(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     return isless(n1, n2);
 }
-calculated_number eval_greater(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_greater(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     return isgreater(n1, n2);
 }
-calculated_number eval_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(isnan(n1) || isnan(n2)) return NAN;
     if(isinf(n1) || isinf(n2)) return INFINITY;
     return n1 + n2;
 }
-calculated_number eval_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(isnan(n1) || isnan(n2)) return NAN;
     if(isinf(n1) || isinf(n2)) return INFINITY;
     return n1 - n2;
 }
-calculated_number eval_multiply(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_multiply(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(isnan(n1) || isnan(n2)) return NAN;
     if(isinf(n1) || isinf(n2)) return INFINITY;
     return n1 * n2;
 }
-calculated_number eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
-    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+NETDATA_DOUBLE eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(isnan(n1) || isnan(n2)) return NAN;
     if(isinf(n1) || isinf(n2)) return INFINITY;
     return n1 / n2;
 }
-calculated_number eval_nop(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+NETDATA_DOUBLE eval_nop(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return eval_value(exp, &op->ops[0], error);
 }
-calculated_number eval_not(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+NETDATA_DOUBLE eval_not(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return !is_true(eval_value(exp, &op->ops[0], error));
 }
-calculated_number eval_sign_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+NETDATA_DOUBLE eval_sign_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return eval_value(exp, &op->ops[0], error);
 }
-calculated_number eval_sign_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+NETDATA_DOUBLE eval_sign_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(isnan(n1)) return NAN;
     if(isinf(n1)) return INFINITY;
     return -n1;
 }
-calculated_number eval_abs(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+NETDATA_DOUBLE eval_abs(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(isnan(n1)) return NAN;
     if(isinf(n1)) return INFINITY;
     return ABS(n1);
 }
-calculated_number eval_if_then_else(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+NETDATA_DOUBLE eval_if_then_else(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     if(is_true(eval_value(exp, &op->ops[0], error)))
         return eval_value(exp, &op->ops[1], error);
     else
@@ -310,7 +310,7 @@ static struct operator {
     char precedence;
     char parameters;
     char isfunction;
-    calculated_number (*eval)(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
+    NETDATA_DOUBLE (*eval)(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
 } operators[256] = {
         // this is a random access array
         // we always access it with a known EVAL_OPERATOR_X
@@ -341,13 +341,13 @@ static struct operator {
 
 #define eval_precedence(operator) (operators[(unsigned char)(operator)].precedence)
 
-static inline calculated_number eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static inline NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     if(unlikely(op->count != operators[op->operator].parameters)) {
         *error = EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS;
         return 0;
     }
 
-    calculated_number n = operators[op->operator].eval(exp, op, error);
+    NETDATA_DOUBLE n = operators[op->operator].eval(exp, op, error);
 
     return n;
 }
@@ -360,7 +360,7 @@ static inline void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, int *
     buffer_sprintf(out, "${%s}", v->name);
 }
 
-static inline void print_parsed_as_constant(BUFFER *out, calculated_number n) {
+static inline void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n) {
     if(unlikely(isnan(n))) {
         buffer_strcat(out, "nan");
         return;
@@ -372,7 +372,7 @@ static inline void print_parsed_as_constant(BUFFER *out, calculated_number n) {
     }
 
     char b[100+1], *s;
-    snprintfz(b, 100, CALCULATED_NUMBER_FORMAT, n);
+    snprintfz(b, 100, NETDATA_DOUBLE_FORMAT, n);
 
     s = &b[strlen(b) - 1];
     while(s > b && *s == '0') {
@@ -737,9 +737,9 @@ static inline int parse_variable(const char **string, char *buffer, size_t len) 
     return 0;
 }
 
-static inline int parse_constant(const char **string, calculated_number *number) {
+static inline int parse_constant(const char **string, NETDATA_DOUBLE *number) {
     char *end = NULL;
-    calculated_number n = str2ld(*string, &end);
+    NETDATA_DOUBLE n = str2ndd(*string, &end);
     if(unlikely(!end || *string == end)) {
         *number = 0;
         return 0;
@@ -845,7 +845,7 @@ static inline void eval_node_set_value_to_node(EVAL_NODE *op, int pos, EVAL_NODE
     op->ops[pos].expression = value;
 }
 
-static inline void eval_node_set_value_to_constant(EVAL_NODE *op, int pos, calculated_number value) {
+static inline void eval_node_set_value_to_constant(EVAL_NODE *op, int pos, NETDATA_DOUBLE value) {
     if(pos >= op->count)
         fatal("Invalid request to set position %d of OPERAND that has only %d values", pos + 1, op->count + 1);
 
@@ -911,7 +911,7 @@ static inline EVAL_NODE *parse_next_operand_given_its_operator(const char **stri
 static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error) {
     char variable_buffer[EVAL_MAX_VARIABLE_NAME_LENGTH + 1];
     EVAL_NODE *op1 = NULL;
-    calculated_number number;
+    NETDATA_DOUBLE number;
 
     *error = EVAL_ERROR_OK;
 

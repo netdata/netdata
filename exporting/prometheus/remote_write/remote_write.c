@@ -294,7 +294,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
             // we need average or sum of the data
 
             time_t last_t = instance->before;
-            calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+            NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
             if (!isnan(value) && !isinf(value)) {
                 if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)

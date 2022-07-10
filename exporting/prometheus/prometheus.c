@@ -362,7 +362,7 @@ static int print_host_variables(RRDVAR *rv, void *data)
             }
         }
 
-        calculated_number value = rrdvar2number(rv);
+        NETDATA_DOUBLE value = rrdvar2number(rv);
         if (isnan(value) || isinf(value)) {
             if (opts->output_options & PROMETHEUS_OUTPUT_HELP)
                 buffer_sprintf(
@@ -383,7 +383,7 @@ static int print_host_variables(RRDVAR *rv, void *data)
         if (opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
             buffer_sprintf(
                 opts->wb,
-                "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
+                "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
                 opts->prefix,
                 opts->name,
                 label_pre,
@@ -394,7 +394,7 @@ static int print_host_variables(RRDVAR *rv, void *data)
         else
             buffer_sprintf(
                 opts->wb,
-                "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT "\n",
+                "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT "\n",
                 opts->prefix,
                 opts->name,
                 label_pre,
@@ -483,9 +483,9 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
     if (prometheus_collector)
         buffer_sprintf(
             wb,
-            CALCULATED_NUMBER_FORMAT,
-            (calculated_number)p->rd->last_collected_value * (calculated_number)p->rd->multiplier /
-                (calculated_number)p->rd->divisor);
+            NETDATA_DOUBLE_FORMAT,
+            (NETDATA_DOUBLE)p->rd->last_collected_value * (NETDATA_DOUBLE)p->rd->multiplier /
+                (NETDATA_DOUBLE)p->rd->divisor);
     else
         buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT, p->rd->last_collected_value);
 
@@ -732,7 +732,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                         time_t first_time = instance->after;
                         time_t last_time = instance->before;
-                        calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_time);
+                        NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_time);
 
                         if (!isnan(value) && !isinf(value)) {
                             if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
@@ -764,7 +764,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(
                                     wb,
-                                    "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT
+                                    "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " NETDATA_DOUBLE_FORMAT
                                     " %llu\n",
                                     prefix,
                                     context,
@@ -779,7 +779,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             else
                                 buffer_sprintf(
                                     wb,
-                                    "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT
+                                    "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " NETDATA_DOUBLE_FORMAT
                                     "\n",
                                     prefix,
                                     context,

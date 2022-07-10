@@ -273,7 +273,8 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st);
 
 extern EXPORTING_OPTIONS exporting_parse_data_source(const char *source, EXPORTING_OPTIONS exporting_options);
 
-calculated_number exporting_calculate_value_from_stored_data(
+NETDATA_DOUBLE
+exporting_calculate_value_from_stored_data(
     struct instance *instance,
     RRDDIM *rd,
     time_t *last_timestamp);

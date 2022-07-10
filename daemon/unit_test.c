@@ -4,7 +4,7 @@
 
 static int check_number_printing(void) {
     struct {
-        calculated_number n;
+        NETDATA_DOUBLE n;
         const char *correct;
     } values[] = {
             { .n = 0, .correct = "0" },
@@ -22,8 +22,8 @@ static int check_number_printing(void) {
     char netdata[50], system[50];
     int i, failed = 0;
     for(i = 0; values[i].correct ; i++) {
-        print_calculated_number(netdata, values[i].n);
-        snprintfz(system, 49, "%0.12" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)values[i].n);
+        print_netdata_double(netdata, values[i].n);
+        snprintfz(system, 49, "%0.12" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)values[i].n);
 
         int ok = 1;
         if(strcmp(netdata, values[i].correct) != 0) {
@@ -95,35 +95,36 @@ static int check_rrdcalc_comparisons(void) {
     return 0;
 }
 
-int check_storage_number(calculated_number n, int debug) {
+int check_storage_number(NETDATA_DOUBLE n, int debug) {
     char buffer[100];
     uint32_t flags = SN_DEFAULT_FLAGS;
 
     storage_number s = pack_storage_number(n, flags);
-    calculated_number d = unpack_storage_number(s);
+    NETDATA_DOUBLE d = unpack_storage_number(s);
 
     if(!does_storage_number_exist(s)) {
-        fprintf(stderr, "Exists flags missing for number " CALCULATED_NUMBER_FORMAT "!\n", n);
+        fprintf(stderr, "Exists flags missing for number " NETDATA_DOUBLE_FORMAT "!\n", n);
         return 5;
     }
 
-    calculated_number ddiff = d - n;
-    calculated_number dcdiff = ddiff * 100.0 / n;
+    NETDATA_DOUBLE ddiff = d - n;
+    NETDATA_DOUBLE dcdiff = ddiff * 100.0 / n;
 
     if(dcdiff < 0) dcdiff = -dcdiff;
 
-    size_t len = (size_t)print_calculated_number(buffer, d);
-    calculated_number p = str2ld(buffer, NULL);
-    calculated_number pdiff = n - p;
-    calculated_number pcdiff = pdiff * 100.0 / n;
+    size_t len = (size_t)print_netdata_double(buffer, d);
+    NETDATA_DOUBLE p = str2ndd(buffer, NULL);
+    NETDATA_DOUBLE pdiff = n - p;
+    NETDATA_DOUBLE pcdiff = pdiff * 100.0 / n;
     if(pcdiff < 0) pcdiff = -pcdiff;
 
     if(debug) {
         fprintf(stderr,
-            CALCULATED_NUMBER_FORMAT " original\n"
-            CALCULATED_NUMBER_FORMAT " packed and unpacked, (stored as 0x%08X, diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n"
-            "%s printed after unpacked (%zu bytes)\n"
-            CALCULATED_NUMBER_FORMAT " re-parsed from printed (diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n\n",
+            NETDATA_DOUBLE_FORMAT
+            " original\n" NETDATA_DOUBLE_FORMAT " packed and unpacked, (stored as 0x%08X, diff " NETDATA_DOUBLE_FORMAT
+            ", " NETDATA_DOUBLE_FORMAT "%%)\n"
+            "%s printed after unpacked (%zu bytes)\n" NETDATA_DOUBLE_FORMAT
+            " re-parsed from printed (diff " NETDATA_DOUBLE_FORMAT ", " NETDATA_DOUBLE_FORMAT "%%)\n\n",
             n,
             d, s, ddiff, dcdiff,
             buffer, len,
@@ -132,10 +133,11 @@ int check_storage_number(calculated_number n, int debug) {
         if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %zu but it has %zu\n", buffer, len, strlen(buffer));
 
         if(dcdiff > ACCURACY_LOSS_ACCEPTED_PERCENT)
-            fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, dcdiff);
+            fprintf(stderr, "WARNING: packing number " NETDATA_DOUBLE_FORMAT " has accuracy loss " NETDATA_DOUBLE_FORMAT " %%\n", n, dcdiff);
 
         if(pcdiff > ACCURACY_LOSS_ACCEPTED_PERCENT)
-            fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, pcdiff);
+            fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " NETDATA_DOUBLE_FORMAT
+                " has accuracy loss " NETDATA_DOUBLE_FORMAT " %%\n", n, pcdiff);
     }
 
     if(len != strlen(buffer)) return 1;
@@ -144,8 +146,8 @@ int check_storage_number(calculated_number n, int debug) {
     return 0;
 }
 
-calculated_number storage_number_min(calculated_number n) {
-    calculated_number r = 1, last;
+NETDATA_DOUBLE storage_number_min(NETDATA_DOUBLE n) {
+    NETDATA_DOUBLE r = 1, last;
 
     do {
         last = n;
@@ -159,12 +161,12 @@ calculated_number storage_number_min(calculated_number n) {
 
 void benchmark_storage_number(int loop, int multiplier) {
     int i, j;
-    calculated_number n, d;
+    NETDATA_DOUBLE n, d;
     storage_number s;
     unsigned long long user, system, total, mine, their;
 
-    calculated_number storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
-    calculated_number storage_number_positive_max = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW);
+    NETDATA_DOUBLE storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
+    NETDATA_DOUBLE storage_number_positive_max = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW);
 
     char buffer[100];
 
@@ -174,25 +176,25 @@ void benchmark_storage_number(int loop, int multiplier) {
 
     // ------------------------------------------------------------------------
 
-    fprintf(stderr, "SYSTEM  LONG DOUBLE    SIZE: %zu bytes\n", sizeof(calculated_number));
+    fprintf(stderr, "SYSTEM  LONG DOUBLE    SIZE: %zu bytes\n", sizeof(NETDATA_DOUBLE));
     fprintf(stderr, "NETDATA FLOATING POINT SIZE: %zu bytes\n", sizeof(storage_number));
 
-    mine = (calculated_number)sizeof(storage_number) * (calculated_number)loop;
-    their = (calculated_number)sizeof(calculated_number) * (calculated_number)loop;
+    mine = (NETDATA_DOUBLE)sizeof(storage_number) * (NETDATA_DOUBLE)loop;
+    their = (NETDATA_DOUBLE)sizeof(NETDATA_DOUBLE) * (NETDATA_DOUBLE)loop;
 
     if(mine > their) {
-        fprintf(stderr, "\nNETDATA NEEDS %0.2" LONG_DOUBLE_MODIFIER " TIMES MORE MEMORY. Sorry!\n", (LONG_DOUBLE)(mine / their));
+        fprintf(stderr, "\nNETDATA NEEDS %0.2" NETDATA_DOUBLE_MODIFIER " TIMES MORE MEMORY. Sorry!\n", (NETDATA_DOUBLE)(mine / their));
     }
     else {
-        fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2" LONG_DOUBLE_MODIFIER " TIMES LESS MEMORY.\n", (LONG_DOUBLE)(their / mine));
+        fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2" NETDATA_DOUBLE_MODIFIER " TIMES LESS MEMORY.\n", (NETDATA_DOUBLE)(their / mine));
     }
 
     fprintf(stderr, "\nNETDATA FLOATING POINT\n");
-    fprintf(stderr, "MIN POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW));
-    fprintf(stderr, "MAX POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW));
-    fprintf(stderr, "MIN NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MIN_RAW));
-    fprintf(stderr, "MAX NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW));
-    fprintf(stderr, "Maximum accuracy loss accepted: " CALCULATED_NUMBER_FORMAT "%%\n\n\n", (calculated_number)ACCURACY_LOSS_ACCEPTED_PERCENT);
+    fprintf(stderr, "MIN POSITIVE VALUE " NETDATA_DOUBLE_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW));
+    fprintf(stderr, "MAX POSITIVE VALUE " NETDATA_DOUBLE_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW));
+    fprintf(stderr, "MIN NEGATIVE VALUE " NETDATA_DOUBLE_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MIN_RAW));
+    fprintf(stderr, "MAX NEGATIVE VALUE " NETDATA_DOUBLE_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW));
+    fprintf(stderr, "Maximum accuracy loss accepted: " NETDATA_DOUBLE_FORMAT "%%\n\n\n", (NETDATA_DOUBLE)ACCURACY_LOSS_ACCEPTED_PERCENT);
 
     // ------------------------------------------------------------------------
 
@@ -207,7 +209,7 @@ void benchmark_storage_number(int loop, int multiplier) {
             n *= multiplier;
             if(n > storage_number_positive_max) n = storage_number_positive_min;
 
-            print_calculated_number(buffer, n);
+            print_netdata_double(buffer, n);
         }
     }
 
@@ -217,7 +219,8 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     mine = total;
 
-    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" NETDATA_DOUBLE_MODIFIER ", system %0.5" NETDATA_DOUBLE_MODIFIER
+        ", total %0.5" NETDATA_DOUBLE_MODIFIER "\n", (NETDATA_DOUBLE)(user / 1000000.0), (NETDATA_DOUBLE)(system / 1000000.0), (NETDATA_DOUBLE)(total / 1000000.0));
 
     // ------------------------------------------------------------------------
 
@@ -231,7 +234,7 @@ void benchmark_storage_number(int loop, int multiplier) {
         for(i = 0; i < loop ;i++) {
             n *= multiplier;
             if(n > storage_number_positive_max) n = storage_number_positive_min;
-            snprintfz(buffer, 100, CALCULATED_NUMBER_FORMAT, n);
+            snprintfz(buffer, 100, NETDATA_DOUBLE_FORMAT, n);
         }
     }
 
@@ -241,13 +244,14 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     their = total;
 
-    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER ", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" NETDATA_DOUBLE_MODIFIER ", system %0.5" NETDATA_DOUBLE_MODIFIER
+        ", total %0.5" NETDATA_DOUBLE_MODIFIER "\n", (NETDATA_DOUBLE)(user / 1000000.0), (NETDATA_DOUBLE)(system / 1000000.0), (NETDATA_DOUBLE)(total / 1000000.0));
 
     if(mine > total) {
-        fprintf(stderr, "NETDATA CODE IS SLOWER %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(mine * 100.0 / their - 100.0));
+        fprintf(stderr, "NETDATA CODE IS SLOWER %0.2" NETDATA_DOUBLE_MODIFIER " %%\n", (NETDATA_DOUBLE)(mine * 100.0 / their - 100.0));
     }
     else {
-        fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(their * 100.0 / mine - 100.0));
+        fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2" NETDATA_DOUBLE_MODIFIER " %%\n", (NETDATA_DOUBLE)(their * 100.0 / mine - 100.0));
     }
 
     // ------------------------------------------------------------------------
@@ -265,7 +269,7 @@ void benchmark_storage_number(int loop, int multiplier) {
 
             s = pack_storage_number(n, SN_DEFAULT_FLAGS);
             d = unpack_storage_number(s);
-            print_calculated_number(buffer, d);
+            print_netdata_double(buffer, d);
         }
     }
 
@@ -275,13 +279,14 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     mine = total;
 
-    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER ", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" NETDATA_DOUBLE_MODIFIER ", system %0.5" NETDATA_DOUBLE_MODIFIER
+        ", total %0.5" NETDATA_DOUBLE_MODIFIER "\n", (NETDATA_DOUBLE)(user / 1000000.0), (NETDATA_DOUBLE)(system / 1000000.0), (NETDATA_DOUBLE)(total / 1000000.0));
 
     if(mine > their) {
-        fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(mine * 100.0 / their - 100.0));
+        fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2" NETDATA_DOUBLE_MODIFIER " %%\n", (NETDATA_DOUBLE)(mine * 100.0 / their - 100.0));
     }
     else {
-        fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(their * 100.0 / mine - 100.0));
+        fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2" NETDATA_DOUBLE_MODIFIER " %%\n", (NETDATA_DOUBLE)(their * 100.0 / mine - 100.0));
     }
 
     // ------------------------------------------------------------------------
@@ -290,13 +295,13 @@ void benchmark_storage_number(int loop, int multiplier) {
 
 static int check_storage_number_exists() {
     uint32_t flags = SN_DEFAULT_FLAGS;
-    calculated_number n = 0.0;
+    NETDATA_DOUBLE n = 0.0;
 
     storage_number s = pack_storage_number(n, flags);
-    calculated_number d = unpack_storage_number(s);
+    NETDATA_DOUBLE d = unpack_storage_number(s);
 
     if(n != d) {
-        fprintf(stderr, "Wrong number returned. Expected " CALCULATED_NUMBER_FORMAT ", returned " CALCULATED_NUMBER_FORMAT "!\n", n, d);
+        fprintf(stderr, "Wrong number returned. Expected " NETDATA_DOUBLE_FORMAT ", returned " NETDATA_DOUBLE_FORMAT "!\n", n, d);
         return 1;
     }
 
@@ -306,10 +311,10 @@ static int check_storage_number_exists() {
 int unit_test_storage() {
     if(check_storage_number_exists()) return 0;
 
-    calculated_number storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
-    calculated_number storage_number_negative_max = unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW);
+    NETDATA_DOUBLE storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
+    NETDATA_DOUBLE storage_number_negative_max = unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW);
 
-    calculated_number c, a = 0;
+    NETDATA_DOUBLE c, a = 0;
     int i, j, g, r = 0;
 
     for(g = -1; g <= 1 ; g++) {
@@ -343,23 +348,26 @@ int unit_test_str2ld() {
     int i;
     for(i = 0; values[i] ; i++) {
         char *e_mine = "hello", *e_sys = "world";
-        LONG_DOUBLE mine = str2ld(values[i], &e_mine);
-        LONG_DOUBLE sys = strtold(values[i], &e_sys);
+        NETDATA_DOUBLE mine = str2ndd(values[i], &e_mine);
+        NETDATA_DOUBLE sys = strtondd(values[i], &e_sys);
 
         if(isnan(mine)) {
             if(!isnan(sys)) {
-                fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
+                fprintf(stderr, "Value '%s' is parsed as %" NETDATA_DOUBLE_MODIFIER
+                    ", but system believes it is %" NETDATA_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
                 return -1;
             }
         }
         else if(isinf(mine)) {
             if(!isinf(sys)) {
-                fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
+                fprintf(stderr, "Value '%s' is parsed as %" NETDATA_DOUBLE_MODIFIER
+                    ", but system believes it is %" NETDATA_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
                 return -1;
             }
         }
         else if(mine != sys && ABS(mine-sys) > 0.000001) {
-            fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ", delta %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys, sys-mine);
+            fprintf(stderr, "Value '%s' is parsed as %" NETDATA_DOUBLE_MODIFIER
+                ", but system believes it is %" NETDATA_DOUBLE_MODIFIER ", delta %" NETDATA_DOUBLE_MODIFIER ".\n", values[i], mine, sys, sys-mine);
             return -1;
         }
 
@@ -368,7 +376,8 @@ int unit_test_str2ld() {
             return -1;
         }
 
-        fprintf(stderr, "str2ld() parsed value '%s' exactly the same way with strtold(), returned %" LONG_DOUBLE_MODIFIER " vs %" LONG_DOUBLE_MODIFIER "\n", values[i], mine, sys);
+        fprintf(stderr, "str2ndd() parsed value '%s' exactly the same way with strtold(), returned %" NETDATA_DOUBLE_MODIFIER
+            " vs %" NETDATA_DOUBLE_MODIFIER "\n", values[i], mine, sys);
     }
 
     return 0;
@@ -461,10 +470,10 @@ struct test {
     unsigned long feed_entries;
     unsigned long result_entries;
     struct feed_values *feed;
-    calculated_number *results;
+    NETDATA_DOUBLE *results;
 
     collected_number *feed2;
-    calculated_number *results2;
+    NETDATA_DOUBLE *results2;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -484,7 +493,7 @@ struct feed_values test1_feed[] = {
         { 1000000, 100 },
 };
 
-calculated_number test1_results[] = {
+NETDATA_DOUBLE test1_results[] = {
         20, 30, 40, 50, 60, 70, 80, 90, 100
 };
 
@@ -520,7 +529,7 @@ struct feed_values test2_feed[] = {
         { 1000000, 100 },
 };
 
-calculated_number test2_results[] = {
+NETDATA_DOUBLE test2_results[] = {
         20, 30, 40, 50, 60, 70, 80, 90, 100
 };
 
@@ -555,7 +564,7 @@ struct feed_values test3_feed[] = {
         { 1000000, 100 },
 };
 
-calculated_number test3_results[] = {
+NETDATA_DOUBLE test3_results[] = {
         10, 10, 10, 10, 10, 10, 10, 10, 10
 };
 
@@ -590,7 +599,7 @@ struct feed_values test4_feed[] = {
         { 1000000, 100 },
 };
 
-calculated_number test4_results[] = {
+NETDATA_DOUBLE test4_results[] = {
         10, 10, 10, 10, 10, 10, 10, 10, 10
 };
 
@@ -625,7 +634,7 @@ struct feed_values test5_feed[] = {
         { 1000000, 0x00000000FFFFFFFFULL / 15 * 0 },
 };
 
-calculated_number test5_results[] = {
+NETDATA_DOUBLE test5_results[] = {
         0x00000000FFFFFFFFULL / 15 * 7,
         0x00000000FFFFFFFFULL / 15 * 7,
         0x00000000FFFFFFFFULL / 15,
@@ -668,7 +677,7 @@ struct feed_values test5b_feed[] = {
         { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
 };
 
-calculated_number test5b_results[] = {
+NETDATA_DOUBLE test5b_results[] = {
         0xFFFFFFFFFFFFFFFFULL / 15 * 7,
         0xFFFFFFFFFFFFFFFFULL / 15 * 7,
         0xFFFFFFFFFFFFFFFFULL / 15,
@@ -717,7 +726,7 @@ struct feed_values test6_feed[] = {
         { 250000, 16000 },
 };
 
-calculated_number test6_results[] = {
+NETDATA_DOUBLE test6_results[] = {
         4000, 4000, 4000, 4000
 };
 
@@ -752,7 +761,7 @@ struct feed_values test7_feed[] = {
         { 2000000, 10000 },
 };
 
-calculated_number test7_results[] = {
+NETDATA_DOUBLE test7_results[] = {
         500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500
 };
 
@@ -783,7 +792,7 @@ struct feed_values test8_feed[] = {
         { 2000000, 6000 },
 };
 
-calculated_number test8_results[] = {
+NETDATA_DOUBLE test8_results[] = {
         1250, 2000, 2250, 3000, 3250, 4000, 4250, 5000, 5250, 6000
 };
 
@@ -824,7 +833,7 @@ struct feed_values test9_feed[] = {
         { 250000, 16000 },
 };
 
-calculated_number test9_results[] = {
+NETDATA_DOUBLE test9_results[] = {
         4000, 8000, 12000, 16000
 };
 
@@ -859,7 +868,7 @@ struct feed_values test10_feed[] = {
         { 1000000, 6900 + 1000 },
 };
 
-calculated_number test10_results[] = {
+NETDATA_DOUBLE test10_results[] = {
         1000, 1000, 1000, 1000, 1000, 1000, 1000
 };
 
@@ -898,11 +907,11 @@ collected_number test11_feed2[] = {
     10, 20, 30, 40, 50, 60, 70, 80, 90, 100
 };
 
-calculated_number test11_results[] = {
+NETDATA_DOUBLE test11_results[] = {
         50, 50, 50, 50, 50, 50, 50, 50, 50
 };
 
-calculated_number test11_results2[] = {
+NETDATA_DOUBLE test11_results2[] = {
         50, 50, 50, 50, 50, 50, 50, 50, 50
 };
 
@@ -941,11 +950,11 @@ collected_number test12_feed2[] = {
     10*3, 20*3, 30*3, 40*3, 50*3, 60*3, 70*3, 80*3, 90*3, 100*3
 };
 
-calculated_number test12_results[] = {
+NETDATA_DOUBLE test12_results[] = {
         25, 25, 25, 25, 25, 25, 25, 25, 25
 };
 
-calculated_number test12_results2[] = {
+NETDATA_DOUBLE test12_results2[] = {
         75, 75, 75, 75, 75, 75, 75, 75, 75
 };
 
@@ -980,7 +989,7 @@ struct feed_values test13_feed[] = {
         { 1000000, 6900 + 1000 },
 };
 
-calculated_number test13_results[] = {
+NETDATA_DOUBLE test13_results[] = {
         83.3333300, 100, 100, 100, 100, 100, 100
 };
 
@@ -1015,7 +1024,7 @@ struct feed_values test14_feed[] = {
         { 29942000, 0x0153987f888982d0ULL },
 };
 
-calculated_number test14_results[] = {
+NETDATA_DOUBLE test14_results[] = {
         23.1383300, 21.8515600, 21.8804600, 21.7788000, 22.0112200, 22.4386100, 22.0906100, 21.9150800
 };
 
@@ -1047,7 +1056,7 @@ struct feed_values test14b_feed[] = {
         { 29942000, 13573000 + 29969000 + 29958000 + 30054000 + 34952000 + 25046000 + 29947000 + 30054000 + 29942000 },
 };
 
-calculated_number test14b_results[] = {
+NETDATA_DOUBLE test14b_results[] = {
         1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000
 };
 
@@ -1079,7 +1088,7 @@ struct feed_values test14c_feed[] = {
         { 30000000, 29000000 + 1000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 },
 };
 
-calculated_number test14c_results[] = {
+NETDATA_DOUBLE test14c_results[] = {
         1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000
 };
 
@@ -1118,11 +1127,11 @@ collected_number test15_feed2[] = {
     178825286, 178825286, 178825286, 178825286, 178825498, 178825498, 179165652, 179202964, 179203282, 179204130
 };
 
-calculated_number test15_results[] = {
+NETDATA_DOUBLE test15_results[] = {
         5857.4080000, 5898.4540000, 5891.6590000, 5806.3160000, 5914.2640000, 3202.2630000, 5589.6560000, 5822.5260000, 5911.7520000
 };
 
-calculated_number test15_results2[] = {
+NETDATA_DOUBLE test15_results2[] = {
         0.0000000, 0.0000000, 0.0024944, 1.6324779, 0.0212777, 2655.1890000, 290.5387000, 5.6733610, 6.5960220
 };
 
@@ -1173,12 +1182,13 @@ int run_test(struct test *test)
 
         if(c) {
             time_now += test->feed[c].microseconds;
-            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " CALCULATED_NUMBER_FORMAT ", rate " CALCULATED_NUMBER_FORMAT "\n", 
+            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " NETDATA_DOUBLE_FORMAT
+                ", rate " NETDATA_DOUBLE_FORMAT "\n",
                 test->name, c+1,
                 (float)test->feed[c].microseconds / 1000000.0,
                 (float)time_now / 1000000.0,
-                ((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor,
-                (((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor) / (calculated_number)test->feed[c].microseconds * (calculated_number)1000000);
+                ((NETDATA_DOUBLE)test->feed[c].value - (NETDATA_DOUBLE)last) * (NETDATA_DOUBLE)test->multiplier / (NETDATA_DOUBLE)test->divisor,
+                (((NETDATA_DOUBLE)test->feed[c].value - (NETDATA_DOUBLE)last) * (NETDATA_DOUBLE)test->multiplier / (NETDATA_DOUBLE)test->divisor) / (NETDATA_DOUBLE)test->feed[c].microseconds * (NETDATA_DOUBLE)1000000);
 
             // rrdset_next_usec_unfiltered(st, test->feed[c].microseconds);
             st->usec_since_last_update = test->feed[c].microseconds;
@@ -1216,10 +1226,11 @@ int run_test(struct test *test)
 
     unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
     for(c = 0 ; c < max ; c++) {
-        calculated_number v = unpack_storage_number(rd->values[c]);
-        calculated_number n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
-        int same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-        fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+        NETDATA_DOUBLE v = unpack_storage_number(rd->db[c]);
+        NETDATA_DOUBLE n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
+        int same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
+        fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
+            ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
             test->name, rd->name, c+1,
             (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
@@ -1227,10 +1238,11 @@ int run_test(struct test *test)
         if(!same) errors++;
 
         if(rd2) {
-            v = unpack_storage_number(rd2->values[c]);
+            v = unpack_storage_number(rd2->db[c]);
             n = test->results2[c];
-            same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-            fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+            same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
+            fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
+                ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
                 test->name, rd2->name, c+1,
                 (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
@@ -1470,14 +1482,14 @@ int unit_test(long delay, long shift)
 
     int ret = 0;
     storage_number sn;
-    calculated_number cn, v;
+    NETDATA_DOUBLE cn, v;
     for(c = 0 ; c < st->counter ; c++) {
         fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
         for(rd = st->dimensions ; rd ; rd = rd->next) {
-            sn = rd->values[c];
+            sn = rd->db[c];
             cn = unpack_storage_number(sn);
-            fprintf(stderr, "\t %s " CALCULATED_NUMBER_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rd->id, cn, sn);
+            fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rd->id, cn, sn);
 
             if(rd == rdabs) v =
                 (     oincrement
@@ -1492,7 +1504,7 @@ int unit_test(long delay, long shift)
 
             if(v == cn) fprintf(stderr, "passed.\n");
             else {
-                fprintf(stderr, "ERROR! (expected " CALCULATED_NUMBER_FORMAT ")\n", v);
+                fprintf(stderr, "ERROR! (expected " NETDATA_DOUBLE_FORMAT ")\n", v);
                 ret = 1;
             }
         }
@@ -1532,8 +1544,66 @@ int test_sqlite(void) {
         fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
         return 1;
     }
+
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+    char *uuid_str = "0000_000";
+
+    buffer_sprintf(sql, TABLE_ACLK_CHART, uuid_str);
+    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    buffer_flush(sql);
+    if (rc != SQLITE_OK)
+        goto error;
+
+    buffer_sprintf(sql, TABLE_ACLK_CHART_PAYLOAD, uuid_str);
+    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    buffer_flush(sql);
+    if (rc != SQLITE_OK)
+        goto error;
+
+    buffer_sprintf(sql, TABLE_ACLK_CHART_LATEST, uuid_str);
+    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    if (rc != SQLITE_OK)
+        goto error;
+    buffer_flush(sql);
+
+    buffer_sprintf(sql, INDEX_ACLK_CHART, uuid_str, uuid_str);
+    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    if (rc != SQLITE_OK)
+        goto error;
+    buffer_flush(sql);
+
+    buffer_sprintf(sql, INDEX_ACLK_CHART_LATEST, uuid_str, uuid_str);
+    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    if (rc != SQLITE_OK)
+        goto error;
+    buffer_flush(sql);
+
+    buffer_sprintf(sql, TRIGGER_ACLK_CHART_PAYLOAD, uuid_str, uuid_str, uuid_str);
+    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    if (rc != SQLITE_OK)
+        goto error;
+    buffer_flush(sql);
+
+    buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
+    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    if (rc != SQLITE_OK)
+        goto error;
+    buffer_flush(sql);
+
+    buffer_sprintf(sql, INDEX_ACLK_ALERT, uuid_str, uuid_str);
+    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    if (rc != SQLITE_OK)
+        goto error;
+    buffer_flush(sql);
+
+    buffer_free(sql);
     fprintf(stderr,"SQLite is OK\n");
     return 0;
+error:
+    fprintf(stderr,"SQLite statement failed: %s\n", buffer_tostring(sql));
+    buffer_free(sql);
+    fprintf(stderr,"SQLite tests failed\n");
+    return 1;
 }
 
 
@@ -1634,7 +1704,7 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Fluh pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 }
@@ -1681,11 +1751,10 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     uint8_t same;
-    time_t time_now, time_retrieved;
+    time_t time_now, time_retrieved, end_time;
     int i, j, k, c, errors, update_every;
     collected_number last;
-    calculated_number value, expected;
-    SN_FLAGS nflags;
+    NETDATA_DOUBLE value, expected;
     struct rrddim_query_handle handle;
     size_t value_errors = 0, time_errors = 0;
 
@@ -1697,20 +1766,22 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH * update_every);
+                rd[i][j]->tiers[0]->query_ops.init(rd[i][j]->tiers[0]->db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every, TIER_QUERY_FETCH_SUM);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
-                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
+                    expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    time_t end_time;
-                    value = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags);
+                    STORAGE_POINT sp = rd[i][j]->tiers[0]->query_ops.next_metric(&handle);
+                    value = sp.sum;
+                    time_retrieved = sp.start_time;
+                    end_time = sp.end_time;
 
-                    same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
+                    same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
                         if(!value_errors)
-                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
-                                        CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                                ", found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
                                 st[i]->name, rd[i][j]->name, (unsigned long)time_now + k * update_every, expected, value);
                         value_errors++;
                         errors++;
@@ -1723,7 +1794,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                         errors++;
                     }
                 }
-                rd[i][j]->state->query_ops.finalize(&handle);
+                rd[i][j]->tiers[0]->query_ops.finalize(&handle);
             }
         }
     }
@@ -1748,13 +1819,16 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
     int i, j, errors, value_errors = 0, time_errors = 0;
     long c;
     collected_number last;
-    calculated_number value, expected;
+    NETDATA_DOUBLE value, expected;
 
     errors = 0;
     long points = (time_end - time_start) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, st[i], points, time_start, time_end, RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL, NULL, 0);
+        RRDR *r = rrd2rrdr(owa, st[i], points, time_start, time_end,
+                           RRDR_GROUPING_AVERAGE, 0, RRDR_OPTION_NATURAL_POINTS,
+                           NULL, NULL, NULL, 0, 0);
+
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", st[i]->name, current_region);
             return ++errors;
@@ -1767,23 +1841,23 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
 
                 // for each dimension
                 for (j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
-                    calculated_number *cn = &r->v[ c * r->d ];
+                    NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     value = cn[j];
                     assert(rd[i][j] == d);
 
                     last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c;
-                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
+                    expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
+                    same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
-                        if(value_errors < 10)
-                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
-                                        CALCULATED_NUMBER_FORMAT ", RRDR found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
+                        if(value_errors < 20)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                                ", RRDR found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
                                 st[i]->name, rd[i][j]->name, (unsigned long)time_now, expected, value);
                         value_errors++;
                     }
                     if(time_retrieved != time_now) {
-                        if(!time_errors)
+                        if(time_errors < 20)
                             fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
                                 st[i]->name, rd[i][j]->name, (unsigned long)time_now, (unsigned long)time_retrieved);
                         time_errors++;
@@ -1840,7 +1914,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 
@@ -1859,7 +1933,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 
@@ -1885,7 +1959,9 @@ int test_dbengine(void)
     long point_offset = (time_start[current_region] - time_start[0]) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, st[i], points, time_start[0] + update_every, time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL, NULL, 0);
+        RRDR *r = rrd2rrdr(owa, st[i], points, time_start[0] + update_every,
+                           time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0,
+                           RRDR_OPTION_NATURAL_POINTS, NULL, NULL, NULL, 0, 0);
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", st[i]->name);
             ++errors;
@@ -1901,18 +1977,18 @@ int test_dbengine(void)
 
                 // for each dimension
                 for(j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
-                    calculated_number *cn = &r->v[ c * r->d ];
-                    calculated_number value = cn[j];
+                    NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
+                    NETDATA_DOUBLE value = cn[j];
                     assert(rd[i][j] == d);
 
                     collected_number last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c - point_offset + 1;
-                    calculated_number expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
+                    NETDATA_DOUBLE expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    uint8_t same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
+                    uint8_t same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
                         if(!value_errors)
-                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
-                                        CALCULATED_NUMBER_FORMAT ", RRDR found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                                ", RRDR found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
                                 st[i]->name, rd[i][j]->name, (unsigned long)time_now, expected, value);
                         value_errors++;
                     }
@@ -1930,9 +2006,9 @@ int test_dbengine(void)
     }
 error_out:
     rrd_wrlock();
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    rrdeng_prepare_exit((struct rrdengine_instance *)host->storage_instance[0]);
     rrdhost_delete_charts(host);
-    rrdeng_exit(host->rrdeng_ctx);
+    rrdeng_exit((struct rrdengine_instance *)host->storage_instance[0]);
     rrd_unlock();
 
     return errors + value_errors + time_errors;
@@ -2017,7 +2093,7 @@ static void generate_dbengine_chart(void *arg)
         thread_info->time_max = time_current;
     }
     for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize(rd[j]);
+        rrdeng_store_metric_finalize((rd[j])->tiers[0]->db_collection_handle);
     }
 }
 
@@ -2107,10 +2183,9 @@ static void query_dbengine_chart(void *arg)
     RRDSET *st;
     RRDDIM *rd;
     uint8_t same;
-    time_t time_now, time_retrieved;
+    time_t time_now, time_retrieved, end_time;
     collected_number generatedv;
-    calculated_number value, expected;
-    SN_FLAGS nflags;
+    NETDATA_DOUBLE value, expected;
     struct rrddim_query_handle handle;
     size_t value_errors = 0, time_errors = 0;
 
@@ -2138,27 +2213,31 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        rd->state->query_ops.init(rd, &handle, time_after, time_before);
+        rd->tiers[0]->query_ops.init(rd->tiers[0]->db_metric_handle, &handle, time_after, time_before, TIER_QUERY_FETCH_SUM);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);
-            expected = unpack_storage_number(pack_storage_number((calculated_number) generatedv, SN_DEFAULT_FLAGS));
+            expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE) generatedv, SN_DEFAULT_FLAGS));
 
-            if (unlikely(rd->state->query_ops.is_finished(&handle))) {
+            if (unlikely(rd->tiers[0]->query_ops.is_finished(&handle))) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
+                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                        ", found data gap, ### E R R O R ###\n",
                             st->name, rd->name, (unsigned long) time_now, expected);
                     ++thread_info->errors;
                 }
                 break;
             }
-            time_t end_time;
-            value = rd->state->query_ops.next_metric(&handle, &time_retrieved, &end_time, &nflags);
-            if (!calculated_number_isnumber(value)) {
+
+            STORAGE_POINT sp = rd->tiers[0]->query_ops.next_metric(&handle);
+            value = sp.sum;
+            time_retrieved = sp.start_time;
+            end_time = sp.end_time;
+
+            if (!netdata_double_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
+                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                        ", found data gap, ### E R R O R ###\n",
                             st->name, rd->name, (unsigned long) time_now, expected);
                     ++thread_info->errors;
                 }
@@ -2166,13 +2245,12 @@ static void query_dbengine_chart(void *arg)
             }
             ++thread_info->queried_metrics_nr;
 
-            same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
+            same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
             if (!same) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     if(!value_errors)
-                       fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT
-                                    ", ### E R R O R ###\n",
+                       fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                            ", found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
                             st->name, rd->name, (unsigned long) time_now, expected, value);
                     value_errors++;
                     thread_info->errors++;
@@ -2189,7 +2267,7 @@ static void query_dbengine_chart(void *arg)
                 }
             }
         }
-        rd->state->query_ops.finalize(&handle);
+        rd->tiers[0]->query_ops.finalize(&handle);
     } while(!thread_info->done);
 
     if(value_errors)
@@ -2337,9 +2415,9 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     }
     freez(query_threads);
     rrd_wrlock();
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    rrdeng_prepare_exit((struct rrdengine_instance *)host->storage_instance[0]);
     rrdhost_delete_charts(host);
-    rrdeng_exit(host->rrdeng_ctx);
+    rrdeng_exit((struct rrdengine_instance *)host->storage_instance[0]);
     rrd_unlock();
 }
 

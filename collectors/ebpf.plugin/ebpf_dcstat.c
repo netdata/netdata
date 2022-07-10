@@ -239,8 +239,8 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
  */
 void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access, uint64_t not_found)
 {
-    calculated_number successful_access = (calculated_number) (((long long)cache_access) - ((long long)not_found));
-    calculated_number ratio = (cache_access) ? successful_access/(calculated_number)cache_access : 0;
+    NETDATA_DOUBLE successful_access = (NETDATA_DOUBLE) (((long long)cache_access) - ((long long)not_found));
+    NETDATA_DOUBLE ratio = (cache_access) ? successful_access/(NETDATA_DOUBLE)cache_access : 0;
 
     out->ratio = (long long )(ratio*100);
 }
@@ -250,20 +250,6 @@ void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access,
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
-
-/**
- * Clean PID structures
- *
- * Clean the allocated structures.
- */
-void clean_dcstat_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(dcstat_pid[pids->pid]);
-
-        pids = pids->next;
-    }
-}
 
 /**
  *  Clean names
@@ -312,7 +298,8 @@ static void ebpf_dcstat_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
-        bpf_object__close(objects);
+        if (objects)
+            bpf_object__close(objects);
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else if (bpf_obj)

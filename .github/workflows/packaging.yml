@@ -46,7 +46,7 @@ jobs:
           import json
           import re
           FULL_CI_REGEX = '/actions run full ci'
-          ALWAYS_RUN_ARCHES = ["amd64"]
+          ALWAYS_RUN_ARCHES = ["amd64", "x86_64"]
           PR_BODY = """${{ github.event.pull_request.body }}"""
           yaml = YAML(typ='safe')
           entries = list()
@@ -65,14 +65,14 @@ jobs:
                           entries.append({
                               'distro': data['include'][i]['distro'],
                               'version': data['include'][i]['version'],
-                              'pkgclouddistro': data['include'][i]['packages']['repo_distro'],
+                              'repo_distro': data['include'][i]['packages']['repo_distro'],
                               'format': data['include'][i]['packages']['type'],
                               'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
                               'platform': data['platform_map'][arch],
                               'arch': arch
                           })
 
-          entries.sort(key=lambda k: (k['arch'], k['distro'], k['version']))
+          entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
           matrix = json.dumps({'include': entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
           print('::set-output name=matrix::' + matrix)
@@ -94,6 +94,7 @@ jobs:
             failure()
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
           }}
 
   version-check:
@@ -149,6 +150,7 @@ jobs:
             failure()
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
           }}
 
   build:
@@ -214,28 +216,38 @@ jobs:
                      -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
                      /netdata/.github/scripts/pkg-test.sh
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        continue-on-error: true
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Upload to packages.netdata.cloud
+        id: package-upload
+        continue-on-error: true
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        run: |
+          .github/scripts/package-upload.sh \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
       - name: Upload to PackageCloud
         id: upload
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
         shell: bash
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
         run: |
           printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank ${{ needs.version-check.outputs.repo }}/${{ matrix.pkgclouddistro }} \
+            .github/scripts/package_cloud_wrapper.sh yank ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} \
             "$(basename "${pkgfile}")" || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.pkgclouddistro }} "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} "${pkgfile}"
           done
-      - name: Clean
-        id: cleanup
-        if: github.event_name == 'workflow_dispatch'
-        shell: bash
-        env:
-          REPO: ${{ needs.version-check.outputs.repo }}
-          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
-          PACKAGE_CLOUD_RETENTION_DAYS: ${{ needs.version-check.outputs.retention }}
-        run: .github/scripts/old_package_purging.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -244,19 +256,21 @@ jobs:
           SLACK_TITLE: 'Package Build failed:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: ${{ matrix.pkgclouddistro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed.
+              ${{ github.repository }}: ${{ matrix.repo_distro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed.
               Checkout: ${{ steps.checkout.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup Docker: ${{ steps.docker-config.outcome }}
               Fetch images: ${{ steps.fetch-images.outcome }}
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
-              Publish: ${{ steps.upload.outcome }}
-              Cleanup: ${{ steps.cleanup.outcome }}
+              Import SSH Key: ${{ steps.ssh-setup.outcome }}
+              Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Publish to PackageCloud: ${{ steps.upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
             failure()
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
           }}

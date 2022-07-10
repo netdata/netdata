@@ -3,28 +3,25 @@
 #include "value.h"
 
 
-inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, uint8_t *anomaly_rate, RRDDIM *temp_rd) {
-    if (r->st_needs_lock)
-        rrdset_check_rdlock(r->st);
-
+inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, uint8_t *anomaly_rate, RRDDIM *temp_rd) {
     long c;
     RRDDIM *d;
 
-    calculated_number *cn = &r->v[ i * r->d ];
+    NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
     RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
     uint8_t *ar = &r->ar[ i * r->d ];
 
-    calculated_number sum = 0, min = 0, max = 0, v;
+    NETDATA_DOUBLE sum = 0, min = 0, max = 0, v;
     int all_null = 1, init = 1;
 
-    calculated_number total = 1;
+    NETDATA_DOUBLE total = 1;
     size_t total_anomaly_rate = 0;
 
     int set_min_max = 0;
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
         for (c = 0, d = temp_rd ? temp_rd : r->st->dimensions; d && c < r->d; c++, d = d->next) {
-            calculated_number n = cn[c];
+            NETDATA_DOUBLE n = cn[c];
 
             if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                 n = -n;
@@ -41,7 +38,7 @@ inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
-        calculated_number n = cn[c];
+        NETDATA_DOUBLE n = cn[c];
 
         if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
             n = -n;

@@ -16,12 +16,21 @@ DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
 DOCS_URL="https://learn.netdata.cloud/docs/"
 FORUM_URL="https://community.netdata.cloud/"
 KICKSTART_OPTIONS="${*}"
-KICKSTART_SOURCE="$(realpath "$0")"
+KICKSTART_SOURCE="$(
+    self=${0}
+    while [ -L "${self}" ]
+    do
+        cd "${self%/*}" || exit 1
+        self=$(readlink "${self}")
+    done
+    cd "${self%/*}" || exit 1
+    echo "$(pwd -P)/${self##*/}"
+)"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
-REPOCONFIG_VERSION="1-1"
+REPOCONFIG_VERSION="1-2"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
 TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
@@ -696,11 +705,17 @@ update() {
       return 0
     fi
 
+    if [ "${INTERACTIVE}" -eq 0 ]; then
+        opts="--non-interactive"
+    else
+        opts="--interactive"
+    fi
+
     export NETDATA_SAVE_WARNINGS=1
     export NETDATA_PROPAGATE_WARNINGS=1
     # shellcheck disable=SC2090
     export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
-    if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
+    if run ${ROOTCMD} "${updater}" ${opts} --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
     else
@@ -771,6 +786,8 @@ uninstall() {
 }
 
 detect_existing_install() {
+  set_tmpdir
+
   progress "Checking for existing installations of Netdata..."
 
   if pkg_installed netdata; then
@@ -936,6 +953,8 @@ handle_existing_install() {
 }
 
 soft_disable_cloud() {
+  set_tmpdir
+
   cloud_prefix="${INSTALL_PREFIX}/var/lib/netdata/cloud.d"
 
   run ${ROOTCMD} mkdir -p "${cloud_prefix}"
@@ -1226,6 +1245,8 @@ try_package_install() {
     warning "Unable to determine Linux distribution for native packages."
     return 2
   fi
+
+  set_tmpdir
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install using native packages..."
@@ -1585,6 +1606,7 @@ set_source_archive_urls() {
 }
 
 install_local_build_dependencies() {
+  set_tmpdir
   bash="$(command -v bash 2> /dev/null)"
 
   if [ -z "${bash}" ] || [ ! -x "${bash}" ]; then
@@ -1665,6 +1687,8 @@ build_and_install() {
 }
 
 try_build_install() {
+  set_tmpdir
+
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install by building locally..."
   else

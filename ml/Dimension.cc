@@ -42,7 +42,7 @@ TrainableDimension::getCalculatedNumbers() {
         auto P = Q.nextMetric();
         CalculatedNumber Value = P.second;
 
-        if (calculated_number_isnumber(Value)) {
+        if (netdata_double_isnumber(Value)) {
             CNs[Idx] = Value;
             LastValue = CNs[Idx];
             CollectedValues++;

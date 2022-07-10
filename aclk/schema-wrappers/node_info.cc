@@ -55,9 +55,6 @@ static int generate_node_info(nodeinstance::info::v1::NodeInfo *info, struct acl
     if (data->custom_info)
         info->set_custom_info(data->custom_info);
 
-    for (size_t i = 0; i < data->service_count; i++)
-        info->add_services(data->services[i]);
-
     if (data->machine_guid)
         info->set_machine_guid(data->machine_guid);
 
@@ -105,6 +102,30 @@ char *generate_update_node_info_message(size_t *len, struct update_node_info *in
             capa++;
         }
     }
+
+    *len = PROTO_COMPAT_MSG_SIZE(msg);
+    char *bin = (char*)malloc(*len);
+    if (bin)
+        msg.SerializeToArray(bin, *len);
+
+    return bin;
+}
+
+char *generate_update_node_collectors_message(size_t *len, struct update_node_collectors *upd_node_collectors)
+{
+    nodeinstance::info::v1::UpdateNodeCollectors msg;
+
+    msg.set_node_id(upd_node_collectors->node_id);
+    msg.set_claim_id(upd_node_collectors->claim_id);
+
+    void *colls;
+    dfe_start_read(upd_node_collectors->node_collectors, colls) {
+        struct collector_info *c =(struct collector_info *)colls;
+        nodeinstance::info::v1::CollectorInfo *col = msg.add_collectors();
+        col->set_plugin(c->plugin);
+        col->set_module(c->module);
+    }
+    dfe_done(colls);
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)malloc(*len);

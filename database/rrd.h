@@ -7,6 +7,11 @@
 extern "C" {
 #endif
 
+// non-existing structs instead of voids
+// to enable type checking at compile time
+typedef struct storage_instance STORAGE_INSTANCE;
+typedef struct storage_metric_handle STORAGE_METRIC_HANDLE;
+
 // forward typedefs
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
@@ -23,9 +28,10 @@ typedef void *ml_host_t;
 typedef void *ml_dimension_t;
 
 // forward declarations
-struct rrddim_volatile;
+struct rrddim_tier;
 struct rrdset_volatile;
 struct context_param;
+
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -34,6 +40,7 @@ struct pg_cache_page_index;
 
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
+#include "web/api/queries/rrdr.h"
 #include "rrdvar.h"
 #include "rrdsetvar.h"
 #include "rrddimvar.h"
@@ -42,6 +49,17 @@ struct pg_cache_page_index;
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
+
+extern int storage_tiers;
+extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
+
+typedef enum {
+    RRD_BACKFILL_NONE,
+    RRD_BACKFILL_FULL,
+    RRD_BACKFILL_NEW
+} RRD_BACKFILL;
+
+extern RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 
 enum {
     CONTEXT_FLAGS_ARCHIVE = 0x01,
@@ -73,9 +91,6 @@ extern int gap_when_lost_iterations_above;
 extern time_t rrdset_free_obsolete_time;
 
 #define RRD_ID_LENGTH_MAX 200
-
-#define RRDSET_MAGIC        "NETDATA RRD SET FILE V019"
-#define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V019"
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
@@ -229,6 +244,8 @@ struct rrddim {
 
     avl_t avl;                                      // the binary index - this has to be first member!
 
+    uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
+
     // ------------------------------------------------------------------------
     // the dimension definition
 
@@ -237,52 +254,50 @@ struct rrddim {
                                                     // this is a pointer to the config structure
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
-                                                    // DO NOT FREE THIS - IT IS ALLOCATED IN CONFIG
+    uint32_t hash;                                  // a simple hash of the id, to speed up searching / indexing
+                                                    // instead of strcmp() every item in the binary index
+                                                    // we first compare the hashes
+    uint32_t hash_name;                             // a simple hash of the name
+
 
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
+    RRDDIM_FLAGS flags;                             // configuration flags for the dimension
+
+    bool updated;                                   // 1 when the dimension has been updated since the last processing
+    bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
 
     collected_number multiplier;                    // the multiplier of the collected values
     collected_number divisor;                       // the divider of the collected values
 
-    uint32_t flags;                                 // configuration flags for the dimension
-
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
-
-    uint32_t hash;                                  // a simple hash of the id, to speed up searching / indexing
-                                                    // instead of strcmp() every item in the binary index
-                                                    // we first compare the hashes
-
-    uint32_t hash_name;                             // a simple hash of the name
-
-    char *cache_filename;                           // the filename we load/save from/to this set
-
-    size_t collections_counter;                     // the number of times we added values to this rrdim
-    struct rrddim_volatile *state;                  // volatile state that is not persistently stored
-    size_t unused[8];
-
-    collected_number collected_value_max;           // the absolute maximum of the collected value
-
-    unsigned int updated:1;                         // 1 when the dimension has been updated since the last processing
-    unsigned int exposed:1;                         // 1 when set what have sent this dimension to the central netdata
 
     struct timeval last_collected_time;             // when was this dimension last updated
                                                     // this is actual date time we updated the last_collected_value
                                                     // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
-    calculated_number calculated_value;             // the current calculated value, after applying the algorithm - resets to zero after being used
-    calculated_number last_calculated_value;        // the last calculated value processed
+#ifdef ENABLE_ACLK
+    int aclk_live_status;
+#endif
+    ml_dimension_t ml_dimension;
 
-    calculated_number last_stored_value;            // the last value as stored in the database (after interpolation)
+    struct rrddim_tier *tiers[RRD_STORAGE_TIERS];   // our tiers of databases
+
+    size_t collections_counter;                     // the number of times we added values to this rrdim
+    collected_number collected_value_max;           // the absolute maximum of the collected value
+
+    NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
+    NETDATA_DOUBLE last_calculated_value;           // the last calculated value processed
+    NETDATA_DOUBLE last_stored_value;               // the last value as stored in the database (after interpolation)
 
     collected_number collected_value;               // the current value, as collected - resets to 0 after being used
     collected_number last_collected_value;          // the last value that was collected, after being processed
 
     // the *_volume members are used to calculate the accuracy of the rounding done by the
     // storage number - they are printed to debug.log when debug is enabled for a set.
-    calculated_number collected_volume;             // the sum of all collected values so far
-    calculated_number stored_volume;                // the sum of all stored values so far
+    NETDATA_DOUBLE collected_volume;             // the sum of all collected values so far
+    NETDATA_DOUBLE stored_volume;                // the sum of all stored values so far
 
     struct rrddim *next;                            // linking of dimensions within the same data set
     struct rrdset *rrdset;
@@ -296,17 +311,32 @@ struct rrddim {
 
     int update_every;                               // every how many seconds is this updated
 
-    size_t memsize;                                 // the memory allocated for this dimension
-
-    char magic[sizeof(RRDDIMENSION_MAGIC) + 1];     // a string to be saved, used to identify our data file
+    size_t memsize;                                 // the memory allocated for this dimension (without RRDDIM)
 
     struct rrddimvar *variables;
 
     // ------------------------------------------------------------------------
     // the values stored in this dimension, using our floating point numbers
 
-    storage_number values[];                        // the array of values - THIS HAS TO BE THE LAST MEMBER
+    void *rd_on_file;                               // pointer to the header written on disk
+    storage_number *db;                             // the array of values
 };
+
+// returns the RRDDIM cache filename, or NULL if it does not exist
+extern const char *rrddim_cache_filename(RRDDIM *rd);
+
+// updated the header with the latest RRDDIM value, for memory mode MAP and SAVE
+extern void rrddim_memory_file_update(RRDDIM *rd);
+
+// free the memory file structures for memory mode MAP and SAVE
+extern void rrddim_memory_file_free(RRDDIM *rd);
+
+extern bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MODE memory_mode);
+
+// return the v019 header size of RRDDIM files
+extern size_t rrddim_memory_file_header_size(void);
+
+extern void rrddim_memory_file_save(RRDDIM *rd);
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
@@ -322,30 +352,71 @@ struct rrddim_query_handle {
     RRDDIM *rd;
     time_t start_time;
     time_t end_time;
+    TIER_QUERY_FETCH tier_query_fetch_type;
     STORAGE_QUERY_HANDLE* handle;
 };
+
+typedef struct storage_point {
+    NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
+    NETDATA_DOUBLE max;     // when count > 1, this is the maximum among them
+    NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
+
+    // end_time - start_time = point duration
+    time_t start_time;      // the time the point starts
+    time_t end_time;        // the time the point ends
+
+    unsigned count;         // the number of original points aggregated
+    unsigned anomaly_count; // the number of original points found anomalous
+
+    SN_FLAGS flags;         // flags stored with the point
+} STORAGE_POINT;
+
+#define storage_point_unset(x)                     do { \
+    (x).min = (x).max = (x).sum = NAN;                  \
+    (x).count = 0;                                      \
+    (x).anomaly_count = 0;                              \
+    (x).flags = SN_EMPTY_SLOT;                          \
+    (x).start_time = 0;                                 \
+    (x).end_time = 0;                                   \
+    } while(0)
+
+#define storage_point_empty(x, start_t, end_t)     do { \
+    (x).min = (x).max = (x).sum = NAN;                  \
+    (x).count = 1;                                      \
+    (x).anomaly_count = 0;                              \
+    (x).flags = SN_EMPTY_SLOT;                          \
+    (x).start_time = start_t;                           \
+    (x).end_time = end_t;                               \
+    } while(0)
+
+#define storage_point_is_unset(x) (!(x).count)
+#define storage_point_is_empty(x) (!netdata_double_isnumber((x).sum))
 
 // ------------------------------------------------------------------------
 // function pointers that handle data collection
 struct rrddim_collect_ops {
     // an initialization function to run before starting collection
-    void (*init)(RRDDIM *rd);
+    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle);
 
     // run this to store each metric into the database
-    void (*store_metric)(RRDDIM *rd, usec_t point_in_time, calculated_number number, SN_FLAGS flags);
+    void (*store_metric)(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
+                         NETDATA_DOUBLE max_value, uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
+
+    // run this to flush / reset the current data collection sequence
+    void (*flush)(STORAGE_COLLECT_HANDLE *collection_handle);
 
     // an finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
-    int (*finalize)(RRDDIM *rd);
+    int (*finalize)(STORAGE_COLLECT_HANDLE *collection_handle);
 };
 
 // function pointers that handle database queries
 struct rrddim_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
 
     // run this to load each metric number from the database
-    calculated_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time, time_t *end_time, SN_FLAGS *flags);
+    STORAGE_POINT (*next_metric)(struct rrddim_query_handle *handle);
 
     // run this to test if the series of next_metric() database queries is finished
     int (*is_finished)(struct rrddim_query_handle *handle);
@@ -354,28 +425,30 @@ struct rrddim_query_ops {
     void (*finalize)(struct rrddim_query_handle *handle);
 
     // get the timestamp of the last entry of this metric
-    time_t (*latest_time)(RRDDIM *rd);
+    time_t (*latest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
 
     // get the timestamp of the first entry of this metric
-    time_t (*oldest_time)(RRDDIM *rd);
+    time_t (*oldest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
 };
 
+
 // ----------------------------------------------------------------------------
-// volatile state per RRD dimension
-struct rrddim_volatile {
-#ifdef ENABLE_DBENGINE
-    uuid_t *rrdeng_uuid;                 // database engine metric UUID
-    struct pg_cache_page_index *page_index;
-#endif
-#ifdef ENABLE_ACLK
-    int aclk_live_status;
-#endif
-    uuid_t metric_uuid;                 // global UUID for this metric (unique_across hosts)
-    STORAGE_COLLECT_HANDLE* handle;
+// Storage tier data for every dimension
+
+struct rrddim_tier {
+    int tier_grouping;
+    RRD_MEMORY_MODE mode;                           // the memory mode of this tier
+    RRD_BACKFILL backfill;                          // backfilling configuration
+    STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
+    STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
+    STORAGE_POINT virtual_point;
+    time_t next_point_time;
+    usec_t last_collected_ut;
     struct rrddim_collect_ops collect_ops;
     struct rrddim_query_ops query_ops;
-    ml_dimension_t ml_dimension;
 };
+
+extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
 
 // ----------------------------------------------------------------------------
 // volatile state per chart
@@ -450,8 +523,6 @@ struct rrdset {
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
 
-    void *unused_ptr;                               // Unused field (previously it held the config section of the chart)
-
     char *type;                                     // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     char *family;                                   // grouping sets under the same family
     char *title;                                    // title shown to user
@@ -484,7 +555,6 @@ struct rrdset {
     RRD_MEMORY_MODE rrd_memory_mode;                // if set to 1, this is memory mapped
 
     char *cache_dir;                                // the directory to store dimensions
-    char cache_filename[FILENAME_MAX+1];            // the filename to store this set
 
     netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
 
@@ -502,7 +572,6 @@ struct rrdset {
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
                                                     // this object.
     struct rrdset_volatile *state;                  // volatile state that is not persistently stored
-    size_t unused[3];
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
@@ -527,8 +596,8 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // local variables
 
-    calculated_number green;                        // green threshold for this chart
-    calculated_number red;                          // red threshold for this chart
+    NETDATA_DOUBLE green;                        // green threshold for this chart
+    NETDATA_DOUBLE red;                          // red threshold for this chart
 
     avl_tree_lock rrdvar_root_index;                // RRDVAR index for this chart
     RRDSETVAR *variables;                           // RRDSETVAR linked list for this chart (one RRDSETVAR, many RRDVARs)
@@ -538,15 +607,13 @@ struct rrdset {
     // members for checking the data when loading from disk
 
     unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
-
-    char magic[sizeof(RRDSET_MAGIC) + 1];           // our magic
+    void *st_on_file;                               // compatibility with V019 RRDSET files
 
     // ------------------------------------------------------------------------
     // the dimensions
 
     avl_tree_lock dimensions_index;                 // the root of the dimensions index
     RRDDIM *dimensions;                             // the actual data for every dimension
-
 };
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
@@ -563,6 +630,12 @@ struct rrdset {
 #define rrdset_foreach_write(st, host) \
     for((st) = (host)->rrdset_root, rrdhost_check_wrlock(host); st ; (st) = (st)->next)
 
+
+extern void rrdset_memory_file_save(RRDSET *st);
+extern void rrdset_memory_file_free(RRDSET *st);
+extern void rrdset_memory_file_update(RRDSET *st);
+extern const char *rrdset_cache_filename(RRDSET *st);
+extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags
@@ -630,8 +703,8 @@ struct alarm_entry {
     char *units;
     char *info;
 
-    calculated_number old_value;
-    calculated_number new_value;
+    NETDATA_DOUBLE old_value;
+    NETDATA_DOUBLE new_value;
 
     char *old_value_string;
     char *new_value_string;
@@ -724,10 +797,6 @@ struct rrdhost {
     const char *tags;                               // tags for this host
     const char *timezone;                           // the timezone of the host
 
-#ifdef ENABLE_ACLK
-    long    deleted_charts_count;
-#endif
-
     const char *abbrev_timezone;                    // the abbriviated timezone of the host
     int32_t utc_offset;                             // the offset in seconds from utc
 
@@ -762,7 +831,7 @@ struct rrdhost {
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     void *dbsync_worker;
 
-    volatile unsigned int rrdpush_sender_connected; // 1 when the sender is ready to push metrics
+    bool rrdpush_sender_connected;                  // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
 
     volatile unsigned int rrdpush_sender_error_shown; // 1 when we have logged a communication error
@@ -854,9 +923,8 @@ struct rrdhost {
     avl_tree_lock rrdfamily_root_index;             // the host's chart families index
     avl_tree_lock rrdvar_root_index;                // the host's chart variables index
 
-#ifdef ENABLE_DBENGINE
-    struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
-#endif
+    STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
+
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
 
@@ -897,6 +965,10 @@ extern netdata_rwlock_t rrd_rwlock;
 #define rrd_rdlock() netdata_rwlock_rdlock(&rrd_rwlock)
 #define rrd_wrlock() netdata_rwlock_wrlock(&rrd_rwlock)
 #define rrd_unlock() netdata_rwlock_unlock(&rrd_rwlock)
+
+// ----------------------------------------------------------------------------
+
+extern bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
 
 // ----------------------------------------------------------------------------
 
@@ -1067,28 +1139,49 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 #define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 
-// get the total duration in seconds of the round robin database
-#define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
-
 // get the timestamp of the last entry in the round robin database
-static inline time_t rrdset_last_entry_t_nolock(RRDSET *st)
-{
-    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        RRDDIM *rd;
-        time_t last_entry_t  = 0;
+static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
+    time_t latest = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
 
-        rrddim_foreach_read(rd, st) {
-            last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd));
-        }
+    for(int tier = 1; tier < storage_tiers ;tier++) {
+        if(unlikely(!rd->tiers[tier])) continue;
 
-        return last_entry_t;
-    } else {
-        return (time_t)st->last_updated.tv_sec;
+        time_t t = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
+        if(t > latest)
+            latest = t;
     }
+
+    return latest;
 }
 
-static inline time_t rrdset_last_entry_t(RRDSET *st)
-{
+static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
+    time_t oldest = 0;
+
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        if(unlikely(!rd->tiers[tier])) continue;
+
+        time_t t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
+        if(t != 0 && (oldest == 0 || t < oldest))
+            oldest = t;
+    }
+
+    return oldest;
+}
+
+// get the timestamp of the last entry in the round robin database
+static inline time_t rrdset_last_entry_t_nolock(RRDSET *st) {
+    RRDDIM *rd;
+    time_t last_entry_t  = 0;
+
+    rrddim_foreach_read(rd, st) {
+        time_t t = rrddim_last_entry_t(rd);
+        if(t > last_entry_t) last_entry_t = t;
+    }
+
+    return last_entry_t;
+}
+
+static inline time_t rrdset_last_entry_t(RRDSET *st) {
     time_t last_entry_t;
 
     netdata_rwlock_rdlock(&st->rrdset_rwlock);
@@ -1099,24 +1192,18 @@ static inline time_t rrdset_last_entry_t(RRDSET *st)
 }
 
 // get the timestamp of first entry in the round robin database
-static inline time_t rrdset_first_entry_t_nolock(RRDSET *st)
-{
-    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        RRDDIM *rd;
-        time_t first_entry_t = LONG_MAX;
+static inline time_t rrdset_first_entry_t_nolock(RRDSET *st) {
+    RRDDIM *rd;
+    time_t first_entry_t = LONG_MAX;
 
-        rrddim_foreach_read(rd, st) {
-            first_entry_t =
-                MIN(first_entry_t,
-                    rd->state->query_ops.oldest_time(rd) > st->update_every ?
-                        rd->state->query_ops.oldest_time(rd) - st->update_every : 0);
-        }
-
-        if (unlikely(LONG_MAX == first_entry_t)) return 0;
-        return first_entry_t;
-    } else {
-        return (time_t)(rrdset_last_entry_t_nolock(st) - rrdset_duration(st));
+    rrddim_foreach_read(rd, st) {
+        time_t t = rrddim_first_entry_t(rd);
+        if(t < first_entry_t)
+            first_entry_t = t;
     }
+
+    if (unlikely(LONG_MAX == first_entry_t)) return 0;
+    return first_entry_t;
 }
 
 static inline time_t rrdset_first_entry_t(RRDSET *st)
@@ -1130,104 +1217,7 @@ static inline time_t rrdset_first_entry_t(RRDSET *st)
     return first_entry_t;
 }
 
-// get the timestamp of the last entry in the round robin database
-static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
-    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        return rd->state->query_ops.latest_time(rd);
-    return (time_t)rd->rrdset->last_updated.tv_sec;
-}
-
-static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
-    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        return rd->state->query_ops.oldest_time(rd);
-    return (time_t)(rd->rrdset->last_updated.tv_sec - rrdset_duration(rd->rrdset));
-}
-
 time_t rrdhost_last_entry_t(RRDHOST *h);
-
-// get the last slot updated in the round robin database
-#define rrdset_last_slot(st) ((size_t)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))
-
-// get the first / oldest slot updated in the round robin database
-// #define rrdset_first_slot(st) ((size_t)( (((st)->counter >= ((unsigned long)(st)->entries)) ? (unsigned long)( ((unsigned long)(st)->current_entry > 0) ? ((unsigned long)(st)->current_entry) : ((unsigned long)(st)->entries) ) - 1 : 0) ))
-
-// return the slot that has the oldest value
-
-static inline size_t rrdset_first_slot(RRDSET *st) {
-    if(st->counter >= (size_t)st->entries) {
-        // the database has been rotated at least once
-        // the oldest entry is the one that will be next
-        // overwritten by data collection
-        return (size_t)st->current_entry;
-    }
-
-    // we do not have rotated the db yet
-    // so 0 is the first entry
-    return 0;
-}
-
-// get the slot of the round robin database, for the given timestamp (t)
-// it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
-// only valid when not using dbengine
-static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
-    size_t ret = 0;
-    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
-    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
-
-    if(t >= last_entry_t) {
-        // the requested time is after the last entry we have
-        ret = rrdset_last_slot(st);
-    }
-    else {
-        if(t <= first_entry_t) {
-            // the requested time is before the first entry we have
-            ret = rrdset_first_slot(st);
-        }
-        else {
-            if(rrdset_last_slot(st) >= (size_t)((last_entry_t - t) / st->update_every))
-                ret = rrdset_last_slot(st) - ((last_entry_t - t) / st->update_every);
-            else
-                ret = rrdset_last_slot(st) - ((last_entry_t - t) / st->update_every) + st->entries;
-        }
-    }
-
-    if(unlikely(ret >= (size_t)st->entries)) {
-        error("INTERNAL ERROR: rrdset_time2slot() on %s returns values outside entries", st->name);
-        ret = (size_t)(st->entries - 1);
-    }
-
-    return ret;
-}
-
-// get the timestamp of a specific slot in the round robin database
-// only valid when not using dbengine
-static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
-    time_t ret;
-    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
-    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
-
-    if(slot >= (size_t)st->entries) {
-        error("INTERNAL ERROR: caller of rrdset_slot2time() gives invalid slot %zu", slot);
-        slot = (size_t)st->entries - 1;
-    }
-
-    if(slot > rrdset_last_slot(st))
-        ret = last_entry_t - (time_t)(st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries));
-    else
-        ret = last_entry_t - (time_t)(st->update_every * (rrdset_last_slot(st) - slot));
-
-    if(unlikely(ret < first_entry_t)) {
-        error("INTERNAL ERROR: rrdset_slot2time() on %s returns time too far in the past", st->name);
-        ret = first_entry_t;
-    }
-
-    if(unlikely(ret > last_entry_t)) {
-        error("INTERNAL ERROR: rrdset_slot2time() on %s returns time into the future", st->name);
-        ret = last_entry_t;
-    }
-
-    return ret;
-}
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
@@ -1263,7 +1253,7 @@ extern void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
 
 extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
-#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#ifdef ENABLE_ACLK
 extern time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
 #endif
 extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
@@ -1301,8 +1291,7 @@ extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
 extern void rrdset_save(RRDSET *st);
-#define rrdset_delete(st) rrdset_delete_custom(st, 0)
-extern void rrdset_delete_custom(RRDSET *st, int db_rotated);
+extern void rrdset_delete(RRDSET *st);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern RRDHOST *rrdhost_create(
@@ -1318,6 +1307,8 @@ extern void set_host_properties(
     RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname, const char *registry_hostname,
     const char *guid, const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *program_name, const char *program_version);
+
+extern int get_tier_grouping(int tier);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

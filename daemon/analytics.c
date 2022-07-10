@@ -7,7 +7,7 @@ struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
 extern void analytics_exporting_connectors_ssl (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
-extern int aclk_connected, aclk_use_new_cloud_arch;
+extern int aclk_connected;
 
 struct collector {
     char *plugin;
@@ -382,7 +382,7 @@ void analytics_https(void)
     BUFFER *b = buffer_create(30);
 #ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
-    buffer_strcat(b, netdata_client_ctx && localhost->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE && localhost->rrdpush_sender_connected == 1 ? "streaming|" : "|");
+    buffer_strcat(b, netdata_client_ctx && localhost->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE && __atomic_load_n(&localhost->rrdpush_sender_connected, __ATOMIC_SEQ_CST) ? "streaming|" : "|");
     buffer_strcat(b, netdata_srv_ctx ? "web" : "");
 #else
     buffer_strcat(b, "||");
@@ -499,12 +499,7 @@ void analytics_aclk(void)
 #ifdef ENABLE_ACLK
     if (aclk_connected) {
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "true");
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-        if (aclk_use_new_cloud_arch)
-            analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "New");
-        else
-#endif
-            analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "Legacy");
+        analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "New");
     }
     else
 #endif

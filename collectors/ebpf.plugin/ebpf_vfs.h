@@ -156,7 +156,6 @@ extern netdata_publish_vfs_t **vfs_pid;
 
 extern void *ebpf_vfs_thread(void *ptr);
 extern void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
-extern void clean_vfs_pid_structures();
 
 extern struct config vfs_config;
 
