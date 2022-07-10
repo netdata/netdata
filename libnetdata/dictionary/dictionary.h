@@ -53,7 +53,10 @@ typedef enum dictionary_flags {
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
-extern DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags);
+#define dictionary_create(flags) dictionary_create_advanced(flags, 0);
+extern DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad_size);
+
+extern void *dictionary_scratchpad(DICTIONARY *dict);
 
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!

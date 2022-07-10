@@ -186,6 +186,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
+    rrdcontext_updated_rrdset_name(st);
     return 2;
 }
 
@@ -204,6 +205,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
         rrdset_push_chart_definition_now(st);
+        rrdcontext_updated_rrdset_flags(st);
     }
 }
 
@@ -216,6 +218,7 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
 
         // the chart will be pushed upstream automatically
         // due to data collection
+        rrdcontext_updated_rrdset_flags(st);
     }
 }
 
@@ -251,6 +254,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
     }
 
     rrdset_flag_clear(st, RRDSET_FLAG_HETEROGENEOUS);
+    rrdcontext_updated_rrdset_flags(st);
 }
 
 // ----------------------------------------------------------------------------
@@ -332,6 +336,8 @@ static inline void last_updated_time_align(RRDSET *st) {
 
 void rrdset_free(RRDSET *st) {
     if(unlikely(!st)) return;
+
+    rrdcontext_removed_rrdset(st);
 
     RRDHOST *host = st->rrdhost;
 
@@ -419,7 +425,7 @@ void rrdset_save(RRDSET *st) {
         rrddim_memory_file_save(rd);
 }
 
-void rrdset_delete(RRDSET *st) {
+void rrdset_delete_files(RRDSET *st) {
     RRDDIM *rd;
     rrdset_check_rdlock(st);
 
@@ -659,8 +665,10 @@ RRDSET *rrdset_create_custom(
             }
         }
         /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
-        if (!changed_from_archived_to_active)
+        if (!changed_from_archived_to_active) {
+            rrdcontext_updated_rrdset(st);
             return st;
+        }
     }
 
     rrdhost_wrlock(host);
@@ -680,6 +688,7 @@ RRDSET *rrdset_create_custom(
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        rrdcontext_updated_rrdset(st);
         return st;
     }
 
@@ -789,6 +798,7 @@ RRDSET *rrdset_create_custom(
     compute_chart_hash(st);
 
     rrdhost_unlock(host);
+    rrdcontext_updated_rrdset(st);
     return(st);
 }
 
@@ -1280,6 +1290,7 @@ void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
     debug(D_RRD_CALLS, "rrdset_done() for chart %s", st->name);
+    rrdcontext_collected_rrdset(st);
 
     RRDDIM *rd;
 

@@ -3,6 +3,10 @@
 #include "rrdcontext.h"
 #include "sqlite/sqlite_context.h"
 
+typedef struct rrdmetric RRDMETRIC;
+typedef struct rrdinstance RRDINSTANCE;
+typedef struct rrdcontext RRDCONTEXT;
+
 
 // ----------------------------------------------------------------------------
 // RRDMETRIC
@@ -146,11 +150,11 @@ void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void 
 }
 
 void rrdinstances_create(RRDHOST *host) {
-    if(host->rrdinstances) return;
-    host->rrdinstances = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(host->rrdinstances, rrdinstance_insert_callback, (void *)host);
-    dictionary_register_delete_callback(host->rrdinstances, rrdinstance_delete_callback, (void *)host);
-    dictionary_register_conflict_callback(host->rrdinstances, rrdinstance_conflict_callback, (void *)host);
+    if(likely(host->rrdinstances)) return;
+    host->rrdinstances = (RRDINSTANCES *)dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback((DICTIONARY *)host->rrdinstances, rrdinstance_insert_callback, (void *)host);
+    dictionary_register_delete_callback((DICTIONARY *)host->rrdinstances, rrdinstance_delete_callback, (void *)host);
+    dictionary_register_conflict_callback((DICTIONARY *)host->rrdinstances, rrdinstance_conflict_callback, (void *)host);
 }
 
 void rrdinstance_add(RRDHOST *host, const char *id, const char *name) {
@@ -161,23 +165,23 @@ void rrdinstance_add(RRDHOST *host, const char *id, const char *name) {
         .rrdmetrics = NULL
     };
 
-    dictionary_set(host->rrdinstances, id, &tmp, sizeof(RRDINSTANCE));
+    dictionary_set((DICTIONARY *)host->rrdinstances, id, &tmp, sizeof(RRDINSTANCE));
 }
 
 void rrdinstance_set_label(RRDHOST *host, const char *id, const char *key, const char *value, RRDLABEL_SRC src) {
-    DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdinstances, id);
+    DICTIONARY_ITEM *item = dictionary_get_and_acquire_item((DICTIONARY *)host->rrdinstances, id);
     if(!item) {
         error("RRDINSTANCE: cannot find instance '%s' on host '%s' to set label key '%s' to value '%s'", id, host->hostname, key, value);
         return;
     }
 
-    RRDINSTANCE *ri = dictionary_acquired_item_value(host->rrdinstances, item);
+    RRDINSTANCE *ri = dictionary_acquired_item_value((DICTIONARY *)host->rrdinstances, item);
     if(!ri->rrdlabels)
         ri->rrdlabels = rrdlabels_create();
 
     rrdlabels_add(ri->rrdlabels, key, value, src);
 
-    dictionary_acquired_item_release(host->rrdinstances, item);
+    dictionary_acquired_item_release((DICTIONARY *)host->rrdinstances, item);
 }
 
 // ----------------------------------------------------------------------------
@@ -217,7 +221,7 @@ static void rrdcontext_freez(RRDCONTEXT *rc) {
     dictionary_destroy(rc->rrdinstances);
 }
 
-static void check_if_we_need_to_update_cloud(RRDCONTEXT *rc) {
+static void check_if_we_need_to_emit_new_version(RRDCONTEXT *rc) {
     VERSIONED_CONTEXT_DATA tmp = {
         .version = rc->version,
         .id = string2str(rc->id),
@@ -225,10 +229,13 @@ static void check_if_we_need_to_update_cloud(RRDCONTEXT *rc) {
         .units = string2str(rc->units),
         .chart_type = rrdset_type_name(rc->chart_type),
         .priority = rc->priority,
-        .last_time_t = rc->last_time_t,
+        .last_time_t = (rc->flags & RRDCONTEXT_FLAG_COLLECTED)? 0 : rc->last_time_t,
         .first_time_t = rc->first_time_t,
+        .deleted = (rc->flags & RRDCONTEXT_FLAG_DELETED) ? true : false,
     };
 
+    // it is ok to memcmp() because our strings are deduplicated
+    // so the pointer of the same string has the same value
     if(memcmp(&tmp, &rc->hub, sizeof(tmp)) != 0) {
         rc->version = tmp.version = (rc->version > rc->hub.version ? rc->version : rc->hub.version) + 1;
         memcpy(&rc->hub, &tmp, sizeof(tmp));
@@ -271,6 +278,9 @@ void rrdcontext_insert_callback(const char *id, void *value, void *data) {
         rc->priority     = rc->hub.priority;
         rc->first_time_t = rc->hub.first_time_t;
         rc->last_time_t  = rc->hub.last_time_t;
+
+        if(rc->hub.deleted)
+            rc->flags |= RRDCONTEXT_FLAG_DELETED;
     }
     else {
         // we are adding this context now for the first time
@@ -281,7 +291,7 @@ void rrdcontext_insert_callback(const char *id, void *value, void *data) {
                    string2str(rc->id), host->hostname, rc->version, string2str(rc->title), string2str(rc->units),
                    rrdset_type_name(rc->chart_type), rc->priority);
 
-    check_if_we_need_to_update_cloud(rc);
+    check_if_we_need_to_emit_new_version(rc);
 }
 
 void rrdcontext_delete_callback(const char *id, void *value, void *data) {
@@ -296,7 +306,7 @@ void rrdcontext_delete_callback(const char *id, void *value, void *data) {
 static STRING *merge_titles(STRING *a, STRING *b) {
     size_t alen = string_length(a);
     size_t blen = string_length(b);
-    size_t length = MAX(a, b);
+    size_t length = MAX(alen, blen);
     char buf1[length + 1], buf2[length + 1], *dst1, *dst2;
     const char *s1, *s2;
 
@@ -364,26 +374,85 @@ void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *
 
     // update the cloud if necessary
     if(changed)
-        check_if_we_need_to_update_cloud(rc);
+        check_if_we_need_to_emit_new_version(rc);
 }
 
 void rrdcontexts_create(RRDHOST *host) {
-    if(host->rrdcontexts) return;
-    host->rrdcontexts = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(host->rrdcontexts, rrdcontext_insert_callback, (void *)host);
-    dictionary_register_delete_callback(host->rrdcontexts, rrdcontext_delete_callback, (void *)host);
-    dictionary_register_conflict_callback(host->rrdcontexts, rrdcontext_conflict_callback, (void *)host);
+    if(likely(host->rrdcontexts)) return;
+    host->rrdcontexts = (RRDCONTEXTS *)dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback((DICTIONARY *)host->rrdcontexts, rrdcontext_insert_callback, (void *)host);
+    dictionary_register_delete_callback((DICTIONARY *)host->rrdcontexts, rrdcontext_delete_callback, (void *)host);
+    dictionary_register_conflict_callback((DICTIONARY *)host->rrdcontexts, rrdcontext_conflict_callback, (void *)host);
 }
 
-void rrdcontext_add(RRDHOST *host, const char *id, const char *name) {
-    (void)name;
+static inline const char *rrdcontext_acquired_name(RRDHOST *host, RRDCONTEXT_ACQUIRED *item) {
+    return dictionary_acquired_item_name((DICTIONARY *)host->rrdcontexts, (DICTIONARY_ITEM *)item);
+}
 
+static inline RRDCONTEXT *rrdcontext_acquired_value(RRDHOST *host, RRDCONTEXT_ACQUIRED *item) {
+    return dictionary_acquired_item_value((DICTIONARY *)host->rrdcontexts, (DICTIONARY_ITEM *)item);
+}
+
+static inline RRDCONTEXT_ACQUIRED *rrdcontext_acquire(RRDHOST *host, const char *name) {
+    return (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdcontexts, name);
+}
+
+static inline void rrdcontext_release(RRDHOST *host, RRDCONTEXT_ACQUIRED *context) {
+    dictionary_acquired_item_release((DICTIONARY *)host->rrdcontexts, (DICTIONARY_ITEM *)context);
+}
+
+static RRDCONTEXT_ACQUIRED *rrdcontext_from_rrdset(RRDSET *st) {
     RRDCONTEXT tmp = {
-        .id = string_dupz(id),
+        .id = string_dupz(st->context),
+        .title = string_dupz(st->title),
+        .units = string_dupz(st->units),
+        .priority = st->priority,
+        .chart_type = st->chart_type,
+        .flags = RRDCONTEXT_FLAG_NONE,
+        .host = st->rrdhost,
+        .first_time_t = 0,
+        .last_time_t = 0,
         .rrdinstances = NULL,
     };
 
-    dictionary_set(host->rrdcontexts, id, &tmp, sizeof(RRDCONTEXT));
+    rrdcontexts_create(tmp.host);
+    return (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item((DICTIONARY *)tmp.host->rrdcontexts, string2str(tmp.id), &tmp, sizeof(tmp));
+}
+
+// ----------------------------------------------------------------------------
+// helpers
+
+
+
+// ----------------------------------------------------------------------------
+// public API
+
+void rrdcontext_updated_rrdset(RRDSET *st) {
+    RRDCONTEXT_ACQUIRED *rca = rrdcontext_from_rrdset(st);
+    {
+        RRDCONTEXT_ACQUIRED *orca = __atomic_exchange_n(&st->rrdcontext, rca, __ATOMIC_SEQ_CST);
+        if(orca) rrdcontext_release(st->rrdhost, orca);
+    }
+
+    RRDINSTANCE_ACQUIRED *ria = rrdinstance_from_rrdset(st, rca);
+    {
+        RRDINSTANCE_ACQUIRED *oria = __atomic_exchange_n(&st->rrdinstance, ria, __ATOMIC_SEQ_CST);
+        if(oria) rrdinstance_release(st->rrdhost, oria);
+    }
+}
+
+
+
+void rrdset_add_to_rrdcontext(RRDSET *st) {
+    RRDCONTEXT_ACQUIRED  *rca = rrdcontext_from_rrdset(st);
+    RRDINSTANCE_ACQUIRED *ria = rrdinstance_from_rrdset(st);
+}
+
+void rrddim_add_to_rrdcontext(RRDDIM *rd) {
+    RRDCONTEXT_ACQUIRED  *rca = rrdcontext_from_rrdset(rd->rrdset);
+    RRDINSTANCE_ACQUIRED *ria = rrdinstance_from_rrdset(rd->rrdset);
+    RRDMETRIC_ACQUIRED   *rma = rrdmetric_from_rrddim(rd);
+
 }
 
 // ----------------------------------------------------------------------------
@@ -401,8 +470,8 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .context = rrdcontext_acquire(host, sc->context),
     };
     uuid_copy(tmp.uuid, sc->chart_id);
-    DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->rrdinstances, sc->id, &tmp, sizeof(tmp));
-    RRDINSTANCE *ri = dictionary_acquired_item_value(host->rrdinstances, item);
+    DICTIONARY_ITEM *item = dictionary_set_and_acquire_item((DICTIONARY *)host->rrdinstances, sc->id, &tmp, sizeof(tmp));
+    RRDINSTANCE *ri = dictionary_acquired_item_value((DICTIONARY *)host->rrdinstances, item);
 
     //ctx_get_label_list(ri->uuid, dict_ctx_get_label_list_cb, NULL);
     //ctx_get_dimension_list(ri->uuid, dict_ctx_get_dimension_list_cb, NULL);
@@ -414,9 +483,11 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
 
     RRDCONTEXT tmp = {
         .id = string_dupz(ctx_data->id),
+        // no need to set more data here
+        // we only need the hub data
     };
     memcpy(&tmp.hub, ctx_data, sizeof(VERSIONED_CONTEXT_DATA));
-    dictionary_set(host->rrdcontexts, ctx_data->id, &tmp, sizeof(tmp));
+    dictionary_set((DICTIONARY *)host->rrdcontexts, ctx_data->id, &tmp, sizeof(tmp));
 }
 
 void rrdcontext_load_all(RRDHOST *host) {
