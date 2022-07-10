@@ -15,3 +15,13 @@ jobs:
         with:
           project-url: https://github.com/orgs/netdata/projects/32
           github-token: ${{ secrets.NETDATABOT_ORG_GITHUB_TOKEN }}
+
+  add-bugs-to-project:
+    name: Add issue to project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v0.1.0
+        with:
+          project-url: https://github.com/orgs/netdata/projects/45
+          github-token: ${{ secrets.NETDATABOT_ORG_GITHUB_TOKEN }}
+          labeled: bug
