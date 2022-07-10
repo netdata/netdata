@@ -93,6 +93,9 @@ struct dictionary {
     long int pending_deletion_items;  // how many items of the dictionary have been deleted, but have not been removed yet
     int readers;                      // how many readers are currently using the dictionary
     int writers;                      // how many writers are currently using the dictionary
+
+    size_t scratchpad_size;           // the size of the scratchpad in bytes
+    uint8_t scratchpad[];             // variable size scratchpad requested by the caller
 };
 
 static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
@@ -772,15 +775,16 @@ static bool name_value_can_be_deleted(DICTIONARY *dict, NAME_VALUE *nv) {
 // ----------------------------------------------------------------------------
 // API - dictionary management
 
-DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
+DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad_size) {
     debug(D_DICTIONARY, "Creating dictionary.");
 
     if(unlikely(flags & DICTIONARY_FLAGS_RESERVED))
         flags &= ~DICTIONARY_FLAGS_RESERVED;
 
-    DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
-    size_t allocated = sizeof(DICTIONARY);
+    DICTIONARY *dict = callocz(1, sizeof(DICTIONARY) + scratchpad_size);
+    size_t allocated = sizeof(DICTIONARY) + scratchpad_size;
 
+    dict->scratchpad_size = scratchpad_size;
     dict->flags = flags;
     dict->first_item = dict->last_item = NULL;
 
@@ -790,6 +794,10 @@ DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags) {
 
     hashtable_init_unsafe(dict);
     return (DICTIONARY *)dict;
+}
+
+void *dictionary_scratchpad(DICTIONARY *dict) {
+    return &dict->scratchpad;
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
@@ -826,8 +834,8 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     freed += dictionary_lock_free(dict);
     freed += reference_counter_free(dict);
 
+    freed += sizeof(DICTIONARY) + dict->scratchpad_size;
     freez(dict);
-    freed += sizeof(DICTIONARY);
 
     return freed;
 }
@@ -1294,9 +1302,9 @@ typedef struct string_entry {
 #ifdef DICTIONARY_WITH_AVL
     avl_t avl_node;
 #endif
-    volatile int references;
-    size_t length;
-    const char str[];
+    volatile int refcount;  // how many times this string is used
+    size_t length;          // the string length with the terminating '\0'
+    const char str[];       // the string itself
 } STRING_ENTRY;
 
 #ifdef DICTIONARY_WITH_AVL
@@ -1337,17 +1345,22 @@ STRING *string_dupz(const char *str) {
     STRING_ENTRY **ptr = (STRING_ENTRY **)hashtable_insert_unsafe(&string_dictionary, str, length);
     if(unlikely(*ptr == 0)) {
         // a new item added to the index
-        se = mallocz(sizeof(STRING_ENTRY)) + length;
+        size_t mem_size = sizeof(STRING_ENTRY) + length;
+        se = mallocz(mem_size);
         strcpy((char *)se->str, str);
         se->length = length;
-        se->references = 1;
+        se->refcount = 1;
         *ptr = se;
         hashtable_inserted_name_value_unsafe(&string_dictionary, se);
+        string_dictionary.inserts++;
+        string_dictionary.entries++;
+        string_dictionary.memory += (long)mem_size;
     }
     else {
         // the item is already in the index
         se = *ptr;
-        se->references++;
+        se->refcount++;
+        string_dictionary.searches++;
     }
 
     netdata_mutex_unlock(&string_mutex);
@@ -1359,12 +1372,16 @@ void string_freez(STRING *item) {
     netdata_mutex_lock(&string_mutex);
 
     STRING_ENTRY *se = (STRING_ENTRY *)item;
-    se->references--;
-    if(unlikely(se->references == 0)) {
+    se->refcount--;
+    if(unlikely(se->refcount == 0)) {
         if(hashtable_delete_unsafe(&string_dictionary, se->str, se->length, se) == 0)
             error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index", se->str);
 
+        size_t mem_size = sizeof(STRING_ENTRY) + se->length;
         freez(se);
+        string_dictionary.deletes++;
+        string_dictionary.entries--;
+        string_dictionary.memory -= (long)mem_size;
     }
 
     netdata_mutex_unlock(&string_mutex);
