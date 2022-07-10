@@ -49,6 +49,7 @@ struct pg_cache_page_index;
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
+#include "rrdcontext.h"
 
 extern int storage_tiers;
 extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
@@ -284,7 +285,7 @@ struct rrddim {
 
     struct rrddim_tier *tiers[RRD_STORAGE_TIERS];   // our tiers of databases
 
-    size_t collections_counter;                     // the number of times we added values to this rrdim
+    size_t collections_counter;                     // the number of times we added values to this rrddim
     collected_number collected_value_max;           // the absolute maximum of the collected value
 
     NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
@@ -296,11 +297,12 @@ struct rrddim {
 
     // the *_volume members are used to calculate the accuracy of the rounding done by the
     // storage number - they are printed to debug.log when debug is enabled for a set.
-    NETDATA_DOUBLE collected_volume;             // the sum of all collected values so far
-    NETDATA_DOUBLE stored_volume;                // the sum of all stored values so far
+    NETDATA_DOUBLE collected_volume;                // the sum of all collected values so far
+    NETDATA_DOUBLE stored_volume;                   // the sum of all stored values so far
 
     struct rrddim *next;                            // linking of dimensions within the same data set
     struct rrdset *rrdset;
+    RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
 
     // ------------------------------------------------------------------------
     // members for checking the data when loading from disk
@@ -530,6 +532,9 @@ struct rrdset {
 
     char *context;                                  // the template of this data set
     uint32_t hash_context;                          // the hash of the chart's context
+
+    RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
+    RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
 
     RRDSET_TYPE chart_type;                         // line, area, stacked
 
@@ -925,8 +930,8 @@ struct rrdhost {
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 
-    DICTIONARY *rrdcontexts;
-    DICTIONARY *rrdinstances;
+    RRDCONTEXTS *rrdcontexts;
+    RRDINSTANCES *rrdinstances;
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
@@ -1294,7 +1299,7 @@ extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
 extern void rrdset_save(RRDSET *st);
-extern void rrdset_delete(RRDSET *st);
+extern void rrdset_delete_files(RRDSET *st);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern RRDHOST *rrdhost_create(

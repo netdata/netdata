@@ -692,6 +692,8 @@ RRDHOST *rrdhost_find_or_create(
         rrdhost_wrlock(host);
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
         host->senders_disconnected_time = 0;
+        rrdcontexts_create(host);
+        rrdinstances_create(host);
         rrdhost_unlock(host);
     }
 
@@ -1125,6 +1127,9 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
+    rrdinstances_destroy(host);
+    rrdcontexts_destroy(host);
+
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
     freez(host->aclk_state.prev_claimed_id);
@@ -1344,7 +1349,7 @@ void rrdhost_delete_charts(RRDHOST *host) {
 
     rrdset_foreach_write(st, host) {
         rrdset_rdlock(st);
-        rrdset_delete(st);
+        rrdset_delete_files(st);
         rrdset_unlock(st);
     }
 
@@ -1372,7 +1377,7 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
         rrdset_rdlock(st);
 
         if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
-            rrdset_delete(st);
+            rrdset_delete_files(st);
         else if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
             rrdset_delete_obsolete_dimensions(st);
         else
@@ -1520,7 +1525,7 @@ restart_after_removal:
             rrdset_rdlock(st);
 
             if(rrdhost_delete_obsolete_charts)
-                rrdset_delete(st);
+                rrdset_delete_files(st);
             else
                 rrdset_save(st);
 
