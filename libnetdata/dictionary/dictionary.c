@@ -82,6 +82,7 @@ struct dictionary {
     void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data);
     void *conflict_callback_data;
 
+    size_t version;                   // the current version of the dictionary
     size_t inserts;                   // how many index insertions have been performed
     size_t deletes;                   // how many index deletions have been performed
     size_t searches;                  // how many index searches have been performed
@@ -128,6 +129,9 @@ long int dictionary_stats_allocated_memory(DICTIONARY *dict) {
 long int dictionary_stats_entries(DICTIONARY *dict) {
     return dict->entries;
 }
+size_t dictionary_stats_version(DICTIONARY *dict) {
+    return dict->version;
+}
 size_t dictionary_stats_searches(DICTIONARY *dict) {
     return dict->searches;
 }
@@ -154,11 +158,13 @@ static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
 }
 static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICTIONARY *dict, size_t size) {
     if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->version++;
         dict->inserts++;
         dict->entries++;
         dict->memory += (long)size;
     }
     else {
+        __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
         __atomic_fetch_add(&dict->inserts, 1, __ATOMIC_RELAXED);
         __atomic_fetch_add(&dict->entries, 1, __ATOMIC_RELAXED);
         __atomic_fetch_add(&dict->memory, (long)size, __ATOMIC_RELAXED);
@@ -166,10 +172,12 @@ static inline void DICTIONARY_STATS_ENTRIES_PLUS1(DICTIONARY *dict, size_t size)
 }
 static inline void DICTIONARY_STATS_ENTRIES_MINUS1(DICTIONARY *dict) {
     if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->version++;
         dict->deletes++;
         dict->entries--;
     }
     else {
+        __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
         __atomic_fetch_add(&dict->deletes, 1, __ATOMIC_RELAXED);
         __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_RELAXED);
     }
@@ -184,11 +192,13 @@ static inline void DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(DICTIONARY *dict, size_
 }
 static inline void DICTIONARY_STATS_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t oldsize, size_t newsize) {
     if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
+        dict->version++;
         dict->resets++;
         dict->memory += (long)newsize;
         dict->memory -= (long)oldsize;
     }
     else {
+        __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
         __atomic_fetch_add(&dict->resets, 1, __ATOMIC_RELAXED);
         __atomic_fetch_add(&dict->memory, (long)newsize, __ATOMIC_RELAXED);
         __atomic_fetch_sub(&dict->memory, (long)oldsize, __ATOMIC_RELAXED);
@@ -1352,6 +1362,7 @@ STRING *string_dupz(const char *str) {
         se->refcount = 1;
         *ptr = se;
         hashtable_inserted_name_value_unsafe(&string_dictionary, se);
+        string_dictionary.version++;
         string_dictionary.inserts++;
         string_dictionary.entries++;
         string_dictionary.memory += (long)mem_size;
@@ -1379,6 +1390,7 @@ void string_freez(STRING *item) {
 
         size_t mem_size = sizeof(STRING_ENTRY) + se->length;
         freez(se);
+        string_dictionary.version++;
         string_dictionary.deletes++;
         string_dictionary.entries--;
         string_dictionary.memory -= (long)mem_size;

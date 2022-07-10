@@ -202,6 +202,7 @@ extern usec_t dictionary_foreach_done(DICTFE *dfe);
 // Get statistics about the dictionary
 extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
 extern long int dictionary_stats_entries(DICTIONARY *dict);
+extern size_t dictionary_stats_version(DICTIONARY *dict);
 extern size_t dictionary_stats_inserts(DICTIONARY *dict);
 extern size_t dictionary_stats_searches(DICTIONARY *dict);
 extern size_t dictionary_stats_deletes(DICTIONARY *dict);
