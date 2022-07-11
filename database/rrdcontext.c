@@ -99,7 +99,7 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg, bool rrdmetrics_is
     BUFFER *wb = buffer_create(1000);
 
     buffer_sprintf(wb,
-                   "RRDINSTANCE: %s id '%s' (host '%s'), uuid '%s', name '%s', context '%s', title '%s', units '%s', priority %zu, chart type '%s', update every %d, rrdset '%s', flags %s%s%s%s, rca %s, labels version %zu, first_time_t %ld, last_time_t %ld",
+                   "RRDINSTANCE: %s id '%s' (host '%s'), uuid '%s', name '%s', context '%s', title '%s', units '%s', priority %zu, chart type '%s', update every %d, rrdset '%s', flags %s%s%s%s%s, rca %s, labels version %zu, first_time_t %ld, last_time_t %ld",
                    msg,
                    string2str(ri->id),
                    ri->rrdhost?ri->rrdhost->hostname:"NONE",
@@ -115,6 +115,7 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg, bool rrdmetrics_is
                    ri->flags & RRD_FLAG_DELETED ?"DELETED ":"",
                    ri->flags & RRD_FLAG_UPDATED ?"UPDATED ":"",
                    ri->flags & RRD_FLAG_COLLECTED ?"COLLECTED ":"",
+                   ri->flags & RRD_FLAG_ARCHIVED ?"ARCHIVED ":"",
                    ri->flags & RRD_FLAG_OWNLABELS ?"OWNLABELS ":"",
                    ri->rca ? "YES": "NO",
                    ri->rrdlabels_version,
