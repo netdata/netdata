@@ -6,7 +6,10 @@
 #define DB_CONTEXT_METADATA_VERSION 1
 
 const char *database_context_config[] = {
-    "CREATE TABLE IF NOT EXISTS context (context_name text PRIMARY KEY, first_time_t integer, last_time_t integer)",
+    "CREATE TABLE IF NOT EXISTS context (host_id BLOB, id TEXT, version INT, title TEXT, chart_type TEXT, " \
+    "unit TEXT, priority INT, first_time_t INT, last_time_t INT, deleted INT, PRIMARY KEY (host_id, id));",
+
+    "CREATE TEMP VIEW IF NOT EXISTS context_host AS SELECT c.host_id, c.context FROM meta.chart c, meta.host h WHERE h.host_id = c.host_id;",
     NULL
 };
 
@@ -132,24 +135,28 @@ void sql_close_context_database(void)
     return;
 }
 
+static int bind_text_null(sqlite3_stmt *res, int position, const char *text)
+{
+    if (likely(text))
+        return sqlite3_bind_text(res, position, text, -1, SQLITE_STATIC);
+    return sqlite3_bind_null(res, position);
+}
+
 //
 // Fetching data
 //
-#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.context, c.update_every FROM meta.chart c " \
+#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, c.update_every FROM meta.chart c " \
         "WHERE c.host_id IN (SELECT h.host_id FROM meta.host h " \
         "WHERE UNLIKELY((h.hops = 0 AND @host_id IS NULL)) OR LIKELY((h.host_id = @host_id)));"
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
-    // TODO support all fields required
-
     int rc;
     sqlite3_stmt *res = NULL;
 
-
     rc = sqlite3_prepare_v2(db_context_meta, CTX_GET_CHART_LIST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch chart lanbels");
+        error_report("Failed to prepare statement to fetch chart list");
         return;
     }
 
@@ -166,8 +173,12 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid_copy(chart_data.chart_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         chart_data.id = (char *) sqlite3_column_text(res, 1);
-        chart_data.context = (char *) sqlite3_column_text(res, 2);
-        chart_data.update_every = sqlite3_column_int(res, 3);
+        chart_data.name = (char *) sqlite3_column_text(res, 2);
+        chart_data.context = (char *) sqlite3_column_text(res, 3);
+        chart_data.title = (char *) sqlite3_column_text(res, 4);
+        chart_data.units = (char *) sqlite3_column_text(res, 5);
+        chart_data.priority = sqlite3_column_int(res, 6);
+        chart_data.update_every = sqlite3_column_int(res, 7);
         dict_cb(&chart_data, data);
     }
 
@@ -211,7 +222,7 @@ failed:
 }
 
 // LABEL LIST
-#define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l where l.chart_id = @id;"
+#define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l WHERE l.chart_id = @id;"
 void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data)
 {
     int rc;
@@ -247,13 +258,14 @@ failed:
 }
 
 // CONTEXT LIST
-#define CTX_GET_CONTEXT_LIST  "SELECT context_name, first_time_t, last_time_t FROM context;"
+#define CTX_GET_CONTEXT_LIST  "SELECT id, version, title, chart_type, unit, priority, first_time_t, " \
+            "last_time_t, deleted FROM context c, context_host ch WHERE " \
+            "ch.host_id = @host_id AND ch.context = c.id;"
 void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
-    (void)host_uuid;
 
-    // TODO load contexts only for host uuid
-    // TODO support all VERSIONED_CONTEXT_DATA fields
+    if (unlikely(!host_uuid))
+        return;
 
     int rc;
     sqlite3_stmt *res = NULL;
@@ -264,31 +276,50 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
         return;
     }
 
-    VERSIONED_CONTEXT_DATA context_data;
+    VERSIONED_CONTEXT_DATA context_data = {0};
+
+    rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id to fetch versioned context data");
+        goto failed;
+    }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         context_data.id = (char *) sqlite3_column_text(res, 0);
-        context_data.first_time_t = sqlite3_column_int64(res, 1);
-        context_data.last_time_t = sqlite3_column_int64(res, 2);
+        context_data.version = sqlite3_column_int64(res, 1);
+        context_data.title = (char *) sqlite3_column_text(res, 2);
+        context_data.chart_type = (char *) sqlite3_column_text(res, 3);
+        context_data.units = (char *) sqlite3_column_text(res, 4);
+        context_data.priority = sqlite3_column_int64(res, 5);
+        context_data.first_time_t = sqlite3_column_int64(res, 6);
+        context_data.last_time_t = sqlite3_column_int64(res, 7);
+        context_data.deleted = sqlite3_column_int(res, 8);
         dict_cb(&context_data, data);
     }
 
+failed:
     rc = sqlite3_finalize(res);
     if (rc != SQLITE_OK)
-        error_report("Failed to finalize statement that fetches stored context list, rc = %d", rc);
+        error_report("Failed to finalize statement that fetches stored context versioned data, rc = %d", rc);
 }
 
 
 //
 // Storing Data
 //
-#define CTX_STORE_CONTEXT "INSERT OR REPLACE INTO context (context_name, first_time_t, last_time_t) VALUES (@context, @first_time_t, @last_time_t);"
-int ctx_store_context(VERSIONED_CONTEXT_DATA *context_data)
+
+#define CTX_STORE_CONTEXT "INSERT OR REPLACE INTO context " \
+    "(host_id, id, version, title, chart_type, unit, priority, first_time_t, last_time_t, deleted) " \
+    "VALUES (@host_id, @context, @version, @title, @chart_type, @unit, @priority, @first_time_t, @last_time_t, @deleted);"
+
+
+int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
     int rc, rc_stored = 1;
     sqlite3_stmt *res = NULL;
 
-    if (unlikely(!context_data || !context_data->id))
+    if (unlikely(!host_uuid || !context_data || !context_data->id))
         return 0;
 
     rc = sqlite3_prepare_v2(db_context_meta, CTX_STORE_CONTEXT, -1, &res, 0);
@@ -297,19 +328,62 @@ int ctx_store_context(VERSIONED_CONTEXT_DATA *context_data)
         return 1;
     }
 
-    rc = sqlite3_bind_text(res, 1, context_data->id, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_uuid to store context details");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_text(res, 2, context_data->id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 2, (time_t) context_data->first_time_t);
+    rc = sqlite3_bind_int64(res, 3, (time_t) context_data->version);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind first_time_t to store context details");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 3, (time_t) context_data->last_time_t);
+
+    rc = bind_text_null(res, 4, context_data->title);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind context to store details");
+        goto failed;
+    }
+
+    rc = bind_text_null(res, 5, context_data->chart_type);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind context to store details");
+        goto failed;
+    }
+
+    rc = bind_text_null(res, 6, context_data->units);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind context to store details");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 7, (time_t) context_data->priority);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind first_time_t to store context details");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 8, (time_t) context_data->first_time_t);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind first_time_t to store context details");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 9, (time_t) context_data->last_time_t);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind last_time_t to store context details");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int(res, 10, (time_t) context_data->deleted);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind last_time_t to store context details");
         goto failed;
@@ -330,8 +404,8 @@ failed:
 
 // Delete a context
 
-#define CTX_DELETE_CONTEXT "DELETE FROM context WHERE context_name = @context;"
-int ctx_delete_context(VERSIONED_CONTEXT_DATA *context_data)
+#define CTX_DELETE_CONTEXT "DELETE FROM context WHERE host_id = @host_id AND id = @context;"
+int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
     int rc, rc_stored = 1;
     sqlite3_stmt *res = NULL;
@@ -339,15 +413,23 @@ int ctx_delete_context(VERSIONED_CONTEXT_DATA *context_data)
     if (unlikely(!context_data || !context_data->id))
         return 0;
 
+
     rc = sqlite3_prepare_v2(db_context_meta, CTX_DELETE_CONTEXT, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to delete context");
         return 1;
     }
 
-    rc = sqlite3_bind_text(res, 1, context_data->id, -1, SQLITE_STATIC);
+	rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context for data deletion");
+        error_report("Failed to bind host_id to delete context data");
+        goto failed;
+    }
+
+
+    rc = sqlite3_bind_text(res, 2, context_data->id, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind context id for data deletion");
         goto failed;
     }
 
@@ -394,7 +476,7 @@ static void dict_ctx_get_chart_list_cb(SQL_CHART_DATA *chart_data, void *data)
 
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(chart_data->chart_id, uuid_str);
-    info("OK GOT %s ID = %s, context = %s", uuid_str, chart_data->id, chart_data->context);
+    info("OK GOT %s ID = %s NAME = %s CONTEXT = %s", uuid_str, chart_data->id, chart_data->name, chart_data->context);
     ctx_get_label_list(&chart_data->chart_id, dict_ctx_get_label_list_cb, NULL);
     ctx_get_dimension_list(&chart_data->chart_id, dict_ctx_get_dimension_list_cb, NULL);
 }
@@ -402,22 +484,64 @@ static void dict_ctx_get_chart_list_cb(SQL_CHART_DATA *chart_data, void *data)
 static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, void *data)
 {
     (void)data;
-    info("   Context %s from %lu to %lu", context_data->id, context_data->first_time_t, context_data->last_time_t);
+    info("   Context id = %s "
+         "version = %lu "
+         "title = %s "
+         "chart_type = %s "
+         "units = %s "
+         "priority = %lu "
+         "first time = %lu "
+         "last time = %lu "
+         "deleted = %d",
+         context_data->id,
+         context_data->version,
+         context_data->title,
+         context_data->chart_type,
+         context_data->units,
+         context_data->priority,
+         context_data->first_time_t,
+         context_data->last_time_t,
+         context_data->deleted);
 }
 
+static int localhost_uuid_cb(void *data, int argc, char **argv, char **column)
+{
+    uuid_t *uuid = data;
+    UNUSED(argc);
+    UNUSED(column);
+    uuid_copy(*uuid, * (uuid_t *) argv[0]);
+    return 0;
+}
 
 int ctx_unittest(void)
 {
+    uuid_t host_uuid;
+    char *err_msg;
+
     sql_init_context_database(1);
-    ctx_get_chart_list(NULL, dict_ctx_get_chart_list_cb, NULL);
+
+    int rc = sqlite3_exec(db_context_meta, "SELECT host_id FROM meta.host WHERE hops = 0;", localhost_uuid_cb, (void *) &host_uuid, &err_msg);
+    if (rc != SQLITE_OK) {
+        info("Failed to discover localhost UUID rc = %d -- %s", rc, err_msg);
+        sqlite3_free(err_msg);
+    }
+
+   ctx_get_chart_list(&host_uuid, dict_ctx_get_chart_list_cb, NULL);
 
     // Store a context
     VERSIONED_CONTEXT_DATA context_data;
 
-    context_data.id = strdupz("TestContext1");
+    context_data.id = strdupz("cpu.cpu");
+    context_data.title = strdupz("TestContextTitle");
+    context_data.units= strdupz("TestContextUnits");
+    context_data.chart_type = strdupz("TestContextChartType");
+    context_data.priority = 50000;
+    context_data.deleted = 0;
     context_data.first_time_t = 1000;
     context_data.last_time_t  = 1001;
-    if (likely(!ctx_store_context(&context_data)))
+    context_data.version  = now_realtime_usec();
+
+    if (likely(!ctx_store_context(&host_uuid, &context_data)))
         info("Entry %s inserted", context_data.id);
     else
         info("Entry %s not inserted", context_data.id);
@@ -425,26 +549,29 @@ int ctx_unittest(void)
     // This will change end time
     context_data.first_time_t = 1000;
     context_data.last_time_t  = 2001;
-    if (likely(!ctx_update_context(&context_data)))
+    if (likely(!ctx_update_context(&host_uuid, &context_data)))
         info("Entry %s updated", context_data.id);
     else
         info("Entry %s not updated", context_data.id);
+    info("List context start after insert");
+    ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
+    info("List context end after insert");
 
     // This will change start time
     context_data.first_time_t = 2000;
     context_data.last_time_t  = 2001;
-    if (likely(!ctx_update_context(&context_data)))
+    if (likely(!ctx_update_context(&host_uuid, &context_data)))
         info("Entry %s updated", context_data.id);
     else
         info("Entry %s not updated", context_data.id);
 
     // This will list one entry
     info("List context start after insert");
-    ctx_get_context_list(NULL, dict_ctx_get_context_list_cb, NULL);
+    ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
     info("List context end after insert");
 
     // This will delete the entry
-    if (likely(!ctx_delete_context(&context_data)))
+    if (likely(!ctx_delete_context(&host_uuid, &context_data)))
         info("Entry %s deleted", context_data.id);
     else
         info("Entry %s not deleted", context_data.id);
@@ -453,10 +580,11 @@ int ctx_unittest(void)
 
     // The list should be empty
     info("List context start after delete");
-    ctx_get_context_list(NULL, dict_ctx_get_context_list_cb, NULL);
+    ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
     info("List context end after delete");
 
     sql_close_context_database();
 
     return 0;
 }
+
