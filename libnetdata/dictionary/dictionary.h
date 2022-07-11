@@ -222,7 +222,7 @@ extern int dictionary_unittest(size_t entries);
 
 typedef struct string STRING;
 extern STRING *string_strdupz(const char *str);
-extern STRING *string_clone(STRING *string);
+extern STRING *string_dup(STRING *string);
 extern void string_freez(STRING *string);
 extern size_t string_length(STRING *string);
 extern const char *string2str(STRING *string) NEVERNULL;

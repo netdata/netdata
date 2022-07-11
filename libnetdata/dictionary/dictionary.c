@@ -1378,7 +1378,7 @@ static void *get_thread_static_string_entry(const char *name) {
 }
 #endif
 
-static DICTIONARY string_dictionary = {
+DICTIONARY string_dictionary = {
 #ifdef DICTIONARY_WITH_AVL
     .values_index = {
         .root = NULL,
@@ -1393,7 +1393,7 @@ static DICTIONARY string_dictionary = {
 
 static netdata_mutex_t string_mutex = NETDATA_MUTEX_INITIALIZER;
 
-STRING *string_clone(STRING *string) {
+STRING *string_dup(STRING *string) {
     if(unlikely(!string)) return NULL;
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
@@ -2111,6 +2111,78 @@ int dictionary_unittest(size_t entries) {
         dictionary_acquired_item_release(dict, (DICTIONARY_ITEM *)nv);
         nv = NULL;
         dict = NULL;
+    }
+
+    // check string
+    {
+        fprintf(stderr, "\nChecking strings...\n");
+
+        STRING *s1 = string_strdupz("hello");
+        STRING *s2 = string_strdupz("hello");
+        if(s1 != s2) {
+            errors++;
+            fprintf(stderr, "ERROR: duplicating strings are not deduplicated\n");
+        }
+        else
+            fprintf(stderr, "OK: duplicating string are deduplicated\n");
+
+        STRING *s3 = string_dup(s1);
+        if(s3 != s1) {
+            errors++;
+            fprintf(stderr, "ERROR: cloning strings are not deduplicated\n");
+        }
+        else
+            fprintf(stderr, "OK: cloning string are deduplicated\n");
+
+        STRING_ENTRY *se = (STRING_ENTRY *)s1;
+        if(se->refcount != 3) {
+            errors++;
+            fprintf(stderr, "ERROR: string refcount is not 3\n");
+        }
+        else
+            fprintf(stderr, "OK: string refcount is 3\n");
+
+        STRING *s4 = string_strdupz("world");
+        if(s4 == s1) {
+            errors++;
+            fprintf(stderr, "ERROR: string is sharing pointers on different strings\n");
+        }
+        else
+            fprintf(stderr, "OK: string is properly handling different strings\n");
+
+        usec_t start_ut, end_ut;
+        STRING **strings = mallocz(entries * sizeof(STRING *));
+
+        start_ut = now_realtime_usec();
+        for(size_t i = 0; i < entries ;i++) {
+            strings[i] = string_strdupz(names[i]);
+        }
+        end_ut = now_realtime_usec();
+        fprintf(stderr, "Created %zu strings in %llu usecs\n", entries, end_ut - start_ut);
+
+        start_ut = now_realtime_usec();
+        for(size_t i = 0; i < entries ;i++) {
+            strings[i] = string_dup(strings[i]);
+        }
+        end_ut = now_realtime_usec();
+        fprintf(stderr, "Cloned %zu strings in %llu usecs\n", entries, end_ut - start_ut);
+
+        start_ut = now_realtime_usec();
+        for(size_t i = 0; i < entries ;i++) {
+            string_freez(strings[i]);
+            string_freez(strings[i]);
+        }
+        end_ut = now_realtime_usec();
+        fprintf(stderr, "Freed %zu strings in %llu usecs\n", entries, end_ut - start_ut);
+
+        freez(strings);
+
+        if(dictionary_stats_entries(&string_dictionary) != 2) {
+            errors++;
+            fprintf(stderr, "ERROR: strings dictionary should have 2 items but it has %ld\n", dictionary_stats_entries(&string_dictionary));
+        }
+        else
+            fprintf(stderr, "OK: strings dictionary has 2 items\n");
     }
 
     dictionary_unittest_free_char_pp(names, entries);
