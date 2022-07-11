@@ -11,9 +11,9 @@ typedef struct rrdmetric_dictionary RRDMETRICS;
 static inline const char *rrdcontext_acquired_name(RRDCONTEXT_ACQUIRED *rca);
 static inline RRDINSTANCE *rrdinstance_acquired_value(RRDINSTANCE_ACQUIRED *ria);
 
-static void rrdinstance_has_been_updated(RRDINSTANCE *ri);
-static void rrdmetric_has_been_updated(RRDMETRIC *rm);
-static void rrdcontext_has_been_updated(RRDCONTEXT *rc);
+static void rrdmetric_has_been_updated(RRDMETRIC *rm, bool rrdmetrics_is_write_locked);
+static void rrdinstance_has_been_updated(RRDINSTANCE *ri, bool rrdinstances_is_write_locked, bool rrdmetrics_is_write_locked);
+static void rrdcontext_has_been_updated(RRDCONTEXT *rc, bool rrdinstances_is_write_locked);
 
 static void rrdcontext_release(RRDHOST *host, RRDCONTEXT_ACQUIRED *rca);
 static void rrdcontext_remove_rrdinstance(RRDINSTANCE *ri);
@@ -109,7 +109,7 @@ struct rrdcontext {
     RRDHOST *rrdhost;
 };
 
-static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
+static void rrdinstance_log(RRDINSTANCE *ri, const char *msg, bool rrdmetrics_is_write_locked) {
     char uuid[UUID_STR_LEN + 1];
 
     uuid_unparse(ri->uuid, uuid);
@@ -117,7 +117,7 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
     BUFFER *wb = buffer_create(1000);
 
     buffer_sprintf(wb,
-                   "RRDINSTANCE: %s id '%s' (host '%s'), uuid '%s', name '%s', context '%s', title '%s', units '%s', priority %zu, chart type '%s', update every %d, rrdset '%s', flags %s%s%s%s, rca %s, labels version %zu",
+                   "RRDINSTANCE: %s id '%s' (host '%s'), uuid '%s', name '%s', context '%s', title '%s', units '%s', priority %zu, chart type '%s', update every %d, rrdset '%s', flags %s%s%s%s, rca %s, labels version %zu, first_time_t %ld, last_time_t %ld",
                    msg,
                    string2str(ri->id),
                    ri->rrdhost?ri->rrdhost->hostname:"NONE",
@@ -135,7 +135,9 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
                    ri->flags & RRDINSTANCE_FLAG_COLLECTED?"COLLECTED ":"",
                    ri->flags & RRDINSTANCE_FLAG_OWN_LABELS?"OWNLABELS ":"",
                    ri->rca ? "YES": "NO",
-                   ri->rrdlabels_version
+                   ri->rrdlabels_version,
+                   ri->first_time_t,
+                   ri->last_time_t
                    );
 
     buffer_strcat(wb, ", labels: { ");
@@ -152,7 +154,7 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
     if(ri->rrdmetrics) {
         RRDMETRIC *v;
         int i = 0;
-        dfe_start_read((DICTIONARY *)ri->rrdmetrics, v) {
+        dfe_start_rw((DICTIONARY *)ri->rrdmetrics, v, (rrdmetrics_is_write_locked)?'u':'r') {
             buffer_sprintf(wb, "%s%s", i?",":"", v_name);
             i++;
         }
@@ -187,14 +189,6 @@ static inline void rrdinstance_release(RRDINSTANCE_ACQUIRED *ria) {
     dictionary_acquired_item_release((DICTIONARY *)ri->rrdhost->rrdinstances, (DICTIONARY_ITEM *)ria);
 }
 
-static inline void rrdinstance_register_metric(RRDINSTANCE *ri, RRDMETRIC *rm) {
-    dictionary_set((DICTIONARY *)ri->rrdmetrics, string2str(rm->id), rm, sizeof(*rm));
-}
-
-static inline void rrdinstance_unregister_metric(RRDINSTANCE *ri, RRDMETRIC *rm) {
-    dictionary_del((DICTIONARY *)ri->rrdmetrics, string2str(rm->id));
-}
-
 // ----------------------------------------------------------------------------
 // RRDMETRIC
 
@@ -205,10 +199,53 @@ static void rrdmetric_free(RRDMETRIC *rm) {
 
 static void rrdmetric_update_retention(RRDMETRIC *rm) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(rm->ria);
-    time_t first_time_t, last_time_t;
-    rrdeng_metric_retention_by_uuid(ri->rrdhost->storage_instance[0], &rm->uuid, &first_time_t, &last_time_t);
+    time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
+
+    if(rm->rd) {
+        min_first_time_t = rrddim_first_entry_t(rm->rd);
+        max_last_time_t = rrddim_last_entry_t(rm->rd);
+    }
+    else {
+        for (int tier = 0; tier < storage_tiers; tier++) {
+            if(!ri->rrdhost->storage_instance[tier]) continue;
+
+            time_t first_time_t, last_time_t;
+            if (rrdeng_metric_retention_by_uuid(ri->rrdhost->storage_instance[tier], &rm->uuid, &first_time_t, &last_time_t) == 0) {
+                if (first_time_t < min_first_time_t)
+                    min_first_time_t = first_time_t;
+
+                if (last_time_t > max_last_time_t)
+                    max_last_time_t = last_time_t;
+            }
+        }
+    }
+
+    if(min_first_time_t == LONG_MAX)
+        min_first_time_t = 0;
+
+    if(min_first_time_t > max_last_time_t) {
+        internal_error(true, "RRDMETRIC: retention of '%s' is flipped", string2str(rm->id));
+        time_t tmp = min_first_time_t;
+        min_first_time_t = max_last_time_t;
+        max_last_time_t = tmp;
+    }
+
+    // check if retention changed
+
+   if (min_first_time_t != rm->first_time_t) {
+        rm->first_time_t = min_first_time_t;
+        rm->flags |= RRDMETRIC_FLAG_UPDATED;
+    }
+
+    if (max_last_time_t != rm->last_time_t) {
+        rm->last_time_t = max_last_time_t;
+        rm->flags |= RRDMETRIC_FLAG_UPDATED;
+    }
+
+    internal_error(true, "RRDMETRIC: '%s' of '%s' retention from %ld to %ld", string2str(rm->id), rrdinstance_acquired_name(rm->ria), rm->first_time_t, rm->last_time_t);
 }
 
+// called when this rrdmetric is inserted to the rrdmetrics dictionary of a rrdinstance
 static void rrdmetric_insert_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDINSTANCE *ri = (RRDINSTANCE *)data;
@@ -223,13 +260,14 @@ static void rrdmetric_insert_callback(const char *id, void *value, void *data) {
     // acquire the instance
     rm->ria = rrdinstance_dup(rm->ria);
 
-    // register to the instance
-    rrdinstance_register_metric(ri, rm);
-
     // update its retention
     rrdmetric_update_retention(rm);
+
+    // propagate the changes
+    rrdmetric_has_been_updated(rm, true);
 }
 
+// called when this rrdmetric is deleted from the rrdmetrics dictionary of a rrdinstance
 static void rrdmetric_delete_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDINSTANCE *ri = (RRDINSTANCE *)data;
@@ -238,8 +276,8 @@ static void rrdmetric_delete_callback(const char *id, void *value, void *data) {
     // update its retention
     rrdmetric_update_retention(rm);
 
-    // unregister from the instance
-    rrdinstance_unregister_metric(ri, rm);
+    // propagate the changes
+    rrdmetric_has_been_updated(rm, true);
 
     // release the instance
     rrdinstance_release(rm->ria);
@@ -248,14 +286,12 @@ static void rrdmetric_delete_callback(const char *id, void *value, void *data) {
     rrdmetric_free(rm);
 }
 
+// called when the same rrdmetric is inserted again to the rrdmetrics dictionary of a rrdinstance
 static void rrdmetric_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
     (void)id;
-    RRDINSTANCE *ri = (RRDINSTANCE *)data;
-    (void)ri;
-
+    RRDINSTANCE *ri = (RRDINSTANCE *)data; (void)ri;
     RRDMETRIC *rm = (RRDMETRIC *)oldv;
     RRDMETRIC *rm_new = (RRDMETRIC *)newv;
-    bool changed = false;
 
     if(uuid_compare(rm->uuid, rm_new->uuid) != 0) {
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
@@ -271,27 +307,49 @@ static void rrdmetric_conflict_callback(const char *id, void *oldv, void *newv, 
         STRING *old = rm->name;
         rm->name = string_dup(rm_new->name);
         string_freez(old);
-        changed = true;
+        rm->flags |= RRDMETRIC_FLAG_UPDATED;
     }
 
     if(rm->update_every != rm_new->update_every) {
         rm->update_every = rm_new->update_every;
-        changed = true;
+        rm->flags |= RRDMETRIC_FLAG_UPDATED;
     }
 
-    if(changed) {
-        rm->flags |= RRDINSTANCE_FLAG_UPDATED;
-        rrdmetric_has_been_updated(rm);
+    if(!rm->first_time_t || (rm_new->first_time_t && rm_new->first_time_t < rm->first_time_t)) {
+        rm->first_time_t = rm_new->first_time_t;
+        rm->flags |= RRDMETRIC_FLAG_UPDATED;
+    }
+
+    if(!rm->last_time_t || (rm_new->last_time_t && rm_new->last_time_t > rm->last_time_t)) {
+        rm->last_time_t = rm_new->last_time_t;
+        rm->flags |= RRDMETRIC_FLAG_UPDATED;
+    }
+
+    rm->flags |= rm_new->flags;
+
+    if(rm->flags & RRDMETRIC_FLAG_DELETED) {
+        rm->flags &= ~RRDMETRIC_FLAG_DELETED;
+        rm->flags |= RRDMETRIC_FLAG_UPDATED;
+    }
+
+    if(rm->flags & RRDMETRIC_FLAG_UPDATED) {
+        rrdmetric_update_retention(rm);
+        rrdmetric_has_been_updated(rm, true);
     }
 
     rrdmetric_free(rm_new);
 }
 
-static void rrdmetric_has_been_updated(RRDMETRIC *rm) {
+static void rrdmetric_has_been_updated(RRDMETRIC *rm, bool rrdmetrics_is_write_locked) {
     if(!rm->ria)
         fatal("RRDMETRIC: '%s' does not have an RRDINSTANCE_ACQUIRED", string2str(rm->id));
 
-    rrdinstance_has_been_updated(rrdinstance_acquired_value(rm->ria));
+    if(!(rm->flags & RRDMETRIC_FLAG_UPDATED))
+        return;
+
+    rrdinstance_has_been_updated(rrdinstance_acquired_value(rm->ria), false, rrdmetrics_is_write_locked);
+
+    rm->flags &= ~RRDMETRIC_FLAG_UPDATED;
 }
 
 static inline RRDMETRIC *rrdmetric_acquired_value(RRDMETRIC_ACQUIRED *rma) {
@@ -352,7 +410,8 @@ static inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
     if(rm->flags & RRDMETRIC_FLAG_COLLECTED)
         rm->flags &= ~RRDMETRIC_FLAG_COLLECTED;
 
-    rrdmetric_has_been_updated(rm);
+    rm->rd = NULL;
+    rrdmetric_has_been_updated(rm, false);
     RRDINSTANCE *ri = rrdinstance_acquired_value(rm->ria);
     rrdmetric_release(ri, rd->rrdmetric);
     rd->rrdmetric = NULL;
@@ -456,12 +515,12 @@ static void rrdinstance_insert_callback(const char *id, void *value, void *data)
 
     netdata_rwlock_init(&ri->rwlock);
 
-    rrdinstance_log(ri, "INSERT");
+    rrdinstance_log(ri, "INSERT", false);
 
     rrdcontext_from_rrdinstance(ri);
 
     ri->flags |= RRDINSTANCE_FLAG_UPDATED;
-    rrdinstance_has_been_updated(ri);
+    rrdinstance_has_been_updated(ri, true, false);
 }
 
 static void rrdinstance_delete_callback(const char *id, void *value, void *data) {
@@ -469,7 +528,7 @@ static void rrdinstance_delete_callback(const char *id, void *value, void *data)
     RRDHOST *host = (RRDHOST *)data; (void)host;
     RRDINSTANCE *ri = (RRDINSTANCE *)value;
 
-    rrdinstance_log(ri, "DELETE");
+    rrdinstance_log(ri, "DELETE", false);
     rrdinstance_free(ri);
 }
 
@@ -567,7 +626,7 @@ static void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv
         changed = true;
     }
 
-    rrdinstance_log(ri, "CONFLICT");
+    rrdinstance_log(ri, "CONFLICT", false);
 
     if(update_rrdcontext) {
         rrdcontext_from_rrdinstance(ri);
@@ -580,7 +639,7 @@ static void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv
 
     if(changed) {
         ri->flags |= RRDINSTANCE_FLAG_UPDATED;
-        rrdinstance_has_been_updated(ri);
+        rrdinstance_has_been_updated(ri, true, false);
     }
 
     // free the new one
@@ -604,13 +663,47 @@ void rrdhost_destroy_rrdinstances(RRDHOST *host) {
     host->rrdinstances = NULL;
 }
 
-static void rrdinstance_has_been_updated(RRDINSTANCE *ri) {
+static void rrdinstance_has_been_updated(RRDINSTANCE *ri, bool rrdinstances_is_write_locked, bool rrdmetrics_is_write_locked) {
     if(!ri->rca)
         fatal("RRDINSTANCE: '%s' does not have an RRDCONTEXT_ACQUIRED", string2str(ri->id));
 
-    rrdinstance_log(ri, "UPDATED");
+    time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
+    RRDMETRIC *rm;
+    dfe_start_rw((DICTIONARY *)ri->rrdmetrics, rm, (rrdmetrics_is_write_locked)?'u':'r') {
+        if(rm->first_time_t == 0 || rm->last_time_t == 0) continue;
 
-    rrdcontext_has_been_updated(rrdcontext_acquired_value(ri->rca));
+        if(rm->first_time_t < min_first_time_t)
+            min_first_time_t = rm->first_time_t;
+
+        if(rm->last_time_t > max_last_time_t)
+            max_last_time_t = rm->last_time_t;
+    }
+    dfe_done(rm);
+
+    if(min_first_time_t == LONG_MAX)
+        min_first_time_t = 0;
+
+    if(min_first_time_t == 0 && max_last_time_t == 0) {
+        // TODO this does not have any retention
+        ri->flags |= RRDINSTANCE_FLAG_UPDATED;
+    }
+    else {
+        if(ri->first_time_t != min_first_time_t) {
+            ri->first_time_t = min_first_time_t;
+            ri->flags |= RRDINSTANCE_FLAG_UPDATED;
+        }
+
+        if(ri->last_time_t != max_last_time_t) {
+            ri->last_time_t = max_last_time_t;
+            ri->flags |= RRDINSTANCE_FLAG_UPDATED;
+        }
+    }
+
+    if(ri->flags & RRDINSTANCE_FLAG_UPDATED) {
+        rrdinstance_log(ri, "UPDATED", rrdmetrics_is_write_locked);
+        rrdcontext_has_been_updated(rrdcontext_acquired_value(ri->rca), rrdinstances_is_write_locked);
+        ri->flags &= ~RRDINSTANCE_FLAG_UPDATED;
+    }
 }
 
 static inline void rrdinstance_from_rrdset(RRDSET *st) {
@@ -676,7 +769,7 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
 
     netdata_rwlock_unlock(&ri->rwlock);
 
-    rrdinstance_has_been_updated(ri);
+    rrdinstance_has_been_updated(ri, false, false);
     rrdinstance_release(st->rrdinstance);
     st->rrdinstance = NULL;
 
@@ -931,8 +1024,9 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
     host->rrdcontexts = NULL;
 }
 
-static void rrdcontext_has_been_updated(RRDCONTEXT *rc) {
-    ;
+static void rrdcontext_has_been_updated(RRDCONTEXT *rc, bool rrdinstances_is_write_locked) {
+    (void)rrdinstances_is_write_locked;
+    rc->flags |= RRDCONTEXT_FLAG_UPDATED;
 }
 
 static inline const char *rrdcontext_acquired_name(RRDCONTEXT_ACQUIRED *rca) {
@@ -1034,10 +1128,12 @@ static RRDCONTEXT_ACQUIRED *rrdcontext_from_rrdset(RRDSET *st) {
 
 void rrdcontext_updated_rrddim(RRDDIM *rd) {
     rrdmetric_from_rrddim(rd);
+    ;
 }
 
 void rrdcontext_removed_rrddim(RRDDIM *rd) {
     rrdmetric_rrddim_is_freed(rd);
+    ;
 }
 
 void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {

@@ -303,6 +303,8 @@ static inline size_t dictionary_lock_free(DICTIONARY *dict) {
 }
 
 static void dictionary_lock(DICTIONARY *dict, char rw) {
+    if(rw == 'u' || rw == 'U') return;
+
     if(rw == 'r' || rw == 'R') {
         // read lock
         __atomic_add_fetch(&dict->readers, 1, __ATOMIC_RELAXED);
@@ -320,7 +322,7 @@ static void dictionary_lock(DICTIONARY *dict, char rw) {
         netdata_rwlock_rdlock(&dict->rwlock);
 
         if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
-            internal_error(true, "DICTIONARY: left-over exclusive access to dictionary found");
+            internal_error(true, "DICTIONARY: left-over exclusive access to dictionary created by %s (%zu@%s) found", dict->creation_function, dict->creation_line, dict->creation_file);
             dict->flags &= ~DICTIONARY_FLAG_EXCLUSIVE_ACCESS;
         }
     }
@@ -333,6 +335,8 @@ static void dictionary_lock(DICTIONARY *dict, char rw) {
 }
 
 static void dictionary_unlock(DICTIONARY *dict, char rw) {
+    if(rw == 'u' || rw == 'U') return;
+
     if(rw == 'r' || rw == 'R') {
         // read unlock
         __atomic_sub_fetch(&dict->readers, 1, __ATOMIC_RELAXED);
@@ -542,7 +546,7 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
 }
 
 static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
-    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: inserting to the index without exclusive access to the dictionary.");
+    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: inserting item from the index without exclusive access to the dictionary created by %s() (%zu@%s)", dict->creation_function, dict->creation_line, dict->creation_file);
 
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&dict->JudyHSArray, (void *)name, name_len, &J_Error);
@@ -562,7 +566,7 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char 
 }
 
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *nv) {
-    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: deleting from the index without exclusive access to the dictionary.");
+    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: deleting item from the index without exclusive access to the dictionary created by %s() (%zu@%s)", dict->creation_function, dict->creation_line, dict->creation_file);
 
     (void)nv;
     if(unlikely(!dict->JudyHSArray)) return 0;
@@ -617,7 +621,7 @@ static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, void *
 // linked list management
 
 static inline void linkedlist_namevalue_link_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
-    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: adding item to the linked-list without exclusive access to the dictionary.");
+    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: adding item to the linked-list without exclusive access to the dictionary created by %s() (%zu@%s)", dict->creation_function, dict->creation_line, dict->creation_file);
 
     if (unlikely(!dict->first_item)) {
         // we are the only ones here
@@ -646,7 +650,7 @@ static inline void linkedlist_namevalue_link_unsafe(DICTIONARY *dict, NAME_VALUE
 }
 
 static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv) {
-    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: removing item from the linked-list without exclusive access to the dictionary.");
+    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: removing item from the linked-list without exclusive access to the dictionary created by %s() (%zu@%s)", dict->creation_function, dict->creation_line, dict->creation_file);
 
     if(nv->next) nv->next->prev = nv->prev;
     if(nv->prev) nv->prev->next = nv->next;
