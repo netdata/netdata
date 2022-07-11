@@ -573,7 +573,7 @@ Will become:
 info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site https://netdata.cloud/
 ```
 
-Note: variables are case-sensitive.
+> Please note that variable names are case sensitive.
 
 ## Expressions
 
