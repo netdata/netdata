@@ -577,6 +577,9 @@ int ctx_unittest(void)
         info("Entry %s not deleted", context_data.id);
 
     freez((void *)context_data.id);
+    freez((void *)context_data.title);
+    freez((void *)context_data.chart_type);
+    freez((void *)context_data.id);
 
     // The list should be empty
     info("List context start after delete");
