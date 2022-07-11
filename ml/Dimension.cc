@@ -96,7 +96,14 @@ MLResult Dimension::trainModel() {
                                      SamplingRatio, Cfg.RandomNums);
     {
         std::lock_guard<std::mutex> Lock(Mutex);
+
+        KMeans KM;
         KM.train(SB, Cfg.MaxKMeansIters);
+
+        if (Models.size() > 4)
+            Models.pop_front();
+
+        Models.push_back(KM);
     }
 
     Trained = true;
@@ -138,7 +145,7 @@ CalculatedNumber Dimension::computeAnomalyScore(SamplesBuffer &SB) {
     if (!Lock.try_lock())
         return std::numeric_limits<CalculatedNumber>::quiet_NaN();
 
-    return isTrained() ? KM.anomalyScore(SB) : 0.0;
+    return isTrained() ? Models.back().anomalyScore(SB) : 0.0;
 }
 
 std::pair<MLResult, bool> Dimension::predict() {

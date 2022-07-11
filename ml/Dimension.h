@@ -103,7 +103,7 @@ public:
     unsigned AnomalyBitCounter;
 
     std::vector<CalculatedNumber> CNs;
-    KMeans KM;
+    std::deque<KMeans> Models;
     std::mutex Mutex;
 };
 
