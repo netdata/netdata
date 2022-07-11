@@ -64,6 +64,7 @@ void netdata_cleanup_and_exit(int ret) {
             rrdeng_exit(multidb_ctx[tier]);
 #endif
     }
+    sql_close_context_database();
     sql_close_database();
 
     // unlink the pid

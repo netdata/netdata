@@ -59,5 +59,6 @@ extern int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_
 extern int ctx_delete_context(uuid_t *host_id, VERSIONED_CONTEXT_DATA *context_data);
 
 extern int sql_init_context_database(int memory);
+extern void sql_close_context_database(void);
 extern int ctx_unittest(void);
 #endif //NETDATA_SQLITE_CONTEXT_H

@@ -750,7 +750,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
     }
 
-    if (unlikely(sql_init_context_database(1))) {
+    if (unlikely(sql_init_context_database(0))) {
         error_report("Failed to initialize context metadata database");
     }
 
