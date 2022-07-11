@@ -65,7 +65,7 @@ CPU required by the agent to query longer timeframes.
 
 Since Netdata Agents usually run on the edge, on production systems, Netdata Agent **parents** should be considered.
 When having a [**parent - child**](/docs/metrics-storage-management/how-streaming-works.md) setup, the child (the
-Netdata Agent running on a production system) delegates all its functions, including longer metrics retention and
+Netdata Agent running on a production system) delegates all of its functions, including longer metrics retention and
 querying, to the parent node that can dedicate more resources to this task. A single Netdata Agent parent can centralize
 multiple children Netdata Agents (dozens, hundreds, or even thousands depending on its available resources).
 
@@ -81,11 +81,11 @@ There are 2 settings for you to tweak:
 By default `[db].update every = 1` and `[db].retention = 3600`. This gives you an hour of data with per second updates.
 
 If you set `[db].update every = 2` and `[db].retention = 1800`, you will still have an hour of data, but collected once
-every 2 seconds. This will **cut in half** both CPU and RAM resources consumed by Netdata. Of course experiment a bit.
+every 2 seconds. This will **cut in half** both CPU and RAM resources consumed by Netdata. Of course experiment a bit to find the right setting.
 On very weak devices you might have to use `[db].update every = 5` and `[db].retention = 720` (still 1 hour of data, but
 1/5 of the CPU and RAM resources).
 
-You can also disable [data collection plugins](/collectors/README.md) you don't need. Disabling such plugins will also
+You can also disable [data collection plugins](/collectors/README.md) that you don't need. Disabling such plugins will also
 free both CPU and RAM resources.
 
 ## Memory optimizations
@@ -94,26 +94,26 @@ free both CPU and RAM resources.
 
 KSM performs memory deduplication by scanning through main memory for physical pages that have identical content, and
 identifies the virtual pages that are mapped to those physical pages. It leaves one page unchanged, and re-maps each
-duplicate page to point to the same physical page. Netdata offers all its in-memory database to kernel for
+duplicate page to point to the same physical page. Netdata offers all of its in-memory database to kernel for
 deduplication.
 
-In the past KSM has been criticized for consuming a lot of CPU resources. This is true when KSM is used for
+In the past, KSM has been criticized for consuming a lot of CPU resources. This is true when KSM is used for
 deduplicating certain applications, but it is not true for Netdata. Agent's memory is written very infrequently
 (if you have 24 hours of metrics in Netdata, each byte at the in-memory database will be updated just once per day). KSM
 is a solution that will provide 60+% memory savings to Netdata.
 
 ### Enable KSM in kernel
 
-You need to run a kernel compiled with:
+To enable KSM in kernel, you need to run a kernel compiled with the following:
 
 ```sh
 CONFIG_KSM=y
 ```
 
-When KSM is enabled at the kernel is just available for the user to enable it.
+When KSM is enabled at the kernel, it is just available for the user to enable it.
 
-So, if you build a kernel with `CONFIG_KSM=y` you will just get a few files in `/sys/kernel/mm/ksm`. Nothing else
-happens. There is no performance penalty (apart I guess from the memory this code occupies into the kernel).
+If you build a kernel with `CONFIG_KSM=y`, you will just get a few files in `/sys/kernel/mm/ksm`. Nothing else
+happens. There is no performance penalty (apart from the memory this code occupies into the kernel).
 
 The files that `CONFIG_KSM=y` offers include:
 
@@ -122,18 +122,18 @@ The files that `CONFIG_KSM=y` offers include:
 - `/sys/kernel/mm/ksm/pages_to_scan`, by default `100`. The amount of pages ksmd will evaluate on each run.
 
 So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources
-he/she is willing `ksmd` to use.
+they are willing to have used by `ksmd`.
 
 ### Run `ksmd` kernel daemon
 
-To activate / run `ksmd` you need to run:
+To activate / run `ksmd,` you need to run the following:
 
 ```sh
 echo 1 >/sys/kernel/mm/ksm/run
 echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs
 ```
 
-With these settings ksmd does not even appear in the running process list (it will run once per second and evaluate 100
+With these settings, ksmd does not even appear in the running process list (it will run once per second and evaluate 100
 pages for de-duplication).
 
 Put the above lines in your boot sequence (`/etc/rc.local` or equivalent) to have `ksmd` run at boot.
