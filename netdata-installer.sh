@@ -367,9 +367,6 @@ while [ -n "${1}" ]; do
     "--build-json-c")
       NETDATA_BUILD_JSON_C=1
       ;;
-    "--build-judy")
-      NETDATA_BUILD_JUDY=1
-      ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
@@ -657,98 +654,6 @@ bundle_protobuf() {
 }
 
 bundle_protobuf
-
-# -----------------------------------------------------------------------------
-
-build_judy() {
-  env_cmd=''
-  libtoolize="libtoolize"
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
-  fi
-
-  if [ "$(uname)" = "Darwin" ]; then
-    libtoolize="glibtoolize"
-  fi
-
-  cd "${1}" > /dev/null || return 1
-  if run eval "${env_cmd} ${libtoolize} --force --copy" &&
-    run eval "${env_cmd} aclocal" &&
-    run eval "${env_cmd} autoheader" &&
-    run eval "${env_cmd} automake --add-missing --force --copy --include-deps" &&
-    run eval "${env_cmd} autoconf" &&
-    run eval "${env_cmd} ./configure" &&
-    run eval "${env_cmd} ${make} ${MAKEOPTS} -C src" &&
-    run eval "${env_cmd} ar -r src/libJudy.a src/Judy*/*.o"; then
-    cd - > /dev/null || return 1
-  else
-    cd - > /dev/null || return 1
-    return 1
-  fi
-}
-
-copy_judy() {
-  target_dir="${PWD}/externaldeps/libJudy"
-
-  run mkdir -p "${target_dir}" || return 1
-
-  run cp "${1}/src/libJudy.a" "${target_dir}/libJudy.a" || return 1
-  run cp "${1}/src/Judy.h" "${target_dir}/Judy.h" || return 1
-}
-
-bundle_judy() {
-  # If --build-judy flag or no Judy on the system and we're building the dbengine, bundle our own libJudy.
-  # shellcheck disable=SC2235,SC2030,SC2031
-  if [ -n "${NETDATA_DISABLE_DBENGINE}" ] || ([ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ]); then
-    return 0
-  elif [ -n "${NETDATA_BUILD_JUDY}" ]; then
-    progress "User requested bundling of libJudy, building it now"
-  elif [ ! -e /usr/include/Judy.h ]; then
-    progress "/usr/include/Judy.h does not exist, but we need libJudy, building our own copy"
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libJudy."
-
-  progress "Prepare libJudy"
-
-  JUDY_PACKAGE_VERSION="$(cat packaging/judy.version)"
-
-  tmp="$(mktemp -d -t netdata-judy-XXXXXX)"
-  JUDY_PACKAGE_BASENAME="v${JUDY_PACKAGE_VERSION}.tar.gz"
-
-  if fetch_and_verify "judy" \
-    "https://github.com/netdata/libjudy/archive/${JUDY_PACKAGE_BASENAME}" \
-    "${JUDY_PACKAGE_BASENAME}" \
-    "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_JUDY}"; then
-    if run tar --no-same-owner -xf "${tmp}/${JUDY_PACKAGE_BASENAME}" -C "${tmp}" &&
-      build_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
-      copy_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
-      rm -rf "${tmp}"; then
-      run_ok "libJudy built and prepared."
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-libJudy"
-    else
-      if [ -n "${NETDATA_BUILD_JUDY}" ]; then
-        [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-        fatal "failed to build libJudy." I0003
-      else
-        run_failed "Failed to build libJudy, dbengine support will be disabled."
-      fi
-    fi
-  else
-    if [ -n "${NETDATA_BUILD_JUDY}" ]; then
-      [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-      fatal "Unable to fetch sources for libJudy, which is required for this build of Netdata." I0004
-    else
-      run_failed "Unable to fetch sources for libJudy, which is required for this build of Netdata."
-    fi
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-bundle_judy
 
 # -----------------------------------------------------------------------------
 build_jsonc() {
