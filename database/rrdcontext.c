@@ -8,18 +8,25 @@ typedef struct rrdinstance RRDINSTANCE;
 typedef struct rrdcontext RRDCONTEXT;
 typedef struct rrdmetric_dictionary RRDMETRICS;
 
+static inline const char *rrdcontext_acquired_name(RRDCONTEXT_ACQUIRED *rca);
+static inline RRDINSTANCE *rrdinstance_acquired_value(RRDINSTANCE_ACQUIRED *ria);
+
 static void rrdinstance_has_been_updated(RRDINSTANCE *ri);
+static void rrdmetric_has_been_updated(RRDMETRIC *rm);
 static void rrdcontext_has_been_updated(RRDCONTEXT *rc);
 
 static void rrdcontext_release(RRDHOST *host, RRDCONTEXT_ACQUIRED *rca);
 static void rrdcontext_remove_rrdinstance(RRDINSTANCE *ri);
 static void rrdcontext_from_rrdinstance(RRDINSTANCE *ri);
 static RRDCONTEXT_ACQUIRED *rrdcontext_from_rrdset(RRDSET *st);
-static inline RRDCONTEXT *rrdcontext_acquired_value(RRDHOST *host, RRDCONTEXT_ACQUIRED *rca);
+static inline RRDCONTEXT *rrdcontext_acquired_value(RRDCONTEXT_ACQUIRED *rca);
 
 typedef enum {
-    RRDMETRIC_FLAG_NONE     = 0,
-    RRDMETRIC_FLAG_ARCHIVED = (1 << 0),
+    RRDMETRIC_FLAG_NONE       = 0,
+    RRDMETRIC_FLAG_DELETED    = (1 << 0),
+    RRDMETRIC_FLAG_COLLECTED  = (1 << 1),
+    RRDMETRIC_FLAG_UPDATED    = (1 << 2),
+    RRDMETRIC_FLAG_ARCHIVED   = (1 << 3),
 } RRDMETRIC_FLAGS;
 
 struct rrdmetric {
@@ -33,7 +40,7 @@ struct rrdmetric {
 
     RRDMETRIC_FLAGS flags;
 
-    RRDINSTANCE_ACQUIRED *rrdinstance;
+    RRDINSTANCE_ACQUIRED *ria;
 };
 
 typedef enum {
@@ -103,7 +110,7 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
     buffer_strcat(wb, ", labels: { ");
     if(ri->rrdlabels) {
         if(!rrdlabels_to_buffer(ri->rrdlabels, wb, "", "=", "'", ",", NULL, NULL, NULL, NULL))
-            buffer_strcat(wb, "NONE }");
+            buffer_strcat(wb, "EMPTY }");
         else
             buffer_strcat(wb, " }");
     }
@@ -119,6 +126,11 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
             i++;
         }
         dfe_done(v);
+
+        if(!i)
+            buffer_strcat(wb, "EMPTY }");
+        else
+            buffer_strcat(wb, " }");
     }
     else
         buffer_strcat(wb, "NONE }");
@@ -130,7 +142,12 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
 // ----------------------------------------------------------------------------
 // RRDMETRIC
 
-void rrdmetric_insert_callback(const char *id, void *value, void *data) {
+static void rrdmetric_free(RRDMETRIC *rm) {
+    string_freez(rm->id);
+    string_freez(rm->name);
+}
+
+static void rrdmetric_insert_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDINSTANCE *ri = (RRDINSTANCE *)data;
     RRDMETRIC *rm = (RRDMETRIC *)value;
@@ -140,30 +157,121 @@ void rrdmetric_insert_callback(const char *id, void *value, void *data) {
     // TODO what other initializations needed?
 }
 
-void rrdmetric_delete_callback(const char *id, void *value, void *data) {
+static void rrdmetric_delete_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDINSTANCE *ri = (RRDINSTANCE *)data;
     (void)ri;
 
     RRDMETRIC *rm = (RRDMETRIC *)value;
-    string_freez(rm->id);
-    string_freez(rm->name);
+    rrdmetric_free(rm);
 }
 
-void rrdmetric_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
+static void rrdmetric_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
     (void)id;
     RRDINSTANCE *ri = (RRDINSTANCE *)data;
     (void)ri;
 
-    RRDMETRIC *rm_old = (RRDMETRIC *)oldv;
+    RRDMETRIC *rm = (RRDMETRIC *)oldv;
     RRDMETRIC *rm_new = (RRDMETRIC *)newv;
+    bool changed = false;
 
-    // TODO what other needs to be done here?
+    if(uuid_compare(rm->uuid, rm_new->uuid) != 0) {
+        uuid_copy(rm->uuid, rm_new->uuid);
+        changed = true;
+    }
 
-    string_freez(rm_new->id);
-    string_freez(rm_new->name);
+    if(rm->id != rm_new->id)
+        fatal("RRDMETRIC: '%s' cannot change id to '%s'", string2str(rm->id), string2str(rm_new->id));
 
-    (void)rm_old;
+    if(rm->name != rm_new->name) {
+        STRING *old = rm->name;
+        rm->name = string_dup(rm_new->name);
+        string_freez(old);
+        changed = true;
+    }
+
+    if(rm->update_every != rm_new->update_every) {
+        rm->update_every = rm_new->update_every;
+        changed = true;
+    }
+
+    if(changed) {
+        rm->flags |= RRDINSTANCE_FLAG_UPDATED;
+        rrdmetric_has_been_updated(rm);
+    }
+
+    rrdmetric_free(rm_new);
+}
+
+static void rrdmetric_has_been_updated(RRDMETRIC *rm) {
+    if(!rm->ria)
+        fatal("RRDMETRIC: '%s' does not have an RRDINSTANCE_ACQUIRED", string2str(rm->id));
+
+    rrdinstance_has_been_updated(rrdinstance_acquired_value(rm->ria));
+}
+
+static inline RRDMETRIC *rrdmetric_acquired_value(RRDMETRIC_ACQUIRED *rma) {
+    return dictionary_acquired_item_value((DICTIONARY_ITEM *)rma);
+}
+
+static inline void rrdmetric_release(RRDINSTANCE *ri, RRDMETRIC_ACQUIRED *rma) {
+    dictionary_acquired_item_release((DICTIONARY *)ri->rrdmetrics, (DICTIONARY_ITEM *)rma);
+}
+
+static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
+    if(unlikely(!rd->rrdset))
+        fatal("RRDMETRIC: rrddim '%s' does not have a rrdset.", rd->id);
+
+    if(unlikely(!rd->rrdset->rrdhost))
+        fatal("RRDMETRIC: rrdset '%s' does not have a rrdhost", rd->rrdset->id);
+
+    if(unlikely(!rd->rrdset->rrdinstance))
+        fatal("RRDMETRIC: rrdset '%s' does not have a rrdinstance", rd->rrdset->id);
+
+    RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdinstance);
+
+    if(unlikely(!ri->rrdmetrics))
+        fatal("RRDMETRIC: rrdinstance '%s' does not have a rrdmetrics dictionary", string2str(ri->id));
+
+    RRDMETRIC tmp = {
+        .id = string_strdupz(rd->id),
+        .name = string_strdupz(rd->name),
+        .flags = RRDMETRIC_FLAG_NONE,
+        .update_every = rd->update_every,
+        .rd = rd,
+        .ria = rd->rrdset->rrdinstance,
+    };
+    uuid_copy(tmp.uuid, rd->metric_uuid);
+
+    RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)dictionary_set_and_acquire_item((DICTIONARY *)ri->rrdmetrics, string2str(tmp.id), &tmp, sizeof(tmp));
+
+    if(rd->rrdmetric && rd->rrdmetric != rma)
+        fatal("RRDMETRIC: dimension '%s' of chart '%s' changed rrdmetric!", rd->id, rd->rrdset->id);
+
+    rd->rrdmetric = rma;
+}
+
+static inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
+    if(unlikely(!rd->rrdmetric))
+        fatal("RRDINSTANCE: dimension '%s' is not linked to an RRDMETRIC", rd->id);
+
+    RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdmetric);
+
+    if(unlikely(!rm->ria))
+        fatal("RRDINSTANCE: '%s' is not linked to an RRDINSTANCE", string2str(rm->id));
+
+    if(unlikely(rm->rd != rd))
+        fatal("RRDMETRIC: '%s' is not linked to dimension '%s'", string2str(rm->id), rd->id);
+
+    rm->flags |= RRDMETRIC_FLAG_DELETED|RRDMETRIC_FLAG_UPDATED;
+
+    if(rm->flags & RRDMETRIC_FLAG_COLLECTED)
+        rm->flags &= ~RRDMETRIC_FLAG_COLLECTED;
+
+    rrdmetric_has_been_updated(rm);
+    RRDINSTANCE *ri = rrdinstance_acquired_value(rm->ria);
+    rrdmetric_release(ri, rd->rrdmetric);
+    rd->rrdmetric = NULL;
 }
 
 static void rrdmetrics_create(RRDINSTANCE *ri) {
@@ -174,6 +282,7 @@ static void rrdmetrics_create(RRDINSTANCE *ri) {
     dictionary_register_insert_callback(dict, rrdmetric_insert_callback, (void *)ri);
     dictionary_register_delete_callback(dict, rrdmetric_delete_callback, (void *)ri);
     dictionary_register_conflict_callback(dict, rrdmetric_conflict_callback, (void *)ri);
+    ri->rrdmetrics = (RRDMETRICS *)dict;
 }
 
 static void rrdmetrics_destroy(RRDINSTANCE *ri) {
@@ -241,7 +350,7 @@ static void rrdinstance_free(RRDINSTANCE *ri) {
     ri->rrdhost = NULL;
 }
 
-void rrdinstance_insert_callback(const char *id, void *value, void *data) {
+static void rrdinstance_insert_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data;
     RRDINSTANCE *ri = (RRDINSTANCE *)value;
@@ -271,7 +380,7 @@ void rrdinstance_insert_callback(const char *id, void *value, void *data) {
     rrdinstance_has_been_updated(ri);
 }
 
-void rrdinstance_delete_callback(const char *id, void *value, void *data) {
+static void rrdinstance_delete_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data; (void)host;
     RRDINSTANCE *ri = (RRDINSTANCE *)value;
@@ -280,7 +389,7 @@ void rrdinstance_delete_callback(const char *id, void *value, void *data) {
     rrdinstance_free(ri);
 }
 
-void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
+static void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data; (void)host;
 
@@ -300,6 +409,9 @@ void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void 
 
     if(ri->id != ri_new->id)
         fatal("RRDINSTANCE: '%s' cannot change id to '%s'", string2str(ri->id), string2str(ri_new->id));
+
+    if(ri->rca && ri_new->rca && ri->rca != ri_new->rca)
+        fatal("RRDINSTANCE: '%s' changed rrdcontext from '%s' to '%s'", string2str(ri->id), rrdcontext_acquired_name(ri->rca), rrdcontext_acquired_name(ri_new->rca));
 
     if(ri->name != ri_new->name) {
         STRING *old = ri->name;
@@ -358,8 +470,8 @@ void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void 
         if(ri->flags & RRDINSTANCE_FLAG_OWN_LABELS) {
             DICTIONARY *old = ri->rrdlabels;
             ri->rrdlabels = ri->rrdset->state->chart_labels;
-            rrdlabels_destroy(old);
             ri->flags &= ~RRDINSTANCE_FLAG_OWN_LABELS;
+            rrdlabels_destroy(old);
         }
 
         changed = true;
@@ -412,15 +524,15 @@ static inline void rrdinstance_release(RRDHOST *host, RRDINSTANCE_ACQUIRED *rca)
     dictionary_acquired_item_release((DICTIONARY *)host->rrdinstances, (DICTIONARY_ITEM *)rca);
 }
 
-static inline RRDINSTANCE *rrdinstance_acquired_value(RRDHOST *host, RRDINSTANCE_ACQUIRED *ria) {
-    return dictionary_acquired_item_value((DICTIONARY *)host->rrdinstances, (DICTIONARY_ITEM *)ria);
+static inline RRDINSTANCE *rrdinstance_acquired_value(RRDINSTANCE_ACQUIRED *ria) {
+    return dictionary_acquired_item_value((DICTIONARY_ITEM *)ria);
 }
 
 static void rrdinstance_has_been_updated(RRDINSTANCE *ri) {
     if(!ri->rca)
         fatal("RRDINSTANCE: '%s' does not have an RRDCONTEXT_ACQUIRED", string2str(ri->id));
 
-    rrdcontext_has_been_updated(rrdcontext_acquired_value(ri->rrdhost, ri->rca));
+    rrdcontext_has_been_updated(rrdcontext_acquired_value(ri->rca));
 }
 
 static inline void rrdinstance_from_rrdset(RRDSET *st) {
@@ -438,6 +550,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         .priority = st->priority,
         .update_every = st->update_every,
         .flags = RRDINSTANCE_FLAG_NONE,
+        .rca = st->rrdcontext,
         .rrdset = st,
         .rrdhost = st->rrdhost
     };
@@ -449,13 +562,22 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         fatal("RRDINSTANCE: chart '%s' changed rrdinstance.", st->id);
 
     st->rrdinstance = ria;
+
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+
+    if(st->rrdcontext && st->rrdcontext != ri->rca)
+        fatal("RRDINSTANCE: chart '%s' does not have the right rrdcontext.", st->id);
+
+    // no need to acquire rrdcontext
+    // it is acquired by rrdinstance
+    st->rrdcontext = ri->rca;
 }
 
 static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     if(unlikely(!st->rrdinstance))
         fatal("RRDINSTANCE: chart '%s' is not linked to an RRDINSTANCE", st->id);
 
-    RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdhost, st->rrdinstance);
+    RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdinstance);
 
     if(unlikely(ri->rrdset != st))
         fatal("RRDINSTANCE: instance '%s' is not linked to chart '%s'", string2str(ri->id), st->id);
@@ -479,6 +601,10 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     rrdinstance_has_been_updated(ri);
     rrdinstance_release(st->rrdhost, st->rrdinstance);
     st->rrdinstance = NULL;
+
+    // no need to release rrdcontext
+    // it is released by rrdinstance
+    st->rrdcontext = NULL;
 }
 
 static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
@@ -561,7 +687,7 @@ static void check_if_we_need_to_emit_new_version(RRDCONTEXT *rc) {
     }
 }
 
-void rrdcontext_insert_callback(const char *id, void *value, void *data) {
+static void rrdcontext_insert_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data;
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
@@ -625,7 +751,7 @@ void rrdcontext_insert_callback(const char *id, void *value, void *data) {
     check_if_we_need_to_emit_new_version(rc);
 }
 
-void rrdcontext_delete_callback(const char *id, void *value, void *data) {
+static void rrdcontext_delete_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data;
     (void)host;
@@ -681,7 +807,7 @@ static STRING *merge_titles(STRING *a, STRING *b) {
     return string_strdupz(buf1);
 }
 
-void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
+static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
     (void)id;
     RRDHOST *host = (RRDHOST *)data;
     (void)host;
@@ -758,12 +884,12 @@ static void rrdcontext_has_been_updated(RRDCONTEXT *rc) {
     ;
 }
 
-static inline const char *rrdcontext_acquired_name(RRDHOST *host, RRDCONTEXT_ACQUIRED *rca) {
-    return dictionary_acquired_item_name((DICTIONARY *)host->rrdcontexts, (DICTIONARY_ITEM *)rca);
+static inline const char *rrdcontext_acquired_name(RRDCONTEXT_ACQUIRED *rca) {
+    return dictionary_acquired_item_name((DICTIONARY_ITEM *)rca);
 }
 
-static inline RRDCONTEXT *rrdcontext_acquired_value(RRDHOST *host, RRDCONTEXT_ACQUIRED *rca) {
-    return dictionary_acquired_item_value((DICTIONARY *)host->rrdcontexts, (DICTIONARY_ITEM *)rca);
+static inline RRDCONTEXT *rrdcontext_acquired_value(RRDCONTEXT_ACQUIRED *rca) {
+    return dictionary_acquired_item_value((DICTIONARY_ITEM *)rca);
 }
 
 static inline RRDCONTEXT_ACQUIRED *rrdcontext_acquire(RRDHOST *host, const char *name) {
@@ -774,25 +900,26 @@ static inline void rrdcontext_release(RRDHOST *host, RRDCONTEXT_ACQUIRED *rca) {
     dictionary_acquired_item_release((DICTIONARY *)host->rrdcontexts, (DICTIONARY_ITEM *)rca);
 }
 
-void rrdcontext_remove_rrdinstance(RRDINSTANCE *ri) {
-    if(!ri || !ri->rca) return;
+static void rrdcontext_remove_rrdinstance(RRDINSTANCE *ri) {
+    if(unlikely(!ri || !ri->rca)) return;
 
-    RRDCONTEXT_ACQUIRED *rca = ri->rca;
-    RRDCONTEXT *rc = rrdcontext_acquired_value(ri->rrdhost, rca);
-    dictionary_del(rc->instances, string2str(ri->context));
+    RRDCONTEXT *rc = rrdcontext_acquired_value(ri->rca);
+
+    if(dictionary_del(rc->instances, string2str(ri->id)) == -1)
+        fatal("RRDCONTEXT: '%s' instance '%s' not found in the dictionary", string2str(rc->id), string2str(ri->id));
 
     ri->rca = NULL;
     if(ri->rrdset && ri->rrdset->rrdcontext)
         ri->rrdset->rrdcontext = NULL;
 
-    rrdcontext_release(ri->rrdhost, rca);
+    rrdcontext_release(ri->rrdhost, ri->rca);
 }
 
 // 1. create an RRDCONTEXT from the supplied RRDINSTANCE
 // 2. add the RRDINSTANCE to the instances dictionary of the RRDCONTEXT
 // 3. update the RRDINSTANCE to point to this RRDCONTEXT
 // 4. update the RRDSET of the RRDINSTANCE to point to this RRDCONTEXT
-void rrdcontext_from_rrdinstance(RRDINSTANCE *ri) {
+static void rrdcontext_from_rrdinstance(RRDINSTANCE *ri) {
     RRDCONTEXT tmp = {
         .id = string_dup(ri->context),
         .title = string_dup(ri->title),
@@ -815,7 +942,7 @@ void rrdcontext_from_rrdinstance(RRDINSTANCE *ri) {
         ri->rca = rca;
 
         // put it in the new context
-        RRDCONTEXT *rc = rrdcontext_acquired_value(ri->rrdhost, rca);
+        RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
         dictionary_set(rc->instances, string2str(ri->context), ri, sizeof(*ri));
     }
 
@@ -855,13 +982,11 @@ static RRDCONTEXT_ACQUIRED *rrdcontext_from_rrdset(RRDSET *st) {
 // public API
 
 void rrdcontext_updated_rrddim(RRDDIM *rd) {
-    (void)rd;
-    ;
+    rrdmetric_from_rrddim(rd);
 }
 
 void rrdcontext_removed_rrddim(RRDDIM *rd) {
-    (void)rd;
-    ;
+    rrdmetric_rrddim_is_freed(rd);
 }
 
 void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
@@ -925,7 +1050,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
     };
     uuid_copy(tmp.uuid, sc->chart_id);
     DICTIONARY_ITEM *item = dictionary_set_and_acquire_item((DICTIONARY *)host->rrdinstances, sc->id, &tmp, sizeof(tmp));
-    RRDINSTANCE *ri = dictionary_acquired_item_value((DICTIONARY *)host->rrdinstances, item);
+    RRDINSTANCE *ri = dictionary_acquired_item_value(item);
 
     //ctx_get_label_list(ri->uuid, dict_ctx_get_label_list_cb, NULL);
     //ctx_get_dimension_list(ri->uuid, dict_ctx_get_dimension_list_cb, NULL);
