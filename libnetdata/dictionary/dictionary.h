@@ -174,6 +174,10 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 #define DICTFE_CONST const
 #endif
 
+#define DICTIONARY_LOCK_READ  'r'
+#define DICTIONARY_LOCK_WRITE 'w'
+#define DICTIONARY_LOCK_NONE  'u'
+
 typedef DICTFE_CONST struct dictionary_foreach {
     DICTFE_CONST char *name;    // the dictionary name of the last item used
     void *value;                // the dictionary value of the last item used
@@ -186,8 +190,8 @@ typedef DICTFE_CONST struct dictionary_foreach {
     void *last_item;            // the item we work on, to remember the position we are at
 } DICTFE;
 
-#define dfe_start_read(dict, value) dfe_start_rw(dict, value, 'r')
-#define dfe_start_write(dict, value) dfe_start_rw(dict, value, 'w')
+#define dfe_start_read(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_READ)
+#define dfe_start_write(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_WRITE)
 #define dfe_start_rw(dict, value, mode) \
         do { \
             DICTFE value ## _dfe = {};  \
