@@ -190,7 +190,7 @@ failed:
 
 // Dimension list
 #define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id FROM meta.dimension d where d.chart_id = @id;"
-void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data)
+void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -207,7 +207,7 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *),
         goto failed;
     }
 
-    ctx_dimension_t dimension_data;
+    SQL_DIMENSION_DATA dimension_data;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
@@ -223,7 +223,7 @@ failed:
 
 // LABEL LIST
 #define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l WHERE l.chart_id = @id;"
-void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data)
+void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data)
 {
     int rc;
     sqlite3_stmt *res = NULL;
@@ -240,7 +240,7 @@ void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), voi
         goto failed;
     }
 
-    ctx_label_t label_data;
+    SQL_CLABEL_DATA label_data;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         label_data.label_key = (char *) sqlite3_column_text(res, 0);
@@ -448,19 +448,19 @@ failed:
 //
 // TESTING FUNCTIONS
 //
-static void dict_ctx_get_label_list_cb(void *label_data_ptr, void *data)
+static void dict_ctx_get_label_list_cb(SQL_CLABEL_DATA *label_data_ptr, void *data)
 {
     (void)data;
-    ctx_label_t *label_data = label_data_ptr;
+    SQL_CLABEL_DATA *label_data = label_data_ptr;
 
     info(" LABEL %d %s = %s", label_data->label_source, label_data->label_key, label_data->label_value);
 }
 
-static void dict_ctx_get_dimension_list_cb(void *dimension_data_ptr, void *data)
+static void dict_ctx_get_dimension_list_cb(SQL_DIMENSION_DATA *dimension_data_ptr, void *data)
 {
     (void)data;
 
-    ctx_dimension_t *dimension_data = dimension_data_ptr;
+    SQL_DIMENSION_DATA *dimension_data = dimension_data_ptr;
 
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(dimension_data->dim_id, uuid_str);
