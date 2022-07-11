@@ -1028,25 +1028,13 @@ DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *n
     return ret;
 }
 
-const char *dictionary_acquired_item_name(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+const char *dictionary_acquired_item_name(DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(((NAME_VALUE *)item)->dict != dict)
-        fatal("DICTIONARY: %s(): name_value item with name '%s' does not belong to this dictionary", __FUNCTION__, namevalue_get_name((NAME_VALUE *)item));
-#endif
-
     return namevalue_get_name((NAME_VALUE *)item);
 }
 
-void *dictionary_acquired_item_value(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+void *dictionary_acquired_item_value(DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(((NAME_VALUE *)item)->dict != dict)
-        fatal("DICTIONARY: %s(): name_value item with name '%s' does not belong to this dictionary", __FUNCTION__, namevalue_get_name((NAME_VALUE *)item));
-#endif
-
     return ((NAME_VALUE *)item)->value;
 }
 
