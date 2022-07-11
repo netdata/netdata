@@ -1069,9 +1069,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 
     assert_string_equal(
         buffer_tostring(buffer),
-        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
-        "netdata_host_tags_info{key1=\"value1\",key2=\"value2\"} 1\n"
-        "netdata_host_tags{key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\",key1=\"value1\",key2=\"value2\"} 1\n"
         "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\"} 690565856.0000000\n");
 
     buffer_flush(buffer);
@@ -1087,9 +1085,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 
     assert_string_equal(
         buffer_tostring(buffer),
-        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
-        "netdata_host_tags_info{key1=\"value1\",key2=\"value2\"} 1\n"
-        "netdata_host_tags{key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\",key1=\"value1\",key2=\"value2\"} 1\n"
         "# TYPE test_prefix_test_context gauge\n"
         "test_prefix_test_context{chart=\"chart_name\",family=\"test_family\",dimension=\"dimension_name\"} 690565856.0000000\n");
 
@@ -1105,9 +1101,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 
     assert_string_equal(
         buffer_tostring(buffer),
-        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
-        "netdata_host_tags_info{instance=\"test_hostname\",key1=\"value1\",key2=\"value2\"} 1\n"
-        "netdata_host_tags{instance=\"test_hostname\",key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\",key1=\"value1\",key2=\"value2\"} 1\n"
         "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\",instance=\"test_hostname\"} 690565856.0000000\n");
 
     free(localhost->rrdset_root->context);
