@@ -837,18 +837,27 @@ void *dictionary_scratchpad(DICTIONARY *dict) {
 size_t dictionary_destroy(DICTIONARY *dict) {
     if(!dict) return 0;
 
-    if(dict->referenced_items) {
-        internal_error(true, "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).", dict->creation_function, dict->creation_line, dict->creation_file, dict->referenced_items, dict->entries);
+    NAME_VALUE *nv;
+
+    debug(D_DICTIONARY, "Destroying dictionary.");
+    dictionary_lock(dict, 'w');
+
+    long referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
+    if(referenced_items) {
+        // there are referenced items
+        // delete all items individually, so that only the referenced will remain
+        for(nv = dict->first_item; nv ;nv = nv->next) {
+            if(!(nv->flags & NAME_VALUE_FLAG_DELETED))
+                dictionary_del_unsafe(dict, namevalue_get_name(nv));
+        }
+        internal_error(true, "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).", dict->creation_function, dict->creation_line, dict->creation_file, referenced_items, dict->entries);
         dict->flags |= DICTIONARY_FLAG_DESTROYED;
+        dictionary_unlock(dict, 'w');
         return 0;
     }
 
-    debug(D_DICTIONARY, "Destroying dictionary.");
-
-    dictionary_lock(dict, 'w');
-
     size_t freed = 0;
-    NAME_VALUE *nv = dict->first_item;
+    nv = dict->first_item;
     while (nv) {
         // cache nv->next
         // because we are going to free nv
@@ -868,7 +877,6 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     dictionary_unlock(dict, 'w');
     freed += dictionary_lock_free(dict);
     freed += reference_counter_free(dict);
-
     freed += sizeof(DICTIONARY) + dict->scratchpad_size;
     freez(dict);
 

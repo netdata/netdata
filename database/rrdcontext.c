@@ -166,7 +166,7 @@ void rrdmetric_conflict_callback(const char *id, void *oldv, void *newv, void *d
     (void)rm_old;
 }
 
-void rrdmetrics_create(RRDINSTANCE *ri) {
+static void rrdmetrics_create(RRDINSTANCE *ri) {
     if(unlikely(!ri)) return;
     if(likely(ri->rrdmetrics)) return;
 
@@ -176,7 +176,7 @@ void rrdmetrics_create(RRDINSTANCE *ri) {
     dictionary_register_conflict_callback(dict, rrdmetric_conflict_callback, (void *)ri);
 }
 
-void rrdmetrics_destroy(RRDINSTANCE *ri) {
+static void rrdmetrics_destroy(RRDINSTANCE *ri) {
     if(unlikely(!ri || !ri->rrdmetrics)) return;
     dictionary_destroy((DICTIONARY *)ri->rrdmetrics);
     ri->rrdmetrics = NULL;
