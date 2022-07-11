@@ -76,5 +76,6 @@ extern int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *db
 extern int rrdeng_exit(struct rrdengine_instance *ctx);
 extern void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
 extern int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t, int tier);
+extern int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

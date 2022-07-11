@@ -38,6 +38,8 @@ struct rrdmetric {
     int update_every;
     RRDDIM *rd;
 
+    time_t first_time_t;
+    time_t last_time_t;
     RRDMETRIC_FLAGS flags;
 
     RRDINSTANCE_ACQUIRED *ria;
@@ -65,6 +67,8 @@ struct rrdinstance {
     int update_every;                   // data collection frequency
     RRDSET *rrdset;                     // pointer to RRDSET when collected, or NULL
 
+    time_t first_time_t;
+    time_t last_time_t;
     RRDINSTANCE_FLAGS flags;            // flags related to this instance
 
     RRDCONTEXT_ACQUIRED *rca;           // acquired rrdcontext item, or NULL
@@ -76,6 +80,33 @@ struct rrdinstance {
     RRDHOST *rrdhost;
 
     netdata_rwlock_t rwlock;
+};
+
+typedef enum {
+    RRDCONTEXT_FLAG_NONE      = 0,
+    RRDCONTEXT_FLAG_DELETED   = (1 << 0),
+    RRDCONTEXT_FLAG_COLLECTED = (1 << 1),
+    RRDCONTEXT_FLAG_UPDATED   = (1 << 2),
+} RRDCONTEXT_FLAGS;
+
+struct rrdcontext {
+    uint64_t version;
+
+    STRING *id;
+    STRING *title;
+    STRING *units;
+    RRDSET_TYPE chart_type;
+
+    size_t priority;
+
+    time_t first_time_t;
+    time_t last_time_t;
+    RRDCONTEXT_FLAGS flags;
+
+    VERSIONED_CONTEXT_DATA hub;
+
+    DICTIONARY *instances;
+    RRDHOST *rrdhost;
 };
 
 static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
@@ -139,6 +170,31 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
     buffer_free(wb);
 }
 
+static inline RRDINSTANCE_ACQUIRED *rrdinstance_dup(RRDINSTANCE_ACQUIRED *ria) {
+    return (RRDINSTANCE_ACQUIRED *)dictionary_acquired_item_dup((DICTIONARY_ITEM *)ria);
+}
+
+static inline RRDINSTANCE *rrdinstance_acquired_value(RRDINSTANCE_ACQUIRED *ria) {
+    return dictionary_acquired_item_value((DICTIONARY_ITEM *)ria);
+}
+
+static inline const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria) {
+    return dictionary_acquired_item_name((DICTIONARY_ITEM *)ria);
+}
+
+static inline void rrdinstance_release(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    dictionary_acquired_item_release((DICTIONARY *)ri->rrdhost->rrdinstances, (DICTIONARY_ITEM *)ria);
+}
+
+static inline void rrdinstance_register_metric(RRDINSTANCE *ri, RRDMETRIC *rm) {
+    dictionary_set((DICTIONARY *)ri->rrdmetrics, string2str(rm->id), rm, sizeof(*rm));
+}
+
+static inline void rrdinstance_unregister_metric(RRDINSTANCE *ri, RRDMETRIC *rm) {
+    dictionary_del((DICTIONARY *)ri->rrdmetrics, string2str(rm->id));
+}
+
 // ----------------------------------------------------------------------------
 // RRDMETRIC
 
@@ -147,22 +203,48 @@ static void rrdmetric_free(RRDMETRIC *rm) {
     string_freez(rm->name);
 }
 
+static void rrdmetric_update_retention(RRDMETRIC *rm) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(rm->ria);
+    time_t first_time_t, last_time_t;
+    rrdeng_metric_retention_by_uuid(ri->rrdhost->storage_instance[0], &rm->uuid, &first_time_t, &last_time_t);
+}
+
 static void rrdmetric_insert_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDINSTANCE *ri = (RRDINSTANCE *)data;
     RRDMETRIC *rm = (RRDMETRIC *)value;
-    (void)ri;
-    (void)rm;
 
-    // TODO what other initializations needed?
+    if(!rm->ria)
+        fatal("RRDMETRIC: '%s' of instance '%s' inserted without an acquired instance.", string2str(rm->id), string2str(ri->id));
+
+    if(rrdinstance_acquired_value(rm->ria) != ri)
+        fatal("RRDMETRIC: '%s' of instance '%s' is linked to instance '%s'", string2str(rm->id), string2str(ri->id), rrdinstance_acquired_name(rm->ria));
+
+    // acquire the instance
+    rm->ria = rrdinstance_dup(rm->ria);
+
+    // register to the instance
+    rrdinstance_register_metric(ri, rm);
+
+    // update its retention
+    rrdmetric_update_retention(rm);
 }
 
 static void rrdmetric_delete_callback(const char *id, void *value, void *data) {
     (void)id;
     RRDINSTANCE *ri = (RRDINSTANCE *)data;
-    (void)ri;
-
     RRDMETRIC *rm = (RRDMETRIC *)value;
+
+    // update its retention
+    rrdmetric_update_retention(rm);
+
+    // unregister from the instance
+    rrdinstance_unregister_metric(ri, rm);
+
+    // release the instance
+    rrdinstance_release(rm->ria);
+
+    // free the resources
     rrdmetric_free(rm);
 }
 
@@ -176,8 +258,10 @@ static void rrdmetric_conflict_callback(const char *id, void *oldv, void *newv, 
     bool changed = false;
 
     if(uuid_compare(rm->uuid, rm_new->uuid) != 0) {
-        uuid_copy(rm->uuid, rm_new->uuid);
-        changed = true;
+        char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
+        uuid_unparse(rm->uuid, uuid1);
+        uuid_unparse(rm_new->uuid, uuid2);
+        fatal("RRDMETRIC: '%s' cannot change uuid from '%s' to '%s'", string2str(rm->id), uuid1, uuid2);
     }
 
     if(rm->id != rm_new->id)
@@ -236,7 +320,7 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
     RRDMETRIC tmp = {
         .id = string_strdupz(rd->id),
         .name = string_strdupz(rd->name),
-        .flags = RRDMETRIC_FLAG_NONE,
+        .flags = RRDMETRIC_FLAG_COLLECTED,
         .update_every = rd->update_every,
         .rd = rd,
         .ria = rd->rrdset->rrdinstance,
@@ -247,8 +331,8 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
 
     if(rd->rrdmetric && rd->rrdmetric != rma)
         fatal("RRDMETRIC: dimension '%s' of chart '%s' changed rrdmetric!", rd->id, rd->rrdset->id);
-
-    rd->rrdmetric = rma;
+    else if(!rd->rrdmetric)
+        rd->rrdmetric = rma;
 }
 
 static inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
@@ -483,7 +567,7 @@ static void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv
         changed = true;
     }
 
-    rrdinstance_log(ri, "UPDATE");
+    rrdinstance_log(ri, "CONFLICT");
 
     if(update_rrdcontext) {
         rrdcontext_from_rrdinstance(ri);
@@ -520,17 +604,11 @@ void rrdhost_destroy_rrdinstances(RRDHOST *host) {
     host->rrdinstances = NULL;
 }
 
-static inline void rrdinstance_release(RRDHOST *host, RRDINSTANCE_ACQUIRED *rca) {
-    dictionary_acquired_item_release((DICTIONARY *)host->rrdinstances, (DICTIONARY_ITEM *)rca);
-}
-
-static inline RRDINSTANCE *rrdinstance_acquired_value(RRDINSTANCE_ACQUIRED *ria) {
-    return dictionary_acquired_item_value((DICTIONARY_ITEM *)ria);
-}
-
 static void rrdinstance_has_been_updated(RRDINSTANCE *ri) {
     if(!ri->rca)
         fatal("RRDINSTANCE: '%s' does not have an RRDCONTEXT_ACQUIRED", string2str(ri->id));
+
+    rrdinstance_log(ri, "UPDATED");
 
     rrdcontext_has_been_updated(rrdcontext_acquired_value(ri->rca));
 }
@@ -599,7 +677,7 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     netdata_rwlock_unlock(&ri->rwlock);
 
     rrdinstance_has_been_updated(ri);
-    rrdinstance_release(st->rrdhost, st->rrdinstance);
+    rrdinstance_release(st->rrdinstance);
     st->rrdinstance = NULL;
 
     // no need to release rrdcontext
@@ -625,33 +703,6 @@ static inline void rrdinstance_collected_rrdset(RRDSET *st) {
 
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
-
-typedef enum {
-    RRDCONTEXT_FLAG_NONE      = 0,
-    RRDCONTEXT_FLAG_DELETED   = (1 << 0),
-    RRDCONTEXT_FLAG_COLLECTED = (1 << 1),
-    RRDCONTEXT_FLAG_UPDATED   = (1 << 2),
-} RRDCONTEXT_FLAGS;
-
-struct rrdcontext {
-    uint64_t version;
-
-    STRING *id;
-    STRING *title;
-    STRING *units;
-    RRDSET_TYPE chart_type;
-
-    size_t priority;
-
-    time_t first_time_t;
-    time_t last_time_t;
-    RRDCONTEXT_FLAGS flags;
-
-    VERSIONED_CONTEXT_DATA hub;
-
-    DICTIONARY *instances;
-    RRDHOST *rrdhost;
-};
 
 static void rrdcontext_freez(RRDCONTEXT *rc) {
     string_freez(rc->id);
