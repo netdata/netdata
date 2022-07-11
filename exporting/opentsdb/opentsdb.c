@@ -38,6 +38,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_opentsdb_telnet;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = simple_connector_end_batch;
 
@@ -94,6 +95,7 @@ int init_opentsdb_http_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_opentsdb_http;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = close_batch_json_http;
 

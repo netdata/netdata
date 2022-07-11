@@ -99,6 +99,7 @@ int init_mongodb_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_json_plaintext;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = format_batch_mongodb;
 

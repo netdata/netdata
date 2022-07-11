@@ -156,6 +156,14 @@ int __mock_end_chart_formatting(struct instance *instance, RRDSET *st)
     return mock_type(int);
 }
 
+int __mock_variables_formatting(struct instance *instance, RRDHOST *host)
+{
+    function_called();
+    check_expected_ptr(instance);
+    check_expected_ptr(host);
+    return mock_type(int);
+}
+
 int __mock_end_host_formatting(struct instance *instance, RRDHOST *host)
 {
     function_called();

@@ -26,7 +26,8 @@ typedef enum exporting_options {
     EXPORTING_OPTION_SEND_AUTOMATIC_LABELS  = (1 << 4),
     EXPORTING_OPTION_USE_TLS                = (1 << 5),
 
-    EXPORTING_OPTION_SEND_NAMES             = (1 << 16)
+    EXPORTING_OPTION_SEND_NAMES             = (1 << 16),
+    EXPORTING_OPTION_SEND_VARIABLES         = (1 << 17)
 } EXPORTING_OPTIONS;
 
 #define EXPORTING_OPTIONS_SOURCE_BITS                                                                                  \
@@ -44,6 +45,8 @@ extern const char *global_exporting_prefix;
       label_source & RRDLABEL_SRC_CONFIG) ||                                                                           \
      (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&                                             \
       label_source & RRDLABEL_SRC_AUTO))
+
+#define should_send_variables(instance) (instance->config.options & EXPORTING_OPTION_SEND_VARIABLES)
 
 typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_UNKNOWN,                 // Invalid type
@@ -219,6 +222,7 @@ struct instance {
     int (*start_chart_formatting)(struct instance *instance, RRDSET *st);
     int (*metric_formatting)(struct instance *instance, RRDDIM *rd);
     int (*end_chart_formatting)(struct instance *instance, RRDSET *st);
+    int (*variables_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_batch_formatting)(struct instance *instance);
 
@@ -280,6 +284,7 @@ void start_host_formatting(struct engine *engine, RRDHOST *host);
 void start_chart_formatting(struct engine *engine, RRDSET *st);
 void metric_formatting(struct engine *engine, RRDDIM *rd);
 void end_chart_formatting(struct engine *engine, RRDSET *st);
+void variables_formatting(struct engine *engine, RRDHOST *host);
 void end_host_formatting(struct engine *engine, RRDHOST *host);
 void end_batch_formatting(struct engine *engine);
 int flush_host_labels(struct instance *instance, RRDHOST *host);
