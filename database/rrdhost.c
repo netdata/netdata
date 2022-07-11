@@ -489,7 +489,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     );
 
     rrd_hosts_available++;
-
+    rrdhost_load_rrdcontext_data(host);
     return host;
 }
 
@@ -1126,7 +1126,6 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
-    rrdhost_destroy_rrdinstances(host);
     rrdhost_destroy_rrdcontexts(host);
 
     pthread_mutex_destroy(&host->aclk_state_lock);
