@@ -473,7 +473,7 @@ void aclk_database_worker(void *arg)
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
 //    wc->retry_count = 0;
-    wc->node_info_send = (wc->host && !localhost);
+    wc->node_info_send = 1;
 //    aclk_add_worker_thread(wc);
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
 
@@ -634,7 +634,7 @@ void aclk_database_worker(void *arg)
                             }
                         }
                     }
-                    if (wc->node_info_send && wc->host && localhost && claimed() && aclk_connected) {
+                    if (wc->node_info_send && localhost && claimed() && aclk_connected) {
                         cmd.opcode = ACLK_DATABASE_NODE_INFO;
                         cmd.completion = NULL;
                         wc->node_info_send = aclk_database_enq_cmd_noblock(wc, &cmd);
