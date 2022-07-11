@@ -61,8 +61,10 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 #ifdef ENABLE_ACLK
     struct update_node_info node_info;
 
-    if (!wc->host)
+    if (!wc->host) {
+        wc->node_info_send = 1;
         return;
+    }
 
     rrd_rdlock();
     node_info.node_id = wc->node_id;
