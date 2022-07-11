@@ -243,14 +243,13 @@ struct rrdengine_instance {
     uint64_t disk_space;
     uint64_t max_disk_space;
     int tier;
-    size_t storage_size;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;
     unsigned long metric_API_max_producers;
 
     uint8_t quiesce; /* set to SET_QUIESCE before shutdown of the engine */
-    uint8_t page_type; /* set to SET_QUIESCE before shutdown of the engine */
+    uint8_t page_type; /* Default page type for this context */
 
     struct rrdengine_statistics stats;
 };

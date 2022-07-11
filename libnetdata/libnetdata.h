@@ -311,6 +311,12 @@ extern char *find_and_replace(const char *src, const char *find, const char *rep
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
+typedef struct bitmap256 {
+    uint64_t data[4];
+} BITMAP256;
+
+extern bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx);
+extern void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);

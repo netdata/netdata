@@ -11,6 +11,12 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
+uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
+
+#if PAGE_TYPE_MAX != 1
+#error PAGE_TYPE_MAX is not 1 - you need to add allocations here
+#endif
+size_t page_type_size[256] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
@@ -169,14 +175,14 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
 }
 
 /* The page must be populated and referenced */
-static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr, size_t storage_size)
+static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
 {
     unsigned i;
     uint8_t has_only_empty_metrics = 1;
     storage_number *page;
 
     page = descr->pg_cache_descr->page;
-    for (i = 0 ; i < descr->page_length / storage_size; ++i) {
+    for (i = 0 ; i < descr->page_length / PAGE_POINT_SIZE_BYTES(descr); ++i) {
         if (SN_EMPTY_SLOT != page[i]) {
             has_only_empty_metrics = 0;
             break;
@@ -199,7 +205,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
 
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
-        page_is_empty = page_has_only_empty_metrics(descr, ctx->storage_size);
+        page_is_empty = page_has_only_empty_metrics(descr);
         if (page_is_empty) {
             debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
             if (unlikely(debug_flags & D_RRDENGINE))
@@ -232,7 +238,6 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
 
     void *page;
     uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
-    size_t storage_size = ctx->storage_size;
 
     if (descr) {
         /* Make alignment decisions */
@@ -242,7 +247,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
             perfect_page_alignment = 1;
         }
         /* is the metric far enough out of alignment with the others? */
-        if (unlikely(descr->page_length + storage_size < rd->rrdset->rrddim_page_alignment)) {
+        if (unlikely(descr->page_length + PAGE_POINT_SIZE_BYTES(descr) < rd->rrdset->rrddim_page_alignment)) {
             handle->unaligned_page = 1;
             debug(D_RRDENGINE, "Metric page is not aligned with chart:");
             if (unlikely(debug_flags & D_RRDENGINE))
@@ -250,14 +255,14 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
         }
         if (unlikely(handle->unaligned_page &&
                      /* did the other metrics change page? */
-                     rd->rrdset->rrddim_page_alignment <= storage_size)) {
+                     rd->rrdset->rrddim_page_alignment <= PAGE_POINT_SIZE_BYTES(descr))) {
             debug(D_RRDENGINE, "Flushing unaligned metric page.");
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
         }
     }
     if (unlikely(NULL == descr ||
-                 descr->page_length + storage_size > RRDENG_BLOCK_SIZE ||
+                 descr->page_length + PAGE_POINT_SIZE_BYTES(descr) > RRDENG_BLOCK_SIZE ||
                  must_flush_unaligned_page)) {
         rrdeng_store_metric_flush_current_page(collection_handle);
 
@@ -278,7 +283,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
 
     switch (descr->type) {
         case PAGE_METRICS: {
-            ((storage_number *)page)[descr->page_length / storage_size] = pack_storage_number(n, flags);
+            ((storage_number *)page)[descr->page_length / PAGE_POINT_SIZE_BYTES(descr)] = pack_storage_number(n, flags);
         }
         break;
 
@@ -289,7 +294,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
             number_tier1.max_value = (float)max_value;
             number_tier1.anomaly_count = anomaly_count;
             number_tier1.count = count;
-            ((storage_number_tier1_t *)page)[descr->page_length / storage_size] = number_tier1;
+            ((storage_number_tier1_t *)page)[descr->page_length / PAGE_POINT_SIZE_BYTES(descr)] = number_tier1;
         }
         break;
 
@@ -303,7 +308,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
         break;
     }
 
-    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + storage_size);
+    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + PAGE_POINT_SIZE_BYTES(descr));
 
     if (perfect_page_alignment)
         rd->rrdset->rrddim_page_alignment = descr->page_length;
@@ -441,7 +446,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 
     if (unlikely(descr->start_time != page_end_time && next_page_time > descr->start_time)) {
         // we're in the middle of the page somewhere
-        unsigned entries = page_length / ctx->storage_size;
+        unsigned entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
         position = ((uint64_t)(next_page_time - descr->start_time)) * (entries - 1) /
                    (page_end_time - descr->start_time);
     }
@@ -451,7 +456,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     handle->page_end_time = page_end_time;
     handle->page_length = page_length;
     handle->page = descr->pg_cache_descr->page;
-    usec_t entries = handle->entries = page_length / ctx->storage_size;
+    usec_t entries = handle->entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
     if (likely(entries > 1))
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
     else {
@@ -815,14 +820,12 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     if(NULL == ctxp) {
         ctx = multidb_ctx[tier];
         memset(ctx, 0, sizeof(*ctx));
-        ctx->storage_size = (tier == 0) ? sizeof(storage_number) : sizeof(storage_number_tier1_t);
-        ctx->tier = tier;
-        ctx->page_type = !tier ? PAGE_METRICS : PAGE_TIER;  // TODO: In the future it can be different page type per tier
     }
     else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));
-        ctx->storage_size = sizeof(storage_number);
     }
+    ctx->tier = tier;
+    ctx->page_type = tier_page_type[tier];
     ctx->global_compress_alg = RRD_LZ4;
     if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
         page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;

@@ -10,6 +10,7 @@ extern int unit_test_str2ld(void);
 extern int unit_test_buffer(void);
 extern int unit_test_static_threads(void);
 extern int test_sqlite(void);
+extern int unit_test_bitmap256(void);
 #ifdef ENABLE_DBENGINE
 extern int test_dbengine(void);
 extern void generate_dbengine_dataset(unsigned history_seconds);

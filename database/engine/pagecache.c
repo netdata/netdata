@@ -1334,7 +1334,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
             pages_size_per_type[descr->type] += descr->page_length;
             pages_count_per_type[descr->type]++;
 
-            size_t points_in_page = (descr->page_length / ctx->storage_size);
+            size_t points_in_page = (descr->page_length / PAGE_POINT_SIZE_BYTES(descr));
             size_t page_duration  = ((descr->end_time - descr->start_time) / USEC_PER_SEC);
             size_t update_every = (page_duration == 0) ? 1 : page_duration / (points_in_page - 1);
 
@@ -1351,7 +1351,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
                 page_duration = update_every * points_in_page;
                 metric_duration += page_duration;
                 seconds_in_db += page_duration;
-                points_in_db += descr->page_length / ctx->storage_size;
+                points_in_db += descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
             }
             else
                 metric_single_point_pages++;
