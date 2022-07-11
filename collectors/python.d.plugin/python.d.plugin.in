@@ -572,7 +572,8 @@ class Plugin:
         try:
             statuses = JobsStatuses().from_file(abs_path)
         except Exception as error:
-            self.log.warning("error on loading '{0}' : {1}".format(abs_path, repr(error)))
+            self.log.error("[{0}] error on loading '{1}': invalid YAML format: {2}".format(
+                module_name, abs_path, ' '.join(str(error).split('\n'))))
             return None
         self.log.debug("'{0}' is loaded".format(abs_path))
         return statuses
