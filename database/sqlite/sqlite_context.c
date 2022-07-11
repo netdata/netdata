@@ -259,8 +259,7 @@ failed:
 
 // CONTEXT LIST
 #define CTX_GET_CONTEXT_LIST  "SELECT id, version, title, chart_type, unit, priority, first_time_t, " \
-            "last_time_t, deleted FROM context c, context_host ch WHERE " \
-            "ch.host_id = @host_id AND ch.context = c.id;"
+            "last_time_t, deleted FROM context c WHERE c.host_id = @host_id;"
 void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
 
@@ -516,6 +515,10 @@ static int localhost_uuid_cb(void *data, int argc, char **argv, char **column)
 int ctx_unittest(void)
 {
     uuid_t host_uuid;
+    uuid_t host_uuid1;
+
+    uuid_generate(host_uuid1);
+
     char *err_msg;
 
     sql_init_context_database(1);
@@ -546,6 +549,11 @@ int ctx_unittest(void)
     else
         info("Entry %s not inserted", context_data.id);
 
+    if (likely(!ctx_store_context(&host_uuid1, &context_data)))
+        info("Entry %s inserted", context_data.id);
+    else
+        info("Entry %s not inserted", context_data.id);
+
     // This will change end time
     context_data.first_time_t = 1000;
     context_data.last_time_t  = 2001;
@@ -570,6 +578,10 @@ int ctx_unittest(void)
     ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
     info("List context end after insert");
 
+    info("List context start after insert");
+    ctx_get_context_list(&host_uuid1, dict_ctx_get_context_list_cb, NULL);
+    info("List context end after insert");
+
     // This will delete the entry
     if (likely(!ctx_delete_context(&host_uuid, &context_data)))
         info("Entry %s deleted", context_data.id);
@@ -579,7 +591,6 @@ int ctx_unittest(void)
     freez((void *)context_data.id);
     freez((void *)context_data.title);
     freez((void *)context_data.chart_type);
-    freez((void *)context_data.id);
 
     // The list should be empty
     info("List context start after delete");
