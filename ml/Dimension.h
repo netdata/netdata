@@ -69,9 +69,7 @@ public:
         return AnomalyBit;
     }
 
-    CalculatedNumber computeAnomalyScore(SamplesBuffer &SB) {
-        return isTrained() ? KM.anomalyScore(SB) : 0.0;
-    }
+    CalculatedNumber computeAnomalyScore(SamplesBuffer &SB);
 
     bool shouldTrain(const TimePoint &TP) const;
 
@@ -106,6 +104,7 @@ public:
 
     std::vector<CalculatedNumber> CNs;
     KMeans KM;
+    std::mutex Mutex;
 };
 
 } // namespace ml

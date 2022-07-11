@@ -94,7 +94,10 @@ MLResult Dimension::trainModel() {
 
     SamplesBuffer SB = SamplesBuffer(CNs, N, 1, Cfg.DiffN, Cfg.SmoothN, Cfg.LagN,
                                      SamplingRatio, Cfg.RandomNums);
-    KM.train(SB, Cfg.MaxKMeansIters);
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        KM.train(SB, Cfg.MaxKMeansIters);
+    }
 
     Trained = true;
     ConstantModel = true;
@@ -128,6 +131,14 @@ void Dimension::addValue(CalculatedNumber Value, bool Exists) {
         ConstantModel = false;
 
     CNs[N - 1] = Value;
+}
+
+CalculatedNumber Dimension::computeAnomalyScore(SamplesBuffer &SB) {
+    std::unique_lock<std::mutex> Lock(Mutex, std::defer_lock);
+    if (!Lock.try_lock())
+        return std::numeric_limits<CalculatedNumber>::quiet_NaN();
+
+    return isTrained() ? KM.anomalyScore(SB) : 0.0;
 }
 
 std::pair<MLResult, bool> Dimension::predict() {

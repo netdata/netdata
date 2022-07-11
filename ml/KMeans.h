@@ -27,8 +27,6 @@ private:
 
     CalculatedNumber MinDist;
     CalculatedNumber MaxDist;
-
-    std::mutex Mutex;
 };
 
 #endif /* KMEANS_H */
