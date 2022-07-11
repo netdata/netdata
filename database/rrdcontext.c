@@ -303,7 +303,7 @@ void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void 
 
     if(ri->name != ri_new->name) {
         STRING *old = ri->name;
-        ri->name = string_clone(ri_new->name);
+        ri->name = string_dup(ri_new->name);
         string_freez(old);
         changed = true;
     }
@@ -313,7 +313,7 @@ void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void 
         rrdcontext_remove_rrdinstance(ri);
 
         STRING *old = ri->context;
-        ri->context = string_clone(ri_new->context);
+        ri->context = string_dup(ri_new->context);
         string_freez(old);
         changed = true;
         update_rrdcontext = true;
@@ -321,14 +321,14 @@ void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv, void 
 
     if(ri->title != ri_new->title) {
         STRING *old = ri->title;
-        ri->title = string_clone(ri_new->title);
+        ri->title = string_dup(ri_new->title);
         string_freez(old);
         changed = true;
     }
 
     if(ri->units != ri_new->units) {
         STRING *old = ri->units;
-        ri->units = string_clone(ri_new->units);
+        ri->units = string_dup(ri_new->units);
         string_freez(old);
         changed = true;
     }
@@ -700,7 +700,7 @@ void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *
 
     if(rc->units != rc_new->units) {
         STRING *old_units = rc->units;
-        rc->units = string_clone(rc_new->units);
+        rc->units = string_dup(rc_new->units);
         string_freez(old_units);
         changed = true;
     }
@@ -794,9 +794,9 @@ void rrdcontext_remove_rrdinstance(RRDINSTANCE *ri) {
 // 4. update the RRDSET of the RRDINSTANCE to point to this RRDCONTEXT
 void rrdcontext_from_rrdinstance(RRDINSTANCE *ri) {
     RRDCONTEXT tmp = {
-        .id = string_clone(ri->context),
-        .title = string_clone(ri->title),
-        .units = string_clone(ri->units),
+        .id = string_dup(ri->context),
+        .title = string_dup(ri->title),
+        .units = string_dup(ri->units),
         .priority = ri->priority,
         .chart_type = ri->chart_type,
         .flags = RRDCONTEXT_FLAG_NONE,
