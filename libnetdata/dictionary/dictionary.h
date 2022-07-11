@@ -116,8 +116,8 @@ extern DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const 
 extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item);
 extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
 
-extern const char *dictionary_acquired_item_name(DICTIONARY *dict, DICTIONARY_ITEM *item);
-extern void *dictionary_acquired_item_value(DICTIONARY *dict, DICTIONARY_ITEM *item);
+extern const char *dictionary_acquired_item_name(DICTIONARY_ITEM *item);
+extern void *dictionary_acquired_item_value(DICTIONARY_ITEM *item);
 
 // UNSAFE functions, without locks
 // to be used when the user is traversing with the right lock type
