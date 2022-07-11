@@ -94,11 +94,12 @@ MLResult Dimension::trainModel() {
 
     SamplesBuffer SB = SamplesBuffer(CNs, N, 1, Cfg.DiffN, Cfg.SmoothN, Cfg.LagN,
                                      SamplingRatio, Cfg.RandomNums);
+    std::vector<DSample> Samples = SB.preprocess();
     {
         std::lock_guard<std::mutex> Lock(Mutex);
 
         KMeans KM;
-        KM.train(SB, Cfg.MaxKMeansIters);
+        KM.train(Samples, Cfg.MaxKMeansIters);
 
         if (Models.size() > 4)
             Models.pop_front();
@@ -141,11 +142,13 @@ void Dimension::addValue(CalculatedNumber Value, bool Exists) {
 }
 
 CalculatedNumber Dimension::computeAnomalyScore(SamplesBuffer &SB) {
+    const DSample Sample = SB.preprocess().back();
+
     std::unique_lock<std::mutex> Lock(Mutex, std::defer_lock);
     if (!Lock.try_lock())
         return std::numeric_limits<CalculatedNumber>::quiet_NaN();
 
-    return isTrained() ? Models.back().anomalyScore(SB) : 0.0;
+    return isTrained() ? Models.back().anomalyScore(Sample) : 0.0;
 }
 
 std::pair<MLResult, bool> Dimension::predict() {

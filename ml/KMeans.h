@@ -17,8 +17,8 @@ public:
         MaxDist = std::numeric_limits<CalculatedNumber>::min();
     };
 
-    void train(SamplesBuffer &SB, size_t MaxIterations);
-    CalculatedNumber anomalyScore(SamplesBuffer &SB);
+    void train(const std::vector<DSample> &Samples, size_t MaxIterations);
+    CalculatedNumber anomalyScore(const DSample &Sample);
 
 private:
     size_t NumClusters;
