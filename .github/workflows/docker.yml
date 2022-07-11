@@ -236,13 +236,13 @@ jobs:
         id: release-tags
         if: github.event.inputs.version != 'nightly'
         run: |
-          echo "tags=netdata/netdata-dbg:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }} '-dbg')" \
+          echo "tags=netdata/netdata-debug:latest,netdata/netdata-debug:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }} '-debug')" \
               >> "${GITHUB_ENV}"
       - name: Determine which tags to use
         id: nightly-tags
         if: github.event.inputs.version == 'nightly'
         run: |
-          echo "tags=netdata/netdata-dbg:latest,netdata/netdata:edge" >> "${GITHUB_ENV}"
+          echo "tags=netdata/netdata-debug:latest,netdata/netdata-debug:edge" >> "${GITHUB_ENV}"
       - name: Mark image as official
         id: env
         if: github.repository == 'netdata/netdata'
