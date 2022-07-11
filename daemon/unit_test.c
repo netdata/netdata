@@ -1625,9 +1625,11 @@ int unit_test_bitmap256(void) {
         fprintf(stderr, "%s() INDEX 192 is OK\n", __FUNCTION__ );
 
     uint8_t i=0;
+    int j = 0;
     do {
         bitmap256_set_bit(&test_bitmap, i++, 1);
-    } while (i);
+        j++;
+    } while (j < 256);
 
     if (test_bitmap.data[0] == 0xffffffff)
         fprintf(stderr, "%s() INDEX 0 is fully set OK\n", __FUNCTION__);
@@ -1639,9 +1641,11 @@ int unit_test_bitmap256(void) {
         fprintf(stderr, "%s() INDEX 3 is fully set OK\n", __FUNCTION__);
 
     i = 0;
+    j = 0;
     do {
         bitmap256_set_bit(&test_bitmap, i++, 0);
-    } while (i);
+        j++;
+    } while (j < 256);
 
     if (test_bitmap.data[0] == 0)
         fprintf(stderr, "%s() INDEX 0 is reset OK\n", __FUNCTION__);
@@ -1671,10 +1675,12 @@ int unit_test_bitmap256(void) {
     }
 
     i=0;
+    j = 0;
     do {
         bitmap256_set_bit(&test_bitmap, i, 1);
         i += 4;
-    } while (i);
+        j += 4;
+    } while (j < 256);
 
     if (test_bitmap.data[0] == 0x11111111)
         fprintf(stderr, "%s() INDEX 0 is 0x11111111 set OK\n", __FUNCTION__);
