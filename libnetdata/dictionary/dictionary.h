@@ -232,4 +232,8 @@ extern void string_freez(STRING *string);
 extern size_t string_length(STRING *string);
 extern const char *string2str(STRING *string) NEVERNULL;
 
+static inline int stringcmp(STRING *s1, STRING *s2) {
+    return strcmp(string2str(s1), string2str(s2));
+}
+
 #endif /* NETDATA_DICTIONARY_H */
