@@ -36,7 +36,6 @@ struct rrdmetric {
     STRING *id;
     STRING *name;
 
-    int update_every;
     RRDDIM *rd;
 
     time_t first_time_t;
@@ -296,11 +295,6 @@ static void rrdmetric_conflict_callback(const char *id, void *oldv, void *newv, 
         rm->flags |= RRD_FLAG_UPDATED;
     }
 
-    if(rm->update_every != rm_new->update_every) {
-        rm->update_every = rm_new->update_every;
-        rm->flags |= RRD_FLAG_UPDATED;
-    }
-
     if(!rm->first_time_t || (rm_new->first_time_t && rm_new->first_time_t < rm->first_time_t)) {
         rm->first_time_t = rm_new->first_time_t;
         rm->flags |= RRD_FLAG_UPDATED;
@@ -365,7 +359,6 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
         .id = string_strdupz(rd->id),
         .name = string_strdupz(rd->name),
         .flags = RRD_FLAG_COLLECTED,
-        .update_every = rd->update_every,
         .rd = rd,
         .ria = rd->rrdset->rrdinstance,
     };
@@ -863,7 +856,10 @@ static void check_if_we_need_to_emit_new_version(RRDCONTEXT *rc) {
                        rc->hub.deleted ? "true" : "false", deleted_changed ? " (CHANGED)" : ""
                        );
 
-        // TODO save to SQL and send to cloud
+        if(ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
+            error("RRDCONTEXT: failed to save context '%s' version %lu to SQL.", rc->hub.id, rc->hub.version);
+
+        // TODO save in the output queue
     }
 }
 
@@ -1282,6 +1278,25 @@ void rrdcontext_collected_rrdset(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // load from SQL
 
+static void rrdinstance_load_clabel(SQL_CLABEL_DATA *sld, void *data) {
+    RRDINSTANCE *ri = data;
+    rrdlabels_add(ri->rrdlabels, sld->label_key, sld->label_value, sld->label_source);
+}
+
+static void rrdinstance_load_dimension(SQL_DIMENSION_DATA *sd, void *data) {
+    RRDINSTANCE_ACQUIRED *ria = data;
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+
+    RRDMETRIC tmp = {
+        .id = string_strdupz(sd->id),
+        .name = string_strdupz(sd->name),
+        .ria = ria
+    };
+    uuid_copy(tmp.uuid, sd->dim_id);
+
+    dictionary_set((DICTIONARY *)ri->rrdmetrics, string2str(tmp.id), &tmp, sizeof(tmp));
+}
+
 static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
     RRDHOST *host = data;
     (void)host;
@@ -1291,14 +1306,20 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .name = string_strdupz(sc->name),
         .title = string_strdupz(sc->title),
         .units = string_strdupz(sc->units),
+        .chart_type = rrdset_type_id(sc->chart_type),
+        .priority = sc->priority,
+        .update_every = sc->update_every,
         .rca = rrdcontext_acquire(host, sc->context),
     };
     uuid_copy(tmp.uuid, sc->chart_id);
-    DICTIONARY_ITEM *item = dictionary_set_and_acquire_item((DICTIONARY *)host->rrdinstances, sc->id, &tmp, sizeof(tmp));
-    RRDINSTANCE *ri = dictionary_acquired_item_value(item);
 
-    //ctx_get_label_list(ri->uuid, dict_ctx_get_label_list_cb, NULL);
-    //ctx_get_dimension_list(ri->uuid, dict_ctx_get_dimension_list_cb, NULL);
+    RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item((DICTIONARY *)host->rrdinstances, sc->id, &tmp, sizeof(tmp));
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+
+    ctx_get_dimension_list(&ri->uuid, rrdinstance_load_dimension, ria);
+    ctx_get_label_list(&ri->uuid, rrdinstance_load_clabel, ri);
+
+    rrdinstance_release(ria);
 }
 
 static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, void *data) {
@@ -1314,7 +1335,7 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
     dictionary_set((DICTIONARY *)host->rrdcontexts, ctx_data->id, &tmp, sizeof(tmp));
 }
 
-void rrdcontext_load_all(RRDHOST *host) {
+void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     rrdhost_create_rrdinstances(host);
     rrdhost_create_rrdcontexts(host);
 
