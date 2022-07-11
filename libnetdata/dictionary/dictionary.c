@@ -111,6 +111,7 @@ struct dictionary {
 
 static inline void linkedlist_namevalue_unlink_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
 static size_t namevalue_destroy_unsafe(DICTIONARY *dict, NAME_VALUE *nv);
+static inline const char *namevalue_get_name(NAME_VALUE *nv);
 
 // ----------------------------------------------------------------------------
 // callbacks registration
@@ -394,6 +395,13 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
     // free memory required for reference counters
     // return number of bytes
     return 0;
+}
+
+static int reference_counter_increase(NAME_VALUE *nv) {
+    int refcount = __atomic_add_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
+    if(refcount == 1)
+        fatal("DICTIONARY: request to dup item '%s' but its reference counter was zero", namevalue_get_name(nv));
+    return refcount;
 }
 
 static int reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
@@ -1026,6 +1034,12 @@ DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *n
     void *ret = dictionary_get_and_acquire_item_unsafe(dict, name);
     dictionary_unlock(dict, 'r');
     return ret;
+}
+
+DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY_ITEM *item) {
+    if(unlikely(!item)) return NULL;
+    reference_counter_increase((NAME_VALUE *)item);
+    return item;
 }
 
 const char *dictionary_acquired_item_name(DICTIONARY_ITEM *item) {
