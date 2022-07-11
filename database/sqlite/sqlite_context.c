@@ -145,7 +145,7 @@ static int bind_text_null(sqlite3_stmt *res, int position, const char *text)
 //
 // Fetching data
 //
-#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, c.update_every FROM meta.chart c " \
+#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, c.update_every, c.chart_type FROM meta.chart c " \
         "WHERE c.host_id IN (SELECT h.host_id FROM meta.host h " \
         "WHERE UNLIKELY((h.hops = 0 AND @host_id IS NULL)) OR LIKELY((h.host_id = @host_id)));"
 
@@ -179,6 +179,7 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
         chart_data.units = (char *) sqlite3_column_text(res, 5);
         chart_data.priority = sqlite3_column_int(res, 6);
         chart_data.update_every = sqlite3_column_int(res, 7);
+        chart_data.chart_type = sqlite3_column_int(res, 8);
         dict_cb(&chart_data, data);
     }
 
@@ -189,7 +190,7 @@ failed:
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id FROM meta.dimension d where d.chart_id = @id;"
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name FROM meta.dimension d WHERE d.chart_id = @id;"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
@@ -212,6 +213,7 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
+        dimension_data.name = (char *) sqlite3_column_text(res, 2);
         dict_cb(&dimension_data, data);
     }
 

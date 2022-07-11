@@ -13,7 +13,7 @@ typedef struct ctx_chart {
     char *context;
     char *title;
     char *units;
-    char *chart_type;
+    int chart_type;
     int priority;
     int update_every;
 } SQL_CHART_DATA;
