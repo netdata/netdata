@@ -61,7 +61,6 @@ dist_noinst_DATA = \
     netdata.spec \
     packaging/bundle-ebpf.sh \
     packaging/bundle-ebpf-co-re.sh \
-    packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
     packaging/check-kernel-config.sh \
     packaging/ebpf.checksums \
@@ -75,8 +74,6 @@ dist_noinst_DATA = \
     packaging/installer/UPDATE.md \
     packaging/jsonc.checksums \
     packaging/jsonc.version \
-    packaging/judy.checksums \
-    packaging/judy.version \
     packaging/libbpf.checksums \
     packaging/libbpf.version \
     packaging/protobuf.checksums \
