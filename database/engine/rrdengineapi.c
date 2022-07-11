@@ -623,6 +623,36 @@ int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, t
     return 1;
 }
 
+int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t)
+{
+    struct page_cache *pg_cache;
+    struct rrdengine_instance *ctx;
+    Pvoid_t *PValue;
+    struct pg_cache_page_index *page_index = NULL;
+
+    ctx = (struct rrdengine_instance *)si;
+    if (unlikely(!ctx)) {
+        error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        return 1;
+    }
+    pg_cache = &ctx->pg_cache;
+
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, dim_uuid, sizeof(uuid_t));
+    if (likely(NULL != PValue)) {
+        page_index = *PValue;
+    }
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+    if (likely(page_index)) {
+        *first_entry_t = page_index->oldest_time / USEC_PER_SEC;
+        *last_entry_t = page_index->latest_time / USEC_PER_SEC;
+        return 0;
+    }
+
+    return 1;
+}
+
 /* Also gets a reference for the page */
 void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrdeng_page_descr **ret_descr)
 {
