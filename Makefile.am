@@ -480,6 +480,48 @@ database/sqlite/sqlite3.$(OBJEXT) : CFLAGS += -Wno-cast-function-type
 database/KolmogorovSmirnovDist.$(OBJEXT) : CFLAGS += -Wno-maybe-uninitialized
 
 if ENABLE_DBENGINE
+    noinst_LIBRARIES = libjudy.a
+
+    libjudy_a_SOURCES = libnetdata/libjudy/src/Judy.h \
+        libnetdata/libjudy/src/JudyCommon/JudyMalloc.c \
+        libnetdata/libjudy/src/JudyCommon/JudyPrivate.h \
+        libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h \
+        libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h \
+        libnetdata/libjudy/src/JudyL/JudyL.h \
+        libnetdata/libjudy/src/JudyL/JudyLByCount.c \
+        libnetdata/libjudy/src/JudyL/JudyLCascade.c \
+        libnetdata/libjudy/src/JudyL/JudyLCount.c \
+        libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c \
+        libnetdata/libjudy/src/JudyL/JudyLDecascade.c \
+        libnetdata/libjudy/src/JudyL/JudyLDel.c \
+        libnetdata/libjudy/src/JudyL/JudyLFirst.c \
+        libnetdata/libjudy/src/JudyL/JudyLFreeArray.c \
+        libnetdata/libjudy/src/JudyL/j__udyLGet.c \
+        libnetdata/libjudy/src/JudyL/JudyLGet.c \
+        libnetdata/libjudy/src/JudyL/JudyLInsArray.c \
+        libnetdata/libjudy/src/JudyL/JudyLIns.c \
+        libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c \
+        libnetdata/libjudy/src/JudyL/JudyLMallocIF.c \
+        libnetdata/libjudy/src/JudyL/JudyLMemActive.c \
+        libnetdata/libjudy/src/JudyL/JudyLMemUsed.c \
+        libnetdata/libjudy/src/JudyL/JudyLNext.c \
+        libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c \
+        libnetdata/libjudy/src/JudyL/JudyLPrev.c \
+        libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c \
+        libnetdata/libjudy/src/JudyL/JudyLTables.c \
+        libnetdata/libjudy/src/JudyL/JudyLTablesGen.c \
+        libnetdata/libjudy/src/JudyHS/JudyHS.c \
+        $(NULL)
+
+    libjudy_a_CFLAGS = -DJUDYL -Ilibnetdata/libjudy/src -Ilibnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough -DJU_64BIT
+
+    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrev.$(OBJEXT) : CFLAGS += -DJUDYPREV
+    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrevEmpty.$(OBJEXT) : CFLAGS += -DJUDYPREV
+    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNext.$(OBJEXT) : CFLAGS += -DJUDYNEXT
+    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNextEmpty.$(OBJEXT) : CFLAGS += -DJUDYNEXT
+    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLByCount.$(OBJEXT) : CFLAGS +=  -DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB
+    libnetdata/libjudy/src/JudyL/libjudy_a-j__udyLGet.$(OBJEXT) : CFLAGS +=  -DJUDYGETINLINE
+
     RRD_PLUGIN_FILES += \
         database/engine/rrdengine.c \
         database/engine/rrdengine.h \
@@ -924,6 +966,11 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JSONC_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(NULL)
+
+if ENABLE_DBENGINE
+    NETDATA_COMMON_LIBS += libjudy.a \
+    $(NULL)
+endif
 
 if LINK_STATIC_JSONC
     NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/jsonc/libjson-c.a

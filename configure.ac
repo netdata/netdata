@@ -42,6 +42,7 @@ AC_PROG_CXX
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
+AC_PROG_RANLIB
 
 # -----------------------------------------------------------------------------
 # configurable options
@@ -468,45 +469,7 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
-
-AC_ARG_WITH([bundled-libJudy],
-            [AS_HELP_STRING([--with-bundled-libJudy],[Use the bundled version of Judy library (default is system-library)])],
-            [
-                AC_MSG_CHECKING(for libJudy in $withval)
-                if test -f "externaldeps/libJudy/libJudy.a" -a -f "externaldeps/libJudy/Judy.h"; then
-                    LIBS_BACKUP="${LIBS}"
-                    LIBS="externaldeps/libJudy/libJudy.a"
-                    AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/libJudy/Judy.h"
-                                                     int main (int argc, char **argv) {
-                                                        Pvoid_t PJLArray = (Pvoid_t) NULL;
-                                                        Word_t * PValue;
-                                                        Word_t Index;
-                                                        JLI(PValue, PJLArray, Index);
-                                                     }]])],
-                                                     [HAVE_libJudy_a="yes"],
-                                                     [HAVE_libJudy_a="no"])
-                    LIBS="${LIBS_BACKUP}"
-                    JUDY_LIBS="\$(abs_top_srcdir)/externaldeps/libJudy/libJudy.a"
-                    JUDY_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/libJudy"
-                    AC_MSG_RESULT([$HAVE_libJudy_a])
-                else
-                    libjudy_dir=""
-                    HAVE_libJudy_a="no"
-                    AC_MSG_RESULT([$HAVE_libJudy_a])
-                fi
-            ],
-            [HAVE_libJudy_a="no"])
-
-if test "${HAVE_libJudy_a}" = "no"; then
-    AC_CHECK_LIB(
-                    [Judy],
-                    [JudyLIns],
-                    [JUDY_LIBS="-lJudy"]
-                )
-fi
-
-test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
-    AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
+JUDY_CFLAGS="-I \$(abs_top_srcdir)/libnetdata/libjudy"
 
 test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
     AC_MSG_ERROR([OpenSSL required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
@@ -515,13 +478,12 @@ test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
     AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
 
 AC_MSG_CHECKING([if netdata dbengine should be used])
-if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}"; then
+if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${SSL_LIBS}"; then
     enable_dbengine="yes"
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
     OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
     OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
     OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
-    OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
@@ -1601,7 +1563,6 @@ AC_SUBST([OPTIONAL_MATH_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_CFLAGS])
-AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
