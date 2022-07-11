@@ -160,7 +160,7 @@ static int ebpf_send_systemd_oomkill_charts()
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->oomkill);
             ect->oomkill = 0;
-        } else
+        } else if (unlikely(ect->systemd))
             ret = 0;
     }
     write_end_chart();
