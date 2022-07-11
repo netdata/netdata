@@ -582,22 +582,18 @@ static void filesystem_collector(ebpf_module_t *em)
                           NETDATA_THREAD_OPTION_JOINABLE, ebpf_filesystem_read_hash, em);
 
     int update_every = em->update_every;
-    int counter = update_every - 1;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = update_every * USEC_PER_SEC;
     while (!close_ebpf_plugin || em->optional) {
-        pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        (void)heartbeat_next(&hb, step);
 
-        if (++counter == update_every) {
-            counter = 0;
-            pthread_mutex_lock(&lock);
+        pthread_mutex_lock(&lock);
 
-            ebpf_create_fs_charts(update_every);
-            ebpf_histogram_send_data();
+        ebpf_create_fs_charts(update_every);
+        ebpf_histogram_send_data();
 
-            pthread_mutex_unlock(&lock);
-        }
-
-        pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
     }
 }
 
