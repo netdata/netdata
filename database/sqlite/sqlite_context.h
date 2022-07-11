@@ -13,6 +13,7 @@ typedef struct ctx_chart {
     char *context;
     char *title;
     char *units;
+    char *chart_type;
     int priority;
     int update_every;
 } SQL_CHART_DATA;
@@ -20,13 +21,14 @@ typedef struct ctx_chart {
 typedef struct ctx_dimension {
     uuid_t dim_id;
     char *id;
-} ctx_dimension_t;
+    char *name;
+} SQL_DIMENSION_DATA;
 
 typedef struct ctx_label {
     char *label_key;
     char *label_value;
     int label_source;
-} ctx_label_t;
+} SQL_CLABEL_DATA;
 
 // Structure to store or delete
 typedef struct versioned_context_data {
@@ -49,8 +51,8 @@ typedef struct versioned_context_data {
 extern void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data);
 
 extern void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data);
-extern void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data);
-extern void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data);
+extern void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data);
+extern void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data);
 
 extern int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data);
 
