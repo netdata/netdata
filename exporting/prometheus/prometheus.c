@@ -532,7 +532,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         host->program_name,
         host->program_version);
 
-    if (instance->labels_buffer && buffer_tostring(instance->labels_buffer)) {
+    if (instance->labels_buffer && *buffer_tostring(instance->labels_buffer)) {
         buffer_sprintf(wb, ",%s", buffer_tostring(instance->labels_buffer));
     }
 
