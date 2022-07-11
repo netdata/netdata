@@ -692,8 +692,7 @@ RRDHOST *rrdhost_find_or_create(
         rrdhost_wrlock(host);
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
         host->senders_disconnected_time = 0;
-        rrdhost_create_rrdcontexts(host);
-        rrdhost_create_rrdinstances(host);
+        rrdhost_load_rrdcontext_data(host);
         rrdhost_unlock(host);
     }
 

@@ -1213,12 +1213,10 @@ static RRDCONTEXT_ACQUIRED *rrdcontext_from_rrdset(RRDSET *st) {
 
 void rrdcontext_updated_rrddim(RRDDIM *rd) {
     rrdmetric_from_rrddim(rd);
-    ;
 }
 
 void rrdcontext_removed_rrddim(RRDDIM *rd) {
     rrdmetric_rrddim_is_freed(rd);
-    ;
 }
 
 void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
@@ -1306,7 +1304,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .name = string_strdupz(sc->name),
         .title = string_strdupz(sc->title),
         .units = string_strdupz(sc->units),
-        .chart_type = rrdset_type_id(sc->chart_type),
+        .chart_type = sc->chart_type,
         .priority = sc->priority,
         .update_every = sc->update_every,
         .rca = rrdcontext_acquire(host, sc->context),
@@ -1336,6 +1334,8 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {
+    if(host->rrdcontexts || host->rrdinstances) return;
+
     rrdhost_create_rrdinstances(host);
     rrdhost_create_rrdcontexts(host);
 
