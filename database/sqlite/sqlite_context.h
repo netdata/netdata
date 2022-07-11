@@ -52,11 +52,11 @@ extern void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA
 extern void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data);
 extern void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(void *, void *), void *data);
 
-extern int ctx_store_context(VERSIONED_CONTEXT_DATA *context_data);
+extern int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data);
 
-#define ctx_update_context(context_data)    ctx_store_context(context_data)
+#define ctx_update_context(host_uuid, context_data)    ctx_store_context(host_uuid, context_data)
 
-extern int ctx_delete_context(VERSIONED_CONTEXT_DATA *context_data);
+extern int ctx_delete_context(uuid_t *host_id, VERSIONED_CONTEXT_DATA *context_data);
 
 extern int sql_init_context_database(int memory);
 extern int ctx_unittest(void);
