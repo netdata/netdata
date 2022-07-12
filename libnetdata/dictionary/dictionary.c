@@ -460,9 +460,9 @@ static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_
     if(can_get_write_lock && DICTIONARY_STATS_PENDING_DELETES_GET(dict)) {
         // we can garbage collect now
 
-        dictionary_lock(dict, 'w');
+        dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
         garbage_collect_pending_deletes_unsafe(dict);
-        dictionary_unlock(dict, 'w');
+        dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
     }
 
     if(refcount < 0) {
@@ -865,7 +865,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     NAME_VALUE *nv;
 
     debug(D_DICTIONARY, "Destroying dictionary.");
-    dictionary_lock(dict, 'w');
+    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
 
     long referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
     if(referenced_items) {
@@ -877,7 +877,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
         }
         internal_error(true, "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).", dict->creation_function, dict->creation_line, dict->creation_file, referenced_items, dict->entries);
         dict->flags |= DICTIONARY_FLAG_DESTROYED;
-        dictionary_unlock(dict, 'w');
+        dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
         return 0;
     }
 
@@ -899,7 +899,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     // destroy the dictionary
     freed += hashtable_destroy_unsafe(dict);
 
-    dictionary_unlock(dict, 'w');
+    dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
     freed += dictionary_lock_free(dict);
     freed += reference_counter_free(dict);
     freed += sizeof(DICTIONARY) + dict->scratchpad_size;
@@ -912,7 +912,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 // helpers
 
 static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
-    if(unlikely(!name || !*name)) {
+    if(unlikely(!name)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_set() a dictionary item without a name");
         return NULL;
     }
@@ -959,14 +959,11 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
             dict->conflict_callback(namevalue_get_name(nv), nv->value, value, dict->conflict_callback_data);
     }
 
-    if(dict->react_callback)
-        dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
-
     return nv;
 }
 
 static NAME_VALUE *dictionary_get_name_value_unsafe(DICTIONARY *dict, const char *name) {
-    if(unlikely(!name || !*name)) {
+    if(unlikely(!name)) {
         internal_error(true, "attempted to dictionary_get() without a name");
         return NULL;
     }
@@ -996,14 +993,28 @@ static NAME_VALUE *dictionary_get_name_value_unsafe(DICTIONARY *dict, const char
 
 void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
     NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+
+    if(unlikely(!nv))
+        return NULL;
+
+    if(unlikely(dict->react_callback))
+        dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
+
     return nv->value;
 }
 
 void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
-    dictionary_lock(dict, 'w');
-    void *ret = dictionary_set_unsafe(dict, name, value, value_len);
-    dictionary_unlock(dict, 'w');
-    return ret;
+    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
+    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+    dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    if(unlikely(!nv))
+        return NULL;
+
+    if(unlikely(dict->react_callback))
+        dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
+
+    return nv->value;
 }
 
 DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
@@ -1013,14 +1024,27 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const 
         return NULL;
 
     reference_counter_acquire(dict, nv);
+
+    if(unlikely(dict->react_callback))
+        dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
+
     return (DICTIONARY_ITEM *)nv;
 }
 
 DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
-    dictionary_lock(dict, 'w');
-    DICTIONARY_ITEM *item = dictionary_set_and_acquire_item_unsafe(dict, name, value, value_len);
-    dictionary_unlock(dict, 'w');
-    return item;
+    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
+    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+    dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    if(unlikely(!nv))
+        return NULL;
+
+    reference_counter_acquire(dict, nv);
+
+    if(dict->react_callback)
+        dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
+
+    return (DICTIONARY_ITEM *)nv;
 }
 
 void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
@@ -1033,9 +1057,9 @@ void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
 }
 
 void *dictionary_get(DICTIONARY *dict, const char *name) {
-    dictionary_lock(dict, 'r');
+    dictionary_lock(dict, DICTIONARY_LOCK_READ);
     void *ret = dictionary_get_unsafe(dict, name);
-    dictionary_unlock(dict, 'r');
+    dictionary_unlock(dict, DICTIONARY_LOCK_READ);
     return ret;
 }
 
@@ -1050,9 +1074,9 @@ DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const 
 }
 
 DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name) {
-    dictionary_lock(dict, 'r');
+    dictionary_lock(dict, DICTIONARY_LOCK_READ);
     void *ret = dictionary_get_and_acquire_item_unsafe(dict, name);
-    dictionary_unlock(dict, 'r');
+    dictionary_unlock(dict, DICTIONARY_LOCK_READ);
     return ret;
 }
 
@@ -1150,9 +1174,9 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
 }
 
 int dictionary_del(DICTIONARY *dict, const char *name) {
-    dictionary_lock(dict, 'w');
+    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     int ret = dictionary_del_unsafe(dict, name);
-    dictionary_unlock(dict, 'w');
+    dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
     return ret;
 }
 

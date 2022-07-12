@@ -79,6 +79,7 @@ extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*confl
 
 // a reaction callback to be called after every item insertion or conflict
 // after the constructors have finished and the items are fully available for use
+// and the dictionary is not write locked anymore
 extern void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const char *name, void *value, void *data), void *data);
 
 // Destroy a dictionary
