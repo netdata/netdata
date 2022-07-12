@@ -333,6 +333,7 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
         min_first_time_t = rrddim_first_entry_t(rm->rrddim);
         max_last_time_t = rrddim_last_entry_t(rm->rrddim);
     }
+#ifdef ENABLE_DBENGINE
     else {
         RRDHOST *rrdhost = rm->ri->rc->rrdhost;
         for (int tier = 0; tier < storage_tiers; tier++) {
@@ -348,6 +349,7 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
             }
         }
     }
+#endif
 
     if(min_first_time_t == LONG_MAX)
         min_first_time_t = 0;
@@ -1027,16 +1029,18 @@ static void rrdcontext_freez(RRDCONTEXT *rc) {
     string_freez(rc->units);
 }
 
-static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc) {
-
+static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc) {
     time_t now = now_realtime_sec();
     uint64_t version = MAX(rc->version, rc->hub.version);
     version = MAX((uint64_t)now, version);
     version++;
+    return version;
+}
+
+static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc) {
 
     // save it, so that we know the last version we sent to hub
-    rc->version = version;
-    rc->hub.version = version;
+    rc->version = rc->hub.version = rrdcontext_get_next_version(rc);
     rc->hub.id = string2str(rc->id);
     rc->hub.title = string2str(rc->title);
     rc->hub.units = string2str(rc->units);
@@ -1439,6 +1443,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc) {
         log_transition(NULL, NULL, rc->id, rc->flags, "RRDCONTEXT");
 
         if(check_if_cloud_version_changed_unsafe(rc, "QUEUE")) {
+            rc->version = rrdcontext_get_next_version(rc);
             rc->last_queued_ut = now_realtime_usec();
             rc->last_queued_flags |= rc->flags;
             dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_queue, string2str(rc->id), rc, sizeof(*rc));
@@ -1703,6 +1708,8 @@ void *rrdcontext_main(void *ptr) {
                         worker_is_busy(3);
                         rrdcontext_message_send_unsafe(rc);
                     }
+                    else
+                        rc->version = rc->hub.version;
 
                     rc->last_queued_ut = 0;
                     rc->last_queued_flags = RRD_FLAG_NONE;
