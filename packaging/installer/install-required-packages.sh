@@ -1535,6 +1535,13 @@ validate_tree_ol() {
 	EOF
       fi
     fi
+  elif [[ "${version}" =~ ^9(\..*)?$ ]]; then
+    echo " > Checking for CodeReady Builder ..."
+    if ! run ${sudo} dnf repolist enabled | grep -q codeready; then
+      if prompt "CodeReady Builder not enabled, shall I enable it?"; then
+        run ${sudo} dnf config-manager --set-enabled ol9_codeready_builder
+      fi
+    fi
   fi
 }
 
