@@ -861,6 +861,7 @@ static void shm_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
     while (!close_ebpf_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         if (++counter == update_every) {
             counter = 0;
