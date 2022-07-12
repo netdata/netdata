@@ -1028,8 +1028,15 @@ static void rrdcontext_freez(RRDCONTEXT *rc) {
 }
 
 static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc) {
+
+    time_t now = now_realtime_sec();
+    uint64_t version = MAX(rc->version, rc->hub.version);
+    version = MAX((uint64_t)now, version);
+    version++;
+
     // save it, so that we know the last version we sent to hub
-    rc->version = rc->hub.version = (rc->version > rc->hub.version ? rc->version : rc->hub.version) + 1;
+    rc->version = version;
+    rc->hub.version = version;
     rc->hub.id = string2str(rc->id);
     rc->hub.title = string2str(rc->title);
     rc->hub.units = string2str(rc->units);
@@ -1039,7 +1046,7 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc) {
     rc->hub.last_time_t = (rc->flags & RRD_FLAG_COLLECTED) ? 0 : rc->last_time_t;
     rc->hub.deleted = (rc->flags & RRD_FLAG_DELETED) ? true : false;
 
-    // call the ACLK function to send this message
+    // TODO call the ACLK function to send this message
 
 
     // store it to SQL
@@ -1048,8 +1055,7 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc) {
 }
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *msg) {
-    bool version_changed = false,
-         id_changed = false,
+    bool id_changed = false,
          title_changed = false,
          units_changed = false,
          chart_type_changed = false,
@@ -1057,9 +1063,6 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *ms
          first_time_changed = false,
          last_time_changed = false,
          deleted_changed = false;
-
-    if(unlikely(rc->version != rc->hub.version))
-        version_changed = true;
 
     if(unlikely(string2str(rc->id) != rc->hub.id))
         id_changed = true;
@@ -1085,19 +1088,19 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *ms
     if(unlikely(((rc->flags & RRD_FLAG_DELETED) ? true : false) != rc->hub.deleted))
         deleted_changed = true;
 
-    if(unlikely(version_changed || id_changed || title_changed || units_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
+    if(unlikely(id_changed || title_changed || units_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
-        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s version %zu%s, title '%s'%s, units '%s'%s, chart type '%s'%s, priority %lu%s, first_time_t %lu%s, last_time_t %lu%s, deleted '%s'%s",
+        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s (last version %zu), title '%s'%s, units '%s'%s, chart type '%s'%s, priority %lu%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s",
                        msg,
-                       rc->hub.id, id_changed ? " (CHANGED)" : "",
-                       rc->hub.version, version_changed ? " (CHANGED)" : "",
-                       rc->hub.title, title_changed ? " (CHANGED)" : "",
-                       rc->hub.units, units_changed ? " (CHANGED)" : "",
-                       rc->hub.chart_type, chart_type_changed ? " (CHANGED)" : "",
-                       rc->hub.priority, priority_changed ? " (CHANGED)" : "",
-                       rc->hub.first_time_t, first_time_changed ? " (CHANGED)" : "",
-                       rc->hub.last_time_t, last_time_changed ? " (CHANGED)" : "",
-                       rc->hub.deleted ? "true" : "false", deleted_changed ? " (CHANGED)" : ""
+                       string2str(rc->id), id_changed ? " (CHANGED)" : "",
+                       rc->version,
+                       string2str(rc->title), title_changed ? " (CHANGED)" : "",
+                       string2str(rc->units), units_changed ? " (CHANGED)" : "",
+                       rrdset_type_name(rc->chart_type), chart_type_changed ? " (CHANGED)" : "",
+                       rc->priority, priority_changed ? " (CHANGED)" : "",
+                       rc->first_time_t, first_time_changed ? " (CHANGED)" : "",
+                       rc->last_time_t, last_time_changed ? " (CHANGED)" : "",
+                       (rc->flags & RRD_FLAG_DELETED) ? "true" : "false", deleted_changed ? " (CHANGED)" : ""
                        );
         return true;
     }
