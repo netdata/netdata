@@ -22,13 +22,18 @@ version](/docs/collect/enable-configure.md), and enable the Python version. Netd
 attempts to load the Python version and its accompanying configuration file.
 
 If you don't see the app/service you'd like to monitor in this list:
-- Check out our [GitHub issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous discussions about that
-collector—we may be looking for assistance from users such as yourself!
-- If you don't see the collector there, you can make a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
-- If you have basic software development skills, you can add your own plugin in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector) or [Python](https://learn.netdata.cloud/guides/python-collector)
+
+- Check out our [GitHub issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous
+  discussions about that collector—we may be looking for assistance from users such as yourself!
+- If you don't see the collector there, you can make
+  a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
+- If you have basic software development skills, you can add your own plugin
+  in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector)
+  or [Python](https://learn.netdata.cloud/guides/python-collector)
 
 Supported Collectors List:
-  - [Service and application collectors](#service-and-application-collectors)
+
+- [Service and application collectors](#service-and-application-collectors)
     - [Generic](#generic)
     - [APM (application performance monitoring)](#apm-application-performance-monitoring)
     - [Containers and VMs](#containers-and-vms)
@@ -44,7 +49,7 @@ Supported Collectors List:
     - [Search](#search)
     - [Storage](#storage)
     - [Web](#web)
-  - [System collectors](#system-collectors)
+- [System collectors](#system-collectors)
     - [Applications](#applications)
     - [Disks and filesystems](#disks-and-filesystems)
     - [eBPF](#ebpf)
@@ -55,10 +60,10 @@ Supported Collectors List:
     - [Processes](#processes)
     - [Resources](#resources)
     - [Users](#users)
-  - [Netdata collectors](#netdata-collectors)
-  - [Orchestrators](#orchestrators)
-  - [Third-party collectors](#third-party-collectors)
-  - [Etc](#etc)
+- [Netdata collectors](#netdata-collectors)
+- [Orchestrators](#orchestrators)
+- [Third-party collectors](#third-party-collectors)
+- [Etc](#etc)
 
 ## Service and application collectors
 
@@ -250,13 +255,14 @@ configure any of these collectors according to your setup and infrastructure.
 
 - [AM2320](/collectors/python.d.plugin/am2320/README.md): Monitor sensor temperature and humidity.
 - [Access point](/collectors/charts.d.plugin/ap/README.md): Monitor client, traffic and signal metrics using the `aw`
-    tool.
+  tool.
 - [APC UPS](/collectors/charts.d.plugin/apcupsd/README.md): Capture status information using the `apcaccess` tool.
 - [Energi Core](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/energid): Monitor
-    blockchain indexes, memory usage, network usage, and transactions of wallet instances.
+  blockchain indexes, memory usage, network usage, and transactions of wallet instances.
 - [UPS/PDU](/collectors/charts.d.plugin/nut/README.md): Read the status of UPS/PDU devices using the `upsc` tool.
-- [SNMP devices](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/snmp): Gather data using the SNMP protocol.
--   [1-Wire sensors](/collectors/python.d.plugin/w1sensor/README.md): Monitor sensor temperature.
+- [SNMP devices](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/snmp): Gather data using the SNMP
+  protocol.
+- [1-Wire sensors](/collectors/python.d.plugin/w1sensor/README.md): Monitor sensor temperature.
 
 ### Search
 
@@ -481,9 +487,9 @@ Plugin orchestrators organize and run many of the above collectors.
 If you're interested in developing a new collector that you'd like to contribute to Netdata, we highly recommend using
 the `go.d.plugin`.
 
--   [go.d.plugin](https://github.com/netdata/go.d.plugin): An orchestrator for data collection modules written in `go`.
--   [python.d.plugin](python.d.plugin/README.md): An orchestrator for data collection modules written in `python` v2/v3.
--   [charts.d.plugin](charts.d.plugin/README.md): An orchestrator for data collection modules written in `bash` v4+.
+- [go.d.plugin](https://github.com/netdata/go.d.plugin): An orchestrator for data collection modules written in `go`.
+- [python.d.plugin](python.d.plugin/README.md): An orchestrator for data collection modules written in `python` v2/v3.
+- [charts.d.plugin](charts.d.plugin/README.md): An orchestrator for data collection modules written in `bash` v4+.
 
 ## Third-party collectors
 
