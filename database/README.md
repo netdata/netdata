@@ -45,7 +45,7 @@ So,
 
 - On a single node setup, use `[db].mode = dbengine`.
 - On a [Parent - Child](/docs/metrics-storage-management/how-streaming-works) setup, use `[db].mode = dbengine` on the
-  parent to increase retention and a more resource efficient modes like, `dbengine` with light retention settings,
+  parent to increase retention, a more resource efficient mode like, `dbengine` with light retention settings, and
   `save`, `ram` or `none` modes for the children to minimize resource utilization.
 
 ## Choose your database mode
@@ -71,9 +71,9 @@ multiple children Netdata Agents (dozens, hundreds, or even thousands depending 
 
 ## Running Netdata on embedded devices
 
-Embedded devices usually have very limited RAM resources available.
+Embedded devices typically have very limited RAM resources available.
 
-There are 2 settings for you to tweak:
+There are two settings for you to configure:
 
 1. `[db].update every`, which controls the data collection frequency
 2. `[db].retention`, which controls the size of the database in memory (except for `[db].mode = dbengine`)

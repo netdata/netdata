@@ -12,7 +12,7 @@ The default settings retain approximately two day's worth of metrics on a system
 but the Netdata Agent is highly configurable if you want your nodes to store days, weeks, or months worth of per-second
 data.
 
-The Netdata Agent uses 3 fundamental settings in `netdata.conf` to change the behavior of the database engine:
+The Netdata Agent uses the following three fundamental settings in `netdata.conf` to change the behavior of the database engine:
 
 ```conf
 [global]

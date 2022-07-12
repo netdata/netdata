@@ -22,9 +22,9 @@ including the Tier 0, which has the highest resolution) which means years of dat
 ### Metric size
 
 Tier 0 is the default that was always available in `dbengine` mode. Tier 1 is the first level of aggregation, Tier 2 is
-the second so on so forth.
+the second, and so on.
 
-Metrics on all tiers except of the _Tier 0_, store 5 more values for every point for accurate representation:
+Metrics on all tiers except of the _Tier 0_ also store the following five additional values for every point for accurate representation:
 
 1. The `sum` of the points aggregated
 2. The `min` of the points aggregated
@@ -32,7 +32,7 @@ Metrics on all tiers except of the _Tier 0_, store 5 more values for every point
 4. The `count` of the points aggregated (could be constant, but it may not be due to gaps in data collection)
 5. The `anomaly_count` of the points aggregated (how many of the aggregated points found anomalous)
 
-Among `min`, `max` and `sum`, the right value is chosen based on the user query. `average` is calculated on the fly at
+Among `min`, `max` and `sum`, the correct value is chosen based on the user query. `average` is calculated on the fly at
 query time.
 
 ### Tiering in a nutshell
@@ -63,14 +63,14 @@ explore the following configuration.
 For 2000 metrics, collected every second and retained for a week, Tier 0 needs: 1 byte x 2000 metrics x 3600 secs per
 hour x 24 hours per day x 7 days per week = 1100MB.
 
-By setting it to `1100`, this node will start maintaining about a week of data. But pay attention to the number of
+By setting `dbengine multihost disk space MB` to `1100`, this node will start maintaining about a week of data. But pay attention to the number of
 metrics. If you have more than 2000 metrics on a node, or you need more that a week of high resolution metrics, you may
 need to adjust this setting accordingly.
 
-Tier 1 is by default sampling the data every **60 points of Tier 0**. In our case Tier 0 is per second, if we want to
+Tier 1 is by default sampling the data every **60 points of Tier 0**. In our case, Tier 0 is per second, if we want to
 transform this information in terms of time then the Tier 1 "resolution" is per minute.
 
-Tier 1 needs 4 times more storage per point compared to Tier 0. So, for 2000 metrics, with per minute resolution,
+Tier 1 needs four times more storage per point compared to Tier 0. So, for 2000 metrics, with per minute resolution,
 retained for a month, Tier 1 needs: 4 bytes x 2000 metrics x 60 minutes per hour x 24 hours per day x 30 days per month
 = 330MB.
 
@@ -231,7 +231,7 @@ storage at lower granularity.
 The DB engine stores chart metric values in 4096-byte pages in memory. Each chart dimension gets its own page to store
 consecutive values generated from the data collectors. Those pages comprise the **Page Cache**.
 
-When those pages fill up they are slowly compressed and flushed to disk. It can
+When those pages fill up, they are slowly compressed and flushed to disk. It can
 take `4096 / 4 = 1024 seconds = 17 minutes`, for a chart dimension that is being collected every 1 second, to fill a
 page. Pages can be cut short when we stop Netdata or the DB engine instance so as to not lose the data. When we query
 the DB engine for data we trigger disk read I/O requests that fill the Page Cache with the requested pages and
