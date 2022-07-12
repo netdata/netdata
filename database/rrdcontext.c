@@ -3,9 +3,8 @@
 #include "rrdcontext.h"
 #include "sqlite/sqlite_context.h"
 
-// #define LOG_RRDMETRICS 1
+#define LOG_TRANSITIONS 1
 // #define LOG_RRDINSTANCES 1
-// #define LOG_RRDCONTEXTS 1
 
 static int log_calls = 1;
 
@@ -187,6 +186,62 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc);
 
 // ----------------------------------------------------------------------------
 // logging of all data collected
+
+#ifdef LOG_TRANSITIONS
+static struct {
+    RRD_FLAGS flag;
+    const char *name;
+} transitions[] = {
+    { RRD_FLAG_UPDATE_REASON_NEW_OBJECT, "object created" },
+    { RRD_FLAG_UPDATE_REASON_LOAD_SQL, "loaded from sql" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_TITLE, "changed title" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_UNITS, "changed units" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY, "changed priority" },
+    { RRD_FLAG_UPDATE_REASON_ZERO_RETENTION, "has no retention" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_UUID, "changed uuid" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY, "changed updated every" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_LINKING, "changed rrd link" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_NAME, "changed name" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T, "updated first_time_t" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T, "updated last_time_t" },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_CHART_TYPE, "changed chart type" },
+    { RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED, "stopped collected" },
+    { RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED, "started collected" },
+    { RRD_FLAG_UPDATE_REASON_CONNECTED_CHILD, "child connected" },
+    { RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, "child disconnected" },
+    { RRD_FLAG_UPDATE_REASON_NETDATA_EXIT, "netdata exits" },
+    { 0, NULL },
+};
+
+static void log_transition(STRING *metric, STRING *instance, STRING *context, RRD_FLAGS flags, const char *msg) {
+    BUFFER *wb = buffer_create(1000);
+
+    buffer_sprintf(wb, "RRD TRANSITION: context '%s'", string2str(context));
+
+    if(instance)
+        buffer_sprintf(wb, ", instance '%s'", string2str(instance));
+
+    if(metric)
+        buffer_sprintf(wb, ", metric '%s'", string2str(metric));
+
+    buffer_sprintf(wb, ", triggered by %s: ", msg);
+
+    size_t added = 0;
+    for(int i = 0; transitions[i].name ;i++) {
+        if(flags & transitions[i].flag) {
+            if(added++) buffer_strcat(wb, ", ");
+            buffer_strcat(wb, transitions[i].name);
+        }
+    }
+    if(!added)
+        buffer_strcat(wb, "NONE");
+
+    internal_error(true, "%s", buffer_tostring(wb));
+    buffer_free(wb);
+}
+#else
+#define log_transition(metric, instance, context, flags, msg) debug_dummy()
+#endif
 
 #ifdef LOG_RRDINSTANCES
 static void rrdinstance_log(RRDINSTANCE *ri, const char *msg, bool rrdmetrics_is_write_locked) {
@@ -438,6 +493,7 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm) {
 
     if(unlikely(rm->flags & RRD_FLAG_UPDATED)) {
         rm->ri->flags |= RRD_FLAG_UPDATED;
+        log_transition(rm->id, rm->ri->id, rm->ri->rc->id, rm->flags, "RRDMETRIC");
         rrdinstance_trigger_updates(rm->ri);
         rrd_flag_unset_updated(rm);
     }
@@ -724,6 +780,7 @@ void rrdinstances_destroy(RRDCONTEXT *rc) {
 
 static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
     if(unlikely(!(ri->flags & RRD_FLAG_UPDATED))) return;
+    rrd_flag_unset_updated(ri);
 
     RRD_FLAGS flags = RRD_FLAG_NONE;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
@@ -820,6 +877,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
 
     if(unlikely(ri->flags & RRD_FLAG_UPDATED)) {
         ri->rc->flags |= RRD_FLAG_UPDATED;
+        log_transition(NULL, ri->id, ri->rc->id, ri->flags, "RRDINSTANCE");
         rrdcontext_trigger_updates(ri->rc);
         rrd_flag_unset_updated(ri);
     }
@@ -1238,10 +1296,10 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
 }
 
 static void rrdcontext_trigger_updates(RRDCONTEXT *rc) {
-    if(unlikely(!(rc->flags & RRD_FLAG_UPDATED)))
-        return;
+    if(unlikely(!(rc->flags & RRD_FLAG_UPDATED))) return;
 
     netdata_mutex_lock(&rc->mutex);
+    rrd_flag_unset_updated(rc);
 
     size_t min_priority = LONG_MAX;
     RRD_FLAGS flags = RRD_FLAG_NONE;
@@ -1345,6 +1403,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc) {
     }
 
     if(unlikely(rc->flags & RRD_FLAG_UPDATED)) {
+        log_transition(NULL, NULL, rc->id, rc->flags, "RRDCONTEXT");
         check_if_we_need_to_emit_new_version(rc);
         rrd_flag_unset_updated(rc);
     }
@@ -1497,3 +1556,9 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 
     internal_error(log_calls, "RRDCONTEXT: finished loading SQL data for host '%s'", host->hostname);
 }
+
+// ----------------------------------------------------------------------------
+// the worker thread
+
+// TODO - cleanup contexts that no longer have any retention
+//
