@@ -135,6 +135,16 @@ const struct netdata_static_thread static_threads_common[] = {
     },
 #endif
 
+    {
+        .name = "rrdcontext",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = rrdcontext_main
+    },
+
     {NULL, NULL, NULL, 0, NULL, NULL, NULL}
 };
 
