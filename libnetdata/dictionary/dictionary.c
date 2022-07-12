@@ -86,6 +86,9 @@ struct dictionary {
     void (*ins_callback)(const char *name, void *value, void *data);
     void *ins_callback_data;
 
+    void (*react_callback)(const char *name, void *value, void *data);
+    void *react_callback_data;
+
     void (*del_callback)(const char *name, void *value, void *data);
     void *del_callback_data;
 
@@ -129,6 +132,11 @@ void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(
 void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data), void *data) {
     dict->conflict_callback = conflict_callback;
     dict->conflict_callback_data = data;
+}
+
+void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const char *name, void *value, void *data), void *data) {
+    dict->react_callback = react_callback;
+    dict->react_callback_data = data;
 }
 
 // ----------------------------------------------------------------------------
@@ -455,6 +463,11 @@ static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_
         dictionary_lock(dict, 'w');
         garbage_collect_pending_deletes_unsafe(dict);
         dictionary_unlock(dict, 'w');
+    }
+
+    if(refcount < 0) {
+        internal_error(true, "DICTIONARY: reference counter is negative on item '%s' on dictionary created by %s() (%zu@%s)", namevalue_get_name(nv), dict->creation_function, dict->creation_line, dict->creation_file);
+        fatal("DICTIONARY: reference counter is negative on item '%s'", namevalue_get_name(nv));
     }
 
     return refcount;
@@ -945,6 +958,9 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
         else if(dict->conflict_callback)
             dict->conflict_callback(namevalue_get_name(nv), nv->value, value, dict->conflict_callback_data);
     }
+
+    if(dict->react_callback)
+        dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
 
     return nv;
 }

@@ -77,6 +77,10 @@ extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_cal
 // the old_value will remain in the dictionary - the new_value is ignored
 extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data), void *data);
 
+// a reaction callback to be called after every item insertion or conflict
+// after the constructors have finished and the items are fully available for use
+extern void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const char *name, void *value, void *data), void *data);
+
 // Destroy a dictionary
 // returns the number of bytes freed
 // the returned value will not include name and value sizes if DICTIONARY_FLAG_WITH_STATISTICS is not set
