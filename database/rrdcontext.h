@@ -52,5 +52,11 @@ extern void rrdcontext_updated_rrdset_name(RRDSET *st);
 extern void rrdcontext_updated_rrdset_flags(RRDSET *st);
 extern void rrdcontext_collected_rrdset(RRDSET *st);
 
+// ----------------------------------------------------------------------------
+// public API for threads
+
+extern void rrdcontext_db_rotation(void);
+extern void *rrdcontext_main(void *);
+
 #endif // NETDATA_RRDCONTEXT_H
 
