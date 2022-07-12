@@ -21,9 +21,9 @@ It is notable for having much simpler configuration than many popular HTTP serve
 
 On most systems, the H2O configuration is found under `/etc/h2o`. H2O uses [YAML 1.1](https://yaml.org/spec/1.1/), with a few special extensions, for it’s configuration files, with the main configuration file being `/etc/h2o/h2o.conf`. 
 
-You can edit the H2O configuration file with Nano, Vim or any other text editors you are comfortable with.
+You can edit the H2O configuration file with Nano, Vim or any other text editors with which you are comfortable.
 
-After making changes to the configuration files:
+After making changes to the configuration files, perform the following:
 
 -   Test the configuration with `h2o -m test -c /etc/h2o/h2o.conf`
 
