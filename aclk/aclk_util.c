@@ -124,6 +124,8 @@ struct topic_name {
     { .id = ACLK_TOPICID_ALARM_CONFIG,          .name = "alarm-config"             },
     { .id = ACLK_TOPICID_ALARM_SNAPSHOT,        .name = "alarm-snapshot"           },
     { .id = ACLK_TOPICID_NODE_COLLECTORS,       .name = "node-instance-collectors" },
+    { .id = ACLK_TOPICID_CTXS_SNAPSHOT,         .name = "ctxs-snapshot"            },
+    { .id = ACLK_TOPICID_CTXS_UPDATED,          .name = "ctxs-updates"             },
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
@@ -147,6 +149,8 @@ enum aclk_topics compulsory_topics[] = {
     ACLK_TOPICID_ALARM_CONFIG,
     ACLK_TOPICID_ALARM_SNAPSHOT,
     ACLK_TOPICID_NODE_COLLECTORS,
+    ACLK_TOPICID_CTXS_SNAPSHOT,
+    ACLK_TOPICID_CTXS_UPDATED,
     ACLK_TOPICID_UNKNOWN
 };
 
