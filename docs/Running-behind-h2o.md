@@ -66,9 +66,9 @@ hosts:
         proxy.reverse.url: http://127.0.0.1:19999
 ```
 
-### As a subfolder for multiple Netdata servers, via one Nginx
+### As a subfolder for multiple Netdata servers, via one H2O instance
 
-This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via subfolders. 
+This is the recommended configuration when one H2O instance will be used to manage multiple Netdata servers via subfolders.
 
 ```yaml
 hosts:
@@ -99,7 +99,7 @@ Using the above, you access Netdata on the backend servers, like this:
 -   `http://netdata.example.com/netdata/server1/` to reach Netdata on `198.51.100.1:19999`
 -   `http://netdata.example.com/netdata/server2/` to reach Netdata on `198.51.100.2:19999`
 
-### Encrypt the communication between Nginx and Netdata
+### Encrypt the communication between H2O and Netdata
 
 In case Netdata's web server has been [configured to use TLS](/web/server/README.md#enabling-tls-support), it is
 necessary to specify inside the H2O configuration that the final destination is using TLS. To do this, change the
