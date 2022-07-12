@@ -515,7 +515,7 @@ static void rrdinstance_insert_callback(const char *id, void *value, void *data)
 
     netdata_rwlock_init(&ri->rwlock);
 
-    rrdinstance_log(ri, "INSERT", false);
+    // rrdinstance_log(ri, "INSERT", false);
 
     ri->flags |= RRD_FLAG_UPDATED;
     rrdinstance_has_been_updated(ri, true, false);
@@ -526,7 +526,7 @@ static void rrdinstance_delete_callback(const char *id, void *value, void *data)
     RRDCONTEXT *rc = data; (void)rc;
     RRDINSTANCE *ri = (RRDINSTANCE *)value;
 
-    rrdinstance_log(ri, "DELETE", false);
+    // rrdinstance_log(ri, "DELETE", false);
     rrdinstance_free(ri);
 }
 
@@ -610,7 +610,7 @@ static void rrdinstance_conflict_callback(const char *id, void *oldv, void *newv
         changed = true;
     }
 
-    rrdinstance_log(ri, "CONFLICT", false);
+    // rrdinstance_log(ri, "CONFLICT", false);
 
     netdata_rwlock_unlock(&ri->rwlock);
 
@@ -646,29 +646,32 @@ static void rrdinstance_has_been_updated(RRDINSTANCE *ri, bool rrdinstances_is_w
     RRD_FLAGS flags = RRD_FLAG_NONE;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t metrics_active = 0, metrics_deleted = 0;
-    RRDMETRIC *rm;
-    dfe_start_rw((DICTIONARY *)ri->rrdmetrics, rm, rrdmetrics_is_write_locked ? DICTIONARY_LOCK_NONE : DICTIONARY_LOCK_READ) {
+    {
+        RRDMETRIC *rm;
+        dfe_start_rw(
+            (DICTIONARY *)ri->rrdmetrics, rm, rrdmetrics_is_write_locked ? DICTIONARY_LOCK_NONE : DICTIONARY_LOCK_READ)
+        {
+            if (rm->flags & RRD_FLAG_DELETED) {
+                metrics_deleted++;
+                continue;
+            }
 
-        if(rm->flags & RRD_FLAG_DELETED) {
-            metrics_deleted++;
-            continue;
+            metrics_active++;
+
+            if (rm->flags & RRD_FLAG_COLLECTED)
+                flags |= RRD_FLAG_COLLECTED;
+
+            if (rm->first_time_t == 0 || rm->last_time_t == 0)
+                continue;
+
+            if (rm->first_time_t < min_first_time_t)
+                min_first_time_t = rm->first_time_t;
+
+            if (rm->last_time_t > max_last_time_t)
+                max_last_time_t = rm->last_time_t;
         }
-
-        metrics_active++;
-
-        if(rm->flags & RRD_FLAG_COLLECTED)
-            flags |= RRD_FLAG_COLLECTED;
-
-        if(rm->first_time_t == 0 || rm->last_time_t == 0)
-            continue;
-
-        if(rm->first_time_t < min_first_time_t)
-            min_first_time_t = rm->first_time_t;
-
-        if(rm->last_time_t > max_last_time_t)
-            max_last_time_t = rm->last_time_t;
+        dfe_done(rm);
     }
-    dfe_done(rm);
 
     if(metrics_active || metrics_deleted) {
         if (min_first_time_t == LONG_MAX)
@@ -695,17 +698,22 @@ static void rrdinstance_has_been_updated(RRDINSTANCE *ri, bool rrdinstances_is_w
             }
         }
 
-        if (!(flags & RRD_FLAG_COLLECTED) && (ri->flags & RRD_FLAG_COLLECTED)) {
-            ri->flags &= ~RRD_FLAG_COLLECTED;
-            ri->flags |= RRD_FLAG_UPDATED;
-        }
+        if(flags & RRD_FLAG_COLLECTED) {
+            ri->flags |= RRD_FLAG_COLLECTED | RRD_FLAG_UPDATED;
 
-        if(!(ri->flags & RRD_FLAG_ARCHIVED) && !(ri->flags & RRD_FLAG_COLLECTED)) {
+            if(ri->flags & RRD_FLAG_ARCHIVED)
+                ri->flags &= ~RRD_FLAG_ARCHIVED;
+        }
+        else {
             ri->flags |= RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATED;
+
+            if(ri->flags & RRD_FLAG_COLLECTED)
+                ri->flags &= ~RRD_FLAG_COLLECTED;
+
         }
 
         if (ri->flags & RRD_FLAG_UPDATED) {
-            rrdinstance_log(ri, "UPDATED", rrdmetrics_is_write_locked);
+            // rrdinstance_log(ri, "UPDATED", rrdmetrics_is_write_locked);
             rrdcontext_has_been_updated(rrdcontext_acquired_value(ri->rca), rrdinstances_is_write_locked);
             ri->flags &= ~RRD_FLAG_UPDATED;
         }
@@ -946,6 +954,12 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
 
         if(rc->hub.deleted)
             rc->flags |= RRD_FLAG_DELETED;
+        else {
+            if (rc->last_time_t == 0)
+                rc->flags |= RRD_FLAG_COLLECTED;
+            else
+                rc->flags |= RRD_FLAG_ARCHIVED;
+        }
     }
     else {
         internal_error(true, "RRDCONTEXT: '%s' loaded from RRDSET", string2str(rc->id));
@@ -1112,34 +1126,37 @@ static void rrdcontext_has_been_updated(RRDCONTEXT *rc, bool rrdinstances_is_wri
     RRD_FLAGS flags = RRD_FLAG_NONE;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t instances_active = 0, instances_deleted = 0;
-    RRDINSTANCE *ri;
-    dfe_start_rw(rc->rrdinstances, ri, rrdinstances_is_write_locked ? DICTIONARY_LOCK_NONE : DICTIONARY_LOCK_READ) {
+    {
+        RRDINSTANCE *ri;
+        dfe_start_rw(rc->rrdinstances, ri, rrdinstances_is_write_locked ? DICTIONARY_LOCK_NONE : DICTIONARY_LOCK_READ)
+        {
+            if (ri->flags & RRD_FLAG_DELETED) {
+                instances_deleted++;
+                continue;
+            }
 
-        if(ri->flags & RRD_FLAG_DELETED) {
-            instances_deleted++;
-            continue;
+            instances_active++;
+
+            // TODO check for different chart types
+            // TODO check for different units
+
+            if (ri->flags & RRD_FLAG_COLLECTED)
+                flags |= RRD_FLAG_COLLECTED;
+
+            if (ri->priority > 0 && ri->priority < min_priority)
+                min_priority = ri->priority;
+
+            if (!ri->first_time_t || !ri->last_time_t)
+                continue;
+
+            if (ri->first_time_t < min_first_time_t)
+                min_first_time_t = ri->first_time_t;
+
+            if (ri->last_time_t > max_last_time_t)
+                max_last_time_t = ri->last_time_t;
         }
-
-        instances_active++;
-
-        // TODO check for different chart types
-        // TODO check for different units
-
-        if(ri->flags & RRD_FLAG_COLLECTED)
-            flags |= RRD_FLAG_COLLECTED;
-
-        if(ri->priority > 0 && ri->priority < min_priority)
-            min_priority = ri->priority;
-
-        if(!ri->first_time_t || !ri->last_time_t) continue;
-
-        if(ri->first_time_t < min_first_time_t)
-            min_first_time_t = ri->first_time_t;
-
-        if(ri->last_time_t > max_last_time_t)
-            max_last_time_t = ri->last_time_t;
+        dfe_done(ri);
     }
-    dfe_done(ri);
 
     if(instances_active || instances_deleted) {
         if (min_first_time_t == LONG_MAX)
@@ -1166,13 +1183,18 @@ static void rrdcontext_has_been_updated(RRDCONTEXT *rc, bool rrdinstances_is_wri
             }
         }
 
-        if (!(flags & RRD_FLAG_COLLECTED) && (rc->flags & RRD_FLAG_COLLECTED)) {
-            rc->flags &= ~RRD_FLAG_COLLECTED;
-            rc->flags |= RRD_FLAG_UPDATED;
-        }
+        if(flags & RRD_FLAG_COLLECTED) {
+            rc->flags |= RRD_FLAG_COLLECTED | RRD_FLAG_UPDATED;
 
-        if(!(rc->flags & RRD_FLAG_ARCHIVED) && !(rc->flags & RRD_FLAG_COLLECTED)) {
+            if(rc->flags & RRD_FLAG_ARCHIVED)
+                rc->flags &= ~RRD_FLAG_ARCHIVED;
+        }
+        else {
             rc->flags |= RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATED;
+
+            if(rc->flags & RRD_FLAG_COLLECTED)
+                rc->flags &= ~RRD_FLAG_COLLECTED;
+
         }
 
         if (min_priority != LONG_MAX && rc->priority != min_priority) {
