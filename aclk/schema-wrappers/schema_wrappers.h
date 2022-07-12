@@ -15,5 +15,6 @@
 #include "node_info.h"
 #include "capability.h"
 #include "context_stream.h"
+#include "context.h"
 
 #endif /* SCHEMA_WRAPPERS_H */
