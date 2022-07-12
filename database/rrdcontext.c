@@ -942,6 +942,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         dictionary_del(rc_old->rrdinstances, st->id);
         rrd_flag_set_updated(rc_old, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
         rrdcontext_trigger_updates(rc_old);
+        rrdcontext_release(st->rrdcontext);
     }
 
     st->rrdcontext = rca;
