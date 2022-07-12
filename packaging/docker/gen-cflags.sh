@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ -z "${CFLAGS}" ]; then
+if [ -n "${CFLAGS}" ]; then
     echo "${CFLAGS}"
 elif [ -n "${DEBUG_BUILD}" ]; then
     echo "-Og -ggdb -pipe"
