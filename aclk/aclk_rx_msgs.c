@@ -426,6 +426,34 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
     return 0;
 }
 
+int contexts_checkpoint(const char *msg, size_t msg_len)
+{
+    struct ctxs_checkpoint *cmd = parse_ctxs_checkpoint(msg, msg_len);
+    if (!cmd)
+        return 1;
+
+    //TODO @ktsaou
+
+    freez(cmd->claim_id);
+    freez(cmd->node_id);
+    freez(cmd);
+    return 0;
+}
+
+int stop_streaming_contexts(const char *msg, size_t msg_len)
+{
+    struct stop_streaming_ctxs *cmd = parse_stop_streaming_ctxs(msg, msg_len);
+    if (!cmd)
+        return 1;
+
+    //TODO @ktsaou
+
+    freez(cmd->claim_id);
+    freez(cmd->node_id);
+    freez(cmd);
+    return 0;
+}
+
 typedef struct {
     const char *name;
     simple_hash_t name_hash;
@@ -444,6 +472,8 @@ new_cloud_rx_msg_t rx_msgs[] = {
     { .name = "SendAlarmConfiguration",    .name_hash = 0, .fnc = send_alarm_configuration     },
     { .name = "SendAlarmSnapshot",         .name_hash = 0, .fnc = send_alarm_snapshot          },
     { .name = "DisconnectReq",             .name_hash = 0, .fnc = handle_disconnect_req        },
+    { .name = "ContextsCheckpoint",        .name_hash = 0, .fnc = contexts_checkpoint          },
+    { .name = "StopStreamingContexts",     .name_hash = 0, .fnc = stop_streaming_contexts      },
     { .name = NULL,                        .name_hash = 0, .fnc = NULL                         },
 };
 
