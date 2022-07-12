@@ -734,6 +734,12 @@ static void get_netdata_configured_variables() {
     }
 
     // --------------------------------------------------------------------
+    // rrdcontext
+
+    rrdcontext_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "rrdcontexts enable", rrdcontext_enabled);
+
+
+    // --------------------------------------------------------------------
     // get various system parameters
 
     get_system_HZ();
