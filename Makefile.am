@@ -655,6 +655,8 @@ ACLK_FILES = \
     aclk/aclk_charts_api.h \
     aclk/aclk_alarm_api.c \
     aclk/aclk_alarm_api.h \
+    aclk/aclk_contexts_api.c \
+    aclk/aclk_contexts_api.h \
     aclk/schema-wrappers/connection.cc \
     aclk/schema-wrappers/connection.h \
     aclk/schema-wrappers/node_connection.cc \

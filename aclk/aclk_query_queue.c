@@ -122,6 +122,7 @@ void aclk_query_free(aclk_query_t query)
     case ALARM_PROVIDE_CFG:
     case ALARM_SNAPSHOT:
     case UPDATE_NODE_COLLECTORS:
+    case PROTO_BIN_MESSAGE:
         if (!use_mqtt_5)
             freez(query->data.bin_payload.payload);
         break;
