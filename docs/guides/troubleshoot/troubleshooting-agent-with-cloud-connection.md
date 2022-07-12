@@ -6,10 +6,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/troublesh
 
 # Troubleshoot Agent-Cloud connectivity issues
 
-When you are claiming a node, you might not be able to see it online in Netdata Cloud immediately.  
-This could be due to an error in the claiming process or a temporary outage of some services:
+When you are claiming a node, you might not be able to immediately see it online in Netdata Cloud.  
+This could be due to an error in the claiming process or a temporary outage of some services.
 
-We identified some scenarios and possible actions you could take to overcome this situation.
+We identified some scenarios that might cause this delay and possible actions you could take to overcome each situation.
+
+The most common explanation for the delay usually falls into one of the following three categories:
 
 - [The claiming process of the kickstart script was unsuccessful](#the-claiming-process-of-the-kickstart-script-was-unsuccessful)
 - [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
@@ -17,13 +19,13 @@ We identified some scenarios and possible actions you could take to overcome thi
 
 ## The claiming process of the kickstart script was unsuccessful
 
-Here we will try to find some corner cases you might bump into.
+Here, we will try to define some edge cases you might encounter when claiming a node.
 
 ### The kickstart script auto-claimed the Agent but there was no error message displayed
 
 The kickstart script will install/update your Agent and then try to claim the node to the Cloud (if tokens are provided). To
-complete the second part the Agent must be running. In some platforms the Netdata service cannot be enabled by default
-and you must do it manually.
+complete the second part, the Agent must be running. In some platforms, the Netdata service cannot be enabled by default
+and you must do it manually, using the following steps:
 
 1. Check if the Agent is running:
 
@@ -57,7 +59,7 @@ Read more about [Starting, Stopping and Restarting the Agent](/docs/configure/st
 
 Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://learn.netdata.cloud/docs/agent/claim#claiming-script).
 
-With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend to [update the Netdata Agent](https://learn.netdata.cloud/docs/agent/packaging/installer/update) to the latest stable version.
+With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend you [update the Netdata Agent](https://learn.netdata.cloud/docs/agent/packaging/installer/update) to the latest stable version.
 
 ## Network issues while connecting to the Cloud
 
@@ -109,7 +111,7 @@ To verify this:
 
     :::info
 
-    There will be cases in which the firewall restricts network access. In those cases you need to whitelist the `app.netdata.cloud` domain to be able to see your nodes in Netdata Cloud.  
+    There will be cases in which the firewall restricts network access. In those cases, you need to whitelist the `app.netdata.cloud` domain to be able to see your nodes in Netdata Cloud.  
     If you can't whitelist domains in your firewall, you can whitelist the IPs that the above command will produce, but keep in mind that they can change without any notice.
 
     :::
