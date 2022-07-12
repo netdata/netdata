@@ -48,7 +48,6 @@ include bind_rndc/Makefile.inc
 include boinc/Makefile.inc
 include ceph/Makefile.inc
 include changefinder/Makefile.inc
-include chrony/Makefile.inc
 include dockerd/Makefile.inc
 include dovecot/Makefile.inc
 include example/Makefile.inc

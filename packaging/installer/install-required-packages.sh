@@ -712,13 +712,6 @@ declare -A pkg_bridge_utils=(
   ['default']="bridge-utils"
 )
 
-declare -A pkg_chrony=(
-  ['gentoo']="net-misc/chrony"
-  ['clearlinux']="time-server-basic"
-  ['macos']="WARNING|"
-  ['default']="chrony"
-)
-
 declare -A pkg_curl=(
   ['gentoo']="net-misc/curl"
   ['sabayon']="net-misc/curl"

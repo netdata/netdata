@@ -199,8 +199,8 @@ configure any of these collectors according to your setup and infrastructure.
 
 - [Bind 9](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/bind/): Collect nameserver summary
   performance statistics via a web interface (`statistics-channels` feature).
-- [Chrony](/collectors/python.d.plugin/chrony/README.md): Monitor the precision and statistics of a local `chronyd`
-  server.
+- [Chrony](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/chrony): Monitor the precision and
+  statistics of a local `chronyd` server.
 - [CoreDNS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/coredns/): Measure DNS query round
   trip time.
 - [Dnsmasq](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsmasq_dhcp/): Automatically
