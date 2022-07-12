@@ -6,6 +6,7 @@ REPO="${1}"
 EVENT_NAME="${2}"
 EVENT_TYPE="${3}"
 EVENT_VERSION="${4}"
+RELEASE_TEST="${5}"
 
 ##############################################################
 # Version validation functions
@@ -94,7 +95,7 @@ check_newer_patch_version() {
 git config user.name "netdatabot"
 git config user.email "bot@netdata.cloud"
 
-if [ "${REPO}" != "netdata/netdata" ]; then
+if [ "${REPO}" != "netdata/netdata" ] && [ -z "${RELEASE_TEST}" ]; then
     echo "::notice::Not running in the netdata/netdata repository, not queueing a release build."
     echo "::set-output name=run::false"
 elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
