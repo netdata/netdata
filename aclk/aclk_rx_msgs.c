@@ -428,6 +428,11 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
 
 int contexts_checkpoint(const char *msg, size_t msg_len)
 {
+    if (!aclk_ctx_based) {
+        error_report("Received ContextsCheckpoint message but context based communication was not enabled (Cloud violated the protocol). Ignoring message");
+        return 1;
+    }
+
     struct ctxs_checkpoint *cmd = parse_ctxs_checkpoint(msg, msg_len);
     if (!cmd)
         return 1;
@@ -442,6 +447,11 @@ int contexts_checkpoint(const char *msg, size_t msg_len)
 
 int stop_streaming_contexts(const char *msg, size_t msg_len)
 {
+    if (!aclk_ctx_based) {
+        error_report("Received StopStreamingContexts message but context based communication was not enabled  (Cloud violated the protocol). Ignoring message");
+        return 1;
+    }
+
     struct stop_streaming_ctxs *cmd = parse_stop_streaming_ctxs(msg, msg_len);
     if (!cmd)
         return 1;

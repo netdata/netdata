@@ -542,6 +542,11 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
         info("New ACLK protobuf protocol negotiated successfully (/env response).");
 
+        if (aclk_env_has_capa("ctx")) {
+            aclk_ctx_based = 1;
+            info ("New CONTEXT based communication to be used");
+        }
+
         memset(&auth_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->auth_endpoint, &auth_url)) {
             error("Parsing URL returned by env endpoint for authentication failed. \"%s\"", aclk_env->auth_endpoint);
