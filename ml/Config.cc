@@ -31,6 +31,7 @@ void Config::readMLConfig(void) {
     unsigned MaxTrainSamples = config_get_number(ConfigSectionML, "maximum num samples to train", 4 * 3600);
     unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 900);
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
+    unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 1 * 24);
 
     unsigned DBEngineAnomalyRateEvery = config_get_number(ConfigSectionML, "dbengine anomaly rate every", 30);
 
@@ -58,9 +59,10 @@ void Config::readMLConfig(void) {
      * Clamp
      */
 
-    MaxTrainSamples = clamp(MaxTrainSamples, 1 * 3600u, 24 * 3600u);
-    MinTrainSamples = clamp(MinTrainSamples, 1 * 900u, 6 * 3600u);
-    TrainEvery = clamp(TrainEvery, 1 * 3600u, 6 * 3600u);
+    MaxTrainSamples = clamp<unsigned>(MaxTrainSamples, 1 * 3600, 24 * 3600);
+    MinTrainSamples = clamp<unsigned>(MinTrainSamples, 1 * 900, 6 * 3600);
+    TrainEvery = clamp<unsigned>(TrainEvery, 1 * 3600, 6 * 3600);
+    NumModelsToUse = clamp<unsigned>(TrainEvery, 1, 7 * 24);
 
     DBEngineAnomalyRateEvery = clamp(DBEngineAnomalyRateEvery, 1 * 30u, 15 * 60u);
 
@@ -107,6 +109,7 @@ void Config::readMLConfig(void) {
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
+    Cfg.NumModelsToUse = NumModelsToUse;
 
     Cfg.DBEngineAnomalyRateEvery = DBEngineAnomalyRateEvery;
 

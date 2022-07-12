@@ -132,9 +132,7 @@ bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
     if (!D)
         return false;
 
-    D->addValue(Value, Exists);
-    bool Result = D->predict().second;
-    return Result;
+    return D->predict(Value, Exists);
 }
 
 void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {

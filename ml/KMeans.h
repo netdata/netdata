@@ -18,7 +18,7 @@ public:
     };
 
     void train(const std::vector<DSample> &Samples, size_t MaxIterations);
-    CalculatedNumber anomalyScore(const DSample &Sample);
+    CalculatedNumber anomalyScore(const DSample &Sample) const;
 
 private:
     size_t NumClusters;

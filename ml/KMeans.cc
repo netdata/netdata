@@ -28,7 +28,7 @@ void KMeans::train(const std::vector<DSample> &Samples, size_t MaxIterations) {
     }
 }
 
-CalculatedNumber KMeans::anomalyScore(const DSample &Sample) {
+CalculatedNumber KMeans::anomalyScore(const DSample &Sample) const {
     CalculatedNumber MeanDist = 0.0;
     for (const auto &CC: ClusterCenters)
         MeanDist += dlib::length(CC - Sample);

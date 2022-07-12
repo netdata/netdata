@@ -69,8 +69,6 @@ public:
         return AnomalyBit;
     }
 
-    CalculatedNumber computeAnomalyScore(SamplesBuffer &SB);
-
     bool shouldTrain(const TimePoint &TP) const;
 
     std::string getID() const;
@@ -79,9 +77,7 @@ public:
 
     MLResult trainModel();
 
-    std::pair<MLResult, bool> predict();
-
-    void addValue(CalculatedNumber Value, bool Exists);
+    bool predict(CalculatedNumber Value, bool Exists);
 
     void updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous);
 
