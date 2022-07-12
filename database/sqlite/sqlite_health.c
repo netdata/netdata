@@ -8,7 +8,7 @@
 /* Health related SQL queries
    Creates a health log table in sqlite, one per host guid
 */
-#define SQL_CREATE_HEALTH_LOG_TABLE(guid) "CREATE TABLE IF NOT EXISTS health_log_%s(hostname text, unique_id int, alarm_id int, alarm_event_id int, config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, new_value double, old_value double, last_repeat int, class text, component text, type text);", guid
+#define SQL_CREATE_HEALTH_LOG_TABLE(guid) "CREATE TABLE IF NOT EXISTS health_log_%s(hostname text, unique_id int, alarm_id int, alarm_event_id int, config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text);", guid
 int sql_create_health_log_table(RRDHOST *host) {
     int rc;
     char *err_msg = NULL, command[MAX_HEALTH_SQL_SIZE + 1];
@@ -113,7 +113,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
     "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
     "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
     "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
-    "class, component, type) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", guid
+    "class, component, type, chart_context) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", guid
 
 void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     sqlite3_stmt *res = NULL;
@@ -323,6 +323,12 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
+    rc = sqlite3_bind_text(res, 32, ae->chart_context, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind chart_context parameter for SQL_INSERT_HEALTH_LOG");
+        goto failed;
+    }
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", host->hostname, rc);
@@ -434,9 +440,9 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 }
 
 #define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
-"delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type) " \
+"delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context) " \
 "select hostname, ?1, ?2, ?3, config_hash_id, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, " \
-"unixepoch(), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type " \
+"unixepoch(), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type, chart_context " \
 "from health_log_%s where unique_id = ?5", guid, guid2
 #define SQL_INJECT_REMOVED_UPDATE(guid) "update health_log_%s set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3; ", guid
 void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id)
@@ -598,7 +604,7 @@ void sql_check_removed_alerts_state(char *uuid_str)
 /* Health related SQL queries
    Load from the health log table
 */
-#define SQL_LOAD_HEALTH_LOG(guid,limit) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type FROM (SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type FROM health_log_%s order by unique_id desc limit %u) order by unique_id asc;", guid, limit
+#define SQL_LOAD_HEALTH_LOG(guid,limit) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context FROM (SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context FROM health_log_%s order by unique_id desc limit %u) order by unique_id asc;", guid, limit
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -770,6 +776,11 @@ void sql_health_alarm_log_load(RRDHOST *host) {
             ae->type = strdupz((char *) sqlite3_column_text(res, 30));
         else
             ae->type = NULL;
+
+        if (sqlite3_column_type(res, 31) != SQLITE_NULL)
+            ae->chart_context = strdupz((char *) sqlite3_column_text(res, 31));
+        else
+            ae->chart_context = NULL;
 
         char value_string[100 + 1];
         freez(ae->old_value_string);

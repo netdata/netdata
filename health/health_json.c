@@ -29,6 +29,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\"name\": \"%s\",\n"
                     "\t\t\"chart\": \"%s\",\n"
+                    "\t\t\"context\": \"%s\",\n"
                     "\t\t\"family\": \"%s\",\n"
                     "\t\t\"class\": \"%s\",\n"
                     "\t\t\"component\": \"%s\",\n"
@@ -65,6 +66,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , config_hash_id
                    , ae->name
                    , ae->chart
+                   , ae->chart_context
                    , ae->family
                    , ae->classification?ae->classification:"Unknown"
                    , ae->component?ae->component:"Unknown"

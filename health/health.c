@@ -817,7 +817,7 @@ void *health_main(void *ptr) {
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         time_t now = now_realtime_sec();
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                            host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
+                            host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
                             rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                             rc->value, NAN, rc->status, RRDCALC_STATUS_REMOVED, rc->source, rc->units, rc->info, 0, 0);
                         if (ae) {
@@ -1077,7 +1077,7 @@ void *health_main(void *ptr) {
 
 
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
+                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
                                 rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                 rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
                                 rc->delay_last,
@@ -1129,7 +1129,7 @@ void *health_main(void *ptr) {
                         rc->last_repeat = now;
                         if (likely(rc->times_repeat < UINT32_MAX)) rc->times_repeat++;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
+                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
                                 rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                 rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
                                 rc->delay_last,
