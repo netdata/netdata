@@ -60,6 +60,7 @@ to work on these platforms with minimal user effort.
 | Fedora | 36 | x86\_64, ARMv7, AArch64 | |
 | Fedora | 35 | x86\_64, ARMv7, AArch64 | |
 | openSUSE | Leap 15.3 | x86\_64, AArch64 | |
+| Oracle Linux | 9.x | x86\_64, AArch64 | |
 | Oracle Linux | 8.x | x86\_64, AArch64 | |
 | Red Hat Enterprise Linux | 9.x | x86\_64, AArch64 | |
 | Red Hat Enterprise Linux | 8.x | x86\_64, AArch64 | |
