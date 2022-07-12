@@ -461,8 +461,9 @@ netdataDashboard.menu = {
     },
 
     'chrony': {
+        title: 'Chrony',
         icon: '<i class="fas fa-clock"></i>',
-        info: 'chronyd parameters about the system’s clock performance.'
+        info: 'The system’s clock performance and peers activity status.'
     },
 
     'couchdb': {
@@ -5307,51 +5308,54 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
-
-    'chrony.system': {
-        info: 'In normal operation, chronyd never steps the system clock, because any jump in the timescale can have adverse consequences for certain application programs. Instead, any error in the system clock is corrected by slightly speeding up or slowing down the system clock until the error has been removed, and then returning to the system clock’s normal speed. A consequence of this is that there will be a period when the system clock (as read by other programs using the <code>gettimeofday()</code> system call, or by the <code>date</code> command in the shell) will be different from chronyd\'s estimate of the current true time (which it reports to NTP clients when it is operating in server mode). The value reported on this line is the difference due to this effect.',
-        colors: NETDATA.colors[3]
-    },
-
-    'chrony.offsets': {
-        info: '<code>last offset</code> is the estimated local offset on the last clock update. <code>RMS offset</code> is a long-term average of the offset value.',
-        height: 0.5
-    },
+    // Chrony
 
     'chrony.stratum': {
-        info: 'The <code>stratum</code> indicates how many hops away from a computer with an attached reference clock we are. Such a computer is a stratum-1 computer.',
-        decimalDigits: 0,
-        height: 0.5
+        info: 'The stratum indicates the distance (hops) to the computer with the reference clock. The higher the stratum number, the more the timing accuracy and stability degrades.',
     },
 
-    'chrony.root': {
-        info: 'Estimated delays against the root time server this system is synchronized with. <code>delay</code> is the total of the network path delays to the stratum-1 computer from which the computer is ultimately synchronised. <code>dispersion</code> is the total dispersion accumulated through all the computers back to the stratum-1 computer from which the computer is ultimately synchronised. Dispersion is due to system clock resolution, statistical measurement variations etc.'
+    'chrony.current_correction': {
+        info: 'Any error in the system clock is corrected by slightly speeding up or slowing down the system clock until the error has been removed, and then returning to the system clock’s normal speed. A consequence of this is that there will be a period when the system clock (as read by other programs) will be different from chronyd\'s estimate of the current true time (which it reports to NTP clients when it is operating as a server). The reported value is the difference due to this effect.',
+    },
+
+    'chrony.root_delay': {
+        info: 'The total of the network path delays to the stratum-1 computer from which the computer is ultimately synchronised.'
+    },
+
+    'chrony.root_dispersion': {
+        info: 'The total dispersion accumulated through all the computers back to the stratum-1 computer from which the computer is ultimately synchronised. Dispersion is due to system clock resolution, statistical measurement variations, etc.'
+    },
+
+    'chrony.last_offset': {
+        info: 'The estimated local offset on the last clock update. A positive value indicates the local time (as previously estimated true time) was ahead of the time sources.',
     },
 
     'chrony.frequency': {
-        info: 'The <code>frequency</code> is the rate by which the system\'s clock would be would be wrong if chronyd was not correcting it. It is expressed in ppm (parts per million). For example, a value of 1ppm would mean that when the system\'s clock thinks it has advanced 1 second, it has actually advanced by 1.000001 seconds relative to true time.',
-        colors: NETDATA.colors[0]
+        info: 'The <b>frequency</b> is the rate by which the system’s clock would be wrong if chronyd was not correcting it. It is expressed in ppm (parts per million). For example, a value of 1 ppm would mean that when the system’s clock thinks it has advanced 1 second, it has actually advanced by 1.000001 seconds relative to true time.',
     },
 
-    'chrony.residualfreq': {
-        info: 'This shows the <code>residual frequency</code> for the currently selected reference source. ' +
-            'It reflects any difference between what the measurements from the reference source indicate the ' +
-            'frequency should be and the frequency currently being used. The reason this is not always zero is ' +
-            'that a smoothing procedure is applied to the frequency. Each time a measurement from the reference ' +
-            'source is obtained and a new residual frequency computed, the estimated accuracy of this residual ' +
-            'is compared with the estimated accuracy (see <code>skew</code>) of the existing frequency value. ' +
-            'A weighted average is computed for the new frequency, with weights depending on these accuracies. ' +
-            'If the measurements from the reference source follow a consistent trend, the residual will be ' +
-            'driven to zero over time.',
-        height: 0.5,
-        colors: NETDATA.colors[3]
+    'chrony.residual_frequency': {
+        info: 'The <b>residual frequency</b> for the currently selected reference source. This reflects any difference between what the measurements from the reference source indicate the frequency should be and the frequency currently being used. The reason this is not always zero is that a smoothing procedure is applied to the frequency.',
     },
 
     'chrony.skew': {
         info: 'The estimated error bound on the frequency.',
-        height: 0.5,
-        colors: NETDATA.colors[5]
     },
+
+    'chrony.ref_measurement_time': {
+        info: 'The time elapsed since the last measurement from the reference source was processed.',
+    },
+
+    'chrony.leap_status': {
+        info: '<p>The current leap status of the source.</p><p><b>Normal</b> - indicates the normal status (no leap second). <b>InsertSecond</b> - indicates that a leap second will be inserted at the end of the month. <b>DeleteSecond</b> - indicates that a leap second will be deleted at the end of the month. <b>Unsynchronised</b> - the server has not synchronized properly with the NTP server.</p>',
+    },
+
+    'chrony.activity': {
+        info: '<p>The number of servers and peers that are online and offline.</p><p><b>Online</b> - the server or peer is currently online (i.e. assumed by chronyd to be reachable). <b>Offline</b> - the server or peer is currently offline (i.e. assumed by chronyd to be unreachable, and no measurements from it will be attempted). <b>BurstOnline</b> - a burst command has been initiated for the server or peer and is being performed. After the burst is complete, the server or peer will be returned to the online state. <b>BurstOffline</b> - a burst command has been initiated for the server or peer and is being performed. After the burst is complete, the server or peer will be returned to the offline state. <b>Unresolved</b> - the name of the server or peer was not resolved to an address yet.</p>',
+    },
+
+    // ------------------------------------------------------------------------
+    // Couchdb
 
     'couchdb.active_tasks': {
         info: 'Active tasks running on this CouchDB <b>cluster</b>. Four types of tasks currently exist: indexer (view building), replication, database compaction and view compaction.'
