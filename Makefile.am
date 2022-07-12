@@ -678,6 +678,8 @@ ACLK_FILES = \
     aclk/schema-wrappers/schema_wrappers.h \
     aclk/schema-wrappers/schema_wrapper_utils.cc \
     aclk/schema-wrappers/schema_wrapper_utils.h \
+    aclk/schema-wrappers/context_stream.cc \
+    aclk/schema-wrappers/context_stream.h \
     $(NULL)
 
 mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
