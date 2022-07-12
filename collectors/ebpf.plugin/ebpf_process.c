@@ -1055,7 +1055,6 @@ static void process_collector(ebpf_module_t *em)
 
             ebpf_create_apps_charts(apps_groups_root_target);
         }
-        pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
 
         if (++counter == update_every) {
@@ -1064,6 +1063,7 @@ static void process_collector(ebpf_module_t *em)
             read_hash_global_tables();
 
             int publish_apps = 0;
+            pthread_mutex_lock(&collect_data_mutex);
             if (all_pids_count > 0) {
                 if (apps_enabled) {
                     publish_apps = 1;
@@ -1092,6 +1092,7 @@ static void process_collector(ebpf_module_t *em)
                 }
             }
             pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&collect_data_mutex);
         }
 
         fflush(stdout);
