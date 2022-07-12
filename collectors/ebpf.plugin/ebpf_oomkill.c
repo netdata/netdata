@@ -318,12 +318,15 @@ static void oomkill_collector(ebpf_module_t *em)
     memset(keys, 0, sizeof(keys));
 
     // loop and read until ebpf plugin is closed.
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = em->update_every * USEC_PER_SEC;
     while (!close_ebpf_plugin) {
-        pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        (void)heartbeat_next(&hb, step);
 
         if (++counter == update_every) {
             counter = 0;
+            pthread_mutex_lock(&collect_data_mutex);
             pthread_mutex_lock(&lock);
 
             uint32_t count = oomkill_read_data(keys);
@@ -339,9 +342,8 @@ static void oomkill_collector(ebpf_module_t *em)
             write_end_chart();
 
             pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&collect_data_mutex);
         }
-
-        pthread_mutex_unlock(&collect_data_mutex);
     }
 }
 
