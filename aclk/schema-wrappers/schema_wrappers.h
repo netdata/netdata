@@ -14,5 +14,6 @@
 #include "alarm_stream.h"
 #include "node_info.h"
 #include "capability.h"
+#include "context_stream.h"
 
 #endif /* SCHEMA_WRAPPERS_H */
