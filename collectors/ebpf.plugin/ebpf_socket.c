@@ -2655,7 +2655,6 @@ struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
  */
 static void socket_collector(usec_t step, ebpf_module_t *em)
 {
-    UNUSED(step);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -2674,11 +2673,11 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     while (!close_ebpf_plugin) {
-        pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        (void)heartbeat_next(&hb, step);
 
         if (++counter == update_every) {
             counter = 0;
+            pthread_mutex_lock(&collect_data_mutex);
             if (socket_global_enabled)
                 read_hash_global_tables();
 
@@ -2718,9 +2717,8 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 
             }
             pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&collect_data_mutex);
         }
-
-        pthread_mutex_unlock(&collect_data_mutex);
     }
 }
 
