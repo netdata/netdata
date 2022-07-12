@@ -3,7 +3,9 @@
 #include "rrdcontext.h"
 #include "sqlite/sqlite_context.h"
 
-#define LOG_TRANSITIONS 1
+int rrdcontext_enabled = CONFIG_BOOLEAN_NO;
+
+// #define LOG_TRANSITIONS 1
 // #define LOG_RRDINSTANCES 1
 
 static int log_calls = 1;
@@ -217,7 +219,6 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc);
 // logging of all data collected
 
 #ifdef LOG_TRANSITIONS
-
 static void log_transition(STRING *metric, STRING *instance, STRING *context, RRD_FLAGS flags, const char *msg) {
     BUFFER *wb = buffer_create(1000);
 
@@ -773,6 +774,9 @@ static void rrdinstance_react_callback(const char *id, void *value, void *data) 
 }
 
 void rrdinstances_create(RRDCONTEXT *rc) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     if(unlikely(!rc || rc->rrdinstances)) return;
 
     rc->rrdinstances = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
@@ -1313,6 +1317,9 @@ static void rrdcontext_react_callback(const char *id, void *value, void *data) {
 }
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     if(unlikely(!host)) return;
     if(likely(host->rrdctx)) return;
 
@@ -1459,50 +1466,86 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc) {
 // public API
 
 void rrdcontext_updated_rrddim(RRDDIM *rd) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdmetric_from_rrddim(rd);
 }
 
 void rrdcontext_removed_rrddim(RRDDIM *rd) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdmetric_rrddim_is_freed(rd);
 }
 
 void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_divisor(RRDDIM *rd) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_flags(RRDDIM *rd) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_collected_rrddim(RRDDIM *rd) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdmetric_collected_rrddim(rd);
 }
 
 void rrdcontext_updated_rrdset(RRDSET *st) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdinstance_from_rrdset(st);
 }
 
 void rrdcontext_removed_rrdset(RRDSET *st) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdinstance_rrdset_is_freed(st);
 }
 
 void rrdcontext_updated_rrdset_name(RRDSET *st) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdinstance_updated_rrdset_name(st);
 }
 
 void rrdcontext_updated_rrdset_flags(RRDSET *st) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdinstance_updated_rrdset_flags(st);
 }
 
 void rrdcontext_collected_rrdset(RRDSET *st) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     rrdinstance_collected_rrdset(st);
 }
 
@@ -1590,6 +1633,9 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return;
+
     if(host->rrdctx) return;
 
     internal_error(log_calls, "RRDCONTEXT: loading SQL data for host '%s'", host->hostname);
@@ -1665,6 +1711,9 @@ static void rrdcontext_main_cleanup(void *ptr) {
 }
 
 void *rrdcontext_main(void *ptr) {
+    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
+        return NULL;
+
     worker_register("RRDCONTEXT");
     worker_register_job_name(1, "hosts");
     worker_register_job_name(2, "dedup checks");

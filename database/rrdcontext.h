@@ -55,6 +55,8 @@ extern void rrdcontext_collected_rrdset(RRDSET *st);
 // ----------------------------------------------------------------------------
 // public API for threads
 
+extern int rrdcontext_enabled;
+
 extern void rrdcontext_db_rotation(void);
 extern void *rrdcontext_main(void *);
 
