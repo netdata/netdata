@@ -1031,19 +1031,30 @@ static void process_collector(ebpf_module_t *em)
     if (cgroups)
         ebpf_process_update_cgroup_algorithm();
 
+    int update_apps_every = (int) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_APPS_EVERY,
+                                                       EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT);
+    if (update_apps_every < EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT){
+        update_apps_every = EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
+        error("Value \"update apps every\" is too small and will impact system performance, adjusting it to %d",
+              EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT);
+    }
+
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     int update_every = em->update_every;
     int counter = update_every - 1;
+    int update_apps_list = update_apps_every - 1;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
 
         pthread_mutex_lock(&collect_data_mutex);
-        cleanup_exited_pids();
-        collect_data_for_all_processes(pid_fd);
+        if (++update_apps_list == update_apps_every) {
+            update_apps_list = 0;
+            cleanup_exited_pids();
+            collect_data_for_all_processes(pid_fd);
 
-        ebpf_create_apps_charts(apps_groups_root_target);
-
+            ebpf_create_apps_charts(apps_groups_root_target);
+        }
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
 
