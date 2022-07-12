@@ -6,25 +6,29 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/database/engine/
 
 # Database engine
 
-The Database Engine works like a traditional database. It dedicates a certain amount of RAM for data caching and
-indexing, while the rest of the data resides compressed on disk. Unlike other [database modes](/database/README.md), the
-amount of historical metrics stored is based on the amount of disk space you allocate and the effective compression
+The Database Engine works like a traditional time series database. Unlike other [database modes](/database/README.md),
+the amount of historical metrics stored is based on the amount of disk space you allocate and the effective compression
 ratio, not a fixed number of metrics collected.
 
 ## Tiering
 
-For Netdata Agents with version `netdata-1.35.0.138.nightly` and greater, `dbengine` supports Tiering which can offer
-almost unlimited retention of data. Tiering is a mechanism of providing multiple tiers of data with
-different [granularity on metrics](/docs/store/distributed-data-architecture.md#granularity-of-metrics). Every Tier down
-samples the exact lower tier (lower tiers have greater resolution). You can have up to 5 Tiers **[0. . 4]** of data (
-including the Tier 0, which has the highest resolution) which means years of data.
+Tiering is a mechanism of providing multiple tiers of data with
+different [granularity on metrics](/docs/store/distributed-data-architecture.md#granularity-of-metrics).
+
+For Netdata Agents with version `netdata-1.35.0.138.nightly` and greater, `dbengine` supports Tiering, allowing almost
+unlimited retention of data.
+
 
 ### Metric size
+
+Every Tier down samples the exact lower tier (lower tiers have greater resolution). You can have up to 5
+Tiers **[0. . 4]** of data (including the Tier 0, which has the highest resolution)
 
 Tier 0 is the default that was always available in `dbengine` mode. Tier 1 is the first level of aggregation, Tier 2 is
 the second, and so on.
 
-Metrics on all tiers except of the _Tier 0_ also store the following five additional values for every point for accurate representation:
+Metrics on all tiers except of the _Tier 0_ also store the following five additional values for every point for accurate
+representation:
 
 1. The `sum` of the points aggregated
 2. The `min` of the points aggregated
@@ -63,9 +67,9 @@ explore the following configuration.
 For 2000 metrics, collected every second and retained for a week, Tier 0 needs: 1 byte x 2000 metrics x 3600 secs per
 hour x 24 hours per day x 7 days per week = 1100MB.
 
-By setting `dbengine multihost disk space MB` to `1100`, this node will start maintaining about a week of data. But pay attention to the number of
-metrics. If you have more than 2000 metrics on a node, or you need more that a week of high resolution metrics, you may
-need to adjust this setting accordingly.
+By setting `dbengine multihost disk space MB` to `1100`, this node will start maintaining about a week of data. But pay
+attention to the number of metrics. If you have more than 2000 metrics on a node, or you need more that a week of high
+resolution metrics, you may need to adjust this setting accordingly.
 
 Tier 1 is by default sampling the data every **60 points of Tier 0**. In our case, Tier 0 is per second, if we want to
 transform this information in terms of time then the Tier 1 "resolution" is per minute.
@@ -84,12 +88,11 @@ x 365 days per year = 67MB.
 
 ## Legacy configuration
 
-
 ### v1.35.1 and prior
 
-These versions of the Agent do not support [Tiering](#Tiering). You could change the metric retention for the parent
-and all of its children only with the `dbengine multihost disk space MB` setting. This setting accounts the space
-allocation for the parent node and all of its children.
+These versions of the Agent do not support [Tiering](#Tiering). You could change the metric retention for the parent and
+all of its children only with the `dbengine multihost disk space MB` setting. This setting accounts the space allocation
+for the parent node and all of its children.
 
 To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in
 the `[db]` section of your `netdata.conf`.
