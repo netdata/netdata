@@ -1336,6 +1336,12 @@ void rrdhost_create_rrdcontexts(RRDHOST *host) {
 void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
     if(unlikely(!host->rrdctx)) return;
+
+    if(host->rrdctx_queue) {
+        dictionary_destroy((DICTIONARY *)host->rrdctx_queue);
+        host->rrdctx = NULL;
+    }
+
     dictionary_destroy((DICTIONARY *)host->rrdctx);
     host->rrdctx = NULL;
 }

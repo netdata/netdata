@@ -871,7 +871,9 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     if(referenced_items) {
         // there are referenced items
         // delete all items individually, so that only the referenced will remain
-        for(nv = dict->first_item; nv ;nv = nv->next) {
+        NAME_VALUE *nv_next;
+        for(nv = dict->first_item; nv ;nv = nv_next) {
+            nv_next = nv->next;
             if(!(nv->flags & NAME_VALUE_FLAG_DELETED))
                 dictionary_del_unsafe(dict, namevalue_get_name(nv));
         }
