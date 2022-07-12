@@ -169,9 +169,8 @@ configure any of these collectors according to your setup and infrastructure.
   plugins metrics from an endpoint provided by `in_monitor plugin`.
 - [Logstash](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/logstash/): Monitor JVM threads,
   memory usage, garbage collection statistics, and more.
-- [OpenVPN status logs](/collectors/python.d.plugin/ovpn_status_log/README.md): Parse server log files and provide
-  summary
-  (client, traffic) metrics.
+- [OpenVPN status logs](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/openvpn_status_log): Parse
+  server log files and provide summary (client, traffic) metrics.
 - [Squid web server logs](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/squidlog/): Tail Squid
   access logs to return the volume of requests, types of requests, bandwidth, and much more.
 - [Web server logs (Go version for Apache,
