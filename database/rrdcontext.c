@@ -653,9 +653,6 @@ static void rrdinstance_check(RRDINSTANCE *ri) {
     if(unlikely(!ri->units))
         fatal("RRDINSTANCE: '%s' created without units", string2str(ri->id));
 
-    if(unlikely(!ri->family))
-        fatal("RRDINSTANCE: '%s' created without family", string2str(ri->id));
-
     if(unlikely(!ri->priority))
         fatal("RRDINSTANCE: '%s' created without a priority", string2str(ri->id));
 
@@ -1264,13 +1261,21 @@ static void rrdcontext_delete_callback(const char *id, void *value, void *data) 
     rrdcontext_freez(rc);
 }
 
-static STRING *merge_titles(RRDCONTEXT *rc, STRING *a, STRING *b) {
-    if(strcmp(string2str(a), "X") == 0)
-        return string_dup(b);
+static STRING *string_2way_merge(RRDCONTEXT *rc, STRING *a, STRING *b) {
+    static STRING *X = NULL, *X2 = NULL;
+
+    if(unlikely(!X)) {
+        X = string_strdupz("X");
+        X2 = string_strdupz("[x]");
+    }
+
+    if(unlikely(a == b)) return string_dup(a);
+    if(unlikely(!a || a == X || a == X2)) return string_dup(b);
+    if(unlikely(!b || b == X || b == X2)) return string_dup(a);
 
     size_t alen = string_length(a);
     size_t blen = string_length(b);
-    size_t length = MAX(alen, blen);
+    size_t length = alen + blen + string_length(X2) + 1;
     char buf1[length + 1], buf2[length + 1], *dst1, *dst2;
     const char *s1, *s2;
 
@@ -1283,7 +1288,9 @@ static STRING *merge_titles(RRDCONTEXT *rc, STRING *a, STRING *b) {
     *dst1 = '\0';
 
     if(*s1 != '\0' || *s2 != '\0') {
-        *dst1++ = 'X';
+        *dst1++ = '[';
+        *dst1++ = 'x';
+        *dst1++ = ']';
 
         s1 = &(string2str(a))[alen - 1];
         s2 = &(string2str(b))[blen - 1];
@@ -1295,10 +1302,10 @@ static STRING *merge_titles(RRDCONTEXT *rc, STRING *a, STRING *b) {
         strcpy(dst1, dst2);
     }
 
-    if(strcmp(buf1, "X") == 0)
+    if(strcmp(buf1, string2str(X2)) == 0)
         return string_dup(a);
 
-    internal_error(true, "RRDCONTEXT: '%s' merged title '%s' and title '%s' as '%s'", string2str(rc->id), string2str(a), string2str(b), buf1);
+    internal_error(true, "RRDCONTEXT: '%s' %s() merged '%s' and '%s' as '%s'", string2str(rc->id), __FUNCTION__, string2str(a), string2str(b), buf1);
     return string_strdupz(buf1);
 }
 
@@ -1314,7 +1321,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 
     if(rc->title != rc_new->title) {
         STRING *old_title = rc->title;
-        rc->title = merge_titles(rc, rc->title, rc_new->title);
+        rc->title = string_2way_merge(rc, rc->title, rc_new->title);
         string_freez(old_title);
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_TITLE);
     }
@@ -1328,7 +1335,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 
     if(rc->family != rc_new->family) {
         STRING *old_family = rc->family;
-        rc->family = merge_titles(rc, rc->family, rc_new->family);
+        rc->family = string_2way_merge(rc, rc->family, rc_new->family);
         string_freez(old_family);
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY);
     }
