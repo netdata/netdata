@@ -1431,11 +1431,16 @@ static void *get_thread_static_string_entry(const char *name) {
     static __thread STRING_ENTRY *_tmp = NULL;
 
     size_t size = sizeof(STRING_ENTRY) + strlen(name) + 1;
-    if(_tmp && _length < size)
+    if(likely(_tmp && _length < size)) {
         freez(_tmp);
+        _tmp = NULL;
+        _length = 0;
+    }
 
-    _tmp = callocz(1, size);
-    _length = size;
+    if(unlikely(!_tmp)) {
+        _tmp = callocz(1, size);
+        _length = size;
+    }
 
     strcpy((char *)&_tmp->str[0], name);
     return _tmp;
