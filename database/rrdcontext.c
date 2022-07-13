@@ -18,6 +18,7 @@ typedef enum {
     RRD_FLAG_ARCHIVED       = (1 << 3),
     RRD_FLAG_OWNLABELS      = (1 << 4),
     RRD_FLAG_LIVE_RETENTION = (1 << 5),
+    RRD_FLAG_QUEUED         = (1 << 6),
 
     RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY    = (1 << 14),
     RRD_FLAG_UPDATE_REASON_CHANGED_LINKING         = (1 << 15),
@@ -63,7 +64,7 @@ typedef enum {
 #define rrd_flag_set_updated(obj, reason) (obj)->flags |= (RRD_FLAG_UPDATED | (reason))
 #define rrd_flag_unset_updated(obj) (obj)->flags &= ~(RRD_FLAG_UPDATED|RRD_FLAG_UPDATE_REASONS)
 
-static struct {
+static struct rrdcontext_reason {
     RRD_FLAGS flag;
     const char *name;
     usec_t delay_ut;
@@ -86,6 +87,8 @@ static struct {
     { RRD_FLAG_UPDATE_REASON_CONNECTED_CHILD, "child connected", 0 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, "child disconnected", 60 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_NETDATA_EXIT, "netdata exits", 300 * USEC_PER_SEC },
+
+    // terminator
     { 0, NULL, 0 },
 };
 
@@ -149,6 +152,9 @@ typedef struct rrdcontext {
 
     RRD_FLAGS last_queued_flags;
     usec_t last_queued_ut;
+    usec_t last_delay_calc_ut;
+    usec_t scheduled_dispatch_ut;
+
     netdata_mutex_t mutex;
 } RRDCONTEXT;
 
@@ -207,6 +213,9 @@ static inline void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     dictionary_acquired_item_release((DICTIONARY *)rc->rrdhost->rrdctx, (DICTIONARY_ITEM *)rca);
 }
+
+#define rrdcontext_lock(rc) netdata_mutex_lock(&((rc)->mutex))
+#define rrdcontext_unlock(rc) netdata_mutex_unlock(&((rc)->mutex))
 
 // ----------------------------------------------------------------------------
 // Updates triggers
@@ -1261,7 +1270,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
     RRDCONTEXT *rc = (RRDCONTEXT *)oldv;
     RRDCONTEXT *rc_new = (RRDCONTEXT *)newv;
 
-    netdata_mutex_lock(&rc->mutex);
+    rrdcontext_lock(rc);
 
     if(rc->title != rc_new->title) {
         STRING *old_title = rc->title;
@@ -1301,7 +1310,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
     //               rc->flags & RRD_FLAG_COLLECTED ? "COLLECTED ":"",
     //               rc->flags & RRD_FLAG_UPDATED ? "UPDATED ": "");
 
-    netdata_mutex_unlock(&rc->mutex);
+    rrdcontext_unlock(rc);
 
     // free the resources of the new one
     rrdcontext_freez(rc_new);
@@ -1349,7 +1358,7 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
 static void rrdcontext_trigger_updates(RRDCONTEXT *rc) {
     if(unlikely(!(rc->flags & RRD_FLAG_UPDATED))) return;
 
-    netdata_mutex_lock(&rc->mutex);
+    rrdcontext_lock(rc);
     rrd_flag_unset_updated(rc);
 
     size_t min_priority = LONG_MAX;
@@ -1460,13 +1469,16 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc) {
             rc->version = rrdcontext_get_next_version(rc);
             rc->last_queued_ut = now_realtime_usec();
             rc->last_queued_flags |= rc->flags;
-            dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_queue, string2str(rc->id), rc, sizeof(*rc));
+            if(!(rc->flags & RRD_FLAG_QUEUED)) {
+                rc->flags |= RRD_FLAG_QUEUED;
+                dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_queue, string2str(rc->id), rc, sizeof(*rc));
+            }
         }
 
         rrd_flag_unset_updated(rc);
     }
 
-    netdata_mutex_unlock(&rc->mutex);
+    rrdcontext_unlock(rc);
 }
 
 // ----------------------------------------------------------------------------
@@ -1660,33 +1672,54 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 // TODO - cleanup contexts that no longer have any retention
 //
 
-#define RRDCONTEXT_HEARTBEAT 1
+static inline usec_t rrdcontext_queued_dispatch_ut(RRDCONTEXT *rc, usec_t now_ut) {
 
-static usec_t rrdcontext_delay(RRDCONTEXT *rc) {
+    if(likely(rc->last_delay_calc_ut >= rc->last_queued_ut))
+        return rc->scheduled_dispatch_ut;
+
     RRD_FLAGS flags = rc->last_queued_flags;
 
-    usec_t min = LONG_MAX;
-    for(int i = 0; rrdcontext_reasons[i].name ;i++) {
-        if(flags & rrdcontext_reasons[i].flag) {
-            if(rrdcontext_reasons[i].delay_ut < min)
-                min = rrdcontext_reasons[i].delay_ut;
+    usec_t delay = LONG_MAX;
+    int i;
+    struct rrdcontext_reason *reason;
+    for(i = 0, reason = &rrdcontext_reasons[i]; reason->name ; reason = &rrdcontext_reasons[++i]) {
+        if(unlikely(flags & reason->flag)) {
+            if(reason->delay_ut < delay)
+                delay = reason->delay_ut;
         }
     }
 
-    if(min == LONG_MAX) {
+    if(unlikely(delay == LONG_MAX)) {
         internal_error(true, "RRDCONTEXT: '%s', cannot find minimum delay of flags %x", string2str(rc->id), (unsigned int)flags);
-        min = 60 * USEC_PER_SEC;
+        delay = 60 * USEC_PER_SEC;
     }
 
-    return min;
+    rc->last_delay_calc_ut = now_ut;
+    usec_t dispatch_ut = rc->scheduled_dispatch_ut = rc->last_queued_ut + delay;
+    return dispatch_ut;
 }
 
+#define RRDCONTEXT_DELAY_AFTER_DB_ROTATION_SECS 120
+#define RRDCONTEXT_CLEANUP_DELETED_EVERY_SECS 3600
+#define RRDCONTEXT_HEARTBEAT_SECS 1
+
+#define WORKER_JOB_HOSTS            1
+#define WORKER_JOB_CHECK            2
+#define WORKER_JOB_SEND             3
+#define WORKER_JOB_DEQUEUE          4
+#define WORKER_JOB_RETENTION        5
+#define WORKER_JOB_QUEUED           6
+#define WORKER_JOB_CLEANUP          7
+#define WORKER_JOB_CLEANUP_DELETE   8
+
+usec_t rrdcontext_last_cleanup_ut = 0;
 usec_t rrdcontext_last_db_rotation_ut = 0;
+
 void rrdcontext_db_rotation(void) {
     rrdcontext_last_db_rotation_ut = now_realtime_usec();
 }
 
-static void rrdcontext_recalculate_retention() {
+static void rrdcontext_recalculate_retention(void) {
     rrdcontext_last_db_rotation_ut = 0;
     rrd_rdlock();
     RRDHOST *host;
@@ -1698,12 +1731,41 @@ static void rrdcontext_recalculate_retention() {
                 RRDMETRIC *rm;
                 dfe_start_read(ri->rrdmetrics, rm) {
                     rm->flags |= RRD_FLAG_UPDATED;
-                    worker_is_busy(5);
+                    worker_is_busy(WORKER_JOB_RETENTION);
                     rrdmetric_trigger_updates(rm);
                 }
                 dfe_done(rm);
             }
             dfe_done(ri);
+        }
+        dfe_done(rc);
+    }
+    rrd_unlock();
+}
+
+static void rrdcontext_cleanup_deleted_unqueued_contexts(void) {
+    rrd_rdlock();
+    RRDHOST *host;
+    rrdhost_foreach_read(host) {
+        RRDCONTEXT *rc;
+        dfe_start_write((DICTIONARY *)host->rrdctx, rc) {
+            worker_is_busy(WORKER_JOB_CLEANUP);
+            if(unlikely((rc->flags & RRD_FLAG_DELETED) && !(rc->flags & RRD_FLAG_QUEUED))) {
+                worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+
+                // we need to refresh the string pointers in rc->hub
+                // in case the context changed values
+                rc->hub.id = string2str(rc->id);
+                rc->hub.title = string2str(rc->title);
+                rc->hub.units = string2str(rc->units);
+
+                // delete it from SQL
+                ctx_delete_context(&host->host_uuid, &rc->hub);
+
+                // delete it from the dictionary
+                if(dictionary_del_unsafe((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
+                    error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.", string2str(rc->id), host->hostname);
+            }
         }
         dfe_done(rc);
     }
@@ -1721,18 +1783,22 @@ void *rrdcontext_main(void *ptr) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return NULL;
 
+    rrdcontext_last_cleanup_ut = now_realtime_usec();
+    
     worker_register("RRDCONTEXT");
-    worker_register_job_name(1, "hosts");
-    worker_register_job_name(2, "dedup checks");
-    worker_register_job_name(3, "sent contexts");
-    worker_register_job_name(4, "deduped contexts");
-    worker_register_job_name(5, "metrics retention");
-    worker_register_job_name(6, "queued contexts");
+    worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
+    worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
+    worker_register_job_name(WORKER_JOB_SEND, "sent contexts");
+    worker_register_job_name(WORKER_JOB_DEQUEUE, "deduped contexts");
+    worker_register_job_name(WORKER_JOB_RETENTION, "metrics retention");
+    worker_register_job_name(WORKER_JOB_QUEUED, "queued contexts");
+    worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup contexts");
+    worker_register_job_name(WORKER_JOB_CLEANUP_DELETE, "deleted contexts");
 
     netdata_thread_cleanup_push(rrdcontext_main_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = USEC_PER_SEC * RRDCONTEXT_HEARTBEAT;
+    usec_t step = USEC_PER_SEC * RRDCONTEXT_HEARTBEAT_SECS;
 
     while (!netdata_exit) {
         worker_is_idle();
@@ -1740,39 +1806,44 @@ void *rrdcontext_main(void *ptr) {
 
         usec_t now_ut = now_realtime_usec();
 
-        if(now_ut < rrdcontext_last_db_rotation_ut + 120 * USEC_PER_SEC) {
+        if(now_ut < rrdcontext_last_db_rotation_ut + RRDCONTEXT_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC) {
             rrdcontext_recalculate_retention();
+        }
+        
+        if(now_ut < rrdcontext_last_cleanup_ut + RRDCONTEXT_CLEANUP_DELETED_EVERY_SECS * USEC_PER_SEC) {
+            rrdcontext_cleanup_deleted_unqueued_contexts();
         }
 
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
-            worker_is_busy(1);
+            worker_is_busy(WORKER_JOB_HOSTS);
 
             if(!dictionary_stats_entries((DICTIONARY *)host->rrdctx_queue)) continue;
 
             RRDCONTEXT *rc;
             dfe_start_write((DICTIONARY *)host->rrdctx_queue, rc) {
-                worker_is_busy(6);
-                usec_t dispatch_ut = rc->last_queued_ut + rrdcontext_delay(rc);
+                worker_is_busy(WORKER_JOB_QUEUED);
+                usec_t dispatch_ut = rrdcontext_queued_dispatch_ut(rc, now_ut);
 
-                if(now_ut >= dispatch_ut) {
-                    netdata_mutex_lock(&rc->mutex);
+                if(unlikely(now_ut >= dispatch_ut)) {
+                    worker_is_busy(WORKER_JOB_CHECK);
 
-                    worker_is_busy(2);
+                    rrdcontext_lock(rc);
+
                     if(check_if_cloud_version_changed_unsafe(rc, "SENDING")) {
-                        worker_is_busy(3);
+                        worker_is_busy(WORKER_JOB_SEND);
                         rrdcontext_message_send_unsafe(rc);
                     }
                     else
                         rc->version = rc->hub.version;
+                    
+                    // remove the queued flag, so that it can be queued again
+                    rc->flags &= ~RRD_FLAG_QUEUED;
 
-                    rc->last_queued_ut = 0;
-                    rc->last_queued_flags = RRD_FLAG_NONE;
+                    rrdcontext_unlock(rc);
 
-                    netdata_mutex_unlock(&rc->mutex);
-
-                    worker_is_busy(4);
+                    worker_is_busy(WORKER_JOB_DEQUEUE);
                     dictionary_del_unsafe((DICTIONARY *)host->rrdctx_queue, string2str(rc->id));
                 }
             }
