@@ -299,7 +299,7 @@ static void log_transition(STRING *metric, STRING *instance, STRING *context, RR
 
 #ifdef LOG_RRDINSTANCES
 static void rrdinstance_log(RRDINSTANCE *ri, const char *msg, bool rrdmetrics_is_write_locked) {
-    char uuid[UUID_STR_LEN + 1];
+    char uuid[UUID_STR_LEN];
 
     uuid_unparse(ri->uuid, uuid);
 
