@@ -447,8 +447,6 @@ RRDHOST *rrdhost_create(const char *hostname,
         host->system_info->mc_version = enable_metric_correlations ? metric_correlations_version : 0;
     }
 
-    ml_new_host(host);
-
     info("Host '%s' (at registry as '%s') with guid '%s' initialized"
                  ", os '%s'"
                  ", timezone '%s'"
@@ -489,7 +487,9 @@ RRDHOST *rrdhost_create(const char *hostname,
     );
 
     rrd_hosts_available++;
+
     rrdhost_load_rrdcontext_data(host);
+    ml_new_host(host);
     return host;
 }
 
