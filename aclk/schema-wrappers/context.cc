@@ -16,7 +16,7 @@ contexts_snapshot_t contexts_snapshot_new(const char *claim_id, const char *node
     ContextsSnapshot *ctxs_snap = new ContextsSnapshot;
 
     if (ctxs_snap == NULL)
-        return NULL;
+        fatal("Cannot allocate ContextsSnapshot object. OOM");
 
     ctxs_snap->set_claim_id(claim_id);
     ctxs_snap->set_node_id(node_id);
@@ -62,6 +62,7 @@ char *contexts_snapshot_2bin(contexts_snapshot_t ctxs_snapshot, size_t *len)
     *len = PROTO_COMPAT_MSG_SIZE_PTR(ctxs_snap);
     char *bin = (char*)mallocz(*len);
     if (!ctxs_snap->SerializeToArray(bin, *len)) {
+        freez(bin);
         delete ctxs_snap;
         return NULL;
     }
@@ -76,7 +77,7 @@ contexts_updated_t contexts_updated_new(const char *claim_id, const char *node_i
     ContextsUpdated *ctxs_updated = new ContextsUpdated;
 
     if (ctxs_updated == NULL)
-        return NULL;
+        fatal("Cannot allocate ContextsUpdated object. OOM");
 
     ctxs_updated->set_claim_id(claim_id);
     ctxs_updated->set_node_id(node_id);
@@ -101,6 +102,9 @@ void contexts_updated_add_ctx_update(contexts_updated_t ctxs_updated, struct con
     ContextsUpdated *ctxs_update = (ContextsUpdated *)ctxs_updated;
     ContextUpdated *ctx = ctxs_update->add_contextupdates();
 
+    if (ctx == NULL)
+        fatal("Cannot allocate ContextUpdated object. OOM");
+
     fill_ctx_updated(ctx, ctx_update);
 }
 
@@ -110,6 +114,7 @@ char *contexts_updated_2bin(contexts_updated_t ctxs_updated, size_t *len)
     *len = PROTO_COMPAT_MSG_SIZE_PTR(ctxs_update);
     char *bin = (char*)mallocz(*len);
     if (!ctxs_update->SerializeToArray(bin, *len)) {
+        freez(bin);
         delete ctxs_update;
         return NULL;
     }
