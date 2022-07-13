@@ -250,7 +250,7 @@ static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reaso
 
 static void rrdmetric_trigger_updates(RRDMETRIC *rm);
 static void rrdinstance_trigger_updates(RRDINSTANCE *ri);
-static void rrdcontext_trigger_updates(RRDCONTEXT *rc);
+static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason);
 
 // ----------------------------------------------------------------------------
 // logging of all data collected
@@ -436,6 +436,9 @@ static void rrdmetric_insert_callback(const char *id __maybe_unused, void *value
 // called when this rrdmetric is deleted from the rrdmetrics dictionary of a rrdinstance
 static void rrdmetric_delete_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDMETRIC *rm = value;
+
+    if(rm->rrddim)
+        fatal("RRDMETRIC: '%s' is freed but there is a RRDDIM linked to it.", string2str(rm->id));
 
     // free the resources
     rrdmetric_free(rm);
@@ -701,6 +704,10 @@ static void rrdinstance_delete_callback(const char *id, void *value, void *data)
     RRDINSTANCE *ri = (RRDINSTANCE *)value;
 
     rrdinstance_log(ri, "DELETE", false);
+
+    if(ri->rrdset)
+        fatal("RRDINSTANCE: '%s' is freed but there is a RRDSET linked to it.", string2str(ri->id));
+
     rrdinstance_free(ri);
 }
 
@@ -914,9 +921,8 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
     }
 
     if(unlikely(ri->flags & RRD_FLAG_UPDATED)) {
-        ri->rc->flags |= RRD_FLAG_UPDATED;
         log_transition(NULL, ri->id, ri->rc->id, ri->flags, "RRDINSTANCE");
-        rrdcontext_trigger_updates(ri->rc);
+        rrdcontext_trigger_updates(ri->rc, true, RRD_FLAG_NONE);
         rrd_flag_unset_updated(ri);
     }
 }
@@ -959,8 +965,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         // the chart changed context
         RRDCONTEXT *rc_old = rrdcontext_acquired_value(st->rrdcontext);
         dictionary_del(rc_old->rrdinstances, st->id);
-        rrd_flag_set_updated(rc_old, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
-        rrdcontext_trigger_updates(rc_old);
+        rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
         rrdcontext_release(st->rrdcontext);
     }
 
@@ -994,6 +999,7 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
         rrdlabels_copy(ri->rrdlabels, st->state->chart_labels);
     }
 
+    ri->rrdset = NULL;
     rrdinstance_trigger_updates(ri);
     rrdinstance_release(st->rrdinstance);
     st->rrdinstance = NULL;
@@ -1333,7 +1339,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 static void rrdcontext_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
-    rrdcontext_trigger_updates(rc);
+    rrdcontext_trigger_updates(rc, false, RRD_FLAG_NONE);
 }
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
@@ -1365,10 +1371,11 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
     host->rrdctx = NULL;
 }
 
-static void rrdcontext_trigger_updates(RRDCONTEXT *rc) {
-    if(unlikely(!(rc->flags & RRD_FLAG_UPDATED))) return;
+static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason) {
+    if(unlikely(!force && !(rc->flags & RRD_FLAG_UPDATED))) return;
 
     rrdcontext_lock(rc);
+    rc->flags |= reason;
     rrd_flag_unset_updated(rc);
 
     size_t min_priority = LONG_MAX;
