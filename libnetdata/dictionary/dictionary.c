@@ -26,8 +26,9 @@ typedef struct dictionary DICTIONARY;
 
 typedef enum name_value_flags {
     NAME_VALUE_FLAG_NONE                   = 0,
-    NAME_VALUE_FLAG_NAME_IS_ALLOCATED      = (1 << 0),
-    NAME_VALUE_FLAG_DELETED                = (1 << 1), // this item is deleted
+    NAME_VALUE_FLAG_NAME_IS_ALLOCATED      = (1 << 0), // the name pointer is a STRING
+    NAME_VALUE_FLAG_DELETED                = (1 << 1), // this item is deleted, so it is not available for traversal
+    NAME_VALUE_FLAG_NEW_OR_UPDATED         = (1 << 2), // this item is new or just updated (used by the react callback)
 } NAME_VALUE_FLAGS;
 
 /*
@@ -485,7 +486,7 @@ static int name_value_compare(void* a, void* b) {
 
 static void *get_thread_static_name_value(const char *name) {
     static __thread NAME_VALUE tmp = { 0 };
-    tmp.flags = NAME_VALUE_FLAG_NAME_IS_ALLOCATED;
+    tmp.flags = NAME_VALUE_FLAG_NONE;
     tmp.caller_name = (char *)name;
     return &tmp;
 }
@@ -947,6 +948,7 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
         hashtable_inserted_name_value_unsafe(dict, nv);
         linkedlist_namevalue_link_unsafe(dict, nv);
+        nv->flags |= NAME_VALUE_FLAG_NEW_OR_UPDATED;
     }
     else {
         // the item is already in the index
@@ -954,11 +956,21 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
         // or overwrite the value, depending on dictionary flags
 
         nv = *pnv;
-        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE))
-            namevalue_reset_unsafe(dict, nv, value, value_len);
 
-        else if(dict->conflict_callback)
+        if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
+            namevalue_reset_unsafe(dict, nv, value, value_len);
+            nv->flags |= NAME_VALUE_FLAG_NEW_OR_UPDATED;
+        }
+
+        else if(dict->conflict_callback) {
             dict->conflict_callback(namevalue_get_name(nv), nv->value, value, dict->conflict_callback_data);
+            nv->flags |= NAME_VALUE_FLAG_NEW_OR_UPDATED;
+        }
+
+        else {
+            // make sure this flag is not set
+            nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
+        }
     }
 
     return nv;
@@ -989,34 +1001,42 @@ static NAME_VALUE *dictionary_get_name_value_unsafe(DICTIONARY *dict, const char
     return nv;
 }
 
-
 // ----------------------------------------------------------------------------
 // API - items management
 
 void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
     NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
 
-    if(unlikely(!nv))
-        return NULL;
-
-    if(unlikely(dict->react_callback))
+    if(unlikely(dict->react_callback && nv && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED))) {
+        // we need to call the react callback with a reference counter on nv
+        reference_counter_acquire(dict, nv);
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
+        reference_counter_release(dict, nv, false);
+        nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
+    }
 
-    return nv->value;
+    return nv ? nv->value : NULL;
 }
 
 void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+
+    // we need to get a reference counter for the react callback
+    // before we unlock the dictionary
+    if(unlikely(dict->react_callback && nv && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED)))
+        reference_counter_acquire(dict, nv);
+
     dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
 
-    if(unlikely(!nv))
-        return NULL;
-
-    if(unlikely(dict->react_callback))
+    if(unlikely(dict->react_callback && nv && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED))) {
+        // we got the reference counter we need, above
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
+        reference_counter_release(dict, nv, true);
+        nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
+    }
 
-    return nv->value;
+    return nv ? nv->value : NULL;
 }
 
 DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
@@ -1027,8 +1047,10 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const 
 
     reference_counter_acquire(dict, nv);
 
-    if(unlikely(dict->react_callback))
+    if(unlikely(dict->react_callback && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED))) {
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
+        nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
+    }
 
     return (DICTIONARY_ITEM *)nv;
 }
@@ -1036,15 +1058,17 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const 
 DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+
+    // we need to get the reference counter before we unlock
+    if(nv) reference_counter_acquire(dict, nv);
+
     dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
 
-    if(unlikely(!nv))
-        return NULL;
-
-    reference_counter_acquire(dict, nv);
-
-    if(dict->react_callback)
+    if(unlikely(dict->react_callback && nv && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED))) {
+        // we already have a reference counter, for the caller, no need for another one
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
+        nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
+    }
 
     return (DICTIONARY_ITEM *)nv;
 }
