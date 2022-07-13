@@ -48,7 +48,6 @@ include bind_rndc/Makefile.inc
 include boinc/Makefile.inc
 include ceph/Makefile.inc
 include changefinder/Makefile.inc
-include chrony/Makefile.inc
 include dockerd/Makefile.inc
 include dovecot/Makefile.inc
 include example/Makefile.inc
@@ -71,7 +70,6 @@ include nginx_plus/Makefile.inc
 include nvidia_smi/Makefile.inc
 include nsd/Makefile.inc
 include ntpd/Makefile.inc
-include ovpn_status_log/Makefile.inc
 include openldap/Makefile.inc
 include oracledb/Makefile.inc
 include postfix/Makefile.inc
