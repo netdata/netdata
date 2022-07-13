@@ -1126,8 +1126,6 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
-    rrdhost_destroy_rrdcontexts(host);
-
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
     freez(host->aclk_state.prev_claimed_id);
@@ -1153,6 +1151,8 @@ void rrdhost_free(RRDHOST *host) {
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host->node_id);
+
+    rrdhost_destroy_rrdcontexts(host);
 
     freez(host);
 #ifdef ENABLE_ACLK
