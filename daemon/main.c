@@ -736,7 +736,7 @@ static void get_netdata_configured_variables() {
     // --------------------------------------------------------------------
     // rrdcontext
 
-    rrdcontext_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "rrdcontexts enable", rrdcontext_enabled);
+    rrdcontext_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "rrdcontexts", rrdcontext_enabled);
 
 
     // --------------------------------------------------------------------
