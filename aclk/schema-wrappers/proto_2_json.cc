@@ -45,6 +45,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new alarms::v1::AlarmSnapshot;
     if (!strcmp(msgname, "AlarmLogEntry"))
         return new alarms::v1::AlarmLogEntry;
+    if (!strcmp(msgname, "UpdateNodeCollectors"))
+        return new nodeinstance::info::v1::UpdateNodeCollectors;
 
 //rx side
     if (!strcmp(msgname, "CreateNodeInstanceResult"))
