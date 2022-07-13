@@ -31,6 +31,8 @@ extern void rrdhost_load_rrdcontext_data(RRDHOST *host);
 extern void rrdhost_create_rrdcontexts(RRDHOST *host);
 extern void rrdhost_destroy_rrdcontexts(RRDHOST *host);
 
+extern void rrdcontext_host_child_connected(RRDHOST *host);
+extern void rrdcontext_host_child_disconnected(RRDHOST *host);
 
 // ----------------------------------------------------------------------------
 // public API for rrddims
