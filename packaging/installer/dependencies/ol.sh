@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << Oracle Linux: [8] >>
+# << Oracle Linux: [8, 9] >>
 
 set -e
 
@@ -90,13 +90,17 @@ check_flags() {
 }
 
 validate_tree_ol() {
-
   opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     opts="-y"
   fi
 
+  # shellcheck disable=SC1091
+  source /etc/os-release
+
+  # shellcheck disable=SC2153
+  version="$(echo "${VERSION}" | cut -f 1 -d '.')"
 
   echo >&2 " > Checking for config-manager ..."
   if ! dnf config-manager &> /dev/null; then
@@ -106,9 +110,17 @@ validate_tree_ol() {
   fi
 
   echo " > Checking for CodeReady Builder ..."
-  if ! dnf repolist | grep ol8_codeready_builder; then
-    if prompt "CodeReadyBuilder not found, shall I install it?"; then
-      dnf ${opts} config-manager --set-enabled ol8_codeready_builder || enable_repo
+  if [[ "${version}" =~ ^8(\..*)?$ ]]; then
+    if ! dnf repolist enabled | grep ol8_codeready_builder; then
+      if prompt "CodeReadyBuilder not found, shall I install it?"; then
+        dnf ${opts} config-manager --set-enabled ol8_codeready_builder || enable_repo
+      fi
+    fi
+  elif [[ "${version}" =~ ^9(\..*)?$ ]]; then
+    if ! dnf repolist enabled | grep ol9_codeready_builder; then
+      if prompt "CodeReadyBuilder not found, shall I install it?"; then
+        dnf ${opts} config-manager --set-enabled ol9_codeready_builder || enable_repo
+      fi
     fi
   fi
 
