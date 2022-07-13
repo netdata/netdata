@@ -33,7 +33,7 @@ struct context_updated {
 // ContextS Snapshot related
 contexts_snapshot_t contexts_snapshot_new(const char *claim_id, const char *node_id, uint64_t version);
 void contexts_snapshot_delete(contexts_snapshot_t ctxs_snapshot);
-void contexts_snapshot_update_version(contexts_snapshot_t ctxs_snapshot, uint64_t version);
+void contexts_snapshot_set_version(contexts_snapshot_t ctxs_snapshot, uint64_t version);
 void contexts_snapshot_add_ctx_update(contexts_snapshot_t ctxs_snapshot, struct context_updated *ctx_update);
 char *contexts_snapshot_2bin(contexts_snapshot_t ctxs_snapshot, size_t *len);
 
