@@ -649,17 +649,17 @@ extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_FLAG_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
-    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2, // delete the entire host when orphan
-    RRDHOST_FLAG_EXPORTING_SEND         = 1 << 3, // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND    = 1 << 4, // don't send it to external databases
-    RRDHOST_FLAG_ARCHIVED               = 1 << 5, // The host is archived, no collected charts yet
-    RRDHOST_FLAG_MULTIHOST              = 1 << 6, // Host belongs to localhost/megadb
-    RRDHOST_FLAG_PENDING_FOREACH_ALARMS = 1 << 7, // contains dims with uninitialized foreach alarms
-    RRDHOST_FLAG_STREAM_LABELS_UPDATE   = 1 << 8,
-    RRDHOST_FLAG_STREAM_LABELS_STOP     = 1 << 9,
-
+    RRDHOST_FLAG_ORPHAN                 = (1 << 0), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = (1 << 1), // delete files of obsolete charts
+    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = (1 << 2), // delete the entire host when orphan
+    RRDHOST_FLAG_EXPORTING_SEND         = (1 << 3), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND    = (1 << 4), // don't send it to external databases
+    RRDHOST_FLAG_ARCHIVED               = (1 << 5), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_MULTIHOST              = (1 << 6), // Host belongs to localhost/megadb
+    RRDHOST_FLAG_PENDING_FOREACH_ALARMS = (1 << 7), // contains dims with uninitialized foreach alarms
+    RRDHOST_FLAG_STREAM_LABELS_UPDATE   = (1 << 8),
+    RRDHOST_FLAG_STREAM_LABELS_STOP     = (1 << 9),
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS   = (1 << 10), // when set, we should send ACLK stream context updates
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))

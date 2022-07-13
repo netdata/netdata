@@ -2,6 +2,9 @@
 
 #include "rrdcontext.h"
 #include "sqlite/sqlite_context.h"
+#include "aclk/schema-wrappers/context.h"
+#include "aclk/aclk_contexts_api.h"
+#include "aclk/aclk_api.h"
 
 int rrdcontext_enabled = CONFIG_BOOLEAN_NO;
 
@@ -241,6 +244,9 @@ static inline void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
 }
 
 static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, int job_id);
+
+#define rrdcontext_version_hash(host) rrdcontext_version_hash_with_callback(host, NULL, false, NULL)
+static uint64_t rrdcontext_version_hash_with_callback(RRDHOST *host, void (*callback)(RRDCONTEXT *, bool, void *), bool snapshot, void *bundle);
 
 #define rrdcontext_lock(rc) netdata_mutex_lock(&((rc)->mutex))
 #define rrdcontext_unlock(rc) netdata_mutex_unlock(&((rc)->mutex))
@@ -1064,7 +1070,7 @@ static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc) {
     return version;
 }
 
-static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc) {
+static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot, void *bundle) {
 
     // save it, so that we know the last version we sent to hub
     rc->version = rc->hub.version = rrdcontext_get_next_version(rc);
@@ -1077,8 +1083,22 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc) {
     rc->hub.last_time_t = rrd_flag_is_collected(rc) ? 0 : rc->last_time_t;
     rc->hub.deleted = (rc->flags & RRD_FLAG_DELETED) ? true : false;
 
-    // TODO call the ACLK function to send this message
+    struct context_updated message = {
+        .id = rc->hub.id,
+        .version = rc->hub.version,
+        .title = rc->hub.title,
+        .units = rc->hub.units,
+        .chart_type = rc->hub.chart_type,
+        .priority = rc->hub.priority,
+        .first_entry = rc->hub.first_time_t,
+        .last_entry = rc->hub.last_time_t,
+        .deleted = rc->hub.deleted,
+    };
 
+    if(snapshot)
+        contexts_snapshot_add_ctx_update(bundle, &message);
+    else
+        contexts_updated_add_ctx_update(bundle, &message);
 
     // store it to SQL
     if(ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
@@ -1600,6 +1620,105 @@ void rrdcontext_host_child_disconnected(RRDHOST *host) {
 }
 
 // ----------------------------------------------------------------------------
+// ACLK interface
+
+static bool rrdhost_check_our_claim_id(const char *claim_id) {
+    if(!localhost->aclk_state.claimed_id) return false;
+    return (strcasecmp(claim_id, localhost->aclk_state.claimed_id) == 0) ? true : false;
+}
+
+static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
+    uuid_t uuid;
+    uuid_parse(node_id, uuid);
+
+    RRDHOST *host = NULL;
+
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        if(uuid_compare(uuid, *host->node_id) == 0)
+            break;
+    }
+    rrd_unlock();
+
+    return host;
+}
+
+void rrdcontext_hub_checkpoint_command(void *ptr) {
+    struct ctxs_checkpoint *cmd = ptr;
+
+    if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
+        error("RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
+              cmd->claim_id, cmd->node_id,
+              localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
+              cmd->claim_id);
+
+        return;
+    }
+
+    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
+    if(!host) {
+        error("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', but there is no node with such node id here. Ignoring command.",
+              cmd->claim_id, cmd->node_id);
+
+        return;
+    }
+
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
+        info("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', while node '%s' has an active context streaming.",
+              cmd->claim_id, cmd->node_id, host->hostname);
+
+        // disable it temporarily, so that our worker will not attempt to send messages in parallel
+        rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+    }
+
+    uint64_t our_version_hash = rrdcontext_version_hash(host);
+
+    if(cmd->version_hash != our_version_hash) {
+        error("RRDCONTEXT: received version hash %lu for host '%s', does not match our version hash %lu. Sending snapshot of all contexts.",
+              cmd->version_hash, host->hostname, our_version_hash);
+
+        char uuid[UUID_STR_LEN];
+        uuid_unparse_lower(*host->node_id, uuid);
+        contexts_snapshot_t bundle = contexts_snapshot_new(host->aclk_state.claimed_id, uuid, our_version_hash);
+        our_version_hash = rrdcontext_version_hash_with_callback(host, rrdcontext_message_send_unsafe, true, bundle);
+        contexts_snapshot_update_version(bundle, our_version_hash);
+        aclk_send_contexts_snapshot(bundle);
+    }
+
+    rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+}
+
+void rrdcontext_hub_stop_streaming_command(void *ptr) {
+    struct stop_streaming_ctxs *cmd = ptr;
+
+    if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
+        error("RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
+              cmd->claim_id, cmd->node_id,
+              localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
+              cmd->claim_id);
+
+        return;
+    }
+
+    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
+    if(!host) {
+        error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but there is no node with such node id here. Ignoring command.",
+              cmd->claim_id, cmd->node_id);
+
+        return;
+    }
+
+    if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
+        error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but node '%s' does not have active context streaming. Ignoring command.",
+              cmd->claim_id, cmd->node_id, host->hostname);
+
+        return;
+    }
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+}
+
+// ----------------------------------------------------------------------------
 // load from SQL
 
 static void rrdinstance_load_clabel(SQL_CLABEL_DATA *sld, void *data) {
@@ -1687,9 +1806,6 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 // the worker thread
 
-// TODO - cleanup contexts that no longer have any retention
-//
-
 static inline usec_t rrdcontext_queued_dispatch_ut(RRDCONTEXT *rc, usec_t now_ut) {
 
     if(likely(rc->last_delay_calc_ut >= rc->last_queued_ut))
@@ -1717,6 +1833,8 @@ static inline usec_t rrdcontext_queued_dispatch_ut(RRDCONTEXT *rc, usec_t now_ut
     return dispatch_ut;
 }
 
+#define MESSAGES_TO_SEND_PER_HOST 1000
+
 #define RRDCONTEXT_DELAY_AFTER_DB_ROTATION_SECS 120
 // #define RRDCONTEXT_CLEANUP_DELETED_EVERY_SECS 3600 // not needed, now it is done at dequeue
 #define RRDCONTEXT_HEARTBEAT_SECS 1
@@ -1737,7 +1855,12 @@ void rrdcontext_db_rotation(void) {
     rrdcontext_last_db_rotation_ut = now_realtime_usec();
 }
 
-static uint64_t rrdcontext_version_hash(RRDHOST *host) {
+static uint64_t rrdcontext_version_hash_with_callback(
+    RRDHOST *host,
+    void (*callback)(RRDCONTEXT *, bool, void *),
+    bool snapshot,
+    void *bundle) {
+
     if(unlikely(!host || !host->rrdctx)) return 0;
 
     RRDCONTEXT *rc;
@@ -1746,9 +1869,14 @@ static uint64_t rrdcontext_version_hash(RRDHOST *host) {
     // loop through all contexts of the host
     dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
 
+        rrdcontext_lock(rc);
+
         // skip any deleted contexts
         if(unlikely(rc->flags & RRD_FLAG_DELETED))
             continue;
+
+        if(unlikely(callback))
+            callback(rc, snapshot, bundle);
 
         // we use rc->hub.* which has the latest
         // metadata we have sent to the hub
@@ -1761,6 +1889,8 @@ static uint64_t rrdcontext_version_hash(RRDHOST *host) {
         // rc->hub.last_time_t is already zero
 
         hash += rc->hub.version + rc->hub.last_time_t - rc->hub.first_time_t;
+
+        rrdcontext_unlock(rc);
 
     }
     dfe_done(rc);
@@ -1864,6 +1994,8 @@ void *rrdcontext_main(void *ptr) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 
+        if(!aclk_connected) continue;
+
         usec_t now_ut = now_realtime_usec();
 
         if(now_ut < rrdcontext_last_db_rotation_ut + RRDCONTEXT_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC) {
@@ -1880,10 +2012,23 @@ void *rrdcontext_main(void *ptr) {
         rrdhost_foreach_read(host) {
             worker_is_busy(WORKER_JOB_HOSTS);
 
-            if(!dictionary_stats_entries((DICTIONARY *)host->rrdctx_queue)) continue;
+            // check if we have received a streaming command for this host
+            if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS))
+                continue;
+
+            // check if there are queued items to send
+            if(!dictionary_stats_entries((DICTIONARY *)host->rrdctx_queue))
+                continue;
+
+            size_t messages_added = 0;
+            contexts_updated_t bundle = NULL;
 
             RRDCONTEXT *rc;
             dfe_start_write((DICTIONARY *)host->rrdctx_queue, rc) {
+
+                if(unlikely(messages_added >= MESSAGES_TO_SEND_PER_HOST))
+                    break;
+
                 worker_is_busy(WORKER_JOB_QUEUED);
                 usec_t dispatch_ut = rrdcontext_queued_dispatch_ut(rc, now_ut);
 
@@ -1894,7 +2039,13 @@ void *rrdcontext_main(void *ptr) {
 
                     if(check_if_cloud_version_changed_unsafe(rc, "SENDING")) {
                         worker_is_busy(WORKER_JOB_SEND);
-                        rrdcontext_message_send_unsafe(rc);
+                        if(!bundle) {
+                            char uuid[UUID_STR_LEN];
+                            uuid_unparse_lower(*host->node_id, uuid);
+                            bundle = contexts_updated_new(host->aclk_state.claimed_id, uuid, 0, now_ut);
+                        }
+                        rrdcontext_message_send_unsafe(rc, false, bundle);
+                        messages_added++;
                     }
                     else
                         rc->version = rc->hub.version;
@@ -1935,8 +2086,14 @@ void *rrdcontext_main(void *ptr) {
                 }
             }
             dfe_done(rc);
+
+            if(bundle) {
+                contexts_updated_update_version_hash(bundle, rrdcontext_version_hash(host));
+                aclk_send_contexts_updated(bundle);
+            }
         }
         rrd_unlock();
+
     }
 
     netdata_thread_cleanup_pop(1);

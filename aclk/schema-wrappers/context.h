@@ -15,7 +15,7 @@ typedef void* contexts_snapshot_t;
 
 struct context_updated {
     // context id
-    char *id;
+    const char *id;
 
     uint64_t version;
 
@@ -24,10 +24,10 @@ struct context_updated {
 
     int deleted;
 
-    char *title;
+    const char *title;
     uint64_t priority;
-    char *chart_type;
-    char *units;
+    const char *chart_type;
+    const char *units;
 };
 
 // ContextS Snapshot related
