@@ -4,11 +4,11 @@
 #include "sqlite_context.h"
 #include "sqlite_db_migration.h"
 
-#define DB_CONTEXT_METADATA_VERSION 1
+#define DB_CONTEXT_METADATA_VERSION 2
 
 const char *database_context_config[] = {
     "CREATE TABLE IF NOT EXISTS context (host_id BLOB, id TEXT, version INT, title TEXT, chart_type TEXT, " \
-    "unit TEXT, priority INT, first_time_t INT, last_time_t INT, deleted INT, PRIMARY KEY (host_id, id));",
+    "unit TEXT, priority INT, first_time_t INT, last_time_t INT, deleted INT, family TEXT, PRIMARY KEY (host_id, id));",
 
     NULL
 };
@@ -125,7 +125,7 @@ static int bind_text_null(sqlite3_stmt *res, int position, const char *text)
 //
 // Fetching data
 //
-#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, c.update_every, c.chart_type FROM meta.chart c " \
+#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, c.update_every, c.chart_type, c.family FROM meta.chart c " \
         "WHERE c.host_id IN (SELECT h.host_id FROM meta.host h " \
         "WHERE UNLIKELY((h.hops = 0 AND @host_id IS NULL)) OR LIKELY((h.host_id = @host_id)));"
 
@@ -160,6 +160,7 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
         chart_data.priority = sqlite3_column_int(res, 6);
         chart_data.update_every = sqlite3_column_int(res, 7);
         chart_data.chart_type = sqlite3_column_int(res, 8);
+        chart_data.family = (char *) sqlite3_column_text(res, 9);
         dict_cb(&chart_data, data);
     }
 
@@ -241,7 +242,7 @@ failed:
 
 // CONTEXT LIST
 #define CTX_GET_CONTEXT_LIST  "SELECT id, version, title, chart_type, unit, priority, first_time_t, " \
-            "last_time_t, deleted FROM context c WHERE c.host_id = @host_id;"
+            "last_time_t, deleted, family FROM context c WHERE c.host_id = @host_id;"
 void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
 
@@ -276,6 +277,7 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
         context_data.first_time_t = sqlite3_column_int64(res, 6);
         context_data.last_time_t = sqlite3_column_int64(res, 7);
         context_data.deleted = sqlite3_column_int(res, 8);
+        context_data.family = (char *) sqlite3_column_text(res, 9);
         dict_cb(&context_data, data);
     }
 
@@ -291,9 +293,8 @@ failed:
 //
 
 #define CTX_STORE_CONTEXT "INSERT OR REPLACE INTO context " \
-    "(host_id, id, version, title, chart_type, unit, priority, first_time_t, last_time_t, deleted) " \
-    "VALUES (@host_id, @context, @version, @title, @chart_type, @unit, @priority, @first_time_t, @last_time_t, @deleted);"
-
+    "(host_id, id, version, title, chart_type, unit, priority, first_time_t, last_time_t, deleted, family) " \
+    "VALUES (@host_id, @context, @version, @title, @chart_type, @unit, @priority, @first_time_t, @last_time_t, @deleted, @family);"
 
 int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
@@ -367,6 +368,12 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
     rc = sqlite3_bind_int(res, 10, (time_t) context_data->deleted);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind last_time_t to store context details");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_text(res, 11, context_data->family, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind context to store details");
         goto failed;
     }
 
@@ -473,7 +480,8 @@ static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, v
          "priority = %lu "
          "first time = %lu "
          "last time = %lu "
-         "deleted = %d",
+         "deleted = %d"
+         "family = %s",
          context_data->id,
          context_data->version,
          context_data->title,
@@ -482,7 +490,8 @@ static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, v
          context_data->priority,
          context_data->first_time_t,
          context_data->last_time_t,
-         context_data->deleted);
+         context_data->deleted,
+         context_data->family);
 }
 
 static int localhost_uuid_cb(void *data, int argc, char **argv, char **column)
@@ -520,6 +529,7 @@ int ctx_unittest(void)
     context_data.title = strdupz("TestContextTitle");
     context_data.units= strdupz("TestContextUnits");
     context_data.chart_type = strdupz("TestContextChartType");
+    context_data.family = strdupz("TestContextFamily");
     context_data.priority = 50000;
     context_data.deleted = 0;
     context_data.first_time_t = 1000;
@@ -573,6 +583,7 @@ int ctx_unittest(void)
     freez((void *)context_data.id);
     freez((void *)context_data.title);
     freez((void *)context_data.chart_type);
+    freez((void *)context_data.family);
 
     // The list should be empty
     info("List context start after delete");
