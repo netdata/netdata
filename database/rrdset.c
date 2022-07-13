@@ -337,8 +337,6 @@ static inline void last_updated_time_align(RRDSET *st) {
 void rrdset_free(RRDSET *st) {
     if(unlikely(!st)) return;
 
-    rrdcontext_removed_rrdset(st);
-
     RRDHOST *host = st->rrdhost;
 
     rrdhost_check_wrlock(host);  // make sure we have a write lock on the host
@@ -388,6 +386,9 @@ void rrdset_free(RRDSET *st) {
     }
 
     rrdset_unlock(st);
+
+    // this has to be after the dimensions are freed
+    rrdcontext_removed_rrdset(st);
 
     // ------------------------------------------------------------------------
     // free it
