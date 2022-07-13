@@ -441,7 +441,7 @@ int contexts_checkpoint(const char *msg, size_t msg_len)
     if (!cmd)
         return 1;
 
-    //TODO @ktsaou
+    rrdcontext_hub_checkpoint_command(cmd);
 
     freez(cmd->claim_id);
     freez(cmd->node_id);
@@ -460,7 +460,7 @@ int stop_streaming_contexts(const char *msg, size_t msg_len)
     if (!cmd)
         return 1;
 
-    //TODO @ktsaou
+    rrdcontext_hub_stop_streaming_command(cmd);
 
     freez(cmd->claim_id);
     freez(cmd->node_id);
