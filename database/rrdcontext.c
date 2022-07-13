@@ -1127,7 +1127,7 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
         error("RRDCONTEXT: failed to save context '%s' version %lu to SQL.", rc->hub.id, rc->hub.version);
 }
 
-static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *msg) {
+static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending) {
     bool id_changed = false,
          title_changed = false,
          units_changed = false,
@@ -1167,8 +1167,8 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *ms
 
     if(unlikely(id_changed || title_changed || units_changed || family_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
-        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %zu, title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %lu%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s",
-                       msg,
+        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %zu, title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %lu%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
+                       sending?"SENDING":"QUEUE",
                        string2str(rc->id), id_changed ? " (CHANGED)" : "",
                        rc->version,
                        string2str(rc->title), title_changed ? " (CHANGED)" : "",
@@ -1178,7 +1178,9 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *ms
                        rc->priority, priority_changed ? " (CHANGED)" : "",
                        rc->first_time_t, first_time_changed ? " (CHANGED)" : "",
                        rrd_flag_is_collected(rc) ? 0 : rc->last_time_t, last_time_changed ? " (CHANGED)" : "",
-                       (rc->flags & RRD_FLAG_DELETED) ? "true" : "false", deleted_changed ? " (CHANGED)" : ""
+                       (rc->flags & RRD_FLAG_DELETED) ? "true" : "false", deleted_changed ? " (CHANGED)" : "",
+                       sending ? (now_realtime_usec() - rc->last_queued_ut) / USEC_PER_MS : 0,
+                       sending ? (rc->scheduled_dispatch_ut - rc->last_queued_ut) / USEC_PER_SEC : 0
                        );
         return true;
     }
@@ -1505,7 +1507,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
     if(unlikely(rc->flags & RRD_FLAG_UPDATED)) {
         log_transition(NULL, NULL, rc->id, rc->flags, "RRDCONTEXT");
 
-        if(check_if_cloud_version_changed_unsafe(rc, "QUEUE")) {
+        if(check_if_cloud_version_changed_unsafe(rc, false)) {
             rc->version = rrdcontext_get_next_version(rc);
             rc->last_queued_ut = now_realtime_usec();
             rc->last_queued_flags |= rc->flags;
@@ -2057,7 +2059,7 @@ void *rrdcontext_main(void *ptr) {
 
                     rrdcontext_lock(rc);
 
-                    if(check_if_cloud_version_changed_unsafe(rc, "SENDING")) {
+                    if(check_if_cloud_version_changed_unsafe(rc, true)) {
                         worker_is_busy(WORKER_JOB_SEND);
 
 #ifdef ENABLE_ACLK
@@ -2072,6 +2074,8 @@ void *rrdcontext_main(void *ptr) {
                         // and save an update to SQL
                         rrdcontext_message_send_unsafe(rc, false, bundle);
                         messages_added++;
+
+                        rc->last_queued_flags = RRD_FLAG_NONE;
                     }
                     else
                         rc->version = rc->hub.version;
