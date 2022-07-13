@@ -1737,6 +1737,37 @@ void rrdcontext_db_rotation(void) {
     rrdcontext_last_db_rotation_ut = now_realtime_usec();
 }
 
+static uint64_t rrdcontext_version_hash(RRDHOST *host) {
+    if(unlikely(!host || !host->rrdctx)) return 0;
+
+    RRDCONTEXT *rc;
+    uint64_t hash = 0;
+
+    // loop through all contexts of the host
+    dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
+
+        // skip any deleted contexts
+        if(unlikely(rc->flags & RRD_FLAG_DELETED))
+            continue;
+
+        // we use rc->hub.* which has the latest
+        // metadata we have sent to the hub
+
+        // if a context is currently queued, rc->hub.* does NOT
+        // reflect the queued changes. rc->hub.* is updated with
+        // their metadata, after messages are dispatched to hub.
+
+        // when the context is being collected,
+        // rc->hub.last_time_t is already zero
+
+        hash += rc->hub.version + rc->hub.last_time_t - rc->hub.first_time_t;
+
+    }
+    dfe_done(rc);
+
+    return hash;
+}
+
 static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, int job_id) {
     if(unlikely(!host || !host->rrdctx)) return;
 
