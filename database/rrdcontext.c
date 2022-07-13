@@ -21,6 +21,7 @@ typedef enum {
     RRD_FLAG_LIVE_RETENTION = (1 << 5), // we have got live retention from the database
     RRD_FLAG_QUEUED         = (1 << 6), // this context is currently queued to be dispatched to hub
 
+    RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY          = (1 << 13),
     RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY    = (1 << 14),
     RRD_FLAG_UPDATE_REASON_CHANGED_LINKING         = (1 << 15), // an instance or a metric switched RRDSET or RRDDIM
     RRD_FLAG_UPDATE_REASON_CHANGED_NAME            = (1 << 16), // an instance or a metric changed name
@@ -42,7 +43,8 @@ typedef enum {
 } RRD_FLAGS;
 
 #define RRD_FLAG_UPDATE_REASONS                       ( \
-     RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY        \
+     RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY              \
+    |RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY        \
     |RRD_FLAG_UPDATE_REASON_CHANGED_LINKING             \
     |RRD_FLAG_UPDATE_REASON_CHANGED_NAME                \
     |RRD_FLAG_UPDATE_REASON_CHANGED_UUID                \
@@ -100,6 +102,7 @@ static struct rrdcontext_reason {
     { RRD_FLAG_UPDATE_REASON_LOAD_SQL,                "loaded from sql",      60 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_CHANGED_TITLE,           "changed title",        30 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_CHANGED_UNITS,           "changed units",        30 * USEC_PER_SEC },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY,           "changed family",      30 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY,        "changed priority",     30 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_ZERO_RETENTION,          "has no retention",     0 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T,    "updated first_time_t", 0 * USEC_PER_SEC },
@@ -144,6 +147,7 @@ typedef struct rrdinstance {
     STRING *name;
     STRING *title;
     STRING *units;
+    STRING *family;
     size_t priority;
     RRDSET_TYPE chart_type;
 
@@ -166,6 +170,7 @@ typedef struct rrdcontext {
     STRING *id;
     STRING *title;
     STRING *units;
+    STRING *family;
     RRDSET_TYPE chart_type;
 
     size_t priority;
@@ -301,7 +306,7 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg, bool rrdmetrics_is
     BUFFER *wb = buffer_create(1000);
 
     buffer_sprintf(wb,
-                   "RRDINSTANCE: %s id '%s' (host '%s'), uuid '%s', name '%s', context '%s', title '%s', units '%s', priority %zu, chart type '%s', update every %d, rrdset '%s', flags %s%s%s%s%s, first_time_t %ld, last_time_t %ld",
+                   "RRDINSTANCE: %s id '%s' (host '%s'), uuid '%s', name '%s', context '%s', title '%s', units '%s', family '%s', priority %zu, chart type '%s', update every %d, rrdset '%s', flags %s%s%s%s%s, first_time_t %ld, last_time_t %ld",
                    msg,
                    string2str(ri->id),
                    ri->rc->rrdhost->hostname,
@@ -310,6 +315,7 @@ static void rrdinstance_log(RRDINSTANCE *ri, const char *msg, bool rrdmetrics_is
                    string2str(ri->rc->id),
                    string2str(ri->title),
                    string2str(ri->units),
+                   string2str(ri->family),
                    ri->priority,
                    rrdset_type_name(ri->chart_type),
                    ri->update_every,
@@ -647,6 +653,9 @@ static void rrdinstance_check(RRDINSTANCE *ri) {
     if(unlikely(!ri->units))
         fatal("RRDINSTANCE: '%s' created without units", string2str(ri->id));
 
+    if(unlikely(!ri->family))
+        fatal("RRDINSTANCE: '%s' created without family", string2str(ri->id));
+
     if(unlikely(!ri->priority))
         fatal("RRDINSTANCE: '%s' created without a priority", string2str(ri->id));
 
@@ -664,11 +673,13 @@ static void rrdinstance_free(RRDINSTANCE *ri) {
     string_freez(ri->name);
     string_freez(ri->title);
     string_freez(ri->units);
+    string_freez(ri->family);
 
     ri->id = NULL;
     ri->name = NULL;
     ri->title = NULL;
     ri->units = NULL;
+    ri->family = NULL;
     ri->rc = NULL;
     ri->rrdlabels = NULL;
     ri->rrdmetrics = NULL;
@@ -762,6 +773,13 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
         ri->units = string_dup(ri_new->units);
         string_freez(old);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_UNITS);
+    }
+
+    if(ri->family != ri_new->family) {
+        STRING *old = ri->family;
+        ri->family = string_dup(ri_new->family);
+        string_freez(old);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY);
     }
 
     if(ri->chart_type != ri_new->chart_type) {
@@ -938,6 +956,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         .id = string_strdupz(st->context),
         .title = string_strdupz(st->title),
         .units = string_strdupz(st->units),
+        .family = string_strdupz(st->family),
         .priority = st->priority,
         .chart_type = st->chart_type,
         .flags = RRD_FLAG_NONE,
@@ -951,6 +970,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         .id = string_strdupz(st->id),
         .name = string_strdupz(st->name),
         .units = string_strdupz(st->units),
+        .family = string_strdupz(st->family),
         .title = string_strdupz(st->title),
         .chart_type = st->chart_type,
         .priority = st->priority,
@@ -1060,6 +1080,7 @@ static void rrdcontext_freez(RRDCONTEXT *rc) {
     string_freez(rc->id);
     string_freez(rc->title);
     string_freez(rc->units);
+    string_freez(rc->family);
 }
 
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc) {
@@ -1077,6 +1098,7 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
     rc->hub.id = string2str(rc->id);
     rc->hub.title = string2str(rc->title);
     rc->hub.units = string2str(rc->units);
+    rc->hub.family = string2str(rc->family);
     rc->hub.chart_type = rrdset_type_name(rc->chart_type);
     rc->hub.priority = rc->priority;
     rc->hub.first_time_t = rc->first_time_t;
@@ -1088,6 +1110,7 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
         .version = rc->hub.version,
         .title = rc->hub.title,
         .units = rc->hub.units,
+        .family = rc->hub.family,
         .chart_type = rc->hub.chart_type,
         .priority = rc->hub.priority,
         .first_entry = rc->hub.first_time_t,
@@ -1111,6 +1134,7 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *ms
     bool id_changed = false,
          title_changed = false,
          units_changed = false,
+         family_changed = false,
          chart_type_changed = false,
          priority_changed = false,
          first_time_changed = false,
@@ -1125,6 +1149,9 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *ms
 
     if(unlikely(string2str(rc->units) != rc->hub.units))
         units_changed = true;
+
+    if(unlikely(string2str(rc->family) != rc->hub.family))
+        family_changed = true;
 
     if(unlikely(rrdset_type_name(rc->chart_type) != rc->hub.chart_type))
         chart_type_changed = true;
@@ -1141,14 +1168,15 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *ms
     if(unlikely(((rc->flags & RRD_FLAG_DELETED) ? true : false) != rc->hub.deleted))
         deleted_changed = true;
 
-    if(unlikely(id_changed || title_changed || units_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
+    if(unlikely(id_changed || title_changed || units_changed || family_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
-        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %zu, title '%s'%s, units '%s'%s, chart type '%s'%s, priority %lu%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s",
+        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %zu, title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %lu%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s",
                        msg,
                        string2str(rc->id), id_changed ? " (CHANGED)" : "",
                        rc->version,
                        string2str(rc->title), title_changed ? " (CHANGED)" : "",
                        string2str(rc->units), units_changed ? " (CHANGED)" : "",
+                       string2str(rc->family), family_changed ? " (CHANGED)" : "",
                        rrdset_type_name(rc->chart_type), chart_type_changed ? " (CHANGED)" : "",
                        rc->priority, priority_changed ? " (CHANGED)" : "",
                        rc->first_time_t, first_time_changed ? " (CHANGED)" : "",
@@ -1190,6 +1218,10 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
         rc->units = string_strdupz(rc->hub.units);
         rc->hub.units = string2str(rc->units);
 
+        string_freez(rc->family);
+        rc->family = string_strdupz(rc->hub.family);
+        rc->hub.family = string2str(rc->family);
+
         rc->chart_type = rrdset_type_id(rc->hub.chart_type);
         rc->hub.chart_type = rrdset_type_name(rc->chart_type);
 
@@ -1216,20 +1248,6 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
     rrdinstances_create(rc);
     netdata_mutex_init(&rc->mutex);
 
-    //internal_error(true, "RRDCONTEXT: INSERT '%s' on host '%s', version %lu, title '%s', units '%s', chart type '%s', priority %zu, first_time_t %ld, last_time_t %ld, options %s%s%s",
-    //               string2str(rc->id),
-    //               host->hostname,
-    //               rc->version,
-    //               string2str(rc->title),
-    //               string2str(rc->units),
-    //               rrdset_type_name(rc->chart_type),
-    //               rc->priority,
-    //               rc->first_time_t,
-    //               rc->last_time_t,
-    //               rc->flags & RRD_FLAG_DELETED ? "DELETED ":"",
-    //               rrd_flag_is_collected(rc) ? "COLLECTED ":"",
-    //               rc->flags & RRD_FLAG_UPDATED ? "UPDATED ": "");
-
     // signal the react callback to do the job
     rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_NEW_OBJECT);
 }
@@ -1240,20 +1258,6 @@ static void rrdcontext_delete_callback(const char *id, void *value, void *data) 
     (void)host;
 
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
-
-    //internal_error(true, "RRDCONTEXT: DELETE '%s' on host '%s', version %lu, title '%s', units '%s', chart type '%s', priority %zu, first_time_t %ld, last_time_t %ld, options %s%s%s",
-    //               string2str(rc->id),
-    //               host->hostname,
-    //               rc->version,
-    //               string2str(rc->title),
-    //               string2str(rc->units),
-    //               rrdset_type_name(rc->chart_type),
-    //               rc->priority,
-    //               rc->first_time_t,
-    //               rc->last_time_t,
-    //               rc->flags & RRD_FLAG_DELETED ? "DELETED ":"",
-    //               rrd_flag_is_collected(rc) ? "COLLECTED ":"",
-    //               rc->flags & RRD_FLAG_UPDATED ? "UPDATED ": "");
 
     rrdinstances_destroy(rc);
     netdata_mutex_destroy(&rc->mutex);
@@ -1322,6 +1326,13 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_UNITS);
     }
 
+    if(rc->family != rc_new->family) {
+        STRING *old_family = rc->family;
+        rc->family = merge_titles(rc, rc->family, rc_new->family);
+        string_freez(old_family);
+        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY);
+    }
+
     if(rc->chart_type != rc_new->chart_type) {
         rc->chart_type = rc_new->chart_type;
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_CHART_TYPE);
@@ -1335,20 +1346,6 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
     rc->flags |= rc_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS;
     if(rrd_flag_is_collected(rc) && rrd_flag_is_archived(rc))
         rrd_flag_set_collected(rc);
-
-    //internal_error(true, "RRDCONTEXT: CONFLICT '%s' on host '%s', version %lu, title '%s', units '%s', chart type '%s', priority %zu, first_time_t %ld, last_time_t %ld, options %s%s%s",
-    //               string2str(rc->id),
-    //               host->hostname,
-    //               rc->version,
-    //               string2str(rc->title),
-    //               string2str(rc->units),
-    //               rrdset_type_name(rc->chart_type),
-    //               rc->priority,
-    //               rc->first_time_t,
-    //               rc->last_time_t,
-    //               rc->flags & RRD_FLAG_DELETED ? "DELETED ":"",
-    //               rrd_flag_is_collected(rc) ? "COLLECTED ":"",
-    //               rc->flags & RRD_FLAG_UPDATED ? "UPDATED ": "");
 
     rrdcontext_unlock(rc);
 
@@ -1757,6 +1754,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .id = string_strdupz(sc->context),
         .title = string_strdupz(sc->title),
         .units = string_strdupz(sc->units),
+        .family = string_strdupz(sc->family),
         .priority = sc->priority,
         .chart_type = sc->chart_type,
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL,
@@ -1771,6 +1769,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .name = string_strdupz(sc->name),
         .title = string_strdupz(sc->title),
         .units = string_strdupz(sc->units),
+        .family = string_strdupz(sc->family),
         .chart_type = sc->chart_type,
         .priority = sc->priority,
         .update_every = sc->update_every,
@@ -1958,6 +1957,7 @@ static void rrdcontext_cleanup_deleted_unqueued_contexts(void) {
                 rc->hub.id = string2str(rc->id);
                 rc->hub.title = string2str(rc->title);
                 rc->hub.units = string2str(rc->units);
+                rc->hub.family = string2str(rc->family);
 
                 // delete it from SQL
                 ctx_delete_context(&host->host_uuid, &rc->hub);
@@ -2084,6 +2084,7 @@ void *rrdcontext_main(void *ptr) {
                         rc->hub.id = string2str(rc->id);
                         rc->hub.title = string2str(rc->title);
                         rc->hub.units = string2str(rc->units);
+                        rc->hub.family = string2str(rc->family);
 
                         // delete it from SQL
                         ctx_delete_context(&host->host_uuid, &rc->hub);
