@@ -13,6 +13,8 @@ typedef struct dictionary DICTIONARY;
 
 #include "../libnetdata.h"
 
+#undef ENABLE_DBENGINE
+
 #ifndef ENABLE_DBENGINE
 #define DICTIONARY_WITH_AVL
 #warning Compiling DICTIONARY with an AVL index
@@ -1012,7 +1014,6 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
         reference_counter_acquire(dict, nv);
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
         reference_counter_release(dict, nv, false);
-        nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
     }
 
     return nv ? nv->value : NULL;
@@ -1033,7 +1034,6 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
         // we got the reference counter we need, above
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
         reference_counter_release(dict, nv, true);
-        nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
     }
 
     return nv ? nv->value : NULL;
@@ -1049,7 +1049,6 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const 
 
     if(unlikely(dict->react_callback && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED))) {
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
-        nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
     }
 
     return (DICTIONARY_ITEM *)nv;
@@ -1067,7 +1066,6 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const char *n
     if(unlikely(dict->react_callback && nv && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED))) {
         // we already have a reference counter, for the caller, no need for another one
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
-        nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
     }
 
     return (DICTIONARY_ITEM *)nv;
@@ -1977,7 +1975,7 @@ static int check_name_value_callback(const char *name, void *value, void *data) 
     return value == data;
 }
 
-static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *name, const char *value, int refcount, NAME_VALUE_FLAGS flags, bool searchable, bool browsable, bool linked) {
+static size_t check_name_value_deleted_flag(DICTIONARY *dict, NAME_VALUE *nv, const char *name, const char *value, int refcount, NAME_VALUE_FLAGS deleted_flags, bool searchable, bool browsable, bool linked) {
     size_t errors = 0;
 
     fprintf(stderr, "NAME_VALUE name is '%s', expected '%s'...\t\t\t\t", namevalue_get_name(nv), name);
@@ -2004,8 +2002,8 @@ static size_t check_name_value(DICTIONARY *dict, NAME_VALUE *nv, const char *nam
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE flags is %u, expected %u...\t\t\t\t\t", nv->flags, flags);
-    if (nv->flags != flags) {
+    fprintf(stderr, "NAME_VALUE deleted flag is %s, expected %s...\t\t\t", (nv->flags & NAME_VALUE_FLAG_DELETED)?"TRUE":"FALSE", (deleted_flags & NAME_VALUE_FLAG_DELETED)?"TRUE":"FALSE");
+    if ((nv->flags & NAME_VALUE_FLAG_DELETED) != (deleted_flags & NAME_VALUE_FLAG_DELETED)) {
         fprintf(stderr, "FAILED\n");
         errors++;
     }
@@ -2146,25 +2144,26 @@ int dictionary_unittest(size_t entries) {
         NAME_VALUE *nv = (NAME_VALUE *)dictionary_get_and_acquire_item(dict, "test");
 
         errors += check_dictionary(dict, 1, 1);
-        errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
+        errors += check_name_value_deleted_flag(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nChecking that reference counters are increased:\n");
         void *t;
         dfe_start_read(dict, t) {
             errors += check_dictionary(dict, 1, 1);
-            errors += check_name_value(dict, nv, "test", "ITEM1", 2, NAME_VALUE_FLAG_NONE, true, true, true);
+            errors +=
+                check_name_value_deleted_flag(dict, nv, "test", "ITEM1", 2, NAME_VALUE_FLAG_NONE, true, true, true);
         }
         dfe_done(t);
 
         fprintf(stderr, "\nChecking that reference counters are decreased:\n");
         errors += check_dictionary(dict, 1, 1);
-        errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
+        errors += check_name_value_deleted_flag(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nDeleting the item we have acquired:\n");
         dictionary_del(dict, "test");
 
         errors += check_dictionary(dict, 0, 1);
-        errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
+        errors += check_name_value_deleted_flag(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
 
         fprintf(stderr, "\nAdding another item with the same name of the item we deleted, while being acquired:\n");
         dictionary_set(dict, "test", "ITEM2", 6);
@@ -2172,19 +2171,19 @@ int dictionary_unittest(size_t entries) {
 
         fprintf(stderr, "\nAcquiring the second item:\n");
         NAME_VALUE *nv2 = (NAME_VALUE *)dictionary_get_and_acquire_item(dict, "test");
-        errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
-        errors += check_name_value(dict, nv2, "test", "ITEM2", 1, NAME_VALUE_FLAG_NONE,    true,  true,  true);
+        errors += check_name_value_deleted_flag(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
+        errors += check_name_value_deleted_flag(dict, nv2, "test", "ITEM2", 1, NAME_VALUE_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nReleasing the second item (the first is still acquired):\n");
         dictionary_acquired_item_release(dict, (DICTIONARY_ITEM *)nv2);
         errors += check_dictionary(dict, 1, 2);
-        errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
-        errors += check_name_value(dict, nv2, "test", "ITEM2", 0, NAME_VALUE_FLAG_NONE,    true,  true,  true);
+        errors += check_name_value_deleted_flag(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
+        errors += check_name_value_deleted_flag(dict, nv2, "test", "ITEM2", 0, NAME_VALUE_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nDeleting the second item (the first is still acquired):\n");
         dictionary_del(dict, "test");
         errors += check_dictionary(dict, 0, 1);
-        errors += check_name_value(dict, nv, "test",  "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
+        errors += check_name_value_deleted_flag(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_DELETED, false, false, true);
 
         fprintf(stderr, "\nReleasing the first item (which we have already deleted):\n");
         dictionary_acquired_item_release(dict, (DICTIONARY_ITEM *)nv);
@@ -2195,7 +2194,7 @@ int dictionary_unittest(size_t entries) {
         nv = (NAME_VALUE *)dictionary_get_and_acquire_item(dict, "test");
 
         errors += check_dictionary(dict, 1, 1);
-        errors += check_name_value(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
+        errors += check_name_value_deleted_flag(dict, nv, "test", "ITEM1", 1, NAME_VALUE_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nDestroying the dictionary while we have acquired an item\n");
         dictionary_destroy(dict);
