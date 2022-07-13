@@ -18,6 +18,10 @@ ARG EXTRA_INSTALL_OPTS
 
 ENV EXTRA_INSTALL_OPTS=$EXTRA_INSTALL_OPTS
 
+ARG DEBUG_BUILD
+
+ENV DEBUG_BUILD=$DEBUG_BUILD
+
 # Copy source
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
@@ -26,7 +30,7 @@ WORKDIR /opt/netdata.git
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
    /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
-   CFLAGS=${CFLAGS:-"-O2 -pipe"} ./netdata-installer.sh --dont-wait --dont-start-it --use-system-protobuf \
+   CFLAGS="$(packaging/docker/gen-cflags.sh)" ./netdata-installer.sh --dont-wait --dont-start-it --use-system-protobuf \
    ${EXTRA_INSTALL_OPTS} --one-time-build "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
 
 # files to one directory
