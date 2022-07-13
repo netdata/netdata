@@ -78,7 +78,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
         { .name = "proto", .version = 1,                     .enabled = 1 },
         { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(wc->host) },
         { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx", .version = 1, .enabled = aclk_ctx_based },
+        { .name = "ctx",   .version = 1, .enabled = aclk_ctx_based },
         { .name = NULL,    .version = 0,                     .enabled = 0 }
     };
     node_info.node_instance_capabilities = instance_caps;
@@ -116,7 +116,6 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     struct capability node_caps[] = {
         { .name = "ml", .version = host->system_info->ml_capable, .enabled = host->system_info->ml_enabled },
         { .name = "mc", .version = host->system_info->mc_version ? host->system_info->mc_version : 0, .enabled = host->system_info->mc_version ? 1 : 0 },
-        { .name = "ctx", .version = 1, .enabled = aclk_ctx_based },
         { .name = NULL, .version = 0, .enabled = 0 }
     };
     node_info.node_capabilities = node_caps;

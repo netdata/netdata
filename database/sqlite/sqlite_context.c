@@ -14,7 +14,7 @@ const char *database_context_config[] = {
 };
 
 const char *database_context_cleanup[] = {
-
+    "VACCUM;",
     NULL
 };
 

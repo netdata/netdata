@@ -542,7 +542,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
         info("New ACLK protobuf protocol negotiated successfully (/env response).");
 
-        aclk_ctx_based = 1;
+        aclk_ctx_based = 0;
         if (aclk_env_has_capa("ctx") || rrdcontext_enabled) {
             if (rrdcontext_enabled) {
                 aclk_ctx_based = 1;
