@@ -25,6 +25,16 @@ contexts_snapshot_t contexts_snapshot_new(const char *claim_id, const char *node
     return ctxs_snap;
 }
 
+void contexts_snapshot_delete(contexts_snapshot_t snapshot)
+{
+    delete (ContextsSnapshot *)snapshot;
+}
+
+void contexts_snapshot_set_version(contexts_snapshot_t ctxs_snapshot, uint64_t version)
+{
+    ((ContextsSnapshot *)ctxs_snapshot)->set_version(version);
+}
+
 static void fill_ctx_updated(ContextUpdated *ctx, struct context_updated *c_ctx)
 {
     ctx->set_id(c_ctx->id);
@@ -74,6 +84,16 @@ contexts_updated_t contexts_updated_new(const char *claim_id, const char *node_i
     ctxs_updated->set_created_at(created_at);
 
     return ctxs_updated;
+}
+
+void contexts_updated_delete(contexts_updated_t ctxs_updated)
+{
+    delete (ContextsUpdated *)ctxs_updated;
+}
+
+void contexts_updated_update_version_hash(contexts_updated_t ctxs_updated, uint64_t version_hash)
+{
+    ((ContextsUpdated *)ctxs_updated)->set_version_hash(version_hash);
 }
 
 void contexts_updated_add_ctx_update(contexts_updated_t ctxs_updated, struct context_updated *ctx_update)
