@@ -1677,11 +1677,18 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
         error("RRDCONTEXT: received version hash %lu for host '%s', does not match our version hash %lu. Sending snapshot of all contexts.",
               cmd->version_hash, host->hostname, our_version_hash);
 
+        // prepare the snapshot
         char uuid[UUID_STR_LEN];
         uuid_unparse_lower(*host->node_id, uuid);
         contexts_snapshot_t bundle = contexts_snapshot_new(host->aclk_state.claimed_id, uuid, our_version_hash);
+
+        // calculate version hash and pack all the messages together in one go
         our_version_hash = rrdcontext_version_hash_with_callback(host, rrdcontext_message_send_unsafe, true, bundle);
-        contexts_snapshot_update_version(bundle, our_version_hash);
+
+        // update the version
+        contexts_snapshot_set_version(bundle, our_version_hash);
+
+        // send it
         aclk_send_contexts_snapshot(bundle);
     }
 
@@ -2039,11 +2046,16 @@ void *rrdcontext_main(void *ptr) {
 
                     if(check_if_cloud_version_changed_unsafe(rc, "SENDING")) {
                         worker_is_busy(WORKER_JOB_SEND);
+                        
                         if(!bundle) {
+                            // prepare the bundle to send the messages
                             char uuid[UUID_STR_LEN];
                             uuid_unparse_lower(*host->node_id, uuid);
                             bundle = contexts_updated_new(host->aclk_state.claimed_id, uuid, 0, now_ut);
                         }
+
+                        // update the hub data of the context, give a new version, pack the message
+                        // and save an update to SQL
                         rrdcontext_message_send_unsafe(rc, false, bundle);
                         messages_added++;
                     }
@@ -2088,7 +2100,12 @@ void *rrdcontext_main(void *ptr) {
             dfe_done(rc);
 
             if(bundle) {
+                // we have a bundle to send messages
+
+                // update the version hash
                 contexts_updated_update_version_hash(bundle, rrdcontext_version_hash(host));
+
+                // send it
                 aclk_send_contexts_updated(bundle);
             }
         }
