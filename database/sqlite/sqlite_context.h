@@ -13,7 +13,7 @@ typedef struct ctx_chart {
     const char *context;
     const char *title;
     const char *units;
-    const char *family;    // TODO @stelfgrag, please add this to SQL and the message
+    const char *family;
     int chart_type;
     int priority;
     int update_every;
@@ -39,7 +39,7 @@ typedef struct versioned_context_data {
     const char *title;      // the title of the context
     const char *chart_type; // the chart_type of the context
     const char *units;      // the units of the context
-    const char *family;     // the family of the context // TODO @stelfrag please add this too!
+    const char *family;     // the family of the context
 
     uint64_t priority;      // the chart priority of the context
 
