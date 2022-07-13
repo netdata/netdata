@@ -11,6 +11,8 @@
 #include "proto/nodeinstance/connection/v1/connection.pb.h"
 #include "proto/nodeinstance/create/v1/creation.pb.h"
 #include "proto/nodeinstance/info/v1/info.pb.h"
+#include "proto/context/v1/stream.pb.h"
+#include "proto/context/v1/context.pb.h"
 
 #include "libnetdata/libnetdata.h"
 
@@ -47,6 +49,10 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new alarms::v1::AlarmLogEntry;
     if (!strcmp(msgname, "UpdateNodeCollectors"))
         return new nodeinstance::info::v1::UpdateNodeCollectors;
+    if (!strcmp(msgname, "ContextsUpdated"))
+        return new context::v1::ContextsUpdated;
+    if (!strcmp(msgname, "ContextsSnapshot"))
+        return new context::v1::ContextsSnapshot;
 
 //rx side
     if (!strcmp(msgname, "CreateNodeInstanceResult"))
@@ -69,6 +75,10 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new alarms::v1::SendAlarmSnapshot;
     if (!strcmp(msgname, "DisconnectReq"))
         return new agent::v1::DisconnectReq;
+    if (!strcmp(msgname, "ContextsUpdated"))
+        return new context::v1::ContextsUpdated;
+    if (!strcmp(msgname, "StopStreamingContexts"))
+        return new context::v1::StopStreamingContexts;
 
     return NULL;
 }
