@@ -542,9 +542,14 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
         info("New ACLK protobuf protocol negotiated successfully (/env response).");
 
+        aclk_ctx_based = 0;
         if (aclk_env_has_capa("ctx")) {
-            aclk_ctx_based = 1;
-            info ("New CONTEXT based communication to be used");
+            if (rrdcontext_enabled) {
+                aclk_ctx_based = 1;
+                info ("New CONTEXT based communication to be used");
+            } else {
+                error_report("Cloud wants us to use context based communication but we are not capable of it");
+            }
         }
 
         memset(&auth_url, 0, sizeof(url_t));

@@ -313,6 +313,10 @@ int send_node_instances(const char *msg, size_t msg_len)
 
 int stream_charts_and_dimensions(const char *msg, size_t msg_len)
 {
+    if (aclk_ctx_based) {
+        error_report("Got StreamChartsAndDimensions in Context mode! Ignoring");
+        return 1;
+    }
     stream_charts_and_dims_t res = parse_stream_charts_and_dims(msg, msg_len);
     if (!res.claim_id || !res.node_id) {
         error("Error parsing StreamChartsAndDimensions msg");
