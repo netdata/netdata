@@ -6,7 +6,7 @@
 #include "aclk/aclk_contexts_api.h"
 #include "aclk/aclk_api.h"
 
-int rrdcontext_enabled = CONFIG_BOOLEAN_NO;
+int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
 
 #define LOG_TRANSITIONS 1
 // #define LOG_RRDINSTANCES 1
@@ -1700,6 +1700,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 #endif
     }
 
+    internal_error(true, "RRDCONTEXT: host '%s' enabling streaming of contexts", host->hostname);
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
@@ -1730,6 +1731,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
         return;
     }
 
+    internal_error(true, "RRDCONTEXT: host '%s' disabling streaming of contexts", host->hostname);
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
