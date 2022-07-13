@@ -1177,7 +1177,7 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, const char *ms
                        rrdset_type_name(rc->chart_type), chart_type_changed ? " (CHANGED)" : "",
                        rc->priority, priority_changed ? " (CHANGED)" : "",
                        rc->first_time_t, first_time_changed ? " (CHANGED)" : "",
-                       rc->last_time_t, last_time_changed ? " (CHANGED)" : "",
+                       rrd_flag_is_collected(rc) ? 0 : rc->last_time_t, last_time_changed ? " (CHANGED)" : "",
                        (rc->flags & RRD_FLAG_DELETED) ? "true" : "false", deleted_changed ? " (CHANGED)" : ""
                        );
         return true;
