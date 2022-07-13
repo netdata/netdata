@@ -46,6 +46,7 @@ static void fill_ctx_updated(ContextUpdated *ctx, struct context_updated *c_ctx)
     ctx->set_priority(c_ctx->priority);
     ctx->set_chart_type(c_ctx->chart_type);
     ctx->set_units(c_ctx->units);
+    ctx->set_family(c_ctx->family);
 }
 
 void contexts_snapshot_add_ctx_update(contexts_snapshot_t ctxs_snapshot, struct context_updated *ctx_update)

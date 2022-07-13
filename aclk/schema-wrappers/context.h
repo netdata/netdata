@@ -28,7 +28,7 @@ struct context_updated {
     uint64_t priority;
     const char *chart_type;
     const char *units;
-    const char *family;     // TODO @underhood please add this to the message
+    const char *family;
 };
 
 // ContextS Snapshot related
