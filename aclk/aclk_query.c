@@ -278,6 +278,7 @@ const char *aclk_query_get_name(aclk_query_type_t qt)
         case ALARM_PROVIDE_CFG:    return "provide_alarm_config";
         case ALARM_SNAPSHOT:       return "alarm_snapshot";
         case UPDATE_NODE_COLLECTORS: return "update_node_collectors";
+        case PROTO_BIN_MESSAGE:    return "generic_binary_proto_message";
         default:
             error_report("Unknown query type used %d", (int) qt);
             return "unknown";
