@@ -485,7 +485,7 @@ static int name_value_compare(void* a, void* b) {
 
 static void *get_thread_static_name_value(const char *name) {
     static __thread NAME_VALUE tmp = { 0 };
-    memset(&tmp, 0, sizeof(NAME_VALUE));
+    tmp.flags = NAME_VALUE_FLAG_NAME_IS_ALLOCATED;
     tmp.caller_name = (char *)name;
     return &tmp;
 }
