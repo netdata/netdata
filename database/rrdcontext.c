@@ -1070,7 +1070,7 @@ static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc) {
     return version;
 }
 
-static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot, void *bundle) {
+static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused, void *bundle __maybe_unused) {
 
     // save it, so that we know the last version we sent to hub
     rc->version = rc->hub.version = rrdcontext_get_next_version(rc);
@@ -1095,10 +1095,12 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot, void *
         .deleted = rc->hub.deleted,
     };
 
+#ifdef ENABLE_ACLK
     if(snapshot)
         contexts_snapshot_add_ctx_update(bundle, &message);
     else
         contexts_updated_add_ctx_update(bundle, &message);
+#endif
 
     // store it to SQL
     if(ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
@@ -1677,6 +1679,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
         error("RRDCONTEXT: received version hash %lu for host '%s', does not match our version hash %lu. Sending snapshot of all contexts.",
               cmd->version_hash, host->hostname, our_version_hash);
 
+#ifdef ENABLE_ACLK
         // prepare the snapshot
         char uuid[UUID_STR_LEN];
         uuid_unparse_lower(*host->node_id, uuid);
@@ -1690,6 +1693,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
         // send it
         aclk_send_contexts_snapshot(bundle);
+#endif
     }
 
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
@@ -2046,14 +2050,15 @@ void *rrdcontext_main(void *ptr) {
 
                     if(check_if_cloud_version_changed_unsafe(rc, "SENDING")) {
                         worker_is_busy(WORKER_JOB_SEND);
-                        
+
+#ifdef ENABLE_ACLK
                         if(!bundle) {
                             // prepare the bundle to send the messages
                             char uuid[UUID_STR_LEN];
                             uuid_unparse_lower(*host->node_id, uuid);
                             bundle = contexts_updated_new(host->aclk_state.claimed_id, uuid, 0, now_ut);
                         }
-
+#endif
                         // update the hub data of the context, give a new version, pack the message
                         // and save an update to SQL
                         rrdcontext_message_send_unsafe(rc, false, bundle);
@@ -2099,6 +2104,7 @@ void *rrdcontext_main(void *ptr) {
             }
             dfe_done(rc);
 
+#ifdef ENABLE_ACLK
             if(bundle) {
                 // we have a bundle to send messages
 
@@ -2108,6 +2114,7 @@ void *rrdcontext_main(void *ptr) {
                 // send it
                 aclk_send_contexts_updated(bundle);
             }
+#endif
         }
         rrd_unlock();
 
