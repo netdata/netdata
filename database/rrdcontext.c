@@ -1871,8 +1871,6 @@ void *rrdcontext_main(void *ptr) {
                     // remove the queued flag, so that it can be queued again
                     rc->flags &= ~RRD_FLAG_QUEUED;
 
-                    rrdcontext_unlock(rc);
-
                     // remove it from the queue
                     worker_is_busy(WORKER_JOB_DEQUEUE);
                     dictionary_del_unsafe((DICTIONARY *)host->rrdctx_queue, string2str(rc->id));
@@ -1891,10 +1889,18 @@ void *rrdcontext_main(void *ptr) {
                         // delete it from SQL
                         ctx_delete_context(&host->host_uuid, &rc->hub);
 
+                        STRING *id = string_dup(rc->id);
+
+                        rrdcontext_unlock(rc);
+
                         // delete it from the master dictionary
                         if(dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
-                            error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.", string2str(rc->id), host->hostname);
+                            error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.", string2str(id), host->hostname);
+
+                        string_freez(id);
                     }
+                    else
+                        rrdcontext_unlock(rc);
                 }
             }
             dfe_done(rc);
