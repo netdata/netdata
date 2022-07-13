@@ -1682,31 +1682,31 @@ int unit_test_bitmap256(void) {
         j += 4;
     } while (j < 256);
 
-    if (test_bitmap.data[0] == 0x11111111)
-        fprintf(stderr, "%s() INDEX 0 is 0x11111111 set OK\n", __FUNCTION__);
+    if (test_bitmap.data[0] == 0x1111111111111111)
+        fprintf(stderr, "%s() INDEX 0 is 0x1111111111111111 set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 0 is %lx expected 0x11111111\n", __FUNCTION__, test_bitmap.data[0]);
+        fprintf(stderr, "%s() INDEX 0 is %llx expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[0]);
         return 1;
     }
 
-    if (test_bitmap.data[1] == 0x11111111)
-        fprintf(stderr, "%s() INDEX 1 is 0x11111111 set OK\n", __FUNCTION__);
+    if (test_bitmap.data[1] == 0x1111111111111111)
+        fprintf(stderr, "%s() INDEX 1 is 0x1111111111111111 set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 1 is %lx expected 0x11111111\n", __FUNCTION__, test_bitmap.data[1]);
+        fprintf(stderr, "%s() INDEX 1 is %llx expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[1]);
         return 1;
     }
 
-    if (test_bitmap.data[2] == 0x11111111)
-        fprintf(stderr, "%s() INDEX 2 is 0x11111111 set OK\n", __FUNCTION__);
+    if (test_bitmap.data[2] == 0x1111111111111111)
+        fprintf(stderr, "%s() INDEX 2 is 0x1111111111111111 set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 2 is %lx expected 0x11111111\n", __FUNCTION__, test_bitmap.data[2]);
+        fprintf(stderr, "%s() INDEX 2 is %llx expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[2]);
         return 1;
     }
 
-    if (test_bitmap.data[3] == 0x11111111)
-        fprintf(stderr, "%s() INDEX 3 is 0x11111111 set OK\n", __FUNCTION__);
+    if (test_bitmap.data[3] == 0x1111111111111111)
+        fprintf(stderr, "%s() INDEX 3 is 0x1111111111111111 set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 3 is %lx expected 0x11111111\n", __FUNCTION__, test_bitmap.data[3]);
+        fprintf(stderr, "%s() INDEX 3 is %llx expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[3]);
         return 1;
     }
 
