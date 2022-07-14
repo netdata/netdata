@@ -2176,8 +2176,8 @@ void *rrdcontext_main(void *ptr) {
 
                 worker_is_busy(WORKER_JOB_QUEUED);
                 usec_t dispatch_ut = rrdcontext_queued_dispatch_ut(rc, now_ut);
-
-                if(unlikely(now_ut >= dispatch_ut)) {
+                char *claim_id = is_agent_claimed();
+                if(unlikely(now_ut >= dispatch_ut) && claim_id) {
                     worker_is_busy(WORKER_JOB_CHECK);
 
                     rrdcontext_lock(rc);
@@ -2190,7 +2190,7 @@ void *rrdcontext_main(void *ptr) {
                             // prepare the bundle to send the messages
                             char uuid[UUID_STR_LEN];
                             uuid_unparse_lower(*host->node_id, uuid);
-                            bundle = contexts_updated_new(host->aclk_state.claimed_id, uuid, 0, now_ut);
+                            bundle = contexts_updated_new(claim_id, uuid, 0, now_ut);
                         }
 #endif
                         // update the hub data of the context, give a new version, pack the message
@@ -2229,6 +2229,7 @@ void *rrdcontext_main(void *ptr) {
                     else
                         rrdcontext_unlock(rc);
                 }
+                freez(claim_id);
             }
             dfe_done(rc);
 
