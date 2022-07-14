@@ -7,30 +7,48 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/database/README.
 # Database
 
 Netdata is fully capable of long-term metrics storage, at per-second granularity, via its default database engine
-(`dbengine`). But to remain as flexible as possible, Netdata supports a number of types of metrics storage:
+(`dbengine`). But to remain as flexible as possible, Netdata supports several storage options:
 
 1. `dbengine`, (the default) data are in database files. The [Database Engine](/database/engine/README.md) works like a
-    traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data
-    reside compressed on disk. The number of history entries is not fixed in this case, but depends on the configured
-    disk space and the effective compression ratio of the data stored. This is the **only mode** that supports changing
-    the data collection update frequency (`update every`) **without losing** the previously stored metrics. For more
-    details see [here](/database/engine/README.md).
+   traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data
+   reside compressed on disk. The number of history entries is not fixed in this case, but depends on the configured
+   disk space and the effective compression ratio of the data stored. This is the **only mode** that supports changing
+   the data collection update frequency (`update every`) **without losing** the previously stored metrics. For more
+   details see [here](/database/engine/README.md).
 
-2.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
+2. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
 
-3.  `save`, data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata
-    restart. It also uses `mmap()` and supports [KSM](#ksm).
+3. `save`, data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata restart. It also
+   uses `mmap()` and supports [KSM](#ksm).
 
-4.  `map`, data are in memory mapped files. This works like the swap. Keep in mind though, this will have a constant
-    write on your disk. When Netdata writes data on its memory, the Linux kernel marks the related memory pages as dirty
-    and automatically starts updating them on disk. Unfortunately we cannot control how frequently this works. The Linux
-    kernel uses exactly the same algorithm it uses for its swap memory. Check below for additional information on
-    running a dedicated central Netdata server. This mode uses `mmap()` but does not support [KSM](#ksm).
+4. `map`, data are in memory mapped files. This works like the swap. When Netdata writes data on its memory, the Linux
+   kernel marks the related memory pages as dirty and automatically starts updating them on disk. Unfortunately we
+   cannot control how frequently this works. The Linux kernel uses exactly the same algorithm it uses for its swap
+   memory. This mode uses `mmap()` but does not support [KSM](#ksm). _Keep in mind though, this option will have a
+   constant write on your disk._
 
-5.  `none`, without a database (collected metrics can only be streamed to another Netdata).
+5. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all others
+   except `none`.
 
-6.  `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all
-    others except `none`.
+6. `none`, without a database (collected metrics can only be streamed to another Netdata).
+
+## Which database mode to use
+
+The default mode `[db].mode = dbengine` has been designed to scale for longer retentions and is the only mode suitable
+for parent Agents in the _Parent - Child_ setups
+
+The other available database modes are designed to minimize resource utilization and should only be considered on
+[Parent - Child](/docs/metrics-storage-management/how-streaming-works) setups at the children side and only when the
+resource constraints are very strict.
+
+So,
+
+- On a single node setup, use `[db].mode = dbengine`.
+- On a [Parent - Child](/docs/metrics-storage-management/how-streaming-works) setup, use `[db].mode = dbengine` on the
+  parent to increase retention, a more resource efficient mode like, `dbengine` with light retention settings, and
+  `save`, `ram` or `none` modes for the children to minimize resource utilization.
+
+## Choose your database mode
 
 You can select the database mode by editing `netdata.conf` and setting:
 
@@ -40,166 +58,87 @@ You can select the database mode by editing `netdata.conf` and setting:
   mode = dbengine
 ```
 
-## Running Netdata in embedded devices
+## Netdata Longer Metrics Retention
 
-Embedded devices usually have very limited RAM resources available.
+Metrics retention is controlled only by the disk space allocated to storing metrics. But it also affects the memory and
+CPU required by the agent to query longer timeframes.
 
-There are 2 settings for you to tweak:
+Since Netdata Agents usually run on the edge, on production systems, Netdata Agent **parents** should be considered.
+When having a [**parent - child**](/docs/metrics-storage-management/how-streaming-works.md) setup, the child (the
+Netdata Agent running on a production system) delegates all of its functions, including longer metrics retention and
+querying, to the parent node that can dedicate more resources to this task. A single Netdata Agent parent can centralize
+multiple children Netdata Agents (dozens, hundreds, or even thousands depending on its available resources).
 
-1.  `[db].update every`, which controls the data collection frequency
-2.  `[db].retention`, which controls the size of the database in memory (except for `[db].mode = dbengine`)
+## Running Netdata on embedded devices
+
+Embedded devices typically have very limited RAM resources available.
+
+There are two settings for you to configure:
+
+1. `[db].update every`, which controls the data collection frequency
+2. `[db].retention`, which controls the size of the database in memory (except for `[db].mode = dbengine`)
 
 By default `[db].update every = 1` and `[db].retention = 3600`. This gives you an hour of data with per second updates.
 
-If you set `[db].update every = 2` and `[db].retention = 1800`, you will still have an hour of data, but collected once every 2
-seconds. This will **cut in half** both CPU and RAM resources consumed by Netdata. Of course experiment a bit. On very
-weak devices you might have to use `[db].update every = 5` and `[db].retention = 720` (still 1 hour of data, but 1/5 of the CPU and
-RAM resources).
+If you set `[db].update every = 2` and `[db].retention = 1800`, you will still have an hour of data, but collected once
+every 2 seconds. This will **cut in half** both CPU and RAM resources consumed by Netdata. Of course experiment a bit to find the right setting.
+On very weak devices you might have to use `[db].update every = 5` and `[db].retention = 720` (still 1 hour of data, but
+1/5 of the CPU and RAM resources).
 
-You can also disable [data collection plugins](/collectors/README.md) you don't need. Disabling such plugins will also free both
-CPU and RAM resources.
+You can also disable [data collection plugins](/collectors/README.md) that you don't need. Disabling such plugins will also
+free both CPU and RAM resources.
 
-## Running a dedicated parent Netdata server
+## Memory optimizations
 
-Netdata allows streaming data between Netdata nodes in real-time. This allows having one or more parent Netdata servers that will maintain
-the entire database for all the nodes that connect to them (their children), and will also run health checks/alarms for all these nodes.
+### KSM
 
-### map
+KSM performs memory deduplication by scanning through main memory for physical pages that have identical content, and
+identifies the virtual pages that are mapped to those physical pages. It leaves one page unchanged, and re-maps each
+duplicate page to point to the same physical page. Netdata offers all of its in-memory database to kernel for
+deduplication.
 
-In this mode, the database of Netdata is stored in memory mapped files. Netdata continues to read and write the database
-in memory, but the kernel automatically loads and saves memory pages from/to disk.
-
-**We suggest _not_ to use this mode on nodes that run other applications.** There will always be dirty memory to be
-synced and this syncing process may influence the way other applications work. This mode however is useful when we need
-a parent Netdata server that would normally need huge amounts of memory.
-
-There are a few kernel options that provide finer control on the way this syncing works. But before explaining them, a
-brief introduction of how Netdata database works is needed.
-
-For each chart, Netdata maps the following files:
-
-1.  `chart/main.db`, this is the file that maintains chart information. Every time data are collected for a chart, this
-    is updated.
-2.  `chart/dimension_name.db`, this is the file for each dimension. At its beginning there is a header, followed by the
-    round robin database where metrics are stored.
-
-So, every time Netdata collects data, the following pages will become dirty:
-
-1.  the chart file
-2.  the header part of all dimension files
-3.  if the collected metrics are stored far enough in the dimension file, another page will become dirty, for each
-    dimension
-
-Each page in Linux is 4KB. So, with 200 charts and 1000 dimensions, there will be 1200 to 2200 4KB pages dirty pages
-every second. Of course 1200 of them will always be dirty (the chart header and the dimensions headers) and 1000 will be
-dirty for about 1000 seconds (4 bytes per metric, 4KB per page, so 1000 seconds, or 16 minutes per page).
-
-Hopefully, the Linux kernel does not sync all these data every second. The frequency they are synced is controlled by
-`/proc/sys/vm/dirty_expire_centisecs` or the `sysctl` `vm.dirty_expire_centisecs`. The default on most systems is 3000
-(30 seconds).
-
-On a busy server centralizing metrics from 20+ servers you will experience this:
-
-![image](https://cloud.githubusercontent.com/assets/2662304/23834750/429ab0dc-0764-11e7-821a-d7908bc881ac.png)
-
-As you can see, there is quite some stress (this is `iowait`) every 30 seconds.
-
-A simple solution is to increase this time to 10 minutes (60000). This is the same system with this setting in 10
-minutes:
-
-![image](https://cloud.githubusercontent.com/assets/2662304/23834784/d2304f72-0764-11e7-8389-fb830ffd973a.png)
-
-Of course, setting this to 10 minutes means that data on disk might be up to 10 minutes old if you get an abnormal
-shutdown.
-
-There are 2 more options to tweak:
-
-1.  `dirty_background_ratio`, by default `10`.
-2.  `dirty_ratio`, by default `20`.
-
-These control the amount of memory that should be dirty for disk syncing to be triggered. On dedicated Netdata servers,
-you can use: `80` and `90` respectively, so that all RAM is given to Netdata.
-
-With these settings, you can expect a little `iowait` spike once every 10 minutes and in case of system crash, data on
-disk will be up to 10 minutes old.
-
-![image](https://cloud.githubusercontent.com/assets/2662304/23835030/ba4bf506-0768-11e7-9bc6-3b23e080c69f.png)
-
-To have these settings automatically applied on boot, create the file `/etc/sysctl.d/netdata-memory.conf` with these
-contents:
-
-```conf
-vm.dirty_expire_centisecs = 60000
-vm.dirty_background_ratio = 80
-vm.dirty_ratio = 90
-vm.dirty_writeback_centisecs = 0
-```
-
-There is another mode to help overcome the memory size problem. What is **most interesting for this setup** is
-`[db].mode = dbengine`.
-
-### dbengine
-
-In this mode, the database of Netdata is stored in database files. The [Database Engine](/database/engine/README.md)
-works like a traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of
-the data reside compressed on disk. The number of history entries is not fixed in this case, but depends on the
-configured disk space and the effective compression ratio of the data stored.
-
-We suggest to use **this** mode on nodes that also run other applications. The Database Engine uses direct I/O to avoid
-polluting the OS filesystem caches and does not generate excessive I/O traffic so as to create the minimum possible
-interference with other applications. Using mode `dbengine` we can overcome most memory restrictions. For more
-details see [here](/database/engine/README.md).
-
-## KSM
-
-Netdata offers all its in-memory database to kernel for deduplication.
-
-In the past KSM has been criticized for consuming a lot of CPU resources. Although this is true when KSM is used for
-deduplicating certain applications, it is not true with netdata, since the Netdata memory is written very infrequently
-(if you have 24 hours of metrics in netdata, each byte at the in-memory database will be updated just once per day).
-
-KSM is a solution that will provide 60+% memory savings to Netdata.
+In the past, KSM has been criticized for consuming a lot of CPU resources. This is true when KSM is used for
+deduplicating certain applications, but it is not true for Netdata. Agent's memory is written very infrequently
+(if you have 24 hours of metrics in Netdata, each byte at the in-memory database will be updated just once per day). KSM
+is a solution that will provide 60+% memory savings to Netdata.
 
 ### Enable KSM in kernel
 
-You need to run a kernel compiled with:
+To enable KSM in kernel, you need to run a kernel compiled with the following:
 
 ```sh
 CONFIG_KSM=y
 ```
 
-When KSM is enabled at the kernel is just available for the user to enable it.
+When KSM is enabled at the kernel, it is just available for the user to enable it.
 
-So, if you build a kernel with `CONFIG_KSM=y` you will just get a few files in `/sys/kernel/mm/ksm`. Nothing else
-happens. There is no performance penalty (apart I guess from the memory this code occupies into the kernel).
+If you build a kernel with `CONFIG_KSM=y`, you will just get a few files in `/sys/kernel/mm/ksm`. Nothing else
+happens. There is no performance penalty (apart from the memory this code occupies into the kernel).
 
 The files that `CONFIG_KSM=y` offers include:
 
--   `/sys/kernel/mm/ksm/run` by default `0`. You have to set this to `1` for the
-    kernel to spawn `ksmd`.
--   `/sys/kernel/mm/ksm/sleep_millisecs`, by default `20`. The frequency ksmd
-    should evaluate memory for deduplication.
--   `/sys/kernel/mm/ksm/pages_to_scan`, by default `100`. The amount of pages
-    ksmd will evaluate on each run.
+- `/sys/kernel/mm/ksm/run` by default `0`. You have to set this to `1` for the kernel to spawn `ksmd`.
+- `/sys/kernel/mm/ksm/sleep_millisecs`, by default `20`. The frequency ksmd should evaluate memory for deduplication.
+- `/sys/kernel/mm/ksm/pages_to_scan`, by default `100`. The amount of pages ksmd will evaluate on each run.
 
 So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources
-he/she is willing `ksmd` to use.
+they are willing to have used by `ksmd`.
 
 ### Run `ksmd` kernel daemon
 
-To activate / run `ksmd` you need to run:
+To activate / run `ksmd,` you need to run the following:
 
 ```sh
 echo 1 >/sys/kernel/mm/ksm/run
 echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs
 ```
 
-With these settings ksmd does not even appear in the running process list (it will run once per second and evaluate 100
+With these settings, ksmd does not even appear in the running process list (it will run once per second and evaluate 100
 pages for de-duplication).
 
 Put the above lines in your boot sequence (`/etc/rc.local` or equivalent) to have `ksmd` run at boot.
 
-## Monitoring Kernel Memory de-duplication performance
+### Monitoring Kernel Memory de-duplication performance
 
 Netdata will create charts for kernel memory de-duplication performance, like this:
 
