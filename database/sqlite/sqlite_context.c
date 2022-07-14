@@ -138,6 +138,11 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
     int rc;
     sqlite3_stmt *res = NULL;
 
+    if (unlikely(!host_uuid)) {
+       internal_error(true, "Requesting context chart list without host_id");
+       return;
+    }
+
     rc = sqlite3_prepare_v2(db_context_meta, CTX_GET_CHART_LIST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch chart list");
