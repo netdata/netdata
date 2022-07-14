@@ -374,13 +374,84 @@ inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_c
     return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
 }
 
-int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
+static RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
+    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+    char *tok;
+
+    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+        if(!*tok) continue;
+
+        if(!strcmp(tok, "full") || !strcmp(tok, "all"))
+            options |= RRDCONTEXT_OPTIONS_ALL;
+        else if(!strcmp(tok, "charts") || !strcmp(tok, "instances"))
+            options |= RRDCONTEXT_OPTION_SHOW_INSTANCES;
+        else if(!strcmp(tok, "dimensions") || !strcmp(tok, "metrics"))
+            options |= RRDCONTEXT_OPTION_SHOW_METRICS;
+        else if(!strcmp(tok, "queue"))
+            options |= RRDCONTEXT_OPTION_SHOW_QUEUED;
+        else if(!strcmp(tok, "flags"))
+            options |= RRDCONTEXT_OPTION_SHOW_FLAGS;
+        else if(!strcmp(tok, "deleted"))
+            options |= RRDCONTEXT_OPTION_SHOW_DELETED;
+        else if(!strcmp(tok, "labels"))
+            options |= RRDCONTEXT_OPTION_SHOW_LABELS;
+    }
+
+    return options;
+}
+
+static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w, char *url) {
+    char *context = NULL;
+    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+
+    buffer_flush(w->response.data);
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "context") || !strcmp(name, "ctx")) context = value;
+        if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
+    }
+
+    if(!context || !*context) {
+        buffer_sprintf(w->response.data, "No context is given at the request.");
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    rrdcontexts_to_json(host, w->response.data, 0xffffffff);
-    return HTTP_RESP_OK;
+    return rrdcontext_to_json(host, w->response.data, options, context);
+}
+
+static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *w, char *url) {
+    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+
+    buffer_flush(w->response.data);
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
+    }
+
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    return rrdcontexts_to_json(host, w->response.data, options);
 }
 
 inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
@@ -1407,6 +1478,7 @@ static struct api_command {
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
+        { "context",         0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_context         },
         { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_contexts        },
         { "archivedcharts",  0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_archivedcharts  },
 
