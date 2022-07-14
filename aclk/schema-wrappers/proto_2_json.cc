@@ -75,8 +75,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new alarms::v1::SendAlarmSnapshot;
     if (!strcmp(msgname, "DisconnectReq"))
         return new agent::v1::DisconnectReq;
-    if (!strcmp(msgname, "ContextsUpdated"))
-        return new context::v1::ContextsUpdated;
+    if (!strcmp(msgname, "ContextsCheckpoint"))
+        return new context::v1::ContextsCheckpoint;
     if (!strcmp(msgname, "StopStreamingContexts"))
         return new context::v1::StopStreamingContexts;
 
