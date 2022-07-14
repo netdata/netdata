@@ -141,12 +141,12 @@ static int wait_till_cloud_enabled()
 static int wait_till_agent_claimed(void)
 {
     //TODO prevent malloc and freez
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     while (likely(!agent_id)) {
         sleep_usec(USEC_PER_SEC * 1);
         if (netdata_exit)
             return 1;
-        agent_id = is_agent_claimed();
+        agent_id = get_agent_claimid();
     }
     freez(agent_id);
     return 0;
@@ -923,7 +923,7 @@ char *ng_aclk_state(void)
     );
     buffer_sprintf(wb, "Protocol Used: Protobuf\nMQTT Version: %d\nClaimed: ", use_mqtt_5 ? 5 : 3);
 
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     if (agent_id == NULL)
         buffer_strcat(wb, "No\n");
     else {
@@ -1089,7 +1089,7 @@ char *ng_aclk_state_json(void)
     json_object_array_add(grp, tmp);
     json_object_object_add(msg, "protocols-supported", grp);
 
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     tmp = json_object_new_boolean(agent_id != NULL);
     json_object_object_add(msg, "agent-claimed", tmp);
 

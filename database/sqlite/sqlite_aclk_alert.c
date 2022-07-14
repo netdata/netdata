@@ -224,7 +224,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         return;
     }
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
 
@@ -449,7 +449,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 #else
     int rc;
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
 
@@ -911,7 +911,7 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
     if (unlikely(!wc->alerts_snapshot_id))
         return;
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
 
