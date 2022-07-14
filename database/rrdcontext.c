@@ -17,7 +17,7 @@ typedef enum {
     RRD_FLAG_COLLECTED      = (1 << 1), // this object is currently being collected
     RRD_FLAG_UPDATED        = (1 << 2), // this object has updates to propagate
     RRD_FLAG_ARCHIVED       = (1 << 3), // this object is not currently being collected
-    RRD_FLAG_OWNLABELS      = (1 << 4), // this instance has its own labels - not linked to an RRDSET
+    RRD_FLAG_OWN_LABELS     = (1 << 4), // this instance has its own labels - not linked to an RRDSET
     RRD_FLAG_LIVE_RETENTION = (1 << 5), // we have got live retention from the database
     RRD_FLAG_QUEUED         = (1 << 6), // this context is currently queued to be dispatched to hub
 
@@ -90,14 +90,14 @@ typedef enum {
 
 #define rrd_flag_set_collected(obj)                                                                        do { \
         if(likely(!((obj)->flags &    RRD_FLAG_COLLECTED)))                                                     \
-                    (obj)->flags |=  (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED);     \
+                    (obj)->flags |=  (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED | RRD_FLAG_UPDATED); \
         if(likely( ((obj)->flags &   (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED))))   \
                     (obj)->flags &= ~(RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED);     \
 } while(0)
 
 #define rrd_flag_set_archived(obj)                                                                         do { \
         if(likely(!((obj)->flags &    RRD_FLAG_ARCHIVED)))                                                      \
-                    (obj)->flags |=  (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED);     \
+                    (obj)->flags |=  (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED | RRD_FLAG_UPDATED); \
         if(likely( ((obj)->flags &   (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED))))   \
                     (obj)->flags &= ~(RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED);     \
 } while(0)
@@ -279,6 +279,43 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
 static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason);
 
 // ----------------------------------------------------------------------------
+// visualizing flags
+
+static void rrd_flags_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
+    if(flags & RRD_FLAG_QUEUED)
+        buffer_strcat(wb, "QUEUED ");
+
+    if(flags & RRD_FLAG_DELETED)
+        buffer_strcat(wb, "DELETED ");
+
+    if(flags & RRD_FLAG_COLLECTED)
+        buffer_strcat(wb, "COLLECTED ");
+
+    if(flags & RRD_FLAG_UPDATED)
+        buffer_strcat(wb, "UPDATED ");
+
+    if(flags & RRD_FLAG_ARCHIVED)
+        buffer_strcat(wb, "ARCHIVED ");
+
+    if(flags & RRD_FLAG_OWN_LABELS)
+        buffer_strcat(wb, "OWN_LABELS ");
+
+    if(flags & RRD_FLAG_LIVE_RETENTION)
+        buffer_strcat(wb, "LIVE_RETENTION ");
+}
+
+static void rrd_reasons_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
+    for(int i = 0, added = 0; rrdcontext_reasons[i].name ; i++) {
+        if (flags & rrdcontext_reasons[i].flag) {
+            if (added)
+                buffer_strcat(wb, ", ");
+            buffer_strcat(wb, rrdcontext_reasons[i].name);
+            added++;
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
 // logging of all data collected
 
 #ifdef LOG_TRANSITIONS
@@ -295,15 +332,11 @@ static void log_transition(STRING *metric, STRING *instance, STRING *context, RR
 
     buffer_sprintf(wb, ", triggered by %s: ", msg);
 
-    size_t added = 0;
-    for(int i = 0; rrdcontext_reasons[i].name ;i++) {
-        if(flags & rrdcontext_reasons[i].flag) {
-            if(added++) buffer_strcat(wb, ", ");
-            buffer_strcat(wb, rrdcontext_reasons[i].name);
-        }
-    }
-    if(!added)
-        buffer_strcat(wb, "NONE");
+    rrd_flags_to_buffer(flags, wb);
+
+    buffer_strcat(wb, ", reasons: ");
+
+    rrd_reasons_to_buffer(flags, wb);
 
     internal_error(true, "%s", buffer_tostring(wb));
     buffer_free(wb);
@@ -533,7 +566,7 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
     }
 
-    rm->flags |= rm_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS;
+    rm->flags |= (rm_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS);
 
     if(rrd_flag_is_collected(rm) && rrd_flag_is_archived(rm))
         rrd_flag_set_collected(rm);
@@ -599,10 +632,6 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate) 
         rrd_flag_set_archived(rm);
 
     rrdmetric_update_retention(rm);
-
-    if(unlikely((rm->flags & RRD_FLAG_DELETED) && rm->rrddim)) {
-        rm->flags &= ~RRD_FLAG_DELETED;
-    }
 
     if(unlikely(escalate && rm->flags & RRD_FLAG_UPDATED)) {
         log_transition(rm->id, rm->ri->id, rm->ri->rc->id, rm->flags, "RRDMETRIC");
@@ -712,7 +741,7 @@ static void rrdinstance_check(RRDINSTANCE *ri) {
 
 static void rrdinstance_free(RRDINSTANCE *ri) {
 
-    if(ri->flags & RRD_FLAG_OWNLABELS)
+    if(ri->flags & RRD_FLAG_OWN_LABELS)
         dictionary_destroy(ri->rrdlabels);
 
     rrdmetrics_destroy(ri);
@@ -746,12 +775,12 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
 
     if(ri->rrdset && ri->rrdset->state) {
         ri->rrdlabels = ri->rrdset->state->chart_labels;
-        if(ri->flags & RRD_FLAG_OWNLABELS)
-            ri->flags &= ~RRD_FLAG_OWNLABELS;
+        if(ri->flags & RRD_FLAG_OWN_LABELS)
+            ri->flags &= ~RRD_FLAG_OWN_LABELS;
     }
     else {
         ri->rrdlabels = rrdlabels_create();
-        ri->flags |= RRD_FLAG_OWNLABELS;
+        ri->flags |= RRD_FLAG_OWN_LABELS;
     }
 
     rrdmetrics_create(ri);
@@ -847,15 +876,16 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
     if(ri->rrdset != ri_new->rrdset) {
         ri->rrdset = ri_new->rrdset;
 
-        if(ri->flags & RRD_FLAG_OWNLABELS) {
+        if(ri->flags & RRD_FLAG_OWN_LABELS) {
             DICTIONARY *old = ri->rrdlabels;
             ri->rrdlabels = ri->rrdset->state->chart_labels;
-            ri->flags &= ~RRD_FLAG_OWNLABELS;
+            ri->flags &= ~RRD_FLAG_OWN_LABELS;
             rrdlabels_destroy(old);
         }
     }
 
-    ri->flags |= ri_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS;
+    ri->flags |= (ri_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS);
+
     if(rrd_flag_is_collected(ri) && rrd_flag_is_archived(ri))
         rrd_flag_set_collected(ri);
 
@@ -1075,8 +1105,8 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
 
     rrd_flag_set_archived(ri);
 
-    if(!(ri->flags & RRD_FLAG_OWNLABELS)) {
-        ri->flags &= ~RRD_FLAG_OWNLABELS;
+    if(!(ri->flags & RRD_FLAG_OWN_LABELS)) {
+        ri->flags &= ~RRD_FLAG_OWN_LABELS;
         ri->rrdlabels = rrdlabels_create();
         rrdlabels_copy(ri->rrdlabels, st->state->chart_labels);
     }
@@ -1407,7 +1437,8 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY);
     }
 
-    rc->flags |= rc_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS;
+    rc->flags |= (rc_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS);
+
     if(rrd_flag_is_collected(rc) && rrd_flag_is_archived(rc))
         rrd_flag_set_collected(rc);
 
@@ -1803,6 +1834,239 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
 
     internal_error(true, "RRDCONTEXT: host '%s' disabling streaming of contexts", host->hostname);
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+}
+
+// ----------------------------------------------------------------------------
+// web API
+
+
+struct rrdcontext_to_json {
+    BUFFER *wb;
+    RRDCONTEXT_TO_JSON_OPTIONS options;
+    size_t written;
+};
+
+static inline int rrdmetric_to_json_callback(const char *id, void *value, void *data) {
+    struct rrdcontext_to_json * t = data;
+    RRDMETRIC *rm = value;
+    BUFFER *wb = t->wb;
+    RRDCONTEXT_TO_JSON_OPTIONS options = t->options;
+
+    if((rm->flags & RRD_FLAG_DELETED) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
+        return 0;
+
+    if(t->written)
+        buffer_strcat(wb, ",\n");
+    else
+        buffer_strcat(wb, "\n");
+
+    buffer_sprintf(wb, "\t\t\t\t\t\t\"%s\": {", id);
+
+    char uuid[UUID_STR_LEN];
+    uuid_unparse(rm->uuid, uuid);
+
+    buffer_sprintf(wb,
+                    "\n\t\t\t\t\t\t\t\"uuid\":\"%s\""
+                   ",\n\t\t\t\t\t\t\t\"name\":\"%s\""
+                   ",\n\t\t\t\t\t\t\t\"first_time_t\":%ld"
+                   ",\n\t\t\t\t\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\t\t\t\t\"collected\":%s"
+                   ",\n\t\t\t\t\t\t\t\"deleted\":%s"
+                   , uuid
+                   , string2str(rm->name)
+                   , rm->first_time_t
+                   , rm->last_time_t
+                   , rm->flags & RRD_FLAG_COLLECTED ? "true" : "false"
+                   , rm->flags & RRD_FLAG_DELETED ? "true" : "false"
+                   );
+
+    if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
+        buffer_strcat(wb, ",\n\t\t\t\t\t\t\t\"flags\":\"");
+        rrd_flags_to_buffer(rm->flags, wb);
+        buffer_strcat(wb, "\"");
+    }
+
+    buffer_strcat(wb, "\n\t\t\t\t\t\t}");
+    t->written++;
+    return 1;
+}
+
+static inline int rrdinstance_to_json_callback(const char *id, void *value, void *data) {
+    struct rrdcontext_to_json * t = data;
+    RRDINSTANCE *ri = value;
+    BUFFER *wb = t->wb;
+    RRDCONTEXT_TO_JSON_OPTIONS options = t->options;
+
+    if((ri->flags & RRD_FLAG_DELETED) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
+        return 0;
+
+    if(t->written)
+        buffer_strcat(wb, ",\n");
+    else
+        buffer_strcat(wb, "\n");
+
+    buffer_sprintf(wb, "\t\t\t\t\"%s\": {", id);
+
+    char uuid[UUID_STR_LEN];
+    uuid_unparse(ri->uuid, uuid);
+
+    buffer_sprintf(wb,
+                   "\n\t\t\t\t\t\"uuid\":\"%s\""
+                   ",\n\t\t\t\t\t\"name\":\"%s\""
+                   ",\n\t\t\t\t\t\"context\":\"%s\""
+                   ",\n\t\t\t\t\t\"title\":\"%s\""
+                   ",\n\t\t\t\t\t\"units\":\"%s\""
+                   ",\n\t\t\t\t\t\"family\":\"%s\""
+                   ",\n\t\t\t\t\t\"chart_type\":\"%s\""
+                   ",\n\t\t\t\t\t\"priority\":%zu"
+                   ",\n\t\t\t\t\t\"update_every\":%d"
+                   ",\n\t\t\t\t\t\"first_time_t\":%ld"
+                   ",\n\t\t\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\t\t\"collected\":%s"
+                   ",\n\t\t\t\t\t\"deleted\":%s"
+                   , uuid
+                   , string2str(ri->name)
+                   , string2str(ri->rc->id)
+                   , string2str(ri->title)
+                   , string2str(ri->units)
+                   , string2str(ri->family)
+                   , rrdset_type_name(ri->chart_type)
+                   , ri->priority
+                   , ri->update_every
+                   , ri->first_time_t
+                   , ri->last_time_t
+                   , ri->flags & RRD_FLAG_COLLECTED ? "true" : "false"
+                   , ri->flags & RRD_FLAG_DELETED ? "true" : "false"
+    );
+
+    if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
+        buffer_strcat(wb, ",\n\t\t\t\t\t\"flags\":\"");
+        rrd_flags_to_buffer(ri->flags, wb);
+        buffer_strcat(wb, "\"");
+    }
+
+    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && ri->rrdlabels && dictionary_stats_entries(ri->rrdlabels)) {
+        buffer_sprintf(wb, ",\n\t\t\t\t\t\"labels\": {\n");
+        rrdlabels_to_buffer(ri->rrdlabels, wb, "\t\t\t\t\t\t", ":", "\"", ",\n", NULL, NULL, NULL, NULL);
+        buffer_strcat(wb, "\n\t\t\t\t\t}");
+    }
+
+    if(options & RRDCONTEXT_OPTION_SHOW_METRICS) {
+        buffer_sprintf(wb, ",\n\t\t\t\t\t\"dimensions\": {");
+        struct rrdcontext_to_json tt = {
+            .wb = wb,
+            .options = options,
+            .written = 0,
+        };
+        dictionary_sorted_walkthrough_read(ri->rrdmetrics, rrdmetric_to_json_callback, &tt);
+        buffer_strcat(wb, "\n\t\t\t\t\t}");
+    }
+
+    buffer_strcat(wb, "\n\t\t\t\t}");
+    t->written++;
+    return 1;
+}
+
+static inline int rrdcontext_to_json_callback(const char *id, void *value, void *data) {
+    struct rrdcontext_to_json * t = data;
+    RRDCONTEXT *rc = value;
+    BUFFER *wb = t->wb;
+    RRDCONTEXT_TO_JSON_OPTIONS options = t->options;
+
+    if((rc->flags & RRD_FLAG_DELETED) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
+        return 0;
+
+    if(t->written)
+        buffer_strcat(wb, ",\n");
+    else
+        buffer_strcat(wb, "\n");
+
+    buffer_sprintf(wb, "\t\t\"%s\": {", id);
+
+    buffer_sprintf(wb,
+                   "\n\t\t\t\"version\":%lu"
+                   ",\n\t\t\t\"title\":\"%s\""
+                   ",\n\t\t\t\"units\":\"%s\""
+                   ",\n\t\t\t\"family\":\"%s\""
+                   ",\n\t\t\t\"chart_type\":\"%s\""
+                   ",\n\t\t\t\"priority\":%zu"
+                   ",\n\t\t\t\"first_time_t\":%ld"
+                   ",\n\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\"collected\":%s"
+                   ",\n\t\t\t\"deleted\":%s"
+                   , rc->version
+                   , string2str(rc->title)
+                   , string2str(rc->units)
+                   , string2str(rc->family)
+                   , rrdset_type_name(rc->chart_type)
+                   , rc->priority
+                   , rc->first_time_t
+                   , rc->last_time_t
+                   , rc->flags & RRD_FLAG_COLLECTED ? "true" : "false"
+                   , rc->flags & RRD_FLAG_DELETED ? "true" : "false"
+                   );
+
+    if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
+        buffer_strcat(wb, ",\n\t\t\t\"flags\":\"");
+        rrd_flags_to_buffer(rc->flags, wb);
+        buffer_strcat(wb, "\"");
+    }
+
+    if(options & RRDCONTEXT_OPTION_SHOW_QUEUE_REASONS) {
+        if (rc->flags & RRD_FLAG_QUEUED) {
+            buffer_strcat(wb, ",\n\t\t\t\"queued_reasons\":\"");
+            rrd_reasons_to_buffer(rc->last_queued_flags, wb);
+            buffer_strcat(wb, "\"");
+        }
+    }
+
+    if(options & (RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_METRICS)) {
+        buffer_sprintf(wb, ",\n\t\t\t\"charts\": {");
+        struct rrdcontext_to_json tt = {
+            .wb = wb,
+            .options = options,
+            .written = 0,
+        };
+        dictionary_sorted_walkthrough_read(rc->rrdinstances, rrdinstance_to_json_callback, &tt);
+        buffer_strcat(wb, "\n\t\t\t}");
+    }
+
+    buffer_strcat(wb, "\n\t\t}");
+    t->written++;
+    return 1;
+}
+
+void rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options) {
+    char node_uuid[UUID_STR_LEN];
+    uuid_unparse(*host->node_id, node_uuid);
+
+    buffer_sprintf(wb, "{\n"
+                          "\t\"hostname\": \"%s\""
+                       ",\n\t\"machine_guid\": \"%s\""
+                       ",\n\t\"node_id\": \"%s\""
+                       ",\n\t\"claim_id\": \"%s\""
+                   , host->hostname
+                   , host->machine_guid
+                   , node_uuid
+                   , host->aclk_state.claimed_id ? host->aclk_state.claimed_id : ""
+                   );
+
+    if(options & RRDCONTEXT_OPTION_SHOW_LABELS) {
+        buffer_sprintf(wb, ",\n\t\"host_labels\": {\n");
+        rrdlabels_to_buffer(host->host_labels, wb, "\t\t", ":", "\"", ",\n", NULL, NULL, NULL, NULL);
+        buffer_strcat(wb, "\n\t}");
+    }
+
+    buffer_sprintf(wb, ",\n\t\"contexts\": {");
+    struct rrdcontext_to_json t = {
+        .wb = wb,
+        .options = options,
+        .written = 0,
+    };
+    dictionary_sorted_walkthrough_read((DICTIONARY *)host->rrdctx, rrdcontext_to_json_callback, &t);
+
+    // close contexts, close main
+    buffer_strcat(wb, "\n\t}\n}");
 }
 
 // ----------------------------------------------------------------------------

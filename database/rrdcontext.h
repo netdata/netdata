@@ -34,6 +34,18 @@ extern void rrdhost_destroy_rrdcontexts(RRDHOST *host);
 extern void rrdcontext_host_child_connected(RRDHOST *host);
 extern void rrdcontext_host_child_disconnected(RRDHOST *host);
 
+typedef enum {
+    RRDCONTEXT_OPTION_NONE               = 0,
+    RRDCONTEXT_OPTION_SHOW_METRICS       = (1 << 0),
+    RRDCONTEXT_OPTION_SHOW_INSTANCES     = (1 << 1),
+    RRDCONTEXT_OPTION_SHOW_LABELS        = (1 << 2),
+    RRDCONTEXT_OPTION_SHOW_QUEUE_REASONS = (1 << 3),
+    RRDCONTEXT_OPTION_SHOW_FLAGS         = (1 << 4),
+    RRDCONTEXT_OPTION_SHOW_DELETED       = (1 << 5),
+} RRDCONTEXT_TO_JSON_OPTIONS;
+
+extern void rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options);
+
 // ----------------------------------------------------------------------------
 // public API for rrddims
 
