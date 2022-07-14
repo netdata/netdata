@@ -909,20 +909,13 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
     if(unlikely(dictionary_stats_referenced_items(ri->rrdmetrics) != 0))
         return false;
 
+    if(unlikely(dictionary_stats_entries(ri->rrdmetrics) != 0))
+        return false;
+
     if(ri->first_time_t || ri->last_time_t)
         return false;
 
-    bool ret = true;
-    RRDMETRIC *rm;
-    dfe_start_read(ri->rrdmetrics, rm) {
-        if(!rrdmetric_should_be_deleted(rm)) {
-            ret = false;
-            break;
-        }
-    }
-    dfe_done(rm);
-
-    return ret;
+    return true;
 }
 
 static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
@@ -1501,23 +1494,16 @@ static inline bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
                     |RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT   )))
         return false;
 
-    if(unlikely(rc->first_time_t || rc->last_time_t))
-        return false;
-
     if(unlikely(dictionary_stats_referenced_items(rc->rrdinstances) != 0))
         return false;
 
-    bool ret = true;
-    RRDINSTANCE *ri;
-    dfe_start_read(rc->rrdinstances, ri) {
-        if(!rrdinstance_should_be_deleted(ri)) {
-            ret = false;
-            break;
-        }
-    }
-    dfe_done(ri);
+    if(unlikely(dictionary_stats_entries(rc->rrdinstances) != 0))
+        return false;
 
-    return ret;
+    if(unlikely(rc->first_time_t || rc->last_time_t))
+        return false;
+
+    return true;
 }
 
 static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason) {
