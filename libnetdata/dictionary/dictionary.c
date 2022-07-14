@@ -13,8 +13,6 @@ typedef struct dictionary DICTIONARY;
 
 #include "../libnetdata.h"
 
-#undef ENABLE_DBENGINE
-
 #ifndef ENABLE_DBENGINE
 #define DICTIONARY_WITH_AVL
 #warning Compiling DICTIONARY with an AVL index
@@ -169,6 +167,9 @@ size_t dictionary_stats_resets(DICTIONARY *dict) {
 size_t dictionary_stats_walkthroughs(DICTIONARY *dict) {
     return dict->walkthroughs;
 }
+size_t dictionary_stats_referenced_items(DICTIONARY *dict) {
+    return __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
+}
 
 static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
     if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
@@ -271,7 +272,7 @@ static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
 
     NAME_VALUE *nv = dict->first_item;
     while(nv) {
-        if(nv->flags & NAME_VALUE_FLAG_DELETED && DICTIONARY_NAME_VALUE_REFCOUNT_GET(nv) == 0) {
+        if((nv->flags & NAME_VALUE_FLAG_DELETED) && DICTIONARY_NAME_VALUE_REFCOUNT_GET(nv) == 0) {
             NAME_VALUE *nv_next = nv->next;
 
             linkedlist_namevalue_unlink_unsafe(dict, nv);
@@ -1033,7 +1034,7 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
     if(unlikely(dict->react_callback && nv && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED))) {
         // we got the reference counter we need, above
         dict->react_callback(namevalue_get_name(nv), nv->value, dict->react_callback_data);
-        reference_counter_release(dict, nv, true);
+        reference_counter_release(dict, nv, false);
     }
 
     return nv ? nv->value : NULL;
