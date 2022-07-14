@@ -1859,6 +1859,7 @@ struct rrdcontext_to_json {
     BUFFER *wb;
     RRDCONTEXT_TO_JSON_OPTIONS options;
     size_t written;
+    time_t now;
 };
 
 static inline int rrdmetric_to_json_callback(const char *id, void *value, void *data) {
@@ -1890,7 +1891,7 @@ static inline int rrdmetric_to_json_callback(const char *id, void *value, void *
                    , uuid
                    , string2str(rm->name)
                    , rm->first_time_t
-                   , rm->last_time_t
+                   , rrd_flag_is_collected(rm) ? t->now : rm->last_time_t
                    , rm->flags & RRD_FLAG_COLLECTED ? "true" : "false"
                    , rm->flags & RRD_FLAG_DELETED ? "true" : "false"
                    );
@@ -1949,7 +1950,7 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
                    , ri->priority
                    , ri->update_every
                    , ri->first_time_t
-                   , ri->last_time_t
+                   , rrd_flag_is_collected(ri) ? t->now : ri->last_time_t
                    , ri->flags & RRD_FLAG_COLLECTED ? "true" : "false"
                    , ri->flags & RRD_FLAG_DELETED ? "true" : "false"
     );
@@ -1972,6 +1973,7 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
             .wb = wb,
             .options = options,
             .written = 0,
+            .now = t->now,
         };
         dictionary_sorted_walkthrough_read(ri->rrdmetrics, rrdmetric_to_json_callback, &tt);
         buffer_strcat(wb, "\n\t\t\t\t\t}");
@@ -2021,7 +2023,7 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
                    , rrdset_type_name(rc->chart_type)
                    , rc->priority
                    , rc->first_time_t
-                   , rc->last_time_t
+                   , rrd_flag_is_collected(rc) ? t->now : rc->last_time_t
                    , rc->flags & RRD_FLAG_COLLECTED ? "true" : "false"
                    , rc->flags & RRD_FLAG_DELETED ? "true" : "false"
                    );
@@ -2053,6 +2055,7 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
             .wb = wb,
             .options = options,
             .written = 0,
+            .now = t->now,
         };
         dictionary_sorted_walkthrough_read(rc->rrdinstances, rrdinstance_to_json_callback, &tt);
         buffer_strcat(wb, "\n\t\t\t}");
@@ -2073,6 +2076,7 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS opt
         .wb = wb,
         .options = options|RRDCONTEXT_OPTION_SKIP_ID,
         .written = 0,
+        .now = now_realtime_sec(),
     };
     rrdcontext_to_json_callback(context, rc, &t);
 
@@ -2106,6 +2110,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS op
         .wb = wb,
         .options = options,
         .written = 0,
+        .now = now_realtime_sec(),
     };
     dictionary_sorted_walkthrough_read((DICTIONARY *)host->rrdctx, rrdcontext_to_json_callback, &t);
 
