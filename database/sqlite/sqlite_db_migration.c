@@ -34,11 +34,6 @@ const char *database_migrate_v1_v2[] = {
     NULL
 };
 
-const char *database_context_migrate_v1_v2[] = {
-    "ALTER TABLE context ADD family TEXT;",
-    NULL
-};
-
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
@@ -48,17 +43,6 @@ static int do_migration_v1_v2(sqlite3 *database, const char *name)
         return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v1_v2[0]);
     return 0;
 }
-
-static int do_context_migration_v1_v2(sqlite3 *database, const char *name)
-{
-    UNUSED(name);
-    info("Running \"%s\" database migration", name);
-
-    if (!column_exists_in_table("context", "family"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_context_migrate_v1_v2[0]);
-    return 0;
-}
-
 
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
@@ -111,7 +95,6 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
 
 DATABASE_FUNC_MIGRATION_LIST context_migration_action[] = {
     {.name = "v0 to v1",  .func = do_migration_noop},
-    {.name = "v1 to v2",  .func = do_context_migration_v1_v2},
 
     // the terminator of this array
     {.name = NULL, .func = NULL}

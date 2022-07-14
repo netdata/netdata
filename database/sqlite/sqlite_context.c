@@ -4,11 +4,13 @@
 #include "sqlite_context.h"
 #include "sqlite_db_migration.h"
 
-#define DB_CONTEXT_METADATA_VERSION 2
+#define DB_CONTEXT_METADATA_VERSION 1
 
 const char *database_context_config[] = {
-    "CREATE TABLE IF NOT EXISTS context (host_id BLOB, id TEXT, version INT, title TEXT, chart_type TEXT, " \
-    "unit TEXT, priority INT, first_time_t INT, last_time_t INT, deleted INT, family TEXT, PRIMARY KEY (host_id, id));",
+    "CREATE TABLE IF NOT EXISTS context (host_id BLOB, id TEXT NOT NULL, version INT NOT NULL, title TEXT NOT NULL, " \
+    "chart_type TEXT NOT NULL, unit TEXT NOT NULL, priority INT NOT NULL, first_time_t INT NOT NULL, "
+    "last_time_t INT NOT NULL, deleted INT NOT NULL, "
+    "family TEXT, PRIMARY KEY (host_id, id));",
 
     NULL
 };
@@ -291,7 +293,6 @@ failed:
 //
 // Storing Data
 //
-
 #define CTX_STORE_CONTEXT "INSERT OR REPLACE INTO context " \
     "(host_id, id, version, title, chart_type, unit, priority, first_time_t, last_time_t, deleted, family) " \
     "VALUES (@host_id, @context, @version, @title, @chart_type, @unit, @priority, @first_time_t, @last_time_t, @deleted, @family);"
@@ -313,68 +314,67 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
     rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_uuid to store context details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_text(res, 2, context_data->id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_int64(res, 3, (time_t) context_data->version);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind first_time_t to store context details");
-        goto failed;
+        goto skip_store;
     }
-
 
     rc = bind_text_null(res, 4, context_data->title);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = bind_text_null(res, 5, context_data->chart_type);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = bind_text_null(res, 6, context_data->units);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_int64(res, 7, (time_t) context_data->priority);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind first_time_t to store context details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_int64(res, 8, (time_t) context_data->first_time_t);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind first_time_t to store context details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_int64(res, 9, (time_t) context_data->last_time_t);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind last_time_t to store context details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_int(res, 10, (time_t) context_data->deleted);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind last_time_t to store context details");
-        goto failed;
+        goto skip_store;
     }
 
     rc = sqlite3_bind_text(res, 11, context_data->family, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
-        goto failed;
+        goto skip_store;
     }
 
     rc_stored = execute_insert(res);
@@ -382,7 +382,7 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
     if (rc_stored != SQLITE_DONE)
         error_report("Failed store context details for context %s, rc = %d", context_data->id, rc_stored);
 
-failed:
+skip_store:
     rc = sqlite3_finalize(res);
     if (rc != SQLITE_OK)
         error_report("Failed to finalize statement that stores context details, rc = %d", rc);
@@ -401,7 +401,6 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
     if (unlikely(!context_data || !context_data->id))
         return 0;
 
-
     rc = sqlite3_prepare_v2(db_context_meta, CTX_DELETE_CONTEXT, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to delete context");
@@ -411,14 +410,13 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 	rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id to delete context data");
-        goto failed;
+        goto skip_delete;
     }
-
 
     rc = sqlite3_bind_text(res, 2, context_data->id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context id for data deletion");
-        goto failed;
+        goto skip_delete;
     }
 
     rc_stored = execute_insert(res);
@@ -426,7 +424,7 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
     if (rc_stored != SQLITE_DONE)
         error_report("Failed to delete context %s, rc = %d", context_data->id, rc_stored);
 
-failed:
+skip_delete:
     rc = sqlite3_finalize(res);
     if (rc != SQLITE_OK)
         error_report("Failed to finalize statement where deleting a context, rc = %d", rc);
@@ -503,6 +501,8 @@ static int localhost_uuid_cb(void *data, int argc, char **argv, char **column)
     return 0;
 }
 
+
+#define SQL_FIND_LOCALHOST "SELECT host_id FROM meta.host WHERE hops = 0;"
 int ctx_unittest(void)
 {
     uuid_t host_uuid;
@@ -514,7 +514,7 @@ int ctx_unittest(void)
 
     sql_init_context_database(1);
 
-    int rc = sqlite3_exec(db_context_meta, "SELECT host_id FROM meta.host WHERE hops = 0;", localhost_uuid_cb, (void *) &host_uuid, &err_msg);
+    int rc = sqlite3_exec(db_context_meta, SQL_FIND_LOCALHOST, localhost_uuid_cb, (void *) &host_uuid, &err_msg);
     if (rc != SQLITE_OK) {
         info("Failed to discover localhost UUID rc = %d -- %s", rc, err_msg);
         sqlite3_free(err_msg);
