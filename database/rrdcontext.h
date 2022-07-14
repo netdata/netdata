@@ -42,6 +42,7 @@ typedef enum {
     RRDCONTEXT_OPTION_SHOW_QUEUED        = (1 << 3),
     RRDCONTEXT_OPTION_SHOW_FLAGS         = (1 << 4),
     RRDCONTEXT_OPTION_SHOW_DELETED       = (1 << 5),
+    RRDCONTEXT_OPTION_DEEPSCAN           = (1 << 6),
     RRDCONTEXT_OPTION_SKIP_ID            = (1 << 31), // internal use
 } RRDCONTEXT_TO_JSON_OPTIONS;
 

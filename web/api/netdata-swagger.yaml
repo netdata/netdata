@@ -88,6 +88,7 @@ paths:
                 - queue
                 - flags
                 - deleted
+                - deepscan
             default:
               - full
       responses:
@@ -128,6 +129,7 @@ paths:
                   - queue
                   - flags
                   - deleted
+                  - deepscan
               default:
                 - full
         responses:

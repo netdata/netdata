@@ -105,7 +105,8 @@
                   "labels",
                   "queue",
                   "flags",
-                  "deleted"
+                  "deleted",
+                  "deepscan"
                 ]
               },
               "default": [
@@ -162,7 +163,8 @@
                   "labels",
                   "queue",
                   "flags",
-                  "deleted"
+                  "deleted",
+                  "deepscan"
                 ]
               },
               "default": [
