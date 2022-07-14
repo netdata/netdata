@@ -1990,11 +1990,11 @@ static inline usec_t rrdcontext_queued_dispatch_ut(RRDCONTEXT *rc, usec_t now_ut
 #define WORKER_JOB_CLEANUP          7
 #define WORKER_JOB_CLEANUP_DELETE   8
 
-usec_t rrdcontext_last_cleanup_ut = 0;
-usec_t rrdcontext_last_db_rotation_ut = 0;
+usec_t rrdcontext_next_garbage_collect_ut = 0;
+usec_t rrdcontext_next_db_rotation_ut = 0;
 
 void rrdcontext_db_rotation(void) {
-    rrdcontext_last_db_rotation_ut = now_realtime_usec();
+    rrdcontext_next_db_rotation_ut = now_realtime_usec() + RRDCONTEXT_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
 }
 
 static uint64_t rrdcontext_version_hash_with_callback(
@@ -2064,7 +2064,7 @@ static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reaso
 }
 
 static void rrdcontext_recalculate_retention(int job_id) {
-    rrdcontext_last_db_rotation_ut = 0;
+    rrdcontext_next_db_rotation_ut = 0;
     rrd_rdlock();
     RRDHOST *host;
     rrdhost_foreach_read(host) {
@@ -2120,7 +2120,7 @@ void *rrdcontext_main(void *ptr) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return NULL;
 
-    rrdcontext_last_cleanup_ut = now_realtime_usec();
+    rrdcontext_next_garbage_collect_ut = now_realtime_usec() + RRDCONTEXT_CLEANUP_DELETED_EVERY_SECS * USEC_PER_SEC;
     
     worker_register("RRDCONTEXT");
     worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
@@ -2145,12 +2145,14 @@ void *rrdcontext_main(void *ptr) {
 
         usec_t now_ut = now_realtime_usec();
 
-        if(now_ut < rrdcontext_last_db_rotation_ut + RRDCONTEXT_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC) {
+        if(now_ut > rrdcontext_next_db_rotation_ut) {
             rrdcontext_recalculate_retention(WORKER_JOB_RETENTION);
+            rrdcontext_next_db_rotation_ut = 0;
         }
 
-        if(now_ut < rrdcontext_last_cleanup_ut + RRDCONTEXT_CLEANUP_DELETED_EVERY_SECS * USEC_PER_SEC) {
+        if(now_ut > rrdcontext_next_garbage_collect_ut) {
             rrdcontext_garbage_collect();
+            rrdcontext_next_garbage_collect_ut = now_ut + RRDCONTEXT_CLEANUP_DELETED_EVERY_SECS * USEC_PER_SEC;
         }
 
         rrd_rdlock();
