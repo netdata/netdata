@@ -114,7 +114,7 @@ tcp:
   port         : 5432
 ```
 
-🚧 **Note**: Every job collection must have a unique identifier. In cases that you monitor multiple DBs, every
+**Note**: Every job collection must have a unique identifier. In cases that you monitor multiple DBs, every
 job must have it's own name. Use a mnemonic of your preference (e.g us_east_db, us_east_tcp)
 
 ## Troubleshooting
