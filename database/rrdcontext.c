@@ -264,8 +264,8 @@ static uint64_t rrdcontext_version_hash_with_callback(RRDHOST *host, void (*call
 // ----------------------------------------------------------------------------
 // Updates triggers
 
-static void rrdmetric_trigger_updates(RRDMETRIC *rm);
-static void rrdinstance_trigger_updates(RRDINSTANCE *ri);
+static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool escalate);
+static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate);
 static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason);
 
 // ----------------------------------------------------------------------------
@@ -528,7 +528,7 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
 static void rrdmetric_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDMETRIC *rm = value;
 
-    rrdmetric_trigger_updates(rm);
+    rrdmetric_trigger_updates(rm, true);
 }
 
 static void rrdmetrics_create(RRDINSTANCE *ri) {
@@ -578,7 +578,7 @@ static inline bool rrdmetric_should_be_deleted(RRDMETRIC *rm) {
     return true;
 }
 
-static void rrdmetric_trigger_updates(RRDMETRIC *rm) {
+static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool escalate) {
     if(likely(!(rm->flags & RRD_FLAG_UPDATED))) return;
 
     rrdmetric_update_retention(rm);
@@ -587,10 +587,9 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm) {
         rm->flags &= ~RRD_FLAG_DELETED;
     }
 
-    if(unlikely(rm->flags & RRD_FLAG_UPDATED)) {
-        rm->ri->flags |= RRD_FLAG_UPDATED;
+    if(unlikely(escalate && rm->flags & RRD_FLAG_UPDATED)) {
         log_transition(rm->id, rm->ri->id, rm->ri->rc->id, rm->flags, "RRDMETRIC");
-        rrdinstance_trigger_updates(rm->ri);
+        rrdinstance_trigger_updates(rm->ri, true, true);
         rrd_flag_unset_updated(rm);
     }
 }
@@ -648,7 +647,7 @@ static inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
     }
 
     rm->rrddim = NULL;
-    rrdmetric_trigger_updates(rm);
+    rrdmetric_trigger_updates(rm, true);
     rrdmetric_release(rd->rrdmetric);
     rd->rrdmetric = NULL;
 }
@@ -663,7 +662,7 @@ static inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
         }
     }
 
-    rrdmetric_trigger_updates(rm);
+    rrdmetric_trigger_updates(rm, true);
 }
 
 static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
@@ -674,7 +673,7 @@ static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED);
     }
 
-    rrdmetric_trigger_updates(rm);
+    rrdmetric_trigger_updates(rm, true);
 }
 
 // ----------------------------------------------------------------------------
@@ -863,7 +862,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
 static void rrdinstance_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDINSTANCE *ri = value;
 
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, false, true);
 }
 
 void rrdinstances_create(RRDCONTEXT *rc) {
@@ -918,8 +917,8 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
     return true;
 }
 
-static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
-    if(unlikely(!(ri->flags & RRD_FLAG_UPDATED))) return;
+static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate) {
+    if(unlikely(!force && !(ri->flags & RRD_FLAG_UPDATED))) return;
     rrd_flag_unset_updated(ri);
 
     RRD_FLAGS combined_metrics_flags = RRD_FLAG_NONE;
@@ -927,14 +926,11 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
     size_t metrics_active = 0, metrics_deleted = 0;
     {
         RRDMETRIC *rm;
-        dfe_start_write((DICTIONARY *)ri->rrdmetrics, rm) {
+        dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
             // find the combined flags of all the metrics
             combined_metrics_flags |= rm->flags & RRD_FLAGS_PROPAGATED_UPSTREAM;
 
             if (unlikely((rrdmetric_should_be_deleted(rm)))) {
-                if(unlikely(dictionary_del_unsafe(ri->rrdmetrics, string2str(rm->id)) != 0))
-                    error("RRDINSTANCE: '%s' failed to delete rrdmetric", string2str(ri->id));
-
                 metrics_deleted++;
                 continue;
             }
@@ -1016,7 +1012,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
         ri->flags &= ~RRD_FLAG_DELETED;
     }
 
-    if(unlikely(ri->flags & RRD_FLAG_UPDATED)) {
+    if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED)) {
         log_transition(NULL, ri->id, ri->rc->id, ri->flags, "RRDINSTANCE");
         rrdcontext_trigger_updates(ri->rc, true, RRD_FLAG_NONE);
         rrd_flag_unset_updated(ri);
@@ -1098,7 +1094,7 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     }
 
     ri->rrdset = NULL;
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, false, true);
     rrdinstance_release(st->rrdinstance);
     st->rrdinstance = NULL;
 
@@ -1120,7 +1116,7 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
 
     string_freez(old);
 
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, false, true);
 }
 
 static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
@@ -1131,7 +1127,7 @@ static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED);
     }
 
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, false, true);
 }
 
 static inline void rrdinstance_collected_rrdset(RRDSET *st) {
@@ -1142,7 +1138,7 @@ static inline void rrdinstance_collected_rrdset(RRDSET *st) {
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED);
     }
 
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, false, true);
 }
 
 // ----------------------------------------------------------------------------
@@ -1519,14 +1515,11 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
     size_t instances_active = 0, instances_deleted = 0;
     {
         RRDINSTANCE *ri;
-        dfe_start_write(rc->rrdinstances, ri) {
+        dfe_start_read(rc->rrdinstances, ri) {
             // find the combined flags of all the metrics
             combined_instances_flags |= ri->flags & RRD_FLAGS_PROPAGATED_UPSTREAM;
 
             if (unlikely(rrdinstance_should_be_deleted(ri))) {
-                if(unlikely(dictionary_del_unsafe(rc->rrdinstances, string2str(ri->id)) != 0))
-                    error("RRDCONTEXT: '%s' failed to delete rrdinstance", string2str(rc->id));
-
                 instances_deleted++;
                 continue;
             }
@@ -1976,7 +1969,6 @@ static inline usec_t rrdcontext_queued_dispatch_ut(RRDCONTEXT *rc, usec_t now_ut
 #define WORKER_JOB_CLEANUP          7
 #define WORKER_JOB_CLEANUP_DELETE   8
 
-usec_t rrdcontext_next_garbage_collect_ut = 0;
 usec_t rrdcontext_next_db_rotation_ut = 0;
 
 void rrdcontext_db_rotation(void) {
@@ -2040,11 +2032,16 @@ static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reaso
                     worker_is_busy(job_id);
 
                 rrd_flag_set_updated(rm, reason);
-                rrdmetric_trigger_updates(rm);
+
+                rrdmetric_trigger_updates(rm, false);
             }
             dfe_done(rm);
+
+            rrdinstance_trigger_updates(ri, true, false);
         }
         dfe_done(ri);
+
+        rrdcontext_trigger_updates(rc, true, RRD_FLAG_NONE);
     }
     dfe_done(rc);
 }
@@ -2059,6 +2056,18 @@ static void rrdcontext_recalculate_retention(int job_id) {
     rrd_unlock();
 }
 
+void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
+    // we need to refresh the string pointers in rc->hub
+    // in case the context changed values
+    rc->hub.id = string2str(rc->id);
+    rc->hub.title = string2str(rc->title);
+    rc->hub.units = string2str(rc->units);
+    rc->hub.family = string2str(rc->family);
+
+    // delete it from SQL
+    ctx_delete_context(&rc->rrdhost->host_uuid, &rc->hub);
+}
+
 static void rrdcontext_garbage_collect(void) {
     rrd_rdlock();
     RRDHOST *host;
@@ -2068,22 +2077,30 @@ static void rrdcontext_garbage_collect(void) {
             worker_is_busy(WORKER_JOB_CLEANUP);
 
             rrdcontext_lock(rc);
+
             if(unlikely(rrdcontext_should_be_deleted(rc))) {
                 worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                rrdcontext_delete_from_sql_unsafe(rc);
 
-                // we need to refresh the string pointers in rc->hub
-                // in case the context changed values
-                rc->hub.id = string2str(rc->id);
-                rc->hub.title = string2str(rc->title);
-                rc->hub.units = string2str(rc->units);
-                rc->hub.family = string2str(rc->family);
-
-                // delete it from SQL
-                ctx_delete_context(&host->host_uuid, &rc->hub);
-
-                // delete it from the dictionary
                 if(dictionary_del_unsafe((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
-                    error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.", string2str(rc->id), host->hostname);
+                    error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
+                          string2str(rc->id), host->hostname);
+            }
+            else {
+                RRDINSTANCE *ri;
+                dfe_start_write(rc->rrdinstances, ri) {
+                    if(rrdinstance_should_be_deleted(ri))
+                        dictionary_del_unsafe(rc->rrdinstances, string2str(ri->id));
+                    else {
+                        RRDMETRIC *rm;
+                        dfe_start_write(ri->rrdmetrics, rm) {
+                            if(rrdmetric_should_be_deleted(rm))
+                                dictionary_del_unsafe(ri->rrdmetrics, string2str(rm->id));
+                        }
+                        dfe_done(rm);
+                    }
+                }
+                dfe_done(ri);
             }
 
             // the item is referenced in the dictionary
@@ -2106,8 +2123,6 @@ void *rrdcontext_main(void *ptr) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return NULL;
 
-    rrdcontext_next_garbage_collect_ut = now_realtime_usec() + RRDCONTEXT_CLEANUP_DELETED_EVERY_SECS * USEC_PER_SEC;
-    
     worker_register("RRDCONTEXT");
     worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
     worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
@@ -2131,14 +2146,10 @@ void *rrdcontext_main(void *ptr) {
 
         usec_t now_ut = now_realtime_usec();
 
-        if(now_ut > rrdcontext_next_db_rotation_ut) {
+        if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
             rrdcontext_recalculate_retention(WORKER_JOB_RETENTION);
-            rrdcontext_next_db_rotation_ut = 0;
-        }
-
-        if(now_ut > rrdcontext_next_garbage_collect_ut) {
             rrdcontext_garbage_collect();
-            rrdcontext_next_garbage_collect_ut = now_ut + RRDCONTEXT_CLEANUP_DELETED_EVERY_SECS * USEC_PER_SEC;
+            rrdcontext_next_db_rotation_ut = 0;
         }
 
         rrd_rdlock();
@@ -2203,24 +2214,15 @@ void *rrdcontext_main(void *ptr) {
                         // this is a deleted context - delete it forever...
 
                         worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-
-                        // we need to refresh the string pointers in rc->hub
-                        // in case the context changed values
-                        rc->hub.id = string2str(rc->id);
-                        rc->hub.title = string2str(rc->title);
-                        rc->hub.units = string2str(rc->units);
-                        rc->hub.family = string2str(rc->family);
-
-                        // delete it from SQL
-                        ctx_delete_context(&host->host_uuid, &rc->hub);
+                        rrdcontext_delete_from_sql_unsafe(rc);
 
                         STRING *id = string_dup(rc->id);
-
                         rrdcontext_unlock(rc);
 
                         // delete it from the master dictionary
                         if(dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
-                            error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.", string2str(id), host->hostname);
+                            error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
+                                  string2str(id), host->hostname);
 
                         string_freez(id);
                     }
