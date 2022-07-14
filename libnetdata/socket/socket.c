@@ -597,6 +597,12 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     return fd;
 }
 
+static int ends_with(const char *str, const char *suffix) {
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    return (str_len >= suffix_len) && (!strcmp(str + str_len - suffix_len, suffix));
+}
+
 // connect_to_this_ip46()
 // protocol    IPPROTO_TCP, IPPROTO_UDP
 // socktype    SOCK_STREAM, SOCK_DGRAM
@@ -617,6 +623,10 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
     hints.ai_protocol = protocol;
 
     int ai_err = getaddrinfo(host, service, &hints, &ai_head);
+    if (ai_err == -3 && ends_with(host, "netdata.cloud")) {
+        hints.ai_family = PF_INET;
+        ai_err = getaddrinfo(host, service, &hints, &ai_head);
+    }
     if (ai_err != 0) {
         error("Cannot resolve host '%s', port '%s': %s", host, service, gai_strerror(ai_err));
         return -1;
