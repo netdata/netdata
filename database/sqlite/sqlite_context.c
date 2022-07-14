@@ -16,7 +16,7 @@ const char *database_context_config[] = {
 };
 
 const char *database_context_cleanup[] = {
-    "VACCUM;",
+    "VACUUM;",
     NULL
 };
 
@@ -115,15 +115,6 @@ void sql_close_context_database(void)
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the context SQLite database, %s", rc, sqlite3_errstr(rc));
     return;
-}
-
-static int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null)
-{
-    if (likely(text))
-        return sqlite3_bind_text(res, position, text, -1, SQLITE_STATIC);
-    if (!can_be_null)
-        return 1;
-    return sqlite3_bind_null(res, position);
 }
 
 //
