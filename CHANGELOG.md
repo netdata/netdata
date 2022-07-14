@@ -6,9 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix bitmap unit tests [\#13374](https://github.com/netdata/netdata/pull/13374) ([stelfrag](https://github.com/stelfrag))
+- chore\(dashboard\): update chrony dashboard info [\#13371](https://github.com/netdata/netdata/pull/13371) ([ilyam8](https://github.com/ilyam8))
+- chore\(python.d\): remove python.d/\* announced in v1.35.0 deprecation notice [\#13370](https://github.com/netdata/netdata/pull/13370) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin version to v0.33.1 [\#13369](https://github.com/netdata/netdata/pull/13369) ([ilyam8](https://github.com/ilyam8))
+- Add Oracle Linux 9 to officially supported platforms. [\#13367](https://github.com/netdata/netdata/pull/13367) ([Ferroin](https://github.com/Ferroin))
 - Address Coverity issues [\#13364](https://github.com/netdata/netdata/pull/13364) ([stelfrag](https://github.com/stelfrag))
 - chore\(python.d\): improve config file parsing error message [\#13363](https://github.com/netdata/netdata/pull/13363) ([ilyam8](https://github.com/ilyam8))
+- Add additional Docker image build with debug info included. [\#13359](https://github.com/netdata/netdata/pull/13359) ([Ferroin](https://github.com/Ferroin))
 - Move host tags to netdata\_info [\#13358](https://github.com/netdata/netdata/pull/13358) ([vlvkobal](https://github.com/vlvkobal))
 - Get rid of extra comma in OpenTSDB exporting [\#13355](https://github.com/netdata/netdata/pull/13355) ([vlvkobal](https://github.com/vlvkobal))
 - add job to move bugs to project board [\#13350](https://github.com/netdata/netdata/pull/13350) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -27,6 +32,7 @@
 - Fix two helgrind reports [\#13325](https://github.com/netdata/netdata/pull/13325) ([vkalintiris](https://github.com/vkalintiris))
 - fix\(cgroups.plugin\): adjust kubepods patterns to filter pods when using Kind cluster [\#13324](https://github.com/netdata/netdata/pull/13324) ([ilyam8](https://github.com/ilyam8))
 - Add link to docker config section [\#13323](https://github.com/netdata/netdata/pull/13323) ([cakrit](https://github.com/cakrit))
+- Guide for troubleshooting Agent with Cloud connection for new nodes [\#13322](https://github.com/netdata/netdata/pull/13322) ([Ancairon](https://github.com/Ancairon))
 - fix\(apps.plugin\): adjust `zmstat*` pattern to exclude zoneminder scripts [\#13314](https://github.com/netdata/netdata/pull/13314) ([ilyam8](https://github.com/ilyam8))
 - array allocator for dbengine page descriptors [\#13312](https://github.com/netdata/netdata/pull/13312) ([ktsaou](https://github.com/ktsaou))
 - fix\(health\): disable go.d last collected alarm for prometheus module [\#13309](https://github.com/netdata/netdata/pull/13309) ([ilyam8](https://github.com/ilyam8))
@@ -335,12 +341,6 @@
 - fix\(cgroups.plugin\): remove "enable cgroup X" config option on cgroup deletion [\#12746](https://github.com/netdata/netdata/pull/12746) ([ilyam8](https://github.com/ilyam8))
 - chore\(cgroup.plugin\): remove undocumented feature reading cgroups-names.sh when renaming cgroups [\#12745](https://github.com/netdata/netdata/pull/12745) ([ilyam8](https://github.com/ilyam8))
 - feat\(cgroups.plugin\): add "CPU Time Relative Share" chart [\#12741](https://github.com/netdata/netdata/pull/12741) ([ilyam8](https://github.com/ilyam8))
-- chore: reduce logging in rrdset [\#12739](https://github.com/netdata/netdata/pull/12739) ([ilyam8](https://github.com/ilyam8))
-- feat\(cgroups.plugin\): add k8s\_qos\_class label [\#12737](https://github.com/netdata/netdata/pull/12737) ([ilyam8](https://github.com/ilyam8))
-- expand on the various parent-child config options [\#12734](https://github.com/netdata/netdata/pull/12734) ([andrewm4894](https://github.com/andrewm4894))
-- Mention serial numbers in chart names in the plugins.d API documentation [\#12733](https://github.com/netdata/netdata/pull/12733) ([vlvkobal](https://github.com/vlvkobal))
-- Make atomics a hard-dep. [\#12730](https://github.com/netdata/netdata/pull/12730) ([vkalintiris](https://github.com/vkalintiris))
-- add --install-version flag for installing specific version of Netdata [\#12729](https://github.com/netdata/netdata/pull/12729) ([maneamarius](https://github.com/maneamarius))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
