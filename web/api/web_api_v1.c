@@ -395,6 +395,8 @@ static RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
             options |= RRDCONTEXT_OPTION_SHOW_DELETED;
         else if(!strcmp(tok, "labels"))
             options |= RRDCONTEXT_OPTION_SHOW_LABELS;
+        else if(!strcmp(tok, "deepscan"))
+            options |= RRDCONTEXT_OPTION_DEEPSCAN;
     }
 
     return options;

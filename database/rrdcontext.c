@@ -269,6 +269,7 @@ static inline void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
     dictionary_acquired_item_release((DICTIONARY *)rc->rrdhost->rrdctx, (DICTIONARY_ITEM *)rca);
 }
 
+static void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, int job_id);
 static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, int job_id);
 
 #define rrdcontext_version_hash(host) rrdcontext_version_hash_with_callback(host, NULL, false, NULL)
@@ -2072,6 +2073,9 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS opt
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
+    if(options & RRDCONTEXT_OPTION_DEEPSCAN)
+        rrdcontext_recalculate_context_retention(rc, RRD_FLAG_NONE, -1);
+
     struct rrdcontext_to_json t = {
         .wb = wb,
         .options = options|RRDCONTEXT_OPTION_SKIP_ID,
@@ -2087,6 +2091,9 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS opt
 int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options) {
     char node_uuid[UUID_STR_LEN];
     uuid_unparse(*host->node_id, node_uuid);
+
+    if(options & RRDCONTEXT_OPTION_DEEPSCAN)
+        rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, -1);
 
     buffer_sprintf(wb, "{\n"
                           "\t\"hostname\": \"%s\""
@@ -2295,30 +2302,34 @@ static uint64_t rrdcontext_version_hash_with_callback(
     return hash;
 }
 
+static void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, int job_id) {
+    RRDINSTANCE *ri;
+    dfe_start_read(rc->rrdinstances, ri) {
+        RRDMETRIC *rm;
+        dfe_start_read(ri->rrdmetrics, rm) {
+
+            if(job_id >= 0)
+                worker_is_busy(job_id);
+
+            rrd_flag_set_updated(rm, reason);
+
+            rrdmetric_trigger_updates(rm, true, false);
+        }
+        dfe_done(rm);
+
+        rrdinstance_trigger_updates(ri, true, false);
+    }
+    dfe_done(ri);
+
+    rrdcontext_trigger_updates(rc, true, RRD_FLAG_NONE);
+}
+
 static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, int job_id) {
     if(unlikely(!host || !host->rrdctx)) return;
 
     RRDCONTEXT *rc;
     dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
-        RRDINSTANCE *ri;
-        dfe_start_read(rc->rrdinstances, ri) {
-            RRDMETRIC *rm;
-            dfe_start_read(ri->rrdmetrics, rm) {
-
-                if(job_id >= 0)
-                    worker_is_busy(job_id);
-
-                rrd_flag_set_updated(rm, reason);
-
-                rrdmetric_trigger_updates(rm, true, false);
-            }
-            dfe_done(rm);
-
-            rrdinstance_trigger_updates(ri, true, false);
-        }
-        dfe_done(ri);
-
-        rrdcontext_trigger_updates(rc, true, RRD_FLAG_NONE);
+        rrdcontext_recalculate_context_retention(rc, reason, job_id);
     }
     dfe_done(rc);
 }
