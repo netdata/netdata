@@ -2208,10 +2208,12 @@ int dictionary_unittest(size_t entries) {
 
     // check string
     {
+        long string_entries_starting = dictionary_stats_entries(&string_dictionary);
+
         fprintf(stderr, "\nChecking strings...\n");
 
-        STRING *s1 = string_strdupz("hello");
-        STRING *s2 = string_strdupz("hello");
+        STRING *s1 = string_strdupz("hello unittest");
+        STRING *s2 = string_strdupz("hello unittest");
         if(s1 != s2) {
             errors++;
             fprintf(stderr, "ERROR: duplicating strings are not deduplicated\n");
@@ -2235,7 +2237,7 @@ int dictionary_unittest(size_t entries) {
         else
             fprintf(stderr, "OK: string refcount is 3\n");
 
-        STRING *s4 = string_strdupz("world");
+        STRING *s4 = string_strdupz("world unittest");
         if(s4 == s1) {
             errors++;
             fprintf(stderr, "ERROR: string is sharing pointers on different strings\n");
@@ -2270,9 +2272,9 @@ int dictionary_unittest(size_t entries) {
 
         freez(strings);
 
-        if(dictionary_stats_entries(&string_dictionary) != 2) {
+        if(dictionary_stats_entries(&string_dictionary) != string_entries_starting + 2) {
             errors++;
-            fprintf(stderr, "ERROR: strings dictionary should have 2 items but it has %ld\n", dictionary_stats_entries(&string_dictionary));
+            fprintf(stderr, "ERROR: strings dictionary should have %ld items but it has %ld\n", string_entries_starting + 2, dictionary_stats_entries(&string_dictionary));
         }
         else
             fprintf(stderr, "OK: strings dictionary has 2 items\n");
