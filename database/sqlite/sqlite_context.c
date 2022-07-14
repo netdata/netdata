@@ -425,6 +425,13 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 
     if (rc_stored != SQLITE_DONE)
         error_report("Failed to delete context %s, rc = %d", context_data->id, rc_stored);
+#ifdef NETDATA_INTERNAL_CHECKS
+     else {
+         char host_uuid_str[UUID_STR_LEN];
+         uuid_unparse_lower(*host_uuid, host_uuid_str);
+         info("%s: Deleted context %s under host %s", __FUNCTION__ , context_data->id, host_uuid_str);
+     }
+#endif
 
 skip_delete:
     rc = sqlite3_finalize(res);
