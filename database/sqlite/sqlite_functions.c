@@ -3,11 +3,15 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 2
+#define DB_METADATA_VERSION 3
 
 const char *database_config[] = {
-    "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
-    "registry_hostname text, update_every int, os text, timezone text, tags text, hops INT);",
+    "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT, "
+    "registry_hostname TEXT, update_every INT, "
+    "os TEXT, timezone TEXT, tags TEXT, hops INT"
+    "memory_mode INT, abbrev_timezone TEXT, utc_offset INT, program_name TEXT, program_version TEXT, entries INT,"
+    "health_enabled INT);",
+
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
     "chart_type int, memory_mode int, history_entries);",
@@ -846,6 +850,113 @@ bind_fail:
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement to store host %s, rc = %d", hostname, rc);
+    return 1;
+}
+
+//
+// Store host and host system info information in the database
+#define SQL_STORE_HOST_INFO "INSERT OR REPLACE INTO host " \
+        "(host_id, hostname, registry_hostname, update_every, os, timezone," \
+        "tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, program_version," \
+        "entries, health_enabled) " \
+        "values (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, @memory_mode, " \
+        "@abbrev_timezone, @utc_offset, @program_name, @program_version, " \
+        "@entries, @health_enabled);"
+
+int sql_store_host_info(RRDHOST *host)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely((!res))) {
+        rc = prepare_statement(db_meta, SQL_STORE_HOST_INFO, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store host, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 2, host->hostname, 0);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 3, host->registry_hostname, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 4, host->rrd_update_every);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 5, host->os, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 6, host->timezone, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 7, host->tags, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 8, host->system_info ? host->system_info->hops : 0);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 9, host->rrd_memory_mode);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 10, host->abbrev_timezone, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 11, host->utc_offset);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 12, host->program_name, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 13, host->program_version, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int64(res, 14, host->rrd_history_entries);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 15, host->health_enabled);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    int store_rc = sqlite3_step(res);
+    if (unlikely(store_rc != SQLITE_DONE))
+        error_report("Failed to store host %s, rc = %d", host->hostname, rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to store host %s, rc = %d", host->hostname, rc);
+
+    return !(store_rc == SQLITE_DONE);
+bind_fail:
+    error_report("Failed to bind parameter to store host %s, rc = %d", host->hostname, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to store host %s, rc = %d", host->hostname, rc);
     return 1;
 }
 
@@ -2313,3 +2424,14 @@ failed:
 
     return;
 };
+
+// Utils
+int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null)
+{
+    if (likely(text))
+        return sqlite3_bind_text(res, position, text, -1, SQLITE_STATIC);
+    if (!can_be_null)
+        return 1;
+    return sqlite3_bind_null(res, position);
+}
+
