@@ -120,9 +120,8 @@ void sql_close_context_database(void)
 //
 // Fetching data
 //
-#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, c.update_every, c.chart_type, c.family FROM meta.chart c " \
-        "WHERE c.host_id IN (SELECT h.host_id FROM meta.host h " \
-        "WHERE UNLIKELY((h.hops = 0 AND @host_id IS NULL)) OR LIKELY((h.host_id = @host_id)));"
+#define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, " \
+        "c.update_every, c.chart_type, c.family FROM meta.chart c WHERE c.host_id = @host_id; "
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
