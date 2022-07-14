@@ -615,6 +615,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
     hints.ai_family   = PF_UNSPEC;   /* Allow IPv4 or IPv6 */
     hints.ai_socktype = socktype;
     hints.ai_protocol = protocol;
+    hints.ai_flags |= AI_ADDRCONFIG;
 
     int ai_err = getaddrinfo(host, service, &hints, &ai_head);
     if (ai_err != 0) {
