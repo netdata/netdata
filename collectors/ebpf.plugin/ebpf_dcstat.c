@@ -1008,7 +1008,6 @@ static void dcstat_collector(ebpf_module_t *em)
     int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
-    int counter = update_every - 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
