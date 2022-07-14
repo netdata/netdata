@@ -97,7 +97,8 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/postgres.conf
 ```
 
-When no configuration file is found, the module tries to connect to TCP/IP socket: `localhost:5432`.
+When no configuration file is found, the module tries to connect to TCP/IP socket: `localhost:5432` with the 
+following collection jobs.
 
 ```yaml
 socket:
@@ -111,6 +112,29 @@ tcp:
   database     : 'postgres'
   host         : 'localhost'
   port         : 5432
+```
+
+**Note**: Every job collection must have a unique identifier. In cases that you monitor multiple DBs, every
+job must have it's own name. Use a mnemonic of your preference (e.g us_east_db, us_east_tcp)
+
+## Troubleshooting
+
+To troubleshoot issues with the `postgres` collector, run the `python.d.plugin` with the debug option enabled. The output
+should give you clues as to why the collector isn't working.
+
+First, navigate to your plugins directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on your
+system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the plugin's directory, switch
+to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+You can now run the `python.d.plugin` to debug the collector:
+
+```bash
+./python.d.plugin postgres debug trace
 ```
 
 ---
