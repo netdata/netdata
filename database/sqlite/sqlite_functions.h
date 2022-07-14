@@ -60,9 +60,12 @@ typedef enum db_check_action_type {
 
 extern int sql_init_database(db_check_action_type_t rebuild, int memory);
 extern void sql_close_database(void);
-
+extern int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null);
 extern int sql_store_host(uuid_t *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
                           const char *timezone, const char *tags, int hops);
+
+extern int sql_store_host_info(RRDHOST *host);
+
 extern int sql_store_chart(
     uuid_t *chart_uuid, uuid_t *host_uuid, const char *type, const char *id, const char *name, const char *family,
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
