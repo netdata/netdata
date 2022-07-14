@@ -856,39 +856,35 @@ static void shm_collector(ebpf_module_t *em)
     int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
-    int counter = update_every - 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = em->update_every * USEC_PER_SEC;
+    usec_t step = update_every * USEC_PER_SEC;
     while (!close_ebpf_plugin) {
         (void)heartbeat_next(&hb, step);
 
-        if (++counter == update_every) {
-            counter = 0;
-            pthread_mutex_lock(&collect_data_mutex);
-            if (apps) {
-                read_apps_table();
-            }
-
-            if (cgroups) {
-                ebpf_update_shm_cgroup();
-            }
-
-            pthread_mutex_lock(&lock);
-
-            shm_send_global();
-
-            if (apps) {
-                ebpf_shm_send_apps_data(apps_groups_root_target);
-            }
-
-            if (cgroups) {
-                ebpf_shm_send_cgroup_data(update_every);
-            }
-
-            pthread_mutex_unlock(&lock);
-            pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_lock(&collect_data_mutex);
+        if (apps) {
+            read_apps_table();
         }
+
+        if (cgroups) {
+            ebpf_update_shm_cgroup();
+        }
+
+        pthread_mutex_lock(&lock);
+
+        shm_send_global();
+
+        if (apps) {
+            ebpf_shm_send_apps_data(apps_groups_root_target);
+        }
+
+        if (cgroups) {
+            ebpf_shm_send_cgroup_data(update_every);
+        }
+
+        pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&collect_data_mutex);
     }
 }
 
