@@ -224,6 +224,7 @@ extern size_t dictionary_stats_searches(DICTIONARY *dict);
 extern size_t dictionary_stats_deletes(DICTIONARY *dict);
 extern size_t dictionary_stats_resets(DICTIONARY *dict);
 extern size_t dictionary_stats_walkthroughs(DICTIONARY *dict);
+extern size_t dictionary_stats_referenced_items(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
 
