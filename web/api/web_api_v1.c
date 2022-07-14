@@ -1077,7 +1077,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
     buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
 #endif
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     if (agent_id == NULL)
         buffer_strcat(wb, "\t\"agent-claimed\": false,\n");
     else {

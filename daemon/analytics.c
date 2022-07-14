@@ -541,7 +541,7 @@ void analytics_gather_mutable_meta_data(void)
     analytics_set_data(
         &analytics_data.netdata_config_is_parent, (localhost->next || configured_as_parent()) ? "true" : "false");
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, claim_id ? "true" : "false");
     freez(claim_id);
 

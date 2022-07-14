@@ -2176,7 +2176,7 @@ void *rrdcontext_main(void *ptr) {
 
                 worker_is_busy(WORKER_JOB_QUEUED);
                 usec_t dispatch_ut = rrdcontext_queued_dispatch_ut(rc, now_ut);
-                char *claim_id = is_agent_claimed();
+                char *claim_id = get_agent_claimid();
                 if(unlikely(now_ut >= dispatch_ut) && claim_id) {
                     worker_is_busy(WORKER_JOB_CHECK);
 

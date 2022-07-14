@@ -39,7 +39,7 @@ void sql_build_node_collectors(struct aclk_database_worker_config *wc)
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
 
     upd_node_collectors.node_id = wc->node_id;
-    upd_node_collectors.claim_id = is_agent_claimed();
+    upd_node_collectors.claim_id = get_agent_claimid();
 
     upd_node_collectors.node_collectors = collectors_from_charts(wc->host, dict);
     aclk_update_node_collectors(&upd_node_collectors);
@@ -68,7 +68,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 
     rrd_rdlock();
     node_info.node_id = wc->node_id;
-    node_info.claim_id = is_agent_claimed();
+    node_info.claim_id = get_agent_claimid();
     node_info.machine_guid = wc->host_guid;
     node_info.child = (wc->host != localhost);
     node_info.ml_info.ml_capable = ml_capable(localhost);
