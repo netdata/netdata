@@ -6,9 +6,9 @@
 #include "aclk/aclk_contexts_api.h"
 #include "aclk/aclk_api.h"
 
-int rrdcontext_enabled = CONFIG_BOOLEAN_NO;
+int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
 
-#define LOG_TRANSITIONS 1
+// #define LOG_TRANSITIONS 1
 // #define LOG_RRDINSTANCES 1
 
 typedef enum {
