@@ -99,50 +99,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/context_summary"
   /context:
-      get:
-        summary: Get info about a specific context
-        description: The context endpoint returns detailed information about a given context.
-        parameters:
-          - name: context
-            in: query
-            description: The id of the context as returned by the /contexts call.
-            required: true
-            schema:
+    get:
+      summary: Get info about a specific context
+      description: The context endpoint returns detailed information about a given context.
+      parameters:
+        - name: context
+          in: query
+          description: The id of the context as returned by the /contexts call.
+          required: true
+          schema:
+            type: string
+            format: as returned by /contexts
+            default: system.cpu
+        - name: options
+          in: query
+          description: Options that affect data generation.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
               type: string
-              format: as returned by /contexts
-              default: system.cpu
-          - name: options
-            in: query
-            description: Options that affect data generation.
-            required: false
-            allowEmptyValue: true
-            schema:
-              type: array
-              items:
-                type: string
-                enum:
-                  - full
-                  - all
-                  - charts
-                  - dimensions
-                  - labels
-                  - queue
-                  - flags
-                  - deleted
-                  - deepscan
-              default:
+              enum:
                 - full
-        responses:
-          "200":
-            description: A javascript object with detailed information about the context.
-            content:
-              application/json:
-                schema:
-                  $ref: "#/components/schemas/context"
-          "400":
-            description: No context id was supplied in the request.
-          "404":
-            description: No context with the given id is found.
+                - all
+                - charts
+                - dimensions
+                - labels
+                - queue
+                - flags
+                - deleted
+                - deepscan
+            default:
+              - full
+      responses:
+        "200":
+          description: A javascript object with detailed information about the context.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/context"
+        "400":
+          description: No context id was supplied in the request.
+        "404":
+          description: No context with the given id is found.
   /alarm_variables:
     get:
       summary: List variables available to configure alarms for a chart
