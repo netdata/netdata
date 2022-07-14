@@ -117,10 +117,12 @@ void sql_close_context_database(void)
     return;
 }
 
-static int bind_text_null(sqlite3_stmt *res, int position, const char *text)
+static int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null)
 {
     if (likely(text))
         return sqlite3_bind_text(res, position, text, -1, SQLITE_STATIC);
+    if (!can_be_null)
+        return 1;
     return sqlite3_bind_null(res, position);
 }
 
@@ -317,7 +319,7 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         goto skip_store;
     }
 
-    rc = sqlite3_bind_text(res, 2, context_data->id, -1, SQLITE_STATIC);
+    rc = bind_text_null(res, 2, context_data->id, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
         goto skip_store;
@@ -329,19 +331,19 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         goto skip_store;
     }
 
-    rc = bind_text_null(res, 4, context_data->title);
+    rc = bind_text_null(res, 4, context_data->title, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
         goto skip_store;
     }
 
-    rc = bind_text_null(res, 5, context_data->chart_type);
+    rc = bind_text_null(res, 5, context_data->chart_type, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
         goto skip_store;
     }
 
-    rc = bind_text_null(res, 6, context_data->units);
+    rc = bind_text_null(res, 6, context_data->units, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
         goto skip_store;
@@ -371,7 +373,7 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         goto skip_store;
     }
 
-    rc = sqlite3_bind_text(res, 11, context_data->family, -1, SQLITE_STATIC);
+    rc = bind_text_null(res, 11, context_data->family, 1);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind context to store details");
         goto skip_store;
