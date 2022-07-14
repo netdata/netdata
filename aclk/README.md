@@ -17,7 +17,12 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
 - 44.207.131.212
 - 44.196.50.41 
  
-However, this list of IPs can change without notice. Watch this page for updates.
+:::caution
+
+This list of IPs can change without notice, we strongly advise you to whitelist the domain `app.netdata.cloud`, if
+this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
+
+:::
 
 For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [get
 started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide or the full [connect to Cloud
