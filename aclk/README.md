@@ -37,7 +37,7 @@ The data passes through our systems, but it isn't stored.
 
 However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
 
-Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/privacy) in the documentation.
+Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/data-privacy) in the documentation.
 
 
 ## Enable and configure the ACLK
