@@ -449,7 +449,7 @@ static void dict_ctx_get_dimension_list_cb(SQL_DIMENSION_DATA *dimension_data_pt
 
     SQL_DIMENSION_DATA *dimension_data = dimension_data_ptr;
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(dimension_data->dim_id, uuid_str);
 
     info(" Dimension %s = %s", uuid_str, dimension_data->id);
@@ -460,7 +460,7 @@ static void dict_ctx_get_chart_list_cb(SQL_CHART_DATA *chart_data, void *data)
 {
     (void)data;
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(chart_data->chart_id, uuid_str);
     info("OK GOT %s ID = %s NAME = %s CONTEXT = %s", uuid_str, chart_data->id, chart_data->name, chart_data->context);
     ctx_get_label_list(&chart_data->chart_id, dict_ctx_get_label_list_cb, NULL);
@@ -532,8 +532,8 @@ int ctx_unittest(void)
     context_data.family = strdupz("TestContextFamily");
     context_data.priority = 50000;
     context_data.deleted = 0;
-    context_data.first_time_t = 1000;
-    context_data.last_time_t  = 1001;
+    context_data.first_time_t = 1657781000;
+    context_data.last_time_t  = 1657781100;
     context_data.version  = now_realtime_usec();
 
     if (likely(!ctx_store_context(&host_uuid, &context_data)))
@@ -547,8 +547,8 @@ int ctx_unittest(void)
         info("Entry %s not inserted", context_data.id);
 
     // This will change end time
-    context_data.first_time_t = 1000;
-    context_data.last_time_t  = 2001;
+    context_data.first_time_t = 1657781000;
+    context_data.last_time_t  = 1657782001;
     if (likely(!ctx_update_context(&host_uuid, &context_data)))
         info("Entry %s updated", context_data.id);
     else
@@ -558,8 +558,8 @@ int ctx_unittest(void)
     info("List context end after insert");
 
     // This will change start time
-    context_data.first_time_t = 2000;
-    context_data.last_time_t  = 2001;
+    context_data.first_time_t = 1657782000;
+    context_data.last_time_t  = 1657782001;
     if (likely(!ctx_update_context(&host_uuid, &context_data)))
         info("Entry %s updated", context_data.id);
     else
