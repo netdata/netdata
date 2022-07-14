@@ -39,12 +39,16 @@ typedef enum {
     RRDCONTEXT_OPTION_SHOW_METRICS       = (1 << 0),
     RRDCONTEXT_OPTION_SHOW_INSTANCES     = (1 << 1),
     RRDCONTEXT_OPTION_SHOW_LABELS        = (1 << 2),
-    RRDCONTEXT_OPTION_SHOW_QUEUE_REASONS = (1 << 3),
+    RRDCONTEXT_OPTION_SHOW_QUEUED        = (1 << 3),
     RRDCONTEXT_OPTION_SHOW_FLAGS         = (1 << 4),
     RRDCONTEXT_OPTION_SHOW_DELETED       = (1 << 5),
+    RRDCONTEXT_OPTION_SKIP_ID            = (1 << 31), // internal use
 } RRDCONTEXT_TO_JSON_OPTIONS;
 
-extern void rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options);
+#define RRDCONTEXT_OPTIONS_ALL (RRDCONTEXT_OPTION_SHOW_METRICS|RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_LABELS|RRDCONTEXT_OPTION_SHOW_QUEUED|RRDCONTEXT_OPTION_SHOW_FLAGS|RRDCONTEXT_OPTION_SHOW_DELETED)
+
+extern int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context);
+extern int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options);
 
 // ----------------------------------------------------------------------------
 // public API for rrddims

@@ -29,6 +29,8 @@ typedef enum name_value_flags {
     NAME_VALUE_FLAG_NAME_IS_ALLOCATED      = (1 << 0), // the name pointer is a STRING
     NAME_VALUE_FLAG_DELETED                = (1 << 1), // this item is deleted, so it is not available for traversal
     NAME_VALUE_FLAG_NEW_OR_UPDATED         = (1 << 2), // this item is new or just updated (used by the react callback)
+
+    // IMPORTANT: IF YOU ADD ANOTHER FLAG, YOU NEED TO ALLOCATE ANOTHER BIT TO FLAGS IN NAME_VALUE !!!
 } NAME_VALUE_FLAGS;
 
 /*
@@ -47,17 +49,15 @@ typedef struct name_value {
     struct name_value *next;    // a double linked list to allow fast insertions and deletions
     struct name_value *prev;
 
-    size_t name_len;            // the size of the name, including the terminating zero
-    size_t value_len;           // the size of the value (assumed binary)
+    uint32_t refcount;          // the reference counter
+    uint32_t value_len:29;      // the size of the value (assumed binary)
+    uint8_t flags:3;            // the flags for this item
 
     void *value;                // the value of the dictionary item
     union {
         STRING *string_name;    // the name of the dictionary item
         char *caller_name;      // the user supplied string pointer
     };
-
-    int refcount;               // the reference counter
-    NAME_VALUE_FLAGS flags;     // the flags for this item
 } NAME_VALUE;
 
 struct dictionary {
@@ -441,18 +441,23 @@ static int reference_counter_acquire(DICTIONARY *dict, NAME_VALUE *nv) {
     return refcount;
 }
 
-static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_get_write_lock) {
+static uint32_t reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_get_write_lock) {
     // this function may be called without any lock on the dictionary
     // or even when someone else has a write lock on the dictionary
     // so, we cannot check for EXCLUSIVE ACCESS
 
-    int refcount;
+    uint32_t refcount;
     if(likely(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))
-        refcount = --nv->refcount;
+        refcount = nv->refcount--;
     else
-        refcount = __atomic_sub_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
+        refcount = __atomic_fetch_sub(&nv->refcount, 1, __ATOMIC_SEQ_CST);
 
     if(refcount == 0) {
+        internal_error(true, "DICTIONARY: attempted to release item without references: '%s' on dictionary created by %s() (%zu@%s)", namevalue_get_name(nv), dict->creation_function, dict->creation_line, dict->creation_file);
+        fatal("DICTIONARY: attempted to release item without references: '%s'", namevalue_get_name(nv));
+    }
+
+    if(refcount == 1) {
         if((nv->flags & NAME_VALUE_FLAG_DELETED))
             DICTIONARY_STATS_PENDING_DELETES_PLUS1(dict);
 
@@ -467,11 +472,6 @@ static int reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool can_
         dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
         garbage_collect_pending_deletes_unsafe(dict);
         dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
-    }
-
-    if(refcount < 0) {
-        internal_error(true, "DICTIONARY: reference counter is negative on item '%s' on dictionary created by %s() (%zu@%s)", namevalue_get_name(nv), dict->creation_function, dict->creation_line, dict->creation_file);
-        fatal("DICTIONARY: reference counter is negative on item '%s'", namevalue_get_name(nv));
     }
 
     return refcount;
@@ -716,7 +716,6 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
 
     nv->refcount = 0;
     nv->flags = NAME_VALUE_FLAG_NONE;
-    nv->name_len = name_len;
     nv->value_len = value_len;
 
     allocated += namevalue_set_name(dict, nv, name, name_len);
@@ -1439,9 +1438,9 @@ typedef struct string_entry {
 #ifdef DICTIONARY_WITH_AVL
     avl_t avl_node;
 #endif
-    volatile int refcount;  // how many times this string is used
-    size_t length;          // the string length with the terminating '\0'
-    const char str[];       // the string itself
+    uint32_t length;    // the string length with the terminating '\0'
+    uint32_t refcount;  // how many times this string is used
+    const char str[];   // the string itself
 } STRING_ENTRY;
 
 #ifdef DICTIONARY_WITH_AVL
@@ -1533,6 +1532,10 @@ void string_freez(STRING *string) {
     netdata_mutex_lock(&string_mutex);
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
+
+    if(se->refcount == 0)
+        fatal("STRING: tried to free string that has zero references.");
+
     se->refcount--;
     if(unlikely(se->refcount == 0)) {
         if(hashtable_delete_unsafe(&string_dictionary, se->str, se->length, se) == 0)
@@ -1976,7 +1979,7 @@ static int check_name_value_callback(const char *name, void *value, void *data) 
     return value == data;
 }
 
-static size_t check_name_value_deleted_flag(DICTIONARY *dict, NAME_VALUE *nv, const char *name, const char *value, int refcount, NAME_VALUE_FLAGS deleted_flags, bool searchable, bool browsable, bool linked) {
+static size_t check_name_value_deleted_flag(DICTIONARY *dict, NAME_VALUE *nv, const char *name, const char *value, unsigned refcount, NAME_VALUE_FLAGS deleted_flags, bool searchable, bool browsable, bool linked) {
     size_t errors = 0;
 
     fprintf(stderr, "NAME_VALUE name is '%s', expected '%s'...\t\t\t\t", namevalue_get_name(nv), name);
@@ -1995,7 +1998,7 @@ static size_t check_name_value_deleted_flag(DICTIONARY *dict, NAME_VALUE *nv, co
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE refcount is %d, expected %d...\t\t\t\t\t", nv->refcount, refcount);
+    fprintf(stderr, "NAME_VALUE refcount is %u, expected %u...\t\t\t\t\t", nv->refcount, refcount);
     if (nv->refcount != refcount) {
         fprintf(stderr, "FAILED\n");
         errors++;

@@ -92,14 +92,14 @@ typedef enum {
         if(likely(!((obj)->flags &    RRD_FLAG_COLLECTED)))                                                     \
                     (obj)->flags |=  (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED | RRD_FLAG_UPDATED); \
         if(likely( ((obj)->flags &   (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED))))   \
-                    (obj)->flags &= ~(RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED);     \
+                    (obj)->flags &= ~(RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED); \
 } while(0)
 
 #define rrd_flag_set_archived(obj)                                                                         do { \
         if(likely(!((obj)->flags &    RRD_FLAG_ARCHIVED)))                                                      \
                     (obj)->flags |=  (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED | RRD_FLAG_UPDATED); \
         if(likely( ((obj)->flags &   (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED))))   \
-                    (obj)->flags &= ~(RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED);     \
+                    (obj)->flags &= ~(RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED); \
 } while(0)
 
 #define rrd_flag_is_collected(obj) ((obj)->flags & RRD_FLAG_COLLECTED)
@@ -163,15 +163,15 @@ typedef struct rrdinstance {
     STRING *title;
     STRING *units;
     STRING *family;
-    size_t priority;
+    uint32_t priority;
     RRDSET_TYPE chart_type;
+
+    RRD_FLAGS flags;                    // flags related to this instance
+    time_t first_time_t;
+    time_t last_time_t;
 
     int update_every;                   // data collection frequency
     RRDSET *rrdset;                     // pointer to RRDSET when collected, or NULL
-
-    time_t first_time_t;
-    time_t last_time_t;
-    RRD_FLAGS flags;                    // flags related to this instance
 
     DICTIONARY *rrdlabels;              // linked to RRDSET->state->chart_labels or own version
 
@@ -186,23 +186,25 @@ typedef struct rrdcontext {
     STRING *title;
     STRING *units;
     STRING *family;
+    uint32_t priority;
     RRDSET_TYPE chart_type;
 
-    size_t priority;
-
+    RRD_FLAGS flags;
     time_t first_time_t;
     time_t last_time_t;
-    RRD_FLAGS flags;
 
     VERSIONED_CONTEXT_DATA hub;
 
     DICTIONARY *rrdinstances;
     RRDHOST *rrdhost;
 
-    RRD_FLAGS last_queued_flags;
-    usec_t last_queued_ut;
-    usec_t last_delay_calc_ut;
-    usec_t scheduled_dispatch_ut;
+    struct {
+        RRD_FLAGS queued_flags;         // the last flags that triggered the queueing
+        usec_t queued_ut;               // the last time this was queued
+        usec_t delay_calc_ut;           // the last time we calculated the scheduled_dispatched_ut
+        usec_t scheduled_dispatch_ut;   // the time it was/is scheduled to be sent
+        usec_t dequeued_ut;             // the last time we sent (or deduped) this context
+    } queue;
 
     netdata_mutex_t mutex;
 } RRDCONTEXT;
@@ -267,6 +269,8 @@ static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reaso
 
 #define rrdcontext_version_hash(host) rrdcontext_version_hash_with_callback(host, NULL, false, NULL)
 static uint64_t rrdcontext_version_hash_with_callback(RRDHOST *host, void (*callback)(RRDCONTEXT *, bool, void *), bool snapshot, void *bundle);
+
+void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 
 #define rrdcontext_lock(rc) netdata_mutex_lock(&((rc)->mutex))
 #define rrdcontext_unlock(rc) netdata_mutex_unlock(&((rc)->mutex))
@@ -1208,8 +1212,14 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
 #endif
 
     // store it to SQL
-    if(ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
-        error("RRDCONTEXT: failed to save context '%s' version %lu to SQL.", rc->hub.id, rc->hub.version);
+
+    if(rc->flags & RRD_FLAG_DELETED) {
+        rrdcontext_delete_from_sql_unsafe(rc);
+    }
+    else {
+        if (ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
+            error("RRDCONTEXT: failed to save context '%s' version %lu to SQL.", rc->hub.id, rc->hub.version);
+    }
 }
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending) {
@@ -1252,7 +1262,7 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending) 
 
     if(unlikely(id_changed || title_changed || units_changed || family_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
-        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %zu, title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %lu%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
+        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %zu, title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
                        sending?"SENDING":"QUEUE",
                        string2str(rc->id), id_changed ? " (CHANGED)" : "",
                        rc->version,
@@ -1264,8 +1274,8 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending) 
                        rc->first_time_t, first_time_changed ? " (CHANGED)" : "",
                        rrd_flag_is_collected(rc) ? 0 : rc->last_time_t, last_time_changed ? " (CHANGED)" : "",
                        (rc->flags & RRD_FLAG_DELETED) ? "true" : "false", deleted_changed ? " (CHANGED)" : "",
-                       sending ? (now_realtime_usec() - rc->last_queued_ut) / USEC_PER_MS : 0,
-                       sending ? (rc->scheduled_dispatch_ut - rc->last_queued_ut) / USEC_PER_SEC : 0
+                       sending ? (now_realtime_usec() - rc->queue.queued_ut) / USEC_PER_MS : 0,
+                       sending ? (rc->queue.scheduled_dispatch_ut - rc->queue.queued_ut) / USEC_PER_SEC : 0
                        );
         return true;
     }
@@ -1608,8 +1618,8 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
 
         if(check_if_cloud_version_changed_unsafe(rc, false)) {
             rc->version = rrdcontext_get_next_version(rc);
-            rc->last_queued_ut = now_realtime_usec();
-            rc->last_queued_flags |= rc->flags;
+            rc->queue.queued_ut = now_realtime_usec();
+            rc->queue.queued_flags |= rc->flags;
             if(!(rc->flags & RRD_FLAG_QUEUED)) {
                 rc->flags |= RRD_FLAG_QUEUED;
                 dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_queue, string2str(rc->id), rc, sizeof(*rc));
@@ -1791,6 +1801,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
         contexts_snapshot_t bundle = contexts_snapshot_new(host->aclk_state.claimed_id, uuid, our_version_hash);
 
         // calculate version hash and pack all the messages together in one go
+        rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, -1);
         our_version_hash = rrdcontext_version_hash_with_callback(host, rrdcontext_message_send_unsafe, true, bundle);
 
         // update the version
@@ -1918,7 +1929,7 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
                    ",\n\t\t\t\t\t\"units\":\"%s\""
                    ",\n\t\t\t\t\t\"family\":\"%s\""
                    ",\n\t\t\t\t\t\"chart_type\":\"%s\""
-                   ",\n\t\t\t\t\t\"priority\":%zu"
+                   ",\n\t\t\t\t\t\"priority\":%u"
                    ",\n\t\t\t\t\t\"update_every\":%d"
                    ",\n\t\t\t\t\t\"first_time_t\":%ld"
                    ",\n\t\t\t\t\t\"last_time_t\":%ld"
@@ -1981,20 +1992,25 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     else
         buffer_strcat(wb, "\n");
 
-    buffer_sprintf(wb, "\t\t\"%s\": {", id);
+    if(options & RRDCONTEXT_OPTION_SKIP_ID)
+        buffer_sprintf(wb, "\t\t\{");
+    else
+        buffer_sprintf(wb, "\t\t\"%s\": {", id);
 
     buffer_sprintf(wb,
                    "\n\t\t\t\"version\":%lu"
+                   ",\n\t\t\t\"hub_version\":%lu"
                    ",\n\t\t\t\"title\":\"%s\""
                    ",\n\t\t\t\"units\":\"%s\""
                    ",\n\t\t\t\"family\":\"%s\""
                    ",\n\t\t\t\"chart_type\":\"%s\""
-                   ",\n\t\t\t\"priority\":%zu"
+                   ",\n\t\t\t\"priority\":%u"
                    ",\n\t\t\t\"first_time_t\":%ld"
                    ",\n\t\t\t\"last_time_t\":%ld"
                    ",\n\t\t\t\"collected\":%s"
                    ",\n\t\t\t\"deleted\":%s"
                    , rc->version
+                   , rc->hub.version
                    , string2str(rc->title)
                    , string2str(rc->units)
                    , string2str(rc->family)
@@ -2012,12 +2028,19 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
         buffer_strcat(wb, "\"");
     }
 
-    if(options & RRDCONTEXT_OPTION_SHOW_QUEUE_REASONS) {
-        if (rc->flags & RRD_FLAG_QUEUED) {
-            buffer_strcat(wb, ",\n\t\t\t\"queued_reasons\":\"");
-            rrd_reasons_to_buffer(rc->last_queued_flags, wb);
-            buffer_strcat(wb, "\"");
-        }
+    if(options & RRDCONTEXT_OPTION_SHOW_QUEUED) {
+        buffer_strcat(wb, ",\n\t\t\t\"queued_reasons\":\"");
+        rrd_reasons_to_buffer(rc->queue.queued_flags, wb);
+        buffer_strcat(wb, "\"");
+
+        buffer_sprintf(wb,
+                       ",\n\t\t\t\"last_queued\":%llu"
+                       ",\n\t\t\t\"scheduled_dispatch\":%llu"
+                       ",\n\t\t\t\"last_dequeued\":%llu"
+                       , rc->queue.queued_ut / USEC_PER_SEC
+                       , rc->queue.scheduled_dispatch_ut / USEC_PER_SEC
+                       , rc->queue.dequeued_ut / USEC_PER_SEC
+                       );
     }
 
     if(options & (RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_METRICS)) {
@@ -2036,7 +2059,24 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     return 1;
 }
 
-void rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options) {
+int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context) {
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, context);
+    if(!rca) return HTTP_RESP_NOT_FOUND;
+
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+
+    struct rrdcontext_to_json t = {
+        .wb = wb,
+        .options = options|RRDCONTEXT_OPTION_SKIP_ID,
+        .written = 0,
+    };
+    rrdcontext_to_json_callback(context, rc, &t);
+
+    rrdcontext_release(rca);
+    return HTTP_RESP_OK;
+}
+
+int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options) {
     char node_uuid[UUID_STR_LEN];
     uuid_unparse(*host->node_id, node_uuid);
 
@@ -2067,6 +2107,8 @@ void rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS o
 
     // close contexts, close main
     buffer_strcat(wb, "\n\t}\n}");
+
+    return HTTP_RESP_OK;
 }
 
 // ----------------------------------------------------------------------------
@@ -2161,10 +2203,10 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 
 static inline usec_t rrdcontext_queued_dispatch_ut(RRDCONTEXT *rc, usec_t now_ut) {
 
-    if(likely(rc->last_delay_calc_ut >= rc->last_queued_ut))
-        return rc->scheduled_dispatch_ut;
+    if(likely(rc->queue.delay_calc_ut >= rc->queue.queued_ut))
+        return rc->queue.scheduled_dispatch_ut;
 
-    RRD_FLAGS flags = rc->last_queued_flags;
+    RRD_FLAGS flags = rc->queue.queued_flags;
 
     usec_t delay = LONG_MAX;
     int i;
@@ -2181,8 +2223,8 @@ static inline usec_t rrdcontext_queued_dispatch_ut(RRDCONTEXT *rc, usec_t now_ut
         delay = 60 * USEC_PER_SEC;
     }
 
-    rc->last_delay_calc_ut = now_ut;
-    usec_t dispatch_ut = rc->scheduled_dispatch_ut = rc->last_queued_ut + delay;
+    rc->queue.delay_calc_ut = now_ut;
+    usec_t dispatch_ut = rc->queue.scheduled_dispatch_ut = rc->queue.queued_ut + delay;
     return dispatch_ut;
 }
 
@@ -2297,7 +2339,8 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
     rc->hub.family = string2str(rc->family);
 
     // delete it from SQL
-    ctx_delete_context(&rc->rrdhost->host_uuid, &rc->hub);
+    if(ctx_delete_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
+        error("RRDCONTEXT: failed to delete context '%s' version %lu from SQL.", rc->hub.id, rc->hub.version);
 }
 
 static void rrdcontext_garbage_collect(void) {
@@ -2430,7 +2473,7 @@ void *rrdcontext_main(void *ptr) {
                         rrdcontext_message_send_unsafe(rc, false, bundle);
                         messages_added++;
 
-                        rc->last_queued_flags = RRD_FLAG_NONE;
+                        rc->queue.dequeued_ut = now_ut;
                     }
                     else
                         rc->version = rc->hub.version;
