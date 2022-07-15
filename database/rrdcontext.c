@@ -1756,6 +1756,8 @@ static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
 
     rrd_rdlock();
     rrdhost_foreach_read(host) {
+        if(!host->node_id) continue;
+
         if(uuid_compare(uuid, *host->node_id) == 0)
             break;
     }
@@ -2089,8 +2091,10 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS opt
 }
 
 int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options) {
-    char node_uuid[UUID_STR_LEN];
-    uuid_unparse(*host->node_id, node_uuid);
+    char node_uuid[UUID_STR_LEN] = "";
+
+    if(host->node_id)
+        uuid_unparse(*host->node_id, node_uuid);
 
     if(options & RRDCONTEXT_OPTION_DEEPSCAN)
         rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, -1);
@@ -2371,20 +2375,24 @@ static void rrdcontext_garbage_collect(void) {
                 worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
                 rrdcontext_delete_from_sql_unsafe(rc);
 
-                if(dictionary_del_unsafe((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
+                if(dictionary_del_having_write_lock((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
                     error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
                           string2str(rc->id), host->hostname);
             }
             else {
                 RRDINSTANCE *ri;
                 dfe_start_write(rc->rrdinstances, ri) {
-                    if(rrdinstance_should_be_deleted(ri))
-                        dictionary_del_unsafe(rc->rrdinstances, string2str(ri->id));
+                    if(rrdinstance_should_be_deleted(ri)) {
+                        worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                        dictionary_del_having_write_lock(rc->rrdinstances, string2str(ri->id));
+                    }
                     else {
                         RRDMETRIC *rm;
                         dfe_start_write(ri->rrdmetrics, rm) {
-                            if(rrdmetric_should_be_deleted(rm))
-                                dictionary_del_unsafe(ri->rrdmetrics, string2str(rm->id));
+                            if(rrdmetric_should_be_deleted(rm)) {
+                                worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                                dictionary_del_having_write_lock(ri->rrdmetrics, string2str(rm->id));
+                            }
                         }
                         dfe_done(rm);
                     }
@@ -2419,8 +2427,8 @@ void *rrdcontext_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_DEQUEUE, "deduped contexts");
     worker_register_job_name(WORKER_JOB_RETENTION, "metrics retention");
     worker_register_job_name(WORKER_JOB_QUEUED, "queued contexts");
-    worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup contexts");
-    worker_register_job_name(WORKER_JOB_CLEANUP_DELETE, "deleted contexts");
+    worker_register_job_name(WORKER_JOB_CLEANUP, "cleanups");
+    worker_register_job_name(WORKER_JOB_CLEANUP_DELETE, "deletes");
 
     netdata_thread_cleanup_push(rrdcontext_main_cleanup, ptr);
     heartbeat_t hb;
@@ -2454,6 +2462,9 @@ void *rrdcontext_main(void *ptr) {
             if(!dictionary_stats_entries((DICTIONARY *)host->rrdctx_queue))
                 continue;
 
+            if(!host->node_id)
+                continue;
+
             size_t messages_added = 0;
             contexts_updated_t bundle = NULL;
 
@@ -2479,6 +2490,7 @@ void *rrdcontext_main(void *ptr) {
                             // prepare the bundle to send the messages
                             char uuid[UUID_STR_LEN];
                             uuid_unparse_lower(*host->node_id, uuid);
+
                             bundle = contexts_updated_new(claim_id, uuid, 0, now_ut);
                         }
 #endif
@@ -2497,7 +2509,7 @@ void *rrdcontext_main(void *ptr) {
 
                     // remove it from the queue
                     worker_is_busy(WORKER_JOB_DEQUEUE);
-                    dictionary_del_unsafe((DICTIONARY *)host->rrdctx_queue, string2str(rc->id));
+                    dictionary_del_having_write_lock((DICTIONARY *)host->rrdctx_queue, string2str(rc->id));
 
                     if(unlikely(rrdcontext_should_be_deleted(rc))) {
                         // this is a deleted context - delete it forever...
