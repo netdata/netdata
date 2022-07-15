@@ -769,6 +769,16 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     };
     node_state_update.node_id = mallocz(UUID_STR_LEN);
     uuid_unparse_lower(node_id, (char*)node_state_update.node_id);
+
+    struct capability caps[] = {
+        { .name = "proto", .version = 1,                     .enabled = 1 },
+        { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(host) },
+        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
+        { .name = "ctx",   .version = 1,                     .enabled = 1 },
+        { .name = NULL,    .version = 0,                     .enabled = 0 }
+    };
+    node_state_update.capabilities = caps;
+
     rrdhost_aclk_state_lock(localhost);
     node_state_update.claim_id = localhost->aclk_state.claimed_id;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
@@ -801,6 +811,20 @@ void aclk_send_node_instances()
             };
             node_state_update.node_id = mallocz(UUID_STR_LEN);
             uuid_unparse_lower(list->node_id, (char*)node_state_update.node_id);
+
+            char host_id[UUID_STR_LEN];
+            uuid_unparse_lower(list->host_id, host_id);
+
+            RRDHOST *host = rrdhost_find_by_guid(host_id, 0);
+            struct capability caps[] = {
+                { .name = "proto", .version = 1,                     .enabled = 1 },
+                { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
+                { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
+                { .name = "ctx",   .version = 1,                     .enabled = 1 },
+                { .name = NULL,    .version = 0,                     .enabled = 0 }
+            };
+            node_state_update.capabilities = caps;
+
             rrdhost_aclk_state_lock(localhost);
             node_state_update.claim_id = localhost->aclk_state.claimed_id;
             query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);

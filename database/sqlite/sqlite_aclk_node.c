@@ -78,7 +78,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
         { .name = "proto", .version = 1,                     .enabled = 1 },
         { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(wc->host) },
         { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1, .enabled = aclk_ctx_based },
+        { .name = "ctx",   .version = 1,                     .enabled = 1 },
         { .name = NULL,    .version = 0,                     .enabled = 0 }
     };
     node_info.node_instance_capabilities = instance_caps;
