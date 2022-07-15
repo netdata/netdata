@@ -248,7 +248,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         { .name = "ml",    .version = 1, .enabled = ml_enabled(localhost) },
 #endif
         { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx", .version = 1, .enabled = aclk_ctx_based },
+        { .name = "ctx",   .version = 1, .enabled = 1 },
         { .name = NULL,    .version = 0, .enabled = 0 }
     };
 

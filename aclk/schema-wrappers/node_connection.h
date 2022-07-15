@@ -3,6 +3,8 @@
 #ifndef ACLK_SCHEMA_WRAPPER_NODE_CONNECTION_H
 #define ACLK_SCHEMA_WRAPPER_NODE_CONNECTION_H
 
+#include "capability.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,6 +19,7 @@ typedef struct {
     int64_t session_id;
 
     int32_t hops;
+    struct capability *capabilities;
 } node_instance_connection_t;
 
 char *generate_node_instance_connection(size_t *len, const node_instance_connection_t *data);
