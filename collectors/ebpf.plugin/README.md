@@ -100,8 +100,6 @@ accepts the following values:
     charts for the return of these functions, such as errors. Monitoring function returns can help in debugging software,
     such as failing to close file descriptors or creating zombie processes.
 -   `update every`:  Number of seconds used for eBPF to send data for Netdata.
--   `update intragtion every`:  Number of seconds used for eBPF to sync data with `apps.plugin` and `cgroup.plugin`. The
-     default and acceptable minimum value is `10` seconds.
 -   `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
 
 #### Integration with `apps.plugin`
