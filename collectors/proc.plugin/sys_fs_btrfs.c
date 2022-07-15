@@ -448,6 +448,11 @@ static inline int find_all_btrfs_pools(const char *path) {
     return 0;
 }
 
+static void add_labels_to_btrfs(BTRFS_NODE *n, RRDSET *st) {
+    rrdlabels_add(st->state->chart_labels, "device", n->id, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->state->chart_labels, "device_label", n->label, RRDLABEL_SRC_AUTO);
+}
+
 int do_sys_fs_btrfs(int update_every, usec_t dt) {
     static int initialized = 0
         , do_allocation_disks = CONFIG_BOOLEAN_AUTO
@@ -579,6 +584,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                 node->rd_allocation_disks_metadata_used = rrddim_add(node->st_allocation_disks, "meta_used", "meta used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_allocation_disks_system_free   = rrddim_add(node->st_allocation_disks, "sys_free",  "sys free",  1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_allocation_disks_system_used   = rrddim_add(node->st_allocation_disks, "sys_used",  "sys used",  1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_btrfs(node, node->st_allocation_disks);
             }
             else rrdset_next(node->st_allocation_disks);
 
@@ -632,6 +639,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 node->rd_allocation_data_free = rrddim_add(node->st_allocation_data, "free", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_allocation_data_used = rrddim_add(node->st_allocation_data, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_btrfs(node, node->st_allocation_data);
             }
             else rrdset_next(node->st_allocation_data);
 
@@ -676,6 +685,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                 node->rd_allocation_metadata_free = rrddim_add(node->st_allocation_metadata, "free", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_allocation_metadata_used = rrddim_add(node->st_allocation_metadata, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_allocation_metadata_reserved = rrddim_add(node->st_allocation_metadata, "reserved", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_btrfs(node, node->st_allocation_metadata);
             }
             else rrdset_next(node->st_allocation_metadata);
 
@@ -720,6 +731,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 node->rd_allocation_system_free = rrddim_add(node->st_allocation_system, "free", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_allocation_system_used = rrddim_add(node->st_allocation_system, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_btrfs(node, node->st_allocation_system);
             }
             else rrdset_next(node->st_allocation_system);
 

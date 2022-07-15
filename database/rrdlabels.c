@@ -369,11 +369,11 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
 
 }
 
-static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf) {
+static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty) {
     if(unlikely(!dst_size)) return 0;
     if(unlikely(!src || !*src)) {
-        *dst = '\0';
-        return 0;
+        strncpyz((char *)dst, empty, dst_size);
+        return strlen((char *)dst);
     }
 
     unsigned char *d = dst;
@@ -456,11 +456,11 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
 }
 
 static inline size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size) {
-    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0);
+    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "");
 }
 
 static inline size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t dst_size) {
-    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1);
+    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1, "[unset]");
 }
 
 // ----------------------------------------------------------------------------
@@ -477,7 +477,8 @@ static void rrdlabel_insert_callback(const char *name, void *value, void *data) 
     RRDLABEL *lb = (RRDLABEL *)value;
 
     // label_value is already allocated by the STRING
-    lb->label_source |= RRDLABEL_FLAG_NEW;
+    lb->label_source |=  RRDLABEL_FLAG_NEW;
+    lb->label_source &= ~RRDLABEL_FLAG_OLD;
 }
 
 static void rrdlabel_delete_callback(const char *name, void *value, void *data) {
@@ -497,8 +498,9 @@ static void rrdlabel_conflict_callback(const char *name, void *oldvalue, void *n
 
     if(lbold->label_value == lbnew->label_value || strcmp(string2str(lbold->label_value), string2str(lbnew->label_value)) == 0) {
         // they are the same
-        lbold->label_source |= lbnew->label_source;
-        lbold->label_source |= RRDLABEL_FLAG_OLD;
+        lbold->label_source |=  lbnew->label_source;
+        lbold->label_source |=  RRDLABEL_FLAG_OLD;
+        lbold->label_source &= ~RRDLABEL_FLAG_NEW;
 
         // free the new one
         string_freez(lbnew->label_value);
@@ -506,9 +508,10 @@ static void rrdlabel_conflict_callback(const char *name, void *oldvalue, void *n
     else {
         // they are different
         string_freez(lbold->label_value);
-        lbold->label_value = lbnew->label_value;
-        lbold->label_source = lbnew->label_source;
-        lbold->label_source |= RRDLABEL_FLAG_NEW;
+        lbold->label_value  =   lbnew->label_value;
+        lbold->label_source =   lbnew->label_source;
+        lbold->label_source |=  RRDLABEL_FLAG_NEW;
+        lbold->label_source &= ~RRDLABEL_FLAG_OLD;
     }
 }
 
@@ -654,7 +657,7 @@ static int remove_not_old_not_new_callback(const char *name, void *value, void *
     DICTIONARY *dict = (DICTIONARY *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
 
-    if(!(lb->label_source & RRDLABEL_FLAG_OLD) && !(lb->label_source & RRDLABEL_FLAG_NEW)) {
+    if(!(lb->label_source & (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT))) {
         dictionary_del_having_write_lock(dict, name);
         return 1;
     }

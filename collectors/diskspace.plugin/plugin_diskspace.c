@@ -431,7 +431,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         };
 
         mp.chart_labels = rrdlabels_create();
-        rrdlabels_add(mp.chart_labels, "fstype", mi->filesystem, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mp.chart_labels, "mount_point", mi->mount_point, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mp.chart_labels, "filesystem", mi->filesystem, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mp.chart_labels, "mount_root", mi->root, RRDLABEL_SRC_AUTO);
 
         m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
 

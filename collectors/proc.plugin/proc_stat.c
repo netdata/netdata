@@ -1039,6 +1039,10 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 , RRDSET_TYPE_STACKED
                         );
 
+                        char corebuf[50+1];
+                        snprintfz(corebuf, 50, "cpu%zu", core);
+                        rrdlabels_add(cpuidle_charts[core].st->state->chart_labels, "cpu", corebuf, RRDLABEL_SRC_AUTO);
+
                         char cpuidle_dim_id[RRD_ID_LENGTH_MAX + 1];
                         cpuidle_charts[core].active_time_rd = rrddim_add(cpuidle_charts[core].st, "active", "C0 (active)", 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                         for(state = 0; state < cpuidle_charts[core].cpuidle_state_len; state++) {

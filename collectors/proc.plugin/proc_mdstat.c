@@ -77,6 +77,11 @@ static inline void make_chart_obsolete(char *name, const char *id_modifier)
     }
 }
 
+static void add_labels_to_mdstat(struct raid *raid, RRDSET *st) {
+    rrdlabels_add(st->state->chart_labels, "device", raid->name, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->state->chart_labels, "raid_level", raid->level, RRDLABEL_SRC_AUTO);
+}
+
 int do_proc_mdstat(int update_every, usec_t dt)
 {
     (void)dt;
@@ -407,7 +412,8 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 RRDSET_TYPE_LINE);
 
             rrdset_isnot_obsolete(st_mdstat_health);
-        } else
+        }
+        else
             rrdset_next(st_mdstat_health);
 
         if (!redundant_num) {
@@ -458,7 +464,10 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         RRDSET_TYPE_STACKED);
 
                     rrdset_isnot_obsolete(raid->st_disks);
-                } else
+
+                    add_labels_to_mdstat(raid, raid->st_disks);
+                }
+                else
                     rrdset_next(raid->st_disks);
 
                 if (unlikely(!raid->rd_inuse && !(raid->rd_inuse = rrddim_find_active(raid->st_disks, "inuse"))))
@@ -495,7 +504,10 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         RRDSET_TYPE_LINE);
 
                     rrdset_isnot_obsolete(raid->st_mismatch_cnt);
-                } else
+
+                    add_labels_to_mdstat(raid, raid->st_mismatch_cnt);
+                }
+                else
                     rrdset_next(raid->st_mismatch_cnt);
 
                 if (unlikely(!raid->rd_mismatch_cnt && !(raid->rd_mismatch_cnt = rrddim_find_active(raid->st_mismatch_cnt, "count"))))
@@ -529,7 +541,10 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         RRDSET_TYPE_LINE);
 
                     rrdset_isnot_obsolete(raid->st_operation);
-                } else
+
+                    add_labels_to_mdstat(raid, raid->st_operation);
+                }
+                else
                     rrdset_next(raid->st_operation);
 
                 if(unlikely(!raid->rd_check && !(raid->rd_check = rrddim_find_active(raid->st_operation, "check"))))
@@ -569,7 +584,10 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         update_every, RRDSET_TYPE_LINE);
 
                     rrdset_isnot_obsolete(raid->st_finish);
-                } else
+
+                    add_labels_to_mdstat(raid, raid->st_finish);
+                }
+                else
                     rrdset_next(raid->st_finish);
 
                 if(unlikely(!raid->rd_finish_in && !(raid->rd_finish_in = rrddim_find_active(raid->st_finish, "finish_in"))))
@@ -601,7 +619,10 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         RRDSET_TYPE_LINE);
 
                     rrdset_isnot_obsolete(raid->st_speed);
-                } else
+
+                    add_labels_to_mdstat(raid, raid->st_speed);
+                }
+                else
                     rrdset_next(raid->st_speed);
 
                 if (unlikely(!raid->rd_speed && !(raid->rd_speed = rrddim_find_active(raid->st_speed, "speed"))))
@@ -635,7 +656,10 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         RRDSET_TYPE_LINE);
 
                     rrdset_isnot_obsolete(raid->st_nonredundant);
-                } else
+
+                    add_labels_to_mdstat(raid, raid->st_nonredundant);
+                }
+                else
                     rrdset_next(raid->st_nonredundant);
 
                 if (unlikely(!raid->rd_nonredundant && !(raid->rd_nonredundant = rrddim_find_active(raid->st_nonredundant, "available"))))
