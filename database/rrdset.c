@@ -490,14 +490,9 @@ static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
 static inline void rrdset_update_permanent_labels(RRDSET *st) {
     if(!st->state || !st->state->chart_labels) return;
 
-    if(st->plugin_name)
-        rrdlabels_add(st->state->chart_labels, "_collect_plugin", st->plugin_name, RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-
-    if(st->module_name)
-        rrdlabels_add(st->state->chart_labels, "_collect_module", st->module_name, RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-
-    if(st->family)
-        rrdlabels_add(st->state->chart_labels, "_instance_family",   st->family,   RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->state->chart_labels, "_collect_plugin", st->plugin_name, RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->state->chart_labels, "_collect_module", st->module_name, RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->state->chart_labels, "_instance_family",   st->family,   RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
 }
 
 RRDSET *rrdset_create_custom(
