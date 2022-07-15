@@ -115,6 +115,8 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                             , RRDSET_TYPE_LINE
                     );
 
+                    rrdlabels_add(m->numastat_st->state->chart_labels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
+
                     rrdset_flag_set(m->numastat_st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(m->numastat_st, "numa_hit",       "hit",        1, 1, RRD_ALGORITHM_INCREMENTAL);

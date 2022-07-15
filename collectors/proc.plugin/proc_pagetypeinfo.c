@@ -242,15 +242,14 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
             // "Node" + NUMA-NodeID + ZoneName + TypeName
             char setname[4+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME +1];
-            snprintfz(setname, MAX_ZONETYPE_NAME + MAX_PAGETYPE_NAME, "Node %d %s %s",
-                pgl->node, pgl->zone, pgl->type);
+            snprintfz(setname, MAX_ZONETYPE_NAME + MAX_PAGETYPE_NAME, "Node %d %s %s", pgl->node, pgl->zone, pgl->type);
 
             st_nodezonetype[p] = rrdset_create_localhost(
                     "mem"
                     , setid
                     , NULL
                     , "pagetype"
-                    , NULL
+                    , "mem.pagetype"
                     , setname
                     , "B"
                     , PLUGIN_PROC_NAME
@@ -259,6 +258,13 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
+
+            char node[50+1];
+            snprintfz(node, 50, "node%d", pgl->node);
+            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_id", node, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_zone", pgl->zone, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_type", pgl->type, RRDLABEL_SRC_AUTO);
+
             for (o = 0; o < pageorders_cnt; o++) {
                 char dimid[3+1];
                 snprintfz(dimid, 3, "%lu", o);

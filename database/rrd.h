@@ -197,15 +197,16 @@ typedef enum rrddim_flags {
 #define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 typedef enum rrdlabel_source {
-    RRDLABEL_SRC_AUTO   = (1 << 0), // set when Netdata found the label by some automation
-    RRDLABEL_SRC_CONFIG = (1 << 1), // set when the user configured the label
-    RRDLABEL_SRC_K8S    = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
-    RRDLABEL_SRC_ACLK   = (1 << 3), // set when this label is found from ACLK (RRDLABEL_SRC_AUTO should also be set)
+    RRDLABEL_SRC_AUTO       = (1 << 0), // set when Netdata found the label by some automation
+    RRDLABEL_SRC_CONFIG     = (1 << 1), // set when the user configured the label
+    RRDLABEL_SRC_K8S        = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
+    RRDLABEL_SRC_ACLK       = (1 << 3), // set when this label is found from ACLK (RRDLABEL_SRC_AUTO should also be set)
 
     // more sources can be added here
 
-    RRDLABEL_FLAG_OLD   = (1 << 30), // marks set for rrdlabels internal use - they are not exposed outside rrdlabels
-    RRDLABEL_FLAG_NEW   = (1 << 31)  //
+    RRDLABEL_FLAG_PERMANENT = (1 << 29), // set when this label should never be removed (can be overwritten though)
+    RRDLABEL_FLAG_OLD       = (1 << 30), // marks for rrdlabels internal use - they are not exposed outside rrdlabels
+    RRDLABEL_FLAG_NEW       = (1 << 31)  // marks for rrdlabels internal use - they are not exposed outside rrdlabels
 } RRDLABEL_SRC;
 
 extern DICTIONARY *rrdlabels_create(void);

@@ -743,11 +743,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
             if (likely(access(buffer, R_OK) == 0)) {
                 d->virtual = 1;
-                rrdlabels_add(d->chart_labels, "type", "virtual", RRDLABEL_SRC_AUTO);
-            } else {
-                d->virtual = 0;
-                rrdlabels_add(d->chart_labels, "type", "real", RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
             }
+            else {
+                d->virtual = 0;
+                rrdlabels_add(d->chart_labels, "interface_type", "real", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
+            }
+            rrdlabels_add(d->chart_labels, "device", name, RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
 
             if(likely(!d->virtual)) {
                 // set the filename to get the interface speed

@@ -75,6 +75,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , RRDSET_TYPE_AREA);
     d->rd_compr_data_size = rrddim_add(d->st_usage, "compressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     d->rd_metadata_size = rrddim_add(d->st_usage, "metadata", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+    rrdlabels_add(d->st_usage->state->chart_labels, "device", name, RRDLABEL_SRC_AUTO);
 
     snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_savings.%s", name);
     d->st_savings = rrdset_create_localhost(
@@ -92,6 +93,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , RRDSET_TYPE_AREA);
     d->rd_savings_size = rrddim_add(d->st_savings, "savings", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     d->rd_original_size = rrddim_add(d->st_savings, "original", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+    rrdlabels_add(d->st_savings->state->chart_labels, "device", name, RRDLABEL_SRC_AUTO);
 
     snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_ratio.%s", name);
     d->st_comp_ratio = rrdset_create_localhost(
@@ -108,6 +110,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , update_every
         , RRDSET_TYPE_LINE);
     d->rd_comp_ratio = rrddim_add(d->st_comp_ratio, "ratio", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+    rrdlabels_add(d->st_comp_ratio->state->chart_labels, "device", name, RRDLABEL_SRC_AUTO);
 
     snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_efficiency.%s", name);
     d->st_alloc_efficiency = rrdset_create_localhost(
@@ -124,6 +127,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , update_every
         , RRDSET_TYPE_LINE);
     d->rd_alloc_efficiency = rrddim_add(d->st_alloc_efficiency, "percent", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+    rrdlabels_add(d->st_alloc_efficiency->state->chart_labels, "device", name, RRDLABEL_SRC_AUTO);
 }
 
 static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_every) {

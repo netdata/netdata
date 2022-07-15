@@ -487,6 +487,19 @@ static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
     return NULL;
 }
 
+static inline void rrdset_update_permanent_labels(RRDSET *st) {
+    if(!st->state || !st->state->chart_labels) return;
+
+    if(st->plugin_name)
+        rrdlabels_add(st->state->chart_labels, "_collect_plugin", st->plugin_name, RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+
+    if(st->module_name)
+        rrdlabels_add(st->state->chart_labels, "_collect_module", st->module_name, RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+
+    if(st->family)
+        rrdlabels_add(st->state->chart_labels, "_instance_family",   st->family,   RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+}
+
 RRDSET *rrdset_create_custom(
           RRDHOST *host
         , const char *type
@@ -667,6 +680,7 @@ RRDSET *rrdset_create_custom(
         }
         /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
         if (!changed_from_archived_to_active) {
+            rrdset_update_permanent_labels(st);
             rrdcontext_updated_rrdset(st);
             return st;
         }
@@ -758,6 +772,7 @@ RRDSET *rrdset_create_custom(
 
     netdata_rwlock_init(&st->rrdset_rwlock);
     st->state->chart_labels = rrdlabels_create();
+    rrdset_update_permanent_labels(st);
 
     if(name && *name && rrdset_set_name(st, name))
         // we did set the name

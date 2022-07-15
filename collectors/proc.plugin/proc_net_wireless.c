@@ -198,6 +198,10 @@ static void configure_device(int do_status, int do_quality, int do_discarded_pac
     wireless_dev->chart_id_net_missed_beacon = strdupz(buffer);
 }
 
+static void add_labels_to_wireless(struct netwireless *w, RRDSET *st) {
+    rrdlabels_add(st->state->chart_labels, "device", w->name, RRDLABEL_SRC_AUTO);
+}
+
 int do_proc_net_wireless(int update_every, usec_t dt)
 {
     UNUSED(dt);
@@ -209,21 +213,11 @@ int do_proc_net_wireless(int update_every, usec_t dt)
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/wireless");
 
-        proc_net_wireless_filename = config_get(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,"filename to monitor",
-                                                filename);
-
-        do_status = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
-                                                "status for all interfaces", CONFIG_BOOLEAN_AUTO);
-
-        do_quality = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
-                                                 "quality for all interfaces", CONFIG_BOOLEAN_AUTO);
-
-        do_discarded_packets = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
-                                                           "discarded packets for all interfaces",
-                                                           CONFIG_BOOLEAN_AUTO);
-
-        do_beacon = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
-                                                "missed beacon for all interface", CONFIG_BOOLEAN_AUTO);
+        proc_net_wireless_filename = config_get(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,"filename to monitor", filename);
+        do_status = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "status for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_quality = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "quality for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_discarded_packets = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "discarded packets for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_beacon = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "missed beacon for all interface", CONFIG_BOOLEAN_AUTO);
 	}
 
     if (unlikely(!ff)) {
@@ -255,25 +249,28 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->status = str2kernel_uint_t(procfile_lineword(ff, l, 1));
 
             if (unlikely(!wireless_dev->st_status)) {
-                wireless_dev->st_status = rrdset_create_localhost("wireless",
-                                                                  wireless_dev->chart_id_net_status,
-                                                                  NULL,
-                                                                  wireless_dev->name,
-                                                                  "wireless.status",
-                                                                  "Internal status reported by interface.",
-                                                                  "status",
-                                                                  PLUGIN_PROC_NAME,
-                                                                  PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
-                                                                  NETDATA_CHART_PRIO_WIRELESS_IFACE,
-                                                                  update_every,
-                                                                  RRDSET_TYPE_LINE);
+                wireless_dev->st_status = rrdset_create_localhost(
+                    "wireless",
+                    wireless_dev->chart_id_net_status,
+                    NULL,
+                    wireless_dev->name,
+                    "wireless.status",
+                    "Internal status reported by interface.",
+                    "status",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
+                    NETDATA_CHART_PRIO_WIRELESS_IFACE,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
                 rrdset_flag_set(wireless_dev->st_status, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_status = rrddim_add(wireless_dev->st_status, "status", NULL, 1,
-                                                     1, RRD_ALGORITHM_ABSOLUTE);
-            } else {
-                rrdset_next(wireless_dev->st_status);
+                wireless_dev->rd_status = rrddim_add(wireless_dev->st_status, "status", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_wireless(wireless_dev, wireless_dev->st_status);
             }
+            else
+                rrdset_next(wireless_dev->st_status);
 
             rrddim_set_by_pointer(wireless_dev->st_status, wireless_dev->rd_status,
                                   (collected_number)wireless_dev->status);
@@ -286,78 +283,81 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->noise = str2ndd(procfile_lineword(ff, l, 4), NULL);
 
             if (unlikely(!wireless_dev->st_link)) {
-                wireless_dev->st_link = rrdset_create_localhost("wireless",
-                                                                wireless_dev->chart_id_net_link,
-                                                                NULL,
-                                                                wireless_dev->name,
-                                                                "wireless.link_quality",
-                                                                "Overall quality of the link. This is an aggregate value, and depends on the driver and hardware.",
-                                                                "value",
-                                                                PLUGIN_PROC_NAME,
-                                                                PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
-                                                                NETDATA_CHART_PRIO_WIRELESS_IFACE + 1,
-                                                                update_every,
-                                                                RRDSET_TYPE_LINE);
+                wireless_dev->st_link = rrdset_create_localhost(
+                    "wireless",
+                    wireless_dev->chart_id_net_link,
+                    NULL,
+                    wireless_dev->name,
+                    "wireless.link_quality",
+                    "Overall quality of the link. This is an aggregate value, and depends on the driver and hardware.",
+                    "value",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
+                    NETDATA_CHART_PRIO_WIRELESS_IFACE + 1,
+                    update_every,
+                    RRDSET_TYPE_LINE);
                 rrdset_flag_set(wireless_dev->st_link, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_link = rrddim_add(wireless_dev->st_link, "link_quality", NULL, 1, 1,
-                                                   RRD_ALGORITHM_ABSOLUTE);
-            } else {
-                rrdset_next(wireless_dev->st_link);
+                wireless_dev->rd_link = rrddim_add(wireless_dev->st_link, "link_quality", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_wireless(wireless_dev, wireless_dev->st_link);
             }
+            else
+                rrdset_next(wireless_dev->st_link);
 
             if (unlikely(!wireless_dev->st_level)) {
-                wireless_dev->st_level = rrdset_create_localhost("wireless",
-                                                                 wireless_dev->chart_id_net_level,
-                                                                 NULL,
-                                                                 wireless_dev->name,
-                                                                 "wireless.signal_level",
-                                                                 "The signal level is the wireless signal power level received by the wireless client. The closer the value is to 0, the stronger the signal.",
-                                                                 "dBm",
-                                                                 PLUGIN_PROC_NAME,
-                                                                 PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
-                                                                 NETDATA_CHART_PRIO_WIRELESS_IFACE + 2,
-                                                                 update_every,
-                                                                 RRDSET_TYPE_LINE);
+                wireless_dev->st_level = rrdset_create_localhost(
+                    "wireless",
+                    wireless_dev->chart_id_net_level,
+                    NULL,
+                    wireless_dev->name,
+                    "wireless.signal_level",
+                    "The signal level is the wireless signal power level received by the wireless client. The closer the value is to 0, the stronger the signal.",
+                    "dBm",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
+                    NETDATA_CHART_PRIO_WIRELESS_IFACE + 2,
+                    update_every,
+                    RRDSET_TYPE_LINE);
                 rrdset_flag_set(wireless_dev->st_level, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_level = rrddim_add(wireless_dev->st_level, "signal_level", NULL, 1, 1,
-                                                    RRD_ALGORITHM_ABSOLUTE);
-            } else {
-                rrdset_next(wireless_dev->st_level);
+                wireless_dev->rd_level = rrddim_add(wireless_dev->st_level, "signal_level", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_wireless(wireless_dev, wireless_dev->st_level);
             }
+            else
+                rrdset_next(wireless_dev->st_level);
 
             if (unlikely(!wireless_dev->st_noise)) {
-                wireless_dev->st_noise = rrdset_create_localhost("wireless",
-                                                                 wireless_dev->chart_id_net_noise,
-                                                                 NULL,
-                                                                 wireless_dev->name,
-                                                                 "wireless.noise_level",
-                                                                 "The noise level indicates the amount of background noise in your environment. The closer the value to 0, the greater the noise level.",
-                                                                 "dBm",
-                                                                 PLUGIN_PROC_NAME,
-                                                                 PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
-                                                                 NETDATA_CHART_PRIO_WIRELESS_IFACE + 3,
-                                                                 update_every,
-                                                                 RRDSET_TYPE_LINE);
+                wireless_dev->st_noise = rrdset_create_localhost(
+                    "wireless",
+                    wireless_dev->chart_id_net_noise,
+                    NULL,
+                    wireless_dev->name,
+                    "wireless.noise_level",
+                    "The noise level indicates the amount of background noise in your environment. The closer the value to 0, the greater the noise level.",
+                    "dBm",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
+                    NETDATA_CHART_PRIO_WIRELESS_IFACE + 3,
+                    update_every,
+                    RRDSET_TYPE_LINE);
                 rrdset_flag_set(wireless_dev->st_noise, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_noise = rrddim_add(wireless_dev->st_noise, "noise_level", NULL, 1, 1,
-                                                    RRD_ALGORITHM_ABSOLUTE);
-            } else {
-                rrdset_next(wireless_dev->st_noise);
-            }
+                wireless_dev->rd_noise = rrddim_add(wireless_dev->st_noise, "noise_level", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(wireless_dev->st_link, wireless_dev->rd_link,
-                                  (collected_number)wireless_dev->link);
+                add_labels_to_wireless(wireless_dev, wireless_dev->st_noise);
+            }
+            else
+                rrdset_next(wireless_dev->st_noise);
+
+            rrddim_set_by_pointer(wireless_dev->st_link, wireless_dev->rd_link, (collected_number)wireless_dev->link);
             rrdset_done(wireless_dev->st_link);
 
-            rrddim_set_by_pointer(wireless_dev->st_level, wireless_dev->rd_level,
-                                  (collected_number)wireless_dev->level);
+            rrddim_set_by_pointer(wireless_dev->st_level, wireless_dev->rd_level, (collected_number)wireless_dev->level);
             rrdset_done(wireless_dev->st_level);
 
-            rrddim_set_by_pointer(wireless_dev->st_noise, wireless_dev->rd_noise,
-                                  (collected_number)wireless_dev->noise);
+            rrddim_set_by_pointer(wireless_dev->st_noise, wireless_dev->rd_noise, (collected_number)wireless_dev->noise);
             rrdset_done(wireless_dev->st_noise);
         }
 
@@ -369,49 +369,38 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->misc = str2kernel_uint_t(procfile_lineword(ff, l, 9));
 
             if (unlikely(!wireless_dev->st_discarded_packets)) {
-                wireless_dev->st_discarded_packets = rrdset_create_localhost("wireless",
-                                                                             wireless_dev->chart_id_net_discarded_packets,
-                                                                             NULL,
-                                                                             wireless_dev->name,
-                                                                             "wireless.discarded_packets",
-                                                                             "Packet discarded in the wireless adapter due to \"wireless\" specific problems.",
-                                                                             "packets/s",
-                                                                             PLUGIN_PROC_NAME,
-                                                                             PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
-                                                                             NETDATA_CHART_PRIO_WIRELESS_IFACE + 4,
-                                                                             update_every,
-                                                                             RRDSET_TYPE_LINE);
+                wireless_dev->st_discarded_packets = rrdset_create_localhost(
+                    "wireless",
+                    wireless_dev->chart_id_net_discarded_packets,
+                    NULL,
+                    wireless_dev->name,
+                    "wireless.discarded_packets",
+                    "Packet discarded in the wireless adapter due to \"wireless\" specific problems.",
+                    "packets/s",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
+                    NETDATA_CHART_PRIO_WIRELESS_IFACE + 4,
+                    update_every,
+                    RRDSET_TYPE_LINE);
 
                 rrdset_flag_set(wireless_dev->st_discarded_packets, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_nwid = rrddim_add(wireless_dev->st_discarded_packets, "nwid", NULL, 1,
-                                                   1, RRD_ALGORITHM_INCREMENTAL);
-                wireless_dev->rd_crypt = rrddim_add(wireless_dev->st_discarded_packets, "crypt", NULL, 1,
-                                                    1, RRD_ALGORITHM_INCREMENTAL);
-                wireless_dev->rd_frag = rrddim_add(wireless_dev->st_discarded_packets, "frag", NULL, 1,
-                                                   1, RRD_ALGORITHM_INCREMENTAL);
-                wireless_dev->rd_retry = rrddim_add(wireless_dev->st_discarded_packets, "retry", NULL, 1,
-                                                    1, RRD_ALGORITHM_INCREMENTAL);
-                wireless_dev->rd_misc = rrddim_add(wireless_dev->st_discarded_packets, "misc", NULL, 1,
-                                                   1, RRD_ALGORITHM_INCREMENTAL);
-            } else {
-                rrdset_next(wireless_dev->st_discarded_packets);
+                wireless_dev->rd_nwid = rrddim_add(wireless_dev->st_discarded_packets, "nwid", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                wireless_dev->rd_crypt = rrddim_add(wireless_dev->st_discarded_packets, "crypt", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                wireless_dev->rd_frag = rrddim_add(wireless_dev->st_discarded_packets, "frag", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                wireless_dev->rd_retry = rrddim_add(wireless_dev->st_discarded_packets, "retry", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                wireless_dev->rd_misc = rrddim_add(wireless_dev->st_discarded_packets, "misc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_wireless(wireless_dev, wireless_dev->st_discarded_packets);
             }
+            else
+                rrdset_next(wireless_dev->st_discarded_packets);
 
-            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_nwid,
-                                  (collected_number)wireless_dev->nwid);
-
-            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_crypt,
-                                  (collected_number)wireless_dev->crypt);
-
-            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_frag,
-                                  (collected_number)wireless_dev->frag);
-
-            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_retry,
-                                  (collected_number)wireless_dev->retry);
-
-            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_misc,
-                                  (collected_number)wireless_dev->misc);
+            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_nwid, (collected_number)wireless_dev->nwid);
+            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_crypt, (collected_number)wireless_dev->crypt);
+            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_frag, (collected_number)wireless_dev->frag);
+            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_retry, (collected_number)wireless_dev->retry);
+            rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_misc, (collected_number)wireless_dev->misc);
 
             rrdset_done(wireless_dev->st_discarded_packets);
         }
@@ -420,28 +409,31 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->missed_beacon = str2kernel_uint_t(procfile_lineword(ff, l, 10));
 
             if (unlikely(!wireless_dev->st_missed_beacon)) {
-                wireless_dev->st_missed_beacon = rrdset_create_localhost("wireless",
-                                                                         wireless_dev->chart_id_net_missed_beacon,
-                                                                         NULL,
-                                                                         wireless_dev->name,
-                                                                         "wireless.missed_beacons",
-                                                                         "Number of missed beacons.",
-                                                                         "frames/s",
-                                                                         PLUGIN_PROC_NAME,
-                                                                         PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
-                                                                         NETDATA_CHART_PRIO_WIRELESS_IFACE + 5,
-                                                                         update_every,
-                                                                         RRDSET_TYPE_LINE);
+                wireless_dev->st_missed_beacon = rrdset_create_localhost(
+                    "wireless",
+                    wireless_dev->chart_id_net_missed_beacon,
+                    NULL,
+                    wireless_dev->name,
+                    "wireless.missed_beacons",
+                    "Number of missed beacons.",
+                    "frames/s",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_NETWIRELESS_NAME,
+                    NETDATA_CHART_PRIO_WIRELESS_IFACE + 5,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
                 rrdset_flag_set(wireless_dev->st_missed_beacon, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_missed_beacon = rrddim_add(wireless_dev->st_missed_beacon, "missed_beacons",
-                                                            NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            } else {
-                rrdset_next(wireless_dev->st_missed_beacon);
-            }
+                wireless_dev->rd_missed_beacon = rrddim_add(wireless_dev->st_missed_beacon, "missed_beacons", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrddim_set_by_pointer(wireless_dev->st_missed_beacon, wireless_dev->rd_missed_beacon,
-                                  (collected_number)wireless_dev->missed_beacon);
+                add_labels_to_wireless(wireless_dev, wireless_dev->st_missed_beacon);
+            }
+            else
+                rrdset_next(wireless_dev->st_missed_beacon);
+
+            rrddim_set_by_pointer(wireless_dev->st_missed_beacon, wireless_dev->rd_missed_beacon, (collected_number)wireless_dev->missed_beacon);
+
             rrdset_done(wireless_dev->st_missed_beacon);
         }
 
