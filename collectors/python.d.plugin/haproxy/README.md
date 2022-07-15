@@ -9,30 +9,32 @@ sidebar_label: "HAProxy"
 Monitors frontend and backend metrics such as bytes in, bytes out, sessions current, sessions in queue current.
 And health metrics such as backend servers status (server check should be used).
 
-Plugin can obtain data from url **OR** unix socket.
+Plugin can obtain data from URL or Unix socket.
 
-**Requirement:**
-Socket MUST be readable AND writable by the `netdata` user.
+Requirement:
+
+- Socket must be readable and writable by the `netdata` user.
+- URL must have `stats uri <path>` present in the haproxy config, otherwise you will get HTTP 503 in the haproxy logs.
 
 It produces:
 
-1.  **Frontend** family charts
+1. **Frontend** family charts
 
-    -   Kilobytes in/s
-    -   Kilobytes out/s
-    -   Sessions current
-    -   Sessions in queue current
+    - Kilobytes in/s
+    - Kilobytes out/s
+    - Sessions current
+    - Sessions in queue current
 
-2.  **Backend** family charts
+2. **Backend** family charts
 
-    -   Kilobytes in/s
-    -   Kilobytes out/s
-    -   Sessions current
-    -   Sessions in queue current
+    - Kilobytes in/s
+    - Kilobytes out/s
+    - Sessions current
+    - Sessions in queue current
 
-3.  **Health** chart
+3. **Health** chart
 
-    -   number of failed servers for every backend (in DOWN state)
+    - number of failed servers for every backend (in DOWN state)
 
 ## Configuration
 
@@ -48,20 +50,18 @@ Sample:
 
 ```yaml
 via_url:
-  user       : 'username' # ONLY IF stats auth is used
-  pass       : 'password' # # ONLY IF stats auth is used
-  url     : 'http://ip.address:port/url;csv;norefresh'
+  user: 'username' # ONLY IF stats auth is used
+  pass: 'password' # # ONLY IF stats auth is used
+  url: 'http://ip.address:port/url;csv;norefresh'
 ```
 
 OR
 
 ```yaml
 via_socket:
-  socket       : 'path/to/haproxy/sock'
+  socket: 'path/to/haproxy/sock'
 ```
 
 If no configuration is given, module will fail to run.
 
 ---
-
-
