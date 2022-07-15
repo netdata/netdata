@@ -6,11 +6,12 @@
 #define DB_METADATA_VERSION 3
 
 const char *database_config[] = {
-    "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT, "
-    "registry_hostname TEXT, update_every INT, "
-    "os TEXT, timezone TEXT, tags TEXT, hops INT"
-    "memory_mode INT, abbrev_timezone TEXT, utc_offset INT, program_name TEXT, program_version TEXT, entries INT,"
-    "health_enabled INT);",
+    "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
+    "registry_hostname TEXT NOT NULL, update_every INT NOT NULL, "
+    "os TEXT NOT NULL, timezone TEXT NOT NULL, tags TEXT NOT NULL, hops INT NOT NULL,"
+    "memory_mode INT, abbrev_timezone TEXT, utc_offset INT NOT NULL, "
+    "program_name TEXT NOT NULL, program_version TEXT NOT NULL, entries INT,"
+    "health_enabled INT NOT NULL);",
 
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
