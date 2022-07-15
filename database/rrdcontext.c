@@ -2006,6 +2006,8 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     else
         buffer_sprintf(wb, "\t\t\"%s\": {", id);
 
+    rrdcontext_lock(rc);
+
     buffer_sprintf(wb,
                    "\n\t\t\t\"version\":%lu"
                    ",\n\t\t\t\"hub_version\":%lu"
@@ -2051,6 +2053,8 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
                        , rc->queue.dequeued_ut / USEC_PER_SEC
                        );
     }
+
+    rrdcontext_unlock(rc);
 
     if(options & (RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_METRICS)) {
         buffer_sprintf(wb, ",\n\t\t\t\"charts\": {");
