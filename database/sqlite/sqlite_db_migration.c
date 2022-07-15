@@ -35,13 +35,13 @@ const char *database_migrate_v1_v2[] = {
 };
 
 const char *database_migrate_v2_v3[] = {
-    "ALTER TABLE host ADD memory_mode INT;",
-    "ALTER TABLE host ADD abbrev_timezone TEXT;",
-    "ALTER TABLE host ADD utc_offset INT;",
-    "ALTER TABLE host ADD program_name TEXT;",
-    "ALTER TABLE host ADD program_version TEXT;",
-    "ALTER TABLE host ADD entries INT;",
-    "ALTER TABLE host ADD health_enabled INT;",
+    "ALTER TABLE host ADD memory_mode INT NOT NULL DEFAULT 0;",
+    "ALTER TABLE host ADD abbrev_timezone TEXT NOT NULL DEFAULT 'unknown';",
+    "ALTER TABLE host ADD utc_offset INT NOT NULL DEFAULT 0;",
+    "ALTER TABLE host ADD program_name TEXT NOT NULL DEFAULT 'unknown';",
+    "ALTER TABLE host ADD program_version TEXT NOT NULL DEFAULT 'unknown';",
+    "ALTER TABLE host ADD entries INT NOT NULL DEFAULT 0;",
+    "ALTER TABLE host ADD health_enabled INT NOT NULL DEFAULT 0;",
     NULL
 };
 
