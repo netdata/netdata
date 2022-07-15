@@ -9,10 +9,12 @@ sidebar_label: "HAProxy"
 Monitors frontend and backend metrics such as bytes in, bytes out, sessions current, sessions in queue current.
 And health metrics such as backend servers status (server check should be used).
 
-Plugin can obtain data from url **OR** unix socket.
+Plugin can obtain data from URL or Unix socket.
 
-**Requirement:**
-Socket MUST be readable AND writable by the `netdata` user.
+Requirement:
+
+- Socket must be readable and writable by the `netdata` user.
+- URL must have `stats uri <path>` present in the haproxy config, otherwise you will get HTTP 503 in the haproxy logs.
 
 It produces:
 
@@ -63,5 +65,3 @@ via_socket:
 If no configuration is given, module will fail to run.
 
 ---
-
-
