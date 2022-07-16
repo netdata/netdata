@@ -1364,20 +1364,22 @@ static void rrdcontext_delete_callback(const char *id, void *value, void *data) 
 }
 
 static STRING *string_2way_merge(RRDCONTEXT *rc __maybe_unused, STRING *a, STRING *b) {
-    static STRING *X = NULL, *X2 = NULL;
+    static STRING *X = NULL;
 
     if(unlikely(!X)) {
-        X = string_strdupz("X");
-        X2 = string_strdupz("[x]");
+        // initialization
+        X = string_strdupz("[x]");
     }
 
     if(unlikely(a == b)) return string_dup(a);
-    if(unlikely(!a || a == X || a == X2)) return string_dup(b);
-    if(unlikely(!b || b == X || b == X2)) return string_dup(a);
+    if(unlikely(a == X)) return string_dup(a);
+    if(unlikely(b == X)) return string_dup(b);
+    if(unlikely(!a)) return string_dup(X);
+    if(unlikely(!b)) return string_dup(X);
 
     size_t alen = string_length(a);
     size_t blen = string_length(b);
-    size_t length = alen + blen + string_length(X2) + 1;
+    size_t length = alen + blen + string_length(X) + 1;
     char buf1[length + 1], buf2[length + 1], *dst1, *dst2;
     const char *s1, *s2;
 
@@ -1403,9 +1405,6 @@ static STRING *string_2way_merge(RRDCONTEXT *rc __maybe_unused, STRING *a, STRIN
 
         strcpy(dst1, dst2);
     }
-
-    if(strcmp(buf1, string2str(X2)) == 0)
-        return string_dup(a);
 
     return string_strdupz(buf1);
 }
