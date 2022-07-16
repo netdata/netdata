@@ -43,13 +43,14 @@ typedef enum {
     RRDCONTEXT_OPTION_SHOW_FLAGS         = (1 << 4),
     RRDCONTEXT_OPTION_SHOW_DELETED       = (1 << 5),
     RRDCONTEXT_OPTION_DEEPSCAN           = (1 << 6),
+    RRDCONTEXT_OPTION_SHOW_UUIDS         = (1 << 7),
     RRDCONTEXT_OPTION_SKIP_ID            = (1 << 31), // internal use
 } RRDCONTEXT_TO_JSON_OPTIONS;
 
-#define RRDCONTEXT_OPTIONS_ALL (RRDCONTEXT_OPTION_SHOW_METRICS|RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_LABELS|RRDCONTEXT_OPTION_SHOW_QUEUED|RRDCONTEXT_OPTION_SHOW_FLAGS|RRDCONTEXT_OPTION_SHOW_DELETED)
+#define RRDCONTEXT_OPTIONS_ALL (RRDCONTEXT_OPTION_SHOW_METRICS|RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_LABELS|RRDCONTEXT_OPTION_SHOW_QUEUED|RRDCONTEXT_OPTION_SHOW_FLAGS|RRDCONTEXT_OPTION_SHOW_DELETED|RRDCONTEXT_OPTION_SHOW_UUIDS)
 
-extern int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context);
-extern int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options);
+extern int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context);
+extern int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options);
 
 // ----------------------------------------------------------------------------
 // public API for rrddims

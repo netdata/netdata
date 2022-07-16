@@ -391,6 +391,8 @@ static RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
             options |= RRDCONTEXT_OPTION_SHOW_QUEUED;
         else if(!strcmp(tok, "flags"))
             options |= RRDCONTEXT_OPTION_SHOW_FLAGS;
+        else if(!strcmp(tok, "uuids"))
+            options |= RRDCONTEXT_OPTION_SHOW_UUIDS;
         else if(!strcmp(tok, "deleted"))
             options |= RRDCONTEXT_OPTION_SHOW_DELETED;
         else if(!strcmp(tok, "labels"))
@@ -405,6 +407,7 @@ static RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
 static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w, char *url) {
     char *context = NULL;
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+    time_t after = 0, before = 0;
 
     buffer_flush(w->response.data);
 
@@ -420,7 +423,9 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
         // they are not null and not empty
 
         if(!strcmp(name, "context") || !strcmp(name, "ctx")) context = value;
-        if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
+        else if(!strcmp(name, "after")) after = str2l(value);
+        else if(!strcmp(name, "before")) before = str2l(value);
+        else if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
     }
 
     if(!context || !*context) {
@@ -430,11 +435,12 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    return rrdcontext_to_json(host, w->response.data, options, context);
+    return rrdcontext_to_json(host, w->response.data, after, before, options, context);
 }
 
 static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *w, char *url) {
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+    time_t after = 0, before = 0;
 
     buffer_flush(w->response.data);
 
@@ -449,11 +455,13 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
+        if(!strcmp(name, "after")) after = str2l(value);
+        else if(!strcmp(name, "before")) before = str2l(value);
+        else if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    return rrdcontexts_to_json(host, w->response.data, options);
+    return rrdcontexts_to_json(host, w->response.data, after, before, options);
 }
 
 inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
