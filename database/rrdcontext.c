@@ -1860,6 +1860,8 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
 struct rrdcontext_to_json {
     BUFFER *wb;
     RRDCONTEXT_TO_JSON_OPTIONS options;
+    time_t after;
+    time_t before;
     size_t written;
     time_t now;
 };
@@ -1869,8 +1871,16 @@ static inline int rrdmetric_to_json_callback(const char *id, void *value, void *
     RRDMETRIC *rm = value;
     BUFFER *wb = t->wb;
     RRDCONTEXT_TO_JSON_OPTIONS options = t->options;
+    time_t after = t->after;
+    time_t before = t->before;
 
     if((rm->flags & RRD_FLAG_DELETED) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
+        return 0;
+
+    if(after && (!rm->last_time_t || after > rm->last_time_t))
+        return 0;
+
+    if(before && (!rm->first_time_t || before < rm->first_time_t))
         return 0;
 
     if(t->written)
@@ -1880,23 +1890,29 @@ static inline int rrdmetric_to_json_callback(const char *id, void *value, void *
 
     buffer_sprintf(wb, "\t\t\t\t\t\t\"%s\": {", id);
 
-    char uuid[UUID_STR_LEN];
-    uuid_unparse(rm->uuid, uuid);
+    if(options & RRDCONTEXT_OPTION_SHOW_UUIDS) {
+        char uuid[UUID_STR_LEN];
+        uuid_unparse(rm->uuid, uuid);
+        buffer_sprintf(wb, "\n\t\t\t\t\t\t\t\"uuid\":\"%s\",", uuid);
+    }
 
     buffer_sprintf(wb,
-                    "\n\t\t\t\t\t\t\t\"uuid\":\"%s\""
-                   ",\n\t\t\t\t\t\t\t\"name\":\"%s\""
+                   "\n\t\t\t\t\t\t\t\"name\":\"%s\""
                    ",\n\t\t\t\t\t\t\t\"first_time_t\":%ld"
                    ",\n\t\t\t\t\t\t\t\"last_time_t\":%ld"
                    ",\n\t\t\t\t\t\t\t\"collected\":%s"
-                   ",\n\t\t\t\t\t\t\t\"deleted\":%s"
-                   , uuid
                    , string2str(rm->name)
                    , rm->first_time_t
                    , rrd_flag_is_collected(rm) ? t->now : rm->last_time_t
                    , rm->flags & RRD_FLAG_COLLECTED ? "true" : "false"
-                   , rm->flags & RRD_FLAG_DELETED ? "true" : "false"
                    );
+
+    if(options & RRDCONTEXT_OPTION_SHOW_DELETED) {
+        buffer_sprintf(wb,
+                       ",\n\t\t\t\t\t\t\t\"deleted\":%s"
+                       , rm->flags & RRD_FLAG_DELETED ? "true" : "false"
+        );
+    }
 
     if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
         buffer_strcat(wb, ",\n\t\t\t\t\t\t\t\"flags\":\"");
@@ -1914,8 +1930,16 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
     RRDINSTANCE *ri = value;
     BUFFER *wb = t->wb;
     RRDCONTEXT_TO_JSON_OPTIONS options = t->options;
+    time_t after = t->after;
+    time_t before = t->before;
 
     if((ri->flags & RRD_FLAG_DELETED) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
+        return 0;
+
+    if(after && (!ri->last_time_t || after > ri->last_time_t))
+        return 0;
+
+    if(before && (!ri->first_time_t || before < ri->first_time_t))
         return 0;
 
     if(t->written)
@@ -1925,12 +1949,14 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
 
     buffer_sprintf(wb, "\t\t\t\t\"%s\": {", id);
 
-    char uuid[UUID_STR_LEN];
-    uuid_unparse(ri->uuid, uuid);
+    if(options & RRDCONTEXT_OPTION_SHOW_UUIDS) {
+        char uuid[UUID_STR_LEN];
+        uuid_unparse(ri->uuid, uuid);
+        buffer_sprintf(wb,"\n\t\t\t\t\t\"uuid\":\"%s\",", uuid);
+    }
 
     buffer_sprintf(wb,
-                   "\n\t\t\t\t\t\"uuid\":\"%s\""
-                   ",\n\t\t\t\t\t\"name\":\"%s\""
+                   "\n\t\t\t\t\t\"name\":\"%s\""
                    ",\n\t\t\t\t\t\"context\":\"%s\""
                    ",\n\t\t\t\t\t\"title\":\"%s\""
                    ",\n\t\t\t\t\t\"units\":\"%s\""
@@ -1941,8 +1967,6 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
                    ",\n\t\t\t\t\t\"first_time_t\":%ld"
                    ",\n\t\t\t\t\t\"last_time_t\":%ld"
                    ",\n\t\t\t\t\t\"collected\":%s"
-                   ",\n\t\t\t\t\t\"deleted\":%s"
-                   , uuid
                    , string2str(ri->name)
                    , string2str(ri->rc->id)
                    , string2str(ri->title)
@@ -1954,8 +1978,14 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
                    , ri->first_time_t
                    , rrd_flag_is_collected(ri) ? t->now : ri->last_time_t
                    , ri->flags & RRD_FLAG_COLLECTED ? "true" : "false"
-                   , ri->flags & RRD_FLAG_DELETED ? "true" : "false"
     );
+
+    if(options & RRDCONTEXT_OPTION_SHOW_DELETED) {
+        buffer_sprintf(wb,
+                       ",\n\t\t\t\t\t\"deleted\":%s"
+                       , ri->flags & RRD_FLAG_DELETED ? "true" : "false"
+        );
+    }
 
     if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
         buffer_strcat(wb, ",\n\t\t\t\t\t\"flags\":\"");
@@ -1974,10 +2004,12 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
         struct rrdcontext_to_json tt = {
             .wb = wb,
             .options = options,
+            .after = after,
+            .before = before,
             .written = 0,
             .now = t->now,
         };
-        dictionary_sorted_walkthrough_read(ri->rrdmetrics, rrdmetric_to_json_callback, &tt);
+        dictionary_walkthrough_read(ri->rrdmetrics, rrdmetric_to_json_callback, &tt);
         buffer_strcat(wb, "\n\t\t\t\t\t}");
     }
 
@@ -1991,8 +2023,16 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     RRDCONTEXT *rc = value;
     BUFFER *wb = t->wb;
     RRDCONTEXT_TO_JSON_OPTIONS options = t->options;
+    time_t after = t->after;
+    time_t before = t->before;
 
     if((rc->flags & RRD_FLAG_DELETED) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
+        return 0;
+
+    if(after && (!rc->last_time_t || after > rc->last_time_t))
+        return 0;
+
+    if(before && (!rc->first_time_t || before < rc->first_time_t))
         return 0;
 
     if(t->written)
@@ -2008,9 +2048,7 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     rrdcontext_lock(rc);
 
     buffer_sprintf(wb,
-                   "\n\t\t\t\"version\":%lu"
-                   ",\n\t\t\t\"hub_version\":%lu"
-                   ",\n\t\t\t\"title\":\"%s\""
+                   "\n\t\t\t\"title\":\"%s\""
                    ",\n\t\t\t\"units\":\"%s\""
                    ",\n\t\t\t\"family\":\"%s\""
                    ",\n\t\t\t\"chart_type\":\"%s\""
@@ -2018,9 +2056,6 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
                    ",\n\t\t\t\"first_time_t\":%ld"
                    ",\n\t\t\t\"last_time_t\":%ld"
                    ",\n\t\t\t\"collected\":%s"
-                   ",\n\t\t\t\"deleted\":%s"
-                   , rc->version
-                   , rc->hub.version
                    , string2str(rc->title)
                    , string2str(rc->units)
                    , string2str(rc->family)
@@ -2029,8 +2064,14 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
                    , rc->first_time_t
                    , rrd_flag_is_collected(rc) ? t->now : rc->last_time_t
                    , rc->flags & RRD_FLAG_COLLECTED ? "true" : "false"
-                   , rc->flags & RRD_FLAG_DELETED ? "true" : "false"
                    );
+
+    if(options & RRDCONTEXT_OPTION_SHOW_DELETED) {
+        buffer_sprintf(wb,
+                       ",\n\t\t\t\"deleted\":%s"
+                       , rc->flags & RRD_FLAG_DELETED ? "true" : "false"
+        );
+    }
 
     if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
         buffer_strcat(wb, ",\n\t\t\t\"flags\":\"");
@@ -2047,9 +2088,13 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
                        ",\n\t\t\t\"last_queued\":%llu"
                        ",\n\t\t\t\"scheduled_dispatch\":%llu"
                        ",\n\t\t\t\"last_dequeued\":%llu"
+                       ",\n\t\t\t\"hub_version\":%lu"
+                       ",\n\t\t\t\"version\":%lu"
                        , rc->queue.queued_ut / USEC_PER_SEC
                        , rc->queue.scheduled_dispatch_ut / USEC_PER_SEC
                        , rc->queue.dequeued_ut / USEC_PER_SEC
+                       , rc->hub.version
+                       , rc->version
                        );
     }
 
@@ -2060,10 +2105,12 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
         struct rrdcontext_to_json tt = {
             .wb = wb,
             .options = options,
+            .after = after,
+            .before = before,
             .written = 0,
             .now = t->now,
         };
-        dictionary_sorted_walkthrough_read(rc->rrdinstances, rrdinstance_to_json_callback, &tt);
+        dictionary_walkthrough_read(rc->rrdinstances, rrdinstance_to_json_callback, &tt);
         buffer_strcat(wb, "\n\t\t\t}");
     }
 
@@ -2072,7 +2119,7 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     return 1;
 }
 
-int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context) {
+int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context) {
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, context);
     if(!rca) return HTTP_RESP_NOT_FOUND;
 
@@ -2081,19 +2128,33 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS opt
     if(options & RRDCONTEXT_OPTION_DEEPSCAN)
         rrdcontext_recalculate_context_retention(rc, RRD_FLAG_NONE, -1);
 
+    if(after != 0 && before != 0) {
+        long long after_wanted = after;
+        long long before_wanted = before;
+        rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
+        after = after_wanted;
+        before = before_wanted;
+    }
+
     struct rrdcontext_to_json t = {
         .wb = wb,
         .options = options|RRDCONTEXT_OPTION_SKIP_ID,
+        .after = after,
+        .before = before,
         .written = 0,
         .now = now_realtime_sec(),
     };
     rrdcontext_to_json_callback(context, rc, &t);
 
     rrdcontext_release(rca);
+
+    if(!t.written)
+        return HTTP_RESP_NOT_FOUND;
+
     return HTTP_RESP_OK;
 }
 
-int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS options) {
+int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options) {
     char node_uuid[UUID_STR_LEN] = "";
 
     if(host->node_id)
@@ -2101,6 +2162,14 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS op
 
     if(options & RRDCONTEXT_OPTION_DEEPSCAN)
         rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, -1);
+
+    if(after != 0 && before != 0) {
+        long long after_wanted = after;
+        long long before_wanted = before;
+        rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
+        after = after_wanted;
+        before = before_wanted;
+    }
 
     buffer_sprintf(wb, "{\n"
                           "\t\"hostname\": \"%s\""
@@ -2123,10 +2192,12 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, RRDCONTEXT_TO_JSON_OPTIONS op
     struct rrdcontext_to_json t = {
         .wb = wb,
         .options = options,
+        .after = after,
+        .before = before,
         .written = 0,
         .now = now_realtime_sec(),
     };
-    dictionary_sorted_walkthrough_read((DICTIONARY *)host->rrdctx, rrdcontext_to_json_callback, &t);
+    dictionary_walkthrough_read((DICTIONARY *)host->rrdctx, rrdcontext_to_json_callback, &t);
 
     // close contexts, close main
     buffer_strcat(wb, "\n\t}\n}");

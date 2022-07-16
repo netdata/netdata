@@ -85,6 +85,7 @@ paths:
                 - charts
                 - dimensions
                 - labels
+                - uuids
                 - queue
                 - flags
                 - deleted
@@ -126,12 +127,27 @@ paths:
                 - charts
                 - dimensions
                 - labels
+                - uuids
                 - queue
                 - flags
                 - deleted
                 - deepscan
             default:
               - full
+        - name: after
+          in: query
+          description: limit the results on context having data after this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: before
+          in: query
+          description: limit the results on context having data before this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
       responses:
         "200":
           description: A javascript object with detailed information about the context.
