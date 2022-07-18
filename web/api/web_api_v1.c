@@ -408,6 +408,8 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     char *context = NULL;
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
     time_t after = 0, before = 0;
+    const char *chart_label_key = NULL, *chart_labels_filter = NULL;
+    BUFFER *dimensions = NULL;
 
     buffer_flush(w->response.data);
 
@@ -426,6 +428,13 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
         else if(!strcmp(name, "after")) after = str2l(value);
         else if(!strcmp(name, "before")) before = str2l(value);
         else if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
+        else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
+        else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
+        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+            if(!dimensions) dimensions = buffer_create(100);
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
+        }
     }
 
     if(!context || !*context) {
@@ -433,14 +442,36 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    buffer_flush(w->response.data);
+    SIMPLE_PATTERN *chart_label_key_pattern = NULL;
+    SIMPLE_PATTERN *chart_labels_filter_pattern = NULL;
+    SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
+
+    if(chart_label_key)
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if(chart_labels_filter)
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if(dimensions) {
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        buffer_free(dimensions);
+    }
+
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    return rrdcontext_to_json(host, w->response.data, after, before, options, context);
+    int ret = rrdcontext_to_json(host, w->response.data, after, before, options, context, chart_label_key_pattern, chart_labels_filter_pattern, chart_dimensions_pattern);
+
+    simple_pattern_free(chart_label_key_pattern);
+    simple_pattern_free(chart_labels_filter_pattern);
+    simple_pattern_free(chart_dimensions_pattern);
+
+    return ret;
 }
 
 static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *w, char *url) {
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
     time_t after = 0, before = 0;
+    const char *chart_label_key = NULL, *chart_labels_filter = NULL;
+    BUFFER *dimensions = NULL;
 
     buffer_flush(w->response.data);
 
@@ -458,10 +489,38 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
         if(!strcmp(name, "after")) after = str2l(value);
         else if(!strcmp(name, "before")) before = str2l(value);
         else if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
+        else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
+        else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
+        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+            if(!dimensions) dimensions = buffer_create(100);
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
+        }
+    }
+
+    SIMPLE_PATTERN *chart_label_key_pattern = NULL;
+    SIMPLE_PATTERN *chart_labels_filter_pattern = NULL;
+    SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
+
+    if(chart_label_key)
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if(chart_labels_filter)
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if(dimensions) {
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        buffer_free(dimensions);
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    return rrdcontexts_to_json(host, w->response.data, after, before, options);
+    int ret = rrdcontexts_to_json(host, w->response.data, after, before, options, chart_label_key_pattern, chart_labels_filter_pattern, chart_dimensions_pattern);
+
+    simple_pattern_free(chart_label_key_pattern);
+    simple_pattern_free(chart_labels_filter_pattern);
+    simple_pattern_free(chart_dimensions_pattern);
+
+    return ret;
 }
 
 inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
