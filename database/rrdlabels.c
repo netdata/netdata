@@ -373,6 +373,7 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
     if(unlikely(!dst_size)) return 0;
     if(unlikely(!src || !*src)) {
         strncpyz((char *)dst, empty, dst_size);
+        dst[dst_size - 1] = '\0';
         return strlen((char *)dst);
     }
 
@@ -454,6 +455,7 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
 
     if(unlikely(*dst == '\0')) {
         strncpyz((char *)dst, empty, dst_size);
+        dst[dst_size - 1] = '\0';
         return strlen((char *)dst);
     }
 

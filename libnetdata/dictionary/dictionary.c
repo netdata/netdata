@@ -897,7 +897,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
                 dict->entries);
 
             dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
-            usleep(10000);
+            sleep_usec(10000);
         }
     } while(referenced_items > 0 && ++retries < 10);
 

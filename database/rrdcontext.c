@@ -1204,6 +1204,7 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
     rc->hub.last_time_t = rrd_flag_is_collected(rc) ? 0 : rc->last_time_t;
     rc->hub.deleted = (rc->flags & RRD_FLAG_DELETED) ? true : false;
 
+#ifdef ENABLE_ACLK
     struct context_updated message = {
         .id = rc->hub.id,
         .version = rc->hub.version,
@@ -1217,7 +1218,6 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
         .deleted = rc->hub.deleted,
     };
 
-#ifdef ENABLE_ACLK
     if(snapshot)
         contexts_snapshot_add_ctx_update(bundle, &message);
     else
@@ -1388,7 +1388,7 @@ static STRING *string_2way_merge(RRDCONTEXT *rc __maybe_unused, STRING *a, STRIN
     size_t alen = string_length(a);
     size_t blen = string_length(b);
     size_t length = alen + blen + string_length(X) + 1;
-    char buf1[length + 1], buf2[length + 1], *dst1, *dst2;
+    char buf1[length + 1], buf2[length + 1], *dst1;
     const char *s1, *s2;
 
     s1 = string2str(a);
@@ -1406,7 +1406,7 @@ static STRING *string_2way_merge(RRDCONTEXT *rc __maybe_unused, STRING *a, STRIN
 
         s1 = &(string2str(a))[alen - 1];
         s2 = &(string2str(b))[blen - 1];
-        dst2 = &buf2[length];
+        char *dst2 = &buf2[length];
         *dst2 = '\0';
         for (; *s1 && *s2 && *s1 == *s2; s1--, s2--)
             *(--dst2) = *s1;
