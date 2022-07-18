@@ -140,7 +140,7 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
     }
 
     if (likely(host_uuid))
-        rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+        rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     else
         rc = sqlite3_bind_null(res, 1);
     if (unlikely(rc != SQLITE_OK)) {
@@ -182,7 +182,7 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, *chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_id to fetch dimension list");
         goto failed;
@@ -216,7 +216,7 @@ void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, v
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, *chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_id to fetch chart labels");
         goto failed;
@@ -259,7 +259,7 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
 
     VERSIONED_CONTEXT_DATA context_data = {0};
 
-    rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
 
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id to fetch versioned context data");
@@ -308,7 +308,7 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_uuid to store context details");
         goto skip_store;
@@ -404,7 +404,7 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         return 1;
     }
 
-	rc = sqlite3_bind_blob(res, 1, *host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+	rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id to delete context data");
         goto skip_delete;
