@@ -512,7 +512,7 @@ static int ebpf_send_systemd_swap_charts()
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.read);
-        } else
+        } else if (unlikely(ect->systemd))
             ret = 0;
     }
     write_end_chart();
@@ -685,31 +685,30 @@ static void swap_collector(ebpf_module_t *em)
     int apps = em->apps_charts;
     int cgroup = em->cgroup_charts;
     int update_every = em->update_every;
-    int counter = update_every - 1;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = update_every * USEC_PER_SEC;
     while (!close_ebpf_plugin) {
+        (void)heartbeat_next(&hb, step);
+
         pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        if (apps)
+            read_apps_table();
 
-        if (++counter == update_every) {
-            counter = 0;
-            if (apps)
-                read_apps_table();
+        if (cgroup)
+            ebpf_update_swap_cgroup();
 
-            if (cgroup)
-                ebpf_update_swap_cgroup();
+        pthread_mutex_lock(&lock);
 
-            pthread_mutex_lock(&lock);
+        swap_send_global();
 
-            swap_send_global();
+        if (apps)
+            ebpf_swap_send_apps_data(apps_groups_root_target);
 
-            if (apps)
-                ebpf_swap_send_apps_data(apps_groups_root_target);
+        if (cgroup)
+            ebpf_swap_send_cgroup_data(update_every);
 
-            if (cgroup)
-                ebpf_swap_send_cgroup_data(update_every);
-
-            pthread_mutex_unlock(&lock);
-        }
+        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }

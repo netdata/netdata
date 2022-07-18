@@ -884,7 +884,7 @@ static int ebpf_send_systemd_process_charts(ebpf_module_t *em)
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, ect->publish_systemd_ps.create_process);
-        } else
+        } else if (unlikely(ect->systemd))
             ret = 0;
     }
     write_end_chart();
@@ -1031,20 +1031,23 @@ static void process_collector(ebpf_module_t *em)
     if (cgroups)
         ebpf_process_update_cgroup_algorithm();
 
+    int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     int update_every = em->update_every;
     int counter = update_every - 1;
+    int update_apps_list = update_apps_every - 1;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
 
         pthread_mutex_lock(&collect_data_mutex);
-        cleanup_exited_pids();
-        collect_data_for_all_processes(pid_fd);
+        if (++update_apps_list == update_apps_every) {
+            update_apps_list = 0;
+            cleanup_exited_pids();
+            collect_data_for_all_processes(pid_fd);
 
-        ebpf_create_apps_charts(apps_groups_root_target);
-
-        pthread_cond_broadcast(&collect_data_cond_var);
+            ebpf_create_apps_charts(apps_groups_root_target);
+        }
         pthread_mutex_unlock(&collect_data_mutex);
 
         if (++counter == update_every) {
@@ -1053,6 +1056,7 @@ static void process_collector(ebpf_module_t *em)
             read_hash_global_tables();
 
             int publish_apps = 0;
+            pthread_mutex_lock(&collect_data_mutex);
             if (all_pids_count > 0) {
                 if (apps_enabled) {
                     publish_apps = 1;
@@ -1081,6 +1085,7 @@ static void process_collector(ebpf_module_t *em)
                 }
             }
             pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&collect_data_mutex);
         }
 
         fflush(stdout);

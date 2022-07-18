@@ -214,24 +214,20 @@ static void softirq_collector(ebpf_module_t *em)
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
-    int update_every = em->update_every;
-    int counter = update_every - 1;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = em->update_every * USEC_PER_SEC;
     while (!close_ebpf_plugin) {
-        pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        (void)heartbeat_next(&hb, step);
 
-        if (++counter == update_every) {
-            counter = 0;
-            pthread_mutex_lock(&lock);
+        pthread_mutex_lock(&lock);
 
-            // write dims now for all hitherto discovered IRQs.
-            write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "softirq_latency");
-            softirq_write_dims();
-            write_end_chart();
+        // write dims now for all hitherto discovered IRQs.
+        write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "softirq_latency");
+        softirq_write_dims();
+        write_end_chart();
 
-            pthread_mutex_unlock(&lock);
-        }
-        pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
     }
 }
 

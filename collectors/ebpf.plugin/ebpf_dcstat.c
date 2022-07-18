@@ -868,7 +868,7 @@ static int ebpf_send_systemd_dc_charts()
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_dc.ratio);
-        } else
+        } else if (unlikely(ect->systemd))
             ret = 0;
     }
     write_end_chart();
@@ -1008,32 +1008,30 @@ static void dcstat_collector(ebpf_module_t *em)
     int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
-    int counter = update_every - 1;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = update_every * USEC_PER_SEC;
     while (!close_ebpf_plugin) {
+        (void)heartbeat_next(&hb, step);
+
         pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        if (apps)
+            read_apps_table();
 
-        if (++counter == update_every) {
-            counter = 0;
-            if (apps)
-                read_apps_table();
+        if (cgroups)
+            ebpf_update_dc_cgroup();
 
-            if (cgroups)
-                ebpf_update_dc_cgroup();
+        pthread_mutex_lock(&lock);
 
-            pthread_mutex_lock(&lock);
+        dcstat_send_global(&publish);
 
-            dcstat_send_global(&publish);
+        if (apps)
+            ebpf_dcache_send_apps_data(apps_groups_root_target);
 
-            if (apps)
-                ebpf_dcache_send_apps_data(apps_groups_root_target);
+        if (cgroups)
+            ebpf_dc_send_cgroup_data(update_every);
 
-            if (cgroups)
-                ebpf_dc_send_cgroup_data(update_every);
-
-            pthread_mutex_unlock(&lock);
-        }
-
+        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }
