@@ -42,7 +42,7 @@ extern void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN +
                                                     uuid_t *ret_uuid);
 
 
-extern STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
+extern STORAGE_METRIC_HANDLE *rrdeng_metric_init(INSTANCE_HANDLE *instance_handle, uuid_t *metric_uuid, STORAGE_INSTANCE *db_instance);
 extern void rrdeng_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle);
 
 extern STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle);

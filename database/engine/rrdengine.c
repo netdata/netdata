@@ -786,6 +786,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time = descr->start_time;
         header->descr[i].end_time = descr->end_time;
+        //header->descr[i].update_every = descr->update_every;
         pos += sizeof(header->descr[i]);
     }
     for (i = 0 ; i < count ; ++i) {

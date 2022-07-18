@@ -266,7 +266,7 @@ void rrdset_reset(RRDSET *st) {
     st->current_entry = 0;
     st->counter = 0;
     st->counter_done = 0;
-    st->rrddim_page_alignment = 0;
+    st->state->instance_handle->rrddim_page_alignment = 0;
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -401,6 +401,7 @@ void rrdset_free(RRDSET *st) {
     freez(st->state->old_title);
     freez(st->state->old_units);
     freez(st->state->old_context);
+    freez(st->state->instance_handle);
     rrdlabels_destroy(st->state->chart_labels);
     freez(st->state);
     freez(st->chart_uuid);
@@ -699,6 +700,8 @@ RRDSET *rrdset_create_custom(
 
     st = callocz(1, sizeof(RRDSET));
     st->state = callocz(1, sizeof(*st->state));
+    st->state->instance_handle = callocz(1, sizeof(st->state->instance_handle));
+    st->state->instance_handle->update_every = (uint32_t) update_every;
 
     strcpy(st->id, fullid);
     st->hash = simple_hash(st->id);

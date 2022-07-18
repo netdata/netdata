@@ -40,7 +40,8 @@ struct rrdeng_collect_handle {
     unsigned long page_correlation_id;
     struct rrdengine_instance *ctx;
     // set to 1 when this dimension is not page aligned with the other dimensions in the chart
-    uint8_t unaligned_page;
+    uint32_t unaligned_page:8;
+    uint32_t update_every:24;
 };
 
 struct rrdeng_query_handle {

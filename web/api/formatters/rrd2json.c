@@ -15,6 +15,8 @@ static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int arc
         if (!temp_rd->rrdset->counter) {
             onewayalloc_freez(owa, (char *)temp_rd->rrdset->name);
             onewayalloc_freez(owa, temp_rd->rrdset->context);
+            onewayalloc_freez(owa, temp_rd->rrdset->state->instance_handle);
+            onewayalloc_freez(owa, temp_rd->rrdset->state);
             onewayalloc_freez(owa, temp_rd->rrdset);
         }
     }

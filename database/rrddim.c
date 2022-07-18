@@ -272,7 +272,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             rd->tiers[tier]->mode = eng->id;
             rd->tiers[tier]->collect_ops = eng->api.collect_ops;
             rd->tiers[tier]->query_ops = eng->api.query_ops;
-            rd->tiers[tier]->db_metric_handle = eng->api.init(rd, host->storage_instance[tier]);
+            rd->tiers[tier]->db_metric_handle = eng->api.init(rd->rrdset->state->instance_handle, &(rd->metric_uuid), host->storage_instance[tier]);
             storage_point_unset(rd->tiers[tier]->virtual_point);
             initialized++;
 

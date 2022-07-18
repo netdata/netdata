@@ -20,7 +20,7 @@ struct mem_query_handle {
     size_t last_slot;
 };
 
-extern STORAGE_METRIC_HANDLE *rrddim_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
+extern STORAGE_METRIC_HANDLE *rrddim_metric_init(RRDDIM *rd, uuid_t *dim_uuid, STORAGE_INSTANCE *db_instance);
 extern void rrddim_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle);
 
 extern STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle);

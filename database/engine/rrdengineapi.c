@@ -76,7 +76,7 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
 }
 
 struct rrdeng_metric_handle {
-    RRDDIM *rd;
+    INSTANCE_HANDLE *instance_handle;
     struct rrdengine_instance *ctx;
     uuid_t *rrdeng_uuid;                            // database engine metric UUID
     struct pg_cache_page_index *page_index;
@@ -86,64 +86,32 @@ void rrdeng_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle) {
     freez(db_metric_handle);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_init(INSTANCE_HANDLE *instance_handle, uuid_t *metric_uuid, STORAGE_INSTANCE *db_instance) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     struct page_cache *pg_cache;
-    uuid_t legacy_uuid;
-    uuid_t multihost_legacy_uuid;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index = NULL;
-    int is_multihost_child = 0;
-    RRDHOST *host = rd->rrdset->rrdhost;
 
     pg_cache = &ctx->pg_cache;
 
-    rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-    if (host != localhost && is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
-        is_multihost_child = 1;
-
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &legacy_uuid, sizeof(uuid_t));
+    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, metric_uuid, sizeof(*metric_uuid));
     if (likely(NULL != PValue)) {
         page_index = *PValue;
     }
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (is_multihost_child || NULL == PValue) {
-        /* First time we see the legacy UUID or metric belongs to child host in multi-host DB.
-         * Drop legacy support, normal path */
-
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &rd->metric_uuid, sizeof(uuid_t));
-        if (likely(NULL != PValue)) {
-            page_index = *PValue;
-        }
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-        if (NULL == PValue) {
-            uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
-            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
-            fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(&rd->metric_uuid);
-            page_index->prev = pg_cache->metrics_index.last_page_index;
-            pg_cache->metrics_index.last_page_index = page_index;
-            uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
-        }
-    } else {
-        /* There are legacy UUIDs in the database, implement backward compatibility */
-
-        rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
-                                                &multihost_legacy_uuid);
-
-        int need_to_store = uuid_compare(rd->metric_uuid, multihost_legacy_uuid);
-
-        uuid_copy(rd->metric_uuid, multihost_legacy_uuid);
-
-        if (unlikely(need_to_store && !ctx->tier))
-            (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
-                rd->algorithm);
+    if (NULL == PValue) {
+        uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
+        PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, metric_uuid, sizeof(*metric_uuid), PJE0);
+        fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
+        *PValue = page_index = create_page_index(metric_uuid);
+        page_index->prev = pg_cache->metrics_index.last_page_index;
+        pg_cache->metrics_index.last_page_index = page_index;
+        uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
     }
 
     struct rrdeng_metric_handle *mh = mallocz(sizeof(struct rrdeng_metric_handle));
-    mh->rd = rd;
+    mh->instance_handle = instance_handle;
     mh->ctx = ctx;
     mh->rrdeng_uuid = &page_index->id;
     mh->page_index = page_index;
@@ -234,20 +202,20 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
     struct rrdengine_instance *ctx = handle->ctx;
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = handle->descr;
-    RRDDIM *rd = metric_handle->rd;
 
     void *page;
     uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
 
+    size_t rrddim_page_alignment = handle->metric_handle->instance_handle->rrddim_page_alignment;
     if (descr) {
         /* Make alignment decisions */
 
-        if (descr->page_length == rd->rrdset->rrddim_page_alignment) {
+        if (descr->page_length == rrddim_page_alignment) {
             /* this is the leading dimension that defines chart alignment */
             perfect_page_alignment = 1;
         }
         /* is the metric far enough out of alignment with the others? */
-        if (unlikely(descr->page_length + PAGE_POINT_SIZE_BYTES(descr) < rd->rrdset->rrddim_page_alignment)) {
+        if (unlikely(descr->page_length + PAGE_POINT_SIZE_BYTES(descr) < rrddim_page_alignment)) {
             handle->unaligned_page = 1;
             debug(D_RRDENGINE, "Metric page is not aligned with chart:");
             if (unlikely(debug_flags & D_RRDENGINE))
@@ -255,7 +223,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
         }
         if (unlikely(handle->unaligned_page &&
                      /* did the other metrics change page? */
-                     rd->rrdset->rrddim_page_alignment <= PAGE_POINT_SIZE_BYTES(descr))) {
+                     rrddim_page_alignment <= PAGE_POINT_SIZE_BYTES(descr))) {
             debug(D_RRDENGINE, "Flushing unaligned metric page.");
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
@@ -268,12 +236,12 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
 
         page = rrdeng_create_page(ctx, &metric_handle->page_index->id, &descr);
         fatal_assert(page);
-
+        descr->update_every = handle->update_every;
         handle->descr = descr;
 
         handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
 
-        if (0 == rd->rrdset->rrddim_page_alignment) {
+        if (0 == rrddim_page_alignment) {
             /* this is the leading dimension that defines chart alignment */
             perfect_page_alignment = 1;
         }
@@ -311,7 +279,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
     pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + PAGE_POINT_SIZE_BYTES(descr));
 
     if (perfect_page_alignment)
-        rd->rrdset->rrddim_page_alignment = descr->page_length;
+        handle->metric_handle->instance_handle->rrddim_page_alignment = descr->page_length;
     if (unlikely(INVALID_TIME == descr->start_time)) {
         unsigned long new_metric_API_producers, old_metric_API_max_producers, ret_metric_API_max_producers;
         descr->start_time = point_in_time;
@@ -374,7 +342,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrd
 {
     struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
     struct rrdengine_instance *ctx = metric_handle->ctx;
-    RRDDIM *rd = metric_handle->rd;
+//    RRDDIM *rd = metric_handle->rd;
 
     // fprintf(stderr, "%s: %s/%s start time %ld, end time %ld\n", __FUNCTION__ , rd->rrdset->name, rd->name, start_time, end_time);
 
@@ -391,7 +359,8 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrd
     // TODO we should store the dt of each page in each page
     // this will produce wrong values for dt in case the user changes
     // the update every of the charts or the tier grouping iterations
-    handle->dt_sec = get_tier_grouping(ctx->tier) * (time_t)rd->update_every;
+//    handle->dt_sec = get_tier_grouping(ctx->tier) * (time_t)rd->update_every;
+    handle->dt_sec = get_tier_grouping(ctx->tier) * (time_t) metric_handle->instance_handle->update_every;
     handle->dt = handle->dt_sec * USEC_PER_SEC;
     handle->position = 0;
     handle->ctx = ctx;

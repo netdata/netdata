@@ -5,7 +5,7 @@
 // ----------------------------------------------------------------------------
 // RRDDIM legacy data collection functions
 
-STORAGE_METRIC_HANDLE *rrddim_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_unused) {
+STORAGE_METRIC_HANDLE *rrddim_metric_init(RRDDIM *rd, uuid_t *dim_uuid __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
     return (STORAGE_METRIC_HANDLE *)rd;
 }
 

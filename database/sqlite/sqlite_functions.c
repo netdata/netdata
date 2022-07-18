@@ -1610,7 +1610,7 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
         rd->tiers[tier]->query_ops.finalize = rrdeng_load_metric_finalize;
         rd->tiers[tier]->query_ops.latest_time = rrdeng_metric_latest_time;
         rd->tiers[tier]->query_ops.oldest_time = rrdeng_metric_oldest_time;
-        rd->tiers[tier]->db_metric_handle = eng->api.init(rd, st->rrdhost->storage_instance[tier]);
+        rd->tiers[tier]->db_metric_handle = eng->api.init(st->state->instance_handle, &(rd->metric_uuid), st->rrdhost->storage_instance[tier]);
     }
 
     return rd;
@@ -1716,6 +1716,9 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
 
         st->counter++;
         st->last_entry_t = MAX(st->last_entry_t, (*param_list)->last_entry_t);
+        st->state = onewayalloc_callocz(owa, 1, sizeof(*st));
+        st->state->instance_handle = onewayalloc_callocz(owa, 1, sizeof(st->state->instance_handle));
+        st->state->instance_handle->update_every = (uint32_t) st->update_every;
 
         RRDDIM *rd = create_rrdim_entry(owa, st, (char *)sqlite3_column_text(res, 1), (char *)sqlite3_column_text(res, 2), &rrdeng_uuid);
         if (unlikely(!rd))

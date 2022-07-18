@@ -23,6 +23,7 @@ typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 typedef struct context_param CONTEXT_PARAM;
+typedef struct instance_handle INSTANCE_HANDLE;
 
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;
@@ -450,6 +451,11 @@ struct rrddim_tier {
 
 extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
 
+typedef struct instance_handle {
+    size_t rrddim_page_alignment;
+    uint32_t update_every;
+} INSTANCE_HANDLE;
+
 // ----------------------------------------------------------------------------
 // volatile state per chart
 struct rrdset_volatile {
@@ -458,6 +464,7 @@ struct rrdset_volatile {
     char *old_context;
     uuid_t hash_id;
     DICTIONARY *chart_labels;
+    INSTANCE_HANDLE  *instance_handle;
     bool is_ar_chart;
 };
 
