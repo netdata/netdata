@@ -2354,8 +2354,10 @@ static uint64_t rrdcontext_version_hash_with_callback(
         rrdcontext_lock(rc);
 
         // skip any deleted contexts
-        if(unlikely(rc->flags & RRD_FLAG_DELETED))
+        if(unlikely(rc->flags & RRD_FLAG_DELETED)) {
+            rrdcontext_unlock(rc);
             continue;
+        }
 
         if(unlikely(callback))
             callback(rc, snapshot, bundle);
