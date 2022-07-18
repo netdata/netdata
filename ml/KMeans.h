@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "SamplesBuffer.h"
+#include "json/single_include/nlohmann/json.hpp"
 
 class KMeans {
 public:
@@ -19,6 +20,14 @@ public:
 
     void train(const std::vector<DSample> &Samples, size_t MaxIterations);
     CalculatedNumber anomalyScore(const DSample &Sample) const;
+
+    void toJson(nlohmann::json &J) const {
+        J = nlohmann::json{
+            {"CCs", ClusterCenters},
+            {"MinDist", MinDist},
+            {"MaxDist", MaxDist}
+        };
+    }
 
 private:
     size_t NumClusters;

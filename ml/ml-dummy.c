@@ -24,6 +24,16 @@ char *ml_get_host_info(RRDHOST *RH) {
     return NULL;
 }
 
+char *ml_get_host_runtime_info(RRDHOST *RH) {
+    (void) RH;
+    return NULL;
+}
+
+char *ml_get_host_models(RRDHOST *RH) {
+    (void) RH;
+    return NULL;
+}
+
 void ml_new_dimension(RRDDIM *RD) { (void) RD; }
 
 void ml_delete_dimension(RRDDIM *RD) { (void) RD; }

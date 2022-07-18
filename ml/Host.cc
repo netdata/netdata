@@ -68,6 +68,25 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
     Json["charts-to-skip"] = Cfg.ChartsToSkip;
 }
 
+void TrainableHost::getModelsAsJson(nlohmann::json &Json) {
+    std::lock_guard<std::mutex> Lock(Mutex);
+
+    for (auto &DP : DimensionsMap) {
+        Dimension *D = DP.second;
+
+        nlohmann::json JsonArray = nlohmann::json::array();
+        for (const KMeans &KM : D->getModels()) {
+            nlohmann::json J;
+            KM.toJson(J);
+            JsonArray.push_back(J);
+        }
+        Json[D->getID()] = JsonArray;
+    }
+
+
+    return;
+}
+
 std::pair<Dimension *, Duration<double>>
 TrainableHost::findDimensionToTrain(const TimePoint &NowTP) {
     std::lock_guard<std::mutex> Lock(Mutex);

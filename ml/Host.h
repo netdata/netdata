@@ -81,6 +81,8 @@ public:
         memcpy(RU, &ResourceUsage, sizeof(struct rusage));
     }
 
+    void getModelsAsJson(nlohmann::json &Json);
+
 private:
     std::pair<Dimension *, Duration<double>> findDimensionToTrain(const TimePoint &NowTP);
     void trainDimension(Dimension *D, const TimePoint &NowTP);

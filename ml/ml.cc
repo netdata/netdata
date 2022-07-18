@@ -127,6 +127,18 @@ char *ml_get_host_runtime_info(RRDHOST *RH) {
     return strdup(ConfigJson.dump(1, '\t').c_str());
 }
 
+char *ml_get_host_models(RRDHOST *RH) {
+    nlohmann::json ModelsJson;
+
+    if (RH && RH->ml_host) {
+        Host *H = static_cast<Host *>(RH->ml_host);
+        H->getModelsAsJson(ModelsJson);
+        return strdup(ModelsJson.dump(2, '\t').c_str());
+    }
+
+    return nullptr;
+}
+
 bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
     Dimension *D = static_cast<Dimension *>(RD->ml_dimension);
     if (!D)
