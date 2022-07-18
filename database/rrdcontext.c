@@ -1494,7 +1494,7 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
 
     if(host->rrdctx_queue) {
         dictionary_destroy((DICTIONARY *)host->rrdctx_queue);
-        host->rrdctx = NULL;
+        host->rrdctx_queue = NULL;
     }
 
     dictionary_destroy((DICTIONARY *)host->rrdctx);

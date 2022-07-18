@@ -868,32 +868,76 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     NAME_VALUE *nv;
 
     debug(D_DICTIONARY, "Destroying dictionary.");
-    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    long referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
-    if(referenced_items) {
-        // there are referenced items
-        // delete all items individually, so that only the referenced will remain
-        NAME_VALUE *nv_next;
-        for(nv = dict->first_item; nv ;nv = nv_next) {
-            nv_next = nv->next;
-            if(!(nv->flags & NAME_VALUE_FLAG_DELETED))
-                dictionary_del_unsafe(dict, namevalue_get_name(nv));
+    long referenced_items = 0;
+    size_t retries = 0;
+    do {
+        retries--;
+        referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
+        if (referenced_items) {
+            dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
+
+            // there are referenced items
+            // delete all items individually, so that only the referenced will remain
+            NAME_VALUE *nv_next;
+            for (nv = dict->first_item; nv; nv = nv_next) {
+                nv_next = nv->next;
+                size_t refcount = DICTIONARY_NAME_VALUE_REFCOUNT_GET(nv);
+                if (!refcount && !(nv->flags & NAME_VALUE_FLAG_DELETED))
+                    dictionary_del_unsafe(dict, namevalue_get_name(nv));
+            }
+
+            internal_error(
+                true,
+                "DICTIONARY: waiting (try %zu) for destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
+                retries + 1,
+                dict->creation_function,
+                dict->creation_line,
+                dict->creation_file,
+                referenced_items,
+                dict->entries);
+
+            dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
+            usleep(10000);
         }
-        internal_error(true, "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).", dict->creation_function, dict->creation_line, dict->creation_file, referenced_items, dict->entries);
+    } while(referenced_items > 0 && retries < 10);
+
+    if(referenced_items) {
+        dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
+
         dict->flags |= DICTIONARY_FLAG_DESTROYED;
+        internal_error(
+            true,
+            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file,
+            referenced_items,
+            dict->entries);
+
         dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
         return 0;
     }
+
+    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
+
+    internal_error(
+        true,
+        "DICTIONARY: destroying dictionary created from %s() %zu@%s, having %ld referenced items in it (%ld total).",
+        dict->creation_function,
+        dict->creation_line,
+        dict->creation_file,
+        dict->referenced_items,
+        dict->entries);
 
     size_t freed = 0;
     nv = dict->first_item;
     while (nv) {
         // cache nv->next
         // because we are going to free nv
-        NAME_VALUE *nvnext = nv->next;
+        NAME_VALUE *nv_next = nv->next;
         freed += namevalue_destroy_unsafe(dict, nv);
-        nv = nvnext;
+        nv = nv_next;
         // to speed up destruction, we don't
         // unlink nv from the linked-list here
     }
