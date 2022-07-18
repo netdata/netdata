@@ -3177,8 +3177,7 @@ netdataDashboard.context = {
 
     'k8s.cgroup.net_net': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 var iface;
                 try {
                     iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
@@ -3188,8 +3187,7 @@ netdataDashboard.context = {
                 return netdataDashboard.gaugeChart('Received' + iface, '12%', 'received');
 
             },
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 var iface;
                 try {
                     iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
