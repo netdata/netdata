@@ -1115,7 +1115,7 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     rrd_flag_set_archived(ri);
 
     if(!(ri->flags & RRD_FLAG_OWN_LABELS)) {
-        ri->flags &= ~RRD_FLAG_OWN_LABELS;
+        ri->flags |= RRD_FLAG_OWN_LABELS;
         ri->rrdlabels = rrdlabels_create();
         rrdlabels_copy(ri->rrdlabels, st->state->chart_labels);
     }

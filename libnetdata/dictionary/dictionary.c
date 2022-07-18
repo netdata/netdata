@@ -872,7 +872,6 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     long referenced_items = 0;
     size_t retries = 0;
     do {
-        retries--;
         referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
         if (referenced_items) {
             dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
@@ -888,7 +887,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
             }
 
             internal_error(
-                true,
+                retries == 0,
                 "DICTIONARY: waiting (try %zu) for destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
                 retries + 1,
                 dict->creation_function,
@@ -900,7 +899,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
             dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
             usleep(10000);
         }
-    } while(referenced_items > 0 && retries < 10);
+    } while(referenced_items > 0 && ++retries < 10);
 
     if(referenced_items) {
         dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
@@ -908,10 +907,11 @@ size_t dictionary_destroy(DICTIONARY *dict) {
         dict->flags |= DICTIONARY_FLAG_DESTROYED;
         internal_error(
             true,
-            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
+            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s after %zu retries, because it has %ld referenced items in it (%ld total).",
             dict->creation_function,
             dict->creation_line,
             dict->creation_file,
+            retries,
             referenced_items,
             dict->entries);
 
@@ -920,15 +920,6 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     }
 
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
-
-    internal_error(
-        true,
-        "DICTIONARY: destroying dictionary created from %s() %zu@%s, having %ld referenced items in it (%ld total).",
-        dict->creation_function,
-        dict->creation_line,
-        dict->creation_file,
-        dict->referenced_items,
-        dict->entries);
 
     size_t freed = 0;
     nv = dict->first_item;
