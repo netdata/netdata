@@ -803,6 +803,17 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
     buffer_sprintf(sql,"DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
         "date_cloud_ack < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_ALERTS_INTERNAL);
     db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
+
+    buffer_sprintf(sql,"UPDATE aclk_chart_%s SET status = NULL, date_submitted=unixepoch() WHERE "
+            "date_submitted IS NULL AND date_created < unixepoch()-%d;", wc->uuid_str, ACLK_AUTO_MARK_SUBMIT_INTERVAL);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
+
+    buffer_sprintf(sql,"UPDATE aclk_chart_%s SET date_updated = unixepoch() WHERE date_updated IS NULL"
+                " AND date_submitted IS NOT NULL AND date_submitted < unixepoch()-%d;",
+                wc->uuid_str, ACLK_AUTO_MARK_UPDATED_INTERVAL);
+    db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
     return;
