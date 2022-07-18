@@ -676,8 +676,11 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
 
     if(rd->rrdmetric && rd->rrdmetric != rma)
         fatal("RRDMETRIC: dimension '%s' of chart '%s' changed rrdmetric!", rd->id, rd->rrdset->id);
-    else if(!rd->rrdmetric)
-        rd->rrdmetric = rma;
+
+    if(rd->rrdmetric)
+        rrdmetric_release(rd->rrdmetric);
+
+    rd->rrdmetric = rma;
 }
 
 #define rrddim_get_rrdmetric(rd) rrddim_get_rrdmetric_with_trace(rd, __FUNCTION__)
@@ -1083,6 +1086,9 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
     if(st->rrdinstance && st->rrdinstance != ria)
         fatal("RRDINSTANCE: chart '%s' changed rrdinstance.", st->id);
 
+    if(st->rrdinstance)
+        rrdinstance_release(st->rrdinstance);
+
     st->rrdinstance = ria;
 
     if(st->rrdcontext && st->rrdcontext != rca) {
@@ -1090,8 +1096,10 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         RRDCONTEXT *rc_old = rrdcontext_acquired_value(st->rrdcontext);
         dictionary_del(rc_old->rrdinstances, st->id);
         rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
-        rrdcontext_release(st->rrdcontext);
     }
+
+    if(st->rrdcontext)
+        rrdcontext_release(st->rrdcontext);
 
     st->rrdcontext = rca;
 }
