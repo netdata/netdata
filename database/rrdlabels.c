@@ -900,7 +900,7 @@ static int label_to_buffer_callback(const char *name, void *value, void *data) {
         vv = v;
     }
 
-    if(!t->filter_callback || (t->filter_callback && t->filter_callback(name, string2str(lb->label_value), lb->label_source, t->filter_data))) {
+    if(!t->filter_callback || t->filter_callback(name, string2str(lb->label_value), lb->label_source, t->filter_data)) {
         buffer_sprintf(t->wb, "%s%s%s%s%s%s%s%s%s", t->count++?t->between_them:"", t->before_each, t->quote, nn, t->quote, t->equal, t->quote, vv, t->quote);
         return 1;
     }
