@@ -11,6 +11,25 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     return 0;
 }
 
+
+static int table_exists_in_database(const char *table)
+{
+    char *err_msg = NULL;
+    char sql[128];
+
+    int exists = 0;
+
+    snprintf(sql, 127, "select 1 from sqlite_schema where type = 'table' and name = '%s';", table);
+
+    int rc = sqlite3_exec(db_meta, sql, return_int_cb, (void *) &exists, &err_msg);
+    if (rc != SQLITE_OK) {
+        info("Error checking table existence; %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    return exists;
+}
+
 static int column_exists_in_table(const char *table, const char *column)
 {
     char *err_msg = NULL;
@@ -50,7 +69,7 @@ static int do_migration_v1_v2(sqlite3 *database, const char *name)
     UNUSED(name);
     info("Running \"%s\" database migration", name);
 
-    if (!column_exists_in_table("host", "hops"))
+    if (table_exists_in_database("host") && !column_exists_in_table("host", "hops"))
         return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v1_v2[0]);
     return 0;
 }
@@ -60,7 +79,7 @@ static int do_migration_v2_v3(sqlite3 *database, const char *name)
     UNUSED(name);
     info("Running \"%s\" database migration", name);
 
-    if (!column_exists_in_table("host", "memory_mode"))
+    if (table_exists_in_database("host") && !column_exists_in_table("host", "memory_mode"))
         return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v2_v3[0]);
     return 0;
 }
