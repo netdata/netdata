@@ -447,9 +447,14 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
     // check if dst is all underscores and empty it if it is
     d = dst;
     while(*d == '_') d++;
-    if(!*d) {
+    if(unlikely(*d == '\0')) {
         *dst = '\0';
         mblen = 0;
+    }
+
+    if(unlikely(*dst == '\0')) {
+        strncpyz((char *)dst, empty, dst_size);
+        return strlen((char *)dst);
     }
 
     return mblen;
@@ -460,7 +465,7 @@ static inline size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t 
 }
 
 static inline size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t dst_size) {
-    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1, "[unset]");
+    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1, "[none]");
 }
 
 // ----------------------------------------------------------------------------
@@ -916,7 +921,7 @@ int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each,
         .between_them = between_them,
         .count = 0
     };
-    return dictionary_sorted_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
+    return dictionary_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
 }
 
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
@@ -1029,12 +1034,12 @@ int rrdlabels_unittest_add_pairs() {
     errors += rrdlabels_unittest_add_a_pair("tag:a", "tag", "a");
 
     // test empty values
-    errors += rrdlabels_unittest_add_a_pair("tag", "tag", "");
-    errors += rrdlabels_unittest_add_a_pair("tag:", "tag", "");
-    errors += rrdlabels_unittest_add_a_pair("tag:\"\"", "tag", "");
-    errors += rrdlabels_unittest_add_a_pair("tag:''", "tag", "");
-    errors += rrdlabels_unittest_add_a_pair("tag:\r\n", "tag", "");
-    errors += rrdlabels_unittest_add_a_pair("tag\r\n", "tag", "");
+    errors += rrdlabels_unittest_add_a_pair("tag", "tag", "[none]");
+    errors += rrdlabels_unittest_add_a_pair("tag:", "tag", "[none]");
+    errors += rrdlabels_unittest_add_a_pair("tag:\"\"", "tag", "[none]");
+    errors += rrdlabels_unittest_add_a_pair("tag:''", "tag", "[none]");
+    errors += rrdlabels_unittest_add_a_pair("tag:\r\n", "tag", "[none]");
+    errors += rrdlabels_unittest_add_a_pair("tag\r\n", "tag", "[none]");
 
     // test UTF-8 in values
     errors += rrdlabels_unittest_add_a_pair("tag: country:Ελλάδα", "tag", "country:Ελλάδα");
@@ -1112,7 +1117,7 @@ int rrdlabels_unittest_sanitize_value(const char *src, const char *expected) {
 int rrdlabels_unittest_sanitization() {
     int errors = 0;
 
-    errors += rrdlabels_unittest_sanitize_value("", "");
+    errors += rrdlabels_unittest_sanitize_value("", "[none]");
     errors += rrdlabels_unittest_sanitize_value("1", "1");
     errors += rrdlabels_unittest_sanitize_value("  hello   world   ", "hello world");
 
