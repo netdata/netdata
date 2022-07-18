@@ -768,6 +768,12 @@ struct cgroup_network_interface {
     struct cgroup_network_interface *next;
 };
 
+enum cgroups_container_orchestrator {
+    CGROUPS_ORCHESTRATOR_UNSET,
+    CGROUPS_ORCHESTRATOR_UNKNOWN,
+    CGROUPS_ORCHESTRATOR_K8S
+};
+
 // *** WARNING *** The fields are not thread safe. Take care of safe usage.
 struct cgroup {
     uint32_t options;
@@ -790,6 +796,8 @@ struct cgroup {
     char *chart_title;
 
     DICTIONARY *chart_labels;
+
+    int container_orchestrator;
 
     struct cpuacct_stat cpuacct_stat;
     struct cpuacct_usage cpuacct_usage;
@@ -935,6 +943,10 @@ static inline int is_cgroup_systemd_service(struct cgroup *cg) {
 }
 
 // ---------------------------------------------------------------------------------------------
+static int k8s_is_kubepod(struct cgroup *cg) {
+    return cg->container_orchestrator == CGROUPS_ORCHESTRATOR_K8S;
+}
+
 static int k8s_is_container(const char *id) {
     // examples:
     // https://github.com/netdata/netdata/blob/0fc101679dcd12f1cb8acdd07bb4c85d8e553e53/collectors/cgroups.plugin/cgroup-name.sh#L121-L147
@@ -1690,7 +1702,8 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
             info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
 
             // register a device rename to proc_net_dev.c
-            netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id, cg->chart_labels);
+            netdev_rename_device_add(
+                i->host_device, i->container_device, cg->chart_id, cg->chart_labels, k8s_is_kubepod(cg) ? "k8s." : "");
         }
     }
 
@@ -2588,6 +2601,14 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     cg->first_time_seen = 0;
 
     char comm[TASK_COMM_LEN];
+
+    if (cg->container_orchestrator == CGROUPS_ORCHESTRATOR_UNSET) {
+        if (strstr(cg->id, "kubepods")) {
+            cg->container_orchestrator = CGROUPS_ORCHESTRATOR_K8S;
+        } else {
+            cg->container_orchestrator = CGROUPS_ORCHESTRATOR_UNKNOWN;
+        }
+    }
 
     if (is_inside_k8s && !k8s_get_container_first_proc_comm(cg->id, comm)) {
         // container initialization may take some time when CPU % is high
@@ -3782,7 +3803,7 @@ void update_cgroup_charts(int update_every) {
                         , "cpu"
                         , NULL
                         , "cpu"
-                        , "cgroup.cpu"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.cpu" : "cgroup.cpu"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -3855,7 +3876,7 @@ void update_cgroup_charts(int update_every) {
                                     , "cpu_limit"
                                     , NULL
                                     , "cpu"
-                                    , "cgroup.cpu_limit"
+                                    , k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_limit" : "cgroup.cpu_limit"
                                     , title
                                     , "percentage"
                                     , PLUGIN_CGROUPS_NAME
@@ -3908,7 +3929,7 @@ void update_cgroup_charts(int update_every) {
                         , "throttled"
                         , NULL
                         , "cpu"
-                        , "cgroup.throttled"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.throttled" : "cgroup.throttled"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -3934,7 +3955,7 @@ void update_cgroup_charts(int update_every) {
                         , "throttled_duration"
                         , NULL
                         , "cpu"
-                        , "cgroup.throttled_duration"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.throttled_duration" : "cgroup.throttled_duration"
                         , title
                         , "ms"
                         , PLUGIN_CGROUPS_NAME
@@ -3962,7 +3983,7 @@ void update_cgroup_charts(int update_every) {
                         , "cpu_shares"
                         , NULL
                         , "cpu"
-                        , "cgroup.cpu_shares"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_shares" : "cgroup.cpu_shares"
                         , title
                         , "shares"
                         , PLUGIN_CGROUPS_NAME
@@ -3993,7 +4014,7 @@ void update_cgroup_charts(int update_every) {
                         , "cpu_per_core"
                         , NULL
                         , "cpu"
-                        , "cgroup.cpu_per_core"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_per_core" : "cgroup.cpu_per_core"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4029,7 +4050,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem"
                         , NULL
                         , "mem"
-                        , "cgroup.mem"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.mem" : "cgroup.mem"
                         , title
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
@@ -4089,7 +4110,7 @@ void update_cgroup_charts(int update_every) {
                         , "writeback"
                         , NULL
                         , "mem"
-                        , "cgroup.writeback"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.writeback" : "cgroup.writeback"
                         , title
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
@@ -4124,7 +4145,7 @@ void update_cgroup_charts(int update_every) {
                             , "mem_activity"
                             , NULL
                             , "mem"
-                            , "cgroup.mem_activity"
+                            , k8s_is_kubepod(cg) ? "k8s.cgroup.mem_activity" : "cgroup.mem_activity"
                             , title
                             , "MiB/s"
                             , PLUGIN_CGROUPS_NAME
@@ -4155,7 +4176,7 @@ void update_cgroup_charts(int update_every) {
                         , "pgfaults"
                         , NULL
                         , "mem"
-                        , "cgroup.pgfaults"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.pgfaults" : "cgroup.pgfaults"
                         , title
                         , "MiB/s"
                         , PLUGIN_CGROUPS_NAME
@@ -4187,7 +4208,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem_usage"
                         , NULL
                         , "mem"
-                        , "cgroup.mem_usage"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.mem_usage" : "cgroup.mem_usage"
                         , title
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
@@ -4254,7 +4275,7 @@ void update_cgroup_charts(int update_every) {
                                 , "mem_usage_limit"
                                 , NULL
                                 , "mem"
-                                , "cgroup.mem_usage_limit"
+                                , k8s_is_kubepod(cg) ? "k8s.cgroup.mem_usage_limit": "cgroup.mem_usage_limit"
                                 , title
                                 , "MiB"
                                 , PLUGIN_CGROUPS_NAME
@@ -4286,7 +4307,7 @@ void update_cgroup_charts(int update_every) {
                                 , "mem_utilization"
                                 , NULL
                                 , "mem"
-                                , "cgroup.mem_utilization"
+                                , k8s_is_kubepod(cg) ? "k8s.cgroup.mem_utilization" : "cgroup.mem_utilization"
                                 , title
                                 , "percentage"
                                 , PLUGIN_CGROUPS_NAME
@@ -4335,7 +4356,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem_failcnt"
                         , NULL
                         , "mem"
-                        , "cgroup.mem_failcnt"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.mem_failcnt" : "cgroup.mem_failcnt"
                         , title
                         , "count"
                         , PLUGIN_CGROUPS_NAME
@@ -4365,7 +4386,7 @@ void update_cgroup_charts(int update_every) {
                         , "io"
                         , NULL
                         , "disk"
-                        , "cgroup.io"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.io" : "cgroup.io"
                         , title
                         , "KiB/s"
                         , PLUGIN_CGROUPS_NAME
@@ -4397,7 +4418,7 @@ void update_cgroup_charts(int update_every) {
                         , "serviced_ops"
                         , NULL
                         , "disk"
-                        , "cgroup.serviced_ops"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.serviced_ops" : "cgroup.serviced_ops"
                         , title
                         , "operations/s"
                         , PLUGIN_CGROUPS_NAME
@@ -4429,7 +4450,7 @@ void update_cgroup_charts(int update_every) {
                         , "throttle_io"
                         , NULL
                         , "disk"
-                        , "cgroup.throttle_io"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.throttle_io" : "cgroup.throttle_io"
                         , title
                         , "KiB/s"
                         , PLUGIN_CGROUPS_NAME
@@ -4461,7 +4482,7 @@ void update_cgroup_charts(int update_every) {
                         , "throttle_serviced_ops"
                         , NULL
                         , "disk"
-                        , "cgroup.throttle_serviced_ops"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.throttle_serviced_ops" : "cgroup.throttle_serviced_ops"
                         , title
                         , "operations/s"
                         , PLUGIN_CGROUPS_NAME
@@ -4493,7 +4514,7 @@ void update_cgroup_charts(int update_every) {
                         , "queued_ops"
                         , NULL
                         , "disk"
-                        , "cgroup.queued_ops"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.queued_ops" : "cgroup.queued_ops"
                         , title
                         , "operations"
                         , PLUGIN_CGROUPS_NAME
@@ -4525,7 +4546,7 @@ void update_cgroup_charts(int update_every) {
                         , "merged_ops"
                         , NULL
                         , "disk"
-                        , "cgroup.merged_ops"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.merged_ops" : "cgroup.merged_ops"
                         , title
                         , "operations/s"
                         , PLUGIN_CGROUPS_NAME
@@ -4563,7 +4584,7 @@ void update_cgroup_charts(int update_every) {
                         , "cpu_some_pressure"
                         , NULL
                         , "cpu"
-                        , "cgroup.cpu_some_pressure"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_some_pressure" : "cgroup.cpu_some_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4587,7 +4608,7 @@ void update_cgroup_charts(int update_every) {
                         , "cpu_some_pressure_stall_time"
                         , NULL
                         , "cpu"
-                        , "cgroup.cpu_some_pressure_stall_time"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_some_pressure_stall_time" : "cgroup.cpu_some_pressure_stall_time"
                         , title
                         , "ms"
                         , PLUGIN_CGROUPS_NAME
@@ -4615,7 +4636,7 @@ void update_cgroup_charts(int update_every) {
                         , "cpu_full_pressure"
                         , NULL
                         , "cpu"
-                        , "cgroup.cpu_full_pressure"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_full_pressure" : "cgroup.cpu_full_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4639,7 +4660,7 @@ void update_cgroup_charts(int update_every) {
                         , "cpu_full_pressure_stall_time"
                         , NULL
                         , "cpu"
-                        , "cgroup.cpu_full_pressure_stall_time"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_full_pressure_stall_time" : "cgroup.cpu_full_pressure_stall_time"
                         , title
                         , "ms"
                         , PLUGIN_CGROUPS_NAME
@@ -4670,7 +4691,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem_some_pressure"
                         , NULL
                         , "mem"
-                        , "cgroup.memory_some_pressure"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.memory_some_pressure" : "cgroup.memory_some_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4694,7 +4715,7 @@ void update_cgroup_charts(int update_every) {
                         , "memory_some_pressure_stall_time"
                         , NULL
                         , "mem"
-                        , "cgroup.memory_some_pressure_stall_time"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.memory_some_pressure_stall_time" : "cgroup.memory_some_pressure_stall_time"
                         , title
                         , "ms"
                         , PLUGIN_CGROUPS_NAME
@@ -4724,7 +4745,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem_full_pressure"
                         , NULL
                         , "mem"
-                        , "cgroup.memory_full_pressure"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.memory_full_pressure" : "cgroup.memory_full_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4749,7 +4770,7 @@ void update_cgroup_charts(int update_every) {
                         , "memory_full_pressure_stall_time"
                         , NULL
                         , "mem"
-                        , "cgroup.memory_full_pressure_stall_time"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.memory_full_pressure_stall_time" : "cgroup.memory_full_pressure_stall_time"
                         , title
                         , "ms"
                         , PLUGIN_CGROUPS_NAME
@@ -4780,7 +4801,7 @@ void update_cgroup_charts(int update_every) {
                         , "io_some_pressure"
                         , NULL
                         , "disk"
-                        , "cgroup.io_some_pressure"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.io_some_pressure" : "cgroup.io_some_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4804,7 +4825,7 @@ void update_cgroup_charts(int update_every) {
                         , "io_some_pressure_stall_time"
                         , NULL
                         , "disk"
-                        , "cgroup.io_some_pressure_stall_time"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.io_some_pressure_stall_time" : "cgroup.io_some_pressure_stall_time"
                         , title
                         , "ms"
                         , PLUGIN_CGROUPS_NAME
@@ -4833,7 +4854,7 @@ void update_cgroup_charts(int update_every) {
                         , "io_full_pressure"
                         , NULL
                         , "disk"
-                        , "cgroup.io_full_pressure"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.io_full_pressure" : "cgroup.io_full_pressure"
                         , title
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
@@ -4857,7 +4878,7 @@ void update_cgroup_charts(int update_every) {
                         , "io_full_pressure_stall_time"
                         , NULL
                         , "disk"
-                        , "cgroup.io_full_pressure_stall_time"
+                        , k8s_is_kubepod(cg) ? "k8s.cgroup.io_full_pressure_stall_time" : "cgroup.io_full_pressure_stall_time"
                         , title
                         , "ms"
                         , PLUGIN_CGROUPS_NAME
