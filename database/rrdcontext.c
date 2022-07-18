@@ -1803,7 +1803,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
         // prepare the snapshot
         char uuid[UUID_STR_LEN];
         uuid_unparse_lower(*host->node_id, uuid);
-        contexts_snapshot_t bundle = contexts_snapshot_new(host->aclk_state.claimed_id, uuid, our_version_hash);
+        contexts_snapshot_t bundle = contexts_snapshot_new(cmd->claim_id, uuid, our_version_hash);
 
         // do a deep scan on every metric of the host to make sure all our data are updated
         rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, -1);
