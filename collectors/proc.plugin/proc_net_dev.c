@@ -333,6 +333,7 @@ static struct netdev_rename {
 
     const char *container_device;
     const char *container_name;
+    const char *ctx_prefix;
 
     DICTIONARY *chart_labels;
 
@@ -355,7 +356,13 @@ static struct netdev_rename *netdev_rename_find(const char *host_device, uint32_
 }
 
 // other threads can call this function to register a rename to a netdev
-void netdev_rename_device_add(const char *host_device, const char *container_device, const char *container_name, DICTIONARY *labels) {
+void netdev_rename_device_add(
+    const char *host_device,
+    const char *container_device,
+    const char *container_name,
+    DICTIONARY *labels,
+    const char *ctx_prefix)
+{
     netdata_mutex_lock(&netdev_rename_mutex);
 
     uint32_t hash = simple_hash(host_device);
@@ -365,6 +372,7 @@ void netdev_rename_device_add(const char *host_device, const char *container_dev
         r->host_device      = strdupz(host_device);
         r->container_device = strdupz(container_device);
         r->container_name   = strdupz(container_name);
+        r->ctx_prefix       = strdupz(ctx_prefix);
         r->chart_labels     = rrdlabels_create();
         rrdlabels_migrate_to_these(r->chart_labels, labels);
         r->hash             = hash;
@@ -415,6 +423,7 @@ void netdev_rename_device_del(const char *host_device) {
             freez((void *) r->host_device);
             freez((void *) r->container_name);
             freez((void *) r->container_device);
+            freez((void *) r->ctx_prefix);
             rrdlabels_destroy(r->chart_labels);
             freez((void *) r);
             break;
@@ -471,18 +480,30 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_mtu_%s", r->container_device);
     d->chart_id_net_mtu        = strdupz(buffer);
 
-    d->chart_ctx_net_bytes      = strdupz("cgroup.net_net");
-    d->chart_ctx_net_compressed = strdupz("cgroup.net_compressed");
-    d->chart_ctx_net_drops      = strdupz("cgroup.net_drops");
-    d->chart_ctx_net_errors     = strdupz("cgroup.net_errors");
-    d->chart_ctx_net_events     = strdupz("cgroup.net_events");
-    d->chart_ctx_net_fifo       = strdupz("cgroup.net_fifo");
-    d->chart_ctx_net_packets    = strdupz("cgroup.net_packets");
-    d->chart_ctx_net_speed      = strdupz("cgroup.net_speed");
-    d->chart_ctx_net_duplex     = strdupz("cgroup.net_duplex");
-    d->chart_ctx_net_operstate  = strdupz("cgroup.net_operstate");
-    d->chart_ctx_net_carrier    = strdupz("cgroup.net_carrier");
-    d->chart_ctx_net_mtu        = strdupz("cgroup.net_mtu");
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_net", r->ctx_prefix);
+    d->chart_ctx_net_bytes      = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_compressed", r->ctx_prefix);
+    d->chart_ctx_net_compressed = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_drops", r->ctx_prefix);
+    d->chart_ctx_net_drops      = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_errors", r->ctx_prefix);
+    d->chart_ctx_net_errors     = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_events", r->ctx_prefix);
+    d->chart_ctx_net_events     = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_fifo", r->ctx_prefix);
+    d->chart_ctx_net_fifo       = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_packets", r->ctx_prefix);
+    d->chart_ctx_net_packets    = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_speed", r->ctx_prefix);
+    d->chart_ctx_net_speed      = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_duplex", r->ctx_prefix);
+    d->chart_ctx_net_duplex     = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_operstate", r->ctx_prefix);
+    d->chart_ctx_net_operstate  = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_carrier", r->ctx_prefix);
+    d->chart_ctx_net_carrier    = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_mtu", r->ctx_prefix);
+    d->chart_ctx_net_mtu        = strdupz(buffer);
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
     d->chart_family = strdupz(buffer);

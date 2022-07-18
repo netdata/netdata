@@ -54,7 +54,12 @@ extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;
 
 // netdev renames
 extern void netdev_rename_device_add(
-    const char *host_device, const char *container_device, const char *container_name, DICTIONARY *labels);
+    const char *host_device,
+    const char *container_device,
+    const char *container_name,
+    DICTIONARY *labels,
+    const char *ctx_prefix);
+
 extern void netdev_rename_device_del(const char *host_device);
 
 #include "proc_self_mountinfo.h"
