@@ -4103,8 +4103,7 @@ netdataDashboard.context = {
     'cgroup.cpu_limit': {
         valueRange: "[0, null]",
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 cgroupCPULimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
@@ -4125,8 +4124,7 @@ netdataDashboard.context = {
     },
     'cgroup.cpu': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 if (cgroupCPULimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
@@ -4173,8 +4171,7 @@ netdataDashboard.context = {
     'k8s.cgroup.cpu_limit': {
         valueRange: "[0, null]",
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 cgroupCPULimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
@@ -4195,8 +4192,7 @@ netdataDashboard.context = {
     },
     'k8s.cgroup.cpu': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 if (cgroupCPULimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
@@ -4245,8 +4241,7 @@ netdataDashboard.context = {
     },
     'cgroup.mem_usage_limit': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 cgroupMemLimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
@@ -4268,8 +4263,7 @@ netdataDashboard.context = {
     },
     'cgroup.mem_usage': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 if (cgroupMemLimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
@@ -4321,8 +4315,7 @@ netdataDashboard.context = {
     },
     'k8s.cgroup.mem_usage_limit': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 cgroupMemLimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
@@ -4344,8 +4337,7 @@ netdataDashboard.context = {
     },
     'k8s.cgroup.mem_usage': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 if (cgroupMemLimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
@@ -4406,8 +4398,7 @@ netdataDashboard.context = {
     },
     'cgroup.throttle_io': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="read"'
                     + ' data-chart-library="gauge"'
@@ -4421,8 +4412,7 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[2] + '"'
                     + ' role="application"></div>';
             },
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="write"'
                     + ' data-chart-library="gauge"'
@@ -4469,8 +4459,7 @@ netdataDashboard.context = {
     },
     'k8s.cgroup.throttle_io': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="read"'
                     + ' data-chart-library="gauge"'
@@ -4484,8 +4473,7 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[2] + '"'
                     + ' role="application"></div>';
             },
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="write"'
                     + ' data-chart-library="gauge"'
