@@ -116,7 +116,7 @@ static int migrate_database(sqlite3 *database, int target_version, char *db_name
     }
 
     info("Database version is %d, current version is %d. Running migration for %s ...", user_version, target_version, db_name);
-    for (int i = user_version; migration_list[i].func && i < target_version; i++) {
+    for (int i = user_version; i < target_version && migration_list[i].func; i++) {
         rc = (migration_list[i].func)(database, migration_list[i].name);
         if (unlikely(rc)) {
             error_report("Database %s migration from version %d to version %d failed", db_name, i, i + 1);
