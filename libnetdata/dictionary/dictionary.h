@@ -231,14 +231,14 @@ extern int dictionary_unittest(size_t entries);
 // ----------------------------------------------------------------------------
 // STRING implementation
 
-typedef struct string STRING;
+typedef struct netdata_string STRING;
 extern STRING *string_strdupz(const char *str);
 extern STRING *string_dup(STRING *string);
 extern void string_freez(STRING *string);
 extern size_t string_length(STRING *string);
 extern const char *string2str(STRING *string) NEVERNULL;
 
-static inline int stringcmp(STRING *s1, STRING *s2) {
+static inline int string_cmp(STRING *s1, STRING *s2) {
     // STRINGs are deduplicated, so the same strings have the same pointer
     if(unlikely(s1 == s2)) return 0;
 
