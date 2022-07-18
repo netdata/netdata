@@ -266,10 +266,10 @@ str_in_list() {
 safe_sha256sum() {
   # Within the context of the installer, we only use -c option that is common between the two commands
   # We will have to reconsider if we start non-common options
-  if command -v sha256sum > /dev/null 2>&1; then
-    sha256sum "$@"
-  elif command -v shasum > /dev/null 2>&1; then
+  if command -v shasum > /dev/null 2>&1; then
     shasum -a 256 "$@"
+  elif command -v sha256sum > /dev/null 2>&1; then
+    sha256sum "$@"
   else
     fatal "I could not find a suitable checksum binary to use" U0002
   fi
