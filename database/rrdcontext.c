@@ -1870,8 +1870,14 @@ struct rrdcontext_to_json {
     RRDCONTEXT_TO_JSON_OPTIONS options;
     time_t after;
     time_t before;
+    SIMPLE_PATTERN *chart_label_key;
+    SIMPLE_PATTERN *chart_labels_filter;
+    SIMPLE_PATTERN *chart_dimensions;
     size_t written;
     time_t now;
+    time_t combined_first_time_t;
+    time_t combined_last_time_t;
+    RRD_FLAGS combined_flags;
 };
 
 static inline int rrdmetric_to_json_callback(const char *id, void *value, void *data) {
@@ -1891,10 +1897,23 @@ static inline int rrdmetric_to_json_callback(const char *id, void *value, void *
     if(before && (!rm->first_time_t || before < rm->first_time_t))
         return 0;
 
-    if(t->written)
+    if(t->chart_dimensions
+        && !simple_pattern_matches(t->chart_dimensions, string2str(rm->id))
+        && !simple_pattern_matches(t->chart_dimensions, string2str(rm->name)))
+        return 0;
+
+    if(t->written) {
         buffer_strcat(wb, ",\n");
-    else
+        t->combined_first_time_t = MIN(t->combined_first_time_t, rm->first_time_t);
+        t->combined_last_time_t = MAX(t->combined_last_time_t, rm->last_time_t);
+        t->combined_flags |= rm->flags;
+    }
+    else {
         buffer_strcat(wb, "\n");
+        t->combined_first_time_t = rm->first_time_t;
+        t->combined_last_time_t = rm->last_time_t;
+        t->combined_flags = rm->flags;
+    }
 
     buffer_sprintf(wb, "\t\t\t\t\t\t\"%s\": {", id);
 
@@ -1950,10 +1969,56 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
     if(before && (!ri->first_time_t || before < ri->first_time_t))
         return 0;
 
-    if(t->written)
+    if(t->chart_label_key && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, t->chart_label_key, '\0'))
+        return 0;
+
+    if(t->chart_labels_filter && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, t->chart_labels_filter, ':'))
+        return 0;
+
+    time_t first_time_t = ri->first_time_t;
+    time_t last_time_t = ri->last_time_t;
+    RRD_FLAGS flags = ri->flags;
+
+    BUFFER *wb_metrics = NULL;
+    if(options & RRDCONTEXT_OPTION_SHOW_METRICS || t->chart_dimensions) {
+
+        wb_metrics = buffer_create(4096);
+
+        struct rrdcontext_to_json t_metrics = {
+            .wb = wb_metrics,
+            .options = options,
+            .chart_label_key = t->chart_label_key,
+            .chart_labels_filter = t->chart_labels_filter,
+            .chart_dimensions = t->chart_dimensions,
+            .after = after,
+            .before = before,
+            .written = 0,
+            .now = t->now,
+        };
+        dictionary_walkthrough_read(ri->rrdmetrics, rrdmetric_to_json_callback, &t_metrics);
+
+        if(!t_metrics.written) {
+            buffer_free(wb_metrics);
+            return 0;
+        }
+
+        first_time_t = t_metrics.combined_first_time_t;
+        last_time_t = t_metrics.combined_last_time_t;
+        flags = t_metrics.combined_flags;
+    }
+
+    if(t->written) {
         buffer_strcat(wb, ",\n");
-    else
+        t->combined_first_time_t = MIN(t->combined_first_time_t, first_time_t);
+        t->combined_last_time_t = MAX(t->combined_last_time_t, last_time_t);
+        t->combined_flags |= flags;
+    }
+    else {
         buffer_strcat(wb, "\n");
+        t->combined_first_time_t = first_time_t;
+        t->combined_last_time_t = last_time_t;
+        t->combined_flags = flags;
+    }
 
     buffer_sprintf(wb, "\t\t\t\t\"%s\": {", id);
 
@@ -1983,15 +2048,15 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
                    , rrdset_type_name(ri->chart_type)
                    , ri->priority
                    , ri->update_every
-                   , ri->first_time_t
-                   , rrd_flag_is_collected(ri) ? t->now : ri->last_time_t
-                   , ri->flags & RRD_FLAG_COLLECTED ? "true" : "false"
+                   , first_time_t
+                   , (flags & RRD_FLAG_COLLECTED) ? t->now : last_time_t
+                   , (flags & RRD_FLAG_COLLECTED) ? "true" : "false"
     );
 
     if(options & RRDCONTEXT_OPTION_SHOW_DELETED) {
         buffer_sprintf(wb,
                        ",\n\t\t\t\t\t\"deleted\":%s"
-                       , ri->flags & RRD_FLAG_DELETED ? "true" : "false"
+                       , (ri->flags & RRD_FLAG_DELETED) ? "true" : "false"
         );
     }
 
@@ -2007,18 +2072,12 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
         buffer_strcat(wb, "\n\t\t\t\t\t}");
     }
 
-    if(options & RRDCONTEXT_OPTION_SHOW_METRICS) {
+    if(wb_metrics) {
         buffer_sprintf(wb, ",\n\t\t\t\t\t\"dimensions\": {");
-        struct rrdcontext_to_json tt = {
-            .wb = wb,
-            .options = options,
-            .after = after,
-            .before = before,
-            .written = 0,
-            .now = t->now,
-        };
-        dictionary_walkthrough_read(ri->rrdmetrics, rrdmetric_to_json_callback, &tt);
+        buffer_fast_strcat(wb, buffer_tostring(wb_metrics), buffer_strlen(wb_metrics));
         buffer_strcat(wb, "\n\t\t\t\t\t}");
+
+        buffer_free(wb_metrics);
     }
 
     buffer_strcat(wb, "\n\t\t\t\t}");
@@ -2037,11 +2096,49 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     if((rc->flags & RRD_FLAG_DELETED) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
         return 0;
 
+    if(options & RRDCONTEXT_OPTION_DEEPSCAN)
+        rrdcontext_recalculate_context_retention(rc, RRD_FLAG_NONE, -1);
+
     if(after && (!rc->last_time_t || after > rc->last_time_t))
         return 0;
 
     if(before && (!rc->first_time_t || before < rc->first_time_t))
         return 0;
+
+    time_t first_time_t = rc->first_time_t;
+    time_t last_time_t = rc->last_time_t;
+    RRD_FLAGS flags = rc->flags;
+
+    BUFFER *wb_instances = NULL;
+    if((options & (RRDCONTEXT_OPTION_SHOW_LABELS|RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_METRICS))
+        || t->chart_label_key
+        || t->chart_labels_filter
+        || t->chart_dimensions) {
+
+        wb_instances = buffer_create(4096);
+
+        struct rrdcontext_to_json t_instances = {
+            .wb = wb_instances,
+            .options = options,
+            .chart_label_key = t->chart_label_key,
+            .chart_labels_filter = t->chart_labels_filter,
+            .chart_dimensions = t->chart_dimensions,
+            .after = after,
+            .before = before,
+            .written = 0,
+            .now = t->now,
+        };
+        dictionary_walkthrough_read(rc->rrdinstances, rrdinstance_to_json_callback, &t_instances);
+
+        if(!t_instances.written) {
+            buffer_free(wb_instances);
+            return 0;
+        }
+
+        first_time_t = t_instances.combined_first_time_t;
+        last_time_t = t_instances.combined_last_time_t;
+        flags = t_instances.combined_flags;
+    }
 
     if(t->written)
         buffer_strcat(wb, ",\n");
@@ -2069,15 +2166,15 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
                    , string2str(rc->family)
                    , rrdset_type_name(rc->chart_type)
                    , rc->priority
-                   , rc->first_time_t
-                   , rrd_flag_is_collected(rc) ? t->now : rc->last_time_t
-                   , rc->flags & RRD_FLAG_COLLECTED ? "true" : "false"
+                   , first_time_t
+                   , (flags & RRD_FLAG_COLLECTED) ? t->now : last_time_t
+                   , (flags & RRD_FLAG_COLLECTED) ? "true" : "false"
                    );
 
     if(options & RRDCONTEXT_OPTION_SHOW_DELETED) {
         buffer_sprintf(wb,
                        ",\n\t\t\t\"deleted\":%s"
-                       , rc->flags & RRD_FLAG_DELETED ? "true" : "false"
+                       , (rc->flags & RRD_FLAG_DELETED) ? "true" : "false"
         );
     }
 
@@ -2108,18 +2205,12 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
 
     rrdcontext_unlock(rc);
 
-    if(options & (RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_METRICS)) {
+    if(wb_instances) {
         buffer_sprintf(wb, ",\n\t\t\t\"charts\": {");
-        struct rrdcontext_to_json tt = {
-            .wb = wb,
-            .options = options,
-            .after = after,
-            .before = before,
-            .written = 0,
-            .now = t->now,
-        };
-        dictionary_walkthrough_read(rc->rrdinstances, rrdinstance_to_json_callback, &tt);
+        buffer_fast_strcat(wb, buffer_tostring(wb_instances), buffer_strlen(wb_instances));
         buffer_strcat(wb, "\n\t\t\t}");
+
+        buffer_free(wb_instances);
     }
 
     buffer_strcat(wb, "\n\t\t}");
@@ -2127,14 +2218,11 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     return 1;
 }
 
-int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context) {
+int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, context);
     if(!rca) return HTTP_RESP_NOT_FOUND;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-
-    if(options & RRDCONTEXT_OPTION_DEEPSCAN)
-        rrdcontext_recalculate_context_retention(rc, RRD_FLAG_NONE, -1);
 
     if(after != 0 && before != 0) {
         long long after_wanted = after;
@@ -2144,32 +2232,32 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
         before = before_wanted;
     }
 
-    struct rrdcontext_to_json t = {
+    struct rrdcontext_to_json t_contexts = {
         .wb = wb,
         .options = options|RRDCONTEXT_OPTION_SKIP_ID,
+        .chart_label_key = chart_label_key,
+        .chart_labels_filter = chart_labels_filter,
+        .chart_dimensions = chart_dimensions,
         .after = after,
         .before = before,
         .written = 0,
         .now = now_realtime_sec(),
     };
-    rrdcontext_to_json_callback(context, rc, &t);
+    rrdcontext_to_json_callback(context, rc, &t_contexts);
 
     rrdcontext_release(rca);
 
-    if(!t.written)
+    if(!t_contexts.written)
         return HTTP_RESP_NOT_FOUND;
 
     return HTTP_RESP_OK;
 }
 
-int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options) {
+int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
     char node_uuid[UUID_STR_LEN] = "";
 
     if(host->node_id)
         uuid_unparse(*host->node_id, node_uuid);
-
-    if(options & RRDCONTEXT_OPTION_DEEPSCAN)
-        rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, -1);
 
     if(after != 0 && before != 0) {
         long long after_wanted = after;
@@ -2197,15 +2285,18 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
     }
 
     buffer_sprintf(wb, ",\n\t\"contexts\": {");
-    struct rrdcontext_to_json t = {
+    struct rrdcontext_to_json t_contexts = {
         .wb = wb,
         .options = options,
+        .chart_label_key = chart_label_key,
+        .chart_labels_filter = chart_labels_filter,
+        .chart_dimensions = chart_dimensions,
         .after = after,
         .before = before,
         .written = 0,
         .now = now_realtime_sec(),
     };
-    dictionary_walkthrough_read((DICTIONARY *)host->rrdctx, rrdcontext_to_json_callback, &t);
+    dictionary_walkthrough_read((DICTIONARY *)host->rrdctx, rrdcontext_to_json_callback, &t_contexts);
 
     // close contexts, close main
     buffer_strcat(wb, "\n\t}\n}");
