@@ -510,7 +510,7 @@ if ENABLE_DBENGINE
         libnetdata/libjudy/src/JudyHS/JudyHS.c \
         $(NULL)
 
-    libjudy_a_CFLAGS = -DJUDYL -Ilibnetdata/libjudy/src -Ilibnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough -DJU_64BIT
+    libjudy_a_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -Ilibnetdata/libjudy/src -Ilibnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
 
     libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrev.$(OBJEXT) : CFLAGS += -DJUDYPREV
     libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrevEmpty.$(OBJEXT) : CFLAGS += -DJUDYPREV

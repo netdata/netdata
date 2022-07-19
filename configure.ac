@@ -469,6 +469,21 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
+AC_C_BIGENDIAN([],
+    [LIBJUDY_CFLAGS="-DJU_LITTLE_ENDIAN"],
+    [AC_MSG_ERROR([Could not find out system endiannnes])])
+
+AC_CHECK_SIZEOF(void *)
+if test "$ac_cv_sizeof_void_p" = 8; then 
+    AC_MSG_RESULT(Detected 64-bit Build Environment)
+    	LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -DJU_64BIT"
+else 
+    AC_MSG_RESULT(Detected 32-bit Build Environment)
+        LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -UJU_64BIT"
+fi
+
+AC_SUBST([LIBJUDY_CFLAGS])
+
 JUDY_CFLAGS="-I \$(abs_top_srcdir)/libnetdata/libjudy/src"
 
 test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
