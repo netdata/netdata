@@ -161,41 +161,7 @@ static void connect_cb(uv_connect_t* req, int status)
 
 int main(int argc, char **argv)
 {
-    int ret, i;
-    static uv_loop_t* loop;
-    uv_connect_t req;
-
-    exit_status = -1; /* default status for when there is no command response from server */
-
-    loop = uv_default_loop();
-
-    ret = uv_pipe_init(loop, &client_pipe, 1);
-    if (ret) {
-        fprintf(stderr, "uv_pipe_init(): %s\n", uv_strerror(ret));
-        return exit_status;
-    }
-
-    command_string_size = 0;
-    command_string[0] = '\0';
-    for (i = 1 ; i < argc ; ++i) {
-        size_t to_copy;
-
-        to_copy = MIN(strlen(argv[i]), MAX_COMMAND_LENGTH - 1 - command_string_size);
-        strncpyz(command_string + command_string_size, argv[i], to_copy);
-        command_string_size += to_copy;
-
-        if (command_string_size < MAX_COMMAND_LENGTH - 1) {
-            command_string[command_string_size++] = ' ';
-        } else {
-            break;
-        }
-    }
-
-    uv_pipe_connect(&req, &client_pipe, PIPENAME, connect_cb);
-
-    uv_run(loop, UV_RUN_DEFAULT);
-
-    uv_close((uv_handle_t *)&client_pipe, NULL);
-
-    return exit_status;
+    UNUSED(argc);
+    UNUSED(argv);
+    string_interning_unittests();
 }

@@ -986,11 +986,12 @@ netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 
 sbin_PROGRAMS += netdatacli
 netdatacli_SOURCES = $(NETDATACLI_FILES)
+netdatacli_CFLAGS = $(CFLAGS) -fsanitize=address,fuzzer
 netdatacli_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 
-netdatacli_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
+netdatacli_LINK = $(CXXLD) $(CXXFLAGS) -fsanitize=address,fuzzer $(LDFLAGS) -o $@
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin

@@ -2324,3 +2324,7 @@ int dictionary_unittest(size_t entries) {
     fprintf(stderr, "\n%zu errors found\n", errors);
     return (int)errors;
 }
+
+int string_interning_unittests(void) {
+    return 0;
+}

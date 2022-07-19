@@ -227,6 +227,7 @@ extern size_t dictionary_stats_walkthroughs(DICTIONARY *dict);
 extern size_t dictionary_stats_referenced_items(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
+extern int string_interning_unittests(void);
 
 // ----------------------------------------------------------------------------
 // STRING implementation
