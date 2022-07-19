@@ -1799,7 +1799,7 @@ components:
               type: array
               items:
                 type: array
-                items: { }
+                items: {}
     data_datatable:
       description: Data response in datatable / datasource formats (suitable for Google
         Charts).
