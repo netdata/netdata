@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix netdata-updater.sh sha256sum on BSDs [\#13391](https://github.com/netdata/netdata/pull/13391) ([tnyeanderson](https://github.com/tnyeanderson))
 - chore\(python.d\): clarify haproxy module readme  [\#13388](https://github.com/netdata/netdata/pull/13388) ([ilyam8](https://github.com/ilyam8))
 - Fix bitmap unit tests [\#13374](https://github.com/netdata/netdata/pull/13374) ([stelfrag](https://github.com/stelfrag))
 - chore\(dashboard\): update chrony dashboard info [\#13371](https://github.com/netdata/netdata/pull/13371) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +18,7 @@
 - Add additional Docker image build with debug info included. [\#13359](https://github.com/netdata/netdata/pull/13359) ([Ferroin](https://github.com/Ferroin))
 - Move host tags to netdata\_info [\#13358](https://github.com/netdata/netdata/pull/13358) ([vlvkobal](https://github.com/vlvkobal))
 - Get rid of extra comma in OpenTSDB exporting [\#13355](https://github.com/netdata/netdata/pull/13355) ([vlvkobal](https://github.com/vlvkobal))
+- Fix chart update ebpf.plugin [\#13351](https://github.com/netdata/netdata/pull/13351) ([thiagoftsm](https://github.com/thiagoftsm))
 - add job to move bugs to project board [\#13350](https://github.com/netdata/netdata/pull/13350) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - added another way to get ansible plays [\#13349](https://github.com/netdata/netdata/pull/13349) ([mhkarimi1383](https://github.com/mhkarimi1383))
 - Send node info message sooner [\#13348](https://github.com/netdata/netdata/pull/13348) ([MrZammler](https://github.com/MrZammler))
@@ -340,7 +342,6 @@
 - Update netdata-installer.sh [\#12755](https://github.com/netdata/netdata/pull/12755) ([petecooper](https://github.com/petecooper))
 - Tag Gotify health notifications for the Gotify phone app [\#12753](https://github.com/netdata/netdata/pull/12753) ([JaphethLim](https://github.com/JaphethLim))
 - fix\(cgroups.plugin\): remove "search for cgroups under PATH" conf option to fix memory leak [\#12752](https://github.com/netdata/netdata/pull/12752) ([ilyam8](https://github.com/ilyam8))
-- fix\(cgroups.plugin\): run renaming script only for containers in k8s [\#12747](https://github.com/netdata/netdata/pull/12747) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
