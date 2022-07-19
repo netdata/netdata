@@ -2363,9 +2363,48 @@ int dictionary_unittest(size_t entries) {
             fprintf(stderr, "OK: strings dictionary has 2 items\n");
     }
 
+    // check 2-way merge
+    {
+        struct testcase {
+            char *src1; char *src2; char *expected;
+        } tests[] = {
+            { "", "", ""},
+            { "a", "", "[x]"},
+            { "", "a", "[x]"},
+            { "a", "a", "a"},
+            { "abcd", "abcd", "abcd"},
+            { "foo_cs", "bar_cs", "[x]_cs"},
+            { "cp_UNIQUE_INFIX_cs", "cp_unique_infix_cs", "cp_[x]_cs"},
+            { "cp_UNIQUE_INFIX_ci_unique_infix_cs", "cp_unique_infix_ci_UNIQUE_INFIX_cs", "cp_[x]_cs"},
+            { "foo[1234]", "foo[4321]", "foo[[x]]"},
+            { NULL, NULL, NULL },
+        };
+
+        for (struct testcase *tc = &tests[0]; tc->expected != NULL; tc++) {
+            STRING *src1 = string_strdupz(tc->src1);
+            STRING *src2 = string_strdupz(tc->src2);
+            STRING *expected = string_strdupz(tc->expected);
+
+            STRING *result = string_2way_merge(src1, src2);
+            if (string_cmp(result, expected) != 0) {
+                fprintf(stderr, "string_2way_merge(\"%s\", \"%s\") -> \"%s\" (expected=\"%s\")\n",
+                        string2str(src1),
+                        string2str(src2),
+                        string2str(result),
+                        string2str(expected));
+                errors++;
+            }
+
+            string_freez(src1);
+            string_freez(src2);
+            string_freez(expected);
+            string_freez(result);
+        }
+    }
+
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
 
     fprintf(stderr, "\n%zu errors found\n", errors);
-    return (int)errors;
+    return  errors ? 1 : 0;
 }
