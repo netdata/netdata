@@ -520,8 +520,7 @@ static void rrdmetric_insert_callback(const char *id __maybe_unused, void *value
 static void rrdmetric_delete_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDMETRIC *rm = value;
 
-    if(rm->rrddim)
-        fatal("RRDMETRIC: '%s' is freed but there is a RRDDIM linked to it.", string2str(rm->id));
+    internal_error(rm->rrddim, "RRDMETRIC: '%s' is freed but there is a RRDDIM linked to it.", string2str(rm->id));
 
     // free the resources
     rrdmetric_free(rm);
@@ -532,8 +531,9 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
     RRDMETRIC *rm     = oldv;
     RRDMETRIC *rm_new = newv;
 
-    if(rm->id != rm_new->id)
-        fatal("RRDMETRIC: '%s' cannot change id to '%s'", string2str(rm->id), string2str(rm_new->id));
+    internal_error(rm->id != rm_new->id,
+                   "RRDMETRIC: '%s' cannot change id to '%s'",
+                   string2str(rm->id), string2str(rm_new->id));
 
     if(uuid_compare(rm->uuid, rm_new->uuid) != 0) {
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
@@ -553,7 +553,7 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
         uuid_unparse(rm_new->uuid, uuid2);
-        fatal("RRDMETRIC: '%s' is linked to RRDDIM '%s' but they have different UUIDs. RRDMETRIC has '%s', RRDDIM has '%s'", string2str(rm->id), rm->rrddim->id, uuid1, uuid2);
+        internal_error(true, "RRDMETRIC: '%s' is linked to RRDDIM '%s' but they have different UUIDs. RRDMETRIC has '%s', RRDDIM has '%s'", string2str(rm->id), rm->rrddim->id, uuid1, uuid2);
     }
 
     if(rm->rrddim != rm_new->rrddim)
@@ -791,8 +791,7 @@ static void rrdinstance_delete_callback(const char *id, void *value, void *data)
 
     rrdinstance_log(ri, "DELETE");
 
-    if(ri->rrdset)
-        fatal("RRDINSTANCE: '%s' is freed but there is a RRDSET linked to it.", string2str(ri->id));
+    internal_error(ri->rrdset, "RRDINSTANCE: '%s' is freed but there is a RRDSET linked to it.", string2str(ri->id));
 
     rrdinstance_free(ri);
 }
@@ -801,8 +800,9 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
     RRDINSTANCE *ri     = (RRDINSTANCE *)oldv;
     RRDINSTANCE *ri_new = (RRDINSTANCE *)newv;
 
-    if(ri->id != ri_new->id)
-        fatal("RRDINSTANCE: '%s' cannot change id to '%s'", string2str(ri->id), string2str(ri_new->id));
+    internal_error(ri->id != ri_new->id,
+                   "RRDINSTANCE: '%s' cannot change id to '%s'",
+                   string2str(ri->id), string2str(ri_new->id));
 
     if(uuid_compare(ri->uuid, ri_new->uuid) != 0) {
         uuid_copy(ri->uuid, ri_new->uuid);
@@ -818,7 +818,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(ri->uuid, uuid1);
         uuid_unparse(*ri->rrdset->chart_uuid, uuid2);
-        fatal("RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), ri->rrdset->id, uuid1, uuid2);
+        internal_error(true, "RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), ri->rrdset->id, uuid1, uuid2);
     }
 
     if(ri->name != ri_new->name) {
@@ -1075,9 +1075,6 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
     uuid_copy(tri.uuid, *st->chart_uuid);
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, string2str(tri.id), &tri, sizeof(tri));
-
-    if(st->rrdinstance && st->rrdinstance != ria)
-        fatal("RRDINSTANCE: chart '%s' changed rrdinstance.", st->id);
 
     if(st->rrdinstance)
         rrdinstance_release(st->rrdinstance);
