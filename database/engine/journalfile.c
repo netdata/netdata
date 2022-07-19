@@ -272,6 +272,16 @@ static int check_journal_file_superblock(uv_file file)
     return ret;
 }
 
+static int get_update_every(struct rrdeng_page_descr *descr)
+{
+    size_t entries = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
+
+    if (entries > 1)
+        return (uint32_t)(((descr->end_time - descr->start_time) / USEC_PER_SEC) / (entries - 1));
+
+    return 0;
+}
+
 static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                                     void *buf, unsigned max_size)
 {
@@ -302,7 +312,10 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         uuid_t *temp_id;
         Pvoid_t *PValue;
         struct pg_cache_page_index *page_index = NULL;
-        uint8_t page_type = jf_metric_data->descr[i].type;
+
+        uint8_t page_type = jf_metric_data->descr[i].type & PAGE_TYPE_FLAG_ALL;
+        bool page_has_update_every = jf_metric_data->descr[i].type & PAGE_TYPE_FLAG_UPDATE_EVERY;
+        jf_metric_data->descr[i].type = page_type;
 
         if (page_type > PAGE_TYPE_MAX) {
             if (!bitmap256_get_bit(&page_error_map, page_type)) {
@@ -312,15 +325,24 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             continue;
         }
         uint64_t start_time = jf_metric_data->descr[i].start_time;
-        uint64_t end_time = jf_metric_data->descr[i].end_time;
+        uint64_t end_time;
+        uint32_t update_every = 0;
+
+        if (page_has_update_every) {
+            update_every = jf_metric_data->descr[i].info.update_every;
+            end_time = start_time + jf_metric_data->descr[i].info.end_time_delta;
+        }
+        else
+            end_time = jf_metric_data->descr[i].end_time;
 
         if (unlikely(start_time > end_time)) {
             error("Invalid page encountered, start time %lu > end time %lu", start_time , end_time );
             continue;
         }
 
+        size_t entries = jf_metric_data->descr[i].page_length / PAGE_POINT_SIZE_BYTES((struct rrdeng_extent_page_descr *) &jf_metric_data->descr[i]);
+
         if (unlikely(start_time == end_time)) {
-            size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
             if (unlikely(entries > 1)) {
                 error("Invalid page encountered, start time %lu = end time but %zu entries were found", start_time, entries);
                 continue;
@@ -354,6 +376,27 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->extent = extent;
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
+
+        char uuid_str[GUID_LEN + 1];
+        uuid_unparse_lower(page_index->id, uuid_str);
+
+        if (unlikely(!page_has_update_every)) {
+            update_every = get_update_every(descr);
+//            if (!update_every) {
+//                struct rrdeng_page_descr *prev_descr = NULL;
+//                uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+//                Word_t Index = (Word_t)(descr->start_time / USEC_PER_SEC);
+//                PValue = JudyLLast(page_index->JudyL_array, &Index, PJE0);
+//                if (likely(NULL != PValue))
+//                    prev_descr = *PValue;
+//                uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+//                if (prev_descr)
+//                    update_every = get_update_every(prev_descr);
+//            }
+        }
+
+        descr->update_every = update_every;
+
         pg_cache_insert(ctx, page_index, descr);
     }
 
@@ -418,7 +461,6 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
 
     return size_bytes;
 }
-
 
 #define READAHEAD_BYTES (RRDENG_BLOCK_SIZE * 256)
 /*

@@ -235,6 +235,13 @@ void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, str
     freez(xt_io_descr);
 }
 
+usec_t get_descr_end_time(struct rrdeng_extent_page_descr *descr)
+{
+    if (descr->type & PAGE_TYPE_FLAG_UPDATE_EVERY)
+        return descr->start_time + descr->info.end_time_delta;
+    return descr->end_time;
+}
+
 void read_extent_cb(uv_fs_t* req)
 {
     struct rrdengine_worker_config* wc = req->loop->data;
@@ -342,7 +349,7 @@ after_crc_check:
             if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj->id) &&
                 header->descr[i].page_length == descrj->page_length &&
                 header->descr[i].start_time == descrj->start_time &&
-                header->descr[i].end_time == descrj->end_time) {
+                get_descr_end_time(&header->descr[i]) == descrj->end_time) {
                 descr = descrj;
                 break;
             }
@@ -781,11 +788,13 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         xt_io_descr->descr_commit_idx_array[i] = descr_commit_idx_array[i];
 
         descr = xt_io_descr->descr_array[i];
-        header->descr[i].type = descr->type;
+        header->descr[i].type = descr->type | PAGE_TYPE_FLAG_UPDATE_EVERY;
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time = descr->start_time;
-        header->descr[i].end_time = descr->end_time;
+        //header->descr[i].end_time = descr->end_time;
+        header->descr[i].info.end_time_delta = (uint64_t) (descr->end_time - descr->start_time);
+        header->descr[i].info.update_every = (uint64_t) descr->update_every;
         pos += sizeof(header->descr[i]);
     }
     for (i = 0 ; i < count ; ++i) {

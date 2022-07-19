@@ -16,7 +16,7 @@ uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER,
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
 #endif
-size_t page_type_size[256] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
+size_t page_type_size[128] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
@@ -267,6 +267,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
         rrdeng_store_metric_flush_current_page(collection_handle);
 
         page = rrdeng_create_page(ctx, &metric_handle->page_index->id, &descr);
+        descr->update_every = rd->update_every;
         fatal_assert(page);
 
         handle->descr = descr;

@@ -127,6 +127,8 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
 
     descr = rrdeng_page_descr_mallocz();
     descr->page_length = 0;
+    descr->type = 0;
+    descr->update_every = 0;
     descr->start_time = INVALID_TIME;
     descr->end_time = INVALID_TIME;
     descr->id = NULL;

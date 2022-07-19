@@ -42,6 +42,9 @@ struct page_cache_descr {
 #define PG_CACHE_DESCR_USERS_MASK   (((unsigned long)-1) << PG_CACHE_DESCR_SHIFT)
 #define PG_CACHE_DESCR_FLAGS_MASK   (((unsigned long)-1) >> (BITS_PER_ULONG - PG_CACHE_DESCR_SHIFT))
 
+#define PAGE_TYPE_FLAG_ALL          127
+#define PAGE_TYPE_FLAG_UPDATE_EVERY 128
+
 /*
  * Page cache descriptor state bits (works for both 32-bit and 64-bit architectures):
  *
@@ -63,7 +66,7 @@ struct rrdeng_page_descr {
     usec_t start_time;
     usec_t end_time;
     uint32_t page_length;
-    uint32_t type:8;
+    uint8_t type:8;
     uint32_t update_every:24;
 };
 
