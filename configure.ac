@@ -469,7 +469,7 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
-JUDY_CFLAGS="-I \$(abs_top_srcdir)/libnetdata/libjudy"
+JUDY_CFLAGS="-I \$(abs_top_srcdir)/libnetdata/libjudy/src"
 
 test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
     AC_MSG_ERROR([OpenSSL required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
