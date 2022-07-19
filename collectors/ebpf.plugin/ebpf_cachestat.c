@@ -316,6 +316,7 @@ static void ebpf_cachestat_cleanup(void *ptr)
 
     freez(cachestat_vector);
     freez(cachestat_values);
+    freez(cachestat_threads.thread);
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -324,6 +325,7 @@ static void ebpf_cachestat_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
+        freez(probe_links);
         if (objects)
             bpf_object__close(objects);
     }
@@ -1068,7 +1070,7 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
 */
 static void cachestat_collector(ebpf_module_t *em)
 {
-    cachestat_threads.thread = mallocz(sizeof(netdata_thread_t));
+    cachestat_threads.thread = callocz(1, sizeof(netdata_thread_t));
     cachestat_threads.start_routine = ebpf_cachestat_read_hash;
 
     netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
