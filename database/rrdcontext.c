@@ -11,6 +11,7 @@ int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
 #define MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST         5000
 #define FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS    120
 #define RRDCONTEXT_WORKER_THREAD_HEARTBEAT_SECS             1
+#define RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY                 10
 
 // #define LOG_TRANSITIONS 1
 // #define LOG_RRDINSTANCES 1
@@ -637,6 +638,9 @@ static inline bool rrdmetric_should_be_deleted(RRDMETRIC *rm) {
 static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate) {
     if(likely(!force && !(rm->flags & RRD_FLAG_UPDATED))) return;
 
+    if(unlikely(rrd_flag_is_collected(rm) && !rm->rrddim))
+        rrd_flag_set_archived(rm);
+
     if(unlikely((rm->flags & RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD) && rrd_flag_is_collected(rm)))
         rrd_flag_set_archived(rm);
 
@@ -731,26 +735,6 @@ static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
 // ----------------------------------------------------------------------------
 // RRDINSTANCE
 
-static void rrdinstance_check(RRDINSTANCE *ri) {
-    if(unlikely(!ri->id))
-        fatal("RRDINSTANCE: created without an id");
-
-    if(unlikely(!ri->name))
-        fatal("RRDINSTANCE: '%s' created without a name", string2str(ri->id));
-
-    if(unlikely(!ri->title))
-        fatal("RRDINSTANCE: '%s' created without a title", string2str(ri->id));
-
-    if(unlikely(!ri->units))
-        fatal("RRDINSTANCE: '%s' created without units", string2str(ri->id));
-
-    if(unlikely(!ri->priority))
-        fatal("RRDINSTANCE: '%s' created without a priority", string2str(ri->id));
-
-    if(unlikely(!ri->update_every))
-        fatal("RRDINSTANCE: '%s' created without an update_every", string2str(ri->id));
-}
-
 static void rrdinstance_free(RRDINSTANCE *ri) {
 
     if(ri->flags & RRD_FLAG_OWN_LABELS)
@@ -783,8 +767,6 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
     if(!ri->name)
         ri->name = string_dup(ri->id);
 
-    rrdinstance_check(ri);
-
     if(ri->rrdset && ri->rrdset->state) {
         ri->rrdlabels = ri->rrdset->state->chart_labels;
         if(ri->flags & RRD_FLAG_OWN_LABELS)
@@ -796,7 +778,6 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
     }
 
     rrdmetrics_create(ri);
-
     rrdinstance_log(ri, "INSERT");
 
     // signal the react callback to do the job
@@ -819,8 +800,6 @@ static void rrdinstance_delete_callback(const char *id, void *value, void *data)
 static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *oldv, void *newv, void *data __maybe_unused) {
     RRDINSTANCE *ri     = (RRDINSTANCE *)oldv;
     RRDINSTANCE *ri_new = (RRDINSTANCE *)newv;
-
-    rrdinstance_check(ri_new);
 
     if(ri->id != ri_new->id)
         fatal("RRDINSTANCE: '%s' cannot change id to '%s'", string2str(ri->id), string2str(ri_new->id));
@@ -965,7 +944,21 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
 
 static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate) {
     if(unlikely(!force && !(ri->flags & RRD_FLAG_UPDATED))) return;
-    rrd_flag_unset_updated(ri);
+
+    if(likely(ri->rrdset)) {
+        if(unlikely(ri->rrdset->priority != ri->priority)) {
+            ri->priority = ri->rrdset->priority;
+            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY);
+        }
+        if(unlikely(ri->rrdset->update_every != ri->update_every)) {
+            ri->update_every = ri->rrdset->update_every;
+            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY);
+        }
+    }
+    else if(unlikely(rrd_flag_is_collected(ri))) {
+        rrd_flag_set_archived(ri);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
+    }
 
     RRD_FLAGS combined_metrics_flags = RRD_FLAG_NONE;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
@@ -1053,7 +1046,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
 }
 
 static inline void rrdinstance_from_rrdset(RRDSET *st) {
-    RRDCONTEXT tc = {
+    RRDCONTEXT trc = {
         .id = string_strdupz(st->context),
         .title = string_strdupz(st->title),
         .units = string_strdupz(st->units),
@@ -1064,7 +1057,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         .rrdhost = st->rrdhost,
     };
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item((DICTIONARY *)st->rrdhost->rrdctx, string2str(tc.id), &tc, sizeof(tc));
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item((DICTIONARY *)st->rrdhost->rrdctx, string2str(trc.id), &trc, sizeof(trc));
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
@@ -1535,8 +1528,9 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
     if(unlikely(!force && !(rc->flags & RRD_FLAG_UPDATED))) return;
 
     rrdcontext_lock(rc);
-    rc->flags |= reason;
-    rrd_flag_unset_updated(rc);
+
+    if(reason)
+        rrd_flag_set_updated(rc, reason);
 
     size_t min_priority = LONG_MAX;
     RRD_FLAGS combined_instances_flags = RRD_FLAG_NONE;
@@ -1553,9 +1547,14 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
                 continue;
             }
 
+            internal_error(rc->units != ri->units,
+                           "RRDCONTEXT: '%s' rrdinstance '%s' has different units, context '%s', instance '%s'",
+                           string2str(rc->id), string2str(ri->id),
+                           string2str(rc->units), string2str(ri->units));
+
             instances_active++;
 
-            if (ri->priority > 0 && ri->priority < min_priority)
+            if (ri->priority >= RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY && ri->priority < min_priority)
                 min_priority = ri->priority;
 
             if (ri->first_time_t && ri->first_time_t < min_first_time_t)
