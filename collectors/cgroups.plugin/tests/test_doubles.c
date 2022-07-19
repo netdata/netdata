@@ -132,12 +132,13 @@ void update_pressure_charts(struct pressure_charts *charts)
 }
 
 void netdev_rename_device_add(
-    const char *host_device, const char *container_device, const char *container_name, DICTIONARY *labels)
+    const char *host_device, const char *container_device, const char *container_name, DICTIONARY *labels, const char *ctx_prefix)
 {
     UNUSED(host_device);
     UNUSED(container_device);
     UNUSED(container_name);
     UNUSED(labels);
+    UNUSED(ctx_prefix);
 }
 
 void netdev_rename_device_del(const char *host_device)
