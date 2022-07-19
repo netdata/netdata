@@ -2402,6 +2402,8 @@ skip_store:
 
 void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info)
 {
+    if (unlikely(!system_info))
+        return;
 
     if (system_info->container_os_name)
         sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_NAME", system_info->container_os_name);
