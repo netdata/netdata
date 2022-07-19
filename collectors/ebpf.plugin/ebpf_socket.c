@@ -3932,7 +3932,6 @@ void *ebpf_socket_thread(void *ptr)
         error("Cannot initialize local mutex");
         goto endsocket;
     }
-    pthread_mutex_lock(&lock);
 
     ebpf_socket_allocate_global_vectors(em->apps_charts);
     initialize_inbound_outbound();
@@ -3959,6 +3958,7 @@ void *ebpf_socket_thread(void *ptr)
         socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
         algorithms, NETDATA_MAX_SOCKET_VECTOR);
 
+    pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
