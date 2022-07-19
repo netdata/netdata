@@ -689,7 +689,6 @@ RRDHOST *rrdhost_find_or_create(
            , rrdpush_api_key
            , rrdpush_send_charts_matching
            , system_info);
-        sql_store_host_system_info(&host->host_uuid, system_info);
     }
     if (host) {
         rrdhost_wrlock(host);

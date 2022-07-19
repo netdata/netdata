@@ -2353,7 +2353,7 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
     "(host_id, system_key, system_value, date_created) " \
     "VALUES (@host, @key, @value, unixepoch());"
 
-void sql_store_host_system_info_key_value(uuid_t *host_id, char *name, char *value)
+void sql_store_host_system_info_key_value(uuid_t *host_id, const char *name, const char *value)
 {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -2400,7 +2400,7 @@ skip_store:
 }
 
 
-void sql_store_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info)
+void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info)
 {
 
     if (system_info->container_os_name)
