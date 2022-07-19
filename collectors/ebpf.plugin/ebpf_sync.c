@@ -455,6 +455,7 @@ void ebpf_sync_cleanup_objects()
                 bpf_link__destroy(w->probe_links[j]);
                 j++;
             }
+            freez(w->probe_links);
             if (w->objects)
                 bpf_object__close(w->objects);
         }
