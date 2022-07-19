@@ -1597,6 +1597,51 @@ const char *string2str(STRING *string) {
     return ((STRING_ENTRY *)string)->str;
 }
 
+STRING *string_2way_merge(STRING *a, STRING *b) {
+    static STRING *X = NULL;
+
+    if(unlikely(!X)) {
+        X = string_strdupz("[x]");
+    }
+
+    if(unlikely(a == b)) return string_dup(a);
+    if(unlikely(a == X)) return string_dup(a);
+    if(unlikely(b == X)) return string_dup(b);
+    if(unlikely(!a)) return string_dup(X);
+    if(unlikely(!b)) return string_dup(X);
+
+    size_t alen = string_length(a);
+    size_t blen = string_length(b);
+    size_t length = alen + blen + string_length(X) + 1;
+    char buf1[length + 1], buf2[length + 1], *dst1;
+    const char *s1, *s2;
+
+    s1 = string2str(a);
+    s2 = string2str(b);
+    dst1 = buf1;
+    for( ; *s1 && *s2 && *s1 == *s2 ;s1++, s2++)
+        *dst1++ = *s1;
+
+    *dst1 = '\0';
+
+    if(*s1 != '\0' || *s2 != '\0') {
+        *dst1++ = '[';
+        *dst1++ = 'x';
+        *dst1++ = ']';
+
+        s1 = &(string2str(a))[alen - 1];
+        s2 = &(string2str(b))[blen - 1];
+        char *dst2 = &buf2[length];
+        *dst2 = '\0';
+        for (; *s1 && *s2 && *s1 == *s2; s1--, s2--)
+            *(--dst2) = *s1;
+
+        strcpy(dst1, dst2);
+    }
+
+    return string_strdupz(buf1);
+}
+
 // ----------------------------------------------------------------------------
 // unit test
 
