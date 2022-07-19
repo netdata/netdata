@@ -1119,7 +1119,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
         key = pids->pid;
         ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
-            w = mallocz(sizeof(ebpf_process_stat_t));
+            w = callocz(1, sizeof(ebpf_process_stat_t));
             global_process_stats[key] = w;
         }
 

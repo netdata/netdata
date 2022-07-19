@@ -177,11 +177,9 @@ void ebpf_process_remove_pids()
         uint32_t pid = pids->pid;
         ebpf_process_stat_t *w = global_process_stats[pid];
         if (w) {
-            if (w->removeme) {
-                freez(w);
-                global_process_stats[pid] = NULL;
-                bpf_map_delete_elem(pid_fd, &pid);
-            }
+            freez(w);
+            global_process_stats[pid] = NULL;
+            bpf_map_delete_elem(pid_fd, &pid);
         }
 
         pids = pids->next;
