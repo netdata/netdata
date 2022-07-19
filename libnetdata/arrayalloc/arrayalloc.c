@@ -317,7 +317,8 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
         // free it
         if(ar->internal.mmap) {
             munmap(page->data, page->size);
-            unlink(page->filename);
+            if (unlikely(unlink(page->filename) == 1))
+                error("Cannot delete file '%s'", page->filename);
             freez((void *)page->filename);
         }
         else
