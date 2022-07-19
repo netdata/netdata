@@ -676,6 +676,7 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Sending node collectors info for %s", wc->uuid_str);
                     sql_build_node_collectors(wc);
                     break;
+#ifdef ENABLE_ACLK
                 case ACLK_DATABASE_UPDATE_NODE_STATE:
                     debug(D_ACLK_SYNC,"Update node info for %s", wc->uuid_str);
                     RRDHOST *host = wc->host;
@@ -691,7 +692,6 @@ void aclk_database_worker(void *arg)
                         wc->update_node_after = -1;
                     }
                     break;
-#ifdef ENABLE_ACLK
                 case ACLK_DATABASE_DIM_DELETION:
                     debug(D_ACLK_SYNC,"Sending dimension deletion information %s", wc->uuid_str);
                     aclk_process_dimension_deletion(wc, cmd);
