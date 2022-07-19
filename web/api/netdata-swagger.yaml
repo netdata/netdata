@@ -92,42 +92,42 @@ paths:
                 - deepscan
             default:
               - full
-      - name: after
-        in: query
-        description: limit the results on context having data after this timestamp.
-        required: false
-        schema:
-          type: number
-          format: integer
-      - name: before
-        in: query
-        description: limit the results on context having data before this timestamp.
-        required: false
-        schema:
-          type: number
-          format: integer
-      - name: chart_label_key
-        in: query
-        description: a simple pattern matching charts label keys (use comma or pipe as separator)
-        required: false
-        allowEmptyValue: true
-        schema:
+        - name: after
+          in: query
+          description: limit the results on context having data after this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: before
+          in: query
+          description: limit the results on context having data before this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: chart_label_key
+          in: query
+          description: a simple pattern matching charts label keys (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
             type: string
-      - name: chart_labels_filter
-        in: query
-        description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
+        - name: chart_labels_filter
+          in: query
+          description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
           as separator)"
-        required: false
-        allowEmptyValue: true
-        schema:
-          type: string
-      - name: dimensions
-        in: query
-        description: a simple pattern matching dimensions (use comma or pipe as separator)
-        required: false
-        allowEmptyValue: true
-        schema:
-          type: string
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: dimensions
+          in: query
+          description: a simple pattern matching dimensions (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
       responses:
         "200":
           description: An array of contexts.
@@ -1799,7 +1799,7 @@ components:
               type: array
               items:
                 type: array
-                items: {}
+                items: { }
     data_datatable:
       description: Data response in datatable / datasource formats (suitable for Google
         Charts).
