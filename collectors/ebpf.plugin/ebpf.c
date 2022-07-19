@@ -1949,6 +1949,7 @@ int main(int argc, char **argv)
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         struct netdata_static_thread *st = &ebpf_threads[i];
         netdata_thread_join(*st->thread, NULL);
+        freez(st->thread);
     }
 
     thread_finished++;
