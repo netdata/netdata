@@ -1361,7 +1361,7 @@ static void rrdcontext_delete_callback(const char *id, void *value, void *data) 
     rrdcontext_freez(rc);
 }
 
-static STRING *string_2way_merge(RRDCONTEXT *rc __maybe_unused, STRING *a, STRING *b) {
+static STRING *string_2way_merge(STRING *a, STRING *b) {
     static STRING *X = NULL;
 
     if(unlikely(!X)) {
@@ -1419,7 +1419,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 
     if(rc->title != rc_new->title) {
         STRING *old_title = rc->title;
-        rc->title = string_2way_merge(rc, rc->title, rc_new->title);
+        rc->title = string_2way_merge(rc->title, rc_new->title);
         string_freez(old_title);
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_TITLE);
     }
@@ -1433,7 +1433,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 
     if(rc->family != rc_new->family) {
         STRING *old_family = rc->family;
-        rc->family = string_2way_merge(rc, rc->family, rc_new->family);
+        rc->family = string_2way_merge(rc->family, rc_new->family);
         string_freez(old_family);
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY);
     }
