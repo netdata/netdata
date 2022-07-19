@@ -2335,7 +2335,7 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter host information");
-        return;
+        goto skip_loading;
     }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
@@ -2343,6 +2343,7 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
                                          (char *) sqlite3_column_text(res, 1));
     }
 
+skip_loading:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading host information");
     return;
