@@ -45,6 +45,7 @@ typedef enum {
     RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED = (1 << 26), // this object has started being collected
     RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD      = (1 << 27), // this context belongs to a host that just disconnected
     RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 28), // this context changed because of a db rotation
+    RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 29), // this context is not used anymore
 } RRD_FLAGS;
 
 #define RRD_FLAG_ALL_UPDATE_REASONS                   ( \
@@ -67,6 +68,7 @@ typedef enum {
     |RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED     \
     |RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD          \
     |RRD_FLAG_UPDATE_REASON_DB_ROTATION                 \
+    |RRD_FLAG_UPDATE_REASON_UNUSED                      \
 )
 
 #define RRD_FLAGS_PROPAGATED_UPSTREAM                 ( \
@@ -131,6 +133,7 @@ static struct rrdcontext_reason {
     { RRD_FLAG_UPDATE_REASON_CHANGED_CHART_TYPE,      "changed chart type",   30 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED, "stopped collected",    60 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED, "started collected",    0 * USEC_PER_SEC },
+    { RRD_FLAG_UPDATE_REASON_UNUSED,                  "unused",               0 * USEC_PER_SEC },
 
     // not context related
     { RRD_FLAG_UPDATE_REASON_CHANGED_UUID,            "changed uuid",         60 * USEC_PER_SEC },
@@ -1072,22 +1075,61 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, string2str(tri.id), &tri, sizeof(tri));
 
-    if(st->rrdinstance)
-        rrdinstance_release(st->rrdinstance);
-
-    st->rrdinstance = ria;
-
-    if(st->rrdcontext && st->rrdcontext != rca) {
-        // the chart changed context
-        RRDCONTEXT *rc_old = rrdcontext_acquired_value(st->rrdcontext);
-        dictionary_del(rc_old->rrdinstances, st->id);
-        rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
-    }
-
-    if(st->rrdcontext)
-        rrdcontext_release(st->rrdcontext);
+    RRDCONTEXT_ACQUIRED *rca_old = st->rrdcontext;
+    RRDINSTANCE_ACQUIRED *ria_old = st->rrdinstance;
 
     st->rrdcontext = rca;
+    st->rrdinstance = ria;
+
+    if(rca == rca_old) {
+        rrdcontext_release(rca_old);
+        rca_old = NULL;
+    }
+
+    if(ria == ria_old) {
+        rrdinstance_release(ria_old);
+        ria_old = NULL;
+    }
+
+    if(rca_old && ria_old) {
+        // the chart changed context
+        RRDCONTEXT *rc_old = rrdcontext_acquired_value(rca_old);
+        RRDINSTANCE *ri_old = rrdinstance_acquired_value(ria_old);
+
+        // migrate all dimensions to the new metrics
+        rrdset_rdlock(st);
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            if (!rd->rrdmetric) continue;
+
+            RRDMETRIC *rm_old = rrdmetric_acquired_value(rd->rrdmetric);
+            rm_old->flags = RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_UPDATE_REASON_UNUSED;
+
+            rrdmetric_release(rd->rrdmetric);
+            rd->rrdmetric = NULL;
+
+            rrdmetric_from_rrddim(rd);
+        }
+        rrdset_unlock(st);
+
+        ri_old->flags = RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_UPDATE_REASON_UNUSED;
+        ri_old->rrdset = NULL;
+
+        rrdinstance_release(ria_old);
+
+        // trigger updates on the old context
+        if(!dictionary_stats_entries(rc_old->rrdinstances))
+            rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_UNUSED);
+        else
+            rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
+
+        rrdcontext_release(rca_old);
+        rca_old = NULL;
+        ria_old = NULL;
+    }
+
+    if(rca_old || ria_old)
+        fatal("RRDCONTEXT: cannot switch rrdcontext without switching rrdinstance too");
 }
 
 #define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__);
