@@ -7,7 +7,6 @@ static char *swap_dimension_name[NETDATA_SWAP_END] = { "read", "write" };
 static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
 static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 
-static int read_thread_closed = 1;
 netdata_publish_swap_t *swap_vector = NULL;
 
 static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
@@ -206,18 +205,16 @@ static void ebpf_swap_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*swap_threads.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     ebpf_cleanup_publish_syscall(swap_publish_aggregated);
 
     freez(swap_vector);
     freez(swap_values);
+    freez(swap_threads.thread);
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -226,6 +223,7 @@ static void ebpf_swap_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
+        freez(probe_links);
         if (objects)
             bpf_object__close(objects);
     }
@@ -393,8 +391,6 @@ static void read_global_table()
  */
 void *ebpf_swap_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -407,7 +403,6 @@ void *ebpf_swap_read_hash(void *ptr)
         read_global_table();
     }
 
-    read_thread_closed = 1;
     return NULL;
 }
 
@@ -679,7 +674,7 @@ static void swap_collector(ebpf_module_t *em)
     swap_threads.thread = mallocz(sizeof(netdata_thread_t));
     swap_threads.start_routine = ebpf_swap_read_hash;
 
-    netdata_thread_create(swap_threads.thread, swap_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(swap_threads.thread, swap_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_swap_read_hash, em);
 
     int apps = em->apps_charts;
