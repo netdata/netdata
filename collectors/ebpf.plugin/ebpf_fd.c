@@ -34,7 +34,6 @@ static struct bpf_object *objects = NULL;
 
 struct netdata_static_thread fd_thread = {"FD KERNEL", NULL, NULL, 1, NULL,
                                           NULL,  NULL};
-static int read_thread_closed = 1;
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
@@ -58,13 +57,10 @@ static void ebpf_fd_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*fd_thread.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     ebpf_cleanup_publish_syscall(fd_publish_aggregated);
     freez(fd_thread.thread);
@@ -78,6 +74,7 @@ static void ebpf_fd_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
+        freez(probe_links);
         if (objects)
             bpf_object__close(objects);
     }
@@ -148,8 +145,6 @@ static void read_global_table()
  */
 void *ebpf_fd_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -162,7 +157,6 @@ void *ebpf_fd_read_hash(void *ptr)
         read_global_table();
     }
 
-    read_thread_closed = 1;
     return NULL;
 }
 
@@ -652,7 +646,7 @@ static void fd_collector(ebpf_module_t *em)
     fd_thread.thread = mallocz(sizeof(netdata_thread_t));
     fd_thread.start_routine = ebpf_fd_read_hash;
 
-    netdata_thread_create(fd_thread.thread, fd_thread.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(fd_thread.thread, fd_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_fd_read_hash, em);
 
     int apps = em->apps_charts;
