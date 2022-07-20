@@ -1128,6 +1128,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         ri_old->last_time_t = 0;
 
         rrdinstance_release(ria_old);
+        dictionary_del(rc_old->rrdinstances, string2str(ri_old->id));
 
         // trigger updates on the old context
         if(!dictionary_stats_entries(rc_old->rrdinstances) && !dictionary_stats_referenced_items(rc_old->rrdinstances)) {
