@@ -116,7 +116,7 @@ paths:
         - name: chart_labels_filter
           in: query
           description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
-          as separator)"
+           as separator)"
           required: false
           allowEmptyValue: true
           schema:
