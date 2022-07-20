@@ -38,8 +38,6 @@ static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
 
-static int read_thread_closed = 1;
-
 static struct netdata_static_thread mdflush_threads = {"MDFLUSH KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
@@ -56,13 +54,10 @@ static void mdflush_cleanup(void *ptr)
         return;
     }
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 1 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*mdflush_threads.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     freez(mdflush_ebpf_vals);
     freez(mdflush_threads.thread);
@@ -74,6 +69,7 @@ static void mdflush_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
+        freez(probe_links);
         if (objects)
             bpf_object__close(objects);
     }
@@ -176,8 +172,6 @@ static void mdflush_read_count_map()
  */
 static void *mdflush_reader(void *ptr)
 {
-    read_thread_closed = 0;
-
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -191,7 +185,6 @@ static void *mdflush_reader(void *ptr)
         mdflush_read_count_map();
     }
 
-    read_thread_closed = 1;
     return NULL;
 }
 
@@ -249,7 +242,7 @@ static void mdflush_collector(ebpf_module_t *em)
     netdata_thread_create(
         mdflush_threads.thread,
         mdflush_threads.name,
-        NETDATA_THREAD_OPTION_JOINABLE,
+        NETDATA_THREAD_OPTION_DEFAULT,
         mdflush_reader,
         em
     );
