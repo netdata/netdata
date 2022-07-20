@@ -32,6 +32,9 @@ const char *database_config[] = {
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int);",
 
+    "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
+    "date_created INT, PRIMARY KEY(host_id, system_key));"
+
     "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob , hash_id blob, UNIQUE (chart_id, hash_id));",
 
     "CREATE TABLE IF NOT EXISTS chart_hash(hash_id blob PRIMARY KEY,type text, id text, name text, "
@@ -63,6 +66,7 @@ const char *database_cleanup[] = {
     "DELETE FROM chart_hash_map WHERE chart_id NOT IN (SELECT chart_id FROM chart);",
     "DELETE FROM chart_hash WHERE hash_id NOT IN (SELECT hash_id FROM chart_hash_map);",
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
+    "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
     NULL
 };
 
@@ -2313,3 +2317,167 @@ failed:
 
     return;
 };
+
+#define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id;"
+
+void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info)
+{
+    int rc;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_INFO, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to read host information");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter host information");
+        goto skip_loading;
+    }
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        rrdhost_set_system_info_variable(system_info, (char *) sqlite3_column_text(res, 0),
+                                         (char *) sqlite3_column_text(res, 1));
+    }
+
+skip_loading:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading host information");
+    return;
+}
+
+
+#define SQL_INS_HOST_SYSTEM_INFO "INSERT OR REPLACE INTO host_info " \
+    "(host_id, system_key, system_value, date_created) " \
+    "VALUES (@host, @key, @value, unixepoch());"
+
+void sql_store_host_system_info_key_value(uuid_t *host_id, const char *name, const char *value)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_INS_HOST_SYSTEM_INFO, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to store system info");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to store system information");
+        goto skip_store;
+    }
+
+    rc = sqlite3_bind_text(res, 2, name, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind label parameter to store name information");
+        goto skip_store;
+    }
+
+    rc = sqlite3_bind_text(res, 3, value, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind value parameter to store value information");
+        goto skip_store;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store host system info, rc = %d", rc);
+
+skip_store:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when storing  host system information");
+
+    return;
+}
+
+
+void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info)
+{
+    if (unlikely(!system_info))
+        return;
+
+    if (system_info->container_os_name)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_NAME", system_info->container_os_name);
+
+    if (system_info->container_os_id)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_ID", system_info->container_os_id);
+
+    if (system_info->container_os_id_like)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like);
+
+    if (system_info->container_os_version)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version);
+
+    if (system_info->container_os_version_id)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id);
+
+    if (system_info->host_os_detection)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection);
+
+    if (system_info->host_os_name)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_NAME", system_info->host_os_name);
+
+    if (system_info->host_os_id)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_ID", system_info->host_os_id);
+
+    if (system_info->host_os_id_like)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like);
+
+    if (system_info->host_os_version)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_VERSION", system_info->host_os_version);
+
+    if (system_info->host_os_version_id)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_VERSION_ID", system_info->host_os_version_id);
+
+    if (system_info->host_os_detection)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_DETECTION", system_info->host_os_detection);
+
+    if (system_info->kernel_name)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_KERNEL_NAME", system_info->kernel_name);
+
+    if (system_info->host_cores)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", system_info->host_cores);
+
+    if (system_info->host_cpu_freq)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_CPU_FREQ", system_info->host_cpu_freq);
+
+    if (system_info->host_ram_total)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_TOTAL_RAM", system_info->host_ram_total);
+
+    if (system_info->host_disk_space)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_TOTAL_DISK_SIZE", system_info->host_disk_space);
+
+    if (system_info->kernel_version)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_KERNEL_VERSION", system_info->kernel_version);
+
+    if (system_info->architecture)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_ARCHITECTURE", system_info->architecture);
+
+    if (system_info->virtualization)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_VIRTUALIZATION", system_info->virtualization);
+
+    if (system_info->virt_detection)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_VIRT_DETECTION", system_info->virt_detection);
+
+    if (system_info->container)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_CONTAINER", system_info->container);
+
+    if (system_info->container_detection)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_CONTAINER_DETECTION", system_info->container_detection);
+
+    if (system_info->is_k8s_node)
+        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_IS_K8S_NODE", system_info->is_k8s_node);
+
+    return;
+}
+

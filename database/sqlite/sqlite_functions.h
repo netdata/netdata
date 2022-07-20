@@ -106,4 +106,5 @@ char *get_hostname_by_node_id(char *node_id);
 void free_temporary_host(RRDHOST *host);
 int init_database_batch(int rebuild, int init_type, const char *batch[]);
 void migrate_localhost(uuid_t *host_uuid);
+extern void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
