@@ -1885,6 +1885,9 @@ int main(int argc, char **argv)
         ebpf_exit(5);
     }
 
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(verify_netdata_host_prefix() == -1) ebpf_exit(6);
+
     ebpf_allocate_common_vectors();
 
 #ifdef LIBBPF_MAJOR_VERSION
