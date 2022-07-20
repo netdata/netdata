@@ -667,9 +667,6 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdinstance);
 
-    if(unlikely(!ri->rrdmetrics))
-        fatal("RRDMETRIC: rrdinstance '%s' does not have a rrdmetrics dictionary", string2str(ri->id));
-
     RRDMETRIC trm = {
         .id = string_strdupz(rd->id),
         .name = string_strdupz(rd->name),
@@ -679,9 +676,6 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
     uuid_copy(trm.uuid, rd->metric_uuid);
 
     RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)dictionary_set_and_acquire_item(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
-
-    if(rd->rrdmetric && rd->rrdmetric != rma)
-        fatal("RRDMETRIC: dimension '%s' of chart '%s' changed rrdmetric!", rd->id, rd->rrdset->id);
 
     if(rd->rrdmetric)
         rrdmetric_release(rd->rrdmetric);
