@@ -1,0 +1,15 @@
+[stream]
+    enabled = yes
+    destination = $destinations
+    api key = 11111111-2222-3333-4444-555555555555
+    timeout seconds = 60
+    send charts matching = *
+    buffer size bytes = 1048576
+    reconnect delay seconds = 5
+    initial clock resync iterations = 60
+    enable compression = yes
+
+[11111111-2222-3333-4444-555555555555]
+    enabled = yes
+    enable compression = yes
+    allow from = *

@@ -232,3 +232,7 @@ Session.*.vim
 # Judy stuff
 JudyLTables.c
 judyltablesgen
+
+# multind
+multind/nd*
+multind/*.yml
