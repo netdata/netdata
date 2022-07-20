@@ -1123,10 +1123,13 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         rrdinstance_release(ria_old);
 
         // trigger updates on the old context
-        if(!dictionary_stats_entries(rc_old->rrdinstances)) {
+        if(!dictionary_stats_entries(rc_old->rrdinstances) && !dictionary_stats_referenced_items(rc_old->rrdinstances)) {
+            rrdcontext_lock(rc_old);
+            rc_old->flags = ((rc_old->flags & RRD_FLAG_QUEUED)?RRD_FLAG_QUEUED:RRD_FLAG_NONE)|RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
             rc_old->first_time_t = 0;
             rc_old->last_time_t = 0;
-            rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+            rrdcontext_unlock(rc_old);
+            rrdcontext_trigger_updates(rc_old, true, 0);
         }
         else
             rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
@@ -1271,7 +1274,7 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
     }
 }
 
-static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending) {
+static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused) {
     bool id_changed = false,
          title_changed = false,
          units_changed = false,
