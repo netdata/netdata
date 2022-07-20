@@ -8,8 +8,6 @@ static char *sync_counter_dimension_name[NETDATA_SYNC_IDX_END] = { "sync", "sync
 static netdata_syscall_stat_t sync_counter_aggregated_data[NETDATA_SYNC_IDX_END];
 static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_IDX_END];
 
-static int read_thread_closed = 1;
-
 static netdata_idx_t sync_hash_values[NETDATA_SYNC_IDX_END];
 
 struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
@@ -335,7 +333,6 @@ static void read_global_table()
 void *ebpf_sync_read_hash(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    read_thread_closed = 0;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -347,7 +344,6 @@ void *ebpf_sync_read_hash(void *ptr)
 
         read_global_table();
     }
-    read_thread_closed = 1;
 
     return NULL;
 }
@@ -414,7 +410,7 @@ static void sync_collector(ebpf_module_t *em)
     sync_threads.thread = mallocz(sizeof(netdata_thread_t));
     sync_threads.start_routine = ebpf_sync_read_hash;
 
-    netdata_thread_create(sync_threads.thread, sync_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(sync_threads.thread, sync_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_sync_read_hash, em);
 
     heartbeat_t hb;
@@ -477,13 +473,10 @@ static void ebpf_sync_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*sync_threads.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     ebpf_sync_cleanup_objects();
     freez(sync_threads.thread);
