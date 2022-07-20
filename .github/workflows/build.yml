@@ -40,6 +40,7 @@ jobs:
       - name: Build
         id: build
         run: |
+          git describe
           mkdir -p artifacts
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
           autoreconf -ivf

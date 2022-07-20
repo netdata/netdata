@@ -17,5 +17,6 @@ path_classifiers:
     - web/gui/lib/
     - web/gui/src/
     - web/gui/css/
+    - libnetdata/libjudy/
   test:
     - tests/
