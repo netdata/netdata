@@ -16,8 +16,6 @@ static struct bpf_object *objects = NULL;
 static netdata_idx_t dcstat_hash_values[NETDATA_DCSTAT_IDX_END];
 static netdata_idx_t *dcstat_values = NULL;
 
-static int read_thread_closed = 1;
-
 struct config dcstat_config = { .first_section = NULL,
     .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -276,16 +274,14 @@ static void ebpf_dcstat_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*dcstat_threads.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     freez(dcstat_vector);
     freez(dcstat_values);
+    freez(dcstat_threads.thread);
 
     ebpf_cleanup_publish_syscall(dcstat_counter_publish_aggregated);
 
@@ -298,6 +294,7 @@ static void ebpf_dcstat_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
+        freez(probe_links);
         if (objects)
             bpf_object__close(objects);
     }
@@ -522,8 +519,6 @@ static void read_global_table()
  */
 void *ebpf_dcstat_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -536,7 +531,6 @@ void *ebpf_dcstat_read_hash(void *ptr)
 
         read_global_table();
     }
-    read_thread_closed = 1;
 
     return NULL;
 }
@@ -1000,7 +994,7 @@ static void dcstat_collector(ebpf_module_t *em)
     dcstat_threads.thread = mallocz(sizeof(netdata_thread_t));
     dcstat_threads.start_routine = ebpf_dcstat_read_hash;
 
-    netdata_thread_create(dcstat_threads.thread, dcstat_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(dcstat_threads.thread, dcstat_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_dcstat_read_hash, em);
 
     netdata_publish_dcstat_t publish;
