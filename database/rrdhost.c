@@ -187,7 +187,8 @@ RRDHOST *rrdhost_create(const char *hostname,
                         char *rrdpush_api_key,
                         char *rrdpush_send_charts_matching,
                         struct rrdhost_system_info *system_info,
-                        int is_localhost
+                        int is_localhost,
+                        bool archived
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
@@ -207,8 +208,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
-    host->sender = mallocz(sizeof(*host->sender));
-    sender_init(host->sender, host);
+    sender_init(host);
     netdata_mutex_init(&host->receiver_lock);
 
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
@@ -335,18 +335,21 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     if(t != host) {
         error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.", host->hostname, host->machine_guid, t->hostname, t->machine_guid);
-        rrdhost_free(host);
+        rrdhost_free(host, 1);
         return NULL;
     }
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-        int rc = sql_store_host_info(host);
-        if (unlikely(rc))
-            error_report("Failed to store machine GUID to the database");
+        int rc;
+        if (!archived) {
+            rc = sql_store_host_info(host);
+            if (unlikely(rc))
+                error_report("Failed to store machine GUID to the database");
+        }
         sql_load_node_id(host);
         if (host->health_enabled) {
             if (!file_is_migrated(host->health_log_filename)) {
-                int rc = sql_create_health_log_table(host);
+                rc = sql_create_health_log_table(host);
                 if (unlikely(rc)) {
                     error_report("Failed to create health log table in the database");
                     health_alarm_log_load(host);
@@ -401,7 +404,7 @@ RRDHOST *rrdhost_create(const char *hostname,
             error(
                 "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
                 host->hostname, host->machine_guid, host->cache_dir);
-            rrdhost_free(host);
+            rrdhost_free(host, 1);
             host = NULL;
             //rrd_hosts_available++; //TODO: maybe we want this?
 
@@ -489,7 +492,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrd_hosts_available++;
 
     rrdhost_load_rrdcontext_data(host);
-    ml_new_host(host);
+    if (!archived)
+        ml_new_host(host);
+    else
+        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
     return host;
 }
 
@@ -605,6 +611,8 @@ void rrdhost_update(RRDHOST *host
             }
         }
         rrd_hosts_available++;
+        ml_new_host(host);
+        rrdhost_load_rrdcontext_data(host);
         info("Host %s is not in archived mode anymore", host->hostname);
     }
 
@@ -631,6 +639,7 @@ RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
         , struct rrdhost_system_info *system_info
+        , bool archived
 ) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
@@ -640,7 +649,7 @@ RRDHOST *rrdhost_find_or_create(
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
               host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
-        rrdhost_free(host);
+        rrdhost_free(host, 1);
         host = NULL;
     }
     if(!host) {
@@ -665,6 +674,7 @@ RRDHOST *rrdhost_find_or_create(
                 , rrdpush_send_charts_matching
                 , system_info
                 , 0
+                , archived
         );
     }
     else {
@@ -693,7 +703,6 @@ RRDHOST *rrdhost_find_or_create(
         rrdhost_wrlock(host);
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
         host->senders_disconnected_time = 0;
-        rrdhost_load_rrdcontext_data(host);
         rrdhost_unlock(host);
     }
 
@@ -705,6 +714,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
     if(host != protected_host
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
+       && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)
        && !host->receiver
        && host->senders_disconnected_time
        && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
@@ -733,7 +743,7 @@ restart_after_removal:
             else
                 rrdhost_save_charts(host);
 
-            rrdhost_free(host);
+            rrdhost_free(host, 0);
             goto restart_after_removal;
         }
     }
@@ -899,6 +909,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         , default_rrdpush_send_charts_matching
         , system_info
         , 1
+        , 0
     );
     if (unlikely(!localhost)) {
         rrd_unlock();
@@ -907,8 +918,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
     if (likely(system_info))
        migrate_localhost(&localhost->host_uuid);
-    sql_aclk_sync_init();
     rrd_unlock();
+    sql_aclk_sync_init();
 
     web_client_api_v1_management_init();
     return localhost==NULL;
@@ -992,19 +1003,12 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
 }
 
 void destroy_receiver_state(struct receiver_state *rpt);
-void rrdhost_free(RRDHOST *host) {
-    if(!host) return;
 
-    info("Freeing all memory for host '%s'...", host->hostname);
+void stop_streaming_sender(RRDHOST *host)
+{
+    if (unlikely(!host->sender))
+        return;
 
-    rrd_check_wrlock();     // make sure the RRDs are write locked
-
-    rrdhost_wrlock(host);
-    ml_delete_host(host);
-    rrdhost_unlock(host);
-
-    // ------------------------------------------------------------------------
-    // clean up streaming
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
     buffer_free(host->sender->build);
@@ -1014,40 +1018,68 @@ void rrdhost_free(RRDHOST *host) {
 #endif
     freez(host->sender);
     host->sender = NULL;
-    if (netdata_exit) {
-        netdata_mutex_lock(&host->receiver_lock);
-        if (host->receiver) {
-            if (!host->receiver->exited)
-                netdata_thread_cancel(host->receiver->thread);
-            netdata_mutex_unlock(&host->receiver_lock);
-            struct receiver_state *rpt = host->receiver;
-            while (host->receiver && !rpt->exited)
-                sleep_usec(50 * USEC_PER_MS);
-            // If the receiver detached from the host then its thread will destroy the state
-            if (host->receiver == rpt)
-                destroy_receiver_state(host->receiver);
-        }
-        else
-            netdata_mutex_unlock(&host->receiver_lock);
-    }
+}
 
+void stop_streaming_receiver(RRDHOST *host)
+{
+    netdata_mutex_lock(&host->receiver_lock);
+    if (host->receiver) {
+        if (!host->receiver->exited)
+            netdata_thread_cancel(host->receiver->thread);
+        netdata_mutex_unlock(&host->receiver_lock);
+        struct receiver_state *rpt = host->receiver;
+        while (host->receiver && !rpt->exited)
+            sleep_usec(50 * USEC_PER_MS);
+        // If the receiver detached from the host then its thread will destroy the state
+        if (host->receiver == rpt)
+            destroy_receiver_state(host->receiver);
+    } else
+        netdata_mutex_unlock(&host->receiver_lock);
+}
 
+void rrdhost_free(RRDHOST *host, bool force) {
+    if(!host) return;
+
+    if (netdata_exit || force)
+        info("Freeing all memory for host '%s'...", host->hostname);
+
+    rrd_check_wrlock();     // make sure the RRDs are write locked
+
+    rrdhost_wrlock(host);
+    ml_delete_host(host);
+    rrdhost_unlock(host);
+
+    // ------------------------------------------------------------------------
+    // clean up streaming
+    stop_streaming_sender(host);
+
+//    rrdpush_sender_thread_stop(host); // stop a possibly running thread
+//    cbuffer_free(host->sender->buffer);
+//    buffer_free(host->sender->build);
+//#ifdef ENABLE_COMPRESSION
+//    if (host->sender->compressor)
+//        host->sender->compressor->destroy(&host->sender->compressor);
+//#endif
+//    freez(host->sender);
+//    host->sender = NULL;
+    if (netdata_exit || force)
+        stop_streaming_receiver(host);
 
     rrdhost_wrlock(host);   // lock this RRDHOST
-#ifdef ENABLE_ACLK
-    struct aclk_database_worker_config *wc =  host->dbsync_worker;
-    if (wc && !netdata_exit) {
-        struct aclk_database_cmd cmd;
-        memset(&cmd, 0, sizeof(cmd));
-        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
-        struct aclk_completion compl ;
-        init_aclk_completion(&compl );
-        cmd.completion = &compl ;
-        aclk_database_enq_cmd(wc, &cmd);
-        wait_for_aclk_completion(&compl );
-        destroy_aclk_completion(&compl );
-    }
-#endif
+//#ifdef ENABLE_ACLK
+//    struct aclk_database_worker_config *wc =  host->dbsync_worker;
+//    if (wc && !netdata_exit) {
+//        struct aclk_database_cmd cmd;
+//        memset(&cmd, 0, sizeof(cmd));
+//        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
+//        struct aclk_completion compl ;
+//        init_aclk_completion(&compl );
+//        cmd.completion = &compl ;
+//        aclk_database_enq_cmd(wc, &cmd);
+//        wait_for_aclk_completion(&compl );
+//        destroy_aclk_completion(&compl );
+//    }
+//#endif
     // ------------------------------------------------------------------------
     // release its children resources
 
@@ -1098,6 +1130,13 @@ void rrdhost_free(RRDHOST *host) {
             rrdeng_exit((struct rrdengine_instance *)host->storage_instance[tier]);
     }
 #endif
+
+    if (!netdata_exit && !force) {
+        info("Setting archive mode for host '%s'...", host->hostname);
+        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+        rrdhost_unlock(host);
+        return;
+    }
 
     // ------------------------------------------------------------------------
     // remove it from the indexes
@@ -1156,18 +1195,18 @@ void rrdhost_free(RRDHOST *host) {
     rrdhost_destroy_rrdcontexts(host);
 
     freez(host);
-#ifdef ENABLE_ACLK
-    if (wc)
-        wc->is_orphan = 0;
-#endif
+//#ifdef ENABLE_ACLK
+//    if (wc)
+//        wc->is_orphan = 0;
+//#endif
     rrd_hosts_available--;
 }
 
 void rrdhost_free_all(void) {
     rrd_wrlock();
     /* Make sure child-hosts are released before the localhost. */
-    while(localhost->next) rrdhost_free(localhost->next);
-    rrdhost_free(localhost);
+    while(localhost->next) rrdhost_free(localhost->next, 1);
+    rrdhost_free(localhost, 1);
     rrd_unlock();
 }
 

@@ -1081,8 +1081,6 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     buffer_strcat(wb, "\t\"mirrored_hosts\": [\n");
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
-            continue;
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
@@ -1094,8 +1092,6 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     count = 0;
     rrdhost_foreach_read(host)
     {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
-            continue;
         if (count > 0)
             buffer_strcat(wb, ",\n");
 

@@ -517,6 +517,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
                 , rpt->system_info
+                , 0
         );
 
         if(!rpt->host) {

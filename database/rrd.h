@@ -1009,6 +1009,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
         , struct rrdhost_system_info *system_info
+        , bool is_archived
 );
 
 extern void rrdhost_update(RRDHOST *host
@@ -1092,7 +1093,7 @@ extern void rrdhost_cleanup_all(void);
 
 extern void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected_host);
 extern void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
-extern void rrdhost_free(RRDHOST *host);
+extern void rrdhost_free(RRDHOST *host, bool force);
 extern void rrdhost_save_charts(RRDHOST *host);
 extern void rrdhost_delete_charts(RRDHOST *host);
 extern void rrd_cleanup_obsolete_charts();
@@ -1308,7 +1309,7 @@ extern RRDHOST *rrdhost_create(
     const char *abbrev_timezone, int32_t utc_offset,const char *tags, const char *program_name, const char *program_version,
     int update_every, long entries, RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled,
     char *rrdpush_destination, char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
-    int is_localhost); //TODO: Remove , int is_archived);
+    int is_localhost, bool is_archived);
 
 #endif /* NETDATA_RRD_INTERNALS */
 

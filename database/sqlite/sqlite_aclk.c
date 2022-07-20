@@ -258,6 +258,46 @@ void aclk_sync_exit_all()
     uv_mutex_unlock(&aclk_async_lock);
 }
 
+static int create_host_callback(void *data, int argc, char **argv, char **column)
+{
+    UNUSED(data);
+    UNUSED(argc);
+    UNUSED(column);
+
+    char guid[UUID_STR_LEN];
+    uuid_unparse_lower(*(uuid_t *)argv[0], guid);
+
+    struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+    system_info->hops = str2i((const char *) argv[7]);
+
+    RRDHOST *host = rrdhost_find_or_create(
+          (const char *) argv[1]
+        , (const char *) argv[2]
+        , guid
+        , (const char *) argv[4]                                    //os
+        , (const char *) argv[5]                                    // timezone
+        , (const char *) argv[9]                                    // abbrev timezone
+        , argv[10] ? str2uint32_t(argv[10]) : 0
+        , (const char *) argv[6]                                    // tags
+        , (const char *) (argv[11] ? argv[11] : "unknown")          // program name
+        , (const char *) (argv[12] ? argv[12] : "unknown")          // program version
+        , argv[3] ? str2i(argv[3]) : 1                              // update every
+        , argv[13] ? str2i(argv[13]) : 0                            // entries
+        , RRD_MEMORY_MODE_DBENGINE                                  // str2i(argv[8])
+        , 0 // health
+        , 0 // rrdpush enabled
+        , NULL  //destination
+        , NULL  // api key
+        , NULL  // send charts matching
+        , system_info
+        , 1
+    );
+    char node_str[UUID_STR_LEN] = "<none>";
+    uuid_unparse_lower(*host->node_id, node_str);
+    internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"", host->hostname, host->machine_guid, node_str);
+    return 0;
+}
+
 int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 {
     char uuid_str[GUID_LEN + 1];
@@ -267,10 +307,11 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
     uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
 
-    if (rrdhost_find_by_guid(uuid_str, 0) == localhost)
+    RRDHOST *host = rrdhost_find_by_guid(uuid_str, 0);
+    if (host == localhost)
         return 0;
 
-    sql_create_aclk_table(NULL, (uuid_t *) argv[0], (uuid_t *) argv[1]);
+    sql_create_aclk_table(host, (uuid_t *) argv[0], (uuid_t *) argv[1]);
     return 0;
 }
 
@@ -302,6 +343,11 @@ void sql_aclk_sync_init(void)
     }
     info("SQLite aclk sync initialization completed");
     fatal_assert(0 == uv_mutex_init(&aclk_async_lock));
+
+    rc = sqlite3_exec(db_meta, "SELECT host_id, hostname, registry_hostname, update_every, os, "
+           "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "
+           "program_version, entries, health_enabled FROM host WHERE hops >0;",
+              create_host_callback, NULL, NULL);
 
     rc = sqlite3_exec(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni WHERE "
         "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, NULL);
