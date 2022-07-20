@@ -642,18 +642,21 @@ void *ebpf_cgroup_update_shm(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    usec_t step = 30 * USEC_PER_SEC;
+    usec_t step = 3 * USEC_PER_SEC;
+    int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
-        if (close_ebpf_plugin)
-            break;
+        // We are using a small heartbeat time to wake up thread,
+        // but we should not update so frequently the shared memory data
+        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
+            counter = 0;
+            if (!shm_ebpf_cgroup.header)
+                ebpf_map_cgroup_shared_memory();
 
-        if (!shm_ebpf_cgroup.header)
-            ebpf_map_cgroup_shared_memory();
-
-        ebpf_parse_cgroup_shm_data();
+            ebpf_parse_cgroup_shm_data();
+        }
     }
 
     return NULL;
@@ -1129,16 +1132,14 @@ static void ebpf_process_cleanup(void *ptr)
 {
     UNUSED(ptr);
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick =  1 * USEC_PER_SEC;
-    while (!finalized_threads) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*cgroup_thread.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_hash_values);
+    freez(cgroup_thread.thread);
 
     ebpf_process_disable_tracepoints();
 

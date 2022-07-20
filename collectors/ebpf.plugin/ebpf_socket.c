@@ -2931,7 +2931,6 @@ static void ebpf_socket_cleanup(void *ptr)
     else if (bpf_obj)
         socket_bpf__destroy(bpf_obj);
 #endif
-    finalized_threads = 1;
 }
 
 /*****************************************************************
@@ -3967,7 +3966,6 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_update_stats(&plugin_statistics, em);
 
-    finalized_threads = 0;
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_every * USEC_PER_SEC), em);
