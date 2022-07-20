@@ -10,7 +10,7 @@ jobs:
   cleanup:
     name: PackageCloud Cleanup
     runs-on: ubuntu-latest
-    if: always()
+    if: github.repository == 'netdata/netdata'
     strategy:
       fail-fast: false
       matrix:

@@ -9,6 +9,7 @@ on:
 jobs:
   add-to-project:
     name: Add issue to project
+    if: github.repository == 'netdata/netdata'
     runs-on: ubuntu-latest
     steps:
       - name: Add issues to Agent project board
