@@ -261,7 +261,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     buffer_sprintf(sql, "select aa.sequence_id, hl.unique_id, hl.alarm_id, hl.config_hash_id, hl.updated_by_id, hl.when_key, \
                    hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name, \
                    hl.chart, hl.family, hl.exec, hl.recipient, hl.source, hl.units, hl.info, hl.exec_code, hl.new_status, \
-                   hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat \
+                   hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, hl.chart_context \
                          from health_log_%s hl, aclk_alert_%s aa \
                          where hl.unique_id = aa.alert_unique_id and aa.date_submitted is null \
                          order by aa.sequence_id asc limit %d;", wc->uuid_str, wc->uuid_str, limit);
@@ -343,6 +343,10 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.rendered_info = sqlite3_column_type(res, 18) == SQLITE_NULL ?
                                       strdupz((char *)"") :
                                       strdupz((char *)sqlite3_column_text(res, 18));
+
+        alarm_log.chart_context = sqlite3_column_type(res, 26) == SQLITE_NULL ?
+                                      strdupz((char *)"") :
+                                      strdupz((char *)sqlite3_column_text(res, 26));
 
         aclk_send_alarm_log_entry(&alarm_log);
 

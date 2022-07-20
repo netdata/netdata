@@ -166,6 +166,8 @@ static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *pr
     proto->set_updated(data->updated);
 
     proto->set_rendered_info(data->rendered_info);
+
+    proto->set_chart_context(data->chart_context);
 }
 
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)

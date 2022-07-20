@@ -97,6 +97,8 @@ struct alarm_log_entry {
 
     // rendered_info 
     char *rendered_info;
+
+    char *chart_context;
 };
 
 struct send_alarm_snapshot {
