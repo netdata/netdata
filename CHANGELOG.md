@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- chore\(health\): remove py web\_log alarms [\#13404](https://github.com/netdata/netdata/pull/13404) ([ilyam8](https://github.com/ilyam8))
+- Fix coverity issue 379240 \(Unchecked return value\) [\#13401](https://github.com/netdata/netdata/pull/13401) ([stelfrag](https://github.com/stelfrag))
 - Fix netdata-updater.sh sha256sum on BSDs [\#13391](https://github.com/netdata/netdata/pull/13391) ([tnyeanderson](https://github.com/tnyeanderson))
 - chore\(python.d\): clarify haproxy module readme  [\#13388](https://github.com/netdata/netdata/pull/13388) ([ilyam8](https://github.com/ilyam8))
 - Fix bitmap unit tests [\#13374](https://github.com/netdata/netdata/pull/13374) ([stelfrag](https://github.com/stelfrag))
@@ -341,7 +343,6 @@
 - fix implicit declaration of function 'appconfig\_section\_option\_destroy\_non\_loaded' [\#12756](https://github.com/netdata/netdata/pull/12756) ([ilyam8](https://github.com/ilyam8))
 - Update netdata-installer.sh [\#12755](https://github.com/netdata/netdata/pull/12755) ([petecooper](https://github.com/petecooper))
 - Tag Gotify health notifications for the Gotify phone app [\#12753](https://github.com/netdata/netdata/pull/12753) ([JaphethLim](https://github.com/JaphethLim))
-- fix\(cgroups.plugin\): remove "search for cgroups under PATH" conf option to fix memory leak [\#12752](https://github.com/netdata/netdata/pull/12752) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
