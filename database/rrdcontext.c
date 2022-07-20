@@ -1034,10 +1034,9 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
         // no deleted metrics, no active metrics
         // just hanging there...
 
-        rrd_flag_set_archived(ri);
-
-        if(!ri->first_time_t && !ri->last_time_t)
-            ri->flags |= RRD_FLAG_DELETED|RRD_FLAG_UPDATED;
+        ri->first_time_t = 0;
+        ri->last_time_t = 0;
+        ri->flags |= RRD_FLAG_DELETED|RRD_FLAG_UPDATED;
     }
 
     if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED)) {
@@ -1128,7 +1127,6 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         ri_old->last_time_t = 0;
 
         rrdinstance_release(ria_old);
-        dictionary_del(rc_old->rrdinstances, string2str(ri_old->id));
 
         // trigger updates on the old context
         if(!dictionary_stats_entries(rc_old->rrdinstances) && !dictionary_stats_referenced_items(rc_old->rrdinstances)) {
@@ -1628,10 +1626,9 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
         // no deleted instances, no active instances
         // just hanging there...
 
-        rrd_flag_set_archived(rc);
-
-        if(!rc->first_time_t && !rc->last_time_t)
-            rc->flags |= RRD_FLAG_DELETED|RRD_FLAG_UPDATED;
+        rc->first_time_t = 0;
+        rc->last_time_t = 0;
+        rc->flags |= RRD_FLAG_DELETED|RRD_FLAG_UPDATED;
     }
 
     if(unlikely(rc->flags & RRD_FLAG_UPDATED)) {
