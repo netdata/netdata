@@ -376,12 +376,28 @@ set(LIBJUDY_SOURCES
         libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
         libnetdata/libjudy/src/JudyL/JudyLPrev.c
         libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
-        libnetdata/libjudy/src/JudyL/JudyLTables.c
-        libnetdata/libjudy/src/JudyL/JudyLTablesGen.c
+        JudyLTables.c
         libnetdata/libjudy/src/JudyHS/JudyHS.c)
 
 ADD_LIBRARY(judy STATIC
              ${LIBJUDY_SOURCES})
+
+ADD_EXECUTABLE(judyltablesgen
+    libnetdata/libjudy/src/JudyL/JudyLTablesGen.c)
+
+target_include_directories(judyltablesgen PUBLIC
+    libnetdata/libjudy/src
+    libnetdata/libjudy/src/JudyCommon)
+
+target_compile_definitions(judyltablesgen PUBLIC
+    JU_64BIT
+    JUDYL)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/JudyLTables.c
+  COMMAND judyltablesgen
+  DEPENDS judyltablesgen
+  )
 
 target_include_directories(judy PUBLIC
     libnetdata/libjudy/src
@@ -407,6 +423,7 @@ set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-D
 set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
 set_source_files_properties(libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
 set_source_files_properties(libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
+set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_CURRENT_BINARY_DIR}/libnetdata/libjudy/src/JudyL")
 
 # -----------------------------------------------------------------------------
 # netdata files
