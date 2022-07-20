@@ -90,7 +90,6 @@ struct netdata_static_thread filesystem_threads = {"EBPF FS READ",
                                                    NULL, NULL, 1, NULL,
                                                    NULL, NULL };
 
-static int read_thread_closed = 1;
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
 
@@ -381,6 +380,7 @@ void ebpf_filesystem_cleanup_ebpf_data()
                 bpf_link__destroy(probe_links[j]);
                 j++;
             }
+            freez(probe_links);
             if (efp->objects)
                 bpf_object__close(efp->objects);
         }
@@ -398,13 +398,10 @@ static void ebpf_filesystem_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*filesystem_threads.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     freez(filesystem_threads.thread);
     ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
@@ -517,7 +514,6 @@ static void read_filesystem_tables()
 void *ebpf_filesystem_read_hash(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    read_thread_closed = 0;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -537,7 +533,6 @@ void *ebpf_filesystem_read_hash(void *ptr)
         read_filesystem_tables();
     }
 
-    read_thread_closed = 1;
     return NULL;
 }
 
@@ -579,7 +574,7 @@ static void filesystem_collector(ebpf_module_t *em)
     filesystem_threads.start_routine = ebpf_filesystem_read_hash;
 
     netdata_thread_create(filesystem_threads.thread, filesystem_threads.name,
-                          NETDATA_THREAD_OPTION_JOINABLE, ebpf_filesystem_read_hash, em);
+                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_filesystem_read_hash, em);
 
     int update_every = em->update_every;
     heartbeat_t hb;
