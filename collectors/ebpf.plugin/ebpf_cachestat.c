@@ -18,8 +18,6 @@ netdata_cachestat_pid_t *cachestat_vector = NULL;
 static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
 
-static int read_thread_closed = 1;
-
 struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
                                                   NULL, NULL, 1, NULL,
                                                   NULL,  NULL};
@@ -304,13 +302,10 @@ static void ebpf_cachestat_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*cachestat_threads.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
@@ -641,8 +636,6 @@ static void read_global_table()
  */
 void *ebpf_cachestat_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -655,7 +648,6 @@ void *ebpf_cachestat_read_hash(void *ptr)
 
         read_global_table();
     }
-    read_thread_closed = 1;
 
     return NULL;
 }
@@ -1073,7 +1065,7 @@ static void cachestat_collector(ebpf_module_t *em)
     cachestat_threads.thread = callocz(1, sizeof(netdata_thread_t));
     cachestat_threads.start_routine = ebpf_cachestat_read_hash;
 
-    netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_cachestat_read_hash, em);
 
     netdata_publish_cachestat_t publish;
