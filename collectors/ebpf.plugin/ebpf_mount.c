@@ -18,7 +18,6 @@ struct config mount_config = { .first_section = NULL, .last_section = NULL, .mut
                                .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                          .rwlock = AVL_LOCK_INITIALIZER } };
 
-static int read_thread_closed = 1;
 static netdata_idx_t *mount_values = NULL;
 
 static struct bpf_link **probe_links = NULL;
@@ -237,6 +236,11 @@ static void ebpf_mount_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
+    int ret = netdata_thread_cancel(*mount_thread.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
+
     freez(mount_thread.thread);
     freez(mount_values);
 
@@ -247,6 +251,7 @@ static void ebpf_mount_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
+        freez(probe_links);
         if (objects)
             bpf_object__close(objects);
     }
@@ -300,8 +305,6 @@ static void read_global_table()
  */
 void *ebpf_mount_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -314,7 +317,6 @@ void *ebpf_mount_read_hash(void *ptr)
 
         read_global_table();
     }
-    read_thread_closed = 1;
 
     return NULL;
 }
