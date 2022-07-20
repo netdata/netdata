@@ -13,3 +13,5 @@ exclude_paths:
   - web/gui/main.js
   - tests/**
   - aclk/tests/**
+  - libnetdata/libjudy/**
+
