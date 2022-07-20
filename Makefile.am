@@ -505,12 +505,16 @@ if ENABLE_DBENGINE
         libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c \
         libnetdata/libjudy/src/JudyL/JudyLPrev.c \
         libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c \
-        libnetdata/libjudy/src/JudyL/JudyLTables.c \
-        libnetdata/libjudy/src/JudyL/JudyLTablesGen.c \
         libnetdata/libjudy/src/JudyHS/JudyHS.c \
         $(NULL)
 
-    libjudy_a_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -Ilibnetdata/libjudy/src -Ilibnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
+    nodist_libjudy_a_SOURCES = JudyLTables.c
+
+    BUILT_SOURCES += JudyLTables.c
+
+    CLEANFILES += JudyLTables.c
+
+    libjudy_a_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
 
     libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrev.$(OBJEXT) : CFLAGS += -DJUDYPREV
     libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrevEmpty.$(OBJEXT) : CFLAGS += -DJUDYPREV
@@ -518,6 +522,16 @@ if ENABLE_DBENGINE
     libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNextEmpty.$(OBJEXT) : CFLAGS += -DJUDYNEXT
     libnetdata/libjudy/src/JudyL/libjudy_a-JudyLByCount.$(OBJEXT) : CFLAGS +=  -DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB
     libnetdata/libjudy/src/JudyL/libjudy_a-j__udyLGet.$(OBJEXT) : CFLAGS +=  -DJUDYGETINLINE
+
+    noinst_PROGRAMS = judyltablesgen
+
+    judyltablesgen_SOURCES = $(abs_top_srcdir)/libnetdata/libjudy/src/JudyL/JudyLTablesGen.c
+    judyltablesgen_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
+
+JudyLTables.c: $(abs_top_srcdir)/libnetdata/libjudy/src/JudyL/JudyLTablesGen.c $(builddir)/judyltablesgen$(EXEEXT)
+	$(builddir)/judyltablesgen$(EXEEXT)
+
+    libjudy_a-JudyLTables.$(OBJEXT) : CFLAGS += -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyL
 
     RRD_PLUGIN_FILES += \
         database/engine/rrdengine.c \

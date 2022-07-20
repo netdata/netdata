@@ -228,3 +228,7 @@ Session.*.vim
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints
+
+# Judy stuff
+JudyLTables.c
+judyltablesgen
