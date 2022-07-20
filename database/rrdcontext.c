@@ -1103,7 +1103,10 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
             if (!rd->rrdmetric) continue;
 
             RRDMETRIC *rm_old = rrdmetric_acquired_value(rd->rrdmetric);
-            rm_old->flags = RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_UPDATE_REASON_UNUSED;
+            rm_old->flags = RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
+            rm_old->rrddim = NULL;
+            rm_old->first_time_t = 0;
+            rm_old->last_time_t = 0;
 
             rrdmetric_release(rd->rrdmetric);
             rd->rrdmetric = NULL;
@@ -1112,14 +1115,19 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         }
         rrdset_unlock(st);
 
-        ri_old->flags = RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_UPDATE_REASON_UNUSED;
+        ri_old->flags = RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
         ri_old->rrdset = NULL;
+        ri_old->first_time_t = 0;
+        ri_old->last_time_t = 0;
 
         rrdinstance_release(ria_old);
 
         // trigger updates on the old context
-        if(!dictionary_stats_entries(rc_old->rrdinstances))
-            rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_UNUSED);
+        if(!dictionary_stats_entries(rc_old->rrdinstances)) {
+            rc_old->first_time_t = 0;
+            rc_old->last_time_t = 0;
+            rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+        }
         else
             rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
 
