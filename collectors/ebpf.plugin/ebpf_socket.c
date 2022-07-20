@@ -64,7 +64,6 @@ static ebpf_bandwidth_t *bandwidth_vector = NULL;
 static int socket_apps_created = 0;
 pthread_mutex_t nv_mutex;
 int wait_to_plot = 0;
-int read_thread_closed = 1;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
@@ -1931,7 +1930,6 @@ void *ebpf_socket_read_hash(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_every;
@@ -1950,7 +1948,6 @@ void *ebpf_socket_read_hash(void *ptr)
         pthread_mutex_unlock(&nv_mutex);
     }
 
-    read_thread_closed = 1;
     return NULL;
 }
 
@@ -2661,7 +2658,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     socket_threads.thread = mallocz(sizeof(netdata_thread_t));
 
     netdata_thread_create(socket_threads.thread, socket_threads.name,
-                          NETDATA_THREAD_OPTION_JOINABLE, ebpf_socket_read_hash, em);
+                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_read_hash, em);
 
     int cgroups = em->cgroup_charts;
     if (cgroups)
@@ -2885,13 +2882,10 @@ static void ebpf_socket_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*socket_threads.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
@@ -2924,6 +2918,7 @@ static void ebpf_socket_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
+        freez(probe_links);
         if (objects)
             bpf_object__close(objects);
     }

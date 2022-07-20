@@ -1020,7 +1020,7 @@ static void process_collector(ebpf_module_t *em)
     cgroup_thread.thread = mallocz(sizeof(netdata_thread_t));
     cgroup_thread.start_routine = ebpf_cgroup_update_shm;
 
-    netdata_thread_create(cgroup_thread.thread, cgroup_thread.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(cgroup_thread.thread, cgroup_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_cgroup_update_shm, em);
 
     heartbeat_t hb;
