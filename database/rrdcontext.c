@@ -1115,7 +1115,11 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         }
         rrdset_unlock(st);
 
-        ri_old->flags = RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
+        // mark the old instance, ready to be deleted
+        if(!(ri_old->flags & RRD_FLAG_OWN_LABELS))
+            ri_old->rrdlabels = rrdlabels_create();
+
+        ri_old->flags = RRD_FLAG_OWN_LABELS|RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
         ri_old->rrdset = NULL;
         ri_old->first_time_t = 0;
         ri_old->last_time_t = 0;
