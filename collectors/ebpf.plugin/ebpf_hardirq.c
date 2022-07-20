@@ -128,8 +128,6 @@ static hardirq_static_val_t hardirq_static_vals[] = {
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
 
-static int read_thread_closed = 1;
-
 // store for "published" data from the reader thread, which the collector
 // thread will write to netdata agent.
 static avl_tree_lock hardirq_pub;
@@ -160,13 +158,10 @@ static void hardirq_cleanup(void *ptr)
         return;
     }
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 1 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    int ret = netdata_thread_cancel(*hardirq_threads.thread);
+    // When it fails to cancel the child thread, it is dangerous to clean any data
+    if (ret != 0)
+        exit(1);
 
     freez(hardirq_ebpf_vals);
     freez(hardirq_ebpf_static_vals);
@@ -179,6 +174,7 @@ static void hardirq_cleanup(void *ptr)
             bpf_link__destroy(probe_links[i]);
             i++;
         }
+        freez(probe_links);
         if (objects)
             bpf_object__close(objects);
     }
@@ -317,8 +313,6 @@ static void hardirq_read_latency_static_map(int mapfd)
  */
 static void *hardirq_reader(void *ptr)
 {
-    read_thread_closed = 0;
-
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -333,7 +327,6 @@ static void *hardirq_reader(void *ptr)
         hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
     }
 
-    read_thread_closed = 1;
     return NULL;
 }
 
@@ -420,7 +413,7 @@ static void hardirq_collector(ebpf_module_t *em)
     netdata_thread_create(
         hardirq_threads.thread,
         hardirq_threads.name,
-        NETDATA_THREAD_OPTION_JOINABLE,
+        NETDATA_THREAD_OPTION_DEFAULT,
         hardirq_reader,
         em
     );
