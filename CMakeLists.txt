@@ -423,7 +423,7 @@ set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-D
 set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
 set_source_files_properties(libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
 set_source_files_properties(libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
-set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_CURRENT_BINARY_DIR}/libnetdata/libjudy/src/JudyL")
+set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src/JudyL")
 
 # -----------------------------------------------------------------------------
 # netdata files
