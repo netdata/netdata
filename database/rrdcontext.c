@@ -71,13 +71,6 @@ typedef enum {
     |RRD_FLAG_UPDATE_REASON_UNUSED                      \
 )
 
-#define RRD_FLAGS_PROPAGATED_UPSTREAM                 ( \
-     RRD_FLAG_COLLECTED                                 \
-    |RRD_FLAG_DELETED                                   \
-    |RRD_FLAG_LIVE_RETENTION                            \
-    |RRD_FLAG_ALL_UPDATE_REASONS                        \
- )
-
 #define RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS   ( \
      RRD_FLAG_ARCHIVED                                  \
     |RRD_FLAG_ALL_UPDATE_REASONS                        \
@@ -959,19 +952,22 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
-    RRD_FLAGS combined_metrics_flags = RRD_FLAG_NONE;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t metrics_active = 0, metrics_deleted = 0;
+    bool live_retention = true, currently_collected = false;
     {
         RRDMETRIC *rm;
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
-            // find the combined flags of all the metrics
-            combined_metrics_flags |= rm->flags & RRD_FLAGS_PROPAGATED_UPSTREAM;
+            if(!(rm->flags & RRD_FLAG_LIVE_RETENTION))
+                live_retention = false;
 
             if (unlikely((rrdmetric_should_be_deleted(rm)))) {
                 metrics_deleted++;
                 continue;
             }
+
+            if(rm->flags & RRD_FLAG_COLLECTED)
+                currently_collected = true;
 
             metrics_active++;
 
@@ -984,31 +980,55 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
         dfe_done(rm);
     }
 
-    // remove the deleted flag - we will recalculate it below
-    ri->flags &= ~RRD_FLAG_DELETED;
+    if(live_retention && !(ri->flags & RRD_FLAG_LIVE_RETENTION))
+        ri->flags |= RRD_FLAG_LIVE_RETENTION;
+    else if(!live_retention && (ri->flags & RRD_FLAG_LIVE_RETENTION))
+        ri->flags &= ~RRD_FLAG_LIVE_RETENTION;
 
-    if(unlikely(!metrics_active && metrics_deleted)) {
-        // we had some metrics, but there are gone now...
+    if(unlikely(!metrics_active)) {
+        // no metrics available
+
+        if(ri->first_time_t) {
+            ri->first_time_t = 0;
+            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T);
+        }
+
+        if(ri->last_time_t) {
+            ri->last_time_t = 0;
+            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
+        }
 
         ri->flags |= RRD_FLAG_DELETED;
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
     }
-    else if(metrics_active) {
+    else {
         // we have active metrics...
+
+        // remove the deleted flag - we will recalculate it below
+        ri->flags &= ~RRD_FLAG_DELETED;
 
         if (unlikely(min_first_time_t == LONG_MAX))
             min_first_time_t = 0;
 
         if (unlikely(min_first_time_t == 0 || max_last_time_t == 0)) {
-            ri->first_time_t = 0;
-            ri->last_time_t = 0;
+            if(ri->first_time_t) {
+                ri->first_time_t = 0;
+                rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T);
+            }
 
-            if(unlikely(combined_metrics_flags & RRD_FLAG_LIVE_RETENTION)) {
+            if(ri->last_time_t) {
+                ri->last_time_t = 0;
+                rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
+            }
+
+            if(unlikely(live_retention)) {
                 ri->flags |= RRD_FLAG_DELETED;
                 rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
             }
         }
         else {
+            ri->flags &= ~RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
+
             if (unlikely(ri->first_time_t != min_first_time_t)) {
                 ri->first_time_t = min_first_time_t;
                 rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T);
@@ -1020,23 +1040,10 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
             }
         }
 
-        if(combined_metrics_flags & RRD_FLAG_LIVE_RETENTION)
-            ri->flags |= RRD_FLAG_LIVE_RETENTION;
-        else
-            ri->flags &= ~RRD_FLAG_LIVE_RETENTION;
-
-        if(likely(combined_metrics_flags & RRD_FLAG_COLLECTED))
+        if(likely(currently_collected))
             rrd_flag_set_collected(ri);
         else
             rrd_flag_set_archived(ri);
-    }
-    else {
-        // no deleted metrics, no active metrics
-        // just hanging there...
-
-        ri->first_time_t = 0;
-        ri->last_time_t = 0;
-        ri->flags |= RRD_FLAG_DELETED|RRD_FLAG_UPDATED;
     }
 
     if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED)) {
@@ -1095,7 +1102,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 
     if(rca_old && ria_old) {
         // the chart changed context
-        RRDCONTEXT *rc_old = rrdcontext_acquired_value(rca_old);
+        // RRDCONTEXT *rc_old = rrdcontext_acquired_value(rca_old);
         RRDINSTANCE *ri_old = rrdinstance_acquired_value(ria_old);
 
         // migrate all dimensions to the new metrics
@@ -1126,8 +1133,10 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         ri_old->first_time_t = 0;
         ri_old->last_time_t = 0;
 
+        rrdinstance_trigger_updates(ri_old, true, true);
         rrdinstance_release(ria_old);
 
+        /*
         // trigger updates on the old context
         if(!dictionary_stats_entries(rc_old->rrdinstances) && !dictionary_stats_referenced_items(rc_old->rrdinstances)) {
             rrdcontext_lock(rc_old);
@@ -1139,6 +1148,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         }
         else
             rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
+        */
 
         rrdcontext_release(rca_old);
         rca_old = NULL;
@@ -1539,19 +1549,22 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
         rrd_flag_set_updated(rc, reason);
 
     size_t min_priority = LONG_MAX;
-    RRD_FLAGS combined_instances_flags = RRD_FLAG_NONE;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t instances_active = 0, instances_deleted = 0;
+    bool live_retention = true, currently_collected = false;
     {
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
-            // find the combined flags of all the metrics
-            combined_instances_flags |= ri->flags & RRD_FLAGS_PROPAGATED_UPSTREAM;
+            if(!(ri->flags & RRD_FLAG_LIVE_RETENTION))
+                live_retention = false;
 
             if (unlikely(rrdinstance_should_be_deleted(ri))) {
                 instances_deleted++;
                 continue;
             }
+
+            if(ri->flags & RRD_FLAG_COLLECTED)
+                currently_collected = true;
 
             internal_error(rc->units != ri->units,
                            "RRDCONTEXT: '%s' rrdinstance '%s' has different units, context '%s', instance '%s'",
@@ -1572,30 +1585,55 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
         dfe_done(ri);
     }
 
-    rc->flags &= ~RRD_FLAG_DELETED;
+    if(live_retention && !(rc->flags & RRD_FLAG_LIVE_RETENTION))
+        rc->flags |= RRD_FLAG_LIVE_RETENTION;
+    else if(!live_retention && (rc->flags & RRD_FLAG_LIVE_RETENTION))
+        rc->flags &= ~RRD_FLAG_LIVE_RETENTION;
 
-    if(unlikely(!instances_active && instances_deleted)) {
+    if(unlikely(!instances_active)) {
         // we had some instances, but they are gone now...
+
+        if(rc->first_time_t) {
+            rc->first_time_t = 0;
+            rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T);
+        }
+
+        if(rc->last_time_t) {
+            rc->last_time_t = 0;
+            rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
+        }
 
         rc->flags |= RRD_FLAG_DELETED;
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
     }
-    else if(instances_active) {
+    else {
         // we have some active instances...
+
+        // remove the deleted flag - we will recalculate it below
+        rc->flags &= ~RRD_FLAG_DELETED;
 
         if (unlikely(min_first_time_t == LONG_MAX))
             min_first_time_t = 0;
 
         if (unlikely(min_first_time_t == 0 && max_last_time_t == 0)) {
-            rc->first_time_t = 0;
-            rc->last_time_t = 0;
+            if(rc->first_time_t) {
+                rc->first_time_t = 0;
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T);
+            }
 
-            if(unlikely(combined_instances_flags & RRD_FLAG_LIVE_RETENTION)) {
+            if(rc->last_time_t) {
+                rc->last_time_t = 0;
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
+            }
+
+            if(unlikely(live_retention)) {
                 rc->flags |= RRD_FLAG_DELETED;
                 rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
             }
         }
         else {
+            rc->flags &= ~RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
+
             if (unlikely(rc->first_time_t != min_first_time_t)) {
                 rc->first_time_t = min_first_time_t;
                 rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T);
@@ -1607,12 +1645,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
             }
         }
 
-        if(combined_instances_flags & RRD_FLAG_LIVE_RETENTION)
-            rc->flags |= RRD_FLAG_LIVE_RETENTION;
-        else
-            rc->flags &= ~RRD_FLAG_LIVE_RETENTION;
-
-        if(likely(combined_instances_flags & RRD_FLAG_COLLECTED))
+        if(likely(currently_collected))
             rrd_flag_set_collected(rc);
         else
             rrd_flag_set_archived(rc);
@@ -1622,23 +1655,20 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
             rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY);
         }
     }
-    else {
-        // no deleted instances, no active instances
-        // just hanging there...
-
-        rc->first_time_t = 0;
-        rc->last_time_t = 0;
-        rc->flags |= RRD_FLAG_DELETED|RRD_FLAG_UPDATED;
-    }
 
     if(unlikely(rc->flags & RRD_FLAG_UPDATED)) {
         log_transition(NULL, NULL, rc->id, rc->flags, "RRDCONTEXT");
 
         if(check_if_cloud_version_changed_unsafe(rc, false)) {
             rc->version = rrdcontext_get_next_version(rc);
-            rc->queue.queued_ut = now_realtime_usec();
-            rc->queue.queued_flags |= rc->flags;
-            if(!(rc->flags & RRD_FLAG_QUEUED)) {
+
+            if(rc->flags & RRD_FLAG_QUEUED) {
+                rc->queue.queued_flags |= rc->flags;
+            }
+            else {
+                rc->queue.queued_ut = now_realtime_usec();
+                rc->queue.queued_flags = rc->flags;
+
                 rc->flags |= RRD_FLAG_QUEUED;
                 dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_queue, string2str(rc->id), rc, sizeof(*rc));
             }
