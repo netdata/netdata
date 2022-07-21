@@ -61,7 +61,6 @@ static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VE
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
-static int socket_apps_created = 0;
 pthread_mutex_t nv_mutex;
 int wait_to_plot = 0;
 
@@ -736,7 +735,7 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
 void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
 {
     UNUSED(em);
-    if (!socket_apps_created)
+    if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
         return;
 
     struct target *w;
@@ -1051,7 +1050,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    socket_apps_created = 1;
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
@@ -2664,13 +2663,13 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     if (cgroups)
         ebpf_socket_update_cgroup_algorithm();
 
-    int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
-    int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
+    int socket_global_enabled = em->global_charts;
     int network_connection = em->optional;
     int update_every = em->update_every;
     while (!close_ebpf_plugin) {
         (void)heartbeat_next(&hb, step);
 
+        netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (socket_global_enabled)
             read_hash_global_tables();
@@ -2687,7 +2686,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_global_enabled)
             ebpf_socket_send_data(em);
 
-        if (socket_apps_enabled)
+        if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
         if (cgroups)
