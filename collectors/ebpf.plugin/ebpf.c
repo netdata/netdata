@@ -28,7 +28,6 @@ struct config collector_config = { .first_section = NULL,
 int running_on_kernel = 0;
 int ebpf_nprocs;
 int isrh = 0;
-uint32_t finalized_threads = 1;
 
 pthread_mutex_t lock;
 pthread_mutex_t collect_data_mutex;
@@ -164,6 +163,44 @@ ebpf_module_t ebpf_modules[] = {
       .cfg = NULL, .config_name = NULL, .kernels = 0, .load = EBPF_LOAD_LEGACY, .targets = NULL},
 };
 
+struct netdata_static_thread ebpf_threads[] = {
+    {"EBPF PROCESS", NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF SOCKET" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF CACHESTAT" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF SYNC" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF DCSTAT" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF SWAP" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF VFS" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF FILESYSTEM" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF DISK" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF MOUNT" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF FD" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF HARDIRQ" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF SOFTIRQ" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF OOMKILL" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF SHM" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {"EBPF MDFLUSH" , NULL, NULL, 1,
+        NULL, NULL, NULL},
+    {NULL          , NULL, NULL, 0,
+                     NULL, NULL, NULL}
+};
+
+
 // Link with apps.plugin
 ebpf_process_stat_t *global_process_stat = NULL;
 
@@ -192,35 +229,15 @@ char *btf_path = NULL;
  *****************************************************************/
 
 /**
- * Clean Loaded Events
- *
- * This function cleans the events previous loaded on Linux.
-void clean_loaded_events()
-{
-    int event_pid;
-    for (event_pid = 0; ebpf_modules[event_pid].probes; event_pid++)
-        clean_kprobe_events(NULL, (int)ebpf_modules[event_pid].thread_id, ebpf_modules[event_pid].probes);
-}
- */
-
-/**
- * Close the collector gracefully
- *
- * @param sig is the signal number used to close the collector
- */
-static void ebpf_stop_threads(int sig)
-{
-    close_ebpf_plugin = 1;
-    (void)sig;
-}
-
-/**
  * Close the collector gracefully
  *
  * @param sig is the signal number used to close the collector
  */
 static void ebpf_exit(int sig)
 {
+    if (sig < 0)
+        return;
+
 #ifdef LIBBPF_MAJOR_VERSION
     if (default_btf) {
         btf__free(default_btf);
@@ -234,6 +251,39 @@ static void ebpf_exit(int sig)
         error("Cannot remove PID file %s", filename);
 
     exit(sig);
+}
+
+/**
+ * Close the collector gracefully
+ *
+ * @param sig is the signal number used to close the collector
+ */
+static void ebpf_stop_threads(int sig)
+{
+    int i;
+    for (i = 0; ebpf_threads[i].name != NULL; i++) {
+        (void)netdata_thread_cancel(*ebpf_threads[i].thread);
+    }
+
+    close_ebpf_plugin = 1;
+
+    usec_t max = 5 * USEC_PER_SEC, step = 100000;
+    while (i && max) {
+        max -= step;
+        sleep_usec(step);
+        i = 0;
+        int j;
+        for (j = 0; ebpf_threads[j].name != NULL; j++) {
+            if (ebpf_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
+                i++;
+        }
+    }
+
+    for (i = 0; ebpf_threads[i].name != NULL; i++) {
+        freez(ebpf_threads[i].thread);
+    }
+
+   ebpf_exit(sig);
 }
 
 /*****************************************************************
@@ -1795,6 +1845,19 @@ static void ebpf_manage_pid(pid_t pid)
 }
 
 /**
+ * Set start routine
+ *
+ * Set static routine before threads to be created.
+ */
+ static void ebpf_set_static_routine()
+ {
+     int i;
+     for (i = 0; ebpf_modules[i].thread_name; i++) {
+         ebpf_threads[i].start_routine = ebpf_modules[i].start_routine;
+     }
+ }
+
+/**
  * Entry point
  *
  * @param argc the number of arguments
@@ -1839,6 +1902,7 @@ int main(int argc, char **argv)
     }
 
     signal(SIGINT, ebpf_stop_threads);
+    signal(SIGQUIT, ebpf_stop_threads);
     signal(SIGTERM, ebpf_stop_threads);
     signal(SIGPIPE, ebpf_stop_threads);
 
@@ -1862,44 +1926,7 @@ int main(int argc, char **argv)
     read_local_ports("/proc/net/udp", IPPROTO_UDP);
     read_local_ports("/proc/net/udp6", IPPROTO_UDP);
 
-    struct netdata_static_thread ebpf_threads[] = {
-        {"EBPF PROCESS", NULL, NULL, 1,
-          NULL, NULL, ebpf_modules[EBPF_MODULE_PROCESS_IDX].start_routine},
-        {"EBPF SOCKET" , NULL, NULL, 1,
-          NULL, NULL, ebpf_modules[EBPF_MODULE_SOCKET_IDX].start_routine},
-        {"EBPF CACHESTAT" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].start_routine},
-        {"EBPF SYNC" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_SYNC_IDX].start_routine},
-        {"EBPF DCSTAT" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_DCSTAT_IDX].start_routine},
-        {"EBPF SWAP" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_SWAP_IDX].start_routine},
-        {"EBPF VFS" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_VFS_IDX].start_routine},
-        {"EBPF FILESYSTEM" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].start_routine},
-        {"EBPF DISK" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_DISK_IDX].start_routine},
-        {"EBPF MOUNT" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_MOUNT_IDX].start_routine},
-        {"EBPF FD" , NULL, NULL, 1,
-             NULL, NULL, ebpf_modules[EBPF_MODULE_FD_IDX].start_routine},
-        {"EBPF HARDIRQ" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_HARDIRQ_IDX].start_routine},
-        {"EBPF SOFTIRQ" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_SOFTIRQ_IDX].start_routine},
-        {"EBPF OOMKILL" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_OOMKILL_IDX].start_routine},
-        {"EBPF SHM" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_SHM_IDX].start_routine},
-        {"EBPF MDFLUSH" , NULL, NULL, 1,
-            NULL, NULL, ebpf_modules[EBPF_MODULE_MDFLUSH_IDX].start_routine},
-        {NULL          , NULL, NULL, 0,
-          NULL, NULL, NULL}
-    };
-
-    //clean_loaded_events();
+    ebpf_set_static_routine();
 
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
@@ -1908,16 +1935,17 @@ int main(int argc, char **argv)
 
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread_id = i;
-        netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
+        netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
     }
 
-    for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        struct netdata_static_thread *st = &ebpf_threads[i];
-        netdata_thread_join(*st->thread, NULL);
-        freez(st->thread);
+    usec_t step = USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    while (!close_ebpf_plugin) {
+        (void)heartbeat_next(&hb, step);
     }
 
-    ebpf_exit(0);
+    ebpf_exit(-1);
 
     return 0;
 }
