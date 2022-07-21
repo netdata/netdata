@@ -25,7 +25,7 @@ typedef enum {
     RRD_FLAG_OWN_LABELS     = (1 << 4), // this instance has its own labels - not linked to an RRDSET
     RRD_FLAG_LIVE_RETENTION = (1 << 5), // we have got live retention from the database
     RRD_FLAG_QUEUED         = (1 << 6), // this context is currently queued to be dispatched to hub
-    RRD_FLAG_DONT_TRIGGER   = (1 << 7), // don't process updates for this object
+    RRD_FLAG_DONT_PROCESS   = (1 << 7), // don't process updates for this object
 
     RRD_FLAG_UPDATE_REASON_LOAD_SQL                = (1 << 10), // this object has just been loaded from SQL
     RRD_FLAG_UPDATE_REASON_NEW_OBJECT              = (1 << 11), // this object has just been created
@@ -74,7 +74,7 @@ typedef enum {
 
 #define RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS   ( \
      RRD_FLAG_ARCHIVED                                  \
-    |RRD_FLAG_DONT_TRIGGER                              \
+    |RRD_FLAG_DONT_PROCESS                              \
     |RRD_FLAG_ALL_UPDATE_REASONS                        \
  )
 
@@ -97,8 +97,8 @@ typedef enum {
                      (obj)->flags &= ~(RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED);    \
         if(unlikely(((obj)->flags &   (RRD_FLAG_DELETED   | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION))))           \
                      (obj)->flags &= ~(RRD_FLAG_DELETED   | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);             \
-        if(unlikely(((obj)->flags &    RRD_FLAG_DONT_TRIGGER)))                                                 \
-                     (obj)->flags &=  ~RRD_FLAG_DONT_TRIGGER;                                                   \
+        if(unlikely(((obj)->flags &    RRD_FLAG_DONT_PROCESS)))                                                 \
+                     (obj)->flags &=  ~RRD_FLAG_DONT_PROCESS;                                                   \
 } while(0)
 
 #define rrd_flag_set_archived(obj)                                                                         do { \
@@ -315,8 +315,8 @@ static void rrd_flags_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
     if(flags & RRD_FLAG_LIVE_RETENTION)
         buffer_strcat(wb, "LIVE_RETENTION ");
 
-    if(flags & RRD_FLAG_DONT_TRIGGER)
-        buffer_strcat(wb, "DONT_TRIGGER ");
+    if(flags & RRD_FLAG_DONT_PROCESS)
+        buffer_strcat(wb, "DONT_PROCESS ");
 }
 
 static void rrd_reasons_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
@@ -652,7 +652,7 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate) 
 
     rrdmetric_update_retention(rm);
 
-    if(unlikely(escalate && rm->flags & RRD_FLAG_UPDATED && !(rm->ri->flags & RRD_FLAG_DONT_TRIGGER))) {
+    if(unlikely(escalate && rm->flags & RRD_FLAG_UPDATED && !(rm->ri->flags & RRD_FLAG_DONT_PROCESS))) {
         log_transition(rm->id, rm->ri->id, rm->ri->rc->id, rm->flags, "RRDMETRIC");
         rrdinstance_trigger_updates(rm->ri, true, true);
     }
@@ -944,7 +944,7 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
 }
 
 static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate) {
-    if(unlikely(ri->flags & RRD_FLAG_DONT_TRIGGER)) return;
+    if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS)) return;
     if(unlikely(!force && !(ri->flags & RRD_FLAG_UPDATED))) return;
 
     if(likely(ri->rrdset)) {
@@ -1059,7 +1059,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
             rrd_flag_set_archived(ri);
     }
 
-    if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED && !(ri->rc->flags & RRD_FLAG_DONT_TRIGGER))) {
+    if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED && !(ri->rc->flags & RRD_FLAG_DONT_PROCESS))) {
         log_transition(NULL, ri->id, ri->rc->id, ri->flags, "RRDINSTANCE");
         rrdcontext_trigger_updates(ri->rc, true, RRD_FLAG_NONE);
     }
@@ -1089,7 +1089,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         .chart_type = st->chart_type,
         .priority = st->priority,
         .update_every = st->update_every,
-        .flags = RRD_FLAG_DONT_TRIGGER,
+        .flags = RRD_FLAG_DONT_PROCESS,
         .rrdset = st,
     };
     uuid_copy(tri.uuid, *st->chart_uuid);
@@ -1114,7 +1114,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 
     if(rca_old && ria_old) {
         // the chart changed context
-        // RRDCONTEXT *rc_old = rrdcontext_acquired_value(rca_old);
+        RRDCONTEXT *rc_old = rrdcontext_acquired_value(rca_old);
         RRDINSTANCE *ri_old = rrdinstance_acquired_value(ria_old);
 
         // migrate all dimensions to the new metrics
@@ -1145,7 +1145,12 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         ri_old->first_time_t = 0;
         ri_old->last_time_t = 0;
 
+        ri_old->flags &= ~RRD_FLAG_DONT_PROCESS;
+        rc_old->flags &= ~RRD_FLAG_DONT_PROCESS;
+
         rrdinstance_trigger_updates(ri_old, true, true);
+
+        ri_old->flags |= RRD_FLAG_DONT_PROCESS;
         rrdinstance_release(ria_old);
 
         /*
@@ -1196,7 +1201,11 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     }
 
     ri->rrdset = NULL;
+
+    ri->flags &= ~RRD_FLAG_DONT_PROCESS;
     rrdinstance_trigger_updates(ri, false, true);
+    ri->flags |= RRD_FLAG_DONT_PROCESS;
+
     rrdinstance_release(st->rrdinstance);
     st->rrdinstance = NULL;
 
@@ -1227,7 +1236,9 @@ static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     if(unlikely(st->flags & (RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)))
         rrd_flag_set_archived(ri);
 
+    ri->flags &= ~RRD_FLAG_DONT_PROCESS;
     rrdinstance_trigger_updates(ri, false, true);
+    ri->flags |= RRD_FLAG_DONT_PROCESS;
 }
 
 static inline void rrdinstance_collected_rrdset(RRDSET *st) {
@@ -1237,8 +1248,8 @@ static inline void rrdinstance_collected_rrdset(RRDSET *st) {
         rrd_flag_set_collected(ri);
 
     // the chart is collected, let's process it now
-    if(unlikely(ri->flags & RRD_FLAG_DONT_TRIGGER))
-        ri->flags &= ~RRD_FLAG_DONT_TRIGGER;
+    if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS))
+        ri->flags &= ~RRD_FLAG_DONT_PROCESS;
 
     rrdinstance_trigger_updates(ri, false, true);
 }
@@ -1559,7 +1570,7 @@ static inline bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
 }
 
 static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason) {
-    if(unlikely(rc->flags & RRD_FLAG_DONT_TRIGGER)) return;
+    if(unlikely(rc->flags & RRD_FLAG_DONT_PROCESS)) return;
     if(unlikely(!force && !(rc->flags & RRD_FLAG_UPDATED))) return;
 
     rrdcontext_lock(rc);
@@ -2397,7 +2408,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .family = string_strdupz(sc->family),
         .priority = sc->priority,
         .chart_type = sc->chart_type,
-        .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_DONT_TRIGGER | RRD_FLAG_UPDATE_REASON_LOAD_SQL,
+        .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_DONT_PROCESS | RRD_FLAG_UPDATE_REASON_LOAD_SQL,
         .rrdhost = host,
     };
 
@@ -2413,7 +2424,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .chart_type = sc->chart_type,
         .priority = sc->priority,
         .update_every = sc->update_every,
-        .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_DONT_TRIGGER | RRD_FLAG_UPDATE_REASON_LOAD_SQL,
+        .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_DONT_PROCESS | RRD_FLAG_UPDATE_REASON_LOAD_SQL,
     };
     uuid_copy(tri.uuid, sc->chart_id);
 
@@ -2422,12 +2433,12 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
 
     ctx_get_dimension_list(&ri->uuid, rrdinstance_load_dimension, ri);
     ctx_get_label_list(&ri->uuid, rrdinstance_load_clabel, ri);
-    ri->flags &= ~RRD_FLAG_DONT_TRIGGER;
+    ri->flags &= ~RRD_FLAG_DONT_PROCESS;
     rrdinstance_trigger_updates(ri, true, true);
 
-    // let the instance be in "don't trigger" mode
+    // let the instance be in "don't process" mode
     // so that we process it once, when it is collected
-    ri->flags |= RRD_FLAG_DONT_TRIGGER;
+    ri->flags |= RRD_FLAG_DONT_PROCESS;
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);
@@ -2437,16 +2448,16 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
     RRDHOST *host = data;
     (void)host;
 
-    RRDCONTEXT tmp = {
+    RRDCONTEXT trc = {
         .id = string_strdupz(ctx_data->id),
-        .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_DONT_TRIGGER | RRD_FLAG_UPDATE_REASON_LOAD_SQL,
+        .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_DONT_PROCESS | RRD_FLAG_UPDATE_REASON_LOAD_SQL,
 
         // no need to set more data here
         // we only need the hub data
 
         .hub = *ctx_data,
     };
-    dictionary_set((DICTIONARY *)host->rrdctx, string2str(tmp.id), &tmp, sizeof(tmp));
+    dictionary_set((DICTIONARY *)host->rrdctx, string2str(trc.id), &trc, sizeof(trc));
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {
@@ -2461,7 +2472,7 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 
     RRDCONTEXT *rc;
     dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
-        rc->flags &= ~RRD_FLAG_DONT_TRIGGER;
+        rc->flags &= ~RRD_FLAG_DONT_PROCESS;
         rrdcontext_trigger_updates(rc, true, 0);
     }
     dfe_done(rc);
@@ -2568,14 +2579,18 @@ static void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS r
 
             rrd_flag_set_updated(rm, reason);
 
+            rm->flags &= ~RRD_FLAG_DONT_PROCESS;
             rrdmetric_trigger_updates(rm, true, false);
         }
         dfe_done(rm);
 
+        ri->flags &= ~RRD_FLAG_DONT_PROCESS;
         rrdinstance_trigger_updates(ri, true, false);
+        ri->flags |= RRD_FLAG_DONT_PROCESS;
     }
     dfe_done(ri);
 
+    rc->flags &= ~RRD_FLAG_DONT_PROCESS;
     rrdcontext_trigger_updates(rc, true, RRD_FLAG_NONE);
 }
 
