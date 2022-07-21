@@ -390,7 +390,8 @@ target_include_directories(judyltablesgen PUBLIC
     libnetdata/libjudy/src/JudyCommon)
 
 target_compile_options(judyltablesgen PUBLIC
-    -Wno-format)
+    -Wno-format
+    -Wno-format-security)
 
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src)
 
