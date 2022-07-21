@@ -258,6 +258,25 @@ void aclk_sync_exit_all()
     uv_mutex_unlock(&aclk_async_lock);
 }
 
+#ifdef ENABLE_ACLK
+enum {
+    IDX_HOST_ID,
+    IDX_HOSTNAME,
+    IDX_REGISTRY,
+    IDX_UPDATE_EVERY,
+    IDX_OS,
+    IDX_TIMEZONE,
+    IDX_TAGS,
+    IDX_HOPS,
+    IDX_MEMORY_MODE,
+    IDX_ABBREV_TIMEZONE,
+    IDX_UTC_OFFSET,
+    IDX_PROGRAM_NAME,
+    IDX_PROGRAM_VERSION,
+    IDX_ENTRIES,
+    IDX_HEALTH_ENABLED,
+};
+
 static int create_host_callback(void *data, int argc, char **argv, char **column)
 {
     UNUSED(data);
@@ -265,27 +284,27 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     UNUSED(column);
 
     char guid[UUID_STR_LEN];
-    uuid_unparse_lower(*(uuid_t *)argv[0], guid);
+    uuid_unparse_lower(*(uuid_t *)argv[IDX_HOST_ID], guid);
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
-    system_info->hops = str2i((const char *) argv[7]);
+    system_info->hops = str2i((const char *) argv[IDX_HOPS]);
 
-    sql_build_host_system_info((uuid_t *)argv[0], system_info);
+    sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);
 
     RRDHOST *host = rrdhost_find_or_create(
-          (const char *) argv[1]
-        , (const char *) argv[2]
+          (const char *) argv[IDX_HOSTNAME]
+        , (const char *) argv[IDX_REGISTRY]
         , guid
-        , (const char *) argv[4]                                    //os
-        , (const char *) argv[5]                                    // timezone
-        , (const char *) argv[9]                                    // abbrev timezone
-        , argv[10] ? str2uint32_t(argv[10]) : 0
-        , (const char *) argv[6]                                    // tags
-        , (const char *) (argv[11] ? argv[11] : "unknown")          // program name
-        , (const char *) (argv[12] ? argv[12] : "unknown")          // program version
-        , argv[3] ? str2i(argv[3]) : 1                              // update every
-        , argv[13] ? str2i(argv[13]) : 0                            // entries
-        , RRD_MEMORY_MODE_DBENGINE                                  // str2i(argv[8])
+        , (const char *) argv[IDX_OS]
+        , (const char *) argv[IDX_TIMEZONE]
+        , (const char *) argv[IDX_ABBREV_TIMEZONE]
+        , argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET]) : 0
+        , (const char *) argv[IDX_TAGS]
+        , (const char *) (argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown")
+        , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")
+        , argv[3] ? str2i(argv[IDX_UPDATE_EVERY]) : 1
+        , argv[13] ? str2i(argv[IDX_ENTRIES]) : 0
+        , RRD_MEMORY_MODE_DBENGINE
         , 0 // health
         , 0 // rrdpush enabled
         , NULL  //destination
@@ -299,6 +318,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"", host->hostname, host->machine_guid, node_str);
     return 0;
 }
+#endif
 
 int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 {

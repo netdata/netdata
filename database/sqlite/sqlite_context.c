@@ -139,13 +139,10 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
         return;
     }
 
-    if (likely(host_uuid))
-        rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
-    else
-        rc = sqlite3_bind_null(res, 1);
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id to fetch the chart list");
-        goto failed;
+        goto skip_load;
     }
 
     SQL_CHART_DATA chart_data = { 0 };
@@ -163,7 +160,7 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
         dict_cb(&chart_data, data);
     }
 
-failed:
+skip_load:
     rc = sqlite3_finalize(res);
     if (rc != SQLITE_OK)
         error_report("Failed to finalize statement that fetches chart label data, rc = %d", rc);
