@@ -735,8 +735,6 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
 void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
 {
     UNUSED(em);
-    if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-        return;
 
     struct target *w;
     collected_number value;
