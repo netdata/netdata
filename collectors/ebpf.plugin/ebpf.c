@@ -18,7 +18,6 @@ char *ebpf_plugin_dir = PLUGINS_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
 char *ebpf_algorithms[] = {"absolute", "incremental"};
-static int thread_finished = 0;
 int close_ebpf_plugin = 0;
 struct config collector_config = { .first_section = NULL,
                                    .last_section = NULL,
@@ -209,50 +208,19 @@ void clean_loaded_events()
  *
  * @param sig is the signal number used to close the collector
  */
-static void ebpf_exit(int sig)
+static void ebpf_stop_threads(int sig)
 {
     close_ebpf_plugin = 1;
-    static int remove_pid = 0;
+    (void)sig;
+}
 
-    // When both threads were not finished case I try to go in front this address, the collector will crash
-    if (!thread_finished) {
-        return;
-    }
-
-    ebpf_close_cgroup_shm();
-
-    /*
-    int ret = fork();
-    if (ret < 0) // error
-        error("Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
-    else if (!ret) { // child
-        int i;
-        for (i = getdtablesize(); i >= 0; --i)
-            close(i);
-
-        int fd = open("/dev/null", O_RDWR, 0);
-        if (fd != -1) {
-            dup2(fd, STDIN_FILENO);
-            dup2(fd, STDOUT_FILENO);
-            dup2(fd, STDERR_FILENO);
-        }
-
-        if (fd > 2)
-            close(fd);
-
-        int sid = setsid();
-        if (sid >= 0) {
-            debug(D_EXIT, "Wait for father %d die", getpid());
-            sleep_usec(200000); // Sleep 200 milliseconds to father dies.
-            clean_loaded_events();
-        } else {
-            error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
-        }
-    } else { // parent
-        exit(0);
-    }
-     */
-
+/**
+ * Close the collector gracefully
+ *
+ * @param sig is the signal number used to close the collector
+ */
+static void ebpf_exit(int sig)
+{
 #ifdef LIBBPF_MAJOR_VERSION
     if (default_btf) {
         btf__free(default_btf);
@@ -260,13 +228,10 @@ static void ebpf_exit(int sig)
     }
 #endif
 
-    if (!remove_pid) {
-        remove_pid = 1;
-        char filename[FILENAME_MAX + 1];
-        ebpf_pid_file(filename, FILENAME_MAX);
-        if (unlink(filename))
-            error("Cannot remove PID file %s", filename);
-    }
+    char filename[FILENAME_MAX + 1];
+    ebpf_pid_file(filename, FILENAME_MAX);
+    if (unlink(filename))
+        error("Cannot remove PID file %s", filename);
 
     exit(sig);
 }
@@ -1031,7 +996,6 @@ int ebpf_start_pthread_variables()
     pthread_mutex_init(&collect_data_mutex, NULL);
 
     if (pthread_cond_init(&collect_data_cond_var, NULL)) {
-        thread_finished++;
         error("Cannot start conditional variable to control Apps charts.");
         return -1;
     }
@@ -1675,7 +1639,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 &apps_groups_default_target, &apps_groups_root_target, ebpf_stock_config_dir, "groups")) {
             error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
                   ebpf_stock_config_dir);
-            thread_finished++;
             ebpf_exit(1);
         }
     } else
@@ -1875,12 +1838,11 @@ int main(int argc, char **argv)
         return 4;
     }
 
-    signal(SIGINT, ebpf_exit);
-    signal(SIGTERM, ebpf_exit);
-    signal(SIGPIPE, ebpf_exit);
+    signal(SIGINT, ebpf_stop_threads);
+    signal(SIGTERM, ebpf_stop_threads);
+    signal(SIGPIPE, ebpf_stop_threads);
 
     if (ebpf_start_pthread_variables()) {
-        thread_finished++;
         error("Cannot start mutex to control overall charts.");
         ebpf_exit(5);
     }
@@ -1955,7 +1917,6 @@ int main(int argc, char **argv)
         freez(st->thread);
     }
 
-    thread_finished++;
     ebpf_exit(0);
 
     return 0;
