@@ -85,7 +85,6 @@ with minimal user effort.
 | -------- | ------- | ------------------------ | ----- |
 | Alpine Linux | 3.15 | No | |
 | Alpine Linux | 3.14 | No | |
-| Alpine Linux | 3.13 | No | |
 | Arch Linux | Latest | No | We officially recommend the community packages available for Arch Linux |
 | Manjaro Linux | Latest | No | We officially recommend the community packages available for Arch Linux |
 
@@ -146,8 +145,8 @@ This is a list of platforms that we have supported in the recent past but no lon
 
 | Platform | Version | Notes |
 | -------- | ------- | ----- |
+| Alpine Linux | 3.13 | EOL as of 2022-11-01 |
 | Alpine Linux | 3.12 | EOL as of 2022-05-01 |
-| Alpine Linux | 3.11 | EOL as of 2021-11-01 |
 | Debian | 9.x | EOL as of 2022-06-30 |
 | Fedora | 34 | EOL as of 2022-06-07 |
 | Fedora | 33 | EOL as of 2021-11-30 |
