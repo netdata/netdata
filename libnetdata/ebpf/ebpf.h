@@ -213,6 +213,12 @@ typedef struct ebpf_plugin_stats {
     uint32_t trampolines; // Number of trampolines used
 } ebpf_plugin_stats_t;
 
+typedef enum netdata_apps_integration_flags {
+    NETDATA_EBPF_APPS_FLAG_NO,
+    NETDATA_EBPF_APPS_FLAG_YES,
+    NETDATA_EBPF_APPS_FLAG_CHART_CREATED
+} netdata_apps_integration_flags_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -220,7 +226,7 @@ typedef struct ebpf_module {
     void *(*start_routine)(void *);
     int update_every;
     int global_charts;
-    int apps_charts;
+    netdata_apps_integration_flags_t apps_charts;
     int cgroup_charts;
     netdata_run_mode_t mode;
     uint32_t thread_id;
