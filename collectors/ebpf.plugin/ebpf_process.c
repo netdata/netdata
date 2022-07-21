@@ -566,6 +566,8 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    root,
                                    em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
@@ -1026,7 +1028,6 @@ static void process_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int publish_global = em->global_charts;
-    int apps_enabled = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int thread_enabled = em->enabled;
     if (cgroups)
@@ -1058,6 +1059,7 @@ static void process_collector(ebpf_module_t *em)
 
             int publish_apps = 0;
             pthread_mutex_lock(&collect_data_mutex);
+            netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
             if (all_pids_count > 0) {
                 if (apps_enabled) {
                     publish_apps = 1;
@@ -1077,7 +1079,7 @@ static void process_collector(ebpf_module_t *em)
                     ebpf_process_send_data(em);
                 }
 
-                if (publish_apps) {
+                if (publish_apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
                     ebpf_process_send_apps_data(apps_groups_root_target, em);
                 }
 
