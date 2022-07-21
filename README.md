@@ -202,16 +202,18 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
 
 Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
-ask questions, find resources, and engage with passionate professionals.
+ask questions, find resources, and engage with passionate professionals. The team is also available and active in our [Discord](https://discord.com/invite/mPZ6WZKKG2) too.
 
 You can also find Netdata on:
 
--   [Reddit](https://www.reddit.com/r/netdata/)
--   [Facebook](https://www.facebook.com/linuxnetdata/)
 -   [Twitter](https://twitter.com/linuxnetdata)
+-   [YouTube](https://www.youtube.com/c/Netdata)
+-   [Reddit](https://www.reddit.com/r/netdata/)
+-   [LinkedIn](https://www.linkedin.com/company/netdata-cloud/)
 -   [StackShare](https://stackshare.io/netdata)
 -   [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/)
 -   [Repology](https://repology.org/metapackage/netdata/versions)
+-   [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## Contribute
 
