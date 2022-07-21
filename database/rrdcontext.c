@@ -6,7 +6,7 @@
 #include "aclk/aclk_contexts_api.h"
 #include "aclk/aclk_api.h"
 
-int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
+int rrdcontext_enabled = CONFIG_BOOLEAN_NO;
 
 #define MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST         5000
 #define FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS    120
@@ -1273,8 +1273,10 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
         .deleted = rc->hub.deleted,
     };
 
-    if(snapshot)
-        contexts_snapshot_add_ctx_update(bundle, &message);
+    if(snapshot) {
+        if(!rc->hub.deleted)
+            contexts_snapshot_add_ctx_update(bundle, &message);
+    }
     else
         contexts_updated_add_ctx_update(bundle, &message);
 #endif
@@ -2492,14 +2494,14 @@ static uint64_t rrdcontext_version_hash_with_callback(
 
         rrdcontext_lock(rc);
 
+        if(unlikely(callback))
+            callback(rc, snapshot, bundle);
+
         // skip any deleted contexts
         if(unlikely(rc->flags & RRD_FLAG_DELETED)) {
             rrdcontext_unlock(rc);
             continue;
         }
-
-        if(unlikely(callback))
-            callback(rc, snapshot, bundle);
 
         // we use rc->hub.* which has the latest
         // metadata we have sent to the hub
