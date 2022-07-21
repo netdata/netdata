@@ -355,6 +355,8 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20103,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /*****************************************************************
@@ -999,7 +1001,6 @@ static void dcstat_collector(ebpf_module_t *em)
 
     netdata_publish_dcstat_t publish;
     memset(&publish, 0, sizeof(publish));
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
     heartbeat_t hb;
@@ -1009,6 +1010,7 @@ static void dcstat_collector(ebpf_module_t *em)
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&collect_data_mutex);
+        uint32_t apps = em->apps_charts;
         if (apps)
             read_apps_table();
 
@@ -1019,7 +1021,7 @@ static void dcstat_collector(ebpf_module_t *em)
 
         dcstat_send_global(&publish);
 
-        if (apps)
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_dcache_send_apps_data(apps_groups_root_target);
 
         if (cgroups)
