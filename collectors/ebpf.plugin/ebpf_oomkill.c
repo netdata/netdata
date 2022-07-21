@@ -334,9 +334,11 @@ static void oomkill_collector(ebpf_module_t *em)
         if (cgroups)
             ebpf_oomkill_send_cgroup_data(update_every);
 
-        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
-        oomkill_write_data(keys, count);
-        write_end_chart();
+        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
+            oomkill_write_data(keys, count);
+            write_end_chart();
+        }
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -361,6 +363,8 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20020,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_OOMKILL);
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
