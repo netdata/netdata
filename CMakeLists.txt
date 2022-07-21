@@ -102,7 +102,7 @@ set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBLZ4_INCLUDE_
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
 
-set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} "-lJudy")
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} judy)
 
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
@@ -388,6 +388,8 @@ ADD_EXECUTABLE(judyltablesgen
 target_include_directories(judyltablesgen PUBLIC
     libnetdata/libjudy/src
     libnetdata/libjudy/src/JudyCommon)
+
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src)
 
 target_compile_definitions(judyltablesgen PUBLIC
     JU_64BIT
