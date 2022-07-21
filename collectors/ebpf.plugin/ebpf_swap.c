@@ -677,7 +677,6 @@ static void swap_collector(ebpf_module_t *em)
     netdata_thread_create(swap_threads.thread, swap_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_swap_read_hash, em);
 
-    int apps = em->apps_charts;
     int cgroup = em->cgroup_charts;
     int update_every = em->update_every;
     heartbeat_t hb;
@@ -686,6 +685,7 @@ static void swap_collector(ebpf_module_t *em)
     while (!close_ebpf_plugin) {
         (void)heartbeat_next(&hb, step);
 
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_apps_table();
@@ -697,7 +697,7 @@ static void swap_collector(ebpf_module_t *em)
 
         swap_send_global();
 
-        if (apps)
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_swap_send_apps_data(apps_groups_root_target);
 
         if (cgroup)
@@ -741,6 +741,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20192,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
