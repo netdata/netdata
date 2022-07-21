@@ -33,7 +33,7 @@ const char *database_config[] = {
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int);",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
-    "date_created INT, PRIMARY KEY(host_id, system_key));"
+    "date_created INT, PRIMARY KEY(host_id, system_key));",
 
     "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob , hash_id blob, UNIQUE (chart_id, hash_id));",
 
