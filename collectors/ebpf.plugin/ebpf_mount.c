@@ -351,7 +351,7 @@ static void mount_collector(ebpf_module_t *em)
 
     mount_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
-    netdata_thread_create(mount_thread.thread, mount_thread.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(mount_thread.thread, mount_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_mount_read_hash, em);
 
     heartbeat_t hb;
