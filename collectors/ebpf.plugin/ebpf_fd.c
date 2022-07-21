@@ -656,8 +656,8 @@ static void fd_collector(ebpf_module_t *em)
     while (!close_ebpf_plugin) {
         (void)heartbeat_next(&hb, step);
 
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
-        uint32_t apps = em->apps_charts;
         if (apps)
             read_apps_table();
 

@@ -1058,8 +1058,8 @@ static void process_collector(ebpf_module_t *em)
             read_hash_global_tables();
 
             int publish_apps = 0;
-            pthread_mutex_lock(&collect_data_mutex);
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
+            pthread_mutex_lock(&collect_data_mutex);
             if (all_pids_count > 0) {
                 if (apps_enabled) {
                     publish_apps = 1;

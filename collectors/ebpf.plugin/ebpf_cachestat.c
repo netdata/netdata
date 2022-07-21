@@ -1080,7 +1080,7 @@ static void cachestat_collector(ebpf_module_t *em)
     while (!close_ebpf_plugin) {
         (void)heartbeat_next(&hb, step);
 
-        uint32_t apps = em->apps_charts;
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_apps_table();
