@@ -1164,7 +1164,6 @@ static void vfs_collector(ebpf_module_t *em)
     netdata_thread_create(vfs_threads.thread, vfs_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_vfs_read_hash, em);
 
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -1172,6 +1171,7 @@ static void vfs_collector(ebpf_module_t *em)
     while (!close_ebpf_plugin) {
         (void)heartbeat_next(&hb, step);
 
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             ebpf_vfs_read_apps();
@@ -1184,7 +1184,7 @@ static void vfs_collector(ebpf_module_t *em)
         ebpf_vfs_send_data(em);
         fflush(stdout);
 
-        if (apps)
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_vfs_send_apps_data(em, apps_groups_root_target);
 
         if (cgroups)
@@ -1498,6 +1498,8 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                    root, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /*****************************************************************
