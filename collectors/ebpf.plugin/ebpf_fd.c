@@ -649,7 +649,6 @@ static void fd_collector(ebpf_module_t *em)
     netdata_thread_create(fd_thread.thread, fd_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_fd_read_hash, em);
 
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -658,6 +657,7 @@ static void fd_collector(ebpf_module_t *em)
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&collect_data_mutex);
+        uint32_t apps = em->apps_charts;
         if (apps)
             read_apps_table();
 
@@ -668,7 +668,7 @@ static void fd_collector(ebpf_module_t *em)
 
         ebpf_fd_send_data(em);
 
-        if (apps)
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_fd_send_apps_data(em, apps_groups_root_target);
 
         if (cgroups)
@@ -734,6 +734,8 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                    root, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
