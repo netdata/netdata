@@ -72,6 +72,7 @@ Here's what you can expect from Netdata:
     synchronize charts as you pan through time, zoom in on anomalies, and more.
 -   **Visual anomaly detection**: Our UI/UX emphasizes the relationships between charts to help you detect the root
     cause of anomalies.
+-   **Machine learning (ML) features out of the box**: Unsupervised ML based [anomaly detection](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor), every second, every metric, zero config!. [Metric correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) to help with short term change detection. And other [additional](https://learn.netdata.cloud/guides/monitor/anomaly-detection) ML based features to help make your life easier.
 -   **Scales to infinity**: You can install it on all your servers, containers, VMs, and IoT devices. Metrics are not
     centralized by default, so there is no limit.
 -   **Several operating modes**: Autonomous host monitoring (the default), headless data collector, forwarding proxy,
