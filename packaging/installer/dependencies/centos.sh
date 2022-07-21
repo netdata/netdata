@@ -139,9 +139,6 @@ validate_tree_centos() {
     echo >&2 " > Updating libarchive ..."
     dnf ${opts} install libarchive
 
-    echo >&2 " > Installing Judy-devel directly ..."
-    dnf ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.3.0+757+d382997d.x86_64.rpm
-    dnf makecache --refresh
   elif [[ $(os_version) =~ ^7(\..*)?$ ]]; then
     package_manager=yum
     echo >&2 " > Checking for EPEL ..."

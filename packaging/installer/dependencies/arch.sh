@@ -24,7 +24,6 @@ declare -a package_tree=(
   libuv
   lz4
   openssl
-  judy
   libelf
   git
   pkgconfig
