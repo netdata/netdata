@@ -239,7 +239,7 @@ static void ebpf_mount_cleanup(void *ptr)
     int ret = netdata_thread_cancel(*mount_thread.thread);
     // When it fails to cancel the child thread, it is dangerous to clean any data
     if (ret != 0)
-        exit(1);
+        pthread_exit(NULL);
 
     freez(mount_thread.thread);
     freez(mount_values);

@@ -57,7 +57,7 @@ static void mdflush_cleanup(void *ptr)
     int ret = netdata_thread_cancel(*mdflush_threads.thread);
     // When it fails to cancel the child thread, it is dangerous to clean any data
     if (ret != 0)
-        exit(1);
+        pthread_exit(NULL);
 
     freez(mdflush_ebpf_vals);
     freez(mdflush_threads.thread);

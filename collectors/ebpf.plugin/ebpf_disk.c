@@ -441,7 +441,7 @@ static void ebpf_disk_cleanup(void *ptr)
     int ret = netdata_thread_cancel(*disk_threads.thread);
     // When it fails to cancel the child thread, it is dangerous to clean any data
     if (ret != 0)
-        exit(1);
+        pthread_exit(NULL);
 
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);

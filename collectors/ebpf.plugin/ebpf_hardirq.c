@@ -161,7 +161,7 @@ static void hardirq_cleanup(void *ptr)
     int ret = netdata_thread_cancel(*hardirq_threads.thread);
     // When it fails to cancel the child thread, it is dangerous to clean any data
     if (ret != 0)
-        exit(1);
+        pthread_exit(NULL);
 
     freez(hardirq_ebpf_vals);
     freez(hardirq_ebpf_static_vals);

@@ -208,7 +208,7 @@ static void ebpf_swap_cleanup(void *ptr)
     int ret = netdata_thread_cancel(*swap_threads.thread);
     // When it fails to cancel the child thread, it is dangerous to clean any data
     if (ret != 0)
-        exit(1);
+        pthread_exit(NULL);
 
     ebpf_cleanup_publish_syscall(swap_publish_aggregated);
 

@@ -401,7 +401,7 @@ static void ebpf_filesystem_cleanup(void *ptr)
     int ret = netdata_thread_cancel(*filesystem_threads.thread);
     // When it fails to cancel the child thread, it is dangerous to clean any data
     if (ret != 0)
-        exit(1);
+        pthread_exit(NULL);
 
     freez(filesystem_threads.thread);
     ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
