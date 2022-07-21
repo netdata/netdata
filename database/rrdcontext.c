@@ -91,12 +91,14 @@ typedef enum {
 #define rrd_flag_unset_updated(obj)       (obj)->flags &= ~(RRD_FLAG_UPDATED | RRD_FLAG_ALL_UPDATE_REASONS)
 
 #define rrd_flag_set_collected(obj)                                                                        do { \
-        if(likely(!((obj)->flags &    RRD_FLAG_COLLECTED)))                                                     \
-                    (obj)->flags |=  (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED | RRD_FLAG_UPDATED); \
-        if(likely( ((obj)->flags &   (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED))))   \
-                    (obj)->flags &= ~(RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED);     \
-        if(likely( ((obj)->flags &   (RRD_FLAG_DELETED   | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION))))            \
-                    (obj)->flags &= ~(RRD_FLAG_DELETED   | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);              \
+        if(likely( !((obj)->flags &    RRD_FLAG_COLLECTED)))                                                    \
+                     (obj)->flags |=  (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED | RRD_FLAG_UPDATED); \
+        if(likely(  ((obj)->flags &   (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED))))  \
+                     (obj)->flags &= ~(RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED);    \
+        if(unlikely(((obj)->flags &   (RRD_FLAG_DELETED   | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION))))           \
+                     (obj)->flags &= ~(RRD_FLAG_DELETED   | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);             \
+        if(unlikely(((obj)->flags &    RRD_FLAG_DONT_TRIGGER)))                                                 \
+                     (obj)->flags &=  ~RRD_FLAG_DONT_TRIGGER;                                                   \
 } while(0)
 
 #define rrd_flag_set_archived(obj)                                                                         do { \
