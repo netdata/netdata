@@ -1663,6 +1663,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
             rc->version = rrdcontext_get_next_version(rc);
 
             if(rc->flags & RRD_FLAG_QUEUED) {
+                rc->queue.queued_ut = now_realtime_usec();
                 rc->queue.queued_flags |= rc->flags;
             }
             else {
