@@ -270,6 +270,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     system_info->hops = str2i((const char *) argv[7]);
 
+    sql_build_host_system_info((uuid_t *)argv[0], system_info);
+
     RRDHOST *host = rrdhost_find_or_create(
           (const char *) argv[1]
         , (const char *) argv[2]
@@ -344,10 +346,12 @@ void sql_aclk_sync_init(void)
     info("SQLite aclk sync initialization completed");
     fatal_assert(0 == uv_mutex_init(&aclk_async_lock));
 
-    rc = sqlite3_exec(db_meta, "SELECT host_id, hostname, registry_hostname, update_every, os, "
+    if (likely(rrdcontext_enabled == CONFIG_BOOLEAN_YES)) {
+        rc = sqlite3_exec(db_meta, "SELECT host_id, hostname, registry_hostname, update_every, os, "
            "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "
            "program_version, entries, health_enabled FROM host WHERE hops >0;",
               create_host_callback, NULL, NULL);
+    }
 
     rc = sqlite3_exec(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni WHERE "
         "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, NULL);

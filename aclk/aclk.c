@@ -774,7 +774,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
         { .name = "proto", .version = 1,                     .enabled = 1 },
         { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(host) },
         { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1,                     .enabled = 1 },
+        { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled },
         { .name = NULL,    .version = 0,                     .enabled = 0 }
     };
     node_state_update.capabilities = caps;
@@ -820,7 +820,7 @@ void aclk_send_node_instances()
                 { .name = "proto", .version = 1,                     .enabled = 1 },
                 { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
                 { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-                { .name = "ctx",   .version = 1,                     .enabled = 1 },
+                { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled },
                 { .name = NULL,    .version = 0,                     .enabled = 0 }
             };
             node_state_update.capabilities = caps;

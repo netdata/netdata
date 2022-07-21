@@ -293,7 +293,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         { .name = "proto", .version = 1,                     .enabled = 1 },
         { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
         { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1,                     .enabled = 1 },
+        { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled },
         { .name = NULL,    .version = 0,                     .enabled = 0 }
     };
     node_state_update.capabilities = caps;
