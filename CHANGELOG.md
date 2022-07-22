@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- add discord, youtube, linkedin links to README [\#13419](https://github.com/netdata/netdata/pull/13419) ([andrewm4894](https://github.com/andrewm4894))
+- add ML bullet point to features section on README [\#13418](https://github.com/netdata/netdata/pull/13418) ([andrewm4894](https://github.com/andrewm4894))
+- Add missing comma \(handle coverity warning CID 379360\) [\#13413](https://github.com/netdata/netdata/pull/13413) ([stelfrag](https://github.com/stelfrag))
 - codacy/lgtm ignore judy sources [\#13411](https://github.com/netdata/netdata/pull/13411) ([underhood](https://github.com/underhood))
 - minor fixes on metadata fields  [\#13406](https://github.com/netdata/netdata/pull/13406) ([tkatsoulas](https://github.com/tkatsoulas))
 - chore\(health\): remove py web\_log alarms [\#13404](https://github.com/netdata/netdata/pull/13404) ([ilyam8](https://github.com/ilyam8))
@@ -339,9 +342,6 @@
 - Remove node.d.plugin and relevant files [\#12769](https://github.com/netdata/netdata/pull/12769) ([surajnpn](https://github.com/surajnpn))
 - Fix checking of enviornment file in updater. [\#12768](https://github.com/netdata/netdata/pull/12768) ([Ferroin](https://github.com/Ferroin))
 - use aclk\_parse\_otp\_error on /env error [\#12767](https://github.com/netdata/netdata/pull/12767) ([underhood](https://github.com/underhood))
-- feat\(dbengine\): make dbengine page cache undumpable and dedupuble [\#12765](https://github.com/netdata/netdata/pull/12765) ([ilyam8](https://github.com/ilyam8))
-- fix: use 'diskutil info` to calculate the disk size on macOS [\#12764](https://github.com/netdata/netdata/pull/12764) ([ilyam8](https://github.com/ilyam8))
-- faster execution of external programs [\#12759](https://github.com/netdata/netdata/pull/12759) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
