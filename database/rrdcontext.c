@@ -2706,6 +2706,8 @@ void *rrdcontext_main(void *ptr) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 
+        if(unlikely(netdata_exit)) break;
+
         if(!aclk_connected) continue;
 
         usec_t now_ut = now_realtime_usec();
@@ -2719,6 +2721,8 @@ void *rrdcontext_main(void *ptr) {
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
+            if(unlikely(netdata_exit)) break;
+
             worker_is_busy(WORKER_JOB_HOSTS);
 
             // check if we have received a streaming command for this host
@@ -2737,6 +2741,7 @@ void *rrdcontext_main(void *ptr) {
 
             RRDCONTEXT *rc;
             dfe_start_write((DICTIONARY *)host->rrdctx_queue, rc) {
+                if(unlikely(netdata_exit)) break;
 
                 if(unlikely(messages_added >= MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST))
                     break;
@@ -2802,7 +2807,7 @@ void *rrdcontext_main(void *ptr) {
             dfe_done(rc);
 
 #ifdef ENABLE_ACLK
-            if(bundle) {
+            if(!netdata_exit && bundle) {
                 // we have a bundle to send messages
 
                 // update the version hash
@@ -2811,6 +2816,8 @@ void *rrdcontext_main(void *ptr) {
                 // send it
                 aclk_send_contexts_updated(bundle);
             }
+            else if(bundle)
+                contexts_updated_delete(bundle);
 #endif
         }
         rrd_unlock();
