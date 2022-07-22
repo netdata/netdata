@@ -238,7 +238,7 @@ void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, str
 static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type) {
     switch(type) {
         case PAGE_METRICS: {
-            storage_number n = SN_EMPTY_SLOT;
+            storage_number n = pack_storage_number(NAN, SN_FLAG_NONE);
             storage_number *array = (storage_number *)page;
             size_t slots = page_length / sizeof(n);
             for(size_t i = 0; i < slots ; i++)
@@ -248,9 +248,9 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
 
         case PAGE_TIER: {
             storage_number_tier1_t n = {
-                .min_value = SN_EMPTY_SLOT,
-                .max_value = SN_EMPTY_SLOT,
-                .sum_value = SN_EMPTY_SLOT,
+                .min_value = NAN,
+                .max_value = NAN,
+                .sum_value = NAN,
                 .count = 1,
                 .anomaly_count = 0,
             };
