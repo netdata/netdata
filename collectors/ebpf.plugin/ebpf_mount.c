@@ -20,9 +20,6 @@ struct config mount_config = { .first_section = NULL, .last_section = NULL, .mut
 
 static netdata_idx_t *mount_values = NULL;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 
 struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
@@ -244,19 +241,8 @@ static void ebpf_mount_cleanup(void *ptr)
     freez(mount_thread.thread);
     freez(mount_values);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (bpf_obj)
+    if (bpf_obj)
         mount_bpf__destroy(bpf_obj);
 #endif
 
@@ -423,8 +409,8 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load == EBPF_LOAD_LEGACY) {
-        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-        if (!probe_links) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
             em->enabled = CONFIG_BOOLEAN_NO;
             ret = -1;
         }

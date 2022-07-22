@@ -35,9 +35,6 @@ static avl_tree_lock mdflush_pub;
 // tmp store for mdflush values we get from a per-CPU eBPF map.
 static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static struct netdata_static_thread mdflush_threads = {"MDFLUSH KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
@@ -61,18 +58,6 @@ static void mdflush_cleanup(void *ptr)
 
     freez(mdflush_ebpf_vals);
     freez(mdflush_threads.thread);
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 }
 
 /**
@@ -293,8 +278,8 @@ void *ebpf_mdflush_thread(void *ptr)
         goto endmdflush;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endmdflush;
     }

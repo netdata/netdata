@@ -10,9 +10,6 @@ static netdata_publish_syscall_t dcstat_counter_publish_aggregated[NETDATA_DCSTA
 netdata_dcstat_pid_t *dcstat_vector = NULL;
 netdata_publish_dcstat_t **dcstat_pid = NULL;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static netdata_idx_t dcstat_hash_values[NETDATA_DCSTAT_IDX_END];
 static netdata_idx_t *dcstat_values = NULL;
 
@@ -287,19 +284,8 @@ static void ebpf_dcstat_cleanup(void *ptr)
 
     ebpf_dcstat_clean_names();
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (bpf_obj)
+    if (bpf_obj)
         dc_bpf__destroy(bpf_obj);
 #endif
 }
@@ -1106,8 +1092,8 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load == EBPF_LOAD_LEGACY) {
-        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-        if (!probe_links) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
             ret = -1;
         }
     }

@@ -54,9 +54,6 @@ static softirq_val_t softirq_vals[] = {
 // tmp store for soft IRQ values we get from a per-CPU eBPF map.
 static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static struct netdata_static_thread softirq_threads = {"SOFTIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
@@ -84,18 +81,6 @@ static void softirq_cleanup(void *ptr)
 
     freez(softirq_ebpf_vals);
     freez(softirq_threads.thread);
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 }
 
 /*****************************************************************
@@ -250,8 +235,8 @@ void *ebpf_softirq_thread(void *ptr)
         goto endsoftirq;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endsoftirq;
     }

@@ -29,9 +29,6 @@ struct config fd_config = { .first_section = NULL, .last_section = NULL, .mutex 
                            .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                      .rwlock = AVL_LOCK_INITIALIZER } };
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 struct netdata_static_thread fd_thread = {"FD KERNEL", NULL, NULL, 1, NULL,
                                           NULL,  NULL};
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
@@ -66,18 +63,6 @@ static void ebpf_fd_cleanup(void *ptr)
     freez(fd_thread.thread);
     freez(fd_values);
     freez(fd_vector);
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 }
 
 /*****************************************************************
@@ -821,8 +806,8 @@ void *ebpf_fd_thread(void *ptr)
 
     ebpf_fd_allocate_global_vectors(em->apps_charts);
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endfd;
     }

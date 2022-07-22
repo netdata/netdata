@@ -125,9 +125,6 @@ static hardirq_static_val_t hardirq_static_vals[] = {
     },
 };
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 // store for "published" data from the reader thread, which the collector
 // thread will write to netdata agent.
 static avl_tree_lock hardirq_pub;
@@ -149,10 +146,6 @@ static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
  */
 static void hardirq_cleanup(void *ptr)
 {
-    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
-    }
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled) {
         return;
@@ -163,21 +156,13 @@ static void hardirq_cleanup(void *ptr)
     if (ret != 0)
         pthread_exit(NULL);
 
+    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
+    }
+
     freez(hardirq_ebpf_vals);
     freez(hardirq_ebpf_static_vals);
     freez(hardirq_threads.thread);
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 }
 
 /*****************************************************************
@@ -470,8 +455,8 @@ void *ebpf_hardirq_thread(void *ptr)
         goto endhardirq;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endhardirq;
     }

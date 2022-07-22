@@ -25,9 +25,6 @@ char *tracepoint_block_type = { "block"} ;
 char *tracepoint_block_issue = { "block_rq_issue" };
 char *tracepoint_block_rq_complete = { "block_rq_complete" };
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static int was_block_issue_enabled = 0;
 static int was_block_rq_complete_enabled = 0;
 
@@ -452,18 +449,6 @@ static void ebpf_disk_cleanup(void *ptr)
 
     ebpf_cleanup_plot_disks();
     ebpf_cleanup_disk_list();
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 }
 
 /*****************************************************************
@@ -813,8 +798,8 @@ void *ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = 0;
         goto enddisk;
     }

@@ -34,9 +34,6 @@ static ebpf_local_maps_t shm_maps[] = {{.name = "tbl_pid_shm", .internal_input =
                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                         {.name = NULL, .internal_input = 0, .user_input = 0}};
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 struct netdata_static_thread shm_threads = {"SHM KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
 
@@ -263,19 +260,8 @@ static void ebpf_shm_cleanup(void *ptr)
     freez(shm_vector);
     freez(shm_values);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (bpf_obj)
+    if (bpf_obj)
         shm_bpf__destroy(bpf_obj);
 #endif
 }
@@ -997,8 +983,8 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load == EBPF_LOAD_LEGACY) {
-        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-        if (!probe_links) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
             em->enabled = CONFIG_BOOLEAN_NO;
             ret = -1;
         }

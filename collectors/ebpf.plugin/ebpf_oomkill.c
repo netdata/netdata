@@ -34,9 +34,6 @@ static ebpf_tracepoint_t oomkill_tracepoints[] = {
     {.enabled = false, .class = NULL, .event = NULL}
 };
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill", .dimension = "oomkill",
                                                                .algorithm = "absolute",
                                                                .next = NULL};
@@ -48,22 +45,7 @@ static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill"
  */
 static void oomkill_cleanup(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        return;
-    }
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
+    (void)ptr;
 }
 
 static void oomkill_write_data(int32_t *keys, uint32_t total)
@@ -399,8 +381,8 @@ void *ebpf_oomkill_thread(void *ptr)
         goto endoomkill;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endoomkill;
     }

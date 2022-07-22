@@ -47,9 +47,6 @@ ebpf_process_publish_apps_t **current_apps_data = NULL;
 
 int process_enabled = 0;
 
-static struct bpf_object *objects = NULL;
-static struct bpf_link **probe_links = NULL;
-
 struct config process_config = { .first_section = NULL,
     .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -1144,18 +1141,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(cgroup_thread.thread);
 
     ebpf_process_disable_tracepoints();
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        freez(probe_links);
-        if (objects)
-            bpf_object__close(objects);
-    }
 }
 
 /*****************************************************************
@@ -1297,8 +1282,8 @@ void *ebpf_process_thread(void *ptr)
     ebpf_update_pid_table(&process_maps[0], em);
 
     set_local_pointers();
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endprocess;
