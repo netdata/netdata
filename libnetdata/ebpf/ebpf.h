@@ -240,6 +240,8 @@ typedef struct ebpf_module {
     uint64_t kernels;
     netdata_ebpf_load_mode_t load;
     netdata_ebpf_targets_t *targets;
+    struct bpf_link **probe_links;
+    struct bpf_object *objects;
 } ebpf_module_t;
 
 extern int ebpf_get_kernel_version();
