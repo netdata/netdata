@@ -102,11 +102,23 @@ typedef enum {
 } while(0)
 
 #define rrd_flag_set_archived(obj)                                                                         do { \
-        if(likely(!((obj)->flags &    RRD_FLAG_ARCHIVED)))                                                      \
-                    (obj)->flags |=  (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED | RRD_FLAG_UPDATED); \
-        if(likely( ((obj)->flags &   (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED))))   \
-                    (obj)->flags &= ~(RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED);     \
+        if(likely( !((obj)->flags &    RRD_FLAG_ARCHIVED)))                                                     \
+                     (obj)->flags |=  (RRD_FLAG_ARCHIVED  | RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED | RRD_FLAG_UPDATED); \
+        if(likely(  ((obj)->flags &   (RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED))))  \
+                     (obj)->flags &= ~(RRD_FLAG_COLLECTED | RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED);    \
+        if(unlikely(((obj)->flags &   (RRD_FLAG_DELETED   | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION))))           \
+                     (obj)->flags &= ~(RRD_FLAG_DELETED   | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);             \
 } while(0)
+
+#define rrd_flag_set_deleted(obj, reason)                                                                  do { \
+        if(likely( !((obj)->flags &    RRD_FLAG_DELETED)))                                                      \
+                     (obj)->flags |=  (RRD_FLAG_DELETED | RRD_FLAG_UPDATE_REASON_ZERO_RETENTION | RRD_FLAG_UPDATED | (reason)); \
+        if(unlikely(((obj)->flags &    RRD_FLAG_ARCHIVED)))                                                     \
+                     (obj)->flags &=  ~RRD_FLAG_ARCHIVED;                                                       \
+        if(likely(  ((obj)->flags &    RRD_FLAG_COLLECTED)))                                                    \
+                     (obj)->flags &=  ~RRD_FLAG_COLLECTED;                                                      \
+} while(0)
+
 
 #define rrd_flag_is_collected(obj) ((obj)->flags & RRD_FLAG_COLLECTED)
 #define rrd_flag_is_archived(obj) ((obj)->flags & RRD_FLAG_ARCHIVED)
@@ -498,10 +510,8 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
     }
 
-    if(rm->first_time_t == 0 && rm->last_time_t == 0 && (!(rm->flags & RRD_FLAG_DELETED))) {
-        rm->flags |= RRD_FLAG_DELETED;
-        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
-    }
+    if(unlikely(!rm->first_time_t && !rm->last_time_t))
+        rrd_flag_set_deleted(rm, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
 
     rm->flags |= RRD_FLAG_LIVE_RETENTION;
 }
@@ -1011,14 +1021,10 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
         }
 
-        ri->flags |= RRD_FLAG_DELETED;
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+        rrd_flag_set_deleted(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
     }
     else {
         // we have active metrics...
-
-        // remove the deleted flag - we will recalculate it below
-        ri->flags &= ~RRD_FLAG_DELETED;
 
         if (unlikely(min_first_time_t == LONG_MAX))
             min_first_time_t = 0;
@@ -1034,10 +1040,8 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
                 rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
             }
 
-            if(unlikely(live_retention)) {
-                ri->flags |= RRD_FLAG_DELETED;
-                rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
-            }
+            if(unlikely(live_retention))
+                rrd_flag_set_deleted(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
         }
         else {
             ri->flags &= ~RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
@@ -1051,12 +1055,12 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
                 ri->last_time_t = max_last_time_t;
                 rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
             }
-        }
 
-        if(likely(currently_collected))
-            rrd_flag_set_collected(ri);
-        else
-            rrd_flag_set_archived(ri);
+            if(likely(currently_collected))
+                rrd_flag_set_collected(ri);
+            else
+                rrd_flag_set_archived(ri);
+        }
     }
 
     if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED && !(ri->rc->flags & RRD_FLAG_DONT_PROCESS))) {
@@ -1422,7 +1426,7 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
         rc->last_time_t  = rc->hub.last_time_t;
 
         if(rc->hub.deleted)
-            rc->flags |= RRD_FLAG_DELETED;
+            rrd_flag_set_deleted(rc, 0);
         else {
             if (rc->last_time_t == 0)
                 rrd_flag_set_collected(rc);
@@ -1636,14 +1640,10 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
             rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
         }
 
-        rc->flags |= RRD_FLAG_DELETED;
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+        rrd_flag_set_deleted(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
     }
     else {
         // we have some active instances...
-
-        // remove the deleted flag - we will recalculate it below
-        rc->flags &= ~RRD_FLAG_DELETED;
 
         if (unlikely(min_first_time_t == LONG_MAX))
             min_first_time_t = 0;
@@ -1659,10 +1659,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
                 rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
             }
 
-            if(unlikely(live_retention)) {
-                rc->flags |= RRD_FLAG_DELETED;
-                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
-            }
+            rrd_flag_set_deleted(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
         }
         else {
             rc->flags &= ~RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
@@ -1676,12 +1673,12 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS rea
                 rc->last_time_t = max_last_time_t;
                 rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
             }
-        }
 
-        if(likely(currently_collected))
-            rrd_flag_set_collected(rc);
-        else
-            rrd_flag_set_archived(rc);
+            if(likely(currently_collected))
+                rrd_flag_set_collected(rc);
+            else
+                rrd_flag_set_archived(rc);
+        }
 
         if (min_priority != LONG_MAX && rc->priority != min_priority) {
             rc->priority = min_priority;
