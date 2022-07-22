@@ -526,7 +526,9 @@ if ENABLE_DBENGINE
     noinst_PROGRAMS = judyltablesgen
 
     judyltablesgen_SOURCES = libnetdata/libjudy/src/JudyL/JudyLTablesGen.c
-    judyltablesgen_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough -Wno-format -Wno-format-security
+    judyltablesgen_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
+
+    judyltablesgen$(EXEEXT) : CFLAGS += -Wno-format -Wno-format-security
 
 JudyLTables.c: $(abs_top_srcdir)/libnetdata/libjudy/src/JudyL/JudyLTablesGen.c $(builddir)/judyltablesgen$(EXEEXT)
 	$(builddir)/judyltablesgen$(EXEEXT)
