@@ -300,7 +300,7 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 
 static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate);
 static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate);
-static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason);
+static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force);
 
 // ----------------------------------------------------------------------------
 // visualizing flags
@@ -1065,7 +1065,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
 
     if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED && !(ri->rc->flags & RRD_FLAG_DONT_PROCESS))) {
         log_transition(NULL, ri->id, ri->rc->id, ri->flags, "RRDINSTANCE");
-        rrdcontext_trigger_updates(ri->rc, true, RRD_FLAG_NONE);
+        rrdcontext_trigger_updates(ri->rc, true);
     }
 }
 
@@ -1165,10 +1165,10 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
             rc_old->first_time_t = 0;
             rc_old->last_time_t = 0;
             rrdcontext_unlock(rc_old);
-            rrdcontext_trigger_updates(rc_old, true, 0);
+            rrdcontext_trigger_updates(rc_old, true);
         }
         else
-            rrdcontext_trigger_updates(rc_old, true, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
+            rrdcontext_trigger_updates(rc_old, true);
         */
 
         rrdcontext_release(rca_old);
@@ -1390,6 +1390,7 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
     rc->rrdhost = host;
+    rc->flags = rc->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS;
 
     if(rc->hub.version) {
         // we are loading data from the SQL database
@@ -1425,7 +1426,7 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
         rc->first_time_t = rc->hub.first_time_t;
         rc->last_time_t  = rc->hub.last_time_t;
 
-        if(rc->hub.deleted)
+        if(rc->hub.deleted || !rc->hub.first_time_t)
             rrd_flag_set_deleted(rc, 0);
         else {
             if (rc->last_time_t == 0)
@@ -1433,11 +1434,12 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
             else
                 rrd_flag_set_archived(rc);
         }
+
+        rc->flags |= RRD_FLAG_UPDATE_REASON_LOAD_SQL;
     }
     else {
         // we are adding this context now for the first time
         rc->version = now_realtime_sec();
-        rc->flags = rc->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS;
     }
 
     rrdinstances_create(rc);
@@ -1519,7 +1521,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 static void rrdcontext_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
-    rrdcontext_trigger_updates(rc, false, RRD_FLAG_NONE);
+    rrdcontext_trigger_updates(rc, false);
 }
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
@@ -1573,14 +1575,11 @@ static inline bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
     return true;
 }
 
-static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason) {
+static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
     if(unlikely(rc->flags & RRD_FLAG_DONT_PROCESS)) return;
     if(unlikely(!force && !(rc->flags & RRD_FLAG_UPDATED))) return;
 
     rrdcontext_lock(rc);
-
-    if(reason)
-        rrd_flag_set_updated(rc, reason);
 
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
@@ -2474,7 +2473,7 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     RRDCONTEXT *rc;
     dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
         rc->flags &= ~RRD_FLAG_DONT_PROCESS;
-        rrdcontext_trigger_updates(rc, true, 0);
+        rrdcontext_trigger_updates(rc, true);
     }
     dfe_done(rc);
 }
@@ -2592,7 +2591,7 @@ static void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS r
     dfe_done(ri);
 
     rc->flags &= ~RRD_FLAG_DONT_PROCESS;
-    rrdcontext_trigger_updates(rc, true, RRD_FLAG_NONE);
+    rrdcontext_trigger_updates(rc, true);
 }
 
 static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, int job_id) {
