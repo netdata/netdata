@@ -99,7 +99,7 @@ typedef enum {
 #define did_storage_number_reset(value)  ((((storage_number)(value)) & SN_EXISTS_RESET))
 #define is_storage_number_anomalous(value)  (does_storage_number_exist(value) && !(((storage_number)(value)) & SN_ANOMALY_BIT))
 
-storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags);
+storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) __attribute__((const));
 static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) __attribute__((const));
 
 int print_netdata_double(char *str, NETDATA_DOUBLE value);
