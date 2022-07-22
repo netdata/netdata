@@ -11,16 +11,13 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // bit 25 SN_ANOMALY_BIT = 0: anomalous, 1: not anomalous
     // bit 24 to bit 1 = the value
 
-    storage_number r = flags & SN_ALL_FLAGS;
+    if(unlikely(fpclassify(value) == FP_NAN || fpclassify(value) == FP_INFINITE))
+        return SN_EMPTY_SLOT;
 
-    // The isnormal() macro shall determine whether its argument value
-    // is normal (neither zero, subnormal, infinite, nor NaN).
-    if(unlikely(!isnormal(value))) {
-        if(unlikely(!netdata_double_isnumber(value)))
-            return SN_EMPTY_SLOT;
-        else
-            return r;
-    }
+    storage_number r = flags & SN_USER_FLAGS;
+
+    if(unlikely(fpclassify(value) == FP_ZERO || fpclassify(value) == FP_SUBNORMAL))
+        return r;
 
     int m = 0;
     NETDATA_DOUBLE n = value, factor = 10;
@@ -28,13 +25,13 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // if the value is negative
     // add the sign bit and make it positive
     if(n < 0) {
-        r += (1 << 31); // the sign bit 32
+        r += SN_FLAG_NEGATIVE; // the sign bit 32
         n = -n;
     }
 
     if(n / 10000000.0 > 0x00ffffff) {
         factor = 100;
-        r |= SN_EXISTS_100;
+        r |= SN_FLAG_NOT_EXISTS_MUL100;
     }
 
     // make its integer part fit in 0x00ffffff
@@ -46,9 +43,9 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     }
 
     if(m) {
-        // the value was too big and we divided it
-        // so we add a multiplier to unpack it
-        r += (1 << 30) + (m << 27); // the multiplier m
+        // the value was too big, and we divided it
+        // so, we add a multiplier to unpack it
+        r += SN_FLAG_MULTIPLY + (m << 27); // the multiplier m
 
         if(n > (NETDATA_DOUBLE)0x00ffffff) {
             #ifdef NETDATA_INTERNAL_CHECKS
@@ -69,13 +66,13 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
             m++;
         }
 
-        if (unlikely(n > (NETDATA_DOUBLE) (0x00ffffff))) {
+        if (unlikely(n > (NETDATA_DOUBLE)0x00ffffff)) {
             n /= 10;
             m--;
         }
-        // the value was small enough and we multiplied it
-        // so we add a divider to unpack it
-        r += (0 << 30) + (m << 27); // the divider m
+        // the value was small enough, and we multiplied it
+        // so, we add a divider to unpack it
+        r += (m << 27); // the divider m
     }
 
 #ifdef STORAGE_WITH_MATH

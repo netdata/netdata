@@ -192,7 +192,7 @@ STORAGE_POINT rrddim_query_next_metric(struct rrddim_query_handle *handle) {
     h->slot_timestamp += h->dt;
 
     sp.anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
-    sp.flags = (n & SN_ALL_FLAGS);
+    sp.flags = (n & SN_USER_FLAGS);
     sp.min = sp.max = sp.sum = unpack_storage_number(n);
 
     return sp;

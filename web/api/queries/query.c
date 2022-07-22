@@ -826,7 +826,7 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         if(likely((point).value != 0.0))                                \
             (ops).group_points_non_zero++;                              \
                                                                         \
-        if(unlikely((point).flags & SN_EXISTS_RESET))                   \
+        if(unlikely((point).flags & SN_FLAG_RESET))                   \
             (ops).group_value_flags |= RRDR_VALUE_RESET;                \
                                                                         \
         (ops).grouping_add(r, (point).value);                           \

@@ -518,7 +518,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
         case PAGE_METRICS: {
             storage_number n = handle->page[position];
             sp.min = sp.max = sp.sum = unpack_storage_number(n);
-            sp.flags = n & SN_ALL_FLAGS;
+            sp.flags = n & SN_USER_FLAGS;
             sp.count = 1;
             sp.anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
         }
@@ -526,7 +526,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
 
         case PAGE_TIER: {
             tier1_value = ((storage_number_tier1_t *)handle->page)[position];
-            sp.flags = tier1_value.anomaly_count ? 0 : SN_ANOMALY_BIT;
+            sp.flags = tier1_value.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
             sp.count = tier1_value.count;
             sp.anomaly_count = tier1_value.anomaly_count;
             sp.min = tier1_value.min_value;
