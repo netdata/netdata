@@ -1061,33 +1061,10 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // clean up streaming
     stop_streaming_sender(host);
 
-//    rrdpush_sender_thread_stop(host); // stop a possibly running thread
-//    cbuffer_free(host->sender->buffer);
-//    buffer_free(host->sender->build);
-//#ifdef ENABLE_COMPRESSION
-//    if (host->sender->compressor)
-//        host->sender->compressor->destroy(&host->sender->compressor);
-//#endif
-//    freez(host->sender);
-//    host->sender = NULL;
     if (netdata_exit || force)
         stop_streaming_receiver(host);
 
     rrdhost_wrlock(host);   // lock this RRDHOST
-//#ifdef ENABLE_ACLK
-//    struct aclk_database_worker_config *wc =  host->dbsync_worker;
-//    if (wc && !netdata_exit) {
-//        struct aclk_database_cmd cmd;
-//        memset(&cmd, 0, sizeof(cmd));
-//        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
-//        struct aclk_completion compl ;
-//        init_aclk_completion(&compl );
-//        cmd.completion = &compl ;
-//        aclk_database_enq_cmd(wc, &cmd);
-//        wait_for_aclk_completion(&compl );
-//        destroy_aclk_completion(&compl );
-//    }
-//#endif
     // ------------------------------------------------------------------------
     // release its children resources
 
@@ -1146,12 +1123,26 @@ void rrdhost_free(RRDHOST *host, bool force) {
         return;
     }
 
+#ifdef ENABLE_ACLK
+    struct aclk_database_worker_config *wc =  host->dbsync_worker;
+    if (wc && !netdata_exit) {
+        struct aclk_database_cmd cmd;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
+        struct aclk_completion compl ;
+        init_aclk_completion(&compl );
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd(wc, &cmd);
+        wait_for_aclk_completion(&compl );
+        destroy_aclk_completion(&compl );
+    }
+#endif
+
     // ------------------------------------------------------------------------
     // remove it from the indexes
 
     if(rrdhost_index_del(host) != host)
         error("RRDHOST '%s' removed from index, deleted the wrong entry.", host->hostname);
-
 
     // ------------------------------------------------------------------------
     // unlink it from the host
@@ -1168,8 +1159,6 @@ void rrdhost_free(RRDHOST *host, bool force) {
         if(h) h->next = host->next;
         else error("Request to free RRDHOST '%s': cannot find it", host->hostname);
     }
-
-
 
     // ------------------------------------------------------------------------
     // free it
@@ -1189,6 +1178,12 @@ void rrdhost_free(RRDHOST *host, bool force) {
     freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);
     freez(host->rrdpush_send_destination);
+    struct rrdpush_destinations *tmp_destination;
+    while (host->destinations) {
+        tmp_destination = host->destinations->next;
+        freez(host->destinations);
+        host->destinations = tmp_destination;
+    }
     freez(host->health_default_exec);
     freez(host->health_default_recipient);
     freez(host->health_log_filename);
@@ -1203,10 +1198,10 @@ void rrdhost_free(RRDHOST *host, bool force) {
     rrdhost_destroy_rrdcontexts(host);
 
     freez(host);
-//#ifdef ENABLE_ACLK
-//    if (wc)
-//        wc->is_orphan = 0;
-//#endif
+#ifdef ENABLE_ACLK
+    if (wc)
+        wc->is_orphan = 0;
+#endif
     rrd_hosts_available--;
 }
 
