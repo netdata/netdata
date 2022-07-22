@@ -281,6 +281,7 @@ extern void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *u
 extern void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 extern ebpf_filesystem_partitions_t localfs[];
+extern ebpf_sync_syscalls_t local_syscalls[];
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 

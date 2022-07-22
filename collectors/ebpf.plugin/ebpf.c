@@ -257,6 +257,43 @@ ebpf_filesystem_partitions_t localfs[] =
       .addresses = {.function = NULL, .addr = 0},
       .kernels = 0}};
 
+ebpf_sync_syscalls_t local_syscalls[] = {
+    {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+        .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_SYNCFS, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+        .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_MSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+        .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_FSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+        .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_FDATASYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+        .sync_obj = NULL
+#endif
+    },
+    {.syscall = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+        .sync_obj = NULL
+#endif
+    },
+    {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL,
+#ifdef LIBBPF_MAJOR_VERSION
+        .sync_obj = NULL
+#endif
+    }
+};
 
 // Link with apps.plugin
 ebpf_process_stat_t *global_process_stat = NULL;
@@ -318,6 +355,9 @@ static void ebpf_exit(int sig)
  */
 static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
 {
+    if (!probe_links || !objects)
+        return;
+
     struct bpf_program *prog;
     size_t j = 0 ;
     bpf_object__for_each_program(prog, objects) {
@@ -355,15 +395,13 @@ static void ebpf_stop_threads(int sig)
         }
     }
 
-    // Unload common threads
+    //Unload common threads
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         freez(ebpf_threads[i].thread);
-        if (ebpf_modules[i].probe_links) {
-            ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
-        }
+        ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
     }
 
-    //unload filesystem
+    //Unload filesystem
     for (i = 0; localfs[i].filesystem != NULL; i++) {
         ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
     }

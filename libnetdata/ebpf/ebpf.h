@@ -295,6 +295,23 @@ typedef struct ebpf_filesystem_partitions {
     uint64_t kernels;
 } ebpf_filesystem_partitions_t;
 
+typedef struct ebpf_sync_syscalls {
+    char *syscall;
+    int enabled;
+    uint32_t flags;
+
+    // BTF structure
+    struct bpf_object *objects;
+    struct bpf_link **probe_links;
+
+    // BPF structure
+#ifdef LIBBPF_MAJOR_VERSION
+    struct sync_bpf *sync_obj;
+#else
+    void *sync_obj;
+#endif
+} ebpf_sync_syscalls_t;
+
 extern void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
 
 // Tracepoint helpers

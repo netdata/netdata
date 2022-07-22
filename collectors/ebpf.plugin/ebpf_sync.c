@@ -41,44 +41,6 @@ struct config sync_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-ebpf_sync_syscalls_t local_syscalls[] = {
-    {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
-#ifdef LIBBPF_MAJOR_VERSION
-     .sync_obj = NULL
-#endif
-    },
-    {.syscall = NETDATA_SYSCALLS_SYNCFS, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
-#ifdef LIBBPF_MAJOR_VERSION
-     .sync_obj = NULL
-#endif
-    },
-    {.syscall = NETDATA_SYSCALLS_MSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
-#ifdef LIBBPF_MAJOR_VERSION
-     .sync_obj = NULL
-#endif
-    },
-    {.syscall = NETDATA_SYSCALLS_FSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
-#ifdef LIBBPF_MAJOR_VERSION
-     .sync_obj = NULL
-#endif
-    },
-    {.syscall = NETDATA_SYSCALLS_FDATASYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
-#ifdef LIBBPF_MAJOR_VERSION
-     .sync_obj = NULL
-#endif
-    },
-    {.syscall = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
-#ifdef LIBBPF_MAJOR_VERSION
-     .sync_obj = NULL
-#endif
-    },
-    {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL,
-#ifdef LIBBPF_MAJOR_VERSION
-     .sync_obj = NULL
-#endif
-    }
-};
-
 netdata_ebpf_targets_t sync_targets[] = { {.name = NETDATA_SYSCALLS_SYNC, .mode = EBPF_LOAD_TRAMPOLINE},
                                           {.name = NETDATA_SYSCALLS_SYNCFS, .mode = EBPF_LOAD_TRAMPOLINE},
                                           {.name = NETDATA_SYSCALLS_MSYNC, .mode = EBPF_LOAD_TRAMPOLINE},
