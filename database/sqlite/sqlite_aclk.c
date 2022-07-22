@@ -370,11 +370,19 @@ void sql_aclk_sync_init(void)
         rc = sqlite3_exec(db_meta, "SELECT host_id, hostname, registry_hostname, update_every, os, "
            "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "
            "program_version, entries, health_enabled FROM host WHERE hops >0;",
-              create_host_callback, NULL, NULL);
+              create_host_callback, NULL, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
+            sqlite3_free(err_msg);
+        }
     }
 
     rc = sqlite3_exec(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni WHERE "
-        "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, NULL);
+        "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        error_report("SQLite error when starting ACLK sync threads, rc = %d (%s)", rc, err_msg);
+        sqlite3_free(err_msg);
+    }
 #endif
     return;
 }

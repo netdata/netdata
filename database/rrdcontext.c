@@ -1828,7 +1828,8 @@ static bool rrdhost_check_our_claim_id(const char *claim_id) {
 
 static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
     uuid_t uuid;
-    uuid_parse(node_id, uuid);
+    if (uuid_parse(node_id, uuid))
+        return NULL;
 
     RRDHOST *host = NULL;
 
