@@ -43,26 +43,6 @@ enum netdata_filesystem_table {
     NETDATA_ADDR_FS_TABLE
 };
 
-typedef struct ebpf_filesystem_partitions {
-    char *filesystem;
-    char *optional_filesystem;
-    char *family;
-    char *family_name;
-    struct bpf_object *objects;
-    struct bpf_link **probe_links;
-
-    netdata_ebpf_histogram_t hread;
-    netdata_ebpf_histogram_t hwrite;
-    netdata_ebpf_histogram_t hopen;
-    netdata_ebpf_histogram_t hadditional;
-
-    uint32_t flags;
-    uint32_t enabled;
-
-    ebpf_addresses_t addresses;
-    uint64_t kernels;
-} ebpf_filesystem_partitions_t;
-
 extern void *ebpf_filesystem_thread(void *ptr);
 extern struct config fs_config;
 

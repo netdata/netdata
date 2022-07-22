@@ -201,6 +201,62 @@ struct netdata_static_thread ebpf_threads[] = {
                      NULL, NULL, NULL}
 };
 
+ebpf_filesystem_partitions_t localfs[] =
+    {{.filesystem = "ext4",
+      .optional_filesystem = NULL,
+      .family = "ext4",
+      .objects = NULL,
+      .probe_links = NULL,
+      .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
+      .enabled = CONFIG_BOOLEAN_YES,
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
+     {.filesystem = "xfs",
+      .optional_filesystem = NULL,
+      .family = "xfs",
+      .objects = NULL,
+      .probe_links = NULL,
+      .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
+      .enabled = CONFIG_BOOLEAN_YES,
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
+     {.filesystem = "nfs",
+      .optional_filesystem = "nfs4",
+      .family = "nfs",
+      .objects = NULL,
+      .probe_links = NULL,
+      .flags = NETDATA_FILESYSTEM_ATTR_CHARTS,
+      .enabled = CONFIG_BOOLEAN_YES,
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
+     {.filesystem = "zfs",
+      .optional_filesystem = NULL,
+      .family = "zfs",
+      .objects = NULL,
+      .probe_links = NULL,
+      .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
+      .enabled = CONFIG_BOOLEAN_YES,
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
+     {.filesystem = "btrfs",
+      .optional_filesystem = NULL,
+      .family = "btrfs",
+      .objects = NULL,
+      .probe_links = NULL,
+      .flags = NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE,
+      .enabled = CONFIG_BOOLEAN_YES,
+      .addresses = {.function = "btrfs_file_operations", .addr = 0},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10},
+     {.filesystem = NULL,
+      .optional_filesystem = NULL,
+      .family = NULL,
+      .objects = NULL,
+      .probe_links = NULL,
+      .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
+      .enabled = CONFIG_BOOLEAN_YES,
+      .addresses = {.function = NULL, .addr = 0},
+      .kernels = 0}};
+
 
 // Link with apps.plugin
 ebpf_process_stat_t *global_process_stat = NULL;
@@ -255,6 +311,25 @@ static void ebpf_exit(int sig)
 }
 
 /**
+ * Unload loegacy code
+ *
+ * @param objects       objects loaded from eBPF programs
+ * @param probe_links   links from loader
+ */
+static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
+{
+    struct bpf_program *prog;
+    size_t j = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[j]);
+        j++;
+    }
+    freez(probe_links);
+    if (objects)
+        bpf_object__close(objects);
+}
+
+/**
  * Close the collector gracefully
  *
  * @param sig is the signal number used to close the collector
@@ -280,24 +355,20 @@ static void ebpf_stop_threads(int sig)
         }
     }
 
+    // Unload common threads
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         freez(ebpf_threads[i].thread);
         if (ebpf_modules[i].probe_links) {
-            struct bpf_program *prog;
-            struct bpf_object *objects = ebpf_modules[i].objects;
-            struct bpf_link **probe_links = ebpf_modules[i].probe_links;
-            size_t j = 0 ;
-            bpf_object__for_each_program(prog, objects) {
-                bpf_link__destroy(probe_links[j]);
-                j++;
-            }
-            freez(probe_links);
-            if (objects)
-                bpf_object__close(objects);
+            ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
         }
     }
 
-   ebpf_exit(sig);
+    //unload filesystem
+    for (i = 0; localfs[i].filesystem != NULL; i++) {
+        ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+    }
+
+    ebpf_exit(sig);
 }
 
 /*****************************************************************
