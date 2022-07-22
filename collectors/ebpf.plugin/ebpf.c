@@ -275,7 +275,7 @@ static void ebpf_stop_threads(int sig)
         i = 0;
         int j;
         for (j = 0; ebpf_threads[j].name != NULL; j++) {
-            if (ebpf_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
+            if (ebpf_threads[j].enabled != NETDATA_MAIN_THREAD_EXITED)
                 i++;
         }
     }
