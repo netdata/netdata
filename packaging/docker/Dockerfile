@@ -8,8 +8,6 @@ FROM netdata/builder:latest as builder
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
 
-ENV JUDY_VER 1.0.5
-
 ARG CFLAGS
 
 ENV CFLAGS=$CFLAGS

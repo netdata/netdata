@@ -25,7 +25,6 @@ pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
 Then run the following commands to download various dependencies from the FreeBSD repository.
 
 ```sh
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/Judy-1.0.5_3.txz
 pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/json-c-0.15_1.txz
 pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-certifi-2021.10.8.txz
 pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-asn1crypto-1.4.0.txz

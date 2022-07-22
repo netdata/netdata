@@ -665,13 +665,6 @@ declare -A pkg_automake=(
   ['default']="automake"
 )
 
-# required to bundle libJudy
-declare -A pkg_libtool=(
-  ['gentoo']="sys-devel/libtool"
-  ['clearlinux']="c-basic"
-  ['default']="libtool"
-)
-
 # Required to build libwebsockets and libmosquitto on some systems.
 declare -A pkg_cmake=(
   ['gentoo']="dev-util/cmake"
@@ -1112,17 +1105,6 @@ declare -A pkg_openssl=(
   ['default']="openssl-devel"
 )
 
-declare -A pkg_judy=(
-  ['debian']="libjudy-dev"
-  ['ubuntu']="libjudy-dev"
-  ['suse']="judy-devel"
-  ['gentoo']="dev-libs/judy"
-  ['arch']="judy"
-  ['freebsd']="Judy"
-  ['fedora']="Judy-devel"
-  ['default']="NOTREQUIRED"
-)
-
 declare -A pkg_python3=(
   ['gentoo']="dev-lang/python"
   ['sabayon']="dev-lang/python:3.4"
@@ -1289,7 +1271,6 @@ packages() {
   suitable_package autoconf-archive
   require_cmd autogen || suitable_package autogen
   require_cmd automake || suitable_package automake
-  require_cmd libtoolize || suitable_package libtool
   require_cmd pkg-config || suitable_package pkg-config
   require_cmd cmake || suitable_package cmake
 
@@ -1361,7 +1342,6 @@ packages() {
     suitable_package libuv
     suitable_package lz4
     suitable_package openssl
-    suitable_package judy
   fi
 
   # -------------------------------------------------------------------------
@@ -1578,9 +1558,6 @@ validate_tree_centos() {
 
     echo >&2 " > Updating libarchive ..."
     run ${sudo} yum ${opts} install libarchive
-
-    echo >&2 " > Installing Judy-devel directly ..."
-    run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.3.0+757+d382997d.x86_64.rpm
 
   elif [[ "${version}" =~ ^7(\..*)?$ ]]; then
     echo >&2 " > Checking for EPEL ..."

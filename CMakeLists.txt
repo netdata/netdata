@@ -102,20 +102,7 @@ set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBLZ4_INCLUDE_
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
 
-# pkgconfig not working in Ubuntu, why? upstream package broken?
-#pkg_check_modules(JUDY REQUIRED Judy)
-#set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${JUDY_CFLAGS_OTHER})
-#set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${JUDY_LIBRARIES})
-#set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${JUDY_INCLUDE_DIRS})
-set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} "-lJudy")
-set(CMAKE_REQUIRED_LIBRARIES "Judy")
-include(CheckSymbolExists)
-check_symbol_exists("JudyLLast" "Judy.h" HAVE_JUDY)
-IF(HAVE_JUDY)
-    message(STATUS "Judy library found")
-ELSE()
-    message( FATAL_ERROR "libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'." )
-ENDIF()
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} judy)
 
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
@@ -361,6 +348,88 @@ IF(DEFINE_ENABLE_ML MATCHES ".+" AND
 ELSE()
     set(ENABLE_ML False)
 ENDIF()
+
+set(LIBJUDY_SOURCES
+        libnetdata/libjudy/src/Judy.h
+        libnetdata/libjudy/src/JudyCommon/JudyMalloc.c
+        libnetdata/libjudy/src/JudyCommon/JudyPrivate.h
+        libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h
+        libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h
+        libnetdata/libjudy/src/JudyL/JudyL.h
+        libnetdata/libjudy/src/JudyL/JudyLByCount.c
+        libnetdata/libjudy/src/JudyL/JudyLCascade.c
+        libnetdata/libjudy/src/JudyL/JudyLCount.c
+        libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c
+        libnetdata/libjudy/src/JudyL/JudyLDecascade.c
+        libnetdata/libjudy/src/JudyL/JudyLDel.c
+        libnetdata/libjudy/src/JudyL/JudyLFirst.c
+        libnetdata/libjudy/src/JudyL/JudyLFreeArray.c
+        libnetdata/libjudy/src/JudyL/j__udyLGet.c
+        libnetdata/libjudy/src/JudyL/JudyLGet.c
+        libnetdata/libjudy/src/JudyL/JudyLInsArray.c
+        libnetdata/libjudy/src/JudyL/JudyLIns.c
+        libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c
+        libnetdata/libjudy/src/JudyL/JudyLMallocIF.c
+        libnetdata/libjudy/src/JudyL/JudyLMemActive.c
+        libnetdata/libjudy/src/JudyL/JudyLMemUsed.c
+        libnetdata/libjudy/src/JudyL/JudyLNext.c
+        libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
+        libnetdata/libjudy/src/JudyL/JudyLPrev.c
+        libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
+        JudyLTables.c
+        libnetdata/libjudy/src/JudyHS/JudyHS.c)
+
+ADD_LIBRARY(judy STATIC
+             ${LIBJUDY_SOURCES})
+
+ADD_EXECUTABLE(judyltablesgen
+    libnetdata/libjudy/src/JudyL/JudyLTablesGen.c)
+
+target_include_directories(judyltablesgen PUBLIC
+    libnetdata/libjudy/src
+    libnetdata/libjudy/src/JudyCommon)
+
+target_compile_options(judyltablesgen PUBLIC
+    -Wno-format
+    -Wno-format-security)
+
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src)
+
+target_compile_definitions(judyltablesgen PUBLIC
+    JU_64BIT
+    JUDYL)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/JudyLTables.c
+  COMMAND judyltablesgen
+  DEPENDS judyltablesgen
+  )
+
+target_include_directories(judy PUBLIC
+    libnetdata/libjudy/src
+    libnetdata/libjudy/src/JudyCommon)
+
+target_compile_definitions(judy PUBLIC
+    JU_64BIT
+    JUDYL)
+
+target_compile_options(judy PUBLIC
+    -Wno-sign-compare
+    -Wno-implicit-fallthrough)
+
+set(LIBJUDY_PREV_FILES
+        libnetdata/libjudy/src/JudyL/JudyLPrev.c
+        libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c)
+
+set(LIBJUDY_NEXT_FILES
+        libnetdata/libjudy/src/JudyL/JudyLNext.c
+        libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c)
+
+set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYPREV")
+set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
+set_source_files_properties(libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
+set_source_files_properties(libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
+set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src/JudyL")
 
 # -----------------------------------------------------------------------------
 # netdata files

@@ -28,7 +28,6 @@ package_tree="
   dev-libs/libuv
   app-arch/lz4
   dev-libs/openssl
-  dev-libs/judy
   virtual/libelf
   dev-lang/python
   dev-libs/libuv

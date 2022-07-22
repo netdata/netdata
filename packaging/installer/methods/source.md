@@ -32,7 +32,6 @@ Additionally, the following build time features require additional dependencies:
 -   dbengine metric storage:
     -   liblz4 r129 or newer
     -   OpenSSL 1.0 or newer (LibreSSL _amy_ work, but is largely untested).
-    -   [libJudy](http://judy.sourceforge.net/)
 -   Netdata Cloud support:
     -   A working internet connection
     -   A recent version of CMake

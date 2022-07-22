@@ -17,7 +17,7 @@ before_install:
 # Install dependencies for all, once
 #
 install:
-  - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python3-pip
+  - sudo apt-get install -y libuv1-dev liblz4-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python3-pip
   - sudo pip3 install git-semver==0.3.2 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
   - source tests/installer/slack.sh
   - export NOTIF_CHANNEL="automation-beta"

@@ -43,7 +43,6 @@ declare -a package_tree=(
   libuv-devel
   lz4-devel
   openssl-devel
-  Judy-devel
   elfutils-libelf-devel
   git
   pkgconfig

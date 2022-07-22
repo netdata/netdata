@@ -25,7 +25,6 @@ package_tree="
   libuv
   liblz4
   openssl
-  Judy
   python3
   "
 
