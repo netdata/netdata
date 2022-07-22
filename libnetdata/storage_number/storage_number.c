@@ -11,12 +11,16 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // bit 25 SN_ANOMALY_BIT = 0: anomalous, 1: not anomalous
     // bit 24 to bit 1 = the value
 
+    storage_number r = flags & SN_ALL_FLAGS;
+
     // The isnormal() macro shall determine whether its argument value
     // is normal (neither zero, subnormal, infinite, nor NaN).
-    if(unlikely(!isnormal(value)))
-        return SN_EMPTY_SLOT;
-
-    storage_number r = flags & SN_ALL_FLAGS;
+    if(unlikely(!isnormal(value))) {
+        if(!netdata_double_isnumber(value))
+            return SN_EMPTY_SLOT;
+        else
+            return r;
+    }
 
     int m = 0;
     NETDATA_DOUBLE n = value, factor = 10;
