@@ -1900,6 +1900,9 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
     internal_error(true, "RRDCONTEXT: host '%s' enabling streaming of contexts", host->hostname);
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+    char node_str[UUID_STR_LEN];
+    uuid_unparse_lower(*host->node_id, node_str);
+    log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, host->hostname);
 }
 
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
@@ -2683,8 +2686,10 @@ static void rrdcontext_main_cleanup(void *ptr) {
 }
 
 void *rrdcontext_main(void *ptr) {
+    netdata_thread_cleanup_push(rrdcontext_main_cleanup, ptr);
+
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return NULL;
+        goto exit;
 
     worker_register("RRDCONTEXT");
     worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
@@ -2696,7 +2701,6 @@ void *rrdcontext_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanups");
     worker_register_job_name(WORKER_JOB_CLEANUP_DELETE, "deletes");
 
-    netdata_thread_cleanup_push(rrdcontext_main_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = USEC_PER_SEC * RRDCONTEXT_WORKER_THREAD_HEARTBEAT_SECS;
@@ -2816,6 +2820,7 @@ void *rrdcontext_main(void *ptr) {
 
     }
 
+exit:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

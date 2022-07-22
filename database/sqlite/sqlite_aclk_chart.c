@@ -825,6 +825,11 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
     if (!aclk_connected)
         return;
 
+    if (wc->host && rrdhost_flag_check(wc->host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
+        internal_error(true, "Skipping aclk_update_retention for host %s because context streaming is enabled", wc->host->hostname);
+        return;
+    }
+
     char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
