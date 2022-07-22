@@ -16,7 +16,7 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // The isnormal() macro shall determine whether its argument value
     // is normal (neither zero, subnormal, infinite, nor NaN).
     if(unlikely(!isnormal(value))) {
-        if(!netdata_double_isnumber(value))
+        if(unlikely(!netdata_double_isnumber(value)))
             return SN_EMPTY_SLOT;
         else
             return r;
