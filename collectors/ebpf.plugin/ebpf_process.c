@@ -1156,8 +1156,6 @@ static void ebpf_process_cleanup(void *ptr)
         if (objects)
             bpf_object__close(objects);
     }
-
-    freez(cgroup_thread.thread);
 }
 
 /*****************************************************************
