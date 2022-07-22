@@ -1065,6 +1065,10 @@ void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc)
 
 void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
 {
+    RRDHOST *host = rd->rrdset->rrdhost;
+    if (likely(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)))
+        return;
+
     int live = !last_updated;
 
     if (likely(rd->aclk_live_status == live))
@@ -1295,6 +1299,11 @@ void sql_check_chart_liveness(RRDSET *st) {
 // ST is read locked
 int queue_chart_to_aclk(RRDSET *st)
 {
+    RRDHOST *host = st->rrdhost;
+
+    if (likely(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)))
+        return 0;
+
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                        st, ACLK_DATABASE_ADD_CHART);
 }
