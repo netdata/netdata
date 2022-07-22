@@ -11,16 +11,12 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // bit 25 SN_ANOMALY_BIT = 0: anomalous, 1: not anomalous
     // bit 24 to bit 1 = the value
 
-    if (unlikely(flags == SN_EMPTY_SLOT)) {
-        return SN_EMPTY_SLOT;
-    }
-
-    storage_number r = flags & SN_ALL_FLAGS;
-
     // The isnormal() macro shall determine whether its argument value
     // is normal (neither zero, subnormal, infinite, nor NaN).
     if(unlikely(!isnormal(value)))
-        goto RET_SN;
+        return SN_EMPTY_SLOT;
+
+    storage_number r = flags & SN_ALL_FLAGS;
 
     int m = 0;
     NETDATA_DOUBLE n = value, factor = 10;
@@ -55,7 +51,7 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
             error("Number " NETDATA_DOUBLE_FORMAT " is too big.", value);
             #endif
             r += 0x00ffffff;
-            goto RET_SN;
+            return r;
         }
     }
     else {
@@ -85,10 +81,6 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
 #else
     r += (storage_number)n;
 #endif
-
-RET_SN:
-    if (r == SN_EMPTY_SLOT)
-        r = SN_ANOMALOUS_ZERO;
 
     return r;
 }

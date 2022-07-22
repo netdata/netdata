@@ -235,6 +235,43 @@ void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, str
     freez(xt_io_descr);
 }
 
+static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type) {
+    switch(type) {
+        case PAGE_METRICS: {
+            storage_number n = SN_EMPTY_SLOT;
+            storage_number *array = (storage_number *)page;
+            size_t slots = page_length / sizeof(n);
+            for(size_t i = 0; i < slots ; i++)
+                array[i] = n;
+        }
+        break;
+
+        case PAGE_TIER: {
+            storage_number_tier1_t n = {
+                .min_value = SN_EMPTY_SLOT,
+                .max_value = SN_EMPTY_SLOT,
+                .sum_value = SN_EMPTY_SLOT,
+                .count = 1,
+                .anomaly_count = 0,
+            };
+            storage_number_tier1_t *array = (storage_number_tier1_t *)page;
+            size_t slots = page_length / sizeof(n);
+            for(size_t i = 0; i < slots ; i++)
+                array[i] = n;
+        }
+        break;
+
+        default: {
+            static bool logged = false;
+            if(!logged) {
+                error("DBENGINE: cannot fill page with nulls on unknown page type id %d", type);
+                logged = true;
+            }
+            memset(page, 0, page_length);
+        }
+    }
+}
+
 void read_extent_cb(uv_fs_t* req)
 {
     struct rrdengine_worker_config* wc = req->loop->data;
@@ -359,8 +396,7 @@ after_crc_check:
 
         /* care, we don't hold the descriptor mutex */
         if (have_read_error) {
-            /* Applications should make sure NULL values match 0 as does SN_EMPTY_SLOT */
-            memset(page, SN_EMPTY_SLOT, descr->page_length);
+            fill_page_with_nulls(page, descr->page_length, descr->type);
         } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
             (void) memcpy(page, xt_io_descr->buf + payload_offset + page_offset, descr->page_length);
         } else {

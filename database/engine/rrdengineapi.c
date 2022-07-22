@@ -183,7 +183,7 @@ static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
 
     page = descr->pg_cache_descr->page;
     for (i = 0 ; i < descr->page_length / PAGE_POINT_SIZE_BYTES(descr); ++i) {
-        if (SN_EMPTY_SLOT != page[i]) {
+        if (does_storage_number_exist(page[i])) {
             has_only_empty_metrics = 0;
             break;
         }
@@ -222,7 +222,9 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     handle->descr = NULL;
 }
 
-void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
+void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
+                              usec_t point_in_time,
+                              NETDATA_DOUBLE n,
                               NETDATA_DOUBLE min_value,
                               NETDATA_DOUBLE max_value,
                               uint16_t count,
@@ -518,7 +520,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
             sp.min = sp.max = sp.sum = unpack_storage_number(n);
             sp.flags = n & SN_ALL_FLAGS;
             sp.count = 1;
-            sp.anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
+            sp.anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
         }
         break;
 

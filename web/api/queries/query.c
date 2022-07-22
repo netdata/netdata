@@ -579,7 +579,7 @@ QUERY_POINT QUERY_POINT_EMPTY = {
     .start_time = 0,
     .value = NAN,
     .anomaly = 0,
-    .flags = SN_EMPTY_SLOT,
+    .flags = SN_FLAG_NONE,
 #ifdef NETDATA_INTERNAL_CHECKS
     .id = 0,
 #endif
@@ -942,7 +942,7 @@ static inline void rrd2rrdr_do_dimension(
                 }
                 else {
                     new_point.value      = NAN;
-                    new_point.flags      = SN_EMPTY_SLOT;
+                    new_point.flags      = SN_FLAG_NONE;
                 }
             }
 

@@ -1042,7 +1042,7 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
                 NAN,
                 0,
                 0,
-                SN_EMPTY_SLOT);
+                SN_FLAG_NONE);
         }
 
         t->virtual_point.count = 0;
@@ -1207,8 +1207,7 @@ static inline size_t rrdset_done_interpolate(
 
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
-//                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
-                store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
+                store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 continue;
             }
 
@@ -1217,10 +1216,9 @@ static inline size_t rrdset_done_interpolate(
 
                 if (ml_is_anomalous(rd, new_value, true)) {
                     // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
-                    dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
+                    dim_storage_flags &= ~((storage_number)SN_ANOMALY_BIT);
                 }
 
-//                rd->state->collect_ops.store_metric(rd, next_store_ut, new_value, 0, 0, 1, dim_storage_flags, 0);
                 store_metric(rd, next_store_ut, new_value, dim_storage_flags);
                 rd->last_stored_value = new_value;
             }
@@ -1228,19 +1226,16 @@ static inline size_t rrdset_done_interpolate(
                 (void) ml_is_anomalous(rd, 0, false);
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING "
-                          , rd->name
-                          , current_entry
-                );
+                rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rd->name, current_entry);
                 #endif
 
-//                rd->state->collect_ops.store_metric(rd, next_store_ut, NAN, 0, 0, 1, SN_EMPTY_SLOT, 0);
-                store_metric(rd, next_store_ut, NAN, SN_EMPTY_SLOT);
+                store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rd->last_stored_value = NAN;
             }
 
             stored_entries++;
         }
+
         // reset the storage flags for the next point, if any;
         storage_flags = SN_DEFAULT_FLAGS;
 
@@ -1277,7 +1272,7 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
         long current_entry = st->current_entry;
 
         for(c = 0; c < entries && next_store_ut <= now_collect_ut ; next_store_ut += update_every_ut, c++) {
-            rd->db[current_entry] = SN_EMPTY_SLOT;
+            rd->db[current_entry] = pack_storage_number(NAN, SN_FLAG_NONE);
             current_entry = ((current_entry + 1) >= entries) ? 0 : current_entry + 1;
 
             #ifdef NETDATA_INTERNAL_CHECKS
