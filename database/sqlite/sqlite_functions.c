@@ -1998,6 +1998,11 @@ void compute_chart_hash(RRDSET *st)
     unsigned int hash_len;
     char  priority_str[32];
 
+    if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
+        internal_error(true, "Skipping compute_chart_hash for host %s because context streaming is enabled", st->rrdhost->hostname);
+        return;
+    }
+
     sprintf(priority_str, "%ld", st->priority);
 
     evpctx = EVP_MD_CTX_create();
