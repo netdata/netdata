@@ -823,10 +823,10 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
 #define query_add_point_to_group(r, point, ops)                   do {  \
     if(likely(netdata_double_isnumber((point).value))) {                \
-        if(likely((point).value != 0.0))                                \
+        if(likely(fpclassify((point).value) != FP_ZERO))                \
             (ops).group_points_non_zero++;                              \
                                                                         \
-        if(unlikely((point).flags & SN_FLAG_RESET))                   \
+        if(unlikely((point).flags & SN_FLAG_RESET))                     \
             (ops).group_value_flags |= RRDR_VALUE_RESET;                \
                                                                         \
         (ops).grouping_add(r, (point).value);                           \
