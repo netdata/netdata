@@ -177,18 +177,38 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
 /* The page must be populated and referenced */
 static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
 {
-    unsigned i;
-    uint8_t has_only_empty_metrics = 1;
-    storage_number *page;
+    switch(descr->type) {
+        case PAGE_METRICS: {
+            size_t slots = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
+            storage_number *array = (storage_number *)descr->pg_cache_descr->page;
+            for (size_t i = 0 ; i < slots; ++i) {
+                if(does_storage_number_exist(array[i]))
+                    return 0;
+            }
+        }
+        break;
 
-    page = descr->pg_cache_descr->page;
-    for (i = 0 ; i < descr->page_length / PAGE_POINT_SIZE_BYTES(descr); ++i) {
-        if (does_storage_number_exist(page[i])) {
-            has_only_empty_metrics = 0;
-            break;
+        case PAGE_TIER: {
+            size_t slots = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
+            storage_number_tier1_t *array = (storage_number_tier1_t *)descr->pg_cache_descr->page;
+            for (size_t i = 0 ; i < slots; ++i) {
+                if(fpclassify(array[i].sum_value) != FP_NAN)
+                    return 0;
+            }
+        }
+        break;
+
+        default: {
+            static bool logged = false;
+            if(!logged) {
+                error("DBENGINE: cannot check page for nulls on unknown page type id %d", descr->type);
+                logged = true;
+            }
+            return 0;
         }
     }
-    return has_only_empty_metrics;
+
+    return 1;
 }
 
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
