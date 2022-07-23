@@ -1055,10 +1055,12 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
         stats.average_metric_retention_secs = (double)stats.pages_duration_secs / (double)stats.metrics;
 
         if(stats.database_retention_secs) {
-            double metric_coverage = (stats.average_metric_retention_secs * 100.0) / (double)stats.database_retention_secs;
+            double metric_coverage = stats.average_metric_retention_secs / (double)stats.database_retention_secs;
             double db_retention_days = (double)stats.database_retention_secs / 86400.0;
 
-            stats.ephemeral_metrics_per_day_percent = (100.0 - metric_coverage) / db_retention_days;
+            stats.estimated_concurrently_collected_metrics = stats.metrics * metric_coverage;
+
+            stats.ephemeral_metrics_per_day_percent = ((double)stats.metrics * 100.0 / (double)stats.estimated_concurrently_collected_metrics - 100.0) / (double)db_retention_days;
         }
     }
 

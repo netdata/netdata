@@ -114,6 +114,8 @@ typedef struct rrdengine_size_statistics {
     usec_t first_t;
     usec_t last_t;
 
+    size_t estimated_concurrently_collected_metrics;
+
     time_t database_retention_secs;
     double average_compression_savings;
     double average_point_duration_secs;

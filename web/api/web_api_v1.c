@@ -1570,6 +1570,7 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, int tier) {
                    ",\n\t\t\"average_metric_retention_secs\":%0.2f"
                    ",\n\t\t\"ephemeral_metrics_per_day_percent\":%0.2f"
                    ",\n\t\t\"average_page_size_bytes\":%0.2f"
+                   ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
                    , stats.sizeof_metric
                    , stats.sizeof_metric_in_index
                    , stats.sizeof_page
@@ -1598,6 +1599,7 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, int tier) {
                    , stats.average_metric_retention_secs
                    , stats.ephemeral_metrics_per_day_percent
                    , stats.average_page_size_bytes
+                   , stats.estimated_concurrently_collected_metrics
                    );
 }
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
