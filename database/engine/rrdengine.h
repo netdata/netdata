@@ -26,6 +26,8 @@
 
 #endif /* NETDATA_RRD_INTERNALS */
 
+extern unsigned rrdeng_pages_per_extent;
+
 /* Forward declarations */
 struct rrdengine_instance;
 

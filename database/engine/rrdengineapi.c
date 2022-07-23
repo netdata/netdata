@@ -986,53 +986,8 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
     //metalog_prepare_exit(ctx->metalog_ctx);
 }
 
-struct rrdengine_page_type_size_statistics {
-    size_t pages;
-    size_t pages_uncompressed_bytes;
-    time_t pages_duration_secs;
-    size_t points;
-};
-
-struct rrdengine_size_statistics {
-    size_t sizeof_page;
-    size_t sizeof_extent;
-
-    size_t datafiles;
-    size_t extents;
-    size_t extents_pages;
-    size_t points;
-    size_t metrics;
-    size_t metrics_pages;
-
-    size_t extents_compressed_bytes;
-    size_t pages_uncompressed_bytes;
-    time_t pages_duration_secs;
-
-    struct rrdengine_page_type_size_statistics page_types[256];
-
-    usec_t first_t;
-    usec_t last_t;
-
-    time_t database_retention_secs;
-    double average_compression_ratio;
-    double average_point_duration_secs;
-    double average_metric_retention_secs;
-
-    double ephemeral_metrics_per_day_percent;
-
-    double average_page_size_bytes;
-};
-
-#define STRUCT_NATURAL_ALIGNMENT (sizeof(uintptr_t) * 2)
-static inline size_t struct_natural_alignment(size_t size) {
-    if(unlikely(size % STRUCT_NATURAL_ALIGNMENT))
-        size = size + STRUCT_NATURAL_ALIGNMENT - (size % STRUCT_NATURAL_ALIGNMENT);
-
-    return size;
-}
-
-void rrdeng_gather_statistics(struct rrdengine_instance *ctx) {
-    struct rrdengine_size_statistics stats = { 0 };
+RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
+    RRDENG_SIZE_STATS stats = { 0 };
 
     for(struct pg_cache_page_index *page_index = ctx->pg_cache.metrics_index.last_page_index;
         page_index != NULL ;page_index = page_index->prev) {
@@ -1051,9 +1006,15 @@ void rrdeng_gather_statistics(struct rrdengine_instance *ctx) {
                 struct rrdeng_page_descr *descr = ei->pages[p];
 
                 // TODO how to find update_every of a page?
-                usec_t update_every_usec = 1 * USEC_PER_SEC;
+                usec_t update_every_usec = storage_tiers_grouping_iterations[ctx->tier] * USEC_PER_SEC;
 
                 size_t points = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
+
+                if(likely(points > 1))
+                    update_every_usec = (descr->end_time - descr->start_time) / (points - 1);
+                else
+                    stats.single_point_pages++;
+
                 time_t duration_secs = (time_t)((descr->end_time - descr->start_time + update_every_usec)/USEC_PER_SEC);
 
                 stats.extents_pages++;
@@ -1067,10 +1028,10 @@ void rrdeng_gather_statistics(struct rrdengine_instance *ctx) {
                 stats.page_types[descr->type].points += points;
 
                 if(!stats.first_t || (descr->start_time - update_every_usec) < stats.first_t)
-                    stats.first_t = descr->start_time - update_every_usec;
+                    stats.first_t = (descr->start_time - update_every_usec) / USEC_PER_SEC;
 
                 if(!stats.last_t || descr->end_time > stats.last_t)
-                    stats.last_t = descr->end_time;
+                    stats.last_t = descr->end_time / USEC_PER_SEC;
             }
         }
     }
@@ -1079,13 +1040,13 @@ void rrdeng_gather_statistics(struct rrdengine_instance *ctx) {
                    "DBENGINE: metrics pages is %zu, but extents pages is %zu",
                    stats.metrics_pages, stats.extents_pages);
 
-    stats.database_retention_secs = (time_t)((stats.last_t - stats.first_t) / USEC_PER_SEC);
+    stats.database_retention_secs = (time_t)(stats.last_t - stats.first_t);
 
     if(stats.extents_pages)
         stats.average_page_size_bytes = (double)stats.pages_uncompressed_bytes / (double)stats.extents_pages;
 
     if(stats.pages_uncompressed_bytes > 0)
-        stats.average_compression_ratio = (double)stats.extents_compressed_bytes * 100.0 / (double)stats.pages_uncompressed_bytes;
+        stats.average_compression_savings = 100.0 - ((double)stats.extents_compressed_bytes * 100.0 / (double)stats.pages_uncompressed_bytes);
 
     if(stats.points)
         stats.average_point_duration_secs = (double)stats.pages_duration_secs / (double)stats.points;
@@ -1094,18 +1055,29 @@ void rrdeng_gather_statistics(struct rrdengine_instance *ctx) {
         stats.average_metric_retention_secs = (double)stats.pages_duration_secs / (double)stats.metrics;
 
         if(stats.database_retention_secs) {
-            double metric_coverage = stats.average_metric_retention_secs / (double)stats.database_retention_secs;
+            double metric_coverage = (stats.average_metric_retention_secs * 100.0) / (double)stats.database_retention_secs;
             double db_retention_days = (double)stats.database_retention_secs / 86400.0;
 
             stats.ephemeral_metrics_per_day_percent = (100.0 - metric_coverage) / db_retention_days;
         }
     }
 
+    stats.sizeof_metric = struct_natural_alignment(sizeof(struct pg_cache_page_index));
     stats.sizeof_page = struct_natural_alignment(sizeof(struct rrdeng_page_descr));
+    stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
+    stats.sizeof_page_in_cache = struct_natural_alignment(sizeof(struct page_cache_descr));
+    stats.sizeof_point_data = page_type_size[ctx->page_type];
+    stats.sizeof_page_data = RRDENG_BLOCK_SIZE;
+    stats.pages_per_extent = rrdeng_pages_per_extent;
 
     stats.sizeof_extent = sizeof(struct extent_info);
     if(stats.extents)
-        stats.sizeof_extent += sizeof(struct rrdeng_page_descr *) * ((stats.extents_pages / stats.extents) + (stats.extents_pages % stats.extents) ? 1 : 0);
+        stats.sizeof_extent += sizeof(struct rrdeng_page_descr *) * ((stats.extents_pages / stats.extents) + ((stats.extents_pages % stats.extents) ? 1 : 0));
 
     stats.sizeof_extent = struct_natural_alignment(stats.sizeof_extent);
+
+    stats.sizeof_metric_in_index = 40;
+    stats.sizeof_page_in_index = 24;
+
+    return stats;
 }

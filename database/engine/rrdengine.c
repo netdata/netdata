@@ -9,7 +9,7 @@ rrdeng_stats_t rrdeng_reserved_file_descriptors = 0;
 rrdeng_stats_t global_pg_cache_over_half_dirty_events = 0;
 rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
-static unsigned pages_per_extent = MAX_PAGES_PER_EXTENT;
+unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2)
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
@@ -741,7 +741,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
          PValue = JudyLFirst(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue ;
 
-         descr != NULL && count != pages_per_extent ;
+         descr != NULL && count != rrdeng_pages_per_extent;
 
          PValue = JudyLNext(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
@@ -1113,10 +1113,10 @@ static void load_configuration_dynamic(void)
 {
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
-        pages_per_extent = read_num;
+        rrdeng_pages_per_extent = read_num;
     else {
-        error("Invalid dbengine pages per extent %u given. Using %u.", read_num, pages_per_extent);
-        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", pages_per_extent);
+        error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdeng_pages_per_extent);
+        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
     }
 }
 

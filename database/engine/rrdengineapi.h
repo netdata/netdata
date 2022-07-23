@@ -78,4 +78,52 @@ extern void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
 extern int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t, int tier);
 extern int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
 
+typedef struct rrdengine_size_statistics {
+    size_t sizeof_metric;
+    size_t sizeof_metric_in_index;
+    size_t sizeof_page;
+    size_t sizeof_page_in_index;
+    size_t sizeof_extent;
+    size_t sizeof_datafile;
+    size_t sizeof_page_in_cache;
+    size_t sizeof_point_data;
+    size_t sizeof_page_data;
+
+    size_t pages_per_extent;
+
+    size_t datafiles;
+    size_t extents;
+    size_t extents_pages;
+    size_t points;
+    size_t metrics;
+    size_t metrics_pages;
+
+    size_t extents_compressed_bytes;
+    size_t pages_uncompressed_bytes;
+    time_t pages_duration_secs;
+
+    struct {
+        size_t pages;
+        size_t pages_uncompressed_bytes;
+        time_t pages_duration_secs;
+        size_t points;
+    } page_types[256];
+
+    size_t single_point_pages;
+
+    usec_t first_t;
+    usec_t last_t;
+
+    time_t database_retention_secs;
+    double average_compression_savings;
+    double average_point_duration_secs;
+    double average_metric_retention_secs;
+
+    double ephemeral_metrics_per_day_percent;
+
+    double average_page_size_bytes;
+} RRDENG_SIZE_STATS;
+
+extern RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
+
 #endif /* NETDATA_RRDENGINEAPI_H */

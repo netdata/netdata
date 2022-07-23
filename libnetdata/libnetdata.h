@@ -360,6 +360,16 @@ extern char *netdata_configured_host_prefix;
 
 #define RRD_STORAGE_TIERS 5
 
+static inline size_t struct_natural_alignment(size_t size) __attribute__((const));
+
+#define STRUCT_NATURAL_ALIGNMENT (sizeof(uintptr_t) * 2)
+static inline size_t struct_natural_alignment(size_t size) {
+    if(unlikely(size % STRUCT_NATURAL_ALIGNMENT))
+        size = size + STRUCT_NATURAL_ALIGNMENT - (size % STRUCT_NATURAL_ALIGNMENT);
+
+    return size;
+}
+
 # ifdef __cplusplus
 }
 # endif
