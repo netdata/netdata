@@ -630,7 +630,8 @@ void *ebpf_cachestat_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
@@ -1063,7 +1064,8 @@ static void cachestat_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         (void)heartbeat_next(&hb, step);
 
         netdata_apps_integration_flags_t apps = em->apps_charts;

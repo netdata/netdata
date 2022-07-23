@@ -18,7 +18,6 @@ char *ebpf_plugin_dir = PLUGINS_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
 char *ebpf_algorithms[] = {"absolute", "incremental"};
-int close_ebpf_plugin = 0;
 struct config collector_config = { .first_section = NULL,
                                    .last_section = NULL,
                                    .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -329,9 +328,6 @@ char *btf_path = NULL;
  */
 static void ebpf_exit(int sig)
 {
-    if (sig < 0)
-        return;
-
 #ifdef LIBBPF_MAJOR_VERSION
     if (default_btf) {
         btf__free(default_btf);
@@ -381,8 +377,6 @@ static void ebpf_stop_threads(int sig)
         (void)netdata_thread_cancel(*ebpf_threads[i].thread);
     }
 
-    close_ebpf_plugin = 1;
-
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
     while (i && max) {
         max -= step;
@@ -398,7 +392,8 @@ static void ebpf_stop_threads(int sig)
     //Unload common threads
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         freez(ebpf_threads[i].thread);
-        ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
+        if (ebpf_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
+            ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
     }
 
     //Unload filesystem
@@ -2061,14 +2056,13 @@ int main(int argc, char **argv)
         netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
     }
 
-    usec_t step = USEC_PER_SEC;
+    usec_t step = 60 * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while (!close_ebpf_plugin) {
+    //Plugin will be killed when it receives a signal
+    for (;;) {
         (void)heartbeat_next(&hb, step);
     }
-
-    ebpf_exit(-1);
 
     return 0;
 }

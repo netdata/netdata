@@ -643,7 +643,8 @@ void *ebpf_cgroup_update_shm(void *ptr)
 
     usec_t step = 3 * USEC_PER_SEC;
     int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
@@ -1035,7 +1036,8 @@ static void process_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     int update_apps_list = update_apps_every - 1;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
 
@@ -1054,12 +1056,10 @@ static void process_collector(ebpf_module_t *em)
 
             read_hash_global_tables();
 
-            int publish_apps = 0;
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
             pthread_mutex_lock(&collect_data_mutex);
             if (all_pids_count > 0) {
                 if (apps_enabled) {
-                    publish_apps = 1;
                     ebpf_process_update_apps_data();
                 }
 
@@ -1076,7 +1076,7 @@ static void process_collector(ebpf_module_t *em)
                     ebpf_process_send_data(em);
                 }
 
-                if (publish_apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+                if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
                     ebpf_process_send_apps_data(apps_groups_root_target, em);
                 }
 

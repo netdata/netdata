@@ -303,7 +303,8 @@ static void oomkill_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&collect_data_mutex);

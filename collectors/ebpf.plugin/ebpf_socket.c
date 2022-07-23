@@ -1930,7 +1930,8 @@ void *ebpf_socket_read_hash(void *ptr)
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int network_connection = em->optional;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
@@ -2661,7 +2662,8 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     int socket_global_enabled = em->global_charts;
     int network_connection = em->optional;
     int update_every = em->update_every;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         (void)heartbeat_next(&hb, step);
 
         netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;

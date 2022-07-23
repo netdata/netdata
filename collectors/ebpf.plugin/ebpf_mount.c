@@ -297,7 +297,8 @@ void *ebpf_mount_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
@@ -343,7 +344,8 @@ static void mount_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    for (;;) {
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&lock);
