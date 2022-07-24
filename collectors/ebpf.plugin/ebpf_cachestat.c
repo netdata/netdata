@@ -293,7 +293,7 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *
  * @param ptr thread data.
  */
-static void ebpf_cachestat_cleanup(void *ptr)
+static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled)
@@ -304,6 +304,16 @@ static void ebpf_cachestat_cleanup(void *ptr)
     if (ret != 0)
         pthread_exit(NULL);
 
+    return NULL;
+}
+
+/**
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_cachestat_cleanup(void *ptr)
+{
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
@@ -624,6 +634,7 @@ static void read_global_table()
  */
 void *ebpf_cachestat_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -638,6 +649,7 @@ void *ebpf_cachestat_read_hash(void *ptr)
         read_global_table();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1235,7 +1247,7 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_cachestat_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_cachestat_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = cachestat_maps;
