@@ -289,7 +289,9 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *****************************************************************/
 
 /**
- * Clean up the main thread.
+ * Cachestat exit.
+ *
+ * Cancel child and exit.
  *
  * @param ptr thread data.
  */
@@ -304,16 +306,19 @@ static void ebpf_cachestat_exit(void *ptr)
     if (ret != 0)
         pthread_exit(NULL);
 
-    return NULL;
+    return;
 }
 
 /**
- * Clean up the main thread.
+ * Cachestat cleanup
+ *
+ * Clean up allocated addresses.
  *
  * @param ptr thread data.
  */
 static void ebpf_cachestat_cleanup(void *ptr)
 {
+    (void)ptr;
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
