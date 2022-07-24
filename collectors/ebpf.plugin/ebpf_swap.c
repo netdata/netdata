@@ -192,21 +192,31 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  *****************************************************************/
 
 /**
- * Clean up the main thread.
+ * Swap exit
+ *
+ * Cancel thread and exit.
  *
  * @param ptr thread data.
  */
-static void ebpf_swap_cleanup(void *ptr)
+static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled)
         return;
 
-    int ret = netdata_thread_cancel(*swap_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
+    (void)netdata_thread_cancel(*swap_threads.thread);
+}
 
+/**
+ * Swap cleanup
+ *
+ * Clean up allocated memory.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_swap_cleanup(void *ptr)
+{
+    (void)ptr;
     ebpf_cleanup_publish_syscall(swap_publish_aggregated);
 
     freez(swap_vector);
@@ -377,6 +387,7 @@ static void read_global_table()
  */
 void *ebpf_swap_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_swap_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -390,6 +401,7 @@ void *ebpf_swap_read_hash(void *ptr)
         read_global_table();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -821,7 +833,7 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_swap_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_swap_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_swap_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = swap_maps;
