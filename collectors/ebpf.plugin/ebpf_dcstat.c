@@ -261,11 +261,13 @@ void ebpf_dcstat_clean_names()
 }
 
 /**
- * Clean up the main thread.
+ * DCstat exit
+ *
+ * Cancel child and exit.
  *
  * @param ptr thread data.
  */
-static void ebpf_dcstat_cleanup(void *ptr)
+static void ebpf_dcstat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled)
@@ -275,7 +277,16 @@ static void ebpf_dcstat_cleanup(void *ptr)
     // When it fails to cancel the child thread, it is dangerous to clean any data
     if (ret != 0)
         pthread_exit(NULL);
+}
 
+/**
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_dcstat_cleanup(void *ptr)
+{
+    (void)ptr;
     freez(dcstat_vector);
     freez(dcstat_values);
     freez(dcstat_threads.thread);
@@ -507,6 +518,7 @@ static void read_global_table()
  */
 void *ebpf_dcstat_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_dcstat_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -521,6 +533,7 @@ void *ebpf_dcstat_read_hash(void *ptr)
         read_global_table();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1126,7 +1139,7 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_dcstat_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_dcstat_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_dcstat_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = dcstat_maps;
