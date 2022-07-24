@@ -40,22 +40,32 @@ static struct netdata_static_thread mdflush_threads = {"MDFLUSH KERNEL",
                                                     NULL, NULL };
 
 /**
- * Clean up the main thread.
+ * MDflush exit
+ *
+ * Cancel thread and exit.
  *
  * @param ptr thread data.
  */
-static void mdflush_cleanup(void *ptr)
+static void mdflush_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled) {
         return;
     }
 
-    int ret = netdata_thread_cancel(*mdflush_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
+    (void)netdata_thread_cancel(*mdflush_threads.thread);
+}
 
+/**
+ * CLeanup
+ *
+ * Clean allocated memory.
+ *
+ * @param ptr thread data.
+ */
+static void mdflush_cleanup(void *ptr)
+{
+    (void)ptr;
     freez(mdflush_ebpf_vals);
     freez(mdflush_threads.thread);
 }
@@ -157,6 +167,7 @@ static void mdflush_read_count_map()
  */
 static void *mdflush_reader(void *ptr)
 {
+    netdata_thread_cleanup_push(mdflush_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -171,6 +182,7 @@ static void *mdflush_reader(void *ptr)
         mdflush_read_count_map();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -264,7 +276,7 @@ static void mdflush_collector(ebpf_module_t *em)
  */
 void *ebpf_mdflush_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(mdflush_cleanup, ptr);
+    netdata_thread_cleanup_push(mdflush_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = mdflush_maps;
