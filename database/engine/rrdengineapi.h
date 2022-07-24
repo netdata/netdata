@@ -79,11 +79,14 @@ extern int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_ent
 extern int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
 
 typedef struct rrdengine_size_statistics {
+    size_t default_granularity_secs;
+
     size_t sizeof_metric;
     size_t sizeof_metric_in_index;
     size_t sizeof_page;
     size_t sizeof_page_in_index;
     size_t sizeof_extent;
+    size_t sizeof_page_in_extent;
     size_t sizeof_datafile;
     size_t sizeof_page_in_cache;
     size_t sizeof_point_data;

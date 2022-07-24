@@ -1542,11 +1542,13 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, int tier) {
     RRDENG_SIZE_STATS stats = rrdeng_size_statistics(multidb_ctx[tier]);
 
     buffer_sprintf(wb,
-                   "\n\t\t\"sizeof_metric\":%zu"
+                   "\n\t\t\"default_granularity_secs\":%zu"
+                   ",\n\t\t\"sizeof_metric\":%zu"
                    ",\n\t\t\"sizeof_metric_in_index\":%zu"
                    ",\n\t\t\"sizeof_page\":%zu"
                    ",\n\t\t\"sizeof_page_in_index\":%zu"
                    ",\n\t\t\"sizeof_extent\":%zu"
+                   ",\n\t\t\"sizeof_page_in_extent\":%zu"
                    ",\n\t\t\"sizeof_datafile\":%zu"
                    ",\n\t\t\"sizeof_page_in_cache\":%zu"
                    ",\n\t\t\"sizeof_point_data\":%zu"
@@ -1571,11 +1573,13 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, int tier) {
                    ",\n\t\t\"ephemeral_metrics_per_day_percent\":%0.2f"
                    ",\n\t\t\"average_page_size_bytes\":%0.2f"
                    ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
+                   , stats.default_granularity_secs
                    , stats.sizeof_metric
                    , stats.sizeof_metric_in_index
                    , stats.sizeof_page
                    , stats.sizeof_page_in_index
                    , stats.sizeof_extent
+                   , stats.sizeof_page_in_extent
                    , stats.sizeof_datafile
                    , stats.sizeof_page_in_cache
                    , stats.sizeof_point_data

@@ -1073,13 +1073,12 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
     stats.sizeof_extent = sizeof(struct extent_info);
-    if(stats.extents)
-        stats.sizeof_extent += sizeof(struct rrdeng_page_descr *) * ((stats.extents_pages / stats.extents) + ((stats.extents_pages % stats.extents) ? 1 : 0));
-
-    stats.sizeof_extent = struct_natural_alignment(stats.sizeof_extent);
+    stats.sizeof_page_in_extent = sizeof(struct rrdeng_page_descr *);
 
     stats.sizeof_metric_in_index = 40;
     stats.sizeof_page_in_index = 24;
+
+    stats.default_granularity_secs = default_rrd_update_every * get_tier_grouping(ctx->tier);
 
     return stats;
 }
